@@ -4041,7 +4041,8 @@
       "rejected": "The platform refused the request. Check the ad details and the connected account.",
       "upload_failed": "The upload failed. Try again.",
       "no_secret": "The connection has no credentials saved.",
-      "invalid_credential": "The saved credentials are not in the expected format."
+      "invalid_credential": "The saved credentials are not in the expected format.",
+      "account_action_required": "Meta needs you to verify the account in Ads Manager (adsmanager.facebook.com) before ads can be created or changed."
     },
     "exportInvalid": "Check the export details: {reasons}",
     "exportVideoNotReady": "That video is not assembled yet.",
@@ -4267,7 +4268,8 @@
       "kindVideo": "Video",
       "kindImage": "Image",
       "video": "The video",
-      "connectMeta": "Connect with Facebook"
+      "connectMeta": "Connect with Facebook",
+      "platformSaid": "The platform said: {detail}"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",

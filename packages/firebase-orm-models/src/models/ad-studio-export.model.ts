@@ -81,6 +81,10 @@ export class AdStudioExportModel extends BaseModel {
   @Field({ is_required: false })
   public failure_message?: string | null;
 
+  /** The platform's own explanation, written for the person (e.g. Meta's error_user_msg), shown in the Publish step; the raw technical message stays in `failure_message`. */
+  @Field()
+  public failure_detail?: string | null;
+
   @Field({ is_required: true })
   public requested_by!: string;
 

@@ -27,6 +27,7 @@ export interface PublishedAdRow {
   status: 'uploading' | 'done' | 'failed';
   externalUrl: string | null;
   failureCode: string | null;
+  failureDetail?: string | null;
   requestedOn: string;
 }
 
@@ -46,7 +47,7 @@ export interface PublishPanelProps {
   metaConnectHref?: string | null;
 }
 
-const FAILURES = new Set(['auth_failed', 'quota_exceeded', 'rejected', 'upload_failed', 'no_secret', 'invalid_credential']);
+const FAILURES = new Set(['auth_failed', 'quota_exceeded', 'rejected', 'upload_failed', 'no_secret', 'invalid_credential', 'account_action_required']);
 
 /**
  * The stepper's last step: turn a finished creative into a real ad. The person picks an image (an
@@ -71,7 +72,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const [countries, setCountries] = React.useState('IL');
   const [euPolitical, setEuPolitical] = React.useState<'' | 'yes' | 'no'>('');
   const [pending, setPending] = React.useState(false);
-  const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string; href?: string } | null>(null);
+  const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string; href?: string; detail?: string | null } | null>(null);
   const [published, setPublished] = React.useState(props.published);
   React.useEffect(() => setPublished(props.published), [props.published]);
 
@@ -107,7 +108,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         setMessage(
           body.ad.status === 'done'
             ? { tone: 'ok', text: t('publish.done', { destination: t(`publish.destination.${destination}`) }), href: body.ad.externalUrl ?? undefined }
-            : { tone: 'error', text: t(`exportFailure.${body.ad.failureCode && FAILURES.has(body.ad.failureCode) ? body.ad.failureCode : 'upload_failed'}`) },
+            : { tone: 'error', text: t(`exportFailure.${body.ad.failureCode && FAILURES.has(body.ad.failureCode) ? body.ad.failureCode : 'upload_failed'}`), detail: body.ad.failureDetail ?? null },
         );
         router.refresh();
       } else if (body.error === 'export_unavailable' && body.reason) {
@@ -266,6 +267,11 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
       {message ? (
         <p role="status" className={cn('flex flex-wrap items-center gap-2 text-sm', message.tone === 'ok' ? 'text-success' : 'text-destructive')}>
           {message.text}
+          {message.detail ? (
+            <span className="basis-full rounded-lg bg-destructive/5 px-3 py-2 text-xs text-foreground" dir="auto" data-testid="ad-studio-publish-detail">
+              {t('publish.platformSaid', { detail: message.detail })}
+            </span>
+          ) : null}
           {message.href ? (
             <a href={message.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium underline">
               {t('publish.openAd')}
@@ -298,7 +304,9 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                     <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 ) : (
-                  <span className="text-xs text-destructive">{t(`exportFailure.${row.failureCode && FAILURES.has(row.failureCode) ? row.failureCode : 'upload_failed'}`)}</span>
+                  <span className="text-xs text-destructive" dir="auto" title={row.failureDetail ?? undefined}>
+                    {t(`exportFailure.${row.failureCode && FAILURES.has(row.failureCode) ? row.failureCode : 'upload_failed'}`)}
+                  </span>
                 )}
               </li>
             ))}

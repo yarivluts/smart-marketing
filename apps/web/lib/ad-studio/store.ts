@@ -213,6 +213,8 @@ export interface AdStudioExportView {
   status: 'uploading' | 'done' | 'failed';
   externalUrl: string | null;
   failureCode: string | null;
+  /** The platform's own explanation of a failure, when it gave one. */
+  failureDetail: string | null;
   requestedOn: string;
 }
 
@@ -230,6 +232,7 @@ export function toAdStudioExportView(row: AdStudioExportModel): AdStudioExportVi
     status: row.status,
     externalUrl: row.external_url ?? null,
     failureCode: row.failure_code ?? null,
+    failureDetail: row.failure_detail ?? null,
     requestedOn: row.requested_on,
   };
 }
