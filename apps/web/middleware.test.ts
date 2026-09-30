@@ -63,6 +63,13 @@ describe('middleware', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
+  it('lets anyone read the privacy policy without signing in, in every locale (Meta links to it)', () => {
+    intlMiddlewareMock.mockReturnValue(NextResponse.next());
+    for (const path of ['/en/privacy', '/he/privacy']) {
+      expect(middleware(requestFor(path)).headers.get('location')).toBeNull();
+    }
+  });
+
   it('lets an unauthenticated visitor reach the public home page', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en'));
