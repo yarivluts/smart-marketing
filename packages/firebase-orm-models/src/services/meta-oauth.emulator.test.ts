@@ -124,6 +124,21 @@ describe('Connect with Facebook', () => {
     expect((await listAuditLogEntriesForOrg(ctx.orgId, 20)).some((entry) => entry.action === 'meta.reconnected')).toBe(true);
   });
 
+  it('with a business login configuration, keeps the business token as issued (no personal token swap) and records no expiry', async () => {
+    const ctx = await setup();
+    const config = { ...CONFIG, loginConfigId: '999' };
+    const { state, authorizeUrl } = await startMetaOAuth({ organizationId: ctx.orgId, projectId: ctx.projectId, userId: ctx.owner.id, locale: 'en', config });
+    expect(new URL(authorizeUrl).searchParams.get('config_id')).toBe('999');
+    const meta = fakeMeta();
+    await completeMetaOAuth({ state, code: 'c', userId: ctx.owner.id, config, kms, fetchImpl: meta.fetchImpl });
+    expect(meta.calls.filter((call) => call.searchParams.get('grant_type') === 'fb_exchange_token')).toHaveLength(0);
+    // The token the code bought is the one used for the account and Page lookups, and the one stored.
+    expect(meta.calls[1].searchParams.get('access_token')).toBe('short-token');
+    const done = await finishMetaOAuth({ organizationId: ctx.orgId, state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', kms });
+    expect(done.credential.token_expires_on).toBeNull();
+    expect(JSON.parse(await revealSharedCredentialSecret({ organizationId: ctx.orgId, credentialId: done.credential.id, kms })).accessToken).toBe('short-token');
+  });
+
   it('refuses another user, an expired session, a choice Meta did not offer, and reports a failed exchange', async () => {
     const ctx = await setup();
     const other = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: `${unique('x')}@example.com` });
