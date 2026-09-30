@@ -4322,5 +4322,38 @@
       "project_not_found": "That project was not found in this organization.",
       "meta_error": "Facebook refused the connection and said:"
     }
+  },
+  "Privacy": {
+    "title": "Privacy Policy",
+    "updated": "Last updated: September 30, 2026",
+    "intro": "GrowthOS is a growth analytics and advertising platform. This policy explains what data GrowthOS handles - in particular when an organization connects a Facebook (Meta) ad account - and how that data is used, protected and deleted.",
+    "collect": {
+      "title": "What we collect",
+      "body": "The account details you sign in with (name and email). The data your organization sends or connects for analysis, such as events, campaigns and ad results. When an administrator uses \"Connect with Facebook\": an access token issued by Meta, and the ids and names of the ad accounts and Facebook Pages the administrator chooses. We do not collect friends lists, messages or personal posts."
+    },
+    "use": {
+      "title": "How we use it",
+      "body": "Only to provide what your organization uses GrowthOS for: showing growth analytics, and creating and managing the ads a member asks GrowthOS to create. Ads GrowthOS creates on Meta or Google are always created paused, so nothing runs or spends until you turn it on in the platform. We do not sell data and do not use it to advertise ourselves."
+    },
+    "protect": {
+      "title": "How it is protected",
+      "body": "Access tokens and other connection secrets are encrypted before they are stored, with keys kept in Google Cloud Secret Manager, and are decrypted only in memory for the request that needs them. Data is hosted on Google Cloud. Only members of your organization with the right permission can see or use a connection, and changes are recorded in an audit log."
+    },
+    "share": {
+      "title": "Who we share it with",
+      "body": "Only the platforms you connect, and only to do what you asked (for example, sending an ad to Meta's Marketing API or to Google Ads); and the providers that run GrowthOS - Google Cloud for hosting, and Google's Gemini models, which write ad plans and generate images and videos from the brief you give. No one else."
+    },
+    "deletion": {
+      "title": "Keeping and deleting data",
+      "body": "A connection's data is kept while the connection exists. To delete what GrowthOS holds from Facebook, an organization administrator removes the connection's access in GrowthOS (Resource library, then the Meta credential), which deletes the stored token at once; you can also remove GrowthOS in Facebook under Settings, Apps and websites, which revokes its access. Any other data is deleted within 30 days of your organization asking us to delete it."
+    },
+    "contact": {
+      "title": "Contact",
+      "body": "For questions or deletion requests, contact your organization's GrowthOS administrator, or the GrowthOS team through the support page inside the app."
+    },
+    "changes": {
+      "title": "Changes",
+      "body": "When this policy changes, the date at the top of this page changes with it."
+    }
   }
 }
