@@ -53,8 +53,8 @@ export function buildScenePrompt(
   const vocalized = Boolean(scene.pronunciation?.trim()) && voiceover.length > 0;
   const product = clip(oneLine(context.productDescription), PRODUCT_CONTEXT_MAX);
   const narrationLine = !vocalized
-    ? `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}: "${voiceover}". Soft background music under the voice. The narration is audio only.`
-    : `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}, exactly these words and nothing else, pronouncing every word as written${isHebrewLanguage(context.language) ? ' - the Hebrew carries full nikud vowel marks that give the exact pronunciation' : ''}: "${voiceover}". Say each word once, fluently, without repeating or stuttering. Soft background music under the voice. The narration is audio only.`;
+    ? `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}: "${voiceover}". Soft background music under the voice. The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`
+    : `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}, exactly these words and nothing else, pronouncing every word as written${isHebrewLanguage(context.language) ? ' - the Hebrew carries full nikud vowel marks that give the exact pronunciation' : ''}: "${voiceover}". Say each word once, fluently, without repeating or stuttering. Soft background music under the voice. The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`;
   return [
     `[0-${seconds}s] ${oneLine(scene.visualPrompt)}`,
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
