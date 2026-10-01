@@ -16,6 +16,18 @@ const PROVIDER_CODES = new Set(['not_configured', 'provider_billing', 'rate_limi
 const VIDEO_REQUEST_CODES = new Set(['scene_not_found', 'already_generating', 'clip_not_editable', 'invalid_instruction', 'not_ready', 'already_assembling']);
 const ASSEMBLY_CODES = new Set(['ffmpeg_unavailable', 'ffmpeg_failed', 'storage_error']);
 const IMAGE_REQUEST_CODES = new Set(['concept_not_found', 'format_not_in_concept', 'image_not_editable', 'invalid_instruction', 'image_not_ready']);
+const REFERENCE_REQUEST_CODES = new Set([
+  'unsupported_image',
+  'image_too_large',
+  'invalid_url',
+  'capture_not_configured',
+  'illustration_not_configured',
+  'reference_not_ready',
+  'label_required',
+  'label_too_long',
+  'description_too_long',
+  'library_full',
+]);
 
 /** Turns a route's error body into one translated sentence. */
 export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
@@ -29,6 +41,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'assembly_failed' && body.code && ASSEMBLY_CODES.has(body.code)) return t(`assemblyErrors.${body.code}`);
     if (body.error === 'image_request' && body.code && IMAGE_REQUEST_CODES.has(body.code)) return t(`images.requestErrors.${body.code}`);
     if (body.error === 'invalid_concepts') return t('images.errorInvalidConcepts');
+    if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');
     if (body.error === 'invalid_options') return t('autopilot.errorInvalidOptions');
     return t('errorGeneric');

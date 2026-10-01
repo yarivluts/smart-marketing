@@ -3713,7 +3713,12 @@
       "scene_not_whole_seconds": "אורך סצנה {scene} חייב להיות בשניות שלמות.",
       "empty_visual_prompt": "סצנה {scene} צריכה תיאור של מה שהמצלמה מראה.",
       "duplicate_scene_id": "סצנה {scene} כפולה לסצנה אחרת.",
-      "pronunciation_too_long": "ההגייה של סצנה {scene} ארוכה מדי."
+      "pronunciation_too_long": "ההגייה של סצנה {scene} ארוכה מדי.",
+      "too_many_references": "סצנה {scene} יכולה להשתמש בעד 3 תמונות.",
+      "duplicate_reference": "סצנה {scene} משתמשת באותה תמונה פעמיים.",
+      "invalid_reference_use": "בסצנה {scene} יש תמונה בלי שימוש תקין.",
+      "two_first_frames": "סצנה {scene} יכולה להתחיל רק מתמונה אחת.",
+      "unknown_reference": "סצנה {scene} משתמשת בתמונה שלא מוכנה או שכבר לא קיימת."
     },
     "addScene": "הוספת סצנה",
     "saving": "שומר...",
@@ -3783,7 +3788,8 @@
       "image": "תמונה",
       "image_edit": "עריכת תמונה",
       "video_qa": "בדיקת AI לסרטון",
-      "vocalize": "ניקוד הקריינות"
+      "vocalize": "ניקוד הקריינות",
+      "reference_image": "איור לסצנה"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -4308,7 +4314,84 @@
     "pronunciation": "הגייה (עם ניקוד)",
     "pronunciationAuto": "יתווסף אוטומטית בשמירה: אותן מילים עם ניקוד מלא ומספרים כתובים במילים, כדי שקריין ה-AI יקרא נכון.",
     "pronunciationHint": "זה מה שהקריין יקרא. תקנו כאן כל מילה שנוקדה לא נכון.",
-    "pronunciationStale": "הקריינות השתנתה - ההגייה תיווצר מחדש בשמירה."
+    "pronunciationStale": "הקריינות השתנתה - ההגייה תיווצר מחדש בשמירה.",
+    "references": {
+      "title": "מסכים ותמונות לסרטון",
+      "description": "צילומי מסך אמיתיים של האפליקציה, עמודי אינטרנט או איורי AI. צרפו אותם לסצנות ומודל הווידאו יציג את המוצר האמיתי שלכם במקום להמציא אחד.",
+      "unavailable": {
+        "upload": "העלו תמונת PNG או JPEG.",
+        "capture": "צילום עמוד לפי כתובת לא מוגדר בסביבה הזו.",
+        "illustration": "לא הוגדר מודל תמונות בסביבה הזו."
+      },
+      "add": {
+        "upload": "העלאת צילום מסך",
+        "capture": "צילום עמוד",
+        "illustration": "יצירת איור"
+      },
+      "fileLabel": "קובץ תמונה",
+      "fileHint": "PNG או JPEG, עד 8MB. צילום מסך חד ובגודל מלא עובד הכי טוב.",
+      "urlLabel": "כתובת העמוד",
+      "deviceLabel": "מסך",
+      "device": {
+        "desktop": "מחשב",
+        "mobile": "טלפון"
+      },
+      "captureHint": "עמודים ציבוריים בלבד - Google פותח את העמוד, בלי ההתחברות שלכם.",
+      "promptLabel": "מה האיור צריך להראות?",
+      "promptPlaceholder": "טלפון שמציג חוזה חתום עם סימן וי ירוק",
+      "aspectLabel": "צורה",
+      "labelLabel": "שם",
+      "descriptionLabel": "מה רואים בה (נכנס להנחיה של הסרטון)",
+      "descriptionPlaceholder": "לוח הבקרה אחרי שמסמך נחתם",
+      "working": {
+        "upload": "מעלה…",
+        "capture": "מצלם…",
+        "illustration": "מאייר…"
+      },
+      "submit": {
+        "upload": "העלאה",
+        "capture": "צילום",
+        "illustration": "איור"
+      },
+      "cancel": "ביטול",
+      "save": "שמירה",
+      "edit": "עריכה",
+      "delete": "מחיקת התמונה",
+      "confirmDelete": "מחיקה - תוסר גם מהסצנות",
+      "empty": "עדיין אין תמונות. הוסיפו צילום מסך של האפליקציה כדי שהסרטון יציג את המוצר האמיתי.",
+      "status": {
+        "generating": "בעבודה…",
+        "ready": "מוכנה",
+        "failed": "לא הצלחנו ליצור את התמונה"
+      },
+      "source": {
+        "upload": "הועלתה",
+        "screenshot": "עמוד מצולם",
+        "illustration": "איור AI"
+      },
+      "sceneTitle": "תמונות לסצנה הזו",
+      "attach": "צירוף תמונה…",
+      "detach": "הסרה מהסצנה",
+      "useLabel": "איך להשתמש בה",
+      "use": {
+        "screen": "להציג על המסך",
+        "subject": "להציג כמו שהיא",
+        "first_frame": "להתחיל ממנה"
+      },
+      "missing": "תמונה חסרה",
+      "errors": {
+        "unsupported_image": "אפשר להשתמש רק בתמונות PNG ו-JPEG.",
+        "image_too_large": "התמונה גדולה מ-8MB.",
+        "invalid_url": "הזינו כתובת עמוד מלאה שמתחילה ב-http או https.",
+        "capture_not_configured": "צילום עמוד לא מוגדר בסביבה הזו.",
+        "illustration_not_configured": "לא הוגדר מודל תמונות בסביבה הזו.",
+        "reference_not_ready": "התמונה עדיין לא מוכנה.",
+        "label_required": "תנו לתמונה שם.",
+        "label_too_long": "השם ארוך מדי.",
+        "description_too_long": "התיאור ארוך מדי.",
+        "library_full": "למודעה הזו כבר יש את מספר התמונות המרבי. מחקו אחת קודם."
+      }
+    }
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

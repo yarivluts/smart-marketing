@@ -2,16 +2,20 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDown, ArrowUp, Check, Loader2, Plus, Save, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ImagePlus, Loader2, Plus, Save, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 import {
+  AD_STUDIO_MAX_SCENE_REFERENCES,
   AD_STUDIO_MAX_SCENES,
+  AD_STUDIO_REFERENCE_USES,
   AD_STUDIO_SCENE_MAX_SECONDS,
   AD_STUDIO_SCENE_MIN_SECONDS,
   isHebrewLanguage,
   validateAdStudioScenes,
+  type AdStudioReferenceUse,
   type AdStudioScene,
   type AdStudioSceneIssue,
 } from '@growthos/shared';
+import type { AdStudioReferenceView } from '@/lib/ad-studio/engine';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { SceneTimeline } from './scene-timeline';
@@ -28,6 +32,8 @@ export interface ScriptEditorProps {
   aiAvailable: boolean;
   /** The ad language; Hebrew narration gets a pronunciation (nikud) field. */
   language?: string;
+  /** The ad's reference images (app screens, illustrations) a scene can hand to the video model. */
+  references?: AdStudioReferenceView[];
 }
 
 function newScene(): AdStudioScene {
@@ -45,7 +51,7 @@ function issueText(t: ReturnType<typeof useTranslations>, issue: AdStudioSceneIs
  * or proposes a rewrite of one scene that the person keeps or discards - it never overwrites work
  * silently.
  */
-export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generatedByModel, aiAvailable, language = 'en' }: ScriptEditorProps): React.ReactElement {
+export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generatedByModel, aiAvailable, language = 'en', references = [] }: ScriptEditorProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -66,6 +72,19 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
   const issues = validateAdStudioScenes(scenes);
   const dirty = JSON.stringify(scenes) !== savedJson;
   const hebrew = isHebrewLanguage(language);
+  const readyReferences = references.filter((reference) => reference.status === 'ready');
+  const referenceById = new Map(references.map((reference) => [reference.id, reference]));
+
+  function setSceneReferences(scene: AdStudioScene, next: { imageId: string; use: AdStudioReferenceUse }[]): void {
+    setScenes((current) =>
+      current.map((candidate) => {
+        if (candidate.id !== scene.id) return candidate;
+        const { references: _old, ...rest } = candidate;
+        return next.length ? { ...rest, references: next } : rest;
+      }),
+    );
+    setMessage(null);
+  }
   const savedById = React.useMemo(() => new Map((JSON.parse(savedJson) as AdStudioScene[]).map((scene) => [scene.id, scene])), [savedJson]);
 
   /** The narration changed since the save but the pronunciation did not: the server redoes it. */
@@ -306,6 +325,61 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                       {pronunciationStale(scene) ? t('pronunciationStale') : scene.pronunciation?.trim() ? t('pronunciationHint') : t('pronunciationAuto')}
                     </span>
                   </label>
+                ) : null}
+                {readyReferences.length || scene.references?.length ? (
+                  <div className="flex flex-col gap-2" data-testid={`ad-studio-scene-references-${index + 1}`}>
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <ImagePlus className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t('references.sceneTitle')}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(scene.references ?? []).map((attached) => {
+                        const reference = referenceById.get(attached.imageId);
+                        return (
+                          <span key={attached.imageId} className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 py-1 pe-1 ps-1">
+                            {reference?.status === 'ready' ? (
+                              <img src={`${base}/references/${attached.imageId}/media`} alt="" className="h-8 w-12 rounded object-cover" />
+                            ) : null}
+                            <span className="max-w-40 truncate text-xs" dir="auto">
+                              {reference?.label ?? t('references.missing')}
+                            </span>
+                            <select
+                              aria-label={t('references.useLabel')}
+                              value={attached.use}
+                              onChange={(event) => setSceneReferences(scene, (scene.references ?? []).map((entry) => (entry.imageId === attached.imageId ? { ...entry, use: event.target.value as AdStudioReferenceUse } : entry)))}
+                              className="h-7 rounded-md border border-input bg-background px-1 text-xs"
+                            >
+                              {AD_STUDIO_REFERENCE_USES.map((use) => (
+                                <option key={use} value={use}>
+                                  {t(`references.use.${use}`)}
+                                </option>
+                              ))}
+                            </select>
+                            <button type="button" onClick={() => setSceneReferences(scene, (scene.references ?? []).filter((entry) => entry.imageId !== attached.imageId))} className="rounded p-1 hover:bg-muted" aria-label={t('references.detach')}>
+                              <X className="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                      {(scene.references?.length ?? 0) < AD_STUDIO_MAX_SCENE_REFERENCES && readyReferences.some((reference) => !scene.references?.some((entry) => entry.imageId === reference.id)) ? (
+                        <select
+                          aria-label={t('references.attach')}
+                          value=""
+                          onChange={(event) => event.target.value && setSceneReferences(scene, [...(scene.references ?? []), { imageId: event.target.value, use: 'screen' }])}
+                          className="h-8 rounded-lg border border-dashed border-input bg-background px-2 text-xs"
+                        >
+                          <option value="">{t('references.attach')}</option>
+                          {readyReferences
+                            .filter((reference) => !scene.references?.some((entry) => entry.imageId === reference.id))
+                            .map((reference) => (
+                              <option key={reference.id} value={reference.id}>
+                                {reference.label}
+                              </option>
+                            ))}
+                        </select>
+                      ) : null}
+                    </div>
+                  </div>
                 ) : null}
 
                 {rewriting ? (

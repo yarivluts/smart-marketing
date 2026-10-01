@@ -21,13 +21,14 @@ import {
   toAdStudioBriefView,
   getLatestAdStudioRunView,
 } from '@/lib/ad-studio/store';
-import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni, resolveAdStudioImageGenerator, listBriefImages } from '@/lib/ad-studio/engine';
+import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni, resolveAdStudioImageGenerator, listBriefImages, listBriefReferences, resolveAdStudioPageCapture } from '@/lib/ad-studio/engine';
 import { adStudioImageSlots, adStudioStages, currentAssembledVideo, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus, type AdStudioVideoStageProgress } from '@/lib/ad-studio/view';
 import { Link } from '@/i18n/navigation';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard, EmptyState, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec, type VizStatus } from '@/components/viz';
 import { BriefForm } from '@/components/ad-studio/brief-form';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
+import { ReferenceLibrary } from '@/components/ad-studio/reference-library';
 import { VideoStudio } from '@/components/ad-studio/video-studio';
 import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
@@ -102,7 +103,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   const storage = resolveAdStudioMediaStorage().describe();
 
   // The selected ad's clips and assembled videos, and how far its video stage has come.
-  const [clipModels, videoModels, exportRows, exportDestinations, images, latestRun] = selected
+  const [clipModels, videoModels, exportRows, exportDestinations, images, latestRun, references] = selected
     ? await Promise.all([
         listAdStudioClips(orgId, projectId, selected.id),
         listAdStudioVideos(orgId, projectId, selected.id),
@@ -110,8 +111,9 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         resolveAdStudioExportDestinations(orgId, projectId),
         listBriefImages({ organizationId: orgId, projectId, briefId: selected.id }),
         getLatestAdStudioRunView(orgId, projectId, selected.id),
+        listBriefReferences({ organizationId: orgId, projectId, briefId: selected.id }),
       ])
-    : [[], [], [], null, [], null];
+    : [[], [], [], null, [], null, []];
   const exportsView = exportRows.map(toAdStudioExportView);
   const uploadedCount = exportsView.filter((row) => row.status === 'done').length;
   const videoExports = exportsView
@@ -327,6 +329,16 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                 aiAvailable={providers.text !== null}
               />
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <ReferenceLibrary
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  initialReferences={references}
+                  captureAvailable={resolveAdStudioPageCapture() !== null}
+                  illustrationAvailable={imagesAvailable}
+                />
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <ScriptEditor
                   orgId={orgId}
                   projectId={projectId}
@@ -335,6 +347,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   generatedByModel={selected.scriptGeneratedBy?.model ?? null}
                   aiAvailable={providers.text !== null}
                   language={selected.language}
+                  references={references}
                 />
               </div>
               <ImageStudio
