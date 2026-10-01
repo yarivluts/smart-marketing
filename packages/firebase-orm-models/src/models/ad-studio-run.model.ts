@@ -103,4 +103,8 @@ export class AdStudioRunModel extends BaseModel {
 
   @Field({ is_required: false })
   public plan_approved_on?: string | null;
+
+  /** Automatic re-renders this run made per scene because the AI quality check found a major problem. */
+  @Field({ is_required: false })
+  public qa_retries?: Record<string, number> | null;
 }

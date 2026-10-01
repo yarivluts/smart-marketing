@@ -94,50 +94,95 @@ function geminiErrorCode(status: number, message: string): AdStudioProviderError
   return 'provider_error';
 }
 
+/** One Gemini generateContent call that must answer JSON matching `schema`; `media` rides along as inline bytes. */
+async function geminiJson<T>(
+  apiKey: string,
+  fetchImpl: FetchLike,
+  baseUrl: string,
+  model: string,
+  request: AdStudioJsonRequest<T> & { media?: AdStudioMediaInput },
+): Promise<T> {
+  const parts: Record<string, unknown>[] = [];
+  if (request.media) parts.push({ inlineData: { mimeType: request.media.mimeType, data: Buffer.from(request.media.data).toString('base64') } });
+  parts.push({ text: request.user });
+  let response: Response;
+  try {
+    response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: request.system }] },
+        contents: [{ role: 'user', parts }],
+        generationConfig: { responseMimeType: 'application/json', responseJsonSchema: z.toJSONSchema(request.schema) },
+      }),
+    });
+  } catch (error) {
+    throw new AdStudioProviderError('provider_error', error instanceof Error ? error.message : String(error));
+  }
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: { message?: string };
+    promptFeedback?: { blockReason?: string };
+    candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+  };
+  if (!response.ok) {
+    const message = body.error?.message ?? `HTTP ${response.status}`;
+    throw new AdStudioProviderError(geminiErrorCode(response.status, message), message);
+  }
+  const candidate = body.candidates?.[0];
+  if (body.promptFeedback?.blockReason || candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'PROHIBITED_CONTENT') {
+    throw new AdStudioProviderError('refused', `The model declined this request (${body.promptFeedback?.blockReason ?? candidate?.finishReason}).`);
+  }
+  const text = candidate?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new AdStudioProviderError('invalid_output', 'The model did not return JSON.');
+  }
+  const result = request.schema.safeParse(parsed);
+  if (!result.success) throw new AdStudioProviderError('invalid_output', `Output did not match the schema: ${result.error.message}`);
+  return result.data;
+}
+
 export function createGeminiLlm(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE): AdStudioLlm {
   return {
     provider: 'gemini',
     model: AD_STUDIO_GEMINI_TEXT_MODEL,
-    async generateJson<T>({ system, user, schema }: AdStudioJsonRequest<T>): Promise<T> {
-      let response: Response;
-      try {
-        response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models/${AD_STUDIO_GEMINI_TEXT_MODEL}:generateContent`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: system }] },
-            contents: [{ role: 'user', parts: [{ text: user }] }],
-            generationConfig: { responseMimeType: 'application/json', responseJsonSchema: z.toJSONSchema(schema) },
-          }),
-        });
-      } catch (error) {
-        throw new AdStudioProviderError('provider_error', error instanceof Error ? error.message : String(error));
-      }
-      const body = (await response.json().catch(() => ({}))) as {
-        error?: { message?: string };
-        promptFeedback?: { blockReason?: string };
-        candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
-      };
-      if (!response.ok) {
-        const message = body.error?.message ?? `HTTP ${response.status}`;
-        throw new AdStudioProviderError(geminiErrorCode(response.status, message), message);
-      }
-      const candidate = body.candidates?.[0];
-      if (body.promptFeedback?.blockReason || candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'PROHIBITED_CONTENT') {
-        throw new AdStudioProviderError('refused', `The model declined this request (${body.promptFeedback?.blockReason ?? candidate?.finishReason}).`);
-      }
-      const text = candidate?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        throw new AdStudioProviderError('invalid_output', 'The model did not return JSON.');
-      }
-      const result = schema.safeParse(parsed);
-      if (!result.success) throw new AdStudioProviderError('invalid_output', `Output did not match the schema: ${result.error.message}`);
-      return result.data;
-    },
+    generateJson: (request) => geminiJson(apiKey, fetchImpl, baseUrl, AD_STUDIO_GEMINI_TEXT_MODEL, request),
   };
+}
+
+/** A media file sent to a model with a prompt, as raw bytes. */
+export interface AdStudioMediaInput {
+  mimeType: string;
+  data: Uint8Array;
+}
+
+/**
+ * A model that watches and listens: it gets a clip with a prompt and answers JSON. Used for the AI
+ * quality check of rendered clips. Always Gemini, whatever the text model is, because it takes video.
+ */
+export interface AdStudioReviewer {
+  provider: 'gemini';
+  model: string;
+  reviewJson<T>(request: AdStudioJsonRequest<T> & { media: AdStudioMediaInput }): Promise<T>;
+}
+
+export function createGeminiReviewer(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE): AdStudioReviewer {
+  return {
+    provider: 'gemini',
+    model: AD_STUDIO_GEMINI_TEXT_MODEL,
+    reviewJson: (request) => geminiJson(apiKey, fetchImpl, baseUrl, AD_STUDIO_GEMINI_TEXT_MODEL, request),
+  };
+}
+
+/** The reviewer for the quality check: Gemini with GEMINI_API_KEY, else null (the check is then skipped). */
+export function resolveAdStudioReviewer(env: NodeJS.ProcessEnv = process.env): AdStudioReviewer | null {
+  const geminiKey = env.GEMINI_API_KEY?.trim();
+  if (!geminiKey) return null;
+  // The same guarded loopback stand-in the other Gemini models use (emulator runs only).
+  const override = adStudioTestOverride(env, AD_STUDIO_TEST_OMNI_BASE_URL);
+  return createGeminiReviewer(geminiKey, fetch, override && isLoopbackHttpUrl(override) ? override : GEMINI_API_BASE);
 }
 
 /** The configured text model: Claude when ANTHROPIC_API_KEY is set, else Gemini with GEMINI_API_KEY, else null. */

@@ -18,6 +18,7 @@ import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { buildSceneTimeline, currentAssembledVideo, formatElapsed, type AdStudioClipView, type AdStudioVideoView } from '@/lib/ad-studio/view';
 import { useAdStudioErrorMessage, useAdStudioFailureReason, type AdStudioApiError } from './use-ad-studio-error';
+import { ClipQaNote } from './clip-qa-note';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -93,6 +94,8 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
   const { latest: finalVideo, current: finalCurrent } = currentAssembledVideo(videos, plan?.map((entry) => entry.clip.id) ?? null);
   const newestVideo = videos[0] ?? null;
   const generating = clips.some((clip) => clip.status === 'generating');
+  // A scene's current clip waiting for its AI check keeps the page polling too: the status route runs the check.
+  const awaitingCheck = states.some((state) => state.usable?.status === 'ready' && !state.usable.qa);
   const assembling = pending === 'assemble' || newestVideo?.status === 'assembling';
 
   const apply = React.useCallback((listing: Listing) => {
@@ -109,16 +112,16 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
     }
   }, [apply, base]);
 
-  // Poll while anything is generating; the status route also advances each clip.
+  // Poll while anything is generating or waits for its check; the status route also advances each clip.
   React.useEffect(() => {
-    if (!generating) return;
+    if (!generating && !awaitingCheck) return;
     const poll = setInterval(() => void refreshStatus(), POLL_MS);
     const tick = setInterval(() => setNow(new Date()), 1000);
     return () => {
       clearInterval(poll);
       clearInterval(tick);
     };
-  }, [generating, refreshStatus]);
+  }, [generating, awaitingCheck, refreshStatus]);
 
   // When the last clip finishes, refresh the server parts of the page (pipeline stage, usage).
   const wasGenerating = React.useRef(generating);
@@ -289,6 +292,7 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
                     {t('video.failed', { reason: failure.clip(lastFailed.failureReason) })}
                   </p>
                 ) : null}
+                {shownClip && !inFlight ? <ClipQaNote clip={shownClip} /> : null}
                 {state.state === 'out_of_date' ? (
                   <p className="flex items-start gap-1.5 text-xs text-warning" data-testid="ad-studio-out-of-date">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />

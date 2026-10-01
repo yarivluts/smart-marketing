@@ -156,3 +156,33 @@ describe('AdStudioAdminPanel keyword data', () => {
     expect(screen.getByTestId('ad-studio-keyword-data')).toHaveTextContent('Available through Agency MCC');
   });
 });
+
+describe('AdStudioAdminPanel AI quality check', () => {
+  it('saves the check on or off and its retries together with the limits', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ settings: {} }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(
+      <AdStudioAdminPanel
+        orgId="o"
+        projectId="p"
+        canConfigure
+        textModel={null}
+        videoConfigured
+        limits={{ dailyTextGenerations: 50, dailyVideoSeconds: 300, dailyImages: 40 }}
+        videoQa={{ enabled: true, retries: 1 }}
+        usageToday={{ textGenerations: 0, videoSeconds: 0, images: 0 }}
+        recentUsage={[]}
+        keywordData={{ available: false, reason: 'no_google_ads_credential' }}
+      />,
+      { locale: 'en' },
+    );
+    fireEvent.change(screen.getByLabelText('Automatic re-renders per scene'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save limits' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string)).toMatchObject({ videoQa: { enabled: true, retries: 2 } });
+    // Turning the check off disables the retries choice.
+    fireEvent.click(screen.getByLabelText('Check every clip'));
+    expect(screen.getByLabelText('Automatic re-renders per scene')).toBeDisabled();
+    vi.unstubAllGlobals();
+  });
+});

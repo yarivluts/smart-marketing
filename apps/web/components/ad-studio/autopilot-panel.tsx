@@ -28,6 +28,7 @@ export interface AutopilotPanelProps {
 const ADVANCE_GAP_MS = 1500;
 
 const KNOWN_REASONS = new Set([
+  'qa_issues',
   'off',
   'already_done',
   'no_concepts',

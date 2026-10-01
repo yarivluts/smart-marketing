@@ -154,6 +154,12 @@ describe('Ad Studio MCP tools', () => {
 
     const limits = await agent.json<{ daily_images: number }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 });
     expect(limits.daily_images).toBe(0);
+    // The AI quality check of clips: on with one retry by default; a partial change keeps the rest.
+    expect((await agent.json<{ video_qa: unknown }>('get_ad_studio_usage')).video_qa).toEqual({ enabled: true, retries: 1 });
+    const qa = await agent.json<{ video_qa: unknown }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 2 });
+    expect(qa.video_qa).toEqual({ enabled: true, retries: 2 });
+    const badRetries = await agent.call('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 9 });
+    expect((badRetries.content[0] as { text: string }).text).toContain('videoQa.retries must be a whole number from 0 to 2');
     const ideas = await agent.json<{ id: string }[]>('save_ad_image_ideas', { brief_id: ad.id, ideas: [{ id: 'c1', visual_prompt: 'A phone', headline: '', formats: ['square'] }] });
     const overLimit = await agent.call('render_ad_image', { brief_id: ad.id, idea_id: ideas[0].id, format: 'square' });
     expect((overLimit.content[0] as { text: string }).text).toContain('daily Ad Studio limit for images is reached (0 of 0)');

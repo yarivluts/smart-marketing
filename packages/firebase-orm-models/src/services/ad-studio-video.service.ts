@@ -3,6 +3,8 @@ import {
   AdStudioClipModel,
   AdStudioVideoModel,
   type AdStudioClipKind,
+  type AdStudioClipQaIssue,
+  type AdStudioClipQaStatus,
 } from '../models/ad-studio.model';
 
 /**
@@ -144,6 +146,45 @@ export async function markAdStudioClipReady(
 }
 
 /** Marks a clip failed with a reason code. Idempotent; a ready clip stays ready. */
+const QA_CLAIM_MS = 2 * 60 * 1000;
+
+/**
+ * Claims a ready, unchecked clip for the quality check so two polls do not both send it to the
+ * reviewer. Best-effort like the render lease: written, read back, and only the surviving token
+ * proceeds. A claim older than two minutes (a check that died) can be taken over.
+ */
+export async function claimAdStudioClipQa(clip: Pick<AdStudioClipModel, 'id' | 'organization_id' | 'project_id' | 'brief_id'>, now: Date = new Date()): Promise<string | null> {
+  const fresh = await reload(clip);
+  if (fresh.status !== 'ready' || fresh.qa_status) return null;
+  if (fresh.qa_started_on && now.getTime() - new Date(fresh.qa_started_on).getTime() < QA_CLAIM_MS) return null;
+  const token = randomUUID();
+  fresh.qa_token = token;
+  fresh.qa_started_on = now.toISOString();
+  await fresh.save();
+  return (await reload(clip)).qa_token === token ? token : null;
+}
+
+/**
+ * Records the AI quality check of a ready clip. Only a ready clip that has not been checked yet takes a
+ * result, so two callers racing on the same clip keep the first verdict. Returns the clip as stored.
+ */
+export async function recordAdStudioClipQa(
+  clip: Pick<AdStudioClipModel, 'id' | 'organization_id' | 'project_id' | 'brief_id'>,
+  result: { status: AdStudioClipQaStatus; issues: AdStudioClipQaIssue[]; transcript: string | null; model: string | null },
+  now?: Date,
+): Promise<AdStudioClipModel> {
+  const fresh = await reload(clip);
+  if (fresh.status !== 'ready' || fresh.qa_status) return fresh;
+  fresh.qa_status = result.status;
+  fresh.qa_issues = result.issues;
+  fresh.qa_transcript = result.transcript;
+  fresh.qa_model = result.model;
+  fresh.qa_checked_on = nowIso(now);
+  fresh.qa_token = null;
+  await fresh.save();
+  return fresh;
+}
+
 export async function markAdStudioClipFailed(
   clip: Pick<AdStudioClipModel, 'id' | 'organization_id' | 'project_id' | 'brief_id'>,
   reason: string,

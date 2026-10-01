@@ -3780,7 +3780,8 @@
       "video_edit": "Video edit",
       "image_concepts": "Image ideas",
       "image": "Image",
-      "image_edit": "Image edit"
+      "image_edit": "Image edit",
+      "video_qa": "AI video check"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -3845,7 +3846,22 @@
       "sceneSeconds": "{seconds}s",
       "started": "Started. Clips appear here as they finish.",
       "assembled": "The video is assembled.",
-      "renderAllIdle": "Render all scenes"
+      "renderAllIdle": "Render all scenes",
+      "qa": {
+        "checking": "AI check running…",
+        "passed": "AI check passed",
+        "issuesTitle": "{count, plural, one {The AI check found a problem} other {The AI check found # problems}}",
+        "fixHint": "Re-render the scene or change it with an instruction. The autopilot already re-rendered it if retries allowed.",
+        "minorCount": "{count, plural, one {1 small note} other {# small notes}}",
+        "heard": "What the AI heard",
+        "at": "at {seconds}s",
+        "skipped": "AI check off",
+        "error": "The AI check could not run for this clip",
+        "kind": {
+          "audio": "Voice:",
+          "visual": "Picture:"
+        }
+      }
     },
     "clipFailure": {
       "not_configured": "no video model is configured",
@@ -4115,7 +4131,8 @@
         "clips_not_ready": "clips not ready",
         "blocked": "waiting on an earlier step",
         "cancelled": "cancelled",
-        "error": "failed"
+        "error": "failed",
+        "qa_issues": "the AI check still found problems - see the scenes"
       },
       "prepareTitle": "Prepare the plan",
       "prepareDescription": "The AI writes the deep plan, the video script and the image ideas. Nothing is rendered yet: you review and change them below, then confirm.",
@@ -4279,6 +4296,12 @@
       "invalid_output": "the image model returned no usable image",
       "provider_error": "the image model failed",
       "storage_error": "the image could not be saved"
+    },
+    "admin": {
+      "qaTitle": "AI quality check of video clips",
+      "qaDescription": "Gemini watches every rendered clip, compares the narration with the script and looks for embarrassing mistakes. The autopilot re-renders a scene that fails.",
+      "qaEnabled": "Check every clip",
+      "qaRetries": "Automatic re-renders per scene"
     }
   },
   "MetaConnect": {

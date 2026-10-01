@@ -67,6 +67,17 @@ export interface AdStudioClipView {
   instruction: string | null;
   requestedOn: string;
   completedOn: string | null;
+  /** The AI quality check, once it ran; null while the clip renders or waits for it. */
+  qa: AdStudioClipQaView | null;
+}
+
+/** What the AI quality check found in a clip. */
+export interface AdStudioClipQaView {
+  status: 'passed' | 'issues' | 'skipped' | 'error';
+  issues: { kind: 'audio' | 'visual'; severity: 'major' | 'minor'; detail: string; atSeconds: number | null }[];
+  /** What the reviewer heard. */
+  transcript: string | null;
+  checkedOn: string | null;
 }
 
 /** A generated ad image as the page receives it. */

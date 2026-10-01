@@ -539,6 +539,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         storage={storage}
         ffmpegAvailable={ffmpegAvailable}
         limits={{ dailyTextGenerations: settings.dailyTextGenerations, dailyVideoSeconds: settings.dailyVideoSeconds, dailyImages: settings.dailyImages }}
+        videoQa={settings.videoQa}
         usageToday={usageToday}
         recentUsage={recentUsage.map((row) => ({
           id: row.id,

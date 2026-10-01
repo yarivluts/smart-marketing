@@ -32,6 +32,8 @@ export interface AdStudioAdminPanelProps {
   /** Whether ffmpeg runs on this server, which assembling a video needs. */
   ffmpegAvailable?: boolean;
   limits: { dailyTextGenerations: number; dailyVideoSeconds: number; dailyImages: number };
+  /** The AI quality check of rendered clips: on or off, and automatic re-renders per scene. */
+  videoQa?: { enabled: boolean; retries: number };
   usageToday: { textGenerations: number; videoSeconds: number; images: number };
   recentUsage: AdStudioUsageRow[];
 }
@@ -69,6 +71,7 @@ export function AdStudioAdminPanel({
   storage,
   ffmpegAvailable,
   limits,
+  videoQa = { enabled: true, retries: 1 },
   usageToday,
   recentUsage,
 }: AdStudioAdminPanelProps): React.ReactElement {
@@ -78,6 +81,8 @@ export function AdStudioAdminPanel({
   const [text, setText] = React.useState(String(limits.dailyTextGenerations));
   const [video, setVideo] = React.useState(String(limits.dailyVideoSeconds));
   const [imagesLimit, setImagesLimit] = React.useState(String(limits.dailyImages));
+  const [qaEnabled, setQaEnabled] = React.useState(videoQa.enabled);
+  const [qaRetries, setQaRetries] = React.useState(String(videoQa.retries));
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const locale = useLocale();
@@ -94,7 +99,12 @@ export function AdStudioAdminPanel({
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/ad-studio/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyTextGenerations: Number(text), dailyVideoSeconds: Number(video), dailyImages: Number(imagesLimit) }),
+        body: JSON.stringify({
+          dailyTextGenerations: Number(text),
+          dailyVideoSeconds: Number(video),
+          dailyImages: Number(imagesLimit),
+          videoQa: { enabled: qaEnabled, retries: Number(qaRetries) },
+        }),
       });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError;
       if (!response.ok) {
@@ -176,6 +186,26 @@ export function AdStudioAdminPanel({
             {t('dailyImages')}
             <input type="number" min={0} max={500} value={imagesLimit} onChange={(event) => setImagesLimit(event.target.value)} className="h-9 w-32 rounded-lg border border-input bg-background px-2 text-sm" />
           </label>
+          <fieldset className="flex basis-full flex-col gap-2 rounded-lg border border-border p-3" data-testid="ad-studio-qa-settings">
+            <legend className="px-1 text-sm font-semibold">{t('admin.qaTitle')}</legend>
+            <p className="text-xs text-muted-foreground">{t('admin.qaDescription')}</p>
+            <div className="flex flex-wrap items-end gap-4">
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={qaEnabled} onChange={(event) => setQaEnabled(event.target.checked)} />
+                {t('admin.qaEnabled')}
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                {t('admin.qaRetries')}
+                <select value={qaRetries} onChange={(event) => setQaRetries(event.target.value)} disabled={!qaEnabled} className="h-9 w-24 rounded-lg border border-input bg-background px-2 text-sm">
+                  {['0', '1', '2'].map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </fieldset>
           <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
             {t('saveLimits')}

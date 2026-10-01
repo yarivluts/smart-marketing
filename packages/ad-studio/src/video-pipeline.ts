@@ -18,6 +18,7 @@ import {
   createAdStudioClip,
   createAdStudioVideo,
   getAdStudioBrief,
+  getAdStudioSettings,
   listAdStudioClips,
   listAdStudioVideos,
   markAdStudioClipFailed,
@@ -33,7 +34,8 @@ import {
   type AdStudioVideoModel,
 } from '@growthos/firebase-orm-models';
 import { adStudioRuntime, ensureOrm } from './runtime';
-import { AdStudioProviderError, type AdStudioProviderErrorCode } from './llm';
+import { AdStudioProviderError, resolveAdStudioReviewer, type AdStudioProviderErrorCode, type AdStudioReviewer } from './llm';
+import { checkAdStudioClip } from './qa';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioClipView, AdStudioVideoView } from './view';
@@ -78,12 +80,19 @@ export interface AdStudioVideoDeps {
   omni: AdStudioOmni;
   storage: AdStudioMediaStorage;
   runner: FfmpegRunner;
+  /** Watches each ready clip for the AI quality check; absent or null skips the check. */
+  reviewer?: AdStudioReviewer | null;
   now?: () => Date;
 }
 
 /** Media storage and ffmpeg always; the video model only when GEMINI_API_KEY is configured. */
-export function resolveAdStudioVideoDeps(env: NodeJS.ProcessEnv = process.env): { omni: AdStudioOmni | null; storage: AdStudioMediaStorage; runner: FfmpegRunner } {
-  return { omni: resolveAdStudioOmni(env), storage: resolveAdStudioMediaStorage(env), runner: defaultFfmpegRunner(env) };
+export function resolveAdStudioVideoDeps(env: NodeJS.ProcessEnv = process.env): {
+  omni: AdStudioOmni | null;
+  storage: AdStudioMediaStorage;
+  runner: FfmpegRunner;
+  reviewer: AdStudioReviewer | null;
+} {
+  return { omni: resolveAdStudioOmni(env), storage: resolveAdStudioMediaStorage(env), runner: defaultFfmpegRunner(env), reviewer: resolveAdStudioReviewer(env) };
 }
 
 interface BriefContext {
@@ -111,6 +120,14 @@ export function toAdStudioClipView(clip: AdStudioClipModel): AdStudioClipView {
     instruction: clip.kind === 'edit' ? clip.prompt.replace(EDIT_SUFFIX, '') : null,
     requestedOn: clip.requested_on,
     completedOn: clip.completed_on ?? null,
+    qa: clip.qa_status
+      ? {
+          status: clip.qa_status,
+          issues: (clip.qa_issues ?? []).map((issue) => ({ kind: issue.kind, severity: issue.severity, detail: issue.detail, atSeconds: issue.at_seconds ?? null })),
+          transcript: clip.qa_transcript ?? null,
+          checkedOn: clip.qa_checked_on ?? null,
+        }
+      : null,
   };
 }
 
@@ -355,6 +372,7 @@ export async function advanceBriefVideo(ctx: Omit<BriefContext, 'actorId'>, deps
   await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
   await Promise.all(clips.filter((clip) => clip.status === 'generating').map((clip) => advanceClip(ctx, clip, deps)));
+  await checkNextClip(ctx, deps);
   const now = clock(deps);
   const videos = await listAdStudioVideos(ctx.organizationId, ctx.projectId, ctx.briefId);
   await Promise.all(
@@ -363,6 +381,21 @@ export async function advanceBriefVideo(ctx: Omit<BriefContext, 'actorId'>, deps
       .map((video) => markAdStudioVideoFailed(video, 'timed_out', now)),
   );
   return listBriefVideo(ctx);
+}
+
+/**
+ * Runs the AI quality check on at most one ready clip per poll - the current clip of a scene that has
+ * not been checked yet - so a poll stays short and the next poll picks up the next clip.
+ */
+async function checkNextClip(ctx: Omit<BriefContext, 'actorId'>, deps: Pick<AdStudioVideoDeps, 'storage' | 'reviewer' | 'now'>): Promise<void> {
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const states = sceneVideoStates(brief.scenes, clips.map(summary), videoContext(brief));
+  const next = states.map((state) => state.usable?.model).find((clip) => clip && clip.status === 'ready' && !clip.qa_status);
+  if (!next) return;
+  const scene = brief.scenes.find((entry) => entry.id === next.scene_id) ?? null;
+  const settings = await getAdStudioSettings(ctx.organizationId, ctx.projectId);
+  await checkAdStudioClip({ clip: next, scene, language: brief.language, reviewer: deps.reviewer ?? null, storage: deps.storage, enabled: settings.videoQa.enabled, now: clock(deps) });
 }
 
 export async function listBriefVideo(ctx: Omit<BriefContext, 'actorId'>): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {

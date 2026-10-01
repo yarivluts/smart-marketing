@@ -4,6 +4,7 @@ import {
   AdStudioQuotaExceededError,
   getAdStudioBrief,
   getAdStudioRun,
+  getAdStudioSettings,
   listAdStudioClips,
   listAdStudioImages,
   listAdStudioVideos,
@@ -22,8 +23,8 @@ import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './l
 import { planAdStudioBrief } from './planning';
 import { generateAdStudioScript } from './script-generation';
 import { generateAdStudioImageConcepts, renderAdStudioConceptImage, toAdStudioImageView, type AdStudioImageDeps } from './image-pipeline';
-import { advanceBriefVideo, assembleBriefVideo, startRenderAll, toAdStudioClipView, toAdStudioVideoView, type AdStudioVideoDeps } from './video-pipeline';
-import { adStudioImageSlots, currentAssembledVideo, missingImageRenders, type AdStudioRunView } from './view';
+import { advanceBriefVideo, assembleBriefVideo, startRenderAll, startSceneRender, toAdStudioClipView, toAdStudioVideoView, type AdStudioVideoDeps } from './video-pipeline';
+import { adStudioImageSlots, currentAssembledVideo, missingImageRenders, type AdStudioClipView, type AdStudioRunView } from './view';
 
 /**
  * The Ad Studio autopilot: one automated pass from brief to finished creatives - plan, script,
@@ -157,14 +158,14 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
       const context = { format: brief.video_format, language: brief.language };
       let clips = (await listAdStudioClips(ctx.organizationId, ctx.projectId, brief.id)).map(toAdStudioClipView);
       let progress = summarizeVideoProgress(sceneVideoStates(brief.scenes, clips, context), brief.scenes);
-      if (progress.rendered === progress.scenes) return { status: 'done', reason: null, progress: { done: progress.rendered, total: progress.scenes } };
       const omni = deps.video.omni;
+      if (progress.rendered === progress.scenes) return clipsQualityGate(run, brief, ctx, deps, clips);
       if (!omni) return { status: 'failed', reason: 'not_configured', progress: { done: progress.rendered, total: progress.scenes } };
       const videoDeps = { ...deps.video, omni };
       if (progress.generating > 0) {
         clips = (await advanceBriefVideo({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id }, videoDeps)).clips;
         progress = summarizeVideoProgress(sceneVideoStates(brief.scenes, clips, context), brief.scenes);
-        if (progress.rendered === progress.scenes) return { status: 'done', reason: null, progress: { done: progress.rendered, total: progress.scenes } };
+        if (progress.rendered === progress.scenes) return clipsQualityGate(run, brief, ctx, deps, clips);
         if (progress.generating > 0) return { status: 'running', progress: { done: progress.rendered, total: progress.scenes } };
       }
       // Nothing in flight and scenes still missing: render them once per run; a scene that already
@@ -189,6 +190,46 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
     default:
       return { status: 'skipped', reason: 'unknown_step' };
   }
+}
+
+/**
+ * Once every scene has a clip: wait for the AI quality check of each current clip (the status poll
+ * runs one check per call), then re-render a scene whose clip has a major problem, while the project's
+ * retry count allows. Done when every current clip is checked, with reason qa_issues when a problem remains, so
+ * the person sees which scenes to look at - the video is still assembled rather than held forever.
+ */
+async function clipsQualityGate(
+  run: AdStudioRunModel,
+  brief: AdStudioBriefModel,
+  ctx: RunContext,
+  deps: AdStudioAutopilotDeps,
+  clips: AdStudioClipView[],
+): Promise<StepResult> {
+  const context = { format: brief.video_format, language: brief.language };
+  const total = brief.scenes.length;
+  const ids = { organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id };
+  let states = sceneVideoStates(brief.scenes, clips, context);
+  // A scene keeps its older clip as usable while a re-render of it is still in flight: wait for that
+  // render (and its check) instead of finishing on the old clip.
+  if (deps.video.omni && summarizeVideoProgress(states, brief.scenes).generating > 0) {
+    states = sceneVideoStates(brief.scenes, (await advanceBriefVideo(ids, { ...deps.video, omni: deps.video.omni })).clips, context);
+    if (summarizeVideoProgress(states, brief.scenes).generating > 0) return { status: 'running', progress: { done: total - 1, total } };
+  }
+  const unchecked = () => states.filter((state) => state.usable && !state.usable.qa).length;
+  if (unchecked() > 0 && deps.video.omni) {
+    states = sceneVideoStates(brief.scenes, (await advanceBriefVideo(ids, { ...deps.video, omni: deps.video.omni })).clips, context);
+    if (unchecked() > 0) return { status: 'running', progress: { done: total - unchecked(), total } };
+  }
+  const failing = states.filter((state) => state.usable?.qa?.status === 'issues');
+  const settings = await getAdStudioSettings(ctx.organizationId, ctx.projectId);
+  const used = run.qa_retries ?? {};
+  const retry = settings.videoQa.enabled && deps.video.omni ? failing.find((state) => (used[state.sceneId] ?? 0) < settings.videoQa.retries) : undefined;
+  if (retry && deps.video.omni) {
+    run.qa_retries = { ...used, [retry.sceneId]: (used[retry.sceneId] ?? 0) + 1 };
+    await startSceneRender({ ...ctx, briefId: brief.id, sceneId: retry.sceneId }, { ...deps.video, omni: deps.video.omni });
+    return { status: 'running', progress: { done: total - 1, total } };
+  }
+  return { status: 'done', reason: failing.length ? 'qa_issues' : null, progress: { done: total, total } };
 }
 
 /** Steps that render media - the costly part a confirmed plan unlocks. */
