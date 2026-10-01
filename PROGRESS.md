@@ -17,6 +17,29 @@ Template for each entry:
 
 ---
 
+## 2026-10-01 - Ad placement previews, narration editing with nikud in Review, shorter phone layout
+
+- **Last completed:** PR #571, deployed 48a08bc. Yariv asked for these after his phone review.
+  - **Ad previews:**
+    - Every image idea and the final video show tabs for Facebook feed, Instagram feed, Instagram story/Reels and Google display (YouTube for video), with the creative's own copy.
+    - Each placement uses its own image format. A note under the preview says when a placement borrows another image.
+    - Publish has a live preview of the ad being created.
+  - **Narration editing in Review:** changed words are saved with the script and get their nikud redone automatically. A person can still correct a vowel by hand.
+  - **Phone layout, reviewed on a local production build seeded with the real Hebrew EasySign ad:**
+    - Review went from 11,359 to 6,274 px, and Publish from 6,780 to 3,252 px.
+    - Idea fields and image management are folded, and the stats are hidden with an ad open.
+    - The stepper shows step names, Studio settings are folded, and Publish has a compact picker grid.
+  - **QA:** findings come in the ad's language.
+  - **Incident (fixed):**
+    - The first local review build lacked the auth-emulator host, so its signup created one test account in prod Firebase Auth (`review-1790882851422@example.com`). Nothing reached prod Firestore.
+    - The account was deleted at once, and a check confirms no review accounts remain.
+    - Review runs now block every non-local Google/Firebase request.
+    - Lesson: build with `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST` set, as `scripts/e2e-sharded.mjs` does.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** automatic retry of transient Gemini 503 errors. Re-assemble and re-publish the Hebrew EasySign ad if the owner wants.
+- **Waiting on human:** the owner's call on re-publishing, and on the "end-to-end encryption" claim in one Hebrew image idea's copy.
+
 ## 2026-10-01 - Mobile accordion, nikud before every render, ad copy next to every creative (KAN-278)
 
 - **Last completed:**
