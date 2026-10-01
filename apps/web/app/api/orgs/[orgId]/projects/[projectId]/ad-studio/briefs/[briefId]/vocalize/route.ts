@@ -1,0 +1,32 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { requireProjectPermission } from '@/lib/orgs/access';
+import { parseJsonBody } from '@/lib/http/parse-json-body';
+import { adStudioErrorResponse } from '@/lib/ad-studio/http';
+import { resolveAdStudioLlm, vocalizeNarrationText } from '@/lib/ad-studio/engine';
+
+interface RouteParams {
+  params: Promise<{ orgId: string; projectId: string; briefId: string }>;
+}
+
+/**
+ * Returns the nikud for a narration text the person just typed, without saving anything - the
+ * editors' "add nikud" button (KAN-239). Hebrew ads only; one call toward the daily text limit.
+ * Gated on `ai.use`.
+ */
+export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
+  const { orgId, projectId, briefId } = await params;
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ai.use');
+  if (error) return error;
+  const llm = resolveAdStudioLlm();
+  if (!llm) return NextResponse.json({ error: 'provider_failed', code: 'not_configured' }, { status: 503 });
+  const parsed = await parseJsonBody<{ text?: unknown }>(request);
+  if (parsed.error) return parsed.error;
+  const text = typeof parsed.body?.text === 'string' ? parsed.body.text : '';
+  if (!text.trim()) return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  try {
+    const pronunciation = await vocalizeNarrationText({ organizationId: orgId, projectId, briefId, actorId: user.id, llm, text });
+    return NextResponse.json({ pronunciation });
+  } catch (err) {
+    return adStudioErrorResponse(err);
+  }
+}

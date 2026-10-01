@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import {
   buildVocalizePrompt,
+  isHebrewLanguage,
   isUsablePronunciation,
   needsPronunciation,
   reconcilePronunciations,
@@ -15,7 +16,7 @@ import {
   type AdStudioGeneratedBy,
 } from '@growthos/firebase-orm-models';
 import { ensureOrm } from './runtime';
-import type { AdStudioLlm } from './llm';
+import { AdStudioProviderError, type AdStudioLlm } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
 
 /**
@@ -51,6 +52,23 @@ export async function vocalizeAdStudioScenes(
     return { ...scene, pronunciation };
   });
   return { scenes, vocalized };
+}
+
+/**
+ * Vocalizes one narration text on request and returns it without saving (KAN-239): the editors'
+ * "add nikud" button, so a person sees the nikud of the words they just typed and can correct it
+ * before saving. One metered `vocalize` call; refused for an ad that is not in Hebrew.
+ */
+export async function vocalizeNarrationText(ctx: AdStudioCallContext & { briefId: string; text: string }): Promise<string> {
+  await ensureOrm();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const text = ctx.text.replace(/\s+/g, ' ').trim();
+  if (!text || !isHebrewLanguage(brief.language)) throw new AdStudioProviderError('invalid_output', 'Only Hebrew narration is vocalized.');
+  const prompt = buildVocalizePrompt([{ id: 'line', text }]);
+  const result = await meteredCall(ctx, 'vocalize', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioVocalizeSchema }));
+  const pronunciation = result.lines.find((line) => line.id === 'line')?.pronunciation.trim() ?? '';
+  if (!isUsablePronunciation(pronunciation)) throw new AdStudioProviderError('invalid_output', 'The model returned no usable nikud.');
+  return pronunciation;
 }
 
 /**
