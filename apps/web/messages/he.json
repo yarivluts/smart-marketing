@@ -3718,7 +3718,9 @@
       "duplicate_reference": "סצנה {scene} משתמשת באותה תמונה פעמיים.",
       "invalid_reference_use": "בסצנה {scene} יש תמונה בלי שימוש תקין.",
       "two_first_frames": "סצנה {scene} יכולה להתחיל רק מתמונה אחת.",
-      "unknown_reference": "סצנה {scene} משתמשת בתמונה שלא מוכנה או שכבר לא קיימת."
+      "unknown_reference": "סצנה {scene} משתמשת בתמונה שלא מוכנה או שכבר לא קיימת.",
+      "invalid_delivery": "בסצנה {scene} סוג הקריינות לא מוכר.",
+      "speaker_too_long": "בסצנה {scene} התיאור של מי שמדבר ארוך מדי."
     },
     "addScene": "הוספת סצנה",
     "saving": "שומר...",
@@ -4462,6 +4464,42 @@
     "nikud": {
       "add": "הוספת ניקוד",
       "adding": "מנקד…"
+    },
+    "speaker": {
+      "label": "מי אומר את הקריינות",
+      "voiceover": "קריין ברקע",
+      "on_screen": "דמות בסרטון מדברת",
+      "who": "איזו דמות מדברת (לא חובה)",
+      "whoPlaceholder": "למשל: האישה בחולצה הכחולה",
+      "whoHint": "כשיש בצילום כמה אנשים, תארו את מי שצריך לדבר. רק הדמות הזו תזיז את השפתיים.",
+      "voiceoverHint": "הקריין נשמע ולא נראה - אף אחד בצילום לא מדבר.",
+      "badgeVoiceover": "קריין ברקע",
+      "badgeOnScreen": "מדבר/ת על המסך: {who}",
+      "badgeOnScreenAny": "דמות על המסך מדברת"
+    },
+    "voice": {
+      "title": "קול הקריינות",
+      "hint": "קול אחד לכל הסצנות, כדי שכל המודעה תישמע כמו אותו דובר.",
+      "presets": {
+        "auto": "אוטומטי",
+        "woman_warm": "אישה - חם",
+        "woman_energetic": "אישה - אנרגטי",
+        "man_warm": "גבר - חם",
+        "man_deep": "גבר - עמוק",
+        "man_energetic": "גבר - אנרגטי",
+        "custom": "מותאם אישית"
+      },
+      "descriptionLabel": "תארו את הקול (באנגלית עובד הכי טוב)",
+      "descriptionPlaceholder": "למשל: an older man with a slow, warm, slightly raspy voice",
+      "descriptionHint": "גיל, מגדר, קצב וטון. אותו תיאור משמש בכל הסצנות.",
+      "save": "שמירת הקול",
+      "saved": "הקול נשמר. סצנות עם קריינות לא מעודכנות עד שירונדרו מחדש.",
+      "outOfDateNote": "שינוי הקול הופך סצנות עם קריינות ללא מעודכנות.",
+      "errors": {
+        "unknown_voice": "בחרו אחד מהקולות.",
+        "voice_description_required": "תארו את הקול הרצוי.",
+        "voice_description_too_long": "תיאור הקול ארוך מדי."
+      }
     }
   },
   "MetaConnect": {

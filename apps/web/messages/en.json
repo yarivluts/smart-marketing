@@ -3718,7 +3718,9 @@
       "duplicate_reference": "Scene {scene} uses the same image twice.",
       "invalid_reference_use": "Scene {scene} has an image without a valid use.",
       "two_first_frames": "Scene {scene} can start on only one image.",
-      "unknown_reference": "Scene {scene} uses an image that is not ready or no longer exists."
+      "unknown_reference": "Scene {scene} uses an image that is not ready or no longer exists.",
+      "invalid_delivery": "Scene {scene} has an unknown narration type.",
+      "speaker_too_long": "In scene {scene}, the description of who speaks is too long."
     },
     "addScene": "Add scene",
     "saving": "Saving...",
@@ -4462,6 +4464,42 @@
     "nikud": {
       "add": "Add nikud",
       "adding": "Adding nikud…"
+    },
+    "speaker": {
+      "label": "Who says the narration",
+      "voiceover": "Voice-over in the background",
+      "on_screen": "A person in the shot speaks",
+      "who": "Which person speaks (optional)",
+      "whoPlaceholder": "e.g. the woman in the blue shirt",
+      "whoHint": "When the shot has several people, describe the one who should speak. Only that person moves their lips.",
+      "voiceoverHint": "A narrator is heard but never seen - no one in the shot speaks.",
+      "badgeVoiceover": "Voice-over",
+      "badgeOnScreen": "Spoken on screen by {who}",
+      "badgeOnScreenAny": "Spoken on screen"
+    },
+    "voice": {
+      "title": "Narrator voice",
+      "hint": "One voice for every scene, so the whole ad sounds like the same speaker.",
+      "presets": {
+        "auto": "Automatic",
+        "woman_warm": "Woman - warm",
+        "woman_energetic": "Woman - energetic",
+        "man_warm": "Man - warm",
+        "man_deep": "Man - deep",
+        "man_energetic": "Man - energetic",
+        "custom": "Custom"
+      },
+      "descriptionLabel": "Describe the voice (in English works best)",
+      "descriptionPlaceholder": "e.g. an older man with a slow, warm, slightly raspy voice",
+      "descriptionHint": "Age, gender, pace and tone. The same description is used in every scene.",
+      "save": "Save voice",
+      "saved": "Voice saved. Scenes with narration are out of date until rendered again.",
+      "outOfDateNote": "Changing the voice makes scenes with narration out of date.",
+      "errors": {
+        "unknown_voice": "Choose one of the voices.",
+        "voice_description_required": "Describe the voice you want.",
+        "voice_description_too_long": "The voice description is too long."
+      }
     }
   },
   "MetaConnect": {

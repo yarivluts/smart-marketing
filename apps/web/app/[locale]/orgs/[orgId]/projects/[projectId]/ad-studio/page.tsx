@@ -6,6 +6,7 @@ import {
   sceneVideoStates,
   summarizeVideoProgress,
   totalSceneSeconds,
+  voiceDescription,
 } from '@growthos/shared';
 import {
   AlertTriangle,
@@ -193,7 +194,7 @@ export default async function AdStudioPage({
   let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
   let exportableVideo: { id: string; durationSeconds: number } | null = null;
   if (selected) {
-    const context = { format: selected.format, language: selected.language };
+    const context = { format: selected.format, language: selected.language, voice: voiceDescription(selected.voice) };
     const progress = summarizeVideoProgress(
       sceneVideoStates(selected.scenes, clips, context),
       selected.scenes,
@@ -608,6 +609,7 @@ export default async function AdStudioPage({
                     settings.dailyVideoSeconds - usageToday.videoSeconds,
                   )}
                   videoCopy={selected.videoCopy}
+                  voice={selected.voice}
                   advertiser={selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}

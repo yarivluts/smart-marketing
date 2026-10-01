@@ -1,5 +1,5 @@
 import 'server-only';
-import type { AdStudioAdCopy, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
@@ -153,6 +153,8 @@ export interface AdStudioBriefView {
   imageConcepts: AdStudioImageConcept[];
   /** The ad copy next to the assembled video (KAN-278); null until written. */
   videoCopy: AdStudioAdCopy | null;
+  /** The narrator voice of every scene; null lets the video model choose. */
+  voice: AdStudioVoice | null;
   createdOn: string;
   lastChangedOn: string;
 }
@@ -179,6 +181,7 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
       : null,
     imageConcepts: (brief.image_concepts ?? []).map((concept) => ({ ...concept, formats: [...concept.formats], ...(concept.copy ? { copy: { ...concept.copy } } : {}) })),
     videoCopy: brief.video_copy ? { ...brief.video_copy } : null,
+    voice: brief.narrator_voice ? { ...brief.narrator_voice } : null,
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
   };

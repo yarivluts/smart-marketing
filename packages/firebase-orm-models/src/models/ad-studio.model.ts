@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioAdCopy, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -80,6 +80,10 @@ export class AdStudioBriefModel extends BaseModel {
 
   @Field({ is_required: false })
   public image_concepts_generated_by?: AdStudioGeneratedBy | null;
+
+  /** The narrator voice of every scene (a preset or a description); absent lets the video model choose. */
+  @Field({ is_required: false })
+  public narrator_voice?: AdStudioVoice | null;
 
   /** The ad copy that runs next to the assembled video in the feed (KAN-278); absent until written. */
   @Field({ is_required: false })

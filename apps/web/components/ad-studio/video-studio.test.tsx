@@ -14,7 +14,7 @@ const SCENES: AdStudioScene[] = [
   { id: 'a', durationSeconds: 5, visualPrompt: 'A lawyer at a desk', voiceover: '', onScreenText: '' },
   { id: 'b', durationSeconds: 8, visualPrompt: 'A phone showing a signature', voiceover: '', onScreenText: '' },
 ];
-const CONTEXT = { format: 'vertical' as const, language: 'en' };
+const CONTEXT = { format: 'vertical' as const, language: 'en', voice: null };
 const fp = (index: number) => sceneFingerprint(SCENES[index], CONTEXT);
 const BASE = '/api/orgs/o/projects/p/ad-studio/briefs/b1';
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fitAdStudioScenes, speakerFields, validateAdStudioScenes, type AdStudioScene } from './scenes';
 import { buildScenePrompt, sceneFingerprint } from './video';
 
-const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers' };
+const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers', voice: null };
 
 function scene(overrides: Partial<AdStudioScene> = {}): AdStudioScene {
   return { id: 's1', durationSeconds: 5, visualPrompt: 'Two lawyers at a desk', voiceover: 'Sign in seconds.', onScreenText: '', ...overrides };

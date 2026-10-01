@@ -220,6 +220,31 @@ describe('Ad Studio MCP tools', () => {
     expect(cleared.image_ideas[0].copy).toBeNull();
   });
 
+  it('lets an agent set who speaks each scene and the one narrator voice of the ad', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    await json('save_ad_script', {
+      brief_id: ad.id,
+      scenes: [
+        { id: 's1', duration_seconds: 5, visual_prompt: 'Two lawyers at a desk', voiceover: 'Sign fast', delivery: 'on_screen', speaker: '  the woman in blue  ', on_screen_text: '' },
+        { id: 's2', duration_seconds: 5, visual_prompt: 'A phone', voiceover: 'Done', on_screen_text: '' },
+      ],
+    });
+    type Scene = { delivery: string; speaker: string | null };
+    const state = await json<{ scenes: Scene[]; video: { narrator_voice: unknown } }>('get_ad_brief', { brief_id: ad.id });
+    expect(state.scenes.map(({ delivery, speaker }) => ({ delivery, speaker }))).toEqual([
+      { delivery: 'on_screen', speaker: 'the woman in blue' },
+      { delivery: 'voiceover', speaker: null },
+    ]);
+    expect(state.video.narrator_voice).toBeNull();
+
+    expect(await json('set_ad_voice', { brief_id: ad.id, preset: 'man_deep' })).toEqual({ narrator_voice: { preset: 'man_deep', description: null } });
+    expect(await json('set_ad_voice', { brief_id: ad.id, preset: 'custom', description: ' an older   man ' })).toEqual({ narrator_voice: { preset: 'custom', description: 'an older man' } });
+    const bad = await call('set_ad_voice', { brief_id: ad.id, preset: 'custom', description: ' ' });
+    expect((bad.content[0] as { text: string }).text).toBe('Invalid voice: voice_description_required.');
+    expect(await json('set_ad_voice', { brief_id: ad.id, preset: 'none' })).toEqual({ narrator_voice: null });
+  });
+
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {
     const readOnly = await setup(['mcp.read']);
     const refused = await readOnly.call('list_ad_briefs');

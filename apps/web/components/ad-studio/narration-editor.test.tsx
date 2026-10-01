@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import type { AdStudioScene } from '@growthos/shared';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
+import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
 import { NarrationEditor } from './narration-editor';
 
@@ -33,6 +34,22 @@ afterEach(() => {
 });
 
 describe('NarrationEditor', () => {
+  it('saves who says the narration - a named person on screen - and shows it after', async () => {
+    const saved = [{ ...SCENES[0], delivery: 'on_screen' as const, speaker: 'the lawyer' }, SCENES[1]];
+    const fetchMock = vi.fn(async () => json({ brief: { scenes: saved } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const en = enMessages.AdStudio;
+    renderEditor({}, 'en');
+    expect(screen.getByTestId('ad-studio-speaker-badge')).toHaveTextContent(en.speaker.badgeVoiceover);
+    fireEvent.click(screen.getByRole('button', { name: en.narration.edit }));
+    fireEvent.click(screen.getByRole('radio', { name: en.speaker.on_screen }));
+    fireEvent.change(screen.getByPlaceholderText(en.speaker.whoPlaceholder), { target: { value: 'the lawyer' } });
+    fireEvent.click(screen.getByRole('button', { name: en.narration.save }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(body.scenes[0]).toMatchObject({ delivery: 'on_screen', speaker: 'the lawyer' });
+  });
+
   it('shows what the camera shows and what the narrator reads, and saves edited words and description with the whole script', async () => {
     const saved = [{ ...SCENES[0], visualPrompt: 'A desk at night', voiceover: `${PLAIN} ${PLAIN}`, pronunciation: `${VOCALIZED} ${VOCALIZED}` }, SCENES[1]];
     const fetchMock = vi.fn(async () => json({ brief: { scenes: saved } }));
