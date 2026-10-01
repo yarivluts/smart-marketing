@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
+  adCopyIssues,
+  isAdCopyEmpty,
   isAdStudioFormat,
   reconcilePronunciations,
   validateAdStudioImageConcepts,
   validateAdStudioScenes,
+  type AdStudioAdCopy,
+  type AdStudioAdCopyIssueCode,
   type AdStudioBriefInput,
   type AdStudioImageConcept,
   type AdStudioImageConceptIssue,
@@ -67,6 +71,14 @@ export class AdStudioImageConceptsInvalidError extends Error {
   constructor(public readonly issues: AdStudioImageConceptIssue[]) {
     super(`The image concepts break ${issues.length} rule(s): ${issues.map((issue) => issue.code).join(', ')}`);
     this.name = 'AdStudioImageConceptsInvalidError';
+  }
+}
+
+export class AdStudioCopyInvalidError extends Error {
+  /** `target` is "video" or the image idea's id. */
+  constructor(public readonly issues: { code: AdStudioAdCopyIssueCode | 'unknown_concept'; target: string }[]) {
+    super(`The ad copy breaks ${issues.length} rule(s): ${issues.map((issue) => `${issue.code} (${issue.target})`).join(', ')}`);
+    this.name = 'AdStudioCopyInvalidError';
   }
 }
 
@@ -237,12 +249,54 @@ export async function saveAdStudioImageConcepts(params: {
   generatedBy?: AdStudioGeneratedBy | null;
   now?: Date;
 }): Promise<AdStudioBriefModel> {
-  const concepts = params.concepts.map((concept) => ({ ...concept, formats: [...concept.formats] }));
-  const issues = validateAdStudioImageConcepts(concepts);
+  const issues = validateAdStudioImageConcepts(params.concepts);
   if (issues.length) throw new AdStudioImageConceptsInvalidError(issues);
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
-  brief.image_concepts = concepts;
+  // An idea sent without copy keeps the copy it has (the ideas editor does not carry it); copy is
+  // changed or cleared through saveAdStudioCopy (KAN-278).
+  const storedCopy = new Map((brief.image_concepts ?? []).flatMap((concept) => (concept.copy ? [[concept.id, concept.copy] as const] : [])));
+  brief.image_concepts = params.concepts.map((concept) => {
+    const { copy: sent, ...rest } = concept;
+    const copy = sent ?? storedCopy.get(concept.id);
+    return { ...rest, formats: [...concept.formats], ...(copy && !isAdCopyEmpty(copy) ? { copy: { ...copy } } : {}) };
+  });
   brief.image_concepts_generated_by = params.generatedBy ?? null;
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/**
+ * Saves ad copy (KAN-278): the video's and/or some image ideas', by idea id. `null` clears a copy;
+ * a target left out is untouched. Copy never changes how a creative renders, so nothing goes out of date.
+ */
+export async function saveAdStudioCopy(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  videoCopy?: AdStudioAdCopy | null;
+  conceptCopies?: Record<string, AdStudioAdCopy | null>;
+  now?: Date;
+}): Promise<AdStudioBriefModel> {
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  const concepts = brief.image_concepts ?? [];
+  const issues: { code: AdStudioAdCopyIssueCode | 'unknown_concept'; target: string }[] = [];
+  if (params.videoCopy) issues.push(...adCopyIssues(params.videoCopy).map((code) => ({ code, target: 'video' })));
+  for (const [conceptId, copy] of Object.entries(params.conceptCopies ?? {})) {
+    if (!concepts.some((concept) => concept.id === conceptId)) issues.push({ code: 'unknown_concept', target: conceptId });
+    issues.push(...adCopyIssues(copy).map((code) => ({ code, target: conceptId })));
+  }
+  if (issues.length) throw new AdStudioCopyInvalidError(issues);
+  const clean = (copy: AdStudioAdCopy) => ({ headline: copy.headline.replace(/\s+/g, ' ').trim(), primaryText: copy.primaryText.replace(/\s+/g, ' ').trim(), description: copy.description.replace(/\s+/g, ' ').trim() });
+  if (params.videoCopy !== undefined) brief.video_copy = params.videoCopy && !isAdCopyEmpty(params.videoCopy) ? clean(params.videoCopy) : null;
+  if (params.conceptCopies) {
+    brief.image_concepts = concepts.map((concept) => {
+      if (!(concept.id in (params.conceptCopies as object))) return concept;
+      const copy = (params.conceptCopies as Record<string, AdStudioAdCopy | null>)[concept.id];
+      const { copy: _old, ...rest } = concept;
+      return copy && !isAdCopyEmpty(copy) ? { ...rest, copy: clean(copy) } : rest;
+    });
+  }
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;

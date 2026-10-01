@@ -15,6 +15,7 @@ import {
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
+import { AdCopyCard } from './ad-copy-card';
 import { adStudioImageSlots, type AdStudioImageSlot, type AdStudioImageView } from '@/lib/ad-studio/view';
 import { useAdStudioErrorMessage, useAdStudioFailureReason, type AdStudioApiError } from './use-ad-studio-error';
 
@@ -252,6 +253,28 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
               </div>
               {conceptIssues.length ? (
                 <p className="text-xs text-destructive">{conceptIssues.map((issue) => t(`images.issue.${issue.code}`)).join(' · ')}</p>
+              ) : null}
+              {savedConcept ? (
+                <div className="w-full max-w-sm">
+                  <AdCopyCard
+                    orgId={orgId}
+                    projectId={projectId}
+                    briefId={briefId}
+                    copyKey={savedConcept.id}
+                    copy={savedConcept.copy ?? null}
+                    advertiser={briefName}
+                    aiAvailable={textAvailable}
+                    onSaved={(copy) => {
+                      const apply = (list: AdStudioImageConcept[]) => list.map((entry) => (entry.id === savedConcept.id ? { ...entry, ...(copy ? { copy } : { copy: undefined }) } : entry));
+                      setSaved(apply);
+                      setDraft(apply);
+                    }}
+                    media={(() => {
+                      const shownImage = ideasOnly ? null : conceptSlots.map((slot) => slot.selected).find((image) => image?.status === 'ready');
+                      return shownImage ? <img src={`${base}/images/${shownImage.id}/media`} alt={t('images.imageAlt', { index: index + 1, format: t(`images.format.${shownImage.format}`) })} className="max-h-80 w-full object-contain" /> : undefined;
+                    })()}
+                  />
+                </div>
               ) : null}
 
               {ideasOnly ? null : savedConcept ? (

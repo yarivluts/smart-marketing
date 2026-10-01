@@ -3789,7 +3789,8 @@
       "image_edit": "עריכת תמונה",
       "video_qa": "בדיקת AI לסרטון",
       "vocalize": "ניקוד הקריינות",
-      "reference_image": "איור לסצנה"
+      "reference_image": "איור לסצנה",
+      "ad_copy": "טקסט מודעה"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -4221,7 +4222,10 @@
         "headline_too_long": "הכותרת ארוכה מדי.",
         "no_formats": "בחרו לפחות מיקום אחד.",
         "unknown_format": "מיקום לא מוכר.",
-        "duplicate_concept_id": "רעיון כפול."
+        "duplicate_concept_id": "רעיון כפול.",
+        "copy_headline_too_long": "הכותרת ארוכה מ-30 תווים.",
+        "copy_primary_text_too_long": "הטקסט הראשי ארוך מ-90 תווים.",
+        "copy_description_too_long": "התיאור ארוך מ-90 תווים."
       },
       "requestErrors": {
         "concept_not_found": "הרעיון הזה כבר לא שמור.",
@@ -4387,7 +4391,27 @@
         "library_full": "למודעה הזו כבר יש את מספר התמונות המרבי. מחקו אחת קודם."
       }
     },
-    "sceneHasIssues": "{count, plural, one {בעיה אחת} other {# בעיות}}"
+    "sceneHasIssues": "{count, plural, one {בעיה אחת} other {# בעיות}}",
+    "copy": {
+      "sponsored": "ממומן",
+      "missingPrimary": "עדיין אין טקסט למודעה - בלעדיו התמונה לא מעבירה את המסר.",
+      "missingHeadline": "עדיין אין כותרת",
+      "cta": "למידע נוסף",
+      "headline": "כותרת",
+      "primaryText": "טקסט ראשי (מעל התמונה)",
+      "description": "תיאור (מתחת לכותרת)",
+      "save": "שמירת הטקסט",
+      "cancel": "ביטול",
+      "edit": "עריכת הטקסט",
+      "write": "כתיבת הטקסט עם AI",
+      "rewrite": "כתיבה מחדש עם AI",
+      "errorInvalid": "הטקסט של המודעה ארוך מדי לפלטפורמות.",
+      "issue": {
+        "copy_headline_too_long": "הכותרת ארוכה מ-30 תווים.",
+        "copy_primary_text_too_long": "הטקסט הראשי ארוך מ-90 תווים.",
+        "copy_description_too_long": "התיאור ארוך מ-90 תווים."
+      }
+    }
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

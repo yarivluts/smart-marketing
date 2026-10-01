@@ -12,6 +12,7 @@ import {
   sceneVideoStates,
   spokenNarration,
   summarizeVideoProgress,
+  type AdStudioAdCopy,
   type AdStudioFormat,
   type AdStudioScene,
   type AdStudioSceneVideoState,
@@ -22,6 +23,7 @@ import { buildSceneTimeline, currentAssembledVideo, formatElapsed, type AdStudio
 import { useAdStudioErrorMessage, useAdStudioFailureReason, type AdStudioApiError } from './use-ad-studio-error';
 import { ClipQaNote } from './clip-qa-note';
 import { MobileAccordionItem } from './mobile-accordion';
+import { AdCopyCard } from './ad-copy-card';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -31,6 +33,12 @@ export interface VideoStudioProps {
   scenes: AdStudioScene[];
   format: AdStudioFormat;
   language: string;
+  /** The ad copy that runs next to the video (KAN-278). */
+  videoCopy?: AdStudioAdCopy | null;
+  /** The name over the ad in the preview. */
+  advertiser?: string;
+  /** A text model is configured, so the AI can write the copy. */
+  textAvailable?: boolean;
   initialClips: AdStudioClipView[];
   initialVideos: AdStudioVideoView[];
   /** False when no video model is configured for the deployment. */
@@ -66,7 +74,7 @@ type Listing = { clips?: AdStudioClipView[]; videos?: AdStudioVideoView[] };
  * status route, which also moves each clip along. Clips are made from the saved script, so a
  * scene edited after its clip was made shows as out of date.
  */
-export function VideoStudio({ orgId, projectId, briefId, scenes, format, language, initialClips, initialVideos, videoAvailable, videoSecondsLeft }: VideoStudioProps): React.ReactElement {
+export function VideoStudio({ orgId, projectId, briefId, scenes, format, language, initialClips, initialVideos, videoAvailable, videoSecondsLeft, videoCopy = null, advertiser = '', textAvailable = false }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
   // Formatted in the browser only, in the viewer's own time zone, so server and client markup agree.
@@ -462,6 +470,16 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
         ) : null}
         {finalVideo ? (
           <div className="flex flex-col items-center gap-2">
+            <div className={cn('w-full', format === 'vertical' ? 'max-w-xs' : 'max-w-2xl')}>
+              <AdCopyCard
+                orgId={orgId}
+                projectId={projectId}
+                briefId={briefId}
+                copyKey="video"
+                copy={videoCopy}
+                advertiser={advertiser}
+                aiAvailable={textAvailable}
+                media={
             <video
               key={finalVideo.id}
               src={`${base}/videos/${finalVideo.id}/media`}
@@ -472,6 +490,9 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
               aria-label={t('video.finalTitle')}
               data-testid="ad-studio-final-player"
             />
+                }
+              />
+            </div>
             <p className="text-xs text-muted-foreground tabular-nums" data-testid="ad-studio-final-meta">
               {t('video.finalMeta', {
                 seconds: Math.round(finalVideo.durationSeconds * 10) / 10,
@@ -486,7 +507,12 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{t('video.noFinal')}</p>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">{t('video.noFinal')}</p>
+            <div className="w-full max-w-md">
+              <AdCopyCard orgId={orgId} projectId={projectId} briefId={briefId} copyKey="video" copy={videoCopy} advertiser={advertiser} aiAvailable={textAvailable} />
+            </div>
+          </div>
         )}
       </div>
 

@@ -32,6 +32,7 @@ import {
 import { ensureOrm, getServerKmsProvider } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
+import { AdCopySchema } from './copy-writing';
 import { resolveAdStudioImageGenerator, type AdStudioGeneratedImage, type AdStudioImageGenerator } from './gemini-image';
 import { adStudioImageObjectPath, readAdStudioObject, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioImageView } from './view';
@@ -91,6 +92,7 @@ const GeneratedConceptsSchema = z.object({
       visualPrompt: z.string().describe('What the picture shows, in English, for an image model. No text in the picture here.'),
       headline: z.string().describe('The only text drawn into the image, in the ad language, at most 40 characters, or empty.'),
       formats: z.array(z.string()).describe('Placements this idea suits: square, portrait, story, landscape.'),
+      copy: AdCopySchema.optional().describe('The ad text that runs next to this idea in the feed, in the ad language.'),
     }),
   ),
 });

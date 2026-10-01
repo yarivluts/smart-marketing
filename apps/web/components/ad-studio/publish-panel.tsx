@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
+import type { AdStudioAdCopy } from '@growthos/shared';
 import { CheckCircle2, ExternalLink, Film, ImageIcon, Loader2, Megaphone } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -17,6 +18,8 @@ export interface PublishCreative {
   label: string;
   /** Media route for a preview (image) or poster-less video. */
   previewSrc: string;
+  /** The creative's own ad copy (KAN-278); the form starts from it when the creative is picked. */
+  copy?: AdStudioAdCopy | null;
 }
 
 export interface PublishedAdRow {
@@ -61,11 +64,12 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
   const [selected, setSelected] = React.useState(creatives[0]?.key ?? '');
+  const firstCopy = creatives[0]?.copy ?? null;
   const [destination, setDestination] = React.useState<Destination>('meta');
   const [campaignName, setCampaignName] = React.useState(briefName);
-  const [headline, setHeadline] = React.useState(briefName.slice(0, 30));
-  const [primaryText, setPrimaryText] = React.useState(props.defaultPrimaryText.slice(0, 90));
-  const [description, setDescription] = React.useState('');
+  const [headline, setHeadline] = React.useState(firstCopy?.headline || briefName.slice(0, 30));
+  const [primaryText, setPrimaryText] = React.useState(firstCopy?.primaryText || props.defaultPrimaryText.slice(0, 90));
+  const [description, setDescription] = React.useState(firstCopy?.description ?? '');
   const [linkUrl, setLinkUrl] = React.useState(props.defaultLink);
   const [businessName, setBusinessName] = React.useState('');
   const [dailyBudget, setDailyBudget] = React.useState('20');
@@ -77,6 +81,15 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   React.useEffect(() => setPublished(props.published), [props.published]);
 
   const creative = creatives.find((entry) => entry.key === selected) ?? null;
+
+  /** Picking a creative brings its own words into the form; one without copy keeps what is typed. */
+  function choose(entry: PublishCreative): void {
+    setSelected(entry.key);
+    if (!entry.copy) return;
+    setHeadline(entry.copy.headline);
+    setPrimaryText(entry.copy.primaryText);
+    setDescription(entry.copy.description);
+  }
   const googleBlocked = destination === 'google_ads' && creative?.kind === 'video';
   const missingEu = destination === 'google_ads' && euPolitical === '';
 
@@ -149,7 +162,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
               className={cn('flex cursor-pointer flex-col gap-2 rounded-xl border p-2 text-xs', selected === entry.key ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/40')}
               data-testid={`ad-studio-publish-creative-${entry.key}`}
             >
-              <input type="radio" name="publish-creative" value={entry.key} checked={selected === entry.key} onChange={() => setSelected(entry.key)} className="sr-only" />
+              <input type="radio" name="publish-creative" value={entry.key} checked={selected === entry.key} onChange={() => choose(entry)} className="sr-only" />
               <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted">
                 {entry.kind === 'image' ? (
                   // A plain img: private media served by our own authenticated route.

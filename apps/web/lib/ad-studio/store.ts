@@ -1,5 +1,5 @@
 import 'server-only';
-import type { AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
@@ -151,6 +151,8 @@ export interface AdStudioBriefView {
   planSources: AdStudioPlanSources | null;
   planGeneratedBy: { provider: string; model: string; generatedAt: string } | null;
   imageConcepts: AdStudioImageConcept[];
+  /** The ad copy next to the assembled video (KAN-278); null until written. */
+  videoCopy: AdStudioAdCopy | null;
   createdOn: string;
   lastChangedOn: string;
 }
@@ -175,7 +177,8 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
     planGeneratedBy: brief.plan_generated_by
       ? { provider: brief.plan_generated_by.provider, model: brief.plan_generated_by.model, generatedAt: brief.plan_generated_by.generated_at }
       : null,
-    imageConcepts: (brief.image_concepts ?? []).map((concept) => ({ ...concept, formats: [...concept.formats] })),
+    imageConcepts: (brief.image_concepts ?? []).map((concept) => ({ ...concept, formats: [...concept.formats], ...(concept.copy ? { copy: { ...concept.copy } } : {}) })),
+    videoCopy: brief.video_copy ? { ...brief.video_copy } : null,
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
   };
