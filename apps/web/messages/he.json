@@ -3868,8 +3868,17 @@
         "kind": {
           "audio": "קול:",
           "visual": "תמונה:"
+        },
+        "short": {
+          "passed": "בדיקת AI עברה",
+          "issues": "בדיקת AI מצאה בעיות",
+          "skipped": "לא נבדק",
+          "error": "הבדיקה נכשלה"
         }
-      }
+      },
+      "narration": "קריינות",
+      "narrationVocalized": "מה שהקריין קורא (עם ניקוד)",
+      "narrationWillVocalize": "הניקוד יתווסף אוטומטית כשהסצנה תרונדר."
     },
     "clipFailure": {
       "not_configured": "לא הוגדר מודל וידאו",
@@ -4377,7 +4386,8 @@
         "description_too_long": "התיאור ארוך מדי.",
         "library_full": "למודעה הזו כבר יש את מספר התמונות המרבי. מחקו אחת קודם."
       }
-    }
+    },
+    "sceneHasIssues": "{count, plural, one {בעיה אחת} other {# בעיות}}"
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

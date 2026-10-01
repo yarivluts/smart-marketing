@@ -181,3 +181,37 @@ describe('VideoStudio', () => {
     expect(screen.getByTestId('ad-studio-video-progress')).toHaveTextContent(heMessages.AdStudio.video.progress.replace('{rendered}', '0').replace('{total}', '2'));
   });
 });
+
+describe('VideoStudio narration and the phone layout', () => {
+  // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
+  const plain = '\u05e9\u05dc\u05d5\u05dd';
+  const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
+
+  it('shows what the narrator reads, with nikud once it is there, and says nikud is added on render until then', () => {
+    const scenes: AdStudioScene[] = [
+      { ...SCENES[0], voiceover: plain, pronunciation: vocalized },
+      { ...SCENES[1], voiceover: plain },
+    ];
+    renderStudio({ scenes, language: 'he' }, 'he');
+    const [first, second] = screen.getAllByTestId('ad-studio-scene-narration');
+    expect(first).toHaveTextContent(heMessages.AdStudio.video.narrationVocalized);
+    expect(within(first).getByText(vocalized)).toHaveAttribute('lang', 'he');
+    expect(second).toHaveTextContent(heMessages.AdStudio.video.narration);
+    expect(second).toHaveTextContent(heMessages.AdStudio.video.narrationWillVocalize);
+  });
+
+  it('is an accordion on phones: the first scene open, the others one header line until tapped', () => {
+    renderStudio();
+    const first = screen.getByTestId('ad-studio-video-scene-1');
+    const second = screen.getByTestId('ad-studio-video-scene-2');
+    expect(first).toHaveAttribute('data-open', 'true');
+    expect(second).toHaveAttribute('data-open', 'false');
+    const toggle = screen.getByTestId('ad-studio-video-scene-2-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Collapsed bodies are hidden below the md breakpoint only; desktop always shows them.
+    expect(document.getElementById(toggle.getAttribute('aria-controls') as string)).toHaveClass('max-md:hidden');
+    fireEvent.click(toggle);
+    expect(second).toHaveAttribute('data-open', 'true');
+    expect(document.getElementById(toggle.getAttribute('aria-controls') as string)).not.toHaveClass('max-md:hidden');
+  });
+});
