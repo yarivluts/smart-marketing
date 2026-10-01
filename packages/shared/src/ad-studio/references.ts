@@ -90,9 +90,15 @@ function oneLine(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-/** The prompt lines that tell the video model how to use each attached image. */
+/**
+ * The prompt lines that tell the video model how to use each attached image. With a screen attached,
+ * a closing line makes the attached screens the only ones allowed: on prod (2026-10-01) a scene whose
+ * description also asked for "a mobile chat application" got the attached signing screen right and
+ * an invented chat screen full of garbled Hebrew for the rest.
+ */
 export function referencePromptLines(references: readonly AdStudioPromptReference[]): string[] {
-  return references.map((reference, index) => {
+  const screens = references.flatMap((reference, index) => (reference.use === 'screen' ? [index + 1] : []));
+  const lines = references.map((reference, index) => {
     const name = `Attached image ${index + 1}`;
     const about = oneLine(reference.description);
     switch (reference.use) {
@@ -105,6 +111,12 @@ export function referencePromptLines(references: readonly AdStudioPromptReferenc
         return `${name} shows ${about || 'a subject of this ad'}: whenever it appears, show it exactly as it looks in the image.`;
     }
   });
+  if (screens.length === 0) return lines;
+  const which = screens.length === 1 ? `attached image ${screens[0]}` : `attached images ${screens.join(' and ')}`;
+  return [
+    ...lines,
+    `Every screen in this shot shows only ${which}. Where the description above mentions another app, chat, page or screen, show ${which} on the screen instead; never draw a different interface.`,
+  ];
 }
 
 /** True when an attached image carries words the frame may show (a screen or an opening frame). */
