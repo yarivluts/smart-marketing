@@ -194,10 +194,10 @@ describe('VideoStudio narration and the phone layout', () => {
     ];
     renderStudio({ scenes, language: 'he' }, 'he');
     const [first, second] = screen.getAllByTestId('ad-studio-scene-narration');
-    expect(first).toHaveTextContent(heMessages.AdStudio.video.narrationVocalized);
+    expect(first).toHaveTextContent(heMessages.AdStudio.narration.readWithNikud);
     expect(within(first).getByText(vocalized)).toHaveAttribute('lang', 'he');
-    expect(second).toHaveTextContent(heMessages.AdStudio.video.narration);
-    expect(second).toHaveTextContent(heMessages.AdStudio.video.narrationWillVocalize);
+    expect(second).toHaveTextContent(heMessages.AdStudio.narration.label);
+    expect(second).toHaveTextContent(heMessages.AdStudio.narration.willVocalize);
   });
 
   it('is an accordion on phones: the first scene open, the others one header line until tapped', () => {

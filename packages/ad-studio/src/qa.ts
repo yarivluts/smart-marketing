@@ -78,7 +78,7 @@ export function buildClipQaPrompt(
       ...(references.length ? [`After the video come ${references.length} reference image(s) the clip was made from:`, ...references.map(referenceRule)] : []),
       '',
       '1) transcript: write exactly what is spoken in the clip, in the language spoken (empty if nothing is said).',
-      '2) issues: every problem, each with kind (audio or visual), severity, a short detail a person can act on, and atSeconds when you can tell.',
+      `2) issues: every problem, each with kind (audio or visual), severity, a short detail a person can act on, and atSeconds when you can tell. Write each detail in ${languageName}, the language of the people making this ad.`,
       'Major audio problems: a missing, extra or different word compared with the intended narration; a word mispronounced so that a native speaker would notice; a stutter or a cut-off word; a grammar error (for example the wrong gender of a number); speech in another language.',
       'Minor audio problems: odd pacing or intonation, music too loud.',
       'Major visual problems: letters, words or numbers drawn in the picture that are gibberish or misspelled; a deformed face, hand or body (extra or missing fingers, melting features); objects that morph or appear from nowhere; a speaking mouth clearly out of sync with the narration.',

@@ -17,8 +17,10 @@ function json(body: unknown, status = 200): Response {
 }
 
 function renderCard(props: Partial<React.ComponentProps<typeof AdCopyCard>> = {}, locale: 'en' | 'he' = 'en') {
-  return renderWithIntl(<AdCopyCard orgId="o" projectId="p" briefId="b1" copyKey="c1" copy={COPY} advertiser="EasySign" aiAvailable media={<img alt="the picture" src="/x" />} {...props} />, { locale });
+  return renderWithIntl(<AdCopyCard orgId="o" projectId="p" briefId="b1" copyKey="c1" copy={COPY} advertiser="EasySign" aiAvailable {...props} />, { locale });
 }
+
+const IMAGES = { kind: 'image' as const, byFormat: { portrait: '/portrait.jpg', story: '/story.jpg', landscape: '/landscape.jpg' }, alt: 'the picture' };
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -26,15 +28,39 @@ afterEach(() => {
 });
 
 describe('AdCopyCard', () => {
-  it('shows the ad as the feed does: advertiser, the main text above the picture, the headline and description under it', () => {
+  it('shows the copy as the feed does: advertiser, the main text, the headline and description', () => {
     renderCard();
     const card = within(screen.getByTestId('ad-studio-copy-c1'));
     expect(card.getByText('EasySign')).toBeInTheDocument();
     expect(card.getByText('Sponsored')).toBeInTheDocument();
     expect(card.getByTestId('ad-studio-copy-primary')).toHaveTextContent(COPY.primaryText);
-    expect(card.getByRole('img', { name: 'the picture' })).toBeInTheDocument();
     expect(card.getByTestId('ad-studio-copy-headline')).toHaveTextContent(COPY.headline);
     expect(card.getByText('Start free')).toBeInTheDocument();
+  });
+
+  it('with images, previews every placement with its own image and the copy, and says when a placement borrows one', () => {
+    renderCard({ preview: IMAGES, linkUrl: 'https://www.easy-sign.co.il/lawyers' });
+    const preview = screen.getByTestId('ad-placement-preview');
+    expect(preview).toHaveAttribute('data-placement', 'facebook_feed');
+    expect(within(preview).getByRole('img', { name: 'the picture' })).toHaveAttribute('src', '/portrait.jpg');
+    expect(within(preview).getByText(COPY.primaryText)).toBeInTheDocument();
+    expect(within(preview).getByText('easy-sign.co.il')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Instagram story / Reels' }));
+    expect(within(preview).getByRole('img', { name: 'the picture' })).toHaveAttribute('src', '/story.jpg');
+    fireEvent.click(screen.getByRole('tab', { name: 'Google display' }));
+    expect(within(preview).getByRole('img', { name: 'the picture' })).toHaveAttribute('src', '/landscape.jpg');
+    expect(within(preview).queryByTestId('ad-preview-format-note')).toBeNull();
+    // An idea rendered only as a square: the story borrows it and says so.
+    renderCard({ copyKey: 'c2', preview: { kind: 'image', byFormat: { square: '/square.jpg' }, alt: 'square only' } });
+    const second = within(screen.getByTestId('ad-studio-copy-c2'));
+    fireEvent.click(second.getByRole('tab', { name: 'Instagram story / Reels' }));
+    expect(second.getByTestId('ad-preview-format-note')).toHaveTextContent('Showing the square image');
+  });
+
+  it('warns plainly when an ad with images has no text, in Hebrew too', () => {
+    renderCard({ copy: null, preview: IMAGES }, 'he');
+    expect(screen.getByTestId('ad-studio-copy-missing')).toHaveTextContent(heMessages.AdStudio.copy.missingPrimary);
+    expect(screen.getByRole('tab', { name: heMessages.AdStudio.preview.placement.facebook_feed })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('says plainly when an ad has no text yet, and the AI writes it for this creative only', async () => {
@@ -88,5 +114,23 @@ describe('PublishPanel with ad copy', () => {
     fireEvent.click(screen.getByRole('radio', { name: /The video/ }));
     expect(screen.getByDisplayValue('Watch it')).toBeInTheDocument();
     expect(screen.getByDisplayValue('See a contract signed.')).toBeInTheDocument();
+  });
+});
+
+describe('PublishPanel live preview', () => {
+  it('shows the ad being created with the typed words, on the chosen platform placements', () => {
+    const creatives: PublishCreative[] = [{ key: 'c1-story', kind: 'image', id: 'img1', label: 'Idea 1 · Story', previewSrc: '/story.jpg', format: 'story', copy: COPY }];
+    renderWithIntl(
+      <PublishPanel orgId="o" projectId="p" briefId="b1" briefName="Sign fast" defaultLink="https://easy-sign.example/x" defaultPrimaryText="Objective" creatives={creatives} destinations={{ meta: true, google_ads: true }} canPublish published={[]} resourcesHref="/r" />,
+      { locale: 'en' },
+    );
+    const preview = within(screen.getByTestId('ad-studio-publish-preview'));
+    expect(preview.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Facebook feed', 'Instagram feed', 'Instagram story / Reels']);
+    fireEvent.change(screen.getByDisplayValue(COPY.headline), { target: { value: 'Typed headline' } });
+    expect(preview.getByText('Typed headline')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: /Google Ads/ }));
+    const google = within(screen.getByTestId('ad-studio-publish-preview'));
+    expect(google.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Google display']);
+    expect(google.getByRole('img', { name: 'Idea 1 · Story' })).toHaveAttribute('src', '/story.jpg');
   });
 });
