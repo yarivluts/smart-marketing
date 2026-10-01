@@ -17,6 +17,29 @@ Template for each entry:
 
 ---
 
+## 2026-10-01 - Mobile accordion, nikud before every render, ad copy next to every creative (KAN-278)
+
+- **Last completed:**
+  - **PR #568 (deployed 4eec973), from Yariv's phone review:**
+    - Scenes in the script editor and the Review step are an accordion below md: one header line per scene, the first one open. Desktop is unchanged.
+    - Nikud is now added automatically right before every render (render-scene and render-all), not only on save.
+    - The Review step shows each scene's narration as the narrator reads it, with nikud.
+  - **PR #569, KAN-278 (deployed 6d1c1ad): ad copy next to every image and video.**
+    - Copy has a headline (30), primary text (90) and description (90).
+    - It is written by AI together with the ideas and the script, and is editable.
+    - It shows as a feed-style ad preview in Review, and the publish form starts from it.
+    - MCP: `write_ad_copy` and `save_ad_copy`.
+  - **Prod:** copy written for both EasySign ads (Hebrew and English), for the video and 3 image ideas each.
+  - **Jira:** KAN-278 Done.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:**
+  - Retry transient Gemini 503 "high demand" errors automatically. The copy for the English ad needed two manual retries.
+  - Re-assemble the Hebrew EasySign video from the fixed scenes, and re-publish it if the owner wants.
+- **Waiting on human:**
+  - Review the AI-written ad copy, which is editable in the Review step. One Hebrew idea mentions end-to-end encryption: confirm EasySign claims it, or edit it out.
+  - Whether to re-publish the paused EasySign ads with the new video and copy.
+
 ## 2026-10-01 - KAN-239 done (AI video QA + Hebrew nikud), KAN-243 app screens for the video model
 
 - **Last completed:**
