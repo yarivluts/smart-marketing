@@ -45,6 +45,9 @@ import {
   AdStudioVoiceInvalidError,
   saveAdStudioVideoSettings,
   AdStudioVideoSettingsInvalidError,
+  saveAdStudioSearchKeywords,
+  saveAdStudioSearchAd,
+  AdStudioSearchInvalidError,
   saveAdStudioImageConcepts,
   setAdStudioSettings,
   updateAdStudioBriefDetails,
@@ -66,6 +69,8 @@ import {
   readBriefReference,
   removeBriefReference,
   writeAdStudioCopy,
+  researchAdStudioKeywords,
+  writeAdStudioSearchAd,
   toAdStudioReferenceView,
   type AdStudioReferenceView,
   adStudioImageSlots,
@@ -108,7 +113,7 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, isSearchTargeting, defaultSearchTargeting, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -160,6 +165,7 @@ function describeAdStudioToolError(error: unknown): string {
   if (error instanceof AdStudioScriptInvalidError) return `The script breaks these rules: ${error.issues.map((issue) => (issue.scene ? `${issue.code} (scene ${issue.scene})` : issue.code)).join(', ')}.`;
   if (error instanceof AdStudioVoiceInvalidError) return `Invalid voice: ${error.code}.`;
   if (error instanceof AdStudioVideoSettingsInvalidError) return `Invalid video settings: ${error.code}.`;
+  if (error instanceof AdStudioSearchInvalidError) return `The search ad breaks these rules: ${error.issues.map((issue) => (issue.index ? `${issue.code} (#${issue.index})` : issue.code)).join(', ')}.`;
   if (error instanceof AdStudioCopyInvalidError) return `The ad copy breaks these rules: ${error.issues.map((issue) => `${issue.code} (${issue.target})`).join(', ')}.`;
   if (error instanceof AdStudioImageConceptsInvalidError) {
     return `The image ideas break these rules: ${error.issues.map((issue) => (issue.concept ? `${issue.code} (idea ${issue.concept})` : issue.code)).join(', ')}.`;
@@ -347,6 +353,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       can_assemble: progress.canAssemble,
       assembled_video: assembled.latest ? { video_id: assembled.latest.id, current: assembled.current, duration_seconds: assembled.latest.durationSeconds } : null,
     },
+    search: searchOutput(brief.search_keywords, brief.search_ad),
     autopilot: run ? runOutput(toAdStudioRunView(run)) : null,
     exports: exports.map(exportOutput),
     web_url: webUrl(auth, briefId),
@@ -358,6 +365,34 @@ function settingsOutput(settings: AdStudioVideoSettings | null | undefined) {
   const full = normalizeVideoSettings(settings);
   return { resolution: full.resolution, style: full.style, music: full.music, music_description: full.musicDescription ?? null, avoid: full.avoid ?? null };
 }
+
+/** The search ad's keywords and responsive search ad in snake case. */
+function searchOutput(keywords: AdStudioSearchKeywords | null | undefined, ad: AdStudioSearchAd | null | undefined) {
+  return {
+    targeting: keywords?.targeting ?? null,
+    keywords: (keywords?.keywords ?? []).map(keywordOutput),
+    negative_keywords: keywords?.negatives ?? [],
+    ad: ad ? { headlines: ad.headlines, descriptions: ad.descriptions, path1: ad.path1, path2: ad.path2 } : null,
+  };
+}
+
+function keywordOutput(keyword: AdStudioSearchKeyword) {
+  return {
+    text: keyword.text,
+    match_type: keyword.matchType,
+    avg_monthly_searches: keyword.avgMonthlySearches,
+    competition: keyword.competition,
+    low_top_of_page_bid: keyword.lowTopOfPageBid,
+    high_top_of_page_bid: keyword.highTopOfPageBid,
+  };
+}
+
+const targetingShape = z
+  .object({
+    country: z.string().describe('ALL, IL, US, GB, CA, AU, DE, FR, ES, IT, NL or IN.'),
+    language: z.string().describe('he, en, ar, ru, es, fr, de or it.'),
+  })
+  .describe('Where volumes are looked up. Defaults from the ad language: Hebrew -> IL/he, otherwise ALL/en.');
 
 const briefId = z.string().min(1).describe('The ad (brief) id, from list_ad_briefs or create_ad_brief.');
 
@@ -632,6 +667,131 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         } as Partial<AdStudioVideoSettings>;
         const brief = await saveAdStudioVideoSettings({ ...ctx(a.brief_id), settings });
         return textResult({ settings: settingsOutput(brief.video_settings) });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'research_ad_keywords',
+    {
+      title: 'Research keywords for a search ad',
+      description:
+        "Looks up keyword ideas with Google's own monthly searches, competition and top-of-page bid range (account currency) for seed phrases and/or the landing page, in a country and language - busiest first, up to 100. Uses the project's attached Google Ads account; when there is none or Google refuses, says why (status unavailable + reason). Nothing is saved: choose keywords with save_ad_keywords. Requires \"ai.use\".",
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        seeds: z.array(z.string()).describe('Up to 10 seed phrases.'),
+        use_landing_page: z.boolean().optional().describe("Also seed from the ad's landing page (default true when it has one)."),
+        targeting: targetingShape.optional(),
+      }),
+    },
+    auditedToolHandler(auth, 'research_ad_keywords', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; seeds: string[]; use_landing_page?: boolean; targeting?: { country: string; language: string } }) => {
+        const brief = await getAdStudioBrief(auth.organizationId, auth.projectId, a.brief_id);
+        const targeting = a.targeting ?? brief.search_keywords?.targeting ?? defaultSearchTargeting(brief.language);
+        if (!isSearchTargeting(targeting)) return errorResult('Invalid targeting: use one of the listed countries and languages.');
+        const research = await researchAdStudioKeywords({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          seeds: a.seeds,
+          url: a.use_landing_page === false ? null : brief.landing_page_url,
+          targeting,
+        });
+        if (research.status !== 'ok') return textResult(research);
+        return textResult({
+          status: 'ok',
+          targeting: research.targeting,
+          ideas: research.ideas.map((idea) => ({ keyword: idea.keyword, avg_monthly_searches: idea.avgMonthlySearches, competition: idea.competition, low_top_of_page_bid: idea.lowTopOfPageBid, high_top_of_page_bid: idea.highTopOfPageBid })),
+        });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'save_ad_keywords',
+    {
+      title: 'Save the keywords of the search ad',
+      description:
+        'Saves the keywords the search ad bids on (at most 50; match type BROAD, PHRASE or EXACT; pass the volumes from research_ad_keywords to keep them) and negative keywords (searches that must not show the ad), with the targeting they were researched in. clear: true removes them. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        targeting: targetingShape.optional(),
+        keywords: z
+          .array(
+            z.object({
+              text: z.string().describe('The keyword, as people search it.'),
+              match_type: z.string().describe('BROAD, PHRASE or EXACT.'),
+              avg_monthly_searches: z.number().nullable().optional().describe('Monthly searches from research_ad_keywords.'),
+              competition: z.string().nullable().optional().describe('LOW, MEDIUM or HIGH.'),
+              low_top_of_page_bid: z.number().nullable().optional().describe('Low top-of-page bid from research_ad_keywords.'),
+              high_top_of_page_bid: z.number().nullable().optional().describe('High top-of-page bid from research_ad_keywords.'),
+            }),
+          )
+          .optional()
+          .describe('The keywords the search ad bids on, at most 50 - the whole list, replacing the saved one.'),
+        negative_keywords: z.array(z.string()).optional().describe('Searches that must not show the ad, e.g. "free", "jobs".'),
+        clear: z.boolean().optional().describe('Remove the saved keywords and negatives.'),
+      }),
+    },
+    auditedToolHandler(auth, 'save_ad_keywords', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: any) => {
+        if (a.clear === true) {
+          await saveAdStudioSearchKeywords({ ...ctx(a.brief_id), keywords: null });
+          return textResult(searchOutput(null, null));
+        }
+        const brief = await getAdStudioBrief(auth.organizationId, auth.projectId, a.brief_id);
+        const keywords: AdStudioSearchKeywords = {
+          targeting: a.targeting ?? brief.search_keywords?.targeting ?? defaultSearchTargeting(brief.language),
+          keywords: (a.keywords ?? []).map((keyword: any) => ({
+            text: keyword.text,
+            matchType: keyword.match_type,
+            avgMonthlySearches: keyword.avg_monthly_searches ?? null,
+            competition: keyword.competition ?? null,
+            lowTopOfPageBid: keyword.low_top_of_page_bid ?? null,
+            highTopOfPageBid: keyword.high_top_of_page_bid ?? null,
+          })),
+          negatives: a.negative_keywords ?? [],
+        };
+        const saved = await saveAdStudioSearchKeywords({ ...ctx(a.brief_id), keywords });
+        return textResult(searchOutput(saved.search_keywords, saved.search_ad));
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'write_search_ad',
+    {
+      title: 'Write the search ad with AI',
+      description:
+        'Writes the Google responsive search ad (15 headlines of at most 30 characters, 4 descriptions of at most 90, display paths) with AI from the brief, the plan and the saved keywords, fitted to the limits, and saves it - replacing the saved one. One text generation. Requires "ai.use".',
+      inputSchema: toolInputSchema({ brief_id: briefId }),
+    },
+    auditedToolHandler(auth, 'write_search_ad', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string }) => {
+        const llm = resolveAdStudioLlm();
+        if (!llm) return errorResult('No AI text model is configured for this deployment.');
+        const brief = await writeAdStudioSearchAd({ ...ctx(a.brief_id), actorId: actorId(auth), llm });
+        return textResult(searchOutput(brief.search_keywords, brief.search_ad).ad);
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'save_search_ad',
+    {
+      title: 'Save the search ad',
+      description: 'Saves an edited responsive search ad: 3-15 unique headlines (30 characters), 2-4 descriptions (90), path1/path2 (15). Refused with every broken rule. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        headlines: z.array(z.string()).describe('3-15 unique headlines, each at most 30 characters.'),
+        descriptions: z.array(z.string()).describe('2-4 descriptions, each at most 90 characters.'),
+        path1: z.string().optional().describe('First display-URL path, at most 15 characters.'),
+        path2: z.string().optional().describe('Second display-URL path (needs path1), at most 15 characters.'),
+      }),
+    },
+    auditedToolHandler(auth, 'save_search_ad', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; headlines: string[]; descriptions: string[]; path1?: string; path2?: string }) => {
+        const brief = await saveAdStudioSearchAd({ ...ctx(a.brief_id), ad: { headlines: a.headlines, descriptions: a.descriptions, path1: a.path1 ?? '', path2: a.path2 ?? '' } });
+        return textResult(searchOutput(brief.search_keywords, brief.search_ad).ad);
       }),
     ),
   );

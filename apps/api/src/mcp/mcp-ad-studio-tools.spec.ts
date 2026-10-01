@@ -49,6 +49,11 @@ beforeEach(() => {
         const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
       }
+      if (schema.includes('"headlines"')) {
+        // The search-ad writer: one headline too long, which the engine fits to 30 characters.
+        const answer = { headlines: ['Electronic signature for every lawyer', 'Sign PDF online', 'Start free'], descriptions: ['Send on WhatsApp, signed in a minute.', 'Legally binding e-signatures.'], path1: 'sign now', path2: '' };
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] });
+      }
       const answer = schema.includes('"concepts"')
         ? { concepts: [{ visualPrompt: 'A lawyer signing on a phone', headline: 'Sign in 30 seconds', formats: ['square'] }] }
         : { title: 't', scenes: [{ durationSeconds: 5, visualPrompt: 'A desk', voiceover: '', onScreenText: '' }] };
@@ -253,6 +258,35 @@ describe('Ad Studio MCP tools', () => {
     expect(await json('set_ad_video_settings', { brief_id: ad.id, avoid: 'cars' })).toEqual({ settings: { ...defaults, resolution: '1080p', music: 'custom', music_description: 'upbeat guitar', avoid: 'cars' } });
     const badSettings = await call('set_ad_video_settings', { brief_id: ad.id, style: 'noir' });
     expect((badSettings.content[0] as { text: string }).text).toBe('Invalid video settings: unknown_style.');
+  });
+
+  it('lets an agent research and save keywords, and write, read and edit the search ad', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    // No Google Ads account in the project: research says why instead of failing.
+    expect(await json('research_ad_keywords', { brief_id: ad.id, seeds: ['e signature'] })).toEqual({ status: 'unavailable', reason: 'no_google_ads_credential' });
+
+    const saved = await json<{ targeting: unknown; keywords: { text: string; match_type: string }[]; negative_keywords: string[] }>('save_ad_keywords', {
+      brief_id: ad.id,
+      targeting: { country: 'US', language: 'en' },
+      keywords: [{ text: 'Sign PDF', match_type: 'EXACT', avg_monthly_searches: 880 }],
+      negative_keywords: ['free'],
+    });
+    expect(saved).toMatchObject({ targeting: { country: 'US', language: 'en' }, keywords: [{ text: 'sign pdf', match_type: 'EXACT' }], negative_keywords: ['free'] });
+    const bad = await call('save_ad_keywords', { brief_id: ad.id, keywords: [{ text: 'x', match_type: 'FUZZY' }] });
+    expect((bad.content[0] as { text: string }).text).toBe('The search ad breaks these rules: invalid_match_type (#1).');
+
+    const written = await json<{ headlines: string[]; path1: string }>('write_search_ad', { brief_id: ad.id });
+    expect(written.headlines).toEqual(['Electronic signature for every', 'Sign PDF online', 'Start free']);
+    expect(written.path1).toBe('sign-now');
+    const state = await json<{ search: { ad: { headlines: string[] }; keywords: unknown[] } }>('get_ad_brief', { brief_id: ad.id });
+    expect(state.search.ad.headlines).toHaveLength(3);
+    expect(state.search.keywords).toHaveLength(1);
+
+    const tooFew = await call('save_search_ad', { brief_id: ad.id, headlines: ['One'], descriptions: ['a', 'b'] });
+    expect((tooFew.content[0] as { text: string }).text).toBe('The search ad breaks these rules: too_few_headlines.');
+    expect(await json('save_search_ad', { brief_id: ad.id, headlines: ['One', 'Two', 'Three'], descriptions: ['a', 'b'], path1: 'x' })).toEqual({ headlines: ['One', 'Two', 'Three'], descriptions: ['a', 'b'], path1: 'x', path2: '' });
+    expect(await json('save_ad_keywords', { brief_id: ad.id, clear: true })).toMatchObject({ keywords: [], targeting: null });
   });
 
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {

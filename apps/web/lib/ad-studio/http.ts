@@ -7,6 +7,7 @@ import {
   AdStudioCopyInvalidError,
   AdStudioVoiceInvalidError,
   AdStudioVideoSettingsInvalidError,
+  AdStudioSearchInvalidError,
   AdStudioQuotaExceededError,
   AdStudioScriptInvalidError,
   AdStudioVideoNotFoundError,
@@ -77,6 +78,9 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof AdStudioVideoRequestError) {
     return NextResponse.json({ error: 'video_request', code: error.code }, { status: VIDEO_REQUEST_STATUS[error.code] });
+  }
+  if (error instanceof AdStudioSearchInvalidError) {
+    return NextResponse.json({ error: 'invalid_search', issues: error.issues }, { status: 400 });
   }
   if (error instanceof AdStudioVideoSettingsInvalidError) {
     return NextResponse.json({ error: 'invalid_video_settings', code: error.code }, { status: 400 });

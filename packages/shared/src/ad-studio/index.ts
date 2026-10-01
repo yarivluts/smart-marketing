@@ -9,3 +9,4 @@ export * from './references';
 export * from './copy';
 export * from './voice';
 export * from './video-settings';
+export * from './search-ads';

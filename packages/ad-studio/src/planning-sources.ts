@@ -184,7 +184,8 @@ export async function gatherResults(
   };
 }
 
-function serverKms(): KmsProvider | null {
+/** The deployment's vault, or null when none is configured (every stored secret is then unreadable). */
+export function serverKms(): KmsProvider | null {
   try {
     return getServerKmsProvider();
   } catch (error) {

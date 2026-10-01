@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -89,6 +89,14 @@ export class AdStudioBriefModel extends BaseModel {
   @Field({ is_required: false })
   public video_settings?: AdStudioVideoSettings | null;
 
+  /** The keywords a search ad bids on, with where their volumes were looked up and the negatives; absent until chosen. */
+  @Field({ is_required: false })
+  public search_keywords?: AdStudioSearchKeywords | null;
+
+  /** The responsive search ad; absent until written. */
+  @Field({ is_required: false })
+  public search_ad?: AdStudioSearchAd | null;
+
   /** The ad copy that runs next to the assembled video in the feed (KAN-278); absent until written. */
   @Field({ is_required: false })
   public video_copy?: AdStudioAdCopy | null;
@@ -154,7 +162,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**
