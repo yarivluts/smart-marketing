@@ -18,6 +18,7 @@ import {
   AdStudioRunNotFoundError,
   AdStudioRunOptionsInvalidError,
   AdStudioScriptInvalidError,
+  AdStudioCopyInvalidError,
   AdStudioReferenceInvalidError,
   AdStudioReferenceNotFoundError,
   AdStudioVideoNotFoundError,
@@ -39,6 +40,7 @@ import {
   listEnvironmentsForProject,
   ProjectNotFoundError,
   resolveAdStudioExportDestinations,
+  saveAdStudioCopy,
   saveAdStudioImageConcepts,
   setAdStudioSettings,
   updateAdStudioBriefDetails,
@@ -59,6 +61,7 @@ import {
   listBriefReferences,
   readBriefReference,
   removeBriefReference,
+  writeAdStudioCopy,
   toAdStudioReferenceView,
   type AdStudioReferenceView,
   adStudioImageSlots,
@@ -101,7 +104,7 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, type AdStudioAdCopy, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -151,6 +154,7 @@ function describeAdStudioToolError(error: unknown): string {
     return `Invalid: ${error.reasons.join('; ')}`;
   }
   if (error instanceof AdStudioScriptInvalidError) return `The script breaks these rules: ${error.issues.map((issue) => (issue.scene ? `${issue.code} (scene ${issue.scene})` : issue.code)).join(', ')}.`;
+  if (error instanceof AdStudioCopyInvalidError) return `The ad copy breaks these rules: ${error.issues.map((issue) => `${issue.code} (${issue.target})`).join(', ')}.`;
   if (error instanceof AdStudioImageConceptsInvalidError) {
     return `The image ideas break these rules: ${error.issues.map((issue) => (issue.concept ? `${issue.code} (idea ${issue.concept})` : issue.code)).join(', ')}.`;
   }
@@ -224,6 +228,11 @@ function runOutput(run: AdStudioRunView) {
           ? 'The plan, script and image ideas are ready and nothing is rendered yet. Show them to the person (get_ad_brief), apply any changes they ask for, and only after they confirm call approve_ad_plan, then advance_ad_autopilot again.'
           : null,
   };
+}
+
+/** Ad copy in MCP's snake_case, or null when none is written (KAN-278). */
+function copyOutput(copy: AdStudioAdCopy | null | undefined) {
+  return copy ? { headline: copy.headline, primary_text: copy.primaryText, description: copy.description } : null;
 }
 
 function referenceOutput(reference: AdStudioReferenceView) {
@@ -308,6 +317,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       visual_prompt: concept.visualPrompt,
       headline: concept.headline,
       formats: concept.formats,
+      copy: copyOutput(concept.copy),
       placements: slots
         .filter((slot) => slot.conceptId === concept.id)
         .map((slot) => ({
@@ -318,6 +328,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
         })),
     })),
     video: {
+      copy: copyOutput(brief.video_copy),
       scenes: progress.scenes,
       rendered: progress.rendered,
       generating: progress.generating,
@@ -539,6 +550,69 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         await saveAdStudioImageConcepts({ organizationId: auth.organizationId, projectId: auth.projectId, briefId: a.brief_id, concepts });
         return textResult((await describeBrief(auth, a.brief_id)).image_ideas);
       }),
+    ),
+  );
+
+  const copyShape = z
+    .object({
+      headline: z.string().describe('At most 30 characters.'),
+      primary_text: z.string().describe('At most 90 characters, shown above the media.'),
+      description: z.string().describe('At most 90 characters, shown under the headline.'),
+    })
+    .nullable();
+
+  server.registerTool(
+    'write_ad_copy',
+    {
+      title: 'Write the ad copy',
+      description:
+        'Writes the ad text that runs next to each creative in the feed (headline, primary text, description) with AI, in the ad language, in one call: by default for the video and every image idea that has none. rewrite: true writes it again; keys ("video" or idea ids) limits it to those. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        rewrite: z.boolean().optional().describe('Write the copy again even where some exists.'),
+        keys: z.array(z.string()).optional().describe('Only these creatives: "video" and/or image idea ids.'),
+      }),
+    },
+    auditedToolHandler(auth, 'write_ad_copy', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; rewrite?: boolean; keys?: string[] }) => {
+        const llm = resolveAdStudioLlm();
+        if (!llm) return errorResult('No AI text model is configured for this deployment.');
+        await writeAdStudioCopy({ ...ctx(a.brief_id), actorId: actorId(auth), llm, rewrite: a.rewrite === true, ...(a.keys ? { keys: a.keys } : {}) });
+        const state = await describeBrief(auth, a.brief_id);
+        return textResult({ video: state.video.copy, image_ideas: state.image_ideas.map((idea) => ({ id: idea.id, copy: idea.copy })) });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'save_ad_copy',
+    {
+      title: 'Save the ad copy',
+      description: 'Saves edited ad copy: video_copy and/or image_copies keyed by idea id; null clears one, a creative left out is untouched. Copy never makes a creative out of date. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        video_copy: copyShape.optional().describe('The copy next to the video, or null to clear it.'),
+        image_copies: z.record(z.string(), copyShape).optional().describe('Copy per image idea id, or null to clear one.'),
+      }),
+    },
+    auditedToolHandler(auth, 'save_ad_copy', async (args: any) =>
+      runAdStudioTool(
+        auth,
+        'ai.use',
+        args,
+        async (a: { brief_id: string; video_copy?: { headline: string; primary_text: string; description: string } | null; image_copies?: Record<string, { headline: string; primary_text: string; description: string } | null> }) => {
+          const fromMcp = (copy: { headline: string; primary_text: string; description: string } | null): AdStudioAdCopy | null =>
+            copy ? { headline: copy.headline, primaryText: copy.primary_text, description: copy.description } : null;
+          if (a.video_copy === undefined && !a.image_copies) return errorResult('Invalid: send video_copy and/or image_copies.');
+          await saveAdStudioCopy({
+            ...ctx(a.brief_id),
+            ...(a.video_copy !== undefined ? { videoCopy: fromMcp(a.video_copy) } : {}),
+            ...(a.image_copies ? { conceptCopies: Object.fromEntries(Object.entries(a.image_copies).map(([id, copy]) => [id, fromMcp(copy)])) } : {}),
+          });
+          const state = await describeBrief(auth, a.brief_id);
+          return textResult({ video: state.video.copy, image_ideas: state.image_ideas.map((idea) => ({ id: idea.id, copy: idea.copy })) });
+        },
+      ),
     ),
   );
 
