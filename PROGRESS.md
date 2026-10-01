@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-10-01 - KAN-238 done: six real paused ads from the stepper, English and Hebrew
+
+- **Last completed:**
+  - Real runs on prod, through the stepper (plan → confirm → create → review → publish), recorded.
+    - Report: https://claude.ai/artifact/R6kfbaLd97udvD2R5vnBV3
+    - Files: `C:\Users\yariv\Downloads\growthos-ad-real\`
+  - **Google Ads Display** (customer 4816235600), PAUSED:
+    - EN: campaign 24296774787, ad 826486803275
+    - HE: campaign 24302256881, ad 826364436195
+  - **Meta** (act_58689695, Page EasySign 1253606311170957), PAUSED:
+    - EN image: campaign 52631348180886, ad 52631348189686
+    - EN video: campaign 52631348192886, ad 52631348209486
+    - HE image: campaign 52631348257486, ad 52631348278286
+    - HE video: campaign 52631348284686, ad 52631348304286
+  - **PRs found on the way, all deployed** (prod at a28dc1b):
+    - #551 an unreadable credential no longer fails the plan
+    - #553 JPEG for Gemini image
+    - #554 Connect with Facebook
+    - #555 Meta error detail and scopes
+    - #556 campaign bid strategy
+    - #557 public /privacy page
+    - #558 cleanup when a publish fails partway
+    - #559 Meta create requires an id
+    - #560 platform reason shown, with `account_action_required`
+    - #561 business login (system-user token, no expiry)
+    - #562 the query string survives sign-in
+  - **Config:**
+    - `gemini-api-key` v3 is a key in the funded Smartech project.
+    - Sv1d Google Ads credential re-sealed with prod keys, without loginCustomerId.
+    - Meta app 2343598839737424 is Live, with domains and privacy URL set.
+    - Secrets `meta-app-id`, `meta-app-secret` and `meta-login-config-id` are mounted on web-prod and web-preprod, with `GROWTHOS_PUBLIC_WEB_URL`.
+  - **Cleanup:**
+    - Orphan paused Meta campaigns from failed attempts were deleted: 52631037915686, 52631037781286, 52631035603286, 52631035508486, 52631193098886, 52631192842286, and the repro 52631193863486.
+    - Two stuck export rows were marked failed.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** none for KAN-238.
+  - Possible follow-up: retry a transient Gemini 503 automatically. One image failed with "service unavailable".
+- **Waiting on human:** nothing. All six ads are paused, so turning any of them on is the owner's call.
+
 ## 2026-09-29 - Ad Studio stepper, confirm the plan, publish paused ads (KAN-238)
 
 - **Last completed:**
