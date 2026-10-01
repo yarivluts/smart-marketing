@@ -87,7 +87,7 @@ describe('the AI quality check of a clip', () => {
     expect(await claimAdStudioClipQa(clip, new Date(at.getTime() + 3 * 60_000))).toBeTruthy();
 
     const issue = { kind: 'audio' as const, severity: 'major' as const, detail: 'stutter on the first word', at_seconds: 0.4 };
-    const checked = await recordAdStudioClipQa(clip, { status: 'issues', issues: [issue], transcript: 'ma-ma'alim', model: 'gemini-3.8-flash' }, new Date('2026-09-30T10:04:00Z'));
+    const checked = await recordAdStudioClipQa(clip, { status: 'issues', issues: [issue], transcript: 'ma-maalim', model: 'gemini-3.8-flash' }, new Date('2026-09-30T10:04:00Z'));
     expect(checked).toMatchObject({ qa_status: 'issues', qa_issues: [issue], qa_model: 'gemini-3.8-flash', qa_checked_on: '2026-09-30T10:04:00.000Z', qa_token: null });
     // A second verdict (a racing caller) does not overwrite the first, and a checked clip cannot be claimed.
     expect((await recordAdStudioClipQa(clip, { status: 'passed', issues: [], transcript: null, model: 'x' })).qa_status).toBe('issues');
