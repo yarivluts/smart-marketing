@@ -38,6 +38,11 @@ export interface AdStudioScene {
   visualPrompt: string;
   /** Spoken narration, if any. */
   voiceover: string;
+  /**
+   * How the narrator says the voiceover, when it differs from the written words: for Hebrew, the
+   * same words with full nikud and numbers written out (see `pronunciation.ts`). Absent when none.
+   */
+  pronunciation?: string;
   /** Text burned into the frame, if any. */
   onScreenText: string;
 }
@@ -50,7 +55,11 @@ export type AdStudioSceneIssueCode =
   | 'scene_too_long'
   | 'scene_not_whole_seconds'
   | 'empty_visual_prompt'
+  | 'pronunciation_too_long'
   | 'duplicate_scene_id';
+
+/** Generous for a 10-second line with vowel points (which roughly double its length). */
+export const AD_STUDIO_PRONUNCIATION_MAX = 1000;
 
 export interface AdStudioSceneIssue {
   code: AdStudioSceneIssueCode;
@@ -75,6 +84,7 @@ export function validateAdStudioScenes(scenes: readonly AdStudioScene[]): AdStud
     if (scene.durationSeconds < AD_STUDIO_SCENE_MIN_SECONDS) issues.push({ code: 'scene_too_short', scene: position });
     if (scene.durationSeconds > AD_STUDIO_SCENE_MAX_SECONDS) issues.push({ code: 'scene_too_long', scene: position });
     if (scene.visualPrompt.trim().length === 0) issues.push({ code: 'empty_visual_prompt', scene: position });
+    if ((scene.pronunciation ?? '').trim().length > AD_STUDIO_PRONUNCIATION_MAX) issues.push({ code: 'pronunciation_too_long', scene: position });
     if (seen.has(scene.id)) issues.push({ code: 'duplicate_scene_id', scene: position });
     seen.add(scene.id);
   });
@@ -100,11 +110,13 @@ export function fitAdStudioScenes(scenes: readonly AdStudioScene[], makeId: () =
     let id = scene.id.trim();
     if (id.length === 0 || seen.has(id)) id = makeId();
     seen.add(id);
+    const pronunciation = (scene.pronunciation ?? '').trim();
     return {
       id,
       durationSeconds: clampDuration(scene.durationSeconds),
       visualPrompt: scene.visualPrompt.trim(),
       voiceover: scene.voiceover.trim(),
+      ...(pronunciation ? { pronunciation } : {}),
       onScreenText: scene.onScreenText.trim(),
     };
   });

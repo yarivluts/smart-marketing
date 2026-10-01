@@ -48,6 +48,7 @@ const SCRIPT_RULES = [
   'Open with a hook in the first scene; end with a clear call to action that matches the objective.',
   'visualPrompt describes only what the camera sees - subject, setting, action, camera movement, lighting, mood - in English, concretely enough for a video model. Never ask for readable text inside the footage; put words in onScreenText instead.',
   'voiceover and onScreenText are written in the ad language. Keep voiceover short enough to be spoken within the scene length. Leave a field empty rather than padding it.',
+  'In voiceover, write numbers, prices, percentages and symbols out as words, in the form that agrees grammatically with the noun they count - a narrator model reads digits badly and gets their gender wrong.',
   'Do not invent facts about the product, prices, discounts, awards, statistics or testimonials. Use only what the brief and context state.',
 ];
 
