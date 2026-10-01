@@ -83,6 +83,15 @@ describe('createOmniClient', () => {
     expect(body).toMatchObject({ previous_interaction_id: 'v1_prev', input: 'Make it night', response_format: { aspect_ratio: '16:9' } });
   });
 
+  it('asks for the resolution the ad chose, for a render and for an edit', async () => {
+    const fetchImpl = vi.fn(async () => json(200, { id: 'v1_new', status: 'in_progress' }));
+    const omni = createOmniClient('k', { fetchImpl });
+    await omni.startSceneGeneration({ prompt: 'A desk', aspectRatio: '9:16', resolution: '1080p' });
+    await omni.startSceneEdit({ previousInteractionId: 'v1_prev', instruction: 'Night', aspectRatio: '9:16', resolution: '360p' });
+    const bodies = (fetchImpl.mock.calls as unknown as [string, RequestInit][]).map(([, init]) => JSON.parse(String(init.body)));
+    expect(bodies.map((body) => body.response_format.resolution)).toEqual(['1080p', '360p']);
+  });
+
   it('polls the interaction and the file, and downloads the bytes', async () => {
     const calls: string[] = [];
     const fetchImpl = vi.fn(async (url: string) => {

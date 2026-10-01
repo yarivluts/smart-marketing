@@ -17,6 +17,7 @@ const VIDEO_REQUEST_CODES = new Set(['scene_not_found', 'already_generating', 'c
 const ASSEMBLY_CODES = new Set(['ffmpeg_unavailable', 'ffmpeg_failed', 'storage_error']);
 const IMAGE_REQUEST_CODES = new Set(['concept_not_found', 'format_not_in_concept', 'image_not_editable', 'invalid_instruction', 'image_not_ready']);
 const VOICE_CODES = new Set(['unknown_voice', 'voice_description_required', 'voice_description_too_long']);
+const VIDEO_SETTINGS_CODES = new Set(['unknown_resolution', 'unknown_style', 'unknown_music', 'music_description_required', 'music_description_too_long', 'avoid_too_long']);
 const REFERENCE_REQUEST_CODES = new Set([
   'unsupported_image',
   'image_too_large',
@@ -42,6 +43,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'invalid_concepts') return t('images.errorInvalidConcepts');
     if (body.error === 'invalid_copy') return t('copy.errorInvalid');
     if (body.error === 'invalid_voice' && body.code && VOICE_CODES.has(body.code)) return t(`voice.errors.${body.code}`);
+    if (body.error === 'invalid_video_settings' && body.code && VIDEO_SETTINGS_CODES.has(body.code)) return t(`advanced.errors.${body.code}`);
     if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');
     if (body.error === 'invalid_options') return t('autopilot.errorInvalidOptions');

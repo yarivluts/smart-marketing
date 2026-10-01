@@ -8,3 +8,4 @@ export * from './images';
 export * from './references';
 export * from './copy';
 export * from './voice';
+export * from './video-settings';

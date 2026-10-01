@@ -155,7 +155,7 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
     case 'clips': {
       if (!options.video) return { status: 'skipped', reason: 'off' };
       if (brief.scenes.length === 0) return { status: 'skipped', reason: 'no_script' };
-      const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice) };
+      const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice), settings: brief.video_settings ?? null };
       let clips = (await listAdStudioClips(ctx.organizationId, ctx.projectId, brief.id)).map(toAdStudioClipView);
       let progress = summarizeVideoProgress(sceneVideoStates(brief.scenes, clips, context), brief.scenes);
       const omni = deps.video.omni;
@@ -179,7 +179,7 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
     case 'assemble': {
       if (!options.video) return { status: 'skipped', reason: 'off' };
       if (brief.scenes.length === 0) return { status: 'skipped', reason: 'no_script' };
-      const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice) };
+      const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice), settings: brief.video_settings ?? null };
       const clips = (await listAdStudioClips(ctx.organizationId, ctx.projectId, brief.id)).map(toAdStudioClipView);
       const plan = assemblyPlan(brief.scenes, clips, context);
       if (!plan) return { status: 'failed', reason: 'clips_not_ready' };
@@ -206,7 +206,7 @@ async function clipsQualityGate(
   deps: AdStudioAutopilotDeps,
   clips: AdStudioClipView[],
 ): Promise<StepResult> {
-  const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice) };
+  const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice), settings: brief.video_settings ?? null };
   const total = brief.scenes.length;
   const ids = { organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id };
   let states = sceneVideoStates(brief.scenes, clips, context);

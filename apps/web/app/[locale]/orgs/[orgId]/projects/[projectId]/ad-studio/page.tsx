@@ -194,7 +194,7 @@ export default async function AdStudioPage({
   let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
   let exportableVideo: { id: string; durationSeconds: number } | null = null;
   if (selected) {
-    const context = { format: selected.format, language: selected.language, voice: voiceDescription(selected.voice) };
+    const context = { format: selected.format, language: selected.language, voice: voiceDescription(selected.voice), settings: selected.videoSettings };
     const progress = summarizeVideoProgress(
       sceneVideoStates(selected.scenes, clips, context),
       selected.scenes,
@@ -610,6 +610,7 @@ export default async function AdStudioPage({
                   )}
                   videoCopy={selected.videoCopy}
                   voice={selected.voice}
+                  videoSettings={selected.videoSettings}
                   advertiser={selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}

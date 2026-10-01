@@ -75,6 +75,13 @@ describe('buildConcatArgs', () => {
     expect(filter).toContain('scale=1280:720');
     expect(() => buildConcatArgs({ inputs: [], output: 'o.mp4', format: 'vertical' })).toThrow();
   });
+
+  it('joins 1080p clips at 1080p and every other resolution at 720p', () => {
+    const input = [{ file: 'a.mp4', seconds: 3, hasAudio: true }];
+    expect(buildConcatArgs({ inputs: input, output: 'o.mp4', format: 'vertical', resolution: '1080p' }).join(' ')).toContain('scale=1080:1920');
+    expect(buildConcatArgs({ inputs: input, output: 'o.mp4', format: 'horizontal', resolution: '1080p' }).join(' ')).toContain('scale=1920:1080');
+    expect(buildConcatArgs({ inputs: input, output: 'o.mp4', format: 'vertical', resolution: '360p' }).join(' ')).toContain('scale=720:1280');
+  });
 });
 
 describe('parsing ffmpeg output', () => {

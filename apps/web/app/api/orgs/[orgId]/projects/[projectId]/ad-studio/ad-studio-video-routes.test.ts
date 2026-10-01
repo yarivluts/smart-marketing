@@ -28,6 +28,7 @@ import { POST as assemble } from './briefs/[briefId]/assemble/route';
 import { GET as clipMedia } from './briefs/[briefId]/clips/[clipId]/media/route';
 import { GET as videoMedia } from './briefs/[briefId]/videos/[videoId]/media/route';
 import { PUT as putSettings } from './settings/route';
+import { PUT as putVideoSettings } from './briefs/[briefId]/video-settings/route';
 
 const { getServerSessionMock, memoryStorage, concatClipsMock } = vi.hoisted(() => ({
   getServerSessionMock: vi.fn(),
@@ -297,6 +298,36 @@ describe('Ad Studio video routes (KAN-231)', () => {
     expect(editClip).toMatchObject({ sceneId: 's1', version: 2, status: 'generating', instruction: 'make it night' });
     expect(starts[2]).toMatchObject({ previous_interaction_id: 'v1_1', input: expect.stringContaining('make it night. Keep everything else the same.') });
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId))[0]).toMatchObject({ kind: 'video_edit', units: 5 });
+  });
+
+  it('renders with the advanced settings: the resolution in the request, style and exclusions in the prompt, edits and assembly at the same resolution', async () => {
+    const ctx = await setup();
+    const { starts } = fakeOmni();
+    const saved = await putVideoSettings(request('PUT', { settings: { resolution: '1080p', style: 'cinematic', avoid: 'cars' } }), ctx.p());
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { brief: { videoSettings: unknown } }).brief.videoSettings).toEqual({ resolution: '1080p', style: 'cinematic', music: 'auto', avoid: 'cars' });
+    expect((await putVideoSettings(request('PUT', { settings: { resolution: '8k' } }), ctx.p())).status).toBe(400);
+
+    await renderAll(request('POST'), ctx.p());
+    expect(starts[0]).toMatchObject({ response_format: { resolution: '1080p' } });
+    expect(JSON.stringify(starts[0].input)).toContain('cinematic film look');
+    expect(JSON.stringify(starts[0].input)).toContain('Never show any of these anywhere in the video: cars.');
+    await poll(ctx.p());
+    await poll(ctx.p());
+    await editScene(request('POST', { instruction: 'make it night' }), ctx.p({ sceneId: 's1' }));
+    expect(starts[2]).toMatchObject({ previous_interaction_id: expect.any(String), response_format: { resolution: '1080p' } });
+    await poll(ctx.p());
+    await poll(ctx.p());
+
+    concatClipsMock.mockImplementation(async ({ output, resolution }: { output: string; resolution?: string }) => {
+      expect(resolution).toBe('1080p');
+      await writeFile(output, Buffer.from('hd'));
+      return { durationSeconds: 13 };
+    });
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
+    // A changed setting makes every clip out of date.
+    await putVideoSettings(request('PUT', { settings: { style: 'documentary' } }), ctx.p());
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(409);
   });
 
   it('assembles the current clips in script order, streams the result, and refuses once a scene changed', async () => {

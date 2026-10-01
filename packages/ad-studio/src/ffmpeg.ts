@@ -20,6 +20,16 @@ export const AD_STUDIO_FRAME: Record<AdStudioFormat, { width: number; height: nu
   vertical: { width: 720, height: 1280 },
   horizontal: { width: 1280, height: 720 },
 };
+/** The 1080p frame, for ads whose clips are made at 1080p; every other resolution is joined at 720p. */
+export const AD_STUDIO_FRAME_1080P: Record<AdStudioFormat, { width: number; height: number }> = {
+  vertical: { width: 1080, height: 1920 },
+  horizontal: { width: 1920, height: 1080 },
+};
+
+/** The frame an ad is assembled at for the resolution its clips were asked for. */
+export function assemblyFrame(format: AdStudioFormat, resolution?: string | null): { width: number; height: number } {
+  return resolution === '1080p' ? AD_STUDIO_FRAME_1080P[format] : AD_STUDIO_FRAME[format];
+}
 export const AD_STUDIO_FPS = 30;
 const DEFAULT_TIMEOUT_MS = 240_000;
 const STDERR_KEEP_BYTES = 64 * 1024;
@@ -53,11 +63,11 @@ function seconds(value: number): string {
 }
 
 /** The full ffmpeg argument list for joining `inputs` in order into `output`. */
-export function buildConcatArgs(params: { inputs: readonly ConcatInput[]; output: string; format: AdStudioFormat; fps?: number; maxSeconds?: number }): string[] {
+export function buildConcatArgs(params: { inputs: readonly ConcatInput[]; output: string; format: AdStudioFormat; resolution?: string | null; fps?: number; maxSeconds?: number }): string[] {
   const { inputs, output, format } = params;
   if (inputs.length === 0) throw new Error('Nothing to join.');
   const fps = params.fps ?? AD_STUDIO_FPS;
-  const { width, height } = AD_STUDIO_FRAME[format];
+  const { width, height } = assemblyFrame(format, params.resolution);
   const args = ['-hide_banner', '-nostdin', '-y'];
   for (const input of inputs) args.push('-i', input.file);
 
@@ -199,14 +209,14 @@ export async function probeMedia(file: string, runner: FfmpegRunner): Promise<Re
  * Joins clips (already on local disk) in order into `output`. Each clip runs its scene's length, or
  * its own length if shorter; a file with no video stream is refused. Returns the output's length.
  */
-export async function concatClips(params: { clips: readonly { file: string; seconds: number }[]; output: string; format: AdStudioFormat; runner: FfmpegRunner }): Promise<{ durationSeconds: number }> {
+export async function concatClips(params: { clips: readonly { file: string; seconds: number }[]; output: string; format: AdStudioFormat; resolution?: string | null; runner: FfmpegRunner }): Promise<{ durationSeconds: number }> {
   const inputs: ConcatInput[] = [];
   for (const clip of params.clips) {
     const probe = await probeMedia(clip.file, params.runner);
     if (!probe.hasVideo) throw new FfmpegFailedError('A clip has no video stream.', '');
     inputs.push({ file: clip.file, seconds: probe.durationSeconds ? Math.min(clip.seconds, probe.durationSeconds) : clip.seconds, hasAudio: probe.hasAudio });
   }
-  const { code, stderr } = await runFfmpeg(buildConcatArgs({ inputs, output: params.output, format: params.format }), params.runner);
+  const { code, stderr } = await runFfmpeg(buildConcatArgs({ inputs, output: params.output, format: params.format, resolution: params.resolution }), params.runner);
   if (code !== 0) throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
   // The container's own length is the most accurate; the last progress mark trails it slightly.
   const planned = inputs.reduce((sum, input) => sum + input.seconds, 0);

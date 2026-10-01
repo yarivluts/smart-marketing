@@ -11,6 +11,7 @@ import {
   sceneFingerprint,
   sceneVideoStates,
   voiceDescription,
+  normalizeVideoSettings,
   type AdStudioClipSummary,
   type AdStudioVideoContext,
 } from '@growthos/shared';
@@ -155,7 +156,7 @@ function summary(clip: AdStudioClipModel): AdStudioClipSummary & { model: AdStud
 }
 
 function videoContext(brief: AdStudioBriefModel): AdStudioVideoContext {
-  return { format: brief.video_format, language: brief.language, productDescription: brief.product_description, voice: voiceDescription(brief.narrator_voice) };
+  return { format: brief.video_format, language: brief.language, productDescription: brief.product_description, voice: voiceDescription(brief.narrator_voice), settings: brief.video_settings ?? null };
 }
 
 function clock(deps: Pick<AdStudioVideoDeps, 'now'>): Date {
@@ -195,6 +196,7 @@ async function startClip(
     parentClipId: string | null;
     prompt: string;
     aspectRatio: '9:16' | '16:9';
+    resolution: string;
     durationSeconds: number;
     call: () => Promise<OmniInteraction>;
   },
@@ -212,6 +214,7 @@ async function startClip(
     prompt: params.prompt,
     model: deps.omni.model,
     aspectRatio: params.aspectRatio,
+    resolution: params.resolution,
     durationSeconds: params.durationSeconds,
     requestedBy: ctx.actorId,
     now,
@@ -293,6 +296,7 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
   const prompt = buildScenePrompt(scene, context, references.map((reference) => reference.prompt));
   const images = references.map((reference) => reference.image);
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
+  const { resolution } = normalizeVideoSettings(brief.video_settings);
   return startClip(ctx, deps, {
     kind: 'video_scene',
     sceneId: scene.id,
@@ -301,8 +305,9 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
     parentClipId: null,
     prompt,
     aspectRatio,
+    resolution,
     durationSeconds: scene.durationSeconds,
-    call: () => deps.omni.startSceneGeneration({ prompt, aspectRatio, ...(images.length ? { images } : {}) }),
+    call: () => deps.omni.startSceneGeneration({ prompt, aspectRatio, resolution, ...(images.length ? { images } : {}) }),
   });
 }
 
@@ -326,6 +331,8 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
   const text = buildSceneEditInstruction(instruction);
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   const previousInteractionId = parent.interaction_id;
+  // An edit continues its clip, so it keeps that clip's resolution (720p for clips made before the setting).
+  const resolution = parent.resolution ?? '720p';
   return startClip(ctx, deps, {
     kind: 'video_edit',
     sceneId: ctx.sceneId,
@@ -334,8 +341,9 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
     parentClipId: parent.id,
     prompt: text,
     aspectRatio,
+    resolution,
     durationSeconds: parent.duration_seconds,
-    call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: text, aspectRatio }),
+    call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: text, aspectRatio, resolution }),
   });
 }
 
@@ -494,7 +502,7 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
     }
     stage = 'ffmpeg_failed';
     const output = path.join(workDir, 'video.mp4');
-    const { durationSeconds } = await (adStudioRuntime().concatClips ?? concatClips)({ clips: local, output, format: brief.video_format, runner: deps.runner });
+    const { durationSeconds } = await (adStudioRuntime().concatClips ?? concatClips)({ clips: local, output, format: brief.video_format, resolution: normalizeVideoSettings(brief.video_settings).resolution, runner: deps.runner });
     stage = 'storage_error';
     const objectPath = adStudioVideoObjectPath({ ...ctx, videoId: video.id });
     await deps.storage.upload(objectPath, await readFile(output), 'video/mp4');

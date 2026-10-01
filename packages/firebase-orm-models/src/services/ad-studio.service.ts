@@ -7,11 +7,16 @@ import {
   reconcilePronunciations,
   speakerFields,
   voiceIssue,
+  videoSettingsIssue,
+  normalizeVideoSettings,
+  isDefaultVideoSettings,
   validateAdStudioImageConcepts,
   validateAdStudioScenes,
   type AdStudioAdCopy,
   type AdStudioVoice,
   type AdStudioVoiceIssueCode,
+  type AdStudioVideoSettings,
+  type AdStudioVideoSettingsIssueCode,
   type AdStudioAdCopyIssueCode,
   type AdStudioBriefInput,
   type AdStudioImageConcept,
@@ -82,6 +87,13 @@ export class AdStudioVoiceInvalidError extends Error {
   constructor(public readonly code: AdStudioVoiceIssueCode) {
     super(`The narrator voice is not valid: ${code}`);
     this.name = 'AdStudioVoiceInvalidError';
+  }
+}
+
+export class AdStudioVideoSettingsInvalidError extends Error {
+  constructor(public readonly code: AdStudioVideoSettingsIssueCode) {
+    super(`The video settings are not valid: ${code}`);
+    this.name = 'AdStudioVideoSettingsInvalidError';
   }
 }
 
@@ -294,6 +306,21 @@ export async function saveAdStudioVoice(params: { organizationId: string; projec
       ? { preset: 'custom', description: (params.voice.description ?? '').replace(/\s+/g, ' ').trim() }
       : { preset: params.voice.preset }
     : null;
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/**
+ * Changes the ad's advanced video settings. Fields left out keep their saved value; settings back at
+ * the defaults are stored as null. A change makes every clip made with the old settings out of date.
+ */
+export async function saveAdStudioVideoSettings(params: { organizationId: string; projectId: string; briefId: string; settings: Partial<AdStudioVideoSettings>; now?: Date }): Promise<AdStudioBriefModel> {
+  const issue = videoSettingsIssue(params.settings);
+  if (issue) throw new AdStudioVideoSettingsInvalidError(issue);
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  const next = normalizeVideoSettings({ ...normalizeVideoSettings(brief.video_settings), ...params.settings });
+  brief.video_settings = isDefaultVideoSettings(next) ? null : next;
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;

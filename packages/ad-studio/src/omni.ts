@@ -61,8 +61,9 @@ export type OmniFileState = { state: 'PROCESSING' } | { state: 'ACTIVE' } | { st
 
 export interface AdStudioOmni {
   model: string;
-  startSceneGeneration(params: { prompt: string; aspectRatio: OmniAspectRatio; images?: readonly OmniImageInput[] }): Promise<OmniInteraction>;
-  startSceneEdit(params: { previousInteractionId: string; instruction: string; aspectRatio: OmniAspectRatio }): Promise<OmniInteraction>;
+  /** `resolution` defaults to 720p. */
+  startSceneGeneration(params: { prompt: string; aspectRatio: OmniAspectRatio; resolution?: string; images?: readonly OmniImageInput[] }): Promise<OmniInteraction>;
+  startSceneEdit(params: { previousInteractionId: string; instruction: string; aspectRatio: OmniAspectRatio; resolution?: string }): Promise<OmniInteraction>;
   getInteraction(interactionId: string): Promise<OmniInteraction>;
   getFileState(fileName: string): Promise<OmniFileState>;
   downloadFile(fileName: string): Promise<Buffer>;
@@ -166,8 +167,8 @@ export function createOmniClient(apiKey: string, options: { fetchImpl?: FetchLik
     return response;
   }
 
-  function responseFormat(aspectRatio: OmniAspectRatio) {
-    return { type: 'video', aspect_ratio: aspectRatio, resolution: AD_STUDIO_VIDEO_RESOLUTION, delivery: 'uri' };
+  function responseFormat(aspectRatio: OmniAspectRatio, resolution: string = AD_STUDIO_VIDEO_RESOLUTION) {
+    return { type: 'video', aspect_ratio: aspectRatio, resolution, delivery: 'uri' };
   }
 
   async function start(body: Json): Promise<OmniInteraction> {
@@ -183,13 +184,13 @@ export function createOmniClient(apiKey: string, options: { fetchImpl?: FetchLik
 
   return {
     model: AD_STUDIO_VIDEO_MODEL,
-    startSceneGeneration: ({ prompt, aspectRatio, images }) =>
+    startSceneGeneration: ({ prompt, aspectRatio, resolution, images }) =>
       start({
         input: images?.length ? [{ type: 'text', text: prompt }, ...images.map((image) => ({ type: 'image', mime_type: image.mimeType, data: image.data.toString('base64') }))] : prompt,
-        response_format: responseFormat(aspectRatio),
+        response_format: responseFormat(aspectRatio, resolution),
       }),
-    startSceneEdit: ({ previousInteractionId, instruction, aspectRatio }) =>
-      start({ previous_interaction_id: previousInteractionId, input: instruction, response_format: responseFormat(aspectRatio) }),
+    startSceneEdit: ({ previousInteractionId, instruction, aspectRatio, resolution }) =>
+      start({ previous_interaction_id: previousInteractionId, input: instruction, response_format: responseFormat(aspectRatio, resolution) }),
     async getInteraction(interactionId) {
       const response = await call(`/interactions/${encodeURIComponent(interactionId)}`, { method: 'GET' });
       return parseOmniInteraction(await readJson(response));

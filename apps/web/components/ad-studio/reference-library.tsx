@@ -7,6 +7,7 @@ import { AD_STUDIO_REFERENCE_DESCRIPTION_MAX, AD_STUDIO_REFERENCE_LABEL_MAX } fr
 import { useRouter } from '@/i18n/navigation';
 import type { AdStudioReferenceView } from '@/lib/ad-studio/engine';
 import { cn } from '@/lib/utils';
+import { labelFromFileName, prepareReferenceImage } from '@/lib/ad-studio/prepare-reference-image';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface ReferenceLibraryProps {
@@ -59,8 +60,15 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
       let response: Response;
       if (mode === 'upload') {
         if (!file) return;
+        let upload: File;
+        try {
+          upload = await prepareReferenceImage(file);
+        } catch {
+          setMessage(errorMessage({ error: 'reference_request', code: 'unsupported_image' }));
+          return;
+        }
         const form = new FormData();
-        form.set('file', file);
+        form.set('file', upload);
         form.set('label', label);
         form.set('description', description);
         response = await fetch(base, { method: 'POST', body: form });
@@ -147,7 +155,16 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
           {mode === 'upload' ? (
             <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
               {t('fileLabel')}
-              <input type="file" accept="image/png,image/jpeg" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="text-sm text-foreground" />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const chosen = event.target.files?.[0] ?? null;
+                  setFile(chosen);
+                  if (chosen && !label.trim()) setLabel(labelFromFileName(chosen.name));
+                }}
+                className="text-sm text-foreground"
+              />
               <span className="font-normal">{t('fileHint')}</span>
             </label>
           ) : null}

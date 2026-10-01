@@ -10,7 +10,7 @@ import {
 import { fitAdStudioScenes, validateAdStudioScenes, type AdStudioScene } from './scenes';
 import { buildScenePrompt, sceneFingerprint } from './video';
 
-const CONTEXT = { format: 'horizontal' as const, language: 'en', productDescription: 'GrowthOS, growth analytics', voice: null };
+const CONTEXT = { format: 'horizontal' as const, language: 'en', productDescription: 'GrowthOS, growth analytics', voice: null, settings: null };
 
 function scene(references?: AdStudioSceneReference[]): AdStudioScene {
   return { id: 's1', durationSeconds: 5, visualPrompt: 'A marketer looks at a laptop', voiceover: '', onScreenText: '', ...(references ? { references } : {}) };
