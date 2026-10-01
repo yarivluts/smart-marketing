@@ -18,7 +18,6 @@ function reference(overrides: Partial<AdStudioReferenceView> = {}): AdStudioRefe
     label: 'Dashboard',
     description: 'The ad studio dashboard',
     status: 'ready',
-    sourceUrl: null,
     prompt: null,
     mimeType: 'image/png',
     byteSize: 1200,
@@ -40,12 +39,14 @@ afterEach(() => {
 const BASE = '/api/orgs/o/projects/p/ad-studio/briefs/b1/references';
 
 describe('ReferenceLibrary', () => {
-  it('shows each image, and offers capture and illustration only when they are set up', () => {
-    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[reference()]} captureAvailable={false} illustrationAvailable />, { locale: 'en' });
+  it('shows each image, and offers illustrations only when an image model is set up', () => {
+    const { unmount } = renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[reference()]} illustrationAvailable={false} />, { locale: 'en' });
+    expect(screen.getByRole('button', { name: 'Draw an illustration' })).toBeDisabled();
+    unmount();
+    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[reference()]} illustrationAvailable />, { locale: 'en' });
     const card = within(screen.getByTestId('ad-studio-reference'));
     expect(card.getByRole('img', { name: 'Dashboard' })).toHaveAttribute('src', `${BASE}/r1/media`);
     expect(card.getByText('Uploaded')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Capture a page' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Draw an illustration' })).toBeEnabled();
   });
 
@@ -54,7 +55,7 @@ describe('ReferenceLibrary', () => {
       typeof init?.body === 'string' ? json({ reference: reference({ id: 'r2', source: 'illustration', label: 'Signed' }) }, 201) : json({ error: 'reference_request', code: 'unsupported_image' }, 400),
     );
     vi.stubGlobal('fetch', fetchMock);
-    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[]} captureAvailable illustrationAvailable />, { locale: 'en' });
+    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[]} illustrationAvailable />, { locale: 'en' });
     expect(screen.getByText(/No images yet/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Draw an illustration' }));
@@ -83,7 +84,7 @@ describe('ReferenceLibrary', () => {
   it('asks before deleting an image, then removes it', async () => {
     const fetchMock = vi.fn(async () => json({ deleted: 'r1' }));
     vi.stubGlobal('fetch', fetchMock);
-    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[reference()]} captureAvailable illustrationAvailable />, { locale: 'he' });
+    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[reference()]} illustrationAvailable />, { locale: 'he' });
     const card = within(screen.getByTestId('ad-studio-reference'));
     fireEvent.click(card.getByRole('button', { name: heMessages.AdStudio.references.delete }));
     expect(fetchMock).not.toHaveBeenCalled();

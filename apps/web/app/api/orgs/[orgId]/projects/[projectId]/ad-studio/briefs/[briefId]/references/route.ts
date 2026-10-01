@@ -5,12 +5,10 @@ import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
 import {
   addUploadedReference,
-  captureReferenceScreenshot,
   drawReferenceIllustration,
   listBriefReferences,
   resolveAdStudioImageGenerator,
   resolveAdStudioMediaStorage,
-  resolveAdStudioPageCapture,
   toAdStudioReferenceView,
   type AdStudioImageAspectRatio,
 } from '@/lib/ad-studio/engine';
@@ -28,7 +26,7 @@ function text(value: unknown): string {
 }
 
 /**
- * The ad's reference images (KAN-243) - app screenshots, captured pages and AI illustrations that
+ * The ad's reference images (KAN-243) - app screenshots and AI illustrations that
  * scenes hand to the video model - and which ways of adding one this deployment offers. Gated on `ai.use`.
  */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
@@ -37,7 +35,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
   if (error) return error;
   try {
     const references = await listBriefReferences({ organizationId: orgId, projectId, briefId });
-    return NextResponse.json({ references, capture: resolveAdStudioPageCapture() !== null, illustration: resolveAdStudioImageGenerator() !== null });
+    return NextResponse.json({ references, illustration: resolveAdStudioImageGenerator() !== null });
   } catch (err) {
     return adStudioErrorResponse(err);
   }
@@ -45,8 +43,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 
 /**
  * Adds a reference image. A multipart form with `file` uploads one (PNG or JPEG, checked by its
- * bytes); a JSON body with `source: "screenshot"` captures a public page, and `source:
- * "illustration"` draws one with the image model (counts toward the daily image limit). Every image
+ * bytes); a JSON body with `source: "illustration"` draws one with the image model (counts toward
+ * the daily image limit). Every image
  * needs a `label`; `description` says what it shows and goes into the scene prompt.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
@@ -67,11 +65,6 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     if (parsed.error) return parsed.error;
     const body = parsed.body ?? {};
     const described = { label: text(body.label), description: text(body.description) };
-    if (body.source === 'screenshot') {
-      const device = body.device === 'mobile' ? 'mobile' : 'desktop';
-      const reference = await captureReferenceScreenshot({ ...ctx, ...described, url: text(body.url), device }, { capture: resolveAdStudioPageCapture() });
-      return NextResponse.json({ reference: toAdStudioReferenceView(reference) }, { status: 201 });
-    }
     if (body.source === 'illustration') {
       const prompt = text(body.prompt).trim();
       const aspectRatio = ASPECT_RATIOS.find((ratio) => ratio === body.aspectRatio) ?? '16:9';

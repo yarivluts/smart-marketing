@@ -55,12 +55,10 @@ import {
   AdStudioVideoRequestError,
   addUploadedReference,
   adStudioBriefMediaPrefix,
-  captureReferenceScreenshot,
   drawReferenceIllustration,
   listBriefReferences,
   readBriefReference,
   removeBriefReference,
-  resolveAdStudioPageCapture,
   toAdStudioReferenceView,
   type AdStudioReferenceView,
   adStudioImageSlots,
@@ -235,7 +233,6 @@ function referenceOutput(reference: AdStudioReferenceView) {
     label: reference.label,
     description: reference.description,
     status: reference.status,
-    source_url: reference.sourceUrl,
     prompt: reference.prompt,
     mime_type: reference.mimeType,
     failure_code: reference.failureCode,
@@ -601,13 +598,13 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     {
       title: 'List reference images',
       description:
-        'Lists the ad\'s reference images - app screenshots, captured pages and AI illustrations that scenes hand to the video model so the clip shows the real product - and which ways of adding one are available. Requires "ai.use".',
+        'Lists the ad\'s reference images - app screenshots and AI illustrations that scenes hand to the video model so the clip shows the real product - and whether illustrations can be drawn. Requires "ai.use".',
       inputSchema: toolInputSchema({ brief_id: briefId }),
     },
     auditedToolHandler(auth, 'list_ad_references', async (args: any) =>
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string }) => {
         const references = await listBriefReferences(ctx(a.brief_id));
-        return textResult({ references: references.map(referenceOutput), can_capture_pages: resolveAdStudioPageCapture() !== null, can_draw_illustrations: resolveAdStudioImageGenerator() !== null });
+        return textResult({ references: references.map(referenceOutput), can_draw_illustrations: resolveAdStudioImageGenerator() !== null });
       }),
     ),
   );
@@ -617,14 +614,12 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     {
       title: 'Add a reference image',
       description:
-        'Adds a reference image to the ad\'s library. source "upload": send a PNG or JPEG (up to 8 MB) as base64 in image_base64 - for example a screenshot of the real app. source "screenshot": capture a public page by url (device desktop or mobile). source "illustration": draw one with the image model from prompt (counts toward the daily image limit). Attach it to scenes with save_ad_script (scene.references). Requires "ai.use".',
+        'Adds a reference image to the ad\'s library. source "upload": send a PNG or JPEG (up to 8 MB) as base64 in image_base64 - for example a sharp screenshot of the real app taken in a browser. source "illustration": draw one with the image model from prompt (counts toward the daily image limit). Attach it to scenes with save_ad_script (scene.references). Requires "ai.use".',
       inputSchema: toolInputSchema({
         brief_id: briefId,
-        source: z.string().describe('"upload", "screenshot" or "illustration".'),
+        source: z.string().describe('"upload" or "illustration".'),
         ...referenceText,
         image_base64: z.string().optional().describe('For source "upload": the PNG or JPEG bytes, base64.'),
-        url: z.string().optional().describe('For source "screenshot": the public page to capture.'),
-        device: z.string().optional().describe('For source "screenshot": "desktop" (default) or "mobile".'),
         prompt: z.string().optional().describe('For source "illustration": what it should show.'),
         aspect_ratio: z.string().optional().describe('For source "illustration": "16:9" (default), "9:16", "1:1" or "4:5".'),
       }),
@@ -634,15 +629,11 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         auth,
         'ai.use',
         args,
-        async (a: { brief_id: string; source: string; label: string; description?: string; image_base64?: string; url?: string; device?: string; prompt?: string; aspect_ratio?: string }) => {
+        async (a: { brief_id: string; source: string; label: string; description?: string; image_base64?: string; prompt?: string; aspect_ratio?: string }) => {
           const base = { ...ctx(a.brief_id), actorId: actorId(auth), label: a.label, description: a.description ?? '' };
           if (a.source === 'upload') {
             if (!a.image_base64) return errorResult('Invalid: image_base64 is required for source "upload".');
             const reference = await addUploadedReference({ ...base, bytes: Buffer.from(a.image_base64, 'base64') });
-            return textResult(referenceOutput(toAdStudioReferenceView(reference)));
-          }
-          if (a.source === 'screenshot') {
-            const reference = await captureReferenceScreenshot({ ...base, url: a.url ?? '', device: a.device === 'mobile' ? 'mobile' : 'desktop' }, { capture: resolveAdStudioPageCapture() });
             return textResult(referenceOutput(toAdStudioReferenceView(reference)));
           }
           if (a.source === 'illustration') {
@@ -651,7 +642,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
             const reference = await drawReferenceIllustration({ ...base, prompt: a.prompt, aspectRatio }, { images: resolveAdStudioImageGenerator() });
             return textResult(referenceOutput(toAdStudioReferenceView(reference)));
           }
-          return errorResult('Invalid: source must be "upload", "screenshot" or "illustration".');
+          return errorResult('Invalid: source must be "upload" or "illustration".');
         },
       ),
     ),

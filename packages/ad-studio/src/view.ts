@@ -79,7 +79,6 @@ export interface AdStudioReferenceView {
   label: string;
   description: string;
   status: 'generating' | 'ready' | 'failed';
-  sourceUrl: string | null;
   prompt: string | null;
   mimeType: string | null;
   byteSize: number | null;

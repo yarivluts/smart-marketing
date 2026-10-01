@@ -24,12 +24,12 @@ import type { OmniImageInput } from './omni';
 import type { AdStudioReferenceView } from './view';
 
 /**
- * Reference images for video scenes (KAN-243): the ad's library of real app screenshots, captured
- * web pages and AI illustrations, and what a scene render sends to the video model with its prompt.
+ * Reference images for video scenes (KAN-243): the ad's library of real app screenshots and AI
+ * illustrations, and what a scene render sends to the video model with its prompt.
  */
 
 /** Why a reference request cannot go ahead, as a code the UI translates. */
-export type AdStudioReferenceRequestCode = 'unsupported_image' | 'image_too_large' | 'invalid_url' | 'capture_not_configured' | 'illustration_not_configured' | 'reference_not_ready';
+export type AdStudioReferenceRequestCode = 'unsupported_image' | 'image_too_large' | 'illustration_not_configured' | 'reference_not_ready';
 
 export class AdStudioReferenceRequestError extends Error {
   constructor(public readonly code: AdStudioReferenceRequestCode) {
@@ -63,7 +63,6 @@ export function toAdStudioReferenceView(reference: AdStudioReferenceModel): AdSt
     label: reference.label,
     description: reference.description,
     status: reference.status,
-    sourceUrl: reference.source_url ?? null,
     prompt: reference.prompt ?? null,
     mimeType: reference.mime_type ?? null,
     byteSize: reference.byte_size ?? null,
@@ -96,91 +95,6 @@ export async function addUploadedReference(
   await ensureOrm();
   const reference = await createAdStudioReference({ ...ctx, source: 'upload' });
   return store(reference, ctx, ctx.bytes, storage, ctx.now);
-}
-
-// ---- Web page capture -------------------------------------------------------------------------
-
-export type AdStudioCaptureDevice = 'mobile' | 'desktop';
-
-/** Takes a picture of a public web page. */
-export interface AdStudioPageCapture {
-  model: string;
-  capture(params: { url: string; device: AdStudioCaptureDevice }): Promise<Buffer>;
-}
-
-type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
-const PAGESPEED_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
-const CAPTURE_TIMEOUT_MS = 120_000;
-
-/**
- * Captures a page through the PageSpeed Insights API, whose Lighthouse run ends with a screenshot of
- * the loaded page (`final-screenshot`, a JPEG data URL). Google loads the page, not this server, so a
- * capture cannot reach anything private. The key goes in the query string, as the API requires; the
- * URL is never logged.
- */
-export function createPageSpeedCapture(apiKey: string, fetchImpl: FetchLike = fetch): AdStudioPageCapture {
-  return {
-    model: 'pagespeed-insights',
-    async capture({ url, device }) {
-      const query = new URLSearchParams({ url, strategy: device, category: 'performance', key: apiKey });
-      let response: Response;
-      try {
-        response = await fetchImpl(`${PAGESPEED_API}?${query.toString()}`, { method: 'GET', signal: AbortSignal.timeout(CAPTURE_TIMEOUT_MS) });
-      } catch (error) {
-        throw new AdStudioProviderError('provider_error', error instanceof Error ? error.message : String(error));
-      }
-      const body = (await response.json().catch(() => ({}))) as {
-        error?: { message?: string };
-        lighthouseResult?: { runtimeError?: { message?: string }; audits?: Record<string, { details?: { data?: string } }> };
-      };
-      if (!response.ok) {
-        const message = body.error?.message ?? `HTTP ${response.status}`;
-        throw new AdStudioProviderError(response.status === 429 ? 'rate_limited' : response.status === 400 ? 'invalid_output' : 'provider_error', message);
-      }
-      const data = body.lighthouseResult?.audits?.['final-screenshot']?.details?.data ?? '';
-      const match = /^data:image\/(?:jpeg|png);base64,(.+)$/.exec(data);
-      if (!match) throw new AdStudioProviderError('invalid_output', body.lighthouseResult?.runtimeError?.message ?? 'The page could not be captured.');
-      return Buffer.from(match[1], 'base64');
-    },
-  };
-}
-
-/** The page capture: PageSpeed Insights with PAGESPEED_API_KEY, else null (capture by URL is then off). */
-export function resolveAdStudioPageCapture(env: NodeJS.ProcessEnv = process.env): AdStudioPageCapture | null {
-  const key = env.PAGESPEED_API_KEY?.trim();
-  return key ? createPageSpeedCapture(key) : null;
-}
-
-/** A public http(s) URL, or null. */
-export function publicPageUrl(value: string): string | null {
-  try {
-    const url = new URL(value.trim());
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
-    if (url.username || url.password) return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-/** Captures a public page and stores it as a reference image; a failed capture stays in the library as failed. */
-export async function captureReferenceScreenshot(
-  ctx: BriefContext & ReferenceText & { url: string; device: AdStudioCaptureDevice; now?: Date },
-  deps: { capture: AdStudioPageCapture | null; storage?: AdStudioMediaStorage },
-): Promise<AdStudioReferenceModel> {
-  const url = publicPageUrl(ctx.url);
-  if (!url) throw new AdStudioReferenceRequestError('invalid_url');
-  if (!deps.capture) throw new AdStudioReferenceRequestError('capture_not_configured');
-  await ensureOrm();
-  const reference = await createAdStudioReference({ ...ctx, source: 'screenshot', sourceUrl: url, model: deps.capture.model });
-  try {
-    const bytes = await deps.capture.capture({ url, device: ctx.device });
-    return await store(reference, ctx, bytes, deps.storage ?? resolveAdStudioMediaStorage(), ctx.now);
-  } catch (error) {
-    const code = error instanceof AdStudioProviderError || error instanceof AdStudioReferenceRequestError ? error.code : 'provider_error';
-    await markAdStudioReferenceFailed(reference, { code, message: error instanceof Error ? error.message : String(error), now: ctx.now });
-    throw error;
-  }
 }
 
 // ---- AI illustration --------------------------------------------------------------------------

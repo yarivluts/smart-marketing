@@ -4317,26 +4317,17 @@
     "pronunciationStale": "The narration changed - the pronunciation will be redone when you save.",
     "references": {
       "title": "Screens and images for the video",
-      "description": "Real screenshots of your app, captured web pages or AI illustrations. Attach them to scenes and the video model shows your real product instead of inventing one.",
+      "description": "Real screenshots of your app or AI illustrations. Attach them to scenes and the video model shows your real product instead of inventing one.",
       "unavailable": {
         "upload": "Upload a PNG or JPEG image.",
-        "capture": "Capturing a page by its address is not set up for this deployment.",
         "illustration": "No image model is configured for this deployment."
       },
       "add": {
         "upload": "Upload a screenshot",
-        "capture": "Capture a page",
         "illustration": "Draw an illustration"
       },
       "fileLabel": "Image file",
       "fileHint": "PNG or JPEG, up to 8 MB. A sharp, full-size screenshot works best.",
-      "urlLabel": "Page address",
-      "deviceLabel": "Screen",
-      "device": {
-        "desktop": "Desktop",
-        "mobile": "Phone"
-      },
-      "captureHint": "Public pages only - the page is opened by Google, not with your login.",
       "promptLabel": "What should the illustration show?",
       "promptPlaceholder": "A phone showing a signed contract with a green check mark",
       "aspectLabel": "Shape",
@@ -4345,12 +4336,10 @@
       "descriptionPlaceholder": "The dashboard after a document was signed",
       "working": {
         "upload": "Uploading…",
-        "capture": "Capturing…",
         "illustration": "Drawing…"
       },
       "submit": {
         "upload": "Upload",
-        "capture": "Capture",
         "illustration": "Draw"
       },
       "cancel": "Cancel",
@@ -4366,7 +4355,6 @@
       },
       "source": {
         "upload": "Uploaded",
-        "screenshot": "Captured page",
         "illustration": "AI illustration"
       },
       "sceneTitle": "Images for this scene",
@@ -4382,8 +4370,6 @@
       "errors": {
         "unsupported_image": "Only PNG and JPEG images can be used.",
         "image_too_large": "The image is larger than 8 MB.",
-        "invalid_url": "Enter a full http or https page address.",
-        "capture_not_configured": "Capturing a page is not set up for this deployment.",
         "illustration_not_configured": "No image model is configured for this deployment.",
         "reference_not_ready": "That image is not ready yet.",
         "label_required": "Give the image a name.",

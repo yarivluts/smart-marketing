@@ -5,9 +5,9 @@ export const AD_STUDIO_REFERENCE_STATUSES = ['generating', 'ready', 'failed'] as
 export type AdStudioReferenceStatus = (typeof AD_STUDIO_REFERENCE_STATUSES)[number];
 
 /**
- * One reference image in an ad's library (KAN-243): an uploaded app screenshot, a captured web page
- * or an AI illustration, that scenes attach and hand to the video model with their prompt. The
- * bytes live in the media bucket under the brief; this record says what the image is and shows.
+ * One reference image in an ad's library (KAN-243): an uploaded app screenshot or an AI
+ * illustration, that scenes attach and hand to the video model with their prompt. The bytes live in
+ * the media bucket under the brief; this record says what the image is and shows.
  */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/ad_studio_references',
@@ -37,15 +37,11 @@ export class AdStudioReferenceModel extends BaseModel {
   @Field({ is_required: true })
   public status!: AdStudioReferenceStatus;
 
-  /** The captured page, for screenshots. */
-  @Field({ is_required: false })
-  public source_url?: string | null;
-
   /** What the illustration was asked to show, for illustrations. */
   @Field({ is_required: false })
   public prompt?: string | null;
 
-  /** The model that drew an illustration, or the capture service of a screenshot. */
+  /** The model that drew an illustration. */
   @Field({ is_required: false })
   public model?: string | null;
 

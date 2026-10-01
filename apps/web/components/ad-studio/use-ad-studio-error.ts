@@ -19,8 +19,6 @@ const IMAGE_REQUEST_CODES = new Set(['concept_not_found', 'format_not_in_concept
 const REFERENCE_REQUEST_CODES = new Set([
   'unsupported_image',
   'image_too_large',
-  'invalid_url',
-  'capture_not_configured',
   'illustration_not_configured',
   'reference_not_ready',
   'label_required',

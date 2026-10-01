@@ -29,29 +29,21 @@ beforeEach(() => {
   memoryStorage.current = createMemoryMediaStorage();
   configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage });
   process.env.GEMINI_API_KEY = 'test-gemini-key';
-  delete process.env.PAGESPEED_API_KEY;
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.GEMINI_API_KEY;
-  delete process.env.PAGESPEED_API_KEY;
 });
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
-const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 4, 5, 6]);
 
-/** Google's APIs with their documented shapes: PageSpeed's final screenshot, the image model, and Omni. */
+/** Google's APIs with their documented shapes: the image model and Omni. */
 function fakeGoogle() {
   const omniStarts: Record<string, unknown>[] = [];
-  const pageSpeed: URL[] = [];
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.startsWith('https://www.googleapis.com/pagespeedonline/v5/runPagespeed')) {
-      pageSpeed.push(new URL(url));
-      return Response.json({ lighthouseResult: { audits: { 'final-screenshot': { details: { data: `data:image/jpeg;base64,${JPEG.toString('base64')}` } } } } });
-    }
     const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
     if (url === `${GEMINI}/interactions` && body.model === 'gemini-3.1-flash-image') {
       return Response.json({ id: 'img', status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'image', mime_type: 'image/png', data: PNG.toString('base64') }] }] });
@@ -63,7 +55,7 @@ function fakeGoogle() {
     return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { omniStarts, pageSpeed };
+  return { omniStarts };
 }
 
 function unique(prefix: string): string {
@@ -105,8 +97,8 @@ describe('Ad Studio reference images', () => {
   it('uploads a real app screenshot, serves it, and refuses a file that is not a PNG or JPEG', async () => {
     fakeGoogle();
     const ctx = await setup();
-    const listed = (await (await listReferences(jsonRequest('GET'), ctx.p())).json()) as { references: unknown[]; capture: boolean; illustration: boolean };
-    expect(listed).toEqual({ references: [], capture: false, illustration: true });
+    const listed = (await (await listReferences(jsonRequest('GET'), ctx.p())).json()) as { references: unknown[]; illustration: boolean };
+    expect(listed).toEqual({ references: [], illustration: true });
 
     const response = await addReference(uploadRequest(PNG, { label: 'Dashboard', description: 'The ad studio dashboard' }), ctx.p());
     expect(response.status).toBe(201);
@@ -123,26 +115,17 @@ describe('Ad Studio reference images', () => {
     expect(await unlabelled.json()).toEqual({ error: 'reference_request', code: 'label_required' });
   });
 
-  it('captures a public page only when capture is set up, and draws an illustration counted as an image', async () => {
-    const google = fakeGoogle();
+  it('draws an illustration counted as an image, and refuses an unknown source', async () => {
+    fakeGoogle();
     const ctx = await setup();
-    const screenshot = { source: 'screenshot', url: 'https://example.com/pricing', device: 'mobile', label: 'Pricing', description: 'The pricing page' };
-    const off = await addReference(jsonRequest('POST', screenshot), ctx.p());
-    expect(off.status).toBe(503);
-    expect(await off.json()).toEqual({ error: 'reference_request', code: 'capture_not_configured' });
-
-    process.env.PAGESPEED_API_KEY = 'psi-key';
-    expect((await addReference(jsonRequest('POST', { ...screenshot, url: 'file:///etc/passwd' }), ctx.p())).status).toBe(400);
-    const captured = (await (await addReference(jsonRequest('POST', screenshot), ctx.p())).json()) as Added;
-    expect(captured.reference).toMatchObject({ source: 'screenshot', status: 'ready', mimeType: 'image/jpeg', sourceUrl: 'https://example.com/pricing' });
-    expect(google.pageSpeed[0].searchParams.get('strategy')).toBe('mobile');
+    const unknown = await addReference(jsonRequest('POST', { source: 'screenshot', url: 'https://example.com', label: 'Pricing' }), ctx.p());
+    expect(unknown.status).toBe(400);
 
     const drawn = (await (await addReference(jsonRequest('POST', { source: 'illustration', prompt: 'A phone showing a signed contract', aspectRatio: '9:16', label: 'Signed' }), ctx.p())).json()) as Added;
     expect(drawn.reference).toMatchObject({ source: 'illustration', status: 'ready', prompt: 'A phone showing a signed contract' });
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'reference_image')).toEqual([expect.objectContaining({ outcome: 'succeeded' })]);
-    const listed = (await (await listReferences(jsonRequest('GET'), ctx.p())).json()) as { references: AdStudioReferenceView[]; capture: boolean };
-    expect(listed.capture).toBe(true);
-    expect(listed.references.map((entry) => entry.label).sort()).toEqual(['Pricing', 'Signed']);
+    const listed = (await (await listReferences(jsonRequest('GET'), ctx.p())).json()) as { references: AdStudioReferenceView[] };
+    expect(listed.references.map((entry) => entry.label)).toEqual(['Signed']);
   });
 
   it('a scene renders with its attached screen, sent to the video model after the prompt; deleting the image detaches it', async () => {

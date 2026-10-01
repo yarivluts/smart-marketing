@@ -39,8 +39,6 @@ const VIDEO_REQUEST_STATUS: Record<AdStudioVideoRequestError['code'], number> = 
 const REFERENCE_REQUEST_STATUS: Record<AdStudioReferenceRequestError['code'], number> = {
   unsupported_image: 400,
   image_too_large: 413,
-  invalid_url: 400,
-  capture_not_configured: 503,
   illustration_not_configured: 503,
   reference_not_ready: 409,
 };

@@ -1,6 +1,5 @@
 /**
- * Reference images for video scenes (KAN-243): real app screenshots, captured web pages and AI
- * illustrations that a scene hands to the video model with its prompt, so the ad shows the real
+ * Reference images for video scenes (KAN-243): real app screenshots and AI illustrations that a scene hands to the video model with its prompt, so the ad shows the real
  * product instead of an interface the model invents. Gemini Omni takes PNG or JPEG images next to
  * the text prompt and uses each the way the prompt says. Pure, shared by the engine, the routes,
  * the editor and the tests.
@@ -10,8 +9,12 @@
  * keeps the whole screen in view.
  */
 
-/** Where a reference image came from. */
-export const AD_STUDIO_REFERENCE_SOURCES = ['upload', 'screenshot', 'illustration'] as const;
+/**
+ * Where a reference image came from. Capturing a page by URL was tried and dropped: the PageSpeed
+ * API returns only thumbnails (500x348), which the video model turns into garbled screens, and real
+ * app screens sit behind a login anyway - a screenshot is uploaded instead (by a person or an agent).
+ */
+export const AD_STUDIO_REFERENCE_SOURCES = ['upload', 'illustration'] as const;
 export type AdStudioReferenceSource = (typeof AD_STUDIO_REFERENCE_SOURCES)[number];
 
 /**

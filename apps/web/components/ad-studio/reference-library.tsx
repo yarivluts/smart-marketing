@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Camera, ImagePlus, Loader2, Pencil, Sparkles, Trash2, Upload } from 'lucide-react';
+import { ImagePlus, Loader2, Pencil, Sparkles, Trash2, Upload } from 'lucide-react';
 import { AD_STUDIO_REFERENCE_DESCRIPTION_MAX, AD_STUDIO_REFERENCE_LABEL_MAX } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import type { AdStudioReferenceView } from '@/lib/ad-studio/engine';
@@ -14,22 +14,19 @@ export interface ReferenceLibraryProps {
   projectId: string;
   briefId: string;
   initialReferences: AdStudioReferenceView[];
-  /** Capture by URL is set up for this deployment (a PageSpeed key). */
-  captureAvailable: boolean;
   /** An image model is configured, so illustrations can be drawn. */
   illustrationAvailable: boolean;
 }
 
-type Mode = 'upload' | 'capture' | 'illustration';
+type Mode = 'upload' | 'illustration';
 
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:5'] as const;
 
 /**
- * The ad's reference images (KAN-243): real app screenshots, captured pages and AI illustrations
- * that scenes hand to the video model, so a clip shows the real product. Add one by upload, page
- * capture or illustration; rename, describe or delete it here, and attach it to scenes in the script.
+ * The ad's reference images (KAN-243): real app screenshots and AI illustrations that scenes hand
+ * to the video model, so a clip shows the real product. Upload one or draw an illustration; rename, describe or delete it here, and attach it to scenes in the script.
  */
-export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences, captureAvailable, illustrationAvailable }: ReferenceLibraryProps): React.ReactElement {
+export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences, illustrationAvailable }: ReferenceLibraryProps): React.ReactElement {
   const t = useTranslations('AdStudio.references');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -39,8 +36,6 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
   const [label, setLabel] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [file, setFile] = React.useState<File | null>(null);
-  const [url, setUrl] = React.useState('');
-  const [device, setDevice] = React.useState<'desktop' | 'mobile'>('desktop');
   const [prompt, setPrompt] = React.useState('');
   const [aspectRatio, setAspectRatio] = React.useState<(typeof ASPECT_RATIOS)[number]>('16:9');
   const [pending, setPending] = React.useState(false);
@@ -70,8 +65,7 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
         form.set('description', description);
         response = await fetch(base, { method: 'POST', body: form });
       } else {
-        const body = mode === 'capture' ? { source: 'screenshot', url, device, label, description } : { source: 'illustration', prompt, aspectRatio, label, description };
-        response = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        response = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'illustration', prompt, aspectRatio, label, description }) });
       }
       const result = (await response.json().catch(() => ({}))) as AdStudioApiError & { reference?: AdStudioReferenceView };
       if (!response.ok || !result.reference) {
@@ -83,7 +77,6 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
       setLabel('');
       setDescription('');
       setFile(null);
-      setUrl('');
       setPrompt('');
       router.refresh();
     } finally {
@@ -117,7 +110,6 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
 
   const modes: { id: Mode; icon: typeof Upload; available: boolean }[] = [
     { id: 'upload', icon: Upload, available: true },
-    { id: 'capture', icon: Camera, available: captureAvailable },
     { id: 'illustration', icon: Sparkles, available: illustrationAvailable },
   ];
   const inputClass = 'h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground';
@@ -158,22 +150,6 @@ export function ReferenceLibrary({ orgId, projectId, briefId, initialReferences,
               <input type="file" accept="image/png,image/jpeg" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="text-sm text-foreground" />
               <span className="font-normal">{t('fileHint')}</span>
             </label>
-          ) : null}
-          {mode === 'capture' ? (
-            <div className="flex flex-wrap gap-3">
-              <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground">
-                {t('urlLabel')}
-                <input type="url" required value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" dir="ltr" className={inputClass} />
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                {t('deviceLabel')}
-                <select value={device} onChange={(event) => setDevice(event.target.value as 'desktop' | 'mobile')} className={inputClass}>
-                  <option value="desktop">{t('device.desktop')}</option>
-                  <option value="mobile">{t('device.mobile')}</option>
-                </select>
-              </label>
-              <p className="basis-full text-xs text-muted-foreground">{t('captureHint')}</p>
-            </div>
           ) : null}
           {mode === 'illustration' ? (
             <div className="flex flex-wrap gap-3">

@@ -21,7 +21,7 @@ import {
   toAdStudioBriefView,
   getLatestAdStudioRunView,
 } from '@/lib/ad-studio/store';
-import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni, resolveAdStudioImageGenerator, listBriefImages, listBriefReferences, resolveAdStudioPageCapture } from '@/lib/ad-studio/engine';
+import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni, resolveAdStudioImageGenerator, listBriefImages, listBriefReferences } from '@/lib/ad-studio/engine';
 import { adStudioImageSlots, adStudioStages, currentAssembledVideo, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus, type AdStudioVideoStageProgress } from '@/lib/ad-studio/view';
 import { Link } from '@/i18n/navigation';
 import { StatCard } from '@/components/ui/stat-card';
@@ -334,7 +334,6 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   projectId={projectId}
                   briefId={selected.id}
                   initialReferences={references}
-                  captureAvailable={resolveAdStudioPageCapture() !== null}
                   illustrationAvailable={imagesAvailable}
                 />
               </div>

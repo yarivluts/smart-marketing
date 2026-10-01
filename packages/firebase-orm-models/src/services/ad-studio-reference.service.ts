@@ -10,8 +10,8 @@ import { AdStudioReferenceModel } from '../models/ad-studio-reference.model';
 import { AdStudioBriefModel } from '../models/ad-studio.model';
 
 /**
- * Ad Studio reference image records (KAN-243). The engine (`@growthos/ad-studio`) stores the bytes,
- * captures pages and draws illustrations; these functions keep the library: what each image is,
+ * Ad Studio reference image records (KAN-243). The engine (`@growthos/ad-studio`) stores the bytes
+ * and draws illustrations; these functions keep the library: what each image is,
  * whether it is ready, and which scenes may attach it.
  */
 
@@ -61,7 +61,7 @@ export async function getAdStudioReference(organizationId: string, projectId: st
   return reference;
 }
 
-/** Records an image about to be stored, captured or drawn. Refused once the library is full. */
+/** Records an image about to be stored or drawn. Refused once the library is full. */
 export async function createAdStudioReference(params: {
   organizationId: string;
   projectId: string;
@@ -69,7 +69,6 @@ export async function createAdStudioReference(params: {
   source: AdStudioReferenceSource;
   label: string;
   description: string;
-  sourceUrl?: string | null;
   prompt?: string | null;
   model?: string | null;
   actorId: string;
@@ -86,7 +85,6 @@ export async function createAdStudioReference(params: {
   reference.label = text.label;
   reference.description = text.description;
   reference.status = 'generating';
-  reference.source_url = params.sourceUrl ?? null;
   reference.prompt = params.prompt ?? null;
   reference.model = params.model ?? null;
   reference.created_by = params.actorId;

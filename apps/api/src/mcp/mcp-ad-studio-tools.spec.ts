@@ -161,8 +161,8 @@ describe('Ad Studio MCP tools', () => {
   it('lets an agent add app screenshots and illustrations, attach them to scenes, look at them, and delete them', async () => {
     const { json, call } = await setup(['mcp.read', 'ai.use']);
     const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
-    const listed = await json<{ references: unknown[]; can_capture_pages: boolean; can_draw_illustrations: boolean }>('list_ad_references', { brief_id: ad.id });
-    expect(listed).toEqual({ references: [], can_capture_pages: false, can_draw_illustrations: true });
+    const listed = await json<{ references: unknown[]; can_draw_illustrations: boolean }>('list_ad_references', { brief_id: ad.id });
+    expect(listed).toEqual({ references: [], can_draw_illustrations: true });
 
     const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
     type Ref = { image_id: string; source: string; status: string };
@@ -172,8 +172,8 @@ describe('Ad Studio MCP tools', () => {
     expect(drawn).toMatchObject({ source: 'illustration', status: 'ready' });
     const gif = await call('add_ad_reference', { brief_id: ad.id, source: 'upload', label: 'x', image_base64: Buffer.from('GIF89a').toString('base64') });
     expect((gif.content[0] as { text: string }).text).toBe('Cannot do that: unsupported_image.');
-    const capture = await call('add_ad_reference', { brief_id: ad.id, source: 'screenshot', label: 'x', url: 'https://example.com' });
-    expect((capture.content[0] as { text: string }).text).toBe('Cannot do that: capture_not_configured.');
+    const capture = await call('add_ad_reference', { brief_id: ad.id, source: 'screenshot', label: 'x' });
+    expect((capture.content[0] as { text: string }).text).toBe('Invalid: source must be "upload" or "illustration".');
 
     const image = await call('get_ad_reference', { brief_id: ad.id, image_id: screen.image_id });
     expect(image.content[1]).toEqual({ type: 'image', data: pngHeader.toString('base64'), mimeType: 'image/png' });

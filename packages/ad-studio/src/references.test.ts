@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildIllustrationPrompt, createPageSpeedCapture, publicPageUrl, resolveAdStudioPageCapture } from './references';
+import { buildIllustrationPrompt } from './references';
 import { createOmniClient } from './omni';
 import { buildClipQaPrompt } from './qa';
 import { createGeminiReviewer } from './llm';
@@ -8,34 +8,6 @@ import { AdStudioClipQaSchema } from './qa';
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
-
-describe('page capture through PageSpeed Insights', () => {
-  it('asks for the page at the device size and returns the final screenshot bytes', async () => {
-    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2]);
-    const fetchImpl = vi.fn(async () => json({ lighthouseResult: { audits: { 'final-screenshot': { details: { data: `data:image/jpeg;base64,${jpeg.toString('base64')}` } } } } }));
-    const bytes = await createPageSpeedCapture('psi-key', fetchImpl).capture({ url: 'https://example.com/app?x=1', device: 'desktop' });
-    expect(bytes.equals(jpeg)).toBe(true);
-    const url = new URL((fetchImpl.mock.calls[0] as unknown as [string])[0]);
-    expect(url.origin + url.pathname).toBe('https://www.googleapis.com/pagespeedonline/v5/runPagespeed');
-    expect(Object.fromEntries(url.searchParams)).toEqual({ url: 'https://example.com/app?x=1', strategy: 'desktop', category: 'performance', key: 'psi-key' });
-  });
-
-  it('reports a page that could not be captured, and a spent quota, by code', async () => {
-    const missing = createPageSpeedCapture('k', vi.fn(async () => json({ lighthouseResult: { runtimeError: { message: 'DNS failure' }, audits: {} } })));
-    await expect(missing.capture({ url: 'https://nope.example', device: 'mobile' })).rejects.toMatchObject({ code: 'invalid_output', message: 'DNS failure' });
-    const limited = createPageSpeedCapture('k', vi.fn(async () => json({ error: { message: 'Quota exceeded' } }, 429)));
-    await expect(limited.capture({ url: 'https://example.com', device: 'mobile' })).rejects.toMatchObject({ code: 'rate_limited' });
-  });
-
-  it('is on only with a key, and takes only public http(s) pages', () => {
-    expect(resolveAdStudioPageCapture({} as NodeJS.ProcessEnv)).toBeNull();
-    expect(resolveAdStudioPageCapture({ PAGESPEED_API_KEY: ' k ' } as NodeJS.ProcessEnv)).toMatchObject({ model: 'pagespeed-insights' });
-    expect(publicPageUrl(' https://example.com/app ')).toBe('https://example.com/app');
-    expect(publicPageUrl('ftp://example.com')).toBeNull();
-    expect(publicPageUrl('https://user:pass@example.com')).toBeNull();
-    expect(publicPageUrl('not a url')).toBeNull();
-  });
-});
 
 describe('reference images in the model calls', () => {
   it('sends a scene render with its images after the prompt, and a plain prompt without them', async () => {
