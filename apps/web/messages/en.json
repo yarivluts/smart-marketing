@@ -3780,7 +3780,8 @@
       "video_edit": "Video edit",
       "image_concepts": "Image ideas",
       "image": "Image",
-      "image_edit": "Image edit"
+      "image_edit": "Image edit",
+      "video_qa": "AI video check"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",

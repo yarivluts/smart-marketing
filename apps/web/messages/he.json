@@ -3780,7 +3780,8 @@
       "video_edit": "עריכת וידאו",
       "image_concepts": "רעיונות לתמונות",
       "image": "תמונה",
-      "image_edit": "עריכת תמונה"
+      "image_edit": "עריכת תמונה",
+      "video_qa": "בדיקת AI לסרטון"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
