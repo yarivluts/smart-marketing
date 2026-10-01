@@ -189,6 +189,7 @@ Rendering takes minutes, so no tool waits for it to finish. Start the work with 
 | `plan_ad_brief` | `ai.use` | Deep plan from the landing page, the project's results and campaigns, and Google Ads search volumes, with recommendations |
 | `generate_ad_script` / `save_ad_script` | `ai.use` | Write the video script with AI (3-10 s scenes, at most 60 s) or save an edited one. Hebrew narration gets a `pronunciation` (full nikud, numbers as words) that the video model reads; it is added on save (one AI text call) and redone when the narration changes |
 | `rewrite_ad_scene` | `ai.use` | Propose a rewrite of one scene by an instruction; not saved until sent back with `save_ad_script` |
+| `set_ad_voice` | `ai.use` | The one narrator voice of every scene (a preset or a custom description; `none` clears it), so separately rendered scenes sound alike. Each scene's `delivery` (`voiceover` or `on_screen`) and `speaker` (which person in the shot talks) are set with `save_ad_script` |
 | `write_ad_copy` / `save_ad_copy` | `ai.use` | Write with AI (one call, missing ones by default) or save the ad copy next to each creative: headline (30), primary text (90) and description (90), for the video and every image idea; null clears one |
 | `list_ad_references` | `ai.use` | The ad's reference images (app screenshots, AI illustrations) and whether illustrations can be drawn |
 | `add_ad_reference` | `ai.use` | Add a reference image: upload a PNG/JPEG (base64), e.g. a sharp screenshot of the real app, or draw an illustration (counts as an image) |

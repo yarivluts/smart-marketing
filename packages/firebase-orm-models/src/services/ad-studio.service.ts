@@ -5,9 +5,13 @@ import {
   isAdCopyEmpty,
   isAdStudioFormat,
   reconcilePronunciations,
+  speakerFields,
+  voiceIssue,
   validateAdStudioImageConcepts,
   validateAdStudioScenes,
   type AdStudioAdCopy,
+  type AdStudioVoice,
+  type AdStudioVoiceIssueCode,
   type AdStudioAdCopyIssueCode,
   type AdStudioBriefInput,
   type AdStudioImageConcept,
@@ -71,6 +75,13 @@ export class AdStudioImageConceptsInvalidError extends Error {
   constructor(public readonly issues: AdStudioImageConceptIssue[]) {
     super(`The image concepts break ${issues.length} rule(s): ${issues.map((issue) => issue.code).join(', ')}`);
     this.name = 'AdStudioImageConceptsInvalidError';
+  }
+}
+
+export class AdStudioVoiceInvalidError extends Error {
+  constructor(public readonly code: AdStudioVoiceIssueCode) {
+    super(`The narrator voice is not valid: ${code}`);
+    this.name = 'AdStudioVoiceInvalidError';
   }
 }
 
@@ -228,7 +239,11 @@ export async function saveAdStudioScript(params: {
   if (unknown.length) throw new AdStudioScriptInvalidError(unknown);
   // A pronunciation sent back unchanged for narration that changed belongs to the old words. It is
   // dropped here so every client (the editor, MCP, the generator) follows the same rule.
-  brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map((scene) => ({ ...scene }));
+  // Who speaks is kept only with narration, and the voice-over default is stored as nothing.
+  brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map(({ delivery: _delivery, speaker: _speaker, ...scene }) => ({
+    ...scene,
+    ...speakerFields({ voiceover: scene.voiceover, delivery: _delivery, speaker: _speaker }),
+  }));
   brief.script_generated_by = params.generatedBy ?? null;
   brief.status = 'scripted';
   brief.last_changed_on = nowIso(params.now);
@@ -261,6 +276,24 @@ export async function saveAdStudioImageConcepts(params: {
     return { ...rest, formats: [...concept.formats], ...(copy && !isAdCopyEmpty(copy) ? { copy: { ...copy } } : {}) };
   });
   brief.image_concepts_generated_by = params.generatedBy ?? null;
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/**
+ * Sets the ad's narrator voice - the same voice in every scene - or clears it (null: the video model
+ * chooses). A changed voice makes the clips of scenes with narration out of date.
+ */
+export async function saveAdStudioVoice(params: { organizationId: string; projectId: string; briefId: string; voice: AdStudioVoice | null; now?: Date }): Promise<AdStudioBriefModel> {
+  const issue = params.voice ? voiceIssue(params.voice) : null;
+  if (issue) throw new AdStudioVoiceInvalidError(issue);
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  brief.narrator_voice = params.voice
+    ? params.voice.preset === 'custom'
+      ? { preset: 'custom', description: (params.voice.description ?? '').replace(/\s+/g, ' ').trim() }
+      : { preset: params.voice.preset }
+    : null;
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;

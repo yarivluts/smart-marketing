@@ -19,6 +19,14 @@ describe('the clip quality check prompt', () => {
     expect(user).toContain('letters, words or numbers drawn in the picture that are gibberish');
   });
 
+  it('tells the reviewer who should speak: no lip movement for a voice-over, lip-sync for a named person on screen', () => {
+    const voiceover = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast' }, 'en').user;
+    expect(voiceover).toContain('Who speaks: an off-screen voice-over narrator. No one in the shot should speak: a closed or still mouth is correct');
+    const onScreen = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast', delivery: 'on_screen', speaker: 'the woman' }, 'en').user;
+    expect(onScreen).toContain('Who speaks: the woman, on camera. Their lips must move in sync with the words');
+    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '' }, 'en').user).not.toContain('Who speaks');
+  });
+
   it('says no one should speak when the scene has no narration', () => {
     expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '  ' }, 'en').user).toContain('Intended narration: none (no one should speak).');
   });

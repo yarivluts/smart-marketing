@@ -7,12 +7,14 @@ import {
   AD_STUDIO_PRONUNCIATION_MAX,
   isHebrewLanguage,
   spokenNarration,
+  type AdStudioDelivery,
   type AdStudioScene,
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 import { AddNikudButton } from './add-nikud-button';
+import { SpeakerBadge, SpeakerControl } from './speaker-control';
 
 export interface NarrationEditorProps {
   orgId: string;
@@ -30,14 +32,17 @@ interface Draft {
   visualPrompt: string;
   voiceover: string;
   pronunciation: string;
+  delivery: AdStudioDelivery;
+  speaker: string;
 }
 
 /**
- * A scene's words where its clip is reviewed (KAN-239): what the camera shows and what the narrator
- * reads (with nikud for Hebrew), and an editor for both. "Add nikud" vocalizes the typed narration at
- * once so a vowel can be corrected before saving; a changed narration saved without it comes back
- * vocalized anyway. The AI can suggest a rewrite of the scene, which only changes anything once the
- * person accepts it into the editor and saves. Either change makes the scene's clip out of date until it is rendered again.
+ * A scene's words where its clip is reviewed (KAN-239): what the camera shows, what the narrator
+ * reads (with nikud for Hebrew) and who says it, and an editor for all three. "Add nikud" vocalizes
+ * the typed narration at once so a vowel can be corrected before saving; a changed narration saved
+ * without it comes back vocalized anyway. The AI can suggest a rewrite of the scene, which only
+ * changes anything once the person accepts it into the editor and saves. A saved change makes the
+ * scene's clip out of date until it is rendered again.
  */
 export function NarrationEditor({
   orgId,
@@ -71,13 +76,16 @@ export function NarrationEditor({
     try {
       const next = scenes.map((entry) => {
         if (entry.id !== scene.id) return entry;
-        const { pronunciation: _old, ...rest } = entry;
+        const { pronunciation: _old, delivery: _delivery, speaker: _speaker, ...rest } = entry;
         const pronunciation = draft.pronunciation.trim();
         return {
           ...rest,
           visualPrompt: draft.visualPrompt,
           voiceover: draft.voiceover,
           ...(pronunciation ? { pronunciation } : {}),
+          ...(draft.delivery === 'on_screen'
+            ? { delivery: draft.delivery, speaker: draft.speaker }
+            : {}),
         };
       });
       const response = await fetch(
@@ -111,6 +119,8 @@ export function NarrationEditor({
       visualPrompt: scene.visualPrompt,
       voiceover: scene.voiceover,
       pronunciation: scene.pronunciation ?? '',
+      delivery: scene.delivery ?? 'voiceover',
+      speaker: scene.speaker ?? '',
     });
     setSuggestion(withSuggestion ? { instruction: '', pending: false, proposal: null } : null);
   }
@@ -150,6 +160,7 @@ export function NarrationEditor({
     if (!suggestion?.proposal || !draft) return;
     const proposal = suggestion.proposal;
     setDraft({
+      ...draft,
       visualPrompt: proposal.visualPrompt,
       voiceover: proposal.voiceover,
       pronunciation:
@@ -267,6 +278,14 @@ export function NarrationEditor({
               className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
+          {draft.voiceover.trim() ? (
+            <SpeakerControl
+              idPrefix={`ad-studio-review-${scene.id}`}
+              delivery={draft.delivery}
+              speaker={draft.speaker}
+              onChange={({ delivery, speaker }) => setDraft({ ...draft, delivery, speaker })}
+            />
+          ) : null}
           {hebrew && draft.voiceover.trim() ? (
             <div className="flex flex-col gap-1 text-[11px] font-medium text-muted-foreground">
               <span className="flex flex-wrap items-center justify-between gap-2">
@@ -346,8 +365,11 @@ export function NarrationEditor({
           <p className="line-clamp-3 text-sm text-muted-foreground" dir="ltr">
             {scene.visualPrompt}
           </p>
-          <span className="text-[11px] font-medium text-muted-foreground">
+          <span className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-medium text-muted-foreground">
             {vocalized ? t('readWithNikud') : t('label')}
+            {scene.voiceover.trim() ? (
+              <SpeakerBadge delivery={scene.delivery} speaker={scene.speaker} />
+            ) : null}
           </span>
           {scene.voiceover.trim() ? (
             <p className="text-base leading-relaxed" dir="auto" lang={language}>

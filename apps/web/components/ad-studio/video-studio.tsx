@@ -19,7 +19,9 @@ import {
   sceneFingerprint,
   sceneVideoStates,
   summarizeVideoProgress,
+  voiceDescription,
   type AdStudioAdCopy,
+  type AdStudioVoice,
   type AdStudioFormat,
   type AdStudioScene,
   type AdStudioSceneVideoState,
@@ -42,6 +44,7 @@ import { ClipQaNote } from './clip-qa-note';
 import { MobileAccordionItem } from './mobile-accordion';
 import { AdCopyCard } from './ad-copy-card';
 import { NarrationEditor } from './narration-editor';
+import { VoicePicker } from './voice-picker';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -59,6 +62,8 @@ export interface VideoStudioProps {
   textAvailable?: boolean;
   /** The landing page, shown as its domain in the ad previews. */
   linkUrl?: string | null;
+  /** The narrator voice of every scene; null lets the video model choose. */
+  voice?: AdStudioVoice | null;
   initialClips: AdStudioClipView[];
   initialVideos: AdStudioVideoView[];
   /** False when no video model is configured for the deployment. */
@@ -109,6 +114,7 @@ export function VideoStudio({
   advertiser = '',
   textAvailable = false,
   linkUrl = null,
+  voice = null,
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -139,7 +145,9 @@ export function VideoStudio({
   React.useEffect(() => setClips(initialClips), [initialClips]);
   React.useEffect(() => setVideos(initialVideos), [initialVideos]);
 
-  const context = { format, language };
+  const [voiceChoice, setVoiceChoice] = React.useState(voice);
+  React.useEffect(() => setVoiceChoice(voice), [voice]);
+  const context = { format, language, voice: voiceDescription(voiceChoice) };
   const states = sceneVideoStates(scenes, clips, context);
   const progress = summarizeVideoProgress(states, scenes);
   const cost = renderAllCost(states, scenes);
@@ -301,6 +309,15 @@ export function VideoStudio({
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {t('video.textNote')}
       </p>
+      <VoicePicker
+        base={base}
+        voice={voiceChoice}
+        disabled={pending !== null || generating}
+        onSaved={(saved) => {
+          setVoiceChoice(saved);
+          router.refresh();
+        }}
+      />
 
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">

@@ -10,6 +10,7 @@ import {
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
+  voiceDescription,
   type AdStudioClipSummary,
   type AdStudioVideoContext,
 } from '@growthos/shared';
@@ -154,7 +155,7 @@ function summary(clip: AdStudioClipModel): AdStudioClipSummary & { model: AdStud
 }
 
 function videoContext(brief: AdStudioBriefModel): AdStudioVideoContext {
-  return { format: brief.video_format, language: brief.language, productDescription: brief.product_description };
+  return { format: brief.video_format, language: brief.language, productDescription: brief.product_description, voice: voiceDescription(brief.narrator_voice) };
 }
 
 function clock(deps: Pick<AdStudioVideoDeps, 'now'>): Date {

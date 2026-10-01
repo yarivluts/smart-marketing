@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { SceneTimeline } from './scene-timeline';
 import { MobileAccordionItem } from './mobile-accordion';
 import { AddNikudButton } from './add-nikud-button';
+import { SpeakerControl } from './speaker-control';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface ScriptEditorProps {
@@ -349,6 +350,16 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                       {pronunciationStale(scene) ? t('pronunciationStale') : scene.pronunciation?.trim() ? t('pronunciationHint') : t('pronunciationAuto')}
                     </span>
                   </div>
+                ) : null}
+                {scene.voiceover.trim() ? (
+                  <SpeakerControl
+                    idPrefix={`ad-studio-scene-${index + 1}`}
+                    delivery={scene.delivery ?? 'voiceover'}
+                    speaker={scene.speaker ?? ''}
+                    onChange={({ delivery, speaker }) =>
+                      update(scene.id, delivery === 'on_screen' ? { delivery, speaker } : { delivery: undefined, speaker: undefined })
+                    }
+                  />
                 ) : null}
                 {readyReferences.length || scene.references?.length ? (
                   <div className="flex flex-col gap-2" data-testid={`ad-studio-scene-references-${index + 1}`}>

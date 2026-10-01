@@ -12,7 +12,7 @@ import {
   type AdStudioClipSummary,
 } from './video';
 
-const CONTEXT = { format: 'vertical' as const, language: 'he', productDescription: 'E-signatures for small law firms' };
+const CONTEXT = { format: 'vertical' as const, language: 'he', productDescription: 'E-signatures for small law firms', voice: null };
 
 function scene(id: string, durationSeconds: number, visualPrompt = `Shot ${id}`, voiceover = ''): AdStudioScene {
   return { id, durationSeconds, visualPrompt, voiceover, onScreenText: '' };

@@ -7,3 +7,4 @@ export * from './planning';
 export * from './images';
 export * from './references';
 export * from './copy';
+export * from './voice';

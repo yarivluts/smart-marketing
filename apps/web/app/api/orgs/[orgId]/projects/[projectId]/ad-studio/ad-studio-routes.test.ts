@@ -22,6 +22,7 @@ import { POST as vocalize } from './briefs/[briefId]/vocalize/route';
 import { POST as generateConcepts } from './briefs/[briefId]/image-concepts/generate/route';
 import { PUT as saveCopy } from './briefs/[briefId]/copy/route';
 import { POST as writeCopy } from './briefs/[briefId]/copy/generate/route';
+import { PUT as saveVoice } from './briefs/[briefId]/voice/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -256,6 +257,22 @@ describe('Ad Studio routes', () => {
     const english = await createBriefAs(ownerSession, orgId, projectId);
     const refused = await vocalize(request('POST', { text: 'Sign fast' }), { params: Promise.resolve({ orgId, projectId, briefId: english }) });
     expect(await refused.json()).toMatchObject({ error: 'provider_failed', code: 'invalid_output' });
+  });
+
+  it('sets one narrator voice for the ad, refuses an invalid one by code, and clears it', async () => {
+    const { ownerSession, orgId, projectId } = await setup();
+    const briefId = await createBriefAs(ownerSession, orgId, projectId);
+    const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
+    const saved = await saveVoice(request('PUT', { voice: { preset: 'custom', description: '  an older   man ' } }), params);
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { brief: { voice: unknown } }).brief.voice).toEqual({ preset: 'custom', description: 'an older man' });
+    const bad = await saveVoice(request('PUT', { voice: { preset: 'robot' } }), params);
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toEqual({ error: 'invalid_voice', code: 'unknown_voice' });
+    expect((await saveVoice(request('PUT', {}), params)).status).toBe(400);
+    const cleared = await saveVoice(request('PUT', { voice: null }), params);
+    expect(((await cleared.json()) as { brief: { voice: unknown } }).brief.voice).toBeNull();
+    expect((await getAdStudioBrief(orgId, projectId, briefId)).narrator_voice).toBeNull();
   });
 
   it('a scene rewrite is a proposal: returned with the same id, the saved script untouched', async () => {

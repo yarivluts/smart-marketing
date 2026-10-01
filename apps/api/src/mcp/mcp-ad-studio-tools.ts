@@ -41,6 +41,8 @@ import {
   ProjectNotFoundError,
   resolveAdStudioExportDestinations,
   saveAdStudioCopy,
+  saveAdStudioVoice,
+  AdStudioVoiceInvalidError,
   saveAdStudioImageConcepts,
   setAdStudioSettings,
   updateAdStudioBriefDetails,
@@ -104,7 +106,7 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, type AdStudioAdCopy, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, type AdStudioAdCopy, type AdStudioVoice, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -154,6 +156,7 @@ function describeAdStudioToolError(error: unknown): string {
     return `Invalid: ${error.reasons.join('; ')}`;
   }
   if (error instanceof AdStudioScriptInvalidError) return `The script breaks these rules: ${error.issues.map((issue) => (issue.scene ? `${issue.code} (scene ${issue.scene})` : issue.code)).join(', ')}.`;
+  if (error instanceof AdStudioVoiceInvalidError) return `Invalid voice: ${error.code}.`;
   if (error instanceof AdStudioCopyInvalidError) return `The ad copy breaks these rules: ${error.issues.map((issue) => `${issue.code} (${issue.target})`).join(', ')}.`;
   if (error instanceof AdStudioImageConceptsInvalidError) {
     return `The image ideas break these rules: ${error.issues.map((issue) => (issue.concept ? `${issue.code} (idea ${issue.concept})` : issue.code)).join(', ')}.`;
@@ -289,7 +292,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
   ]);
   const clips = clipModels.map(toAdStudioClipView);
   const videos = videoModels.map(toAdStudioVideoView);
-  const context = { format: brief.video_format, language: brief.language };
+  const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice) };
   const states = sceneVideoStates(brief.scenes, clips, context);
   const progress = summarizeVideoProgress(states, brief.scenes);
   const plan = assemblyPlan(brief.scenes, clips, context);
@@ -305,6 +308,8 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       visual_prompt: scene.visualPrompt,
       voiceover: scene.voiceover,
       pronunciation: scene.pronunciation ?? null,
+      delivery: scene.delivery ?? 'voiceover',
+      speaker: scene.speaker ?? null,
       references: (scene.references ?? []).map((reference) => ({ image_id: reference.imageId, use: reference.use })),
       on_screen_text: scene.onScreenText,
       video_state: states[index]?.state ?? 'none',
@@ -328,6 +333,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
         })),
     })),
     video: {
+      narrator_voice: brief.narrator_voice ? { preset: brief.narrator_voice.preset, description: brief.narrator_voice.preset === 'custom' ? (brief.narrator_voice.description ?? '') : null } : null,
       copy: copyOutput(brief.video_copy),
       scenes: progress.scenes,
       rendered: progress.rendered,
@@ -366,6 +372,14 @@ const sceneShape = z
         .string()
         .optional()
         .describe('How the narrator says the voiceover: for Hebrew, the same words with full nikud and numbers written out. Omit to have Hebrew narration vocalized on save; send back the stored one to keep it.'),
+      delivery: z
+        .string()
+        .optional()
+        .describe('Who says the narration: "voiceover" (default - an off-screen narrator, no one in the shot talks) or "on_screen" (a person in the shot says it, lip-synced).'),
+      speaker: z
+        .string()
+        .optional()
+        .describe('For "on_screen": which person in the shot speaks, when there are several (e.g. "the woman in the blue shirt"). Omit for whoever is in the shot.'),
       references: z
         .array(z.object({ image_id: z.string().describe('A ready image from list_ad_references.'), use: z.string().describe('"screen" (the real product screen, shown on any device), "subject" (show it as it looks) or "first_frame" (the shot starts on it).') }))
         .optional()
@@ -493,7 +507,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; scenes: unknown }) => {
         const scenes = parseScenes(
           Array.isArray(a.scenes)
-            ? a.scenes.map((scene: Record<string, unknown>) => ({ id: scene.id, durationSeconds: scene.duration_seconds, visualPrompt: scene.visual_prompt, voiceover: scene.voiceover, pronunciation: scene.pronunciation, references: Array.isArray(scene.references) ? scene.references.map((reference: Record<string, unknown>) => ({ imageId: reference.image_id, use: reference.use })) : undefined, onScreenText: scene.on_screen_text }))
+            ? a.scenes.map((scene: Record<string, unknown>) => ({ id: scene.id, durationSeconds: scene.duration_seconds, visualPrompt: scene.visual_prompt, voiceover: scene.voiceover, pronunciation: scene.pronunciation, delivery: scene.delivery, speaker: scene.speaker, references: Array.isArray(scene.references) ? scene.references.map((reference: Record<string, unknown>) => ({ imageId: reference.image_id, use: reference.use })) : undefined, onScreenText: scene.on_screen_text }))
             : null,
         );
         if (!scenes) return errorResult('Invalid: scenes must be an array.');
@@ -560,6 +574,27 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
       description: z.string().describe('At most 90 characters, shown under the headline.'),
     })
     .nullable();
+
+  server.registerTool(
+    'set_ad_voice',
+    {
+      title: 'Set the narrator voice',
+      description:
+        'Sets the one narrator voice of every scene of the ad, so separately rendered scenes sound alike: preset woman_warm, woman_energetic, man_warm, man_deep or man_energetic, or "custom" with a description in English. preset "none" clears it. Scenes with narration render again with the new voice. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        preset: z.string().describe('woman_warm, woman_energetic, man_warm, man_deep, man_energetic, custom, or none.'),
+        description: z.string().optional().describe('For "custom": the voice in words, e.g. "an older man with a slow, warm voice".'),
+      }),
+    },
+    auditedToolHandler(auth, 'set_ad_voice', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; preset: string; description?: string }) => {
+        const voice = a.preset === 'none' ? null : ({ preset: a.preset, description: a.description } as AdStudioVoice);
+        await saveAdStudioVoice({ ...ctx(a.brief_id), voice });
+        return textResult({ narrator_voice: (await describeBrief(auth, a.brief_id)).video.narrator_voice });
+      }),
+    ),
+  );
 
   server.registerTool(
     'write_ad_copy',

@@ -94,6 +94,16 @@ describe('Ad Studio briefs', () => {
     expect((await getAdStudioBrief(orgId, projectId, brief.id)).scenes.map((s) => s.durationSeconds)).toEqual([6, 10]);
   });
 
+  it('stores who speaks only for an on-screen speaker with narration, and nothing for the voice-over default', async () => {
+    const { owner, orgId, projectId } = await setup();
+    const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: INPUT, createdByUserId: owner.id });
+    const talking = (id: string, extra: Partial<AdStudioScene>): AdStudioScene => ({ ...scene(id, 5), voiceover: 'Sign fast', ...extra });
+    await saveAdStudioScript({ organizationId: orgId, projectId, briefId: brief.id, scenes: [talking('a', { delivery: 'on_screen', speaker: '  the   lawyer ' }), talking('b', { delivery: 'voiceover', speaker: 'x' }), talking('c', { delivery: 'on_screen', voiceover: '' })] });
+    const stored = (await getAdStudioBrief(orgId, projectId, brief.id)).scenes;
+    expect(stored[0]).toMatchObject({ delivery: 'on_screen', speaker: 'the lawyer' });
+    expect(['delivery' in stored[1], 'speaker' in stored[1], 'delivery' in stored[2]]).toEqual([false, false, false]);
+  });
+
   it('stores a scene pronunciation, drops it once the narration changes under it, and stores no empty one', async () => {
     const { owner, orgId, projectId } = await setup();
     const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: INPUT, createdByUserId: owner.id });

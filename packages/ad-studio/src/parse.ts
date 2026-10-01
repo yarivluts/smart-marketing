@@ -1,4 +1,4 @@
-import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
+import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioDelivery, AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
 
 /**
  * Shapes request bodies into service inputs without deciding what is valid - the services own the
@@ -45,6 +45,8 @@ export function parseScenes(value: unknown): AdStudioScene[] | null {
       voiceover: text(scene.voiceover),
       ...(pronunciation ? { pronunciation } : {}),
       ...(references.length ? { references } : {}),
+      ...(scene.delivery !== undefined && scene.delivery !== null ? { delivery: text(scene.delivery) as AdStudioDelivery } : {}),
+      ...(text(scene.speaker).trim() ? { speaker: text(scene.speaker) } : {}),
       onScreenText: text(scene.onScreenText),
     };
   });
