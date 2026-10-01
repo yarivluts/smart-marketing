@@ -112,6 +112,19 @@ describe('ScriptEditor pronunciation (nikud)', () => {
   const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
   const HEBREW: AdStudioScene[] = [{ id: 'a', durationSeconds: 5, visualPrompt: 'A lawyer at a desk', voiceover: plain, onScreenText: '' }];
 
+  it('adds nikud to the narration as typed with one tap, before saving', async () => {
+    const fetchMock = vi.fn(async () => json({ pronunciation: vocalized }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderEditor({ initialScenes: HEBREW, language: 'he' });
+    const field = within(screen.getByTestId('ad-studio-pronunciation-1'));
+    fireEvent.click(field.getByRole('button', { name: 'Add nikud' }));
+    await waitFor(() => expect((field.getByLabelText(/Pronunciation/) as HTMLTextAreaElement).value).toBe(vocalized));
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/orgs/o/projects/p/ad-studio/briefs/b1/vocalize');
+    expect(JSON.parse(String(init.body))).toEqual({ text: plain });
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+  });
+
   it('is offered only for Hebrew narration, says it is added on save, and shows what came back vocalized', async () => {
     const { unmount } = renderEditor();
     expect(screen.queryByTestId('ad-studio-pronunciation-1')).toBeNull();

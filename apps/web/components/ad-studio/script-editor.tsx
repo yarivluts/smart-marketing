@@ -20,6 +20,7 @@ import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { SceneTimeline } from './scene-timeline';
 import { MobileAccordionItem } from './mobile-accordion';
+import { AddNikudButton } from './add-nikud-button';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface ScriptEditorProps {
@@ -328,9 +329,15 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                   </label>
                 </div>
                 {(hebrew || scene.pronunciation) && scene.voiceover.trim() ? (
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" data-testid={`ad-studio-pronunciation-${index + 1}`}>
-                    {t('pronunciation')}
+                  <div className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" data-testid={`ad-studio-pronunciation-${index + 1}`}>
+                    <span className="flex flex-wrap items-center justify-between gap-2">
+                      <label htmlFor={`pronunciation-${scene.id}`}>{t('pronunciation')}</label>
+                      {hebrew ? (
+                        <AddNikudButton orgId={orgId} projectId={projectId} briefId={briefId} text={scene.voiceover} onVocalized={(pronunciation) => update(scene.id, { pronunciation })} />
+                      ) : null}
+                    </span>
                     <textarea
+                      id={`pronunciation-${scene.id}`}
                       value={scene.pronunciation ?? ''}
                       onChange={(event) => update(scene.id, { pronunciation: event.target.value })}
                       rows={2}
@@ -341,7 +348,7 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                     <span className={cn('font-normal', pronunciationStale(scene) ? 'text-warning' : undefined)}>
                       {pronunciationStale(scene) ? t('pronunciationStale') : scene.pronunciation?.trim() ? t('pronunciationHint') : t('pronunciationAuto')}
                     </span>
-                  </label>
+                  </div>
                 ) : null}
                 {readyReferences.length || scene.references?.length ? (
                   <div className="flex flex-col gap-2" data-testid={`ad-studio-scene-references-${index + 1}`}>

@@ -18,6 +18,7 @@ import { PUT as saveScript } from './briefs/[briefId]/script/route';
 import { POST as generateScript } from './briefs/[briefId]/script/generate/route';
 import { POST as rewriteScene } from './briefs/[briefId]/scenes/[sceneId]/rewrite/route';
 import { PUT as putSettings } from './settings/route';
+import { POST as vocalize } from './briefs/[briefId]/vocalize/route';
 import { POST as generateConcepts } from './briefs/[briefId]/image-concepts/generate/route';
 import { PUT as saveCopy } from './briefs/[briefId]/copy/route';
 import { POST as writeCopy } from './briefs/[briefId]/copy/generate/route';
@@ -234,6 +235,27 @@ describe('Ad Studio routes', () => {
     const edited = (await (await saveCopy(request('PUT', { videoCopy: null, conceptCopies: { [first]: { headline: 'Signed. Done.', primaryText: 'x', description: '' } } }), params)).json()) as { brief: Brief };
     expect(edited.brief.videoCopy).toBeNull();
     expect(edited.brief.imageConcepts[0].copy).toEqual({ headline: 'Signed. Done.', primaryText: 'x', description: '' });
+  });
+
+  it('adds nikud to a typed narration on request without saving it, for Hebrew ads only', async () => {
+    const { ownerSession, orgId, projectId } = await setup();
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const created = await createBrief(request('POST', { ...BRIEF, language: 'he' }), { params: Promise.resolve({ orgId, projectId }) });
+    const briefId = ((await created.json()) as { brief: { id: string } }).brief.id;
+    const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
+    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    const fetchMock = geminiReplies(JSON.stringify({ lines: [{ id: 'line', pronunciation: `${plain}\u05b8` }] }));
+    const response = await vocalize(request('POST', { text: ` ${plain}  ` }), params);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ pronunciation: `${plain}\u05b8` });
+    expect(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).toContain(`\\"text\\":\\"${plain}\\"`);
+    expect((await getAdStudioBrief(orgId, projectId, briefId)).scenes).toEqual([]);
+    expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(1);
+
+    expect((await vocalize(request('POST', { text: '  ' }), params)).status).toBe(400);
+    const english = await createBriefAs(ownerSession, orgId, projectId);
+    const refused = await vocalize(request('POST', { text: 'Sign fast' }), { params: Promise.resolve({ orgId, projectId, briefId: english }) });
+    expect(await refused.json()).toMatchObject({ error: 'provider_failed', code: 'invalid_output' });
   });
 
   it('a scene rewrite is a proposal: returned with the same id, the saved script untouched', async () => {

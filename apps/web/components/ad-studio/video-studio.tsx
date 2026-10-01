@@ -430,9 +430,6 @@ export function VideoStudio({
                     {t(`video.legend.${state.state}`)}
                   </span>
                 </div>
-                <p className="line-clamp-3 text-sm text-muted-foreground" dir="ltr">
-                  {scene.visualPrompt}
-                </p>
                 <NarrationEditor
                   orgId={orgId}
                   projectId={projectId}

@@ -4437,7 +4437,7 @@
     "narration": {
       "label": "Narration",
       "readWithNikud": "What the narrator reads (with nikud)",
-      "edit": "Edit narration",
+      "edit": "Edit the scene",
       "none": "No narration in this scene.",
       "willVocalize": "Nikud is added automatically on save and before rendering.",
       "textLabel": "Narration",
@@ -4447,7 +4447,21 @@
       "save": "Save narration",
       "savingWithNikud": "Saving and adding nikud…",
       "cancel": "Cancel",
-      "saved": "Saved. Render the scene again to hear the new narration."
+      "saved": "Saved. Render the scene again to see and hear the change.",
+      "sceneLabel": "What the camera shows",
+      "sceneHint": "In English, for the video model: who, where, what happens, camera and light.",
+      "suggest": "AI suggestion",
+      "suggestLabel": "What should change? (optional)",
+      "suggestPlaceholder": "e.g. shorter, more energy, mention the free trial",
+      "suggestRun": "Suggest",
+      "suggesting": "Thinking…",
+      "proposalTitle": "The AI's suggestion",
+      "acceptProposal": "Use the suggestion",
+      "discardProposal": "Discard"
+    },
+    "nikud": {
+      "add": "Add nikud",
+      "adding": "Adding nikud…"
     }
   },
   "MetaConnect": {
