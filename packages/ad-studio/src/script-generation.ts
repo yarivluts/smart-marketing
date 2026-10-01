@@ -7,10 +7,11 @@ import {
   type AdStudioScene,
   type AdStudioScriptContext,
 } from '@growthos/shared';
-import { adStudioBriefInput, getAdStudioBrief, newAdStudioSceneId, saveAdStudioScript, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { adStudioBriefInput, getAdStudioBrief, newAdStudioSceneId, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
 import { ensureOrm } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
+import { saveAdStudioScriptWithPronunciation } from './vocalize';
 
 const GeneratedSceneSchema = z.object({
   durationSeconds: z.number().describe('Whole seconds, 3 to 10.'),
@@ -53,11 +54,14 @@ export async function generateAdStudioScript(
   if (scenes.length === 0 || scenes.some((scene) => scene.visualPrompt.length === 0)) {
     throw new AdStudioProviderError('invalid_output', 'The model returned a scene without a visual description.');
   }
-  return saveAdStudioScript({
+  // Hebrew narration is vocalized before it is stored (best effort - see the vocalizer).
+  return saveAdStudioScriptWithPronunciation({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
     briefId: brief.id,
     scenes,
+    actorId: ctx.actorId,
+    llm: ctx.llm,
     generatedBy: { provider: ctx.llm.provider, model: ctx.llm.model, generated_at: (ctx.now ?? new Date()).toISOString() },
     now: ctx.now,
   });

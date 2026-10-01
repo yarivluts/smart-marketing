@@ -94,6 +94,24 @@ describe('Ad Studio briefs', () => {
     expect((await getAdStudioBrief(orgId, projectId, brief.id)).scenes.map((s) => s.durationSeconds)).toEqual([6, 10]);
   });
 
+  it('stores a scene pronunciation, drops it once the narration changes under it, and stores no empty one', async () => {
+    const { owner, orgId, projectId } = await setup();
+    const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: INPUT, createdByUserId: owner.id });
+    // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
+    const plain = 'שלום';
+    const vocalized = 'שָׁלוֹם';
+    const spoken = (id: string, voiceover: string, pronunciation?: string): AdStudioScene => ({ ...scene(id, 5), voiceover, ...(pronunciation === undefined ? {} : { pronunciation }) });
+    await saveAdStudioScript({ organizationId: orgId, projectId, briefId: brief.id, scenes: [spoken('a', plain, vocalized), spoken('b', plain, ''), spoken('c', plain, vocalized)] });
+    let stored = (await getAdStudioBrief(orgId, projectId, brief.id)).scenes;
+    expect(stored.map((s) => s.pronunciation)).toEqual([vocalized, undefined, vocalized]);
+    expect('pronunciation' in stored[1]).toBe(false);
+
+    // Scene a's narration changed but its pronunciation came back as it was; scene c is untouched.
+    await saveAdStudioScript({ organizationId: orgId, projectId, briefId: brief.id, scenes: [spoken('a', `${plain} ${plain}`, vocalized), spoken('b', plain), spoken('c', plain, vocalized)] });
+    stored = (await getAdStudioBrief(orgId, projectId, brief.id)).scenes;
+    expect(stored.map((s) => s.pronunciation)).toEqual([undefined, undefined, vocalized]);
+  });
+
   it('deletes a brief with an audit entry, and a missing brief reads as not found', async () => {
     const { owner, orgId, projectId } = await setup();
     const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: INPUT, createdByUserId: owner.id });
