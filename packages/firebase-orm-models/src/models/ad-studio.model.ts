@@ -116,6 +116,14 @@ export class AdStudioSettingsModel extends BaseModel {
   @Field({ is_required: false })
   public daily_images?: number | null;
 
+  /** Whether each rendered clip gets the AI quality check; absent (settings saved before it existed) means on. */
+  @Field({ is_required: false })
+  public video_qa_enabled?: boolean | null;
+
+  /** How many times the autopilot re-renders a scene whose clip failed the check (0-2); absent means 1. */
+  @Field({ is_required: false })
+  public video_qa_retries?: number | null;
+
   @Field({ is_required: true })
   public changed_by!: string;
 
@@ -123,7 +131,18 @@ export class AdStudioSettingsModel extends BaseModel {
   public last_changed_on!: string;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit'] as const;
+export const AD_STUDIO_CLIP_QA_STATUSES = ['passed', 'issues', 'skipped', 'error'] as const;
+export type AdStudioClipQaStatus = (typeof AD_STUDIO_CLIP_QA_STATUSES)[number];
+
+/** One problem the reviewer found in a clip. `major` problems (wrong or garbled words, a stutter, gibberish text, a deformed face or hand) fail the check. */
+export interface AdStudioClipQaIssue {
+  kind: 'audio' | 'visual';
+  severity: 'major' | 'minor';
+  detail: string;
+  at_seconds: number | null;
+}
+
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**
@@ -262,6 +281,35 @@ export class AdStudioClipModel extends BaseModel {
 
   @Field({ is_required: false })
   public lease_until?: string | null;
+
+  /**
+   * The AI quality check of a ready clip: Gemini watches it, compares the speech with the scene's
+   * narration and looks for visual defects. `passed` (nothing major), `issues` (at least one major
+   * problem), `skipped` (no reviewer configured or the check is off) or `error` (the check itself
+   * failed). Absent until checked.
+   */
+  @Field({ is_required: false })
+  public qa_status?: AdStudioClipQaStatus | null;
+
+  @Field({ is_required: false })
+  public qa_issues?: AdStudioClipQaIssue[] | null;
+
+  /** What the reviewer heard, for comparing with the script. */
+  @Field({ is_required: false })
+  public qa_transcript?: string | null;
+
+  @Field({ is_required: false })
+  public qa_model?: string | null;
+
+  @Field({ is_required: false })
+  public qa_checked_on?: string | null;
+
+  /** Who is checking the clip right now, and since when; a claim older than two minutes may be taken over. */
+  @Field({ is_required: false })
+  public qa_token?: string | null;
+
+  @Field({ is_required: false })
+  public qa_started_on?: string | null;
 }
 
 export const AD_STUDIO_VIDEO_STATUSES = ['assembling', 'ready', 'failed'] as const;

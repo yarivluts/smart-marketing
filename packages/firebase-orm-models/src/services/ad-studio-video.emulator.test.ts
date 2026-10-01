@@ -5,6 +5,10 @@ import {
   AdStudioClipNotFoundError,
   AdStudioVideoNotFoundError,
   acquireAdStudioClipLease,
+  claimAdStudioClipQa,
+  getAdStudioSettings,
+  recordAdStudioClipQa,
+  setAdStudioSettings,
   createAdStudioBrief,
   createAdStudioClip,
   createAdStudioVideo,
@@ -67,6 +71,41 @@ function clipParams(ctx: Awaited<ReturnType<typeof setup>>, sceneId: string, req
     now: new Date(requestedOn),
   };
 }
+
+describe('the AI quality check of a clip', () => {
+  it('is claimed by one caller at a time, only for a ready clip, and keeps the first verdict', async () => {
+    const ctx = await setup();
+    const clip = await createAdStudioClip(clipParams(ctx, 's1', '2026-09-30T10:00:00Z'));
+    // A clip still rendering cannot be checked.
+    expect(await claimAdStudioClipQa(clip, new Date('2026-09-30T10:01:00Z'))).toBeNull();
+    await markAdStudioClipReady(clip, { gcsPath: 'p/c.mp4', now: new Date('2026-09-30T10:02:00Z') });
+    const at = new Date('2026-09-30T10:03:00Z');
+    const token = await claimAdStudioClipQa(clip, at);
+    expect(token).toBeTruthy();
+    expect(await claimAdStudioClipQa(clip, new Date(at.getTime() + 30_000))).toBeNull();
+    // A claim that died (older than two minutes) can be taken over.
+    expect(await claimAdStudioClipQa(clip, new Date(at.getTime() + 3 * 60_000))).toBeTruthy();
+
+    const issue = { kind: 'audio' as const, severity: 'major' as const, detail: 'stutter on the first word', at_seconds: 0.4 };
+    const checked = await recordAdStudioClipQa(clip, { status: 'issues', issues: [issue], transcript: 'ma-ma'alim', model: 'gemini-3.8-flash' }, new Date('2026-09-30T10:04:00Z'));
+    expect(checked).toMatchObject({ qa_status: 'issues', qa_issues: [issue], qa_model: 'gemini-3.8-flash', qa_checked_on: '2026-09-30T10:04:00.000Z', qa_token: null });
+    // A second verdict (a racing caller) does not overwrite the first, and a checked clip cannot be claimed.
+    expect((await recordAdStudioClipQa(clip, { status: 'passed', issues: [], transcript: null, model: 'x' })).qa_status).toBe('issues');
+    expect(await claimAdStudioClipQa(clip, new Date('2026-09-30T11:00:00Z'))).toBeNull();
+  });
+
+  it('is on with one automatic retry by default, and an admin can change it within bounds', async () => {
+    const ctx = await setup();
+    expect((await getAdStudioSettings(ctx.orgId, ctx.projectId)).videoQa).toEqual({ enabled: true, retries: 1 });
+    const set = await setAdStudioSettings({ organizationId: ctx.orgId, projectId: ctx.projectId, dailyTextGenerations: 50, dailyVideoSeconds: 300, videoQa: { enabled: false, retries: 2 }, actorId: ctx.owner.id });
+    expect(set.videoQa).toEqual({ enabled: false, retries: 2 });
+    // A caller that predates the check keeps it as it is.
+    expect((await setAdStudioSettings({ organizationId: ctx.orgId, projectId: ctx.projectId, dailyTextGenerations: 40, dailyVideoSeconds: 300, actorId: ctx.owner.id })).videoQa).toEqual({ enabled: false, retries: 2 });
+    await expect(
+      setAdStudioSettings({ organizationId: ctx.orgId, projectId: ctx.projectId, dailyTextGenerations: 40, dailyVideoSeconds: 300, videoQa: { enabled: true, retries: 5 }, actorId: ctx.owner.id }),
+    ).rejects.toMatchObject({ reasons: ['videoQa.retries must be a whole number from 0 to 2'] });
+  });
+});
 
 describe('Ad Studio clips', () => {
   it('numbers versions per scene, lists oldest first, and never uses the ORM-stamped field names', async () => {

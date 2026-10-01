@@ -34,6 +34,8 @@ export const AD_STUDIO_DEFAULT_DAILY_IMAGES = 40;
 export const AD_STUDIO_MAX_DAILY_TEXT_GENERATIONS = 1000;
 export const AD_STUDIO_MAX_DAILY_VIDEO_SECONDS = 3600;
 export const AD_STUDIO_MAX_DAILY_IMAGES = 500;
+export const AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES = 1;
+export const AD_STUDIO_MAX_VIDEO_QA_RETRIES = 2;
 
 const SETTINGS_ID = 'settings';
 const MIN_TARGET_SECONDS = 5;
@@ -297,6 +299,8 @@ export interface AdStudioSettingsView {
   dailyTextGenerations: number;
   dailyVideoSeconds: number;
   dailyImages: number;
+  /** The AI quality check of rendered clips: on or off, and how many automatic re-renders a failing scene gets. */
+  videoQa: { enabled: boolean; retries: number };
   /** False while the project is still on the defaults. */
   customized: boolean;
   lastChangedOn: string | null;
@@ -309,6 +313,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
       dailyTextGenerations: AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS,
       dailyVideoSeconds: AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
       dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
+      videoQa: { enabled: true, retries: AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES },
       customized: false,
       lastChangedOn: null,
     };
@@ -317,6 +322,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
     dailyTextGenerations: settings.daily_text_generations,
     dailyVideoSeconds: settings.daily_video_seconds,
     dailyImages: settings.daily_images ?? AD_STUDIO_DEFAULT_DAILY_IMAGES,
+    videoQa: { enabled: settings.video_qa_enabled ?? true, retries: settings.video_qa_retries ?? AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES },
     customized: true,
     lastChangedOn: settings.last_changed_on,
   };
@@ -329,6 +335,8 @@ export async function setAdStudioSettings(params: {
   dailyVideoSeconds: number;
   /** Omitted by callers that predate image ads: the current image limit is kept. */
   dailyImages?: number;
+  /** Omitted by callers that predate the quality check: the current settings are kept. */
+  videoQa?: { enabled: boolean; retries: number };
   actorId: string;
   now?: Date;
 }): Promise<AdStudioSettingsView> {
@@ -342,11 +350,15 @@ export async function setAdStudioSettings(params: {
   if (params.dailyImages !== undefined && (!Number.isInteger(params.dailyImages) || params.dailyImages < 0 || params.dailyImages > AD_STUDIO_MAX_DAILY_IMAGES)) {
     reasons.push(`dailyImages must be a whole number from 0 to ${AD_STUDIO_MAX_DAILY_IMAGES}`);
   }
+  if (params.videoQa && (typeof params.videoQa.enabled !== 'boolean' || !Number.isInteger(params.videoQa.retries) || params.videoQa.retries < 0 || params.videoQa.retries > AD_STUDIO_MAX_VIDEO_QA_RETRIES)) {
+    reasons.push(`videoQa.retries must be a whole number from 0 to ${AD_STUDIO_MAX_VIDEO_QA_RETRIES}`);
+  }
   if (reasons.length) throw new AdStudioBriefInvalidError(reasons);
   await requireProject(params.organizationId, params.projectId);
 
   const before = await getAdStudioSettings(params.organizationId, params.projectId);
   const dailyImages = params.dailyImages ?? before.dailyImages;
+  const videoQa = params.videoQa ?? before.videoQa;
   const existing = await AdStudioSettingsModel.init(SETTINGS_ID, { organization_id: params.organizationId, project_id: params.projectId });
   const settings = existing ?? new AdStudioSettingsModel();
   settings.organization_id = params.organizationId;
@@ -354,6 +366,8 @@ export async function setAdStudioSettings(params: {
   settings.daily_text_generations = params.dailyTextGenerations;
   settings.daily_video_seconds = params.dailyVideoSeconds;
   settings.daily_images = dailyImages;
+  settings.video_qa_enabled = videoQa.enabled;
+  settings.video_qa_retries = videoQa.retries;
   settings.changed_by = params.actorId;
   settings.last_changed_on = nowIso(params.now);
   settings.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
@@ -368,8 +382,8 @@ export async function setAdStudioSettings(params: {
       targetType: 'ad_studio_settings',
       targetId: params.projectId,
       summary: `Set Ad Studio daily limits to ${params.dailyTextGenerations} AI text calls, ${params.dailyVideoSeconds}s of video and ${dailyImages} images`,
-      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages },
-      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages },
+      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages, video_qa: before.videoQa },
+      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages, video_qa: videoQa },
     });
   } catch {
     // Best-effort.

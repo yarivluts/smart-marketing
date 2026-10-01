@@ -111,6 +111,7 @@ describe('Ad Studio limits and usage', () => {
       dailyTextGenerations: AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS,
       dailyVideoSeconds: AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
       dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
+      videoQa: { enabled: true, retries: 1 },
       customized: false,
       lastChangedOn: null,
     });
