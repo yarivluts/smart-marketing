@@ -3713,7 +3713,12 @@
       "scene_not_whole_seconds": "Scene {scene} must be whole seconds.",
       "empty_visual_prompt": "Scene {scene} needs a description of what the camera shows.",
       "duplicate_scene_id": "Scene {scene} duplicates another scene.",
-      "pronunciation_too_long": "The pronunciation of scene {scene} is too long."
+      "pronunciation_too_long": "The pronunciation of scene {scene} is too long.",
+      "too_many_references": "Scene {scene} can use at most 3 images.",
+      "duplicate_reference": "Scene {scene} uses the same image twice.",
+      "invalid_reference_use": "Scene {scene} has an image without a valid use.",
+      "two_first_frames": "Scene {scene} can start on only one image.",
+      "unknown_reference": "Scene {scene} uses an image that is not ready or no longer exists."
     },
     "addScene": "Add scene",
     "saving": "Saving...",
@@ -3783,7 +3788,8 @@
       "image": "Image",
       "image_edit": "Image edit",
       "video_qa": "AI video check",
-      "vocalize": "Narration nikud"
+      "vocalize": "Narration nikud",
+      "reference_image": "Scene illustration"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4308,7 +4314,70 @@
     "pronunciation": "Pronunciation (with nikud)",
     "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
     "pronunciationHint": "This is what the narrator reads. Fix any word that is vocalized wrong.",
-    "pronunciationStale": "The narration changed - the pronunciation will be redone when you save."
+    "pronunciationStale": "The narration changed - the pronunciation will be redone when you save.",
+    "references": {
+      "title": "Screens and images for the video",
+      "description": "Real screenshots of your app or AI illustrations. Attach them to scenes and the video model shows your real product instead of inventing one.",
+      "unavailable": {
+        "upload": "Upload a PNG or JPEG image.",
+        "illustration": "No image model is configured for this deployment."
+      },
+      "add": {
+        "upload": "Upload a screenshot",
+        "illustration": "Draw an illustration"
+      },
+      "fileLabel": "Image file",
+      "fileHint": "PNG or JPEG, up to 4 MB. A sharp, full-size screenshot works best.",
+      "promptLabel": "What should the illustration show?",
+      "promptPlaceholder": "A phone showing a signed contract with a green check mark",
+      "aspectLabel": "Shape",
+      "labelLabel": "Name",
+      "descriptionLabel": "What it shows (goes into the video prompt)",
+      "descriptionPlaceholder": "The dashboard after a document was signed",
+      "working": {
+        "upload": "Uploading…",
+        "illustration": "Drawing…"
+      },
+      "submit": {
+        "upload": "Upload",
+        "illustration": "Draw"
+      },
+      "cancel": "Cancel",
+      "save": "Save",
+      "edit": "Edit",
+      "delete": "Delete image",
+      "confirmDelete": "Delete - also removes it from scenes",
+      "empty": "No images yet. Add a screenshot of your app so the video shows the real product.",
+      "status": {
+        "generating": "Working on it…",
+        "ready": "Ready",
+        "failed": "This image could not be made"
+      },
+      "source": {
+        "upload": "Uploaded",
+        "illustration": "AI illustration"
+      },
+      "sceneTitle": "Images for this scene",
+      "attach": "Attach an image…",
+      "detach": "Remove from this scene",
+      "useLabel": "How to use it",
+      "use": {
+        "screen": "Show on screen",
+        "subject": "Show as it looks",
+        "first_frame": "Start on it"
+      },
+      "missing": "Missing image",
+      "errors": {
+        "unsupported_image": "Only PNG and JPEG images can be used.",
+        "image_too_large": "The image is larger than 4 MB.",
+        "illustration_not_configured": "No image model is configured for this deployment.",
+        "reference_not_ready": "That image is not ready yet.",
+        "label_required": "Give the image a name.",
+        "label_too_long": "The name is too long.",
+        "description_too_long": "The description is too long.",
+        "library_full": "This ad already has the most images it can hold. Delete one first."
+      }
+    }
   },
   "MetaConnect": {
     "title": "Connect with Facebook",

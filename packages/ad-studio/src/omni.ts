@@ -15,6 +15,8 @@ import { AD_STUDIO_TEST_OMNI_BASE_URL, adStudioTestOverride, isLoopbackHttpUrl }
  *   `output_video.uri`, and older shapes used `outputs[]`, so all three are read. The uri names a
  *   Files API file (`.../v1beta/files/{ID}:download?alt=media`), polled with `GET /v1beta/files/{ID}`
  *   until `state` is `ACTIVE` (or `FAILED`) and downloaded from `:download?alt=media`.
+ * - Reference images (KAN-243) go in `input` as `{ type: "image", mime_type, data }` items after the
+ *   text prompt, which says how to use each; PNG and JPEG only.
  * - Edits chain with `previous_interaction_id` and the instruction as `input`; the response format
  *   is repeated because it is interaction-scoped.
  * - There is no duration parameter: the length (3-10 seconds) is asked for in the prompt, which
@@ -49,11 +51,17 @@ export interface OmniInteraction {
   error: { code: AdStudioProviderErrorCode; message: string } | null;
 }
 
+/** An image sent with a scene prompt (an app screen, an illustration, an opening frame). */
+export interface OmniImageInput {
+  mimeType: string;
+  data: Buffer;
+}
+
 export type OmniFileState = { state: 'PROCESSING' } | { state: 'ACTIVE' } | { state: 'FAILED'; message: string };
 
 export interface AdStudioOmni {
   model: string;
-  startSceneGeneration(params: { prompt: string; aspectRatio: OmniAspectRatio }): Promise<OmniInteraction>;
+  startSceneGeneration(params: { prompt: string; aspectRatio: OmniAspectRatio; images?: readonly OmniImageInput[] }): Promise<OmniInteraction>;
   startSceneEdit(params: { previousInteractionId: string; instruction: string; aspectRatio: OmniAspectRatio }): Promise<OmniInteraction>;
   getInteraction(interactionId: string): Promise<OmniInteraction>;
   getFileState(fileName: string): Promise<OmniFileState>;
@@ -175,7 +183,11 @@ export function createOmniClient(apiKey: string, options: { fetchImpl?: FetchLik
 
   return {
     model: AD_STUDIO_VIDEO_MODEL,
-    startSceneGeneration: ({ prompt, aspectRatio }) => start({ input: prompt, response_format: responseFormat(aspectRatio) }),
+    startSceneGeneration: ({ prompt, aspectRatio, images }) =>
+      start({
+        input: images?.length ? [{ type: 'text', text: prompt }, ...images.map((image) => ({ type: 'image', mime_type: image.mimeType, data: image.data.toString('base64') }))] : prompt,
+        response_format: responseFormat(aspectRatio),
+      }),
     startSceneEdit: ({ previousInteractionId, instruction, aspectRatio }) =>
       start({ previous_interaction_id: previousInteractionId, input: instruction, response_format: responseFormat(aspectRatio) }),
     async getInteraction(interactionId) {

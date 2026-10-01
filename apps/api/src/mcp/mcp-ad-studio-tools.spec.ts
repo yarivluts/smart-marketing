@@ -18,7 +18,7 @@ import type { ToolResult } from './mcp-tools';
  */
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 7, 7, 7]);
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7]);
 
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';
@@ -156,6 +156,42 @@ describe('Ad Studio MCP tools', () => {
     expect(kept[0].pronunciation).toBe(`${plain}!`);
     const usage = await json<{ today: { text_generations: number } }>('get_ad_studio_usage');
     expect(usage.today.text_generations).toBe(1);
+  });
+
+  it('lets an agent add app screenshots and illustrations, attach them to scenes, look at them, and delete them', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    const listed = await json<{ references: unknown[]; can_draw_illustrations: boolean }>('list_ad_references', { brief_id: ad.id });
+    expect(listed).toEqual({ references: [], can_draw_illustrations: true });
+
+    const pngHeader = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+    type Ref = { image_id: string; source: string; status: string };
+    const screen = await json<Ref>('add_ad_reference', { brief_id: ad.id, source: 'upload', label: 'Dashboard', description: 'The app dashboard', image_base64: pngHeader.toString('base64') });
+    expect(screen).toMatchObject({ source: 'upload', status: 'ready' });
+    const drawn = await json<Ref>('add_ad_reference', { brief_id: ad.id, source: 'illustration', label: 'Signed', prompt: 'A signed contract on a phone' });
+    expect(drawn).toMatchObject({ source: 'illustration', status: 'ready' });
+    const gif = await call('add_ad_reference', { brief_id: ad.id, source: 'upload', label: 'x', image_base64: Buffer.from('GIF89a').toString('base64') });
+    expect((gif.content[0] as { text: string }).text).toBe('Cannot do that: unsupported_image.');
+    const capture = await call('add_ad_reference', { brief_id: ad.id, source: 'screenshot', label: 'x' });
+    expect((capture.content[0] as { text: string }).text).toBe('Invalid: source must be "upload" or "illustration".');
+
+    const image = await call('get_ad_reference', { brief_id: ad.id, image_id: screen.image_id });
+    expect(image.content[1]).toEqual({ type: 'image', data: pngHeader.toString('base64'), mimeType: 'image/png' });
+
+    const scene = { id: 's1', duration_seconds: 5, visual_prompt: 'A laptop on a desk', voiceover: '', on_screen_text: '' };
+    type Scene = { references: { image_id: string; use: string }[] };
+    const saved = await json<Scene[]>('save_ad_script', { brief_id: ad.id, scenes: [{ ...scene, references: [{ image_id: screen.image_id, use: 'screen' }, { image_id: drawn.image_id, use: 'subject' }] }] });
+    expect(saved[0].references).toEqual([
+      { image_id: screen.image_id, use: 'screen' },
+      { image_id: drawn.image_id, use: 'subject' },
+    ]);
+    const unknown = await call('save_ad_script', { brief_id: ad.id, scenes: [{ ...scene, references: [{ image_id: 'nope', use: 'screen' }] }] });
+    expect((unknown.content[0] as { text: string }).text).toContain('unknown_reference (scene 1)');
+
+    await json('delete_ad_reference', { brief_id: ad.id, image_id: screen.image_id });
+    const state = await json<{ scenes: Scene[] }>('get_ad_brief', { brief_id: ad.id });
+    expect(state.scenes[0].references).toEqual([{ image_id: drawn.image_id, use: 'subject' }]);
+    expect((await json<{ today: { images: number } }>('get_ad_studio_usage')).today.images).toBe(1);
   });
 
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {

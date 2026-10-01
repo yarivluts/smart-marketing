@@ -36,6 +36,7 @@ import {
 import { adStudioRuntime, ensureOrm } from './runtime';
 import { AdStudioProviderError, resolveAdStudioReviewer, type AdStudioProviderErrorCode, type AdStudioReviewer } from './llm';
 import { checkAdStudioClip } from './qa';
+import { loadSceneReferences } from './references';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioClipView, AdStudioVideoView } from './view';
@@ -252,7 +253,10 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
   if (generatingFor(clips, scene.id)) throw new AdStudioVideoRequestError('already_generating');
   const context = videoContext(brief);
-  const prompt = buildScenePrompt(scene, context);
+  // The scene's reference images (app screens, illustrations) go to the model with the prompt (KAN-243).
+  const references = await loadSceneReferences(ctx, scene, deps.storage);
+  const prompt = buildScenePrompt(scene, context, references.map((reference) => reference.prompt));
+  const images = references.map((reference) => reference.image);
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   return startClip(ctx, deps, {
     kind: 'video_scene',
@@ -263,7 +267,7 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
     prompt,
     aspectRatio,
     durationSeconds: scene.durationSeconds,
-    call: () => deps.omni.startSceneGeneration({ prompt, aspectRatio }),
+    call: () => deps.omni.startSceneGeneration({ prompt, aspectRatio, ...(images.length ? { images } : {}) }),
   });
 }
 
@@ -395,7 +399,18 @@ async function checkNextClip(ctx: Omit<BriefContext, 'actorId'>, deps: Pick<AdSt
   if (!next) return;
   const scene = brief.scenes.find((entry) => entry.id === next.scene_id) ?? null;
   const settings = await getAdStudioSettings(ctx.organizationId, ctx.projectId);
-  await checkAdStudioClip({ clip: next, scene, language: brief.language, reviewer: deps.reviewer ?? null, storage: deps.storage, enabled: settings.videoQa.enabled, now: clock(deps) });
+  // Checked against the images it was rendered with; an image that cannot be read is left out, not fatal.
+  const references = scene && settings.videoQa.enabled ? await loadSceneReferences(ctx, scene, deps.storage).catch(() => []) : [];
+  await checkAdStudioClip({
+    clip: next,
+    scene,
+    language: brief.language,
+    reviewer: deps.reviewer ?? null,
+    storage: deps.storage,
+    enabled: settings.videoQa.enabled,
+    references: references.map((reference) => ({ use: reference.use, label: reference.label, description: reference.prompt.description, image: reference.image })),
+    now: clock(deps),
+  });
 }
 
 export async function listBriefVideo(ctx: Omit<BriefContext, 'actorId'>): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {

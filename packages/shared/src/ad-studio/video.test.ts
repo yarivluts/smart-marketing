@@ -35,6 +35,9 @@ describe('buildScenePrompt', () => {
     const prompt = buildScenePrompt(scene('a', 5, 'A desk', 'Signed in seconds'), CONTEXT);
     expect(prompt).toContain('Do not show any readable text');
     expect(prompt).toContain('narrator says, in Hebrew: "Signed in seconds"');
+    // Omni made an on-screen person the speaker and the lips drifted out of sync (seen on prod, 2026-10-01).
+    expect(prompt).toContain('the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.');
+    expect(buildScenePrompt({ ...scene('a', 5, 'A desk', 'Signed in seconds'), pronunciation: 'Signed in seconds!' }, CONTEXT)).toContain('no one in the shot speaks or moves their lips');
     const silent = buildScenePrompt(scene('a', 5, 'A desk', '   '), CONTEXT);
     expect(silent).toContain('No speech.');
     expect(silent).not.toContain('narrator');

@@ -1,4 +1,4 @@
-import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioScene } from '@growthos/shared';
+import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
 
 /**
  * Shapes request bodies into service inputs without deciding what is valid - the services own the
@@ -32,12 +32,19 @@ export function parseScenes(value: unknown): AdStudioScene[] | null {
   return value.map((raw) => {
     const scene = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
     const pronunciation = text(scene.pronunciation).trim();
+    const references = Array.isArray(scene.references)
+      ? scene.references.map((entry) => {
+          const reference = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+          return { imageId: text(reference.imageId), use: text(reference.use) as AdStudioReferenceUse };
+        })
+      : [];
     return {
       id: text(scene.id),
       durationSeconds: wholeNumber(scene.durationSeconds),
       visualPrompt: text(scene.visualPrompt),
       voiceover: text(scene.voiceover),
       ...(pronunciation ? { pronunciation } : {}),
+      ...(references.length ? { references } : {}),
       onScreenText: text(scene.onScreenText),
     };
   });

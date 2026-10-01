@@ -7,6 +7,7 @@ import {
   type AdStudioEvidenceSource,
   type AdStudioPlanRecommendation,
   type AdStudioPlanSources,
+  type AdStudioReferenceSource,
   type AdStudioScene,
 } from '@growthos/shared';
 
@@ -69,6 +70,20 @@ export interface AdStudioClipView {
   completedOn: string | null;
   /** The AI quality check, once it ran; null while the clip renders or waits for it. */
   qa: AdStudioClipQaView | null;
+}
+
+/** A reference image in an ad's library (KAN-243), as the page and MCP see it. */
+export interface AdStudioReferenceView {
+  id: string;
+  source: AdStudioReferenceSource;
+  label: string;
+  description: string;
+  status: 'generating' | 'ready' | 'failed';
+  prompt: string | null;
+  mimeType: string | null;
+  byteSize: number | null;
+  failureCode: string | null;
+  createdOn: string;
 }
 
 /** What the AI quality check found in a clip. */
