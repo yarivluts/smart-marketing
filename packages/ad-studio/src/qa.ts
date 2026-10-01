@@ -8,8 +8,8 @@ import {
   type AdStudioClipModel,
   type AdStudioClipQaIssue,
 } from '@growthos/firebase-orm-models';
-import type { AdStudioScene } from '@growthos/shared';
-import { AdStudioProviderError, type AdStudioReviewer } from './llm';
+import type { AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
+import { AdStudioProviderError, type AdStudioMediaInput, type AdStudioReviewer } from './llm';
 import { readAdStudioObject, type AdStudioMediaStorage } from './media-storage';
 
 /**
@@ -39,7 +39,31 @@ export const AdStudioClipQaSchema = z.object({
 
 const LANGUAGE_NAMES: Record<string, string> = { he: 'Hebrew', en: 'English', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German' };
 
-export function buildClipQaPrompt(scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'>, language: string): { system: string; user: string } {
+/** A reference image the clip is checked against (KAN-243). */
+export interface AdStudioQaReference {
+  use: AdStudioReferenceUse;
+  label: string;
+  description: string;
+}
+
+function referenceRule(reference: AdStudioQaReference, index: number): string {
+  const name = `Reference image ${index + 1} (${reference.label}${reference.description ? `: ${reference.description}` : ''})`;
+  switch (reference.use) {
+    case 'screen':
+      return `${name} is the real product screen. Any device screen in the clip must show it: a different, invented or redrawn interface, or its words garbled, is a major visual problem; small text too small to read is fine.`;
+    case 'first_frame':
+      return `${name} is the opening frame. The clip should start on it; starting on something clearly different is a major visual problem.`;
+    case 'subject':
+    default:
+      return `${name} shows how this subject must look. Showing it clearly different is a major visual problem.`;
+  }
+}
+
+export function buildClipQaPrompt(
+  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'>,
+  language: string,
+  references: readonly AdStudioQaReference[] = [],
+): { system: string; user: string } {
   const languageName = LANGUAGE_NAMES[language.toLowerCase()] ?? language;
   const narration = scene.voiceover.trim();
   const pronunciation = narration ? (scene.pronunciation ?? '').trim() : '';
@@ -51,6 +75,7 @@ export function buildClipQaPrompt(scene: Pick<AdStudioScene, 'visualPrompt' | 'v
       narration ? `Intended narration, word for word: "${narration}"` : 'Intended narration: none (no one should speak).',
       pronunciation ? `Pronunciation guide (the same words with vowel marks, numbers written out): "${pronunciation}". Judge the pronunciation against this guide.` : null,
       `Intended picture: ${scene.visualPrompt}`,
+      ...(references.length ? [`After the video come ${references.length} reference image(s) the clip was made from:`, ...references.map(referenceRule)] : []),
       '',
       '1) transcript: write exactly what is spoken in the clip, in the language spoken (empty if nothing is said).',
       '2) issues: every problem, each with kind (audio or visual), severity, a short detail a person can act on, and atSeconds when you can tell.',
@@ -69,6 +94,8 @@ export interface CheckAdStudioClipParams {
   clip: AdStudioClipModel;
   /** The scene the clip renders, as it reads now; null when the scene was deleted (the check is then skipped). */
   scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'> | null;
+  /** The images the scene was rendered with, in order; the reviewer compares the clip with them. */
+  references?: readonly (AdStudioQaReference & { image: AdStudioMediaInput })[];
   language: string;
   reviewer: AdStudioReviewer | null;
   storage: AdStudioMediaStorage;
@@ -112,7 +139,12 @@ export async function checkAdStudioClip(params: CheckAdStudioClipParams): Promis
     });
   try {
     const bytes = await readAdStudioObject(params.storage, clip.gcs_path, MAX_CLIP_BYTES);
-    const review = await reviewer.reviewJson({ ...buildClipQaPrompt(params.scene, params.language), schema: AdStudioClipQaSchema, media: { mimeType: 'video/mp4', data: bytes } });
+    const references = params.references ?? [];
+    const review = await reviewer.reviewJson({
+      ...buildClipQaPrompt(params.scene, params.language, references),
+      schema: AdStudioClipQaSchema,
+      media: [{ mimeType: 'video/mp4', data: bytes }, ...references.map((reference) => reference.image)],
+    });
     await usage('succeeded');
     const issues: AdStudioClipQaIssue[] = review.issues.slice(0, MAX_ISSUES).map((issue) => ({
       kind: issue.kind,

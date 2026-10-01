@@ -94,16 +94,17 @@ function geminiErrorCode(status: number, message: string): AdStudioProviderError
   return 'provider_error';
 }
 
-/** One Gemini generateContent call that must answer JSON matching `schema`; `media` rides along as inline bytes. */
+/** One Gemini generateContent call that must answer JSON matching `schema`; `media` rides along as inline bytes, in order, before the prompt. */
 async function geminiJson<T>(
   apiKey: string,
   fetchImpl: FetchLike,
   baseUrl: string,
   model: string,
-  request: AdStudioJsonRequest<T> & { media?: AdStudioMediaInput },
+  request: AdStudioJsonRequest<T> & { media?: AdStudioMediaInput | readonly AdStudioMediaInput[] },
 ): Promise<T> {
   const parts: Record<string, unknown>[] = [];
-  if (request.media) parts.push({ inlineData: { mimeType: request.media.mimeType, data: Buffer.from(request.media.data).toString('base64') } });
+  const media = request.media === undefined ? [] : Array.isArray(request.media) ? request.media : [request.media as AdStudioMediaInput];
+  for (const item of media) parts.push({ inlineData: { mimeType: item.mimeType, data: Buffer.from(item.data).toString('base64') } });
   parts.push({ text: request.user });
   let response: Response;
   try {
@@ -165,7 +166,8 @@ export interface AdStudioMediaInput {
 export interface AdStudioReviewer {
   provider: 'gemini';
   model: string;
-  reviewJson<T>(request: AdStudioJsonRequest<T> & { media: AdStudioMediaInput }): Promise<T>;
+  /** The clip first, then any reference images it is checked against. */
+  reviewJson<T>(request: AdStudioJsonRequest<T> & { media: AdStudioMediaInput | readonly AdStudioMediaInput[] }): Promise<T>;
 }
 
 export function createGeminiReviewer(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE): AdStudioReviewer {

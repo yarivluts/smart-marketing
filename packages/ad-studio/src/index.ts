@@ -13,6 +13,7 @@ export * from './planning';
 export * from './planning-sources';
 export * from './script-generation';
 export * from './vocalize';
+export * from './references';
 export * from './video-pipeline';
 export * from './qa';
 export * from './gemini-image';
