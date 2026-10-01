@@ -43,6 +43,8 @@ import {
   saveAdStudioCopy,
   saveAdStudioVoice,
   AdStudioVoiceInvalidError,
+  saveAdStudioVideoSettings,
+  AdStudioVideoSettingsInvalidError,
   saveAdStudioImageConcepts,
   setAdStudioSettings,
   updateAdStudioBriefDetails,
@@ -106,7 +108,7 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, type AdStudioAdCopy, type AdStudioVoice, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -157,6 +159,7 @@ function describeAdStudioToolError(error: unknown): string {
   }
   if (error instanceof AdStudioScriptInvalidError) return `The script breaks these rules: ${error.issues.map((issue) => (issue.scene ? `${issue.code} (scene ${issue.scene})` : issue.code)).join(', ')}.`;
   if (error instanceof AdStudioVoiceInvalidError) return `Invalid voice: ${error.code}.`;
+  if (error instanceof AdStudioVideoSettingsInvalidError) return `Invalid video settings: ${error.code}.`;
   if (error instanceof AdStudioCopyInvalidError) return `The ad copy breaks these rules: ${error.issues.map((issue) => `${issue.code} (${issue.target})`).join(', ')}.`;
   if (error instanceof AdStudioImageConceptsInvalidError) {
     return `The image ideas break these rules: ${error.issues.map((issue) => (issue.concept ? `${issue.code} (idea ${issue.concept})` : issue.code)).join(', ')}.`;
@@ -292,7 +295,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
   ]);
   const clips = clipModels.map(toAdStudioClipView);
   const videos = videoModels.map(toAdStudioVideoView);
-  const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice) };
+  const context = { format: brief.video_format, language: brief.language, voice: voiceDescription(brief.narrator_voice), settings: brief.video_settings ?? null };
   const states = sceneVideoStates(brief.scenes, clips, context);
   const progress = summarizeVideoProgress(states, brief.scenes);
   const plan = assemblyPlan(brief.scenes, clips, context);
@@ -334,6 +337,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
     })),
     video: {
       narrator_voice: brief.narrator_voice ? { preset: brief.narrator_voice.preset, description: brief.narrator_voice.preset === 'custom' ? (brief.narrator_voice.description ?? '') : null } : null,
+      settings: settingsOutput(brief.video_settings),
       copy: copyOutput(brief.video_copy),
       scenes: progress.scenes,
       rendered: progress.rendered,
@@ -347,6 +351,12 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
     exports: exports.map(exportOutput),
     web_url: webUrl(auth, briefId),
   };
+}
+
+/** The ad's advanced video settings in snake case, every field filled. */
+function settingsOutput(settings: AdStudioVideoSettings | null | undefined) {
+  const full = normalizeVideoSettings(settings);
+  return { resolution: full.resolution, style: full.style, music: full.music, music_description: full.musicDescription ?? null, avoid: full.avoid ?? null };
 }
 
 const briefId = z.string().min(1).describe('The ad (brief) id, from list_ad_briefs or create_ad_brief.');
@@ -592,6 +602,36 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         const voice = a.preset === 'none' ? null : ({ preset: a.preset, description: a.description } as AdStudioVoice);
         await saveAdStudioVoice({ ...ctx(a.brief_id), voice });
         return textResult({ narrator_voice: (await describeBrief(auth, a.brief_id)).video.narrator_voice });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'set_ad_video_settings',
+    {
+      title: 'Set the advanced video settings',
+      description:
+        'Changes the advanced video settings of the ad; fields left out keep their value. resolution: 360p, 720p (default) or 1080p - the assembled video follows (1080p, else 720p). style: commercial (default), cinematic, ugc_phone, studio_product, documentary, animation_3d or illustration_2d. music: auto (default), none, or custom with music_description. avoid: what must never appear, in words ("" clears it). Every clip made with the old settings becomes out of date. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        resolution: z.string().optional().describe('360p, 720p or 1080p.'),
+        style: z.string().optional().describe('commercial, cinematic, ugc_phone, studio_product, documentary, animation_3d or illustration_2d.'),
+        music: z.string().optional().describe('auto, none or custom.'),
+        music_description: z.string().optional().describe('For custom music, in English: e.g. "upbeat acoustic guitar".'),
+        avoid: z.string().optional().describe('What must never appear in the video, e.g. "animals, cars". "" clears it.'),
+      }),
+    },
+    auditedToolHandler(auth, 'set_ad_video_settings', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; resolution?: string; style?: string; music?: string; music_description?: string; avoid?: string }) => {
+        const settings = {
+          ...(a.resolution !== undefined ? { resolution: a.resolution } : {}),
+          ...(a.style !== undefined ? { style: a.style } : {}),
+          ...(a.music !== undefined ? { music: a.music } : {}),
+          ...(a.music_description !== undefined ? { musicDescription: a.music_description } : {}),
+          ...(a.avoid !== undefined ? { avoid: a.avoid } : {}),
+        } as Partial<AdStudioVideoSettings>;
+        const brief = await saveAdStudioVideoSettings({ ...ctx(a.brief_id), settings });
+        return textResult({ settings: settingsOutput(brief.video_settings) });
       }),
     ),
   );

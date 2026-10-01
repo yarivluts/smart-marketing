@@ -22,6 +22,7 @@ import {
   voiceDescription,
   type AdStudioAdCopy,
   type AdStudioVoice,
+  type AdStudioVideoSettings,
   type AdStudioFormat,
   type AdStudioScene,
   type AdStudioSceneVideoState,
@@ -45,6 +46,7 @@ import { MobileAccordionItem } from './mobile-accordion';
 import { AdCopyCard } from './ad-copy-card';
 import { NarrationEditor } from './narration-editor';
 import { VoicePicker } from './voice-picker';
+import { AdvancedVideoSettings } from './advanced-video-settings';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -64,6 +66,8 @@ export interface VideoStudioProps {
   linkUrl?: string | null;
   /** The narrator voice of every scene; null lets the video model choose. */
   voice?: AdStudioVoice | null;
+  /** The advanced video settings; null means the defaults. */
+  videoSettings?: AdStudioVideoSettings | null;
   initialClips: AdStudioClipView[];
   initialVideos: AdStudioVideoView[];
   /** False when no video model is configured for the deployment. */
@@ -115,6 +119,7 @@ export function VideoStudio({
   textAvailable = false,
   linkUrl = null,
   voice = null,
+  videoSettings = null,
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -147,7 +152,9 @@ export function VideoStudio({
 
   const [voiceChoice, setVoiceChoice] = React.useState(voice);
   React.useEffect(() => setVoiceChoice(voice), [voice]);
-  const context = { format, language, voice: voiceDescription(voiceChoice) };
+  const [settingsChoice, setSettingsChoice] = React.useState(videoSettings);
+  React.useEffect(() => setSettingsChoice(videoSettings), [videoSettings]);
+  const context = { format, language, voice: voiceDescription(voiceChoice), settings: settingsChoice };
   const states = sceneVideoStates(scenes, clips, context);
   const progress = summarizeVideoProgress(states, scenes);
   const cost = renderAllCost(states, scenes);
@@ -268,6 +275,15 @@ export function VideoStudio({
           <p className="max-w-2xl text-sm text-muted-foreground">{t('video.description')}</p>
         </div>
         <div className="flex max-w-xs flex-col items-end gap-1 text-end">
+          <AdvancedVideoSettings
+            base={base}
+            settings={settingsChoice}
+            disabled={pending !== null || generating}
+            onSaved={(saved) => {
+              setSettingsChoice(saved);
+              router.refresh();
+            }}
+          />
           <button
             type="button"
             onClick={() => act('all', '/render-all', undefined, t('video.started'))}

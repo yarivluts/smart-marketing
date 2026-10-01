@@ -77,6 +77,7 @@ export async function createAdStudioClip(params: {
   prompt: string;
   model: string;
   aspectRatio: string;
+  resolution?: string | null;
   durationSeconds: number;
   requestedBy: string;
   now?: Date;
@@ -95,6 +96,7 @@ export async function createAdStudioClip(params: {
   clip.prompt = params.prompt;
   clip.model = params.model;
   clip.aspect_ratio = params.aspectRatio;
+  clip.resolution = params.resolution ?? null;
   clip.interaction_id = null;
   clip.file_name = null;
   clip.status = 'generating';
@@ -249,6 +251,7 @@ export async function createAdStudioVideo(params: {
   clipIds: string[];
   sceneIds: string[];
   aspectRatio: string;
+  resolution?: string | null;
   durationSeconds: number;
   requestedBy: string;
   now?: Date;

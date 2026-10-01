@@ -2,6 +2,7 @@ import { AD_STUDIO_ASPECT_RATIO, AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioForma
 import { languageName } from './prompts';
 import { isHebrewLanguage, spokenNarration } from './pronunciation';
 import { referencePromptLines, referencesShowText, type AdStudioPromptReference } from './references';
+import { AD_STUDIO_VISUAL_STYLE_PROMPTS, isDefaultVideoSettings, musicPromptLine, normalizeVideoSettings, type AdStudioVideoSettings } from './video-settings';
 
 /**
  * Ad Studio video (KAN-231): what each scene's clip is asked of the video model, how a clip is tied
@@ -28,6 +29,11 @@ export interface AdStudioVideoContext {
    * purpose: every place that computes a fingerprint must pass it, or clips would look out of date.
    */
   voice: string | null;
+  /**
+   * The ad's advanced video settings (see `video-settings.ts`), or null for the defaults. Required on
+   * purpose, like `voice`.
+   */
+  settings: AdStudioVideoSettings | null;
 }
 
 const PRODUCT_CONTEXT_MAX = 300;
@@ -66,20 +72,23 @@ export function buildScenePrompt(
     : '';
   // The ad's one narrator voice, described the same way in every scene so the scenes sound alike.
   const voice = context.voice ? oneLine(context.voice) : null;
+  const settings = normalizeVideoSettings(context.settings);
+  const music = musicPromptLine(settings, true);
   const narrationLine = onScreen
-    ? `Audio: ${who ? `${who} in the shot` : 'the person in the shot'} looks at the camera and says, in ${language}${exactly}: "${voiceover}". Their lips move in sync with every word. ${who ? 'No one else in the shot speaks.' : 'Only this one person speaks.'}${voice ? ` They speak with the voice of ${voice} - the same voice in every scene of this ad.` : ''} There is no off-screen narrator. Soft background music under the voice.`
-    : `Audio: ${voice ? `a voice-over narrator - ${voice} - says` : 'a warm, clear voice-over narrator says'}, in ${language}${exactly}: "${voiceover}".${vocalized ? ' Say each word once, fluently, without repeating or stuttering.' : ''}${voice ? ' It is exactly the same narrator voice in every scene of this ad.' : ''} Soft background music under the voice. The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`;
+    ? `Audio: ${who ? `${who} in the shot` : 'the person in the shot'} looks at the camera and says, in ${language}${exactly}: "${voiceover}". Their lips move in sync with every word. ${who ? 'No one else in the shot speaks.' : 'Only this one person speaks.'}${voice ? ` They speak with the voice of ${voice} - the same voice in every scene of this ad.` : ''} There is no off-screen narrator. ${music}`
+    : `Audio: ${voice ? `a voice-over narrator - ${voice} - says` : 'a warm, clear voice-over narrator says'}, in ${language}${exactly}: "${voiceover}".${vocalized ? ' Say each word once, fluently, without repeating or stuttering.' : ''}${voice ? ' It is exactly the same narrator voice in every scene of this ad.' : ''} ${music} The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`;
   return [
     `[0-${seconds}s] ${oneLine(scene.visualPrompt)}`,
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
-    `This shot is one scene of a short video ad for: ${product}. Keep the look consistent with the other scenes of the ad: the same polished commercial style, colour grading and lighting, and the same product, people and setting whenever they appear.`,
+    `This shot is one scene of a short video ad for: ${product}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.`,
     ...referencePromptLines(references),
     voiceover
       ? narrationLine
-      : 'Audio: background music and natural ambient sound that fit the mood. No speech.',
+      : musicPromptLine(settings, false),
     referencesShowText(references)
       ? 'Apart from what the attached screen or opening frame shows, do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame.'
       : 'Do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame.',
+    ...(settings.avoid ? [`Never show any of these anywhere in the video: ${settings.avoid}.`] : []),
   ].join('\n');
 }
 
@@ -109,8 +118,9 @@ function fnv1a(input: string, basis: number): number {
  * on purpose - reordering scenes or editing a caption does not need a re-render. Not a security
  * hash; it only has to differ when the inputs differ.
  */
-export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>, context: Pick<AdStudioVideoContext, 'format' | 'language' | 'voice'>): string {
+export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>, context: Pick<AdStudioVideoContext, 'format' | 'language' | 'voice' | 'settings'>): string {
   const pronunciation = oneLine(scene.pronunciation ?? '');
+  const settings = normalizeVideoSettings(context.settings);
   const canonical = JSON.stringify([
     scene.durationSeconds,
     oneLine(scene.visualPrompt),
@@ -125,6 +135,8 @@ export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 
     ...(context.voice && scene.voiceover.trim() ? [{ voice: oneLine(context.voice) }] : []),
     // The attached images and how each is used, also only when present (KAN-243).
     ...(scene.references?.length ? [{ references: scene.references.map((reference) => [reference.imageId, reference.use]) }] : []),
+    // The advanced video settings, only when changed from the defaults.
+    ...(isDefaultVideoSettings(settings) ? [] : [{ settings: [settings.resolution, settings.style, settings.music, settings.musicDescription ?? '', settings.avoid ?? ''] }]),
   ]);
   const high = fnv1a(canonical, 0x811c9dc5).toString(16).padStart(8, '0');
   const low = fnv1a(`${canonical}#`, 0x01000193).toString(16).padStart(8, '0');
@@ -175,7 +187,7 @@ export interface AdStudioSceneVideo<T extends AdStudioClipSummary = AdStudioClip
 export function sceneVideoStates<T extends AdStudioClipSummary>(
   scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>[],
   clips: readonly T[],
-  context: Pick<AdStudioVideoContext, 'format' | 'language' | 'voice'>,
+  context: Pick<AdStudioVideoContext, 'format' | 'language' | 'voice' | 'settings'>,
 ): AdStudioSceneVideo<T>[] {
   const grouped = clipsByScene(clips);
   return scenes.map((scene) => {
@@ -235,7 +247,7 @@ export function renderAllCost(states: readonly AdStudioSceneVideo[], scenes: rea
 export function assemblyPlan<T extends AdStudioClipSummary>(
   scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>[],
   clips: readonly T[],
-  context: Pick<AdStudioVideoContext, 'format' | 'language' | 'voice'>,
+  context: Pick<AdStudioVideoContext, 'format' | 'language' | 'voice' | 'settings'>,
 ): { clip: T; sceneId: string; seconds: number }[] | null {
   if (scenes.length === 0) return null;
   const states = sceneVideoStates(scenes, clips, context);

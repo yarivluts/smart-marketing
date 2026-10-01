@@ -4332,18 +4332,18 @@
     "pronunciationHint": "This is what the narrator reads. Fix any word that is vocalized wrong.",
     "pronunciationStale": "The narration changed - the pronunciation will be redone when you save.",
     "references": {
-      "title": "Screens and images for the video",
-      "description": "Real screenshots of your app or AI illustrations. Attach them to scenes and the video model shows your real product instead of inventing one.",
+      "title": "Images for the video",
+      "description": "Your own images - a product photo, your logo, a person, a place - real screenshots of your app, or AI illustrations. Attach them to scenes and the video model uses them instead of inventing its own.",
       "unavailable": {
         "upload": "Upload a PNG or JPEG image.",
         "illustration": "No image model is configured for this deployment."
       },
       "add": {
-        "upload": "Upload a screenshot",
+        "upload": "Upload an image",
         "illustration": "Draw an illustration"
       },
       "fileLabel": "Image file",
-      "fileHint": "PNG or JPEG, up to 4 MB. A sharp, full-size screenshot works best.",
+      "fileHint": "Any image - large photos and WebP are converted to JPEG under 4 MB in your browser. A sharp, full-size image works best.",
       "promptLabel": "What should the illustration show?",
       "promptPlaceholder": "A phone showing a signed contract with a green check mark",
       "aspectLabel": "Shape",
@@ -4363,7 +4363,7 @@
       "edit": "Edit",
       "delete": "Delete image",
       "confirmDelete": "Delete - also removes it from scenes",
-      "empty": "No images yet. Add a screenshot of your app so the video shows the real product.",
+      "empty": "No images yet. Upload a product photo, logo or screenshot so the video shows the real thing.",
       "status": {
         "generating": "Working on it…",
         "ready": "Ready",
@@ -4499,6 +4499,51 @@
         "unknown_voice": "Choose one of the voices.",
         "voice_description_required": "Describe the voice you want.",
         "voice_description_too_long": "The voice description is too long."
+      }
+    },
+    "advanced": {
+      "open": "Advanced settings",
+      "changed": "Changed",
+      "title": "Advanced video settings",
+      "description": "Settings for every scene of this ad, sent to the video model (Gemini Omni) with each clip.",
+      "resolutionLabel": "Resolution",
+      "resolution": {
+        "360p": "360p - quick drafts",
+        "720p": "720p - standard",
+        "1080p": "1080p - full HD"
+      },
+      "resolutionHint": "The finished video is assembled in 1080p when the clips are 1080p, otherwise in 720p.",
+      "styleLabel": "Visual style",
+      "style": {
+        "commercial": "Polished commercial",
+        "cinematic": "Cinematic",
+        "ugc_phone": "Phone video (UGC)",
+        "studio_product": "Studio product shot",
+        "documentary": "Documentary",
+        "animation_3d": "3D animation",
+        "illustration_2d": "2D illustration"
+      },
+      "musicLabel": "Background music",
+      "music": {
+        "auto": "Automatic",
+        "none": "No music",
+        "custom": "Describe it"
+      },
+      "musicDescriptionLabel": "What music? (in English works best)",
+      "musicDescriptionPlaceholder": "e.g. upbeat acoustic guitar",
+      "avoidLabel": "Never show",
+      "avoidPlaceholder": "e.g. animals, cars, crowds",
+      "avoidHint": "Things that must not appear in any scene. The video model has no separate field for this, so it is written into every prompt.",
+      "outOfDateNote": "Saving a change makes the clips made with the old settings out of date - render them again to apply it.",
+      "reset": "Back to defaults",
+      "save": "Save settings",
+      "errors": {
+        "unknown_resolution": "Choose one of the resolutions.",
+        "unknown_style": "Choose one of the styles.",
+        "unknown_music": "Choose one of the music options.",
+        "music_description_required": "Describe the music you want.",
+        "music_description_too_long": "The music description is too long.",
+        "avoid_too_long": "The list of things to avoid is too long."
       }
     }
   },

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { AdStudioBriefInput } from '@growthos/shared';
 import {
+  AdStudioVideoSettingsInvalidError,
   AdStudioVoiceInvalidError,
   createAdStudioBrief,
   createOrganizationWithOwner,
@@ -9,6 +10,7 @@ import {
   ensureUserForFirebaseSession,
   getAdStudioBrief,
   saveAdStudioScript,
+  saveAdStudioVideoSettings,
   saveAdStudioVoice,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -52,6 +54,20 @@ describe('Ad Studio narrator voice', () => {
     await expect(saveAdStudioVoice({ ...ref, voice: { preset: 'custom', description: ' ' } })).rejects.toBeInstanceOf(AdStudioVoiceInvalidError);
     await expect(saveAdStudioVoice({ ...ref, voice: { preset: 'robot' as never } })).rejects.toMatchObject({ code: 'unknown_voice' });
     expect((await getAdStudioBrief(ref.organizationId, ref.projectId, ref.briefId)).narrator_voice).toEqual({ preset: 'woman_warm' });
+  });
+
+  it('changes the advanced video settings field by field, stores defaults as null, and refuses invalid ones', async () => {
+    const ref = await setup();
+    const read = async () => (await getAdStudioBrief(ref.organizationId, ref.projectId, ref.briefId)).video_settings ?? null;
+    await saveAdStudioVideoSettings({ ...ref, settings: { resolution: '1080p', avoid: '  no   cars ' } });
+    expect(await read()).toEqual({ resolution: '1080p', style: 'commercial', music: 'auto', avoid: 'no cars' });
+    // A field left out keeps its value.
+    await saveAdStudioVideoSettings({ ...ref, settings: { style: 'cinematic' } });
+    expect(await read()).toEqual({ resolution: '1080p', style: 'cinematic', music: 'auto', avoid: 'no cars' });
+    await expect(saveAdStudioVideoSettings({ ...ref, settings: { music: 'custom', musicDescription: ' ' } })).rejects.toBeInstanceOf(AdStudioVideoSettingsInvalidError);
+    await expect(saveAdStudioVideoSettings({ ...ref, settings: { resolution: '4k' as never } })).rejects.toMatchObject({ code: 'unknown_resolution' });
+    await saveAdStudioVideoSettings({ ...ref, settings: { resolution: '720p', style: 'commercial', avoid: '' } });
+    expect(await read()).toBeNull();
   });
 
   it('keeps who speaks each scene through a script save', async () => {

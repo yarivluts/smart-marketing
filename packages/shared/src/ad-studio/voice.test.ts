@@ -3,7 +3,7 @@ import type { AdStudioScene } from './scenes';
 import { buildScenePrompt, sceneFingerprint } from './video';
 import { AD_STUDIO_VOICE_PRESET_DESCRIPTIONS, voiceDescription, voiceIssue } from './voice';
 
-const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers', voice: null };
+const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers', voice: null, settings: null };
 
 function scene(overrides: Partial<AdStudioScene> = {}): AdStudioScene {
   return { id: 's1', durationSeconds: 5, visualPrompt: 'Two lawyers at a desk', voiceover: 'Sign in seconds.', onScreenText: '', ...overrides };

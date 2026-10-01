@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -84,6 +84,10 @@ export class AdStudioBriefModel extends BaseModel {
   /** The narrator voice of every scene (a preset or a description); absent lets the video model choose. */
   @Field({ is_required: false })
   public narrator_voice?: AdStudioVoice | null;
+
+  /** Advanced video settings (resolution, style, music, what to avoid); absent means the defaults. */
+  @Field({ is_required: false })
+  public video_settings?: AdStudioVideoSettings | null;
 
   /** The ad copy that runs next to the assembled video in the feed (KAN-278); absent until written. */
   @Field({ is_required: false })
@@ -251,6 +255,10 @@ export class AdStudioClipModel extends BaseModel {
 
   @Field({ is_required: true })
   public aspect_ratio!: string;
+
+  /** The resolution the clip was asked for; absent on clips made before it was a setting (720p). */
+  @Field({ is_required: false })
+  public resolution?: string | null;
 
   /** Gemini's interaction id - what a later edit chains from. Null until the start call returned. */
   @Field({ is_required: false })

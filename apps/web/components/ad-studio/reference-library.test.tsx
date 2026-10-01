@@ -73,12 +73,31 @@ describe('ReferenceLibrary', () => {
     });
     expect(refresh).toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upload a screenshot' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Upload an image' }));
     const upload = within(screen.getByTestId('ad-studio-reference-form'));
     fireEvent.change(upload.getByLabelText(/Image file/), { target: { files: [new File(['GIF89a'], 'a.gif', { type: 'image/gif' })] } });
     fireEvent.change(upload.getByLabelText('Name'), { target: { value: 'Animated' } });
     fireEvent.click(upload.getByRole('button', { name: 'Upload' }));
+    // A file the browser cannot turn into a JPEG is refused before anything is sent.
+    const calls = fetchMock.mock.calls.length;
     expect(await screen.findByRole('alert')).toHaveTextContent('Only PNG and JPEG images can be used.');
+    expect(fetchMock.mock.calls).toHaveLength(calls);
+  });
+
+  it('names an uploaded image from its file and sends a PNG as it is', async () => {
+    const fetchMock = vi.fn(async () => json({ reference: reference({ id: 'r9', label: 'product shot' }) }, 201));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(<ReferenceLibrary orgId="o" projectId="p" briefId="b1" initialReferences={[]} illustrationAvailable={false} />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: 'Upload an image' }));
+    const form = within(screen.getByTestId('ad-studio-reference-form'));
+    const png = new File([new Uint8Array([137, 80, 78, 71])], 'product_shot.png', { type: 'image/png' });
+    fireEvent.change(form.getByLabelText(/Image file/), { target: { files: [png] } });
+    expect(form.getByLabelText('Name')).toHaveValue('product shot');
+    fireEvent.click(form.getByRole('button', { name: 'Upload' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as FormData;
+    expect(body.get('file')).toBe(png);
+    expect(body.get('label')).toBe('product shot');
   });
 
   it('asks before deleting an image, then removes it', async () => {

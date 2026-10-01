@@ -106,6 +106,7 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   delete_ad_reference: { kind: 'per-call-permission', permission: 'ai.use' },
   get_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
   set_ad_voice: { kind: 'per-call-permission', permission: 'ai.use' },
+  set_ad_video_settings: { kind: 'per-call-permission', permission: 'ai.use' },
   write_ad_copy: { kind: 'per-call-permission', permission: 'ai.use' },
   save_ad_copy: { kind: 'per-call-permission', permission: 'ai.use' },
   render_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
