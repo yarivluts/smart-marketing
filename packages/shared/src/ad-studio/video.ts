@@ -1,5 +1,6 @@
 import { AD_STUDIO_ASPECT_RATIO, AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat, type AdStudioScene } from './scenes';
 import { languageName } from './prompts';
+import { isHebrewLanguage, spokenNarration } from './pronunciation';
 
 /**
  * Ad Studio video (KAN-231): what each scene's clip is asked of the video model, how a clip is tied
@@ -38,17 +39,21 @@ function clip(value: string, max: number): string {
  * line so separately generated clips read as one ad; the length is stated in seconds and as a
  * timecode because the API has no duration parameter; readable text is forbidden (see above).
  */
-export function buildScenePrompt(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover'>, context: AdStudioVideoContext): string {
+export function buildScenePrompt(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation'>, context: AdStudioVideoContext): string {
   const seconds = scene.durationSeconds;
   const frame = context.format === 'vertical' ? 'vertical 9:16 frame for phones' : 'horizontal 16:9 frame';
-  const voiceover = oneLine(scene.voiceover);
+  const voiceover = spokenNarration(scene);
+  const vocalized = Boolean(scene.pronunciation?.trim()) && voiceover.length > 0;
   const product = clip(oneLine(context.productDescription), PRODUCT_CONTEXT_MAX);
+  const narrationLine = !vocalized
+    ? `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}: "${voiceover}". Soft background music under the voice. The narration is audio only.`
+    : `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}, exactly these words and nothing else, pronouncing every word as written${isHebrewLanguage(context.language) ? ' - the Hebrew carries full nikud vowel marks that give the exact pronunciation' : ''}: "${voiceover}". Say each word once, fluently, without repeating or stuttering. Soft background music under the voice. The narration is audio only.`;
   return [
     `[0-${seconds}s] ${oneLine(scene.visualPrompt)}`,
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
     `This shot is one scene of a short video ad for: ${product}. Keep the look consistent with the other scenes of the ad: the same polished commercial style, colour grading and lighting, and the same product, people and setting whenever they appear.`,
     voiceover
-      ? `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}: "${voiceover}". Soft background music under the voice. The narration is audio only.`
+      ? narrationLine
       : 'Audio: background music and natural ambient sound that fit the mood. No speech.',
     'Do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame.',
   ].join('\n');
@@ -80,13 +85,16 @@ function fnv1a(input: string, basis: number): number {
  * on purpose - reordering scenes or editing a caption does not need a re-render. Not a security
  * hash; it only has to differ when the inputs differ.
  */
-export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover'>, context: Pick<AdStudioVideoContext, 'format' | 'language'>): string {
+export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation'>, context: Pick<AdStudioVideoContext, 'format' | 'language'>): string {
+  const pronunciation = oneLine(scene.pronunciation ?? '');
   const canonical = JSON.stringify([
     scene.durationSeconds,
     oneLine(scene.visualPrompt),
     oneLine(scene.voiceover),
     AD_STUDIO_ASPECT_RATIO[context.format] ?? context.format,
     context.language.trim().toLowerCase(),
+    // Only when present, so every clip rendered before pronunciations existed stays current.
+    ...(pronunciation ? [pronunciation] : []),
   ]);
   const high = fnv1a(canonical, 0x811c9dc5).toString(16).padStart(8, '0');
   const low = fnv1a(`${canonical}#`, 0x01000193).toString(16).padStart(8, '0');
@@ -135,7 +143,7 @@ export interface AdStudioSceneVideo<T extends AdStudioClipSummary = AdStudioClip
  * failed but has an older usable one still reads as ready, since the video can be assembled.
  */
 export function sceneVideoStates<T extends AdStudioClipSummary>(
-  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover'>[],
+  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation'>[],
   clips: readonly T[],
   context: Pick<AdStudioVideoContext, 'format' | 'language'>,
 ): AdStudioSceneVideo<T>[] {
@@ -195,7 +203,7 @@ export function renderAllCost(states: readonly AdStudioSceneVideo[], scenes: rea
 
 /** The clips an assembly concatenates, in script order, each trimmed to its scene's length; null until every scene has a usable clip. */
 export function assemblyPlan<T extends AdStudioClipSummary>(
-  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover'>[],
+  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation'>[],
   clips: readonly T[],
   context: Pick<AdStudioVideoContext, 'format' | 'language'>,
 ): { clip: T; sceneId: string; seconds: number }[] | null {

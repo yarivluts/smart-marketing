@@ -38,6 +38,12 @@ beforeEach(() => {
     const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null;
     if (url.endsWith(':generateContent')) {
       const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
+      const prompt = (body?.contents as { parts: { text: string }[] }[] | undefined)?.[0]?.parts?.[0]?.text ?? '';
+      if (schema.includes('"lines"')) {
+        // The vocalizer: every line comes back with a marker standing in for the nikud.
+        const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
+      }
       const answer = schema.includes('"concepts"')
         ? { concepts: [{ visualPrompt: 'A lawyer signing on a phone', headline: 'Sign in 30 seconds', formats: ['square'] }] }
         : { title: 't', scenes: [{ durationSeconds: 5, visualPrompt: 'A desk', voiceover: '', onScreenText: '' }] };
@@ -135,6 +141,21 @@ describe('Ad Studio MCP tools', () => {
     expect(run.next).toBeNull();
     const state = await json<{ image_ideas: { placements: { format: string; state: string }[] }[] }>('get_ad_brief', { brief_id: ad.id });
     expect(state.image_ideas[0].placements).toEqual([expect.objectContaining({ format: 'portrait', state: 'ready' })]);
+  });
+
+  it('vocalizes Hebrew narration when an agent saves the script, and keeps a pronunciation it sends back', async () => {
+    const { json } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', { ...BRIEF, language: 'he' });
+    // Hebrew as escapes (no Hebrew in code files).
+    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    const scene = { id: 's1', duration_seconds: 5, visual_prompt: 'A desk', voiceover: plain, on_screen_text: '' };
+    type Scene = { id: string; pronunciation: string | null };
+    const saved = await json<Scene[]>('save_ad_script', { brief_id: ad.id, scenes: [scene, { ...scene, id: 's2', voiceover: '' }] });
+    expect(saved.map((entry) => entry.pronunciation)).toEqual([`${plain}\u05b8`, null]);
+    const kept = await json<Scene[]>('save_ad_script', { brief_id: ad.id, scenes: [{ ...scene, pronunciation: `${plain}!` }] });
+    expect(kept[0].pronunciation).toBe(`${plain}!`);
+    const usage = await json<{ today: { text_generations: number } }>('get_ad_studio_usage');
+    expect(usage.today.text_generations).toBe(1);
   });
 
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {

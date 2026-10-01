@@ -38,7 +38,6 @@ import {
   ProjectNotFoundError,
   resolveAdStudioExportDestinations,
   saveAdStudioImageConcepts,
-  saveAdStudioScript,
   setAdStudioSettings,
   updateAdStudioBriefDetails,
   type AdStudioBriefModel,
@@ -80,6 +79,7 @@ import {
   resolveAdStudioLlm,
   resolveAdStudioMediaStorage,
   resolveAdStudioVideoDeps,
+  saveAdStudioScriptWithPronunciation,
   selectBriefImage,
   startAdStudioAutopilot,
   startRenderAll,
@@ -270,6 +270,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       duration_seconds: scene.durationSeconds,
       visual_prompt: scene.visualPrompt,
       voiceover: scene.voiceover,
+      pronunciation: scene.pronunciation ?? null,
       on_screen_text: scene.onScreenText,
       video_state: states[index]?.state ?? 'none',
       clip_id: states[index]?.usable?.id ?? null,
@@ -324,6 +325,10 @@ const sceneShape = z
       duration_seconds: z.number().describe('Whole seconds, 3 to 10.'),
       visual_prompt: z.string().describe('What the camera shows, in English.'),
       voiceover: z.string().describe('Narration in the ad language, or empty.'),
+      pronunciation: z
+        .string()
+        .optional()
+        .describe('How the narrator says the voiceover: for Hebrew, the same words with full nikud and numbers written out. Omit to have Hebrew narration vocalized on save; send back the stored one to keep it.'),
       on_screen_text: z.string().describe('Text in the frame, in the ad language, or empty.'),
     }),
   )
@@ -442,16 +447,16 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
 
   server.registerTool(
     'save_ad_script',
-    { title: 'Save the video script', description: 'Saves an edited script. Scenes whose text changed show their clips as out of date until rendered again. Requires "ai.use".', inputSchema: toolInputSchema({ brief_id: briefId, scenes: sceneShape }) },
+    { title: 'Save the video script', description: 'Saves an edited script. Scenes whose text changed show their clips as out of date until rendered again. Hebrew narration without a pronunciation is vocalized first (one AI text call, best effort); a pronunciation sent back unchanged for narration that changed is redone. Requires "ai.use".', inputSchema: toolInputSchema({ brief_id: briefId, scenes: sceneShape }) },
     auditedToolHandler(auth, 'save_ad_script', async (args: any) =>
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; scenes: unknown }) => {
         const scenes = parseScenes(
           Array.isArray(a.scenes)
-            ? a.scenes.map((scene: Record<string, unknown>) => ({ id: scene.id, durationSeconds: scene.duration_seconds, visualPrompt: scene.visual_prompt, voiceover: scene.voiceover, onScreenText: scene.on_screen_text }))
+            ? a.scenes.map((scene: Record<string, unknown>) => ({ id: scene.id, durationSeconds: scene.duration_seconds, visualPrompt: scene.visual_prompt, voiceover: scene.voiceover, pronunciation: scene.pronunciation, onScreenText: scene.on_screen_text }))
             : null,
         );
         if (!scenes) return errorResult('Invalid: scenes must be an array.');
-        await saveAdStudioScript({ organizationId: auth.organizationId, projectId: auth.projectId, briefId: a.brief_id, scenes });
+        await saveAdStudioScriptWithPronunciation({ ...ctx(a.brief_id), scenes, actorId: actorId(auth), llm: resolveAdStudioLlm() });
         return textResult((await describeBrief(auth, a.brief_id)).scenes);
       }),
     ),

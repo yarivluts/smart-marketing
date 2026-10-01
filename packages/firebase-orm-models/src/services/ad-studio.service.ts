@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
   isAdStudioFormat,
+  reconcilePronunciations,
   validateAdStudioImageConcepts,
   validateAdStudioScenes,
   type AdStudioBriefInput,
@@ -210,7 +211,9 @@ export async function saveAdStudioScript(params: {
   const issues = validateAdStudioScenes(params.scenes);
   if (issues.length) throw new AdStudioScriptInvalidError(issues);
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
-  brief.scenes = params.scenes.map((scene) => ({ ...scene }));
+  // A pronunciation sent back unchanged for narration that changed belongs to the old words. It is
+  // dropped here so every client (the editor, MCP, the generator) follows the same rule.
+  brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map((scene) => ({ ...scene }));
   brief.script_generated_by = params.generatedBy ?? null;
   brief.status = 'scripted';
   brief.last_changed_on = nowIso(params.now);

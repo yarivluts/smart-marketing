@@ -10,7 +10,9 @@ import {
   createProject,
   createSharedCredential,
   ensureUserForFirebaseSession,
+  getAdStudioBrief,
   getAdStudioUsageToday,
+  listAdStudioUsage,
   listAdStudioClips,
   inviteMemberToOrganization,
   listAdStudioExports,
@@ -97,6 +99,12 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
     expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-gemini-key');
     if (url.endsWith(':generateContent')) {
       const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
+      if (schema.includes('"lines"')) {
+        // The vocalizer: each line comes back with a vowel point added, standing in for the nikud.
+        const prompt = (body?.contents as { parts: { text: string }[] }[])[0].parts[0].text;
+        const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
+      }
       if (schema.includes('"transcript"')) {
         reviews += 1;
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(options.qa ? options.qa(reviews) : { transcript: '', issues: [] }) }] } }] });
@@ -389,6 +397,32 @@ describe('autopilot routes', () => {
     expect(clips.filter((clip) => clip.scene_id === 's1').map((clip) => clip.qa_status)).toEqual(['issues', 'issues']);
     expect(clips.filter((clip) => clip.scene_id === 's2').map((clip) => clip.qa_status)).toEqual(['passed']);
     expect(google.reviews()).toBe(3);
+  });
+
+  it('vocalizes Hebrew narration saved before pronunciations existed, before Omni renders it', async () => {
+    const google = fakeGoogle();
+    const ctx = await setup();
+    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    // Stored straight on the brief, as a script saved before this feature would be: no pronunciation.
+    const brief = await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId);
+    brief.language = 'he';
+    brief.scenes = [
+      { id: 's1', durationSeconds: 5, visualPrompt: 'A lawyer at a desk', voiceover: plain, onScreenText: '' },
+      { id: 's2', durationSeconds: 8, visualPrompt: 'The lawyer signs on a phone', voiceover: '', onScreenText: '' },
+    ];
+    brief.status = 'scripted';
+    await brief.save();
+    const run = ((await (await startRun(request('POST', { options: { plan: false, images: false, video: true, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    expect((await drive(ctx, run.id)).status).toBe('done');
+
+    const vocalized = `${plain}\u05b8`;
+    expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).scenes.map((scene) => scene.pronunciation)).toEqual([vocalized, undefined]);
+    const renders = google.calls.filter((call) => call.url === `${BASE}/interactions` && call.body?.model !== 'gemini-3.1-flash-image').map((call) => String(call.body?.input));
+    expect(renders).toHaveLength(2);
+    expect(renders[0]).toContain(`"${vocalized}"`);
+    expect(renders[0]).toContain('full nikud vowel marks');
+    expect(renders[1]).toContain('No speech.');
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(1);
   });
 
   it('a waiting plan can be discarded without creating anything', async () => {

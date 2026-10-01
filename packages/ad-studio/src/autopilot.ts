@@ -1,4 +1,4 @@
-import { assemblyPlan, sceneVideoStates, summarizeVideoProgress } from '@growthos/shared';
+import { assemblyPlan, needsPronunciation, renderAllCost, sceneVideoStates, summarizeVideoProgress } from '@growthos/shared';
 import {
   acquireAdStudioRunLease,
   AdStudioQuotaExceededError,
@@ -22,6 +22,7 @@ import { ensureOrm } from './runtime';
 import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './llm';
 import { planAdStudioBrief } from './planning';
 import { generateAdStudioScript } from './script-generation';
+import { saveAdStudioScriptWithPronunciation } from './vocalize';
 import { generateAdStudioImageConcepts, renderAdStudioConceptImage, toAdStudioImageView, type AdStudioImageDeps } from './image-pipeline';
 import { advanceBriefVideo, assembleBriefVideo, startRenderAll, startSceneRender, toAdStudioClipView, toAdStudioVideoView, type AdStudioVideoDeps } from './video-pipeline';
 import { adStudioImageSlots, currentAssembledVideo, missingImageRenders, type AdStudioClipView, type AdStudioRunView } from './view';
@@ -172,6 +173,13 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
       // failed in this run stops the step (the person fixes or retries it, then runs again).
       const failedThisRun = clips.some((clip) => clip.status === 'failed' && clip.requestedOn >= run.started_on);
       if (failedThisRun) return { status: 'failed', reason: 'clip_failed', progress: { done: progress.rendered, total: progress.scenes } };
+      // Hebrew narration about to be rendered for the first time is vocalized first (a script saved
+      // before pronunciations existed). Only those scenes: a rendered scene keeps its clip. Best effort -
+      // on a failure the scenes render from the narration as written.
+      const toRender = new Set(renderAllCost(sceneVideoStates(brief.scenes, clips, context), brief.scenes).sceneIds);
+      if (deps.llm && brief.scenes.some((scene) => toRender.has(scene.id) && needsPronunciation(scene, brief.language))) {
+        await saveAdStudioScriptWithPronunciation({ ...callCtx(deps.llm), scenes: brief.scenes, generatedBy: brief.script_generated_by ?? null, onlySceneIds: toRender });
+      }
       await startRenderAll({ ...ctx, briefId: brief.id }, videoDeps);
       return { status: 'running', progress: { done: progress.rendered, total: progress.scenes } };
     }

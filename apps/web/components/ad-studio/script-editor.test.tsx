@@ -105,3 +105,37 @@ describe('ScriptEditor', () => {
     expect(screen.getByText('13s of 60s')).toBeInTheDocument();
   });
 });
+
+describe('ScriptEditor pronunciation (nikud)', () => {
+  // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
+  const plain = '\u05e9\u05dc\u05d5\u05dd';
+  const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
+  const HEBREW: AdStudioScene[] = [{ id: 'a', durationSeconds: 5, visualPrompt: 'A lawyer at a desk', voiceover: plain, onScreenText: '' }];
+
+  it('is offered only for Hebrew narration, says it is added on save, and shows what came back vocalized', async () => {
+    const { unmount } = renderEditor();
+    expect(screen.queryByTestId('ad-studio-pronunciation-1')).toBeNull();
+    unmount();
+
+    renderEditor({ initialScenes: HEBREW, language: 'he' });
+    const field = within(screen.getByTestId('ad-studio-pronunciation-1'));
+    expect(field.getByText(/Added automatically when you save/)).toBeInTheDocument();
+    const fetchMock = vi.fn(async () => json({ brief: { scenes: [{ ...HEBREW[0], voiceover: `${plain} ${plain}`, pronunciation: `${vocalized} ${vocalized}` }] } }));
+    vi.stubGlobal('fetch', fetchMock);
+    fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText('Voiceover'), { target: { value: `${plain} ${plain}` } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save script' }));
+    await waitFor(() => expect((field.getByLabelText(/Pronunciation/) as HTMLTextAreaElement).value).toBe(`${vocalized} ${vocalized}`));
+    expect(field.getByText(/This is what the narrator reads/)).toBeInTheDocument();
+    // What was saved is what is shown: nothing is left unsaved.
+    expect(screen.queryByText('Unsaved changes')).toBeNull();
+  });
+
+  it('warns that a pronunciation will be redone once the narration changes under it, and lets a person correct it', () => {
+    renderEditor({ initialScenes: [{ ...HEBREW[0], pronunciation: vocalized }], language: 'he' });
+    const scene = within(screen.getByTestId('ad-studio-scene-1'));
+    fireEvent.change(scene.getByLabelText('Voiceover'), { target: { value: `${plain}!` } });
+    expect(scene.getByText(/the pronunciation will be redone when you save/)).toBeInTheDocument();
+    fireEvent.change(scene.getByLabelText(/Pronunciation/), { target: { value: `${vocalized}!` } });
+    expect(scene.queryByText(/will be redone/)).toBeNull();
+  });
+});

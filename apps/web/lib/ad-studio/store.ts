@@ -16,7 +16,6 @@ import {
   getAdStudioUsageToday as getAdStudioUsageTodayInOrganization,
   listAdStudioBriefs as listAdStudioBriefsInOrganization,
   listAdStudioUsage as listAdStudioUsageInOrganization,
-  saveAdStudioScript as saveAdStudioScriptInOrganization,
   setAdStudioSettings as setAdStudioSettingsInOrganization,
   updateAdStudioBriefDetails as updateAdStudioBriefDetailsInOrganization,
   type AdStudioBriefModel,
@@ -52,11 +51,6 @@ export async function createAdStudioBrief(params: { organizationId: string; proj
 export async function updateAdStudioBriefDetails(params: { organizationId: string; projectId: string; briefId: string; input: AdStudioBriefInput }): Promise<AdStudioBriefModel> {
   await ensureFirestoreOrm();
   return updateAdStudioBriefDetailsInOrganization(params);
-}
-
-export async function saveAdStudioScript(params: { organizationId: string; projectId: string; briefId: string; scenes: AdStudioScene[] }): Promise<AdStudioBriefModel> {
-  await ensureFirestoreOrm();
-  return saveAdStudioScriptInOrganization(params);
 }
 
 /** Deletes the brief, its clip and video records, and (best-effort) their files in the bucket. */

@@ -20,6 +20,14 @@ describe('the clip quality check prompt', () => {
   it('says no one should speak when the scene has no narration', () => {
     expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '  ' }, 'en').user).toContain('Intended narration: none (no one should speak).');
   });
+
+  it('gives the vowelized pronunciation as the guide to judge pronunciation by, only with narration', () => {
+    const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
+    const user = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '\u05e9\u05dc\u05d5\u05dd', pronunciation: ` ${vocalized} ` }, 'he').user;
+    expect(user).toContain(`Pronunciation guide (the same words with vowel marks, numbers written out): "${vocalized}"`);
+    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '\u05e9\u05dc\u05d5\u05dd' }, 'he').user).not.toContain('Pronunciation guide');
+    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '', pronunciation: vocalized }, 'he').user).not.toContain('Pronunciation guide');
+  });
 });
 
 describe('the reviewer', () => {

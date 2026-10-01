@@ -31,11 +31,13 @@ export function parseScenes(value: unknown): AdStudioScene[] | null {
   if (!Array.isArray(value)) return null;
   return value.map((raw) => {
     const scene = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+    const pronunciation = text(scene.pronunciation).trim();
     return {
       id: text(scene.id),
       durationSeconds: wholeNumber(scene.durationSeconds),
       visualPrompt: text(scene.visualPrompt),
       voiceover: text(scene.voiceover),
+      ...(pronunciation ? { pronunciation } : {}),
       onScreenText: text(scene.onScreenText),
     };
   });

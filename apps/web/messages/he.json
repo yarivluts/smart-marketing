@@ -3712,7 +3712,8 @@
       "scene_too_long": "סצנה {scene} ארוכה מ-10 שניות.",
       "scene_not_whole_seconds": "אורך סצנה {scene} חייב להיות בשניות שלמות.",
       "empty_visual_prompt": "סצנה {scene} צריכה תיאור של מה שהמצלמה מראה.",
-      "duplicate_scene_id": "סצנה {scene} כפולה לסצנה אחרת."
+      "duplicate_scene_id": "סצנה {scene} כפולה לסצנה אחרת.",
+      "pronunciation_too_long": "ההגייה של סצנה {scene} ארוכה מדי."
     },
     "addScene": "הוספת סצנה",
     "saving": "שומר...",
@@ -3781,7 +3782,8 @@
       "image_concepts": "רעיונות לתמונות",
       "image": "תמונה",
       "image_edit": "עריכת תמונה",
-      "video_qa": "בדיקת AI לסרטון"
+      "video_qa": "בדיקת AI לסרטון",
+      "vocalize": "ניקוד הקריינות"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -4302,7 +4304,11 @@
       "qaDescription": "Gemini צופה בכל קליפ שמרונדר, משווה את הקריינות לתסריט ומחפש טעויות מביכות. הטייס האוטומטי מרנדר מחדש סצנה שנכשלה.",
       "qaEnabled": "לבדוק כל קליפ",
       "qaRetries": "רינדורים חוזרים אוטומטיים לסצנה"
-    }
+    },
+    "pronunciation": "הגייה (עם ניקוד)",
+    "pronunciationAuto": "יתווסף אוטומטית בשמירה: אותן מילים עם ניקוד מלא ומספרים כתובים במילים, כדי שקריין ה-AI יקרא נכון.",
+    "pronunciationHint": "זה מה שהקריין יקרא. תקנו כאן כל מילה שנוקדה לא נכון.",
+    "pronunciationStale": "הקריינות השתנתה - ההגייה תיווצר מחדש בשמירה."
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

@@ -39,15 +39,17 @@ export const AdStudioClipQaSchema = z.object({
 
 const LANGUAGE_NAMES: Record<string, string> = { he: 'Hebrew', en: 'English', ar: 'Arabic', ru: 'Russian', fr: 'French', es: 'Spanish', de: 'German' };
 
-export function buildClipQaPrompt(scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover'>, language: string): { system: string; user: string } {
+export function buildClipQaPrompt(scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'>, language: string): { system: string; user: string } {
   const languageName = LANGUAGE_NAMES[language.toLowerCase()] ?? language;
   const narration = scene.voiceover.trim();
+  const pronunciation = narration ? (scene.pronunciation ?? '').trim() : '';
   return {
     system:
       'You check short AI-generated video clips for a video ad before a person sees them. Be strict about anything that would embarrass the brand in an ad, and never invent a problem you did not see or hear.',
     user: [
       `Language of the ad: ${languageName}.`,
       narration ? `Intended narration, word for word: "${narration}"` : 'Intended narration: none (no one should speak).',
+      pronunciation ? `Pronunciation guide (the same words with vowel marks, numbers written out): "${pronunciation}". Judge the pronunciation against this guide.` : null,
       `Intended picture: ${scene.visualPrompt}`,
       '',
       '1) transcript: write exactly what is spoken in the clip, in the language spoken (empty if nothing is said).',
@@ -57,14 +59,16 @@ export function buildClipQaPrompt(scene: Pick<AdStudioScene, 'visualPrompt' | 'v
       'Major visual problems: letters, words or numbers drawn in the picture that are gibberish or misspelled; a deformed face, hand or body (extra or missing fingers, melting features); objects that morph or appear from nowhere; a speaking mouth clearly out of sync with the narration.',
       'Minor visual problems: slight blur, small background artifacts, a small continuity slip.',
       'If you find nothing, return an empty issues list.',
-    ].join('\n'),
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n'),
   };
 }
 
 export interface CheckAdStudioClipParams {
   clip: AdStudioClipModel;
   /** The scene the clip renders, as it reads now; null when the scene was deleted (the check is then skipped). */
-  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover'> | null;
+  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'> | null;
   language: string;
   reviewer: AdStudioReviewer | null;
   storage: AdStudioMediaStorage;
