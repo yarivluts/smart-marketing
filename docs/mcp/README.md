@@ -189,6 +189,9 @@ Rendering takes minutes, so no tool waits for it to finish. Start the work with 
 | `plan_ad_brief` | `ai.use` | Deep plan from the landing page, the project's results and campaigns, and Google Ads search volumes, with recommendations |
 | `generate_ad_script` / `save_ad_script` | `ai.use` | Write the video script with AI (3-10 s scenes, at most 60 s) or save an edited one. Hebrew narration gets a `pronunciation` (full nikud, numbers as words) that the video model reads; it is added on save (one AI text call) and redone when the narration changes |
 | `rewrite_ad_scene` | `ai.use` | Propose a rewrite of one scene by an instruction; not saved until sent back with `save_ad_script` |
+| `list_ad_references` | `ai.use` | The ad's reference images (app screenshots, captured pages, AI illustrations) and which ways of adding one are available |
+| `add_ad_reference` | `ai.use` | Add a reference image: upload a PNG/JPEG (base64), capture a public page by URL, or draw an illustration (counts as an image) |
+| `get_ad_reference` / `delete_ad_reference` | `ai.use` | Look at a reference image, or delete it (it is removed from every scene). Scenes attach up to 3 images with `save_ad_script` (`references`: screen, subject or first_frame), and the video model gets them with the scene prompt |
 | `generate_ad_image_ideas` / `save_ad_image_ideas` | `ai.use` | Write image ad ideas with AI (optionally for chosen placements) or save edited ones |
 | `render_ad_image` | `ai.use` | Render one idea in one placement (square, portrait, story, landscape) with Gemini 3.1 Flash Image |
 | `edit_ad_image` | `ai.use` | Change a finished image by an instruction; the result is a new, selected version |

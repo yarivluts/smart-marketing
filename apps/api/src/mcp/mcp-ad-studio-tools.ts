@@ -18,6 +18,8 @@ import {
   AdStudioRunNotFoundError,
   AdStudioRunOptionsInvalidError,
   AdStudioScriptInvalidError,
+  AdStudioReferenceInvalidError,
+  AdStudioReferenceNotFoundError,
   AdStudioVideoNotFoundError,
   approveAdStudioRunPlan,
   cancelAdStudioRun,
@@ -49,8 +51,18 @@ import {
   AdStudioAssemblyError,
   AdStudioImageRequestError,
   AdStudioProviderError,
+  AdStudioReferenceRequestError,
   AdStudioVideoRequestError,
+  addUploadedReference,
   adStudioBriefMediaPrefix,
+  captureReferenceScreenshot,
+  drawReferenceIllustration,
+  listBriefReferences,
+  readBriefReference,
+  removeBriefReference,
+  resolveAdStudioPageCapture,
+  toAdStudioReferenceView,
+  type AdStudioReferenceView,
   adStudioImageSlots,
   advanceAdStudioAutopilot,
   advanceBriefVideo,
@@ -127,7 +139,8 @@ function describeAdStudioToolError(error: unknown): string {
     error instanceof AdStudioClipNotFoundError ||
     error instanceof AdStudioVideoNotFoundError ||
     error instanceof AdStudioImageNotFoundError ||
-    error instanceof AdStudioRunNotFoundError
+    error instanceof AdStudioRunNotFoundError ||
+    error instanceof AdStudioReferenceNotFoundError
   ) {
     return 'Not found.';
   }
@@ -145,6 +158,7 @@ function describeAdStudioToolError(error: unknown): string {
   }
   if (error instanceof AdStudioImageRequestError || error instanceof AdStudioVideoRequestError) return `Cannot do that: ${error.code}.`;
   if (error instanceof AdStudioImageNotReadyError) return 'Cannot do that: image_not_ready.';
+  if (error instanceof AdStudioReferenceRequestError || error instanceof AdStudioReferenceInvalidError) return `Cannot do that: ${error.code}.`;
   if (error instanceof AdStudioAssemblyError) return `Assembly failed: ${error.code}.`;
   if (error instanceof AdStudioRunNotAwaitingApprovalError) return 'Cannot do that: this run is not waiting for its plan to be confirmed.';
   if (error instanceof AdStudioRunAlreadyActiveError) return `An autopilot run is already in progress for this ad (run_id ${error.runId}); advance or cancel it first.`;
@@ -214,6 +228,20 @@ function runOutput(run: AdStudioRunView) {
   };
 }
 
+function referenceOutput(reference: AdStudioReferenceView) {
+  return {
+    image_id: reference.id,
+    source: reference.source,
+    label: reference.label,
+    description: reference.description,
+    status: reference.status,
+    source_url: reference.sourceUrl,
+    prompt: reference.prompt,
+    mime_type: reference.mimeType,
+    failure_code: reference.failureCode,
+  };
+}
+
 function clipQaOutput(qa: AdStudioClipView['qa']) {
   if (!qa) return null;
   return {
@@ -271,6 +299,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       visual_prompt: scene.visualPrompt,
       voiceover: scene.voiceover,
       pronunciation: scene.pronunciation ?? null,
+      references: (scene.references ?? []).map((reference) => ({ image_id: reference.imageId, use: reference.use })),
       on_screen_text: scene.onScreenText,
       video_state: states[index]?.state ?? 'none',
       clip_id: states[index]?.usable?.id ?? null,
@@ -329,6 +358,10 @@ const sceneShape = z
         .string()
         .optional()
         .describe('How the narrator says the voiceover: for Hebrew, the same words with full nikud and numbers written out. Omit to have Hebrew narration vocalized on save; send back the stored one to keep it.'),
+      references: z
+        .array(z.object({ image_id: z.string().describe('A ready image from list_ad_references.'), use: z.string().describe('"screen" (the real product screen, shown on any device), "subject" (show it as it looks) or "first_frame" (the shot starts on it).') }))
+        .optional()
+        .describe('Up to 3 reference images the video model gets with this scene. Omit or send [] for none.'),
       on_screen_text: z.string().describe('Text in the frame, in the ad language, or empty.'),
     }),
   )
@@ -452,7 +485,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; scenes: unknown }) => {
         const scenes = parseScenes(
           Array.isArray(a.scenes)
-            ? a.scenes.map((scene: Record<string, unknown>) => ({ id: scene.id, durationSeconds: scene.duration_seconds, visualPrompt: scene.visual_prompt, voiceover: scene.voiceover, pronunciation: scene.pronunciation, onScreenText: scene.on_screen_text }))
+            ? a.scenes.map((scene: Record<string, unknown>) => ({ id: scene.id, durationSeconds: scene.duration_seconds, visualPrompt: scene.visual_prompt, voiceover: scene.voiceover, pronunciation: scene.pronunciation, references: Array.isArray(scene.references) ? scene.references.map((reference: Record<string, unknown>) => ({ imageId: reference.image_id, use: reference.use })) : undefined, onScreenText: scene.on_screen_text }))
             : null,
         );
         if (!scenes) return errorResult('Invalid: scenes must be an array.');
@@ -554,6 +587,99 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; image_id: string }) => {
         const image = await selectBriefImage({ ...ctx(a.brief_id), imageId: a.image_id });
         return textResult({ image_id: image.id, selected: image.selected });
+      }),
+    ),
+  );
+
+  const referenceText = {
+    label: z.string().min(1).describe('A short name for the image.'),
+    description: z.string().optional().describe('What the image shows; it goes into the scene prompt (e.g. "the dashboard after a document was signed").'),
+  };
+
+  server.registerTool(
+    'list_ad_references',
+    {
+      title: 'List reference images',
+      description:
+        'Lists the ad\'s reference images - app screenshots, captured pages and AI illustrations that scenes hand to the video model so the clip shows the real product - and which ways of adding one are available. Requires "ai.use".',
+      inputSchema: toolInputSchema({ brief_id: briefId }),
+    },
+    auditedToolHandler(auth, 'list_ad_references', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string }) => {
+        const references = await listBriefReferences(ctx(a.brief_id));
+        return textResult({ references: references.map(referenceOutput), can_capture_pages: resolveAdStudioPageCapture() !== null, can_draw_illustrations: resolveAdStudioImageGenerator() !== null });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'add_ad_reference',
+    {
+      title: 'Add a reference image',
+      description:
+        'Adds a reference image to the ad\'s library. source "upload": send a PNG or JPEG (up to 8 MB) as base64 in image_base64 - for example a screenshot of the real app. source "screenshot": capture a public page by url (device desktop or mobile). source "illustration": draw one with the image model from prompt (counts toward the daily image limit). Attach it to scenes with save_ad_script (scene.references). Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        source: z.string().describe('"upload", "screenshot" or "illustration".'),
+        ...referenceText,
+        image_base64: z.string().optional().describe('For source "upload": the PNG or JPEG bytes, base64.'),
+        url: z.string().optional().describe('For source "screenshot": the public page to capture.'),
+        device: z.string().optional().describe('For source "screenshot": "desktop" (default) or "mobile".'),
+        prompt: z.string().optional().describe('For source "illustration": what it should show.'),
+        aspect_ratio: z.string().optional().describe('For source "illustration": "16:9" (default), "9:16", "1:1" or "4:5".'),
+      }),
+    },
+    auditedToolHandler(auth, 'add_ad_reference', async (args: any) =>
+      runAdStudioTool(
+        auth,
+        'ai.use',
+        args,
+        async (a: { brief_id: string; source: string; label: string; description?: string; image_base64?: string; url?: string; device?: string; prompt?: string; aspect_ratio?: string }) => {
+          const base = { ...ctx(a.brief_id), actorId: actorId(auth), label: a.label, description: a.description ?? '' };
+          if (a.source === 'upload') {
+            if (!a.image_base64) return errorResult('Invalid: image_base64 is required for source "upload".');
+            const reference = await addUploadedReference({ ...base, bytes: Buffer.from(a.image_base64, 'base64') });
+            return textResult(referenceOutput(toAdStudioReferenceView(reference)));
+          }
+          if (a.source === 'screenshot') {
+            const reference = await captureReferenceScreenshot({ ...base, url: a.url ?? '', device: a.device === 'mobile' ? 'mobile' : 'desktop' }, { capture: resolveAdStudioPageCapture() });
+            return textResult(referenceOutput(toAdStudioReferenceView(reference)));
+          }
+          if (a.source === 'illustration') {
+            if (!a.prompt?.trim()) return errorResult('Invalid: prompt is required for source "illustration".');
+            const aspectRatio = (['16:9', '9:16', '1:1', '4:5'] as const).find((ratio) => ratio === a.aspect_ratio) ?? '16:9';
+            const reference = await drawReferenceIllustration({ ...base, prompt: a.prompt, aspectRatio }, { images: resolveAdStudioImageGenerator() });
+            return textResult(referenceOutput(toAdStudioReferenceView(reference)));
+          }
+          return errorResult('Invalid: source must be "upload", "screenshot" or "illustration".');
+        },
+      ),
+    ),
+  );
+
+  server.registerTool(
+    'get_ad_reference',
+    { title: 'Get a reference image', description: 'Returns a ready reference image itself (as MCP image content) with its details. Requires "ai.use".', inputSchema: toolInputSchema({ brief_id: briefId, image_id: z.string().min(1).describe('A reference image id.') }) },
+    auditedToolHandler(auth, 'get_ad_reference', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; image_id: string }) => {
+        const { bytes, mimeType, reference } = await readBriefReference({ ...ctx(a.brief_id), referenceId: a.image_id });
+        return {
+          content: [
+            { type: 'text', text: JSON.stringify(referenceOutput(toAdStudioReferenceView(reference)), null, 2) },
+            { type: 'image', data: bytes.toString('base64'), mimeType },
+          ],
+        };
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'delete_ad_reference',
+    { title: 'Delete a reference image', description: 'Deletes a reference image and removes it from every scene that used it. Requires "ai.use".', inputSchema: toolInputSchema({ brief_id: briefId, image_id: z.string().min(1).describe('A reference image id.') }) },
+    auditedToolHandler(auth, 'delete_ad_reference', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; image_id: string }) => {
+        await removeBriefReference({ ...ctx(a.brief_id), referenceId: a.image_id });
+        return textResult({ deleted: a.image_id });
       }),
     ),
   );
