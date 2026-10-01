@@ -11,8 +11,8 @@ import { AD_STUDIO_PRONUNCIATION_MAX, type AdStudioScene } from './scenes';
  */
 
 /** Hebrew cantillation marks and vowel points (nikud), U+0591-U+05C7. */
-const HEBREW_POINTS = /[֑-ׇ]/g;
-const HEBREW_LETTER = /[א-ת]/;
+const HEBREW_POINTS = /[\u0591-\u05c7]/g;
+const HEBREW_LETTER = /[\u05d0-\u05ea]/;
 
 function oneLine(value: string): string {
   return value.replace(/\s+/g, ' ').trim();

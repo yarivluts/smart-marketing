@@ -13,9 +13,9 @@ import { buildScenePrompt, sceneFingerprint } from './video';
 
 // Hebrew is written as escapes: no Hebrew characters in code files.
 /** "shalom" without vowels. */
-const PLAIN = 'שלום';
+const PLAIN = '\u05e9\u05dc\u05d5\u05dd';
 /** The same word with nikud (shin+shin dot+qamats, lamed, holam male, final mem). */
-const VOCALIZED = 'שָׁלוֹם';
+const VOCALIZED = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
 
 function scene(overrides: Partial<AdStudioScene> = {}): AdStudioScene {
   return { id: 's1', durationSeconds: 5, visualPrompt: 'A lawyer smiles at her phone', voiceover: PLAIN, onScreenText: '', ...overrides };

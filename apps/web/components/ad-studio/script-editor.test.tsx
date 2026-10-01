@@ -108,8 +108,8 @@ describe('ScriptEditor', () => {
 
 describe('ScriptEditor pronunciation (nikud)', () => {
   // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
-  const plain = 'שלום';
-  const vocalized = 'שָׁלוֹם';
+  const plain = '\u05e9\u05dc\u05d5\u05dd';
+  const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
   const HEBREW: AdStudioScene[] = [{ id: 'a', durationSeconds: 5, visualPrompt: 'A lawyer at a desk', voiceover: plain, onScreenText: '' }];
 
   it('is offered only for Hebrew narration, says it is added on save, and shows what came back vocalized', async () => {

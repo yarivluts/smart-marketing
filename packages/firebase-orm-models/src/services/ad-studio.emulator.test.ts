@@ -98,8 +98,8 @@ describe('Ad Studio briefs', () => {
     const { owner, orgId, projectId } = await setup();
     const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: INPUT, createdByUserId: owner.id });
     // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
-    const plain = 'שלום';
-    const vocalized = 'שָׁלוֹם';
+    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
     const spoken = (id: string, voiceover: string, pronunciation?: string): AdStudioScene => ({ ...scene(id, 5), voiceover, ...(pronunciation === undefined ? {} : { pronunciation }) });
     await saveAdStudioScript({ organizationId: orgId, projectId, briefId: brief.id, scenes: [spoken('a', plain, vocalized), spoken('b', plain, ''), spoken('c', plain, vocalized)] });
     let stored = (await getAdStudioBrief(orgId, projectId, brief.id)).scenes;

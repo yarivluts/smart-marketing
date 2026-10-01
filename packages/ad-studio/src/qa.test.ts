@@ -22,10 +22,10 @@ describe('the clip quality check prompt', () => {
   });
 
   it('gives the vowelized pronunciation as the guide to judge pronunciation by, only with narration', () => {
-    const vocalized = 'שָׁלוֹם';
-    const user = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'שלום', pronunciation: ` ${vocalized} ` }, 'he').user;
+    const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
+    const user = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '\u05e9\u05dc\u05d5\u05dd', pronunciation: ` ${vocalized} ` }, 'he').user;
     expect(user).toContain(`Pronunciation guide (the same words with vowel marks, numbers written out): "${vocalized}"`);
-    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'שלום' }, 'he').user).not.toContain('Pronunciation guide');
+    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '\u05e9\u05dc\u05d5\u05dd' }, 'he').user).not.toContain('Pronunciation guide');
     expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '', pronunciation: vocalized }, 'he').user).not.toContain('Pronunciation guide');
   });
 });

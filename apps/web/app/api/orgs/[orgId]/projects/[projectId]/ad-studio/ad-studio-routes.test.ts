@@ -143,8 +143,8 @@ describe('Ad Studio routes', () => {
     const briefId = ((await created.json()) as { brief: { id: string } }).brief.id;
     const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
     // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
-    const plain = 'שלום';
-    const vocalized = 'שָׁלוֹם';
+    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
     const scene = (voiceover: string, pronunciation?: string) => ({ id: 'a', durationSeconds: 5, visualPrompt: 'A desk', voiceover, onScreenText: '', ...(pronunciation ? { pronunciation } : {}) });
     const vocalizations = () => listAdStudioUsage(orgId, projectId).then((rows) => rows.filter((row) => row.kind === 'vocalize'));
 
