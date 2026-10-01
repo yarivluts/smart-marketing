@@ -32,19 +32,20 @@ export const AdStudioVocalizeSchema = z.object({
 /**
  * Fills in the pronunciation of every scene that needs one (kind `vocalize`, one text call for the
  * whole script). A line the model returns unusable stays without one. Scenes that need nothing are
- * returned as they are, without a call.
+ * returned as they are, without a call. `onlySceneIds` limits it to those scenes.
  */
 export async function vocalizeAdStudioScenes(
-  ctx: AdStudioCallContext & { briefId: string; language: string; scenes: readonly AdStudioScene[] },
+  ctx: AdStudioCallContext & { briefId: string; language: string; scenes: readonly AdStudioScene[]; onlySceneIds?: ReadonlySet<string> },
 ): Promise<{ scenes: AdStudioScene[]; vocalized: number }> {
-  const pending = ctx.scenes.filter((scene) => needsPronunciation(scene, ctx.language));
+  const wanted = (scene: AdStudioScene) => needsPronunciation(scene, ctx.language) && (!ctx.onlySceneIds || ctx.onlySceneIds.has(scene.id));
+  const pending = ctx.scenes.filter(wanted);
   if (pending.length === 0) return { scenes: [...ctx.scenes], vocalized: 0 };
   const prompt = buildVocalizePrompt(pending.map((scene) => ({ id: scene.id, text: scene.voiceover })));
   const result = await meteredCall(ctx, 'vocalize', ctx.briefId, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioVocalizeSchema }));
   const byId = new Map(result.lines.map((line) => [line.id, line.pronunciation.trim()]));
   let vocalized = 0;
   const scenes = ctx.scenes.map((scene) => {
-    const pronunciation = needsPronunciation(scene, ctx.language) ? byId.get(scene.id) : undefined;
+    const pronunciation = wanted(scene) ? byId.get(scene.id) : undefined;
     if (!pronunciation || !isUsablePronunciation(pronunciation)) return scene;
     vocalized += 1;
     return { ...scene, pronunciation };
@@ -66,6 +67,8 @@ export async function saveAdStudioScriptWithPronunciation(params: {
   actorId: string;
   llm: AdStudioLlm | null;
   generatedBy?: AdStudioGeneratedBy | null;
+  /** Vocalize only these scenes (the autopilot passes the ones it is about to render). */
+  onlySceneIds?: ReadonlySet<string>;
   now?: Date;
 }): Promise<AdStudioBriefModel> {
   const issues = validateAdStudioScenes(params.scenes);
