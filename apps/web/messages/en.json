@@ -3876,10 +3876,7 @@
           "skipped": "Not checked",
           "error": "Check failed"
         }
-      },
-      "narration": "Narration",
-      "narrationVocalized": "What the narrator reads (with nikud)",
-      "narrationWillVocalize": "Nikud is added automatically when the scene is rendered."
+      }
     },
     "clipFailure": {
       "not_configured": "no video model is configured",
@@ -4235,7 +4232,9 @@
         "image_not_ready": "That image is not ready."
       },
       "ideasTitle": "Image ad ideas",
-      "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan."
+      "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan.",
+      "editIdea": "Edit the idea (picture, text in the image, placements)",
+      "manageImages": "Manage the images ({count}): render again, change, download, send"
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
@@ -4307,7 +4306,8 @@
       "kindImage": "Image",
       "video": "The video",
       "connectMeta": "Connect with Facebook",
-      "platformSaid": "The platform said: {detail}"
+      "platformSaid": "The platform said: {detail}",
+      "previewTitle": "How the ad will look"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
@@ -4322,7 +4322,8 @@
       "qaTitle": "AI quality check of video clips",
       "qaDescription": "Gemini watches every rendered clip, compares the narration with the script and looks for embarrassing mistakes. The autopilot re-renders a scene that fails.",
       "qaEnabled": "Check every clip",
-      "qaRetries": "Automatic re-renders per scene"
+      "qaRetries": "Automatic re-renders per scene",
+      "collapsed": "Studio settings and AI usage"
     },
     "pronunciation": "Pronunciation (with nikud)",
     "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
@@ -4411,6 +4412,42 @@
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
       }
+    },
+    "preview": {
+      "placementsLabel": "Where the ad runs",
+      "placement": {
+        "facebook_feed": "Facebook feed",
+        "instagram_feed": "Instagram feed",
+        "instagram_story": "Instagram story / Reels",
+        "google_display": "Google display",
+        "youtube": "YouTube"
+      },
+      "sponsored": "Sponsored",
+      "cta": "Learn more",
+      "noHeadline": "No headline yet",
+      "noMedia": "No image for this placement yet",
+      "formatFallback": "Showing the {format, select, square {square} portrait {portrait} story {story} landscape {landscape} other {}} image - this placement has none of its own yet",
+      "like": "Like",
+      "comment": "Comment",
+      "share": "Share",
+      "adBadge": "Ad",
+      "skipAd": "Skip ad",
+      "mockupNote": "A preview - each platform draws the final ad itself."
+    },
+    "narration": {
+      "label": "Narration",
+      "readWithNikud": "What the narrator reads (with nikud)",
+      "edit": "Edit narration",
+      "none": "No narration in this scene.",
+      "willVocalize": "Nikud is added automatically on save and before rendering.",
+      "textLabel": "Narration",
+      "nikudLabel": "With nikud (what the narrator reads)",
+      "nikudHint": "You can correct a vowel here; the narrator reads exactly this.",
+      "nikudWillRedo": "The words changed - the nikud is redone automatically when you save.",
+      "save": "Save narration",
+      "savingWithNikud": "Saving and adding nikud…",
+      "cancel": "Cancel",
+      "saved": "Saved. Render the scene again to hear the new narration."
     }
   },
   "MetaConnect": {

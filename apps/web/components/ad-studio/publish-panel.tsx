@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import type { AdStudioAdCopy } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioImageFormat } from '@growthos/shared';
+import { AdPlacementPreview, type AdPlacement, type AdPreviewMedia } from './ad-placement-preview';
 import { CheckCircle2, ExternalLink, Film, ImageIcon, Loader2, Megaphone } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -20,6 +21,10 @@ export interface PublishCreative {
   previewSrc: string;
   /** The creative's own ad copy (KAN-278); the form starts from it when the creative is picked. */
   copy?: AdStudioAdCopy | null;
+  /** The image's placement format, for the live preview. */
+  format?: AdStudioImageFormat;
+  /** For the video: whether it is vertical. */
+  vertical?: boolean;
 }
 
 export interface PublishedAdRow {
@@ -50,7 +55,38 @@ export interface PublishPanelProps {
   metaConnectHref?: string | null;
 }
 
-const FAILURES = new Set(['auth_failed', 'quota_exceeded', 'rejected', 'upload_failed', 'no_secret', 'invalid_credential', 'account_action_required']);
+/** The placements a published ad can run in on each platform (Google Ads takes images only). */
+function placementsFor(destination: Destination, kind: 'image' | 'video'): AdPlacement[] {
+  if (destination === 'google_ads') return ['google_display'];
+  return kind === 'video'
+    ? ['facebook_feed', 'instagram_story']
+    : ['facebook_feed', 'instagram_feed', 'instagram_story'];
+}
+
+function previewMedia(creative: PublishCreative): AdPreviewMedia {
+  return creative.kind === 'video'
+    ? {
+        kind: 'video',
+        src: creative.previewSrc,
+        vertical: creative.vertical ?? true,
+        label: creative.label,
+      }
+    : {
+        kind: 'image',
+        byFormat: { [creative.format ?? 'square']: creative.previewSrc },
+        alt: creative.label,
+      };
+}
+
+const FAILURES = new Set([
+  'auth_failed',
+  'quota_exceeded',
+  'rejected',
+  'upload_failed',
+  'no_secret',
+  'invalid_credential',
+  'account_action_required',
+]);
 
 /**
  * The stepper's last step: turn a finished creative into a real ad. The person picks an image (an
@@ -59,7 +95,16 @@ const FAILURES = new Set(['auth_failed', 'quota_exceeded', 'rejected', 'upload_f
  * created ad is listed with a link that opens it on the platform.
  */
 export function PublishPanel(props: PublishPanelProps): React.ReactElement {
-  const { orgId, projectId, briefId, briefName, creatives, destinations, canPublish, resourcesHref } = props;
+  const {
+    orgId,
+    projectId,
+    briefId,
+    briefName,
+    creatives,
+    destinations,
+    canPublish,
+    resourcesHref,
+  } = props;
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -68,7 +113,9 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const [destination, setDestination] = React.useState<Destination>('meta');
   const [campaignName, setCampaignName] = React.useState(briefName);
   const [headline, setHeadline] = React.useState(firstCopy?.headline || briefName.slice(0, 30));
-  const [primaryText, setPrimaryText] = React.useState(firstCopy?.primaryText || props.defaultPrimaryText.slice(0, 90));
+  const [primaryText, setPrimaryText] = React.useState(
+    firstCopy?.primaryText || props.defaultPrimaryText.slice(0, 90),
+  );
   const [description, setDescription] = React.useState(firstCopy?.description ?? '');
   const [linkUrl, setLinkUrl] = React.useState(props.defaultLink);
   const [businessName, setBusinessName] = React.useState('');
@@ -76,7 +123,12 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const [countries, setCountries] = React.useState('IL');
   const [euPolitical, setEuPolitical] = React.useState<'' | 'yes' | 'no'>('');
   const [pending, setPending] = React.useState(false);
-  const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string; href?: string; detail?: string | null } | null>(null);
+  const [message, setMessage] = React.useState<{
+    tone: 'ok' | 'error';
+    text: string;
+    href?: string;
+    detail?: string | null;
+  } | null>(null);
   const [published, setPublished] = React.useState(props.published);
   React.useEffect(() => setPublished(props.published), [props.published]);
 
@@ -99,35 +151,60 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
     setPending(true);
     setMessage(null);
     try {
-      const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          destination,
-          source: creative.kind === 'image' ? { kind: 'image', imageId: creative.id } : { kind: 'video', videoId: creative.id },
-          campaignName,
-          copy: { headline, primaryText, description, linkUrl, businessName },
-          dailyBudget: Number(dailyBudget),
-          countries: countries
-            .split(/[\s,]+/)
-            .map((code) => code.trim().toUpperCase())
-            .filter(Boolean),
-          ...(destination === 'google_ads' && euPolitical ? { containsEuPoliticalAdvertising: euPolitical === 'yes' } : {}),
-        }),
-      });
-      const body = (await response.json().catch(() => ({}))) as { ad?: PublishedAdRow; reason?: string; reasons?: string[] } & AdStudioApiError;
+      const response = await fetch(
+        `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}/publish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            destination,
+            source:
+              creative.kind === 'image'
+                ? { kind: 'image', imageId: creative.id }
+                : { kind: 'video', videoId: creative.id },
+            campaignName,
+            copy: { headline, primaryText, description, linkUrl, businessName },
+            dailyBudget: Number(dailyBudget),
+            countries: countries
+              .split(/[\s,]+/)
+              .map((code) => code.trim().toUpperCase())
+              .filter(Boolean),
+            ...(destination === 'google_ads' && euPolitical
+              ? { containsEuPoliticalAdvertising: euPolitical === 'yes' }
+              : {}),
+          }),
+        },
+      );
+      const body = (await response.json().catch(() => ({}))) as {
+        ad?: PublishedAdRow;
+        reason?: string;
+        reasons?: string[];
+      } & AdStudioApiError;
       if (body.ad) {
         setPublished((current) => [body.ad as PublishedAdRow, ...current]);
         setMessage(
           body.ad.status === 'done'
-            ? { tone: 'ok', text: t('publish.done', { destination: t(`publish.destination.${destination}`) }), href: body.ad.externalUrl ?? undefined }
-            : { tone: 'error', text: t(`exportFailure.${body.ad.failureCode && FAILURES.has(body.ad.failureCode) ? body.ad.failureCode : 'upload_failed'}`), detail: body.ad.failureDetail ?? null },
+            ? {
+                tone: 'ok',
+                text: t('publish.done', { destination: t(`publish.destination.${destination}`) }),
+                href: body.ad.externalUrl ?? undefined,
+              }
+            : {
+                tone: 'error',
+                text: t(
+                  `exportFailure.${body.ad.failureCode && FAILURES.has(body.ad.failureCode) ? body.ad.failureCode : 'upload_failed'}`,
+                ),
+                detail: body.ad.failureDetail ?? null,
+              },
         );
         router.refresh();
       } else if (body.error === 'export_unavailable' && body.reason) {
         setMessage({ tone: 'error', text: t(`exportUnavailable.${body.reason}`) });
       } else if (body.error === 'invalid_export') {
-        setMessage({ tone: 'error', text: t('publish.invalid', { reasons: (body.reasons ?? []).join('; ') }) });
+        setMessage({
+          tone: 'error',
+          text: t('publish.invalid', { reasons: (body.reasons ?? []).join('; ') }),
+        });
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }
@@ -139,7 +216,11 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const input = 'h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground';
 
   return (
-    <section className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm" aria-labelledby="ad-studio-publish-heading" data-testid="ad-studio-publish">
+    <section
+      className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      aria-labelledby="ad-studio-publish-heading"
+      data-testid="ad-studio-publish"
+    >
       <header className="flex items-start gap-3">
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Megaphone className="h-4 w-4" aria-hidden="true" />
@@ -152,28 +233,52 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         </div>
       </header>
 
-      {creatives.length === 0 ? <p className="text-sm text-muted-foreground">{t('publish.nothingReady')}</p> : null}
+      {creatives.length === 0 ? (
+        <p className="text-sm text-muted-foreground">{t('publish.nothingReady')}</p>
+      ) : null}
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 text-sm font-semibold">{t('publish.chooseCreative')}</legend>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {creatives.map((entry) => (
             <label
               key={entry.key}
-              className={cn('flex cursor-pointer flex-col gap-2 rounded-xl border p-2 text-xs', selected === entry.key ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/40')}
+              className={cn(
+                'flex cursor-pointer flex-col gap-2 rounded-xl border p-2 text-xs',
+                selected === entry.key
+                  ? 'border-primary ring-2 ring-primary/30'
+                  : 'border-border hover:border-primary/40',
+              )}
               data-testid={`ad-studio-publish-creative-${entry.key}`}
             >
-              <input type="radio" name="publish-creative" value={entry.key} checked={selected === entry.key} onChange={() => choose(entry)} className="sr-only" />
+              <input
+                type="radio"
+                name="publish-creative"
+                value={entry.key}
+                checked={selected === entry.key}
+                onChange={() => choose(entry)}
+                className="sr-only"
+              />
               <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted">
                 {entry.kind === 'image' ? (
                   // A plain img: private media served by our own authenticated route.
                   <img src={entry.previewSrc} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <video src={entry.previewSrc} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                  <video
+                    src={entry.previewSrc}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className="h-full w-full object-cover"
+                  />
                 )}
               </span>
-              <span className="flex items-center gap-1 font-medium">
-                {entry.kind === 'image' ? <ImageIcon className="h-3 w-3" aria-hidden="true" /> : <Film className="h-3 w-3" aria-hidden="true" />}
-                {entry.label}
+              <span className="flex min-w-0 items-center gap-1 font-medium">
+                {entry.kind === 'image' ? (
+                  <ImageIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
+                ) : (
+                  <Film className="h-3 w-3 shrink-0" aria-hidden="true" />
+                )}
+                <span className="truncate">{entry.label}</span>
               </span>
             </label>
           ))}
@@ -189,10 +294,19 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
               role="radio"
               aria-checked={destination === entry}
               onClick={() => setDestination(entry)}
-              className={cn('rounded-xl border px-4 py-2 text-sm font-semibold', destination === entry ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted')}
+              className={cn(
+                'rounded-xl border px-4 py-2 text-sm font-semibold',
+                destination === entry
+                  ? 'border-primary bg-primary/10 text-primary'
+                  : 'border-border hover:bg-muted',
+              )}
             >
               {t(`publish.destination.${entry}`)}
-              {!destinations[entry] ? <span className="ms-2 text-[11px] font-normal text-muted-foreground">{t('publish.notConnected')}</span> : null}
+              {!destinations[entry] ? (
+                <span className="ms-2 text-[11px] font-normal text-muted-foreground">
+                  {t('publish.notConnected')}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
@@ -201,7 +315,11 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
           <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {t('publish.connectFirst')}
             {destination === 'meta' && props.metaConnectHref ? (
-              <a href={props.metaConnectHref} className="inline-flex items-center rounded-lg bg-[#1877F2] px-3 py-1.5 font-semibold text-white hover:bg-[#166fe0]" data-testid="ad-studio-connect-meta">
+              <a
+                href={props.metaConnectHref}
+                className="inline-flex items-center rounded-lg bg-[#1877F2] px-3 py-1.5 font-semibold text-white hover:bg-[#166fe0]"
+                data-testid="ad-studio-connect-meta"
+              >
                 {t('publish.connectMeta')}
               </a>
             ) : (
@@ -215,50 +333,125 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         <div className="grid gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.campaignName')}
-            <input value={campaignName} onChange={(event) => setCampaignName(event.target.value)} maxLength={120} dir="auto" className={input} />
+            <input
+              value={campaignName}
+              onChange={(event) => setCampaignName(event.target.value)}
+              maxLength={120}
+              dir="auto"
+              className={input}
+            />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.link')}
-            <input value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} dir="ltr" placeholder="https://" className={input} />
+            <input
+              value={linkUrl}
+              onChange={(event) => setLinkUrl(event.target.value)}
+              dir="ltr"
+              placeholder="https://"
+              className={input}
+            />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.headline')}
-            <input value={headline} onChange={(event) => setHeadline(event.target.value)} maxLength={destination === 'google_ads' ? 30 : 40} dir="auto" className={input} />
+            <input
+              value={headline}
+              onChange={(event) => setHeadline(event.target.value)}
+              maxLength={destination === 'google_ads' ? 30 : 40}
+              dir="auto"
+              className={input}
+            />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.primaryText')}
-            <input value={primaryText} onChange={(event) => setPrimaryText(event.target.value)} maxLength={destination === 'google_ads' ? 90 : 500} dir="auto" className={input} />
+            <input
+              value={primaryText}
+              onChange={(event) => setPrimaryText(event.target.value)}
+              maxLength={destination === 'google_ads' ? 90 : 500}
+              dir="auto"
+              className={input}
+            />
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.descriptionLabel')}
-            <input value={description} onChange={(event) => setDescription(event.target.value)} maxLength={90} dir="auto" className={input} />
+            <input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={90}
+              dir="auto"
+              className={input}
+            />
           </label>
           {destination === 'google_ads' ? (
             <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
               {t('publish.businessName')}
-              <input value={businessName} onChange={(event) => setBusinessName(event.target.value)} maxLength={25} dir="auto" className={input} />
+              <input
+                value={businessName}
+                onChange={(event) => setBusinessName(event.target.value)}
+                maxLength={25}
+                dir="auto"
+                className={input}
+              />
             </label>
           ) : (
             <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
               {t('publish.countries')}
-              <input value={countries} onChange={(event) => setCountries(event.target.value)} dir="ltr" className={input} />
+              <input
+                value={countries}
+                onChange={(event) => setCountries(event.target.value)}
+                dir="ltr"
+                className={input}
+              />
             </label>
           )}
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.dailyBudget')}
-            <input type="number" min={1} value={dailyBudget} onChange={(event) => setDailyBudget(event.target.value)} className={input} />
+            <input
+              type="number"
+              min={1}
+              value={dailyBudget}
+              onChange={(event) => setDailyBudget(event.target.value)}
+              className={input}
+            />
           </label>
         </div>
+        {creative && !googleBlocked ? (
+          <div
+            className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3"
+            data-testid="ad-studio-publish-preview"
+          >
+            <span className="text-sm font-semibold">{t('publish.previewTitle')}</span>
+            <AdPlacementPreview
+              key={`${destination}-${creative.key}`}
+              copy={{ headline, primaryText, description }}
+              media={previewMedia(creative)}
+              advertiser={
+                destination === 'google_ads' && businessName.trim() ? businessName : briefName
+              }
+              linkUrl={linkUrl}
+              placements={placementsFor(destination, creative.kind)}
+            />
+          </div>
+        ) : null}
         {destination === 'google_ads' ? (
           <fieldset className="flex flex-col gap-2 rounded-lg border border-border p-3">
             <legend className="px-1 text-sm font-medium">{t('publish.euLegend')}</legend>
             <div className="flex flex-wrap gap-4 text-sm">
               <label className="inline-flex items-center gap-2">
-                <input type="radio" name="publish-eu" checked={euPolitical === 'no'} onChange={() => setEuPolitical('no')} />
+                <input
+                  type="radio"
+                  name="publish-eu"
+                  checked={euPolitical === 'no'}
+                  onChange={() => setEuPolitical('no')}
+                />
                 {t('publish.euNo')}
               </label>
               <label className="inline-flex items-center gap-2">
-                <input type="radio" name="publish-eu" checked={euPolitical === 'yes'} onChange={() => setEuPolitical('yes')} />
+                <input
+                  type="radio"
+                  name="publish-eu"
+                  checked={euPolitical === 'yes'}
+                  onChange={() => setEuPolitical('yes')}
+                />
                 {t('publish.euYes')}
               </label>
             </div>
@@ -268,25 +461,53 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={pending || !creative || !canPublish || !destinations[destination] || googleBlocked || missingEu}
+            disabled={
+              pending ||
+              !creative ||
+              !canPublish ||
+              !destinations[destination] ||
+              googleBlocked ||
+              missingEu
+            }
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
           >
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Megaphone className="h-4 w-4" aria-hidden="true" />}
+            {pending ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Megaphone className="h-4 w-4" aria-hidden="true" />
+            )}
             {t('publish.create', { destination: t(`publish.destination.${destination}`) })}
           </button>
-          {!canPublish ? <span className="text-xs text-muted-foreground">{t('exportNeedsPermission')}</span> : null}
+          {!canPublish ? (
+            <span className="text-xs text-muted-foreground">{t('exportNeedsPermission')}</span>
+          ) : null}
         </div>
       </form>
       {message ? (
-        <p role="status" className={cn('flex flex-wrap items-center gap-2 text-sm', message.tone === 'ok' ? 'text-success' : 'text-destructive')}>
+        <p
+          role="status"
+          className={cn(
+            'flex flex-wrap items-center gap-2 text-sm',
+            message.tone === 'ok' ? 'text-success' : 'text-destructive',
+          )}
+        >
           {message.text}
           {message.detail ? (
-            <span className="basis-full rounded-lg bg-destructive/5 px-3 py-2 text-xs text-foreground" dir="auto" data-testid="ad-studio-publish-detail">
+            <span
+              className="basis-full rounded-lg bg-destructive/5 px-3 py-2 text-xs text-foreground"
+              dir="auto"
+              data-testid="ad-studio-publish-detail"
+            >
               {t('publish.platformSaid', { detail: message.detail })}
             </span>
           ) : null}
           {message.href ? (
-            <a href={message.href} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium underline">
+            <a
+              href={message.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 font-medium underline"
+            >
               {t('publish.openAd')}
               <ExternalLink className="h-3 w-3" aria-hidden="true" />
             </a>
@@ -301,24 +522,44 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         ) : (
           <ul className="flex flex-col gap-2">
             {published.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-3 py-2 text-sm" data-testid="ad-studio-published-ad">
+              <li
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-3 py-2 text-sm"
+                data-testid="ad-studio-published-ad"
+              >
                 <span className="flex min-w-0 items-center gap-2">
-                  {row.status === 'done' ? <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" /> : null}
+                  {row.status === 'done' ? (
+                    <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+                  ) : null}
                   <span className="truncate font-medium" dir="auto">
                     {row.title}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {t(`publish.destination.${row.destination === 'google_ads' ? 'google_ads' : 'meta'}`)} · {t(row.mediaKind === 'video' ? 'publish.kindVideo' : 'publish.kindImage')}
+                    {t(
+                      `publish.destination.${row.destination === 'google_ads' ? 'google_ads' : 'meta'}`,
+                    )}{' '}
+                    · {t(row.mediaKind === 'video' ? 'publish.kindVideo' : 'publish.kindImage')}
                   </span>
                 </span>
                 {row.externalUrl ? (
-                  <a href={row.externalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                  <a
+                    href={row.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                  >
                     {t('publish.openAd')}
                     <ExternalLink className="h-3 w-3" aria-hidden="true" />
                   </a>
                 ) : (
-                  <span className="text-xs text-destructive" dir="auto" title={row.failureDetail ?? undefined}>
-                    {t(`exportFailure.${row.failureCode && FAILURES.has(row.failureCode) ? row.failureCode : 'upload_failed'}`)}
+                  <span
+                    className="text-xs text-destructive"
+                    dir="auto"
+                    title={row.failureDetail ?? undefined}
+                  >
+                    {t(
+                      `exportFailure.${row.failureCode && FAILURES.has(row.failureCode) ? row.failureCode : 'upload_failed'}`,
+                    )}
                   </span>
                 )}
               </li>

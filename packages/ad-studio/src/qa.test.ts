@@ -11,6 +11,8 @@ describe('the clip quality check prompt', () => {
     const { system, user } = buildClipQaPrompt({ visualPrompt: 'A lawyer signs on a phone', voiceover: '\u05e0\u05e1\u05d5 \u05e2\u05db\u05e9\u05d9\u05d5 \u05e9\u05e0\u05d9 \u05de\u05e1\u05de\u05db\u05d9\u05dd \u05d1\u05d7\u05d9\u05e0\u05dd' }, 'he');
     expect(system).toContain('never invent a problem');
     expect(user).toContain('Language of the ad: Hebrew.');
+    // The findings are read by the people making the ad, so they come in its language.
+    expect(user).toContain('Write each detail in Hebrew');
     expect(user).toContain('Intended narration, word for word: "\u05e0\u05e1\u05d5 \u05e2\u05db\u05e9\u05d9\u05d5 \u05e9\u05e0\u05d9 \u05de\u05e1\u05de\u05db\u05d9\u05dd \u05d1\u05d7\u05d9\u05e0\u05dd"');
     expect(user).toContain('a stutter or a cut-off word');
     expect(user).toContain('the wrong gender of a number');
