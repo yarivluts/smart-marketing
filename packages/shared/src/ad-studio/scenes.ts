@@ -1,3 +1,5 @@
+import { sceneReferenceIssues, type AdStudioReferenceIssueCode, type AdStudioSceneReference } from './references';
+
 /**
  * Ad Studio (KAN-229): the rules every video script obeys, whoever wrote it - the AI or a person
  * editing it. A video is at most {@link AD_STUDIO_MAX_TOTAL_SECONDS} long and is made of scenes;
@@ -43,6 +45,8 @@ export interface AdStudioScene {
    * same words with full nikud and numbers written out (see `pronunciation.ts`). Absent when none.
    */
   pronunciation?: string;
+  /** Images handed to the video model with this scene (app screens, illustrations); absent when none. */
+  references?: AdStudioSceneReference[];
   /** Text burned into the frame, if any. */
   onScreenText: string;
 }
@@ -56,6 +60,7 @@ export type AdStudioSceneIssueCode =
   | 'scene_not_whole_seconds'
   | 'empty_visual_prompt'
   | 'pronunciation_too_long'
+  | AdStudioReferenceIssueCode
   | 'duplicate_scene_id';
 
 /** Generous for a 10-second line with vowel points (which roughly double its length). */
@@ -85,6 +90,7 @@ export function validateAdStudioScenes(scenes: readonly AdStudioScene[]): AdStud
     if (scene.durationSeconds > AD_STUDIO_SCENE_MAX_SECONDS) issues.push({ code: 'scene_too_long', scene: position });
     if (scene.visualPrompt.trim().length === 0) issues.push({ code: 'empty_visual_prompt', scene: position });
     if ((scene.pronunciation ?? '').trim().length > AD_STUDIO_PRONUNCIATION_MAX) issues.push({ code: 'pronunciation_too_long', scene: position });
+    for (const code of sceneReferenceIssues(scene.references)) issues.push({ code, scene: position });
     if (seen.has(scene.id)) issues.push({ code: 'duplicate_scene_id', scene: position });
     seen.add(scene.id);
   });
@@ -117,6 +123,7 @@ export function fitAdStudioScenes(scenes: readonly AdStudioScene[], makeId: () =
       visualPrompt: scene.visualPrompt.trim(),
       voiceover: scene.voiceover.trim(),
       ...(pronunciation ? { pronunciation } : {}),
+      ...(scene.references?.length ? { references: scene.references.map((reference) => ({ ...reference })) } : {}),
       onScreenText: scene.onScreenText.trim(),
     };
   });
