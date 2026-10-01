@@ -6,6 +6,7 @@ import {
   assemblyPlan,
   buildSceneEditInstruction,
   buildScenePrompt,
+  needsPronunciation,
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
@@ -34,7 +35,8 @@ import {
   type AdStudioVideoModel,
 } from '@growthos/firebase-orm-models';
 import { adStudioRuntime, ensureOrm } from './runtime';
-import { AdStudioProviderError, resolveAdStudioReviewer, type AdStudioProviderErrorCode, type AdStudioReviewer } from './llm';
+import { AdStudioProviderError, resolveAdStudioLlm, resolveAdStudioReviewer, type AdStudioLlm, type AdStudioProviderErrorCode, type AdStudioReviewer } from './llm';
+import { saveAdStudioScriptWithPronunciation } from './vocalize';
 import { checkAdStudioClip } from './qa';
 import { loadSceneReferences } from './references';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
@@ -83,6 +85,8 @@ export interface AdStudioVideoDeps {
   runner: FfmpegRunner;
   /** Watches each ready clip for the AI quality check; absent or null skips the check. */
   reviewer?: AdStudioReviewer | null;
+  /** The text model that vocalizes Hebrew narration before a render; absent or null renders it as written. */
+  llm?: AdStudioLlm | null;
   now?: () => Date;
 }
 
@@ -92,8 +96,9 @@ export function resolveAdStudioVideoDeps(env: NodeJS.ProcessEnv = process.env): 
   storage: AdStudioMediaStorage;
   runner: FfmpegRunner;
   reviewer: AdStudioReviewer | null;
+  llm: AdStudioLlm | null;
 } {
-  return { omni: resolveAdStudioOmni(env), storage: resolveAdStudioMediaStorage(env), runner: defaultFfmpegRunner(env), reviewer: resolveAdStudioReviewer(env) };
+  return { omni: resolveAdStudioOmni(env), storage: resolveAdStudioMediaStorage(env), runner: defaultFfmpegRunner(env), reviewer: resolveAdStudioReviewer(env), llm: resolveAdStudioLlm(env) };
 }
 
 interface BriefContext {
@@ -240,6 +245,32 @@ async function startClip(
   return clip;
 }
 
+/**
+ * Vocalizes the Hebrew narration of the given scenes that has no pronunciation yet, right before they
+ * render, and returns the brief as saved. Scripts saved before pronunciations existed, or whose
+ * vocalizing failed on save, still get nikud this way. Best effort: without a text model, or if the
+ * call fails, the scenes render from the narration as written.
+ */
+async function vocalizeBeforeRender(brief: AdStudioBriefModel, sceneIds: ReadonlySet<string>, ctx: BriefContext, deps: Pick<AdStudioVideoDeps, 'llm' | 'now'>): Promise<AdStudioBriefModel> {
+  if (!deps.llm || !brief.scenes.some((scene) => sceneIds.has(scene.id) && needsPronunciation(scene, brief.language))) return brief;
+  try {
+    return await saveAdStudioScriptWithPronunciation({
+      organizationId: ctx.organizationId,
+      projectId: ctx.projectId,
+      briefId: ctx.briefId,
+      scenes: brief.scenes,
+      actorId: ctx.actorId,
+      llm: deps.llm,
+      generatedBy: brief.script_generated_by ?? null,
+      onlySceneIds: sceneIds,
+      now: deps.now?.(),
+    });
+  } catch (error) {
+    console.warn('[ad-studio] vocalizing before a render failed; rendering the narration as written', { briefId: brief.id, error: error instanceof Error ? error.message : String(error) });
+    return brief;
+  }
+}
+
 function generatingFor(clips: readonly AdStudioClipModel[], sceneId: string): boolean {
   return clips.some((clip) => clip.scene_id === sceneId && clip.status === 'generating');
 }
@@ -247,11 +278,14 @@ function generatingFor(clips: readonly AdStudioClipModel[], sceneId: string): bo
 /** Renders one scene from its current script (units = the scene's seconds, kind `video_scene`). */
 export async function startSceneRender(ctx: BriefContext & { sceneId: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel> {
   await ensureOrm();
-  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  let brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  if (!brief.scenes.some((candidate) => candidate.id === ctx.sceneId)) throw new AdStudioVideoRequestError('scene_not_found');
+  const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
+  if (generatingFor(clips, ctx.sceneId)) throw new AdStudioVideoRequestError('already_generating');
+  // Hebrew narration gets its nikud before the model speaks it (KAN-239).
+  brief = await vocalizeBeforeRender(brief, new Set([ctx.sceneId]), ctx, deps);
   const scene = brief.scenes.find((candidate) => candidate.id === ctx.sceneId);
   if (!scene) throw new AdStudioVideoRequestError('scene_not_found');
-  const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
-  if (generatingFor(clips, scene.id)) throw new AdStudioVideoRequestError('already_generating');
   const context = videoContext(brief);
   // The scene's reference images (app screens, illustrations) go to the model with the prompt (KAN-243).
   const references = await loadSceneReferences(ctx, scene, deps.storage);
@@ -317,6 +351,8 @@ export async function startRenderAll(ctx: BriefContext, deps: AdStudioVideoDeps)
   const cost = renderAllCost(states, brief.scenes);
   if (cost.sceneIds.length === 0) return [];
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'video_scene', units: cost.seconds, now: clock(deps) });
+  // One vocalizing call for every scene about to render, instead of one per scene.
+  await vocalizeBeforeRender(brief, new Set(cost.sceneIds), ctx, deps);
   const started: AdStudioClipModel[] = [];
   for (const sceneId of cost.sceneIds) started.push(await startSceneRender({ ...ctx, sceneId }, deps));
   return started;

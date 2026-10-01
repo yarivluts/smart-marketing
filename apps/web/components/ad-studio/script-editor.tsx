@@ -19,6 +19,7 @@ import type { AdStudioReferenceView } from '@/lib/ad-studio/engine';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { SceneTimeline } from './scene-timeline';
+import { MobileAccordionItem } from './mobile-accordion';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface ScriptEditorProps {
@@ -222,14 +223,30 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
             const sceneIssues = issues.filter((issue) => issue.scene === index + 1);
             const rewriting = rewrite?.sceneId === scene.id ? rewrite : null;
             return (
-              <li
+              <MobileAccordionItem
                 key={scene.id}
-                className={cn('flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm', sceneIssues.length ? 'border-destructive/50' : 'border-border')}
+                defaultOpen={index === 0 || sceneIssues.length > 0}
+                toggleLabel={t('sceneLabel', { number: index + 1 })}
+                className={cn('rounded-2xl border bg-card p-4 shadow-sm', sceneIssues.length ? 'border-destructive/50' : 'border-border')}
+                bodyClassName="flex flex-col gap-3"
                 onFocusCapture={() => setActiveSceneId(scene.id)}
-                data-testid={`ad-studio-scene-${index + 1}`}
+                testId={`ad-studio-scene-${index + 1}`}
+                summary={
+                  <>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs text-primary">{index + 1}</span>
+                    <span className="text-sm font-semibold">{t('sceneLabel', { number: index + 1 })}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{t('secondsShort', { seconds: scene.durationSeconds })}</span>
+                    {sceneIssues.length ? <span className="text-xs text-destructive">{t('sceneHasIssues', { count: sceneIssues.length })}</span> : null}
+                    {scene.voiceover.trim() ? (
+                      <span className="w-full truncate text-xs text-muted-foreground" dir="auto">
+                        {scene.voiceover}
+                      </span>
+                    ) : null}
+                  </>
+                }
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex items-center gap-2 text-sm font-semibold">
+                  <span className="flex items-center gap-2 text-sm font-semibold max-md:hidden">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs text-primary">{index + 1}</span>
                     {t('sceneLabel', { number: index + 1 })}
                   </span>
@@ -429,7 +446,7 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                     ))}
                   </ul>
                 ) : null}
-              </li>
+              </MobileAccordionItem>
             );
           })}
         </ol>

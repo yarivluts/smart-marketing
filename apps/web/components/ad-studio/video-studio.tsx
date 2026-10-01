@@ -6,9 +6,11 @@ import { AlertTriangle, Clapperboard, Film, Info, Loader2, Play, RefreshCw, Wand
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
   assemblyPlan,
+  isHebrewLanguage,
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
+  spokenNarration,
   summarizeVideoProgress,
   type AdStudioFormat,
   type AdStudioScene,
@@ -19,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { buildSceneTimeline, currentAssembledVideo, formatElapsed, type AdStudioClipView, type AdStudioVideoView } from '@/lib/ad-studio/view';
 import { useAdStudioErrorMessage, useAdStudioFailureReason, type AdStudioApiError } from './use-ad-studio-error';
 import { ClipQaNote } from './clip-qa-note';
+import { MobileAccordionItem } from './mobile-accordion';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -261,9 +264,25 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
           const canRender = videoAvailable && pending === null && !inFlight && scene.durationSeconds <= videoSecondsLeft;
           const lastFailed = history[0]?.status === 'failed' ? history[0] : null;
           return (
-            <li key={scene.id} className="grid gap-4 rounded-2xl border border-border bg-card p-4 shadow-sm md:grid-cols-[minmax(0,1fr)_auto]" data-testid={`ad-studio-video-scene-${index + 1}`}>
+            <MobileAccordionItem
+              key={scene.id}
+              defaultOpen={index === 0}
+              toggleLabel={t('sceneLabel', { number: index + 1 })}
+              className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+              bodyClassName="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]"
+              testId={`ad-studio-video-scene-${index + 1}`}
+              summary={
+                <>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
+                  <span className="text-sm font-semibold">{t('sceneLabel', { number: index + 1 })}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{t('video.sceneSeconds', { seconds: scene.durationSeconds })}</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', STATE_BADGE[state.state])}>{t(`video.legend.${state.state}`)}</span>
+                  {shownClip?.qa ? <span className="text-[11px] text-muted-foreground">{t(`video.qa.short.${shownClip.qa.status}`)}</span> : null}
+                </>
+              }
+            >
               <div className="flex min-w-0 flex-col gap-2">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 max-md:hidden">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
                   <span className="text-sm font-semibold">{t('sceneLabel', { number: index + 1 })}</span>
                   <span className="text-xs text-muted-foreground tabular-nums">{t('video.sceneSeconds', { seconds: scene.durationSeconds })}</span>
@@ -274,6 +293,15 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
                 <p className="line-clamp-3 text-sm text-muted-foreground" dir="ltr">
                   {scene.visualPrompt}
                 </p>
+                {scene.voiceover.trim() ? (
+                  <div className="flex flex-col gap-0.5 rounded-lg bg-muted/40 px-3 py-2" data-testid="ad-studio-scene-narration">
+                    <span className="text-[11px] font-medium text-muted-foreground">{scene.pronunciation?.trim() ? t('video.narrationVocalized') : t('video.narration')}</span>
+                    <p className="text-base leading-relaxed" dir="auto" lang={language}>
+                      {spokenNarration(scene)}
+                    </p>
+                    {!scene.pronunciation?.trim() && isHebrewLanguage(language) ? <span className="text-[11px] text-muted-foreground">{t('video.narrationWillVocalize')}</span> : null}
+                  </div>
+                ) : null}
 
                 {inFlight ? (
                   <div className="flex flex-col gap-1 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2" role="status">
@@ -408,7 +436,7 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
                   </div>
                 )}
               </div>
-            </li>
+            </MobileAccordionItem>
           );
         })}
       </ol>

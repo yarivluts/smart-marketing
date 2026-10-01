@@ -3868,8 +3868,17 @@
         "kind": {
           "audio": "Voice:",
           "visual": "Picture:"
+        },
+        "short": {
+          "passed": "AI check passed",
+          "issues": "AI check found problems",
+          "skipped": "Not checked",
+          "error": "Check failed"
         }
-      }
+      },
+      "narration": "Narration",
+      "narrationVocalized": "What the narrator reads (with nikud)",
+      "narrationWillVocalize": "Nikud is added automatically when the scene is rendered."
     },
     "clipFailure": {
       "not_configured": "no video model is configured",
@@ -4377,7 +4386,8 @@
         "description_too_long": "The description is too long.",
         "library_full": "This ad already has the most images it can hold. Delete one first."
       }
-    }
+    },
+    "sceneHasIssues": "{count, plural, one {# problem} other {# problems}}"
   },
   "MetaConnect": {
     "title": "Connect with Facebook",
