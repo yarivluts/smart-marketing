@@ -31,6 +31,13 @@ describe('middleware', () => {
     expect(response.headers.get('location')).toBe('https://growthos.test/en/login?from=%2Fdashboard');
   });
 
+  it('keeps the query string in ?from= so a link with context survives signing in', () => {
+    const response = middleware(requestFor('/he/orgs/o1/integrations/meta?projectId=p1'));
+    const location = new URL(response.headers.get('location') as string);
+    expect(location.pathname).toBe('/he/login');
+    expect(location.searchParams.get('from')).toBe('/orgs/o1/integrations/meta?projectId=p1');
+  });
+
   it('passes an authenticated visitor through to a protected route', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en/dashboard', { cookie: `${SESSION_COOKIE_NAME}=abc` }));

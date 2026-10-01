@@ -42,7 +42,9 @@ export default function middleware(request: NextRequest): NextResponse {
       // Locale-agnostic (no `/${matchedLocale}` prefix) so the login form can
       // hand it straight to next-intl's locale-prefixing router without
       // double-prefixing.
-      loginUrl.searchParams.set('from', pathWithoutLocale);
+      // The query string too, so a link that carries its context (e.g. ?projectId= or ?brief=&step=)
+      // still has it after signing in; resolveRedirectTarget only accepts same-app relative paths.
+      loginUrl.searchParams.set('from', `${pathWithoutLocale}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
   }
