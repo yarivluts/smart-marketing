@@ -17,6 +17,40 @@ Template for each entry:
 
 ---
 
+## 2026-10-01 - KAN-239 done (AI video QA + Hebrew nikud), KAN-243 app screens for the video model
+
+- **Last completed:**
+  - **KAN-239 part 1 - AI quality check of every clip** (PR #564, deployed 693c615).
+    - Gemini watches each ready clip and reports a transcript plus major and minor audio and visual issues.
+    - The status poll checks one clip per call.
+    - The autopilot re-renders a failing scene (admin setting, default 1 retry, at most 2) and finishes with `qa_issues` if a problem remains.
+    - Shown in the UI, the admin panel and MCP.
+    - Prod check on the Hebrew EasySign ad: it caught the garbled phone-screen text and the "שתיים מסמכים" grammar error.
+  - **KAN-239 part 2 - Hebrew nikud** (PR #565, deployed bbddadb).
+    - Each scene has a `pronunciation`: full nikud, numbers as words.
+    - It is added automatically on save, on generation, and by the autopilot before a render. Editable in the script editor.
+    - Omni reads it and QA judges against it.
+    - Prod check: after vocalizing, re-rendered scene 3 (clip qVAqMHpYpAwamJjxaRmA) says "שני מסמכים" correctly. QA then flagged a real lip-sync slip, fixed by the prompt line in #566.
+  - **KAN-243 - reference images** (PR #566, deployed cff95fa; follow-up PR "only the attached screens").
+    - Per-ad library: uploaded app screenshots and AI illustrations.
+    - Scenes attach up to 3, used as screen, subject or first frame. Omni gets them inline after the prompt, and QA compares the clip with them.
+    - Library UI in the Plan step, image picker per scene, MCP tools, en and he strings.
+    - Measured first: Omni reproduces a real GrowthOS screen faithfully (layout, numbers, headings). Small text garbles in extreme close-ups, so prompts keep the screen in view.
+  - **Dropped: capture by URL.**
+    - PageSpeed returns only 500×348 thumbnails, and app screens sit behind a login.
+    - The temporary key and the `pagespeed-api-key` secret were deleted, and the API was disabled again.
+  - **Prod check of KAN-243 on the Hebrew EasySign ad, scene 2:**
+    - The old clip had garbled Hebrew on the phone. An AI illustration of the signing screen was attached as its screen.
+    - First render (clip y0VN19rlwvF87Hgt7buP): the screen was right, but the scene text also asks for a chat app. Omni invented a chat screen with gibberish, and QA flagged it.
+    - With the follow-up prompt rule (attached screens are the only screens), the re-render (clip ViItCw5aZAR9tqbKWaKc) passed QA: the signing screen throughout, and only a minor shimmer.
+  - **Jira:** KAN-239 Done, KAN-243 Done.
+- **In progress (exact stopping point):** none, once the follow-up PR is merged and deployed.
+- **Blocked + why:** none.
+- **Next step:**
+  - The Hebrew EasySign ad now has new current clips for scenes 2 and 3. Assemble the video again, and re-publish it if wanted (the published Meta and Google ads still use the old video).
+  - Possible follow-up: an EasySign chat screenshot, so scene 2 can show the WhatsApp step too.
+- **Waiting on human:** whether to re-assemble and re-publish the Hebrew EasySign video with the fixed scenes. The ads are paused, so this is the owner's call.
+
 ## 2026-10-01 - KAN-238 done: six real paused ads from the stepper, English and Hebrew
 
 - **Last completed:**

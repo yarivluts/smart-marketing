@@ -52,6 +52,10 @@ describe('scene reference images', () => {
     expect(lines[0]).toContain('Keep the whole screen in view');
     expect(lines[1]).toBe('Attached image 2 shows a subject of this ad: whenever it appears, show it exactly as it looks in the image.');
     expect(lines[2]).toMatch(/^Attached image 3 is the opening frame/);
+    // A screen makes the attached screens the only ones the shot may show.
+    expect(lines[3]).toBe('Every screen in this shot shows only attached image 1. Where the description above mentions another app, chat, page or screen, show attached image 1 on the screen instead; never draw a different interface.');
+    expect(referencePromptLines([{ use: 'subject', description: '' }])).toHaveLength(1);
+    expect(referencePromptLines([{ use: 'screen', description: 'a' }, { use: 'screen', description: 'b' }])[2]).toContain('shows only attached images 1 and 2.');
     expect(referencesShowText([{ use: 'subject' }])).toBe(false);
     expect(referencesShowText([{ use: 'subject' }, { use: 'screen' }])).toBe(true);
 
