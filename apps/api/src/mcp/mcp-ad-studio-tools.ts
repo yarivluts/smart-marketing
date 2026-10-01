@@ -614,7 +614,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     {
       title: 'Add a reference image',
       description:
-        'Adds a reference image to the ad\'s library. source "upload": send a PNG or JPEG (up to 8 MB) as base64 in image_base64 - for example a sharp screenshot of the real app taken in a browser. source "illustration": draw one with the image model from prompt (counts toward the daily image limit). Attach it to scenes with save_ad_script (scene.references). Requires "ai.use".',
+        'Adds a reference image to the ad\'s library. source "upload": send a PNG or JPEG (up to 4 MB) as base64 in image_base64 - for example a sharp screenshot of the real app taken in a browser. source "illustration": draw one with the image model from prompt (counts toward the daily image limit). Attach it to scenes with save_ad_script (scene.references). Requires "ai.use".',
       inputSchema: toolInputSchema({
         brief_id: briefId,
         source: z.string().describe('"upload" or "illustration".'),

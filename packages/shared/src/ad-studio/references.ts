@@ -31,8 +31,11 @@ export type AdStudioReferenceMimeType = (typeof AD_STUDIO_REFERENCE_MIME_TYPES)[
 
 /** Images per scene: each is sent inline with the render, so the request stays small. */
 export const AD_STUDIO_MAX_SCENE_REFERENCES = 3;
-/** Per image; a full-page screenshot is ~1-3 MB. */
-export const AD_STUDIO_MAX_REFERENCE_BYTES = 8 * 1024 * 1024;
+/**
+ * Per image; a sharp screenshot is ~1-3 MB. Images go inline in the render request, and three at
+ * this size stay under the ~20 MB inline request limit once base64-encoded.
+ */
+export const AD_STUDIO_MAX_REFERENCE_BYTES = 4 * 1024 * 1024;
 /** Images in one ad's library. */
 export const AD_STUDIO_MAX_REFERENCES = 30;
 export const AD_STUDIO_REFERENCE_LABEL_MAX = 80;

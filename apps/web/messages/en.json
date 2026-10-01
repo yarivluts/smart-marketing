@@ -4327,7 +4327,7 @@
         "illustration": "Draw an illustration"
       },
       "fileLabel": "Image file",
-      "fileHint": "PNG or JPEG, up to 8 MB. A sharp, full-size screenshot works best.",
+      "fileHint": "PNG or JPEG, up to 4 MB. A sharp, full-size screenshot works best.",
       "promptLabel": "What should the illustration show?",
       "promptPlaceholder": "A phone showing a signed contract with a green check mark",
       "aspectLabel": "Shape",
@@ -4369,7 +4369,7 @@
       "missing": "Missing image",
       "errors": {
         "unsupported_image": "Only PNG and JPEG images can be used.",
-        "image_too_large": "The image is larger than 8 MB.",
+        "image_too_large": "The image is larger than 4 MB.",
         "illustration_not_configured": "No image model is configured for this deployment.",
         "reference_not_ready": "That image is not ready yet.",
         "label_required": "Give the image a name.",
