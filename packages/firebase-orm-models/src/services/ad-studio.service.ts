@@ -5,6 +5,7 @@ import {
   isAdCopyEmpty,
   isAdStudioFormat,
   reconcilePronunciations,
+  speakerFields,
   validateAdStudioImageConcepts,
   validateAdStudioScenes,
   type AdStudioAdCopy,
@@ -228,7 +229,11 @@ export async function saveAdStudioScript(params: {
   if (unknown.length) throw new AdStudioScriptInvalidError(unknown);
   // A pronunciation sent back unchanged for narration that changed belongs to the old words. It is
   // dropped here so every client (the editor, MCP, the generator) follows the same rule.
-  brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map((scene) => ({ ...scene }));
+  // Who speaks is kept only with narration, and the voice-over default is stored as nothing.
+  brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map(({ delivery: _delivery, speaker: _speaker, ...scene }) => ({
+    ...scene,
+    ...speakerFields({ voiceover: scene.voiceover, delivery: _delivery, speaker: _speaker }),
+  }));
   brief.script_generated_by = params.generatedBy ?? null;
   brief.status = 'scripted';
   brief.last_changed_on = nowIso(params.now);

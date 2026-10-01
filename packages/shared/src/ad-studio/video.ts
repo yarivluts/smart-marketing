@@ -43,7 +43,7 @@ function clip(value: string, max: number): string {
  * the prompt, in their order (KAN-243).
  */
 export function buildScenePrompt(
-  scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation'>,
+  scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'delivery' | 'speaker'>,
   context: AdStudioVideoContext,
   references: readonly AdStudioPromptReference[] = [],
 ): string {
@@ -52,7 +52,11 @@ export function buildScenePrompt(
   const voiceover = spokenNarration(scene);
   const vocalized = Boolean(scene.pronunciation?.trim()) && voiceover.length > 0;
   const product = clip(oneLine(context.productDescription), PRODUCT_CONTEXT_MAX);
-  const narrationLine = !vocalized
+  const onScreen = scene.delivery === 'on_screen';
+  const who = oneLine(scene.speaker ?? '');
+  const narrationLine = onScreen
+    ? `Audio: ${who ? `${who} in the shot` : 'the person in the shot'} looks at the camera and says, in ${languageName(context.language)}${vocalized ? ', exactly these words and nothing else, pronouncing every word as written' + (isHebrewLanguage(context.language) ? ' - the Hebrew carries full nikud vowel marks that give the exact pronunciation' : '') : ''}: "${voiceover}". Their lips move in sync with every word. ${who ? 'No one else in the shot speaks.' : 'Only this one person speaks.'} There is no off-screen narrator. Soft background music under the voice.`
+    : !vocalized
     ? `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}: "${voiceover}". Soft background music under the voice. The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`
     : `Audio: a warm, clear voice-over narrator says, in ${languageName(context.language)}, exactly these words and nothing else, pronouncing every word as written${isHebrewLanguage(context.language) ? ' - the Hebrew carries full nikud vowel marks that give the exact pronunciation' : ''}: "${voiceover}". Say each word once, fluently, without repeating or stuttering. Soft background music under the voice. The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`;
   return [
@@ -95,7 +99,7 @@ function fnv1a(input: string, basis: number): number {
  * on purpose - reordering scenes or editing a caption does not need a re-render. Not a security
  * hash; it only has to differ when the inputs differ.
  */
-export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references'>, context: Pick<AdStudioVideoContext, 'format' | 'language'>): string {
+export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>, context: Pick<AdStudioVideoContext, 'format' | 'language'>): string {
   const pronunciation = oneLine(scene.pronunciation ?? '');
   const canonical = JSON.stringify([
     scene.durationSeconds,
@@ -105,6 +109,8 @@ export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 
     context.language.trim().toLowerCase(),
     // Only when present, so every clip rendered before pronunciations existed stays current.
     ...(pronunciation ? [pronunciation] : []),
+    // Who speaks, only for a person on screen: the voice-over default keeps every earlier fingerprint.
+    ...(scene.delivery === 'on_screen' ? [{ delivery: 'on_screen', speaker: oneLine(scene.speaker ?? '') }] : []),
     // The attached images and how each is used, also only when present (KAN-243).
     ...(scene.references?.length ? [{ references: scene.references.map((reference) => [reference.imageId, reference.use]) }] : []),
   ]);
@@ -155,7 +161,7 @@ export interface AdStudioSceneVideo<T extends AdStudioClipSummary = AdStudioClip
  * failed but has an older usable one still reads as ready, since the video can be assembled.
  */
 export function sceneVideoStates<T extends AdStudioClipSummary>(
-  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references'>[],
+  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>[],
   clips: readonly T[],
   context: Pick<AdStudioVideoContext, 'format' | 'language'>,
 ): AdStudioSceneVideo<T>[] {
@@ -215,7 +221,7 @@ export function renderAllCost(states: readonly AdStudioSceneVideo[], scenes: rea
 
 /** The clips an assembly concatenates, in script order, each trimmed to its scene's length; null until every scene has a usable clip. */
 export function assemblyPlan<T extends AdStudioClipSummary>(
-  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references'>[],
+  scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>[],
   clips: readonly T[],
   context: Pick<AdStudioVideoContext, 'format' | 'language'>,
 ): { clip: T; sceneId: string; seconds: number }[] | null {

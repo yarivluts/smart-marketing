@@ -47,6 +47,13 @@ export interface AdStudioScene {
   pronunciation?: string;
   /** Images handed to the video model with this scene (app screens, illustrations); absent when none. */
   references?: AdStudioSceneReference[];
+  /**
+   * Who says the narration: an off-screen voice-over (the default, also when absent) or a person in
+   * the shot, lip-synced. Kept only with narration.
+   */
+  delivery?: AdStudioDelivery;
+  /** For `on_screen`: which person in the shot speaks, when there are several ("the lawyer in the blue suit"). */
+  speaker?: string;
   /** Text burned into the frame, if any. */
   onScreenText: string;
 }
@@ -60,8 +67,19 @@ export type AdStudioSceneIssueCode =
   | 'scene_not_whole_seconds'
   | 'empty_visual_prompt'
   | 'pronunciation_too_long'
+  | 'invalid_delivery'
+  | 'speaker_too_long'
   | AdStudioReferenceIssueCode
   | 'duplicate_scene_id';
+
+/** Who says a scene's narration (see AdStudioScene.delivery). */
+export const AD_STUDIO_DELIVERIES = ['voiceover', 'on_screen'] as const;
+export type AdStudioDelivery = (typeof AD_STUDIO_DELIVERIES)[number];
+export const AD_STUDIO_SPEAKER_MAX = 200;
+
+export function isAdStudioDelivery(value: unknown): value is AdStudioDelivery {
+  return typeof value === 'string' && (AD_STUDIO_DELIVERIES as readonly string[]).includes(value);
+}
 
 /** Generous for a 10-second line with vowel points (which roughly double its length). */
 export const AD_STUDIO_PRONUNCIATION_MAX = 1000;
@@ -91,6 +109,8 @@ export function validateAdStudioScenes(scenes: readonly AdStudioScene[]): AdStud
     if (scene.visualPrompt.trim().length === 0) issues.push({ code: 'empty_visual_prompt', scene: position });
     if ((scene.pronunciation ?? '').trim().length > AD_STUDIO_PRONUNCIATION_MAX) issues.push({ code: 'pronunciation_too_long', scene: position });
     for (const code of sceneReferenceIssues(scene.references)) issues.push({ code, scene: position });
+    if (scene.delivery !== undefined && !isAdStudioDelivery(scene.delivery)) issues.push({ code: 'invalid_delivery', scene: position });
+    if ((scene.speaker ?? '').trim().length > AD_STUDIO_SPEAKER_MAX) issues.push({ code: 'speaker_too_long', scene: position });
     if (seen.has(scene.id)) issues.push({ code: 'duplicate_scene_id', scene: position });
     seen.add(scene.id);
   });
@@ -110,6 +130,16 @@ function clampDuration(seconds: number): number {
  * are made unique. The result always passes {@link validateAdStudioScenes} unless a visual prompt
  * is empty, which the caller must treat as a failed generation rather than invent content for.
  */
+/**
+ * The delivery fields a scene keeps: `on_screen` (with its speaker, trimmed) only for a scene with
+ * narration; the voice-over default is stored as nothing, so scripts from before stay identical.
+ */
+export function speakerFields(scene: Pick<AdStudioScene, 'voiceover' | 'delivery' | 'speaker'>): Pick<AdStudioScene, 'delivery' | 'speaker'> {
+  if (scene.delivery !== 'on_screen' || !scene.voiceover.trim()) return {};
+  const speaker = (scene.speaker ?? '').replace(/\s+/g, ' ').trim();
+  return { delivery: 'on_screen', ...(speaker ? { speaker } : {}) };
+}
+
 export function fitAdStudioScenes(scenes: readonly AdStudioScene[], makeId: () => string): AdStudioScene[] {
   const seen = new Set<string>();
   const fitted = scenes.slice(0, AD_STUDIO_MAX_SCENES).map((scene) => {
@@ -124,6 +154,7 @@ export function fitAdStudioScenes(scenes: readonly AdStudioScene[], makeId: () =
       voiceover: scene.voiceover.trim(),
       ...(pronunciation ? { pronunciation } : {}),
       ...(scene.references?.length ? { references: scene.references.map((reference) => ({ ...reference })) } : {}),
+      ...speakerFields(scene),
       onScreenText: scene.onScreenText.trim(),
     };
   });

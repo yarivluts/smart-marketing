@@ -60,7 +60,7 @@ function referenceRule(reference: AdStudioQaReference, index: number): string {
 }
 
 export function buildClipQaPrompt(
-  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'>,
+  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation' | 'delivery' | 'speaker'>,
   language: string,
   references: readonly AdStudioQaReference[] = [],
 ): { system: string; user: string } {
@@ -73,6 +73,11 @@ export function buildClipQaPrompt(
     user: [
       `Language of the ad: ${languageName}.`,
       narration ? `Intended narration, word for word: "${narration}"` : 'Intended narration: none (no one should speak).',
+      narration
+        ? scene.delivery === 'on_screen'
+          ? `Who speaks: ${scene.speaker?.trim() || 'the person in the shot'}, on camera. Their lips must move in sync with the words; lips out of sync, a different person speaking, or the words coming from an unseen narrator are major problems.`
+          : 'Who speaks: an off-screen voice-over narrator. No one in the shot should speak: a closed or still mouth is correct, and a person visibly mouthing the narration is a minor problem.'
+        : null,
       pronunciation ? `Pronunciation guide (the same words with vowel marks, numbers written out): "${pronunciation}". Judge the pronunciation against this guide.` : null,
       `Intended picture: ${scene.visualPrompt}`,
       ...(references.length ? [`After the video come ${references.length} reference image(s) the clip was made from:`, ...references.map(referenceRule)] : []),
@@ -93,7 +98,7 @@ export function buildClipQaPrompt(
 export interface CheckAdStudioClipParams {
   clip: AdStudioClipModel;
   /** The scene the clip renders, as it reads now; null when the scene was deleted (the check is then skipped). */
-  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation'> | null;
+  scene: Pick<AdStudioScene, 'visualPrompt' | 'voiceover' | 'pronunciation' | 'delivery' | 'speaker'> | null;
   /** The images the scene was rendered with, in order; the reviewer compares the clip with them. */
   references?: readonly (AdStudioQaReference & { image: AdStudioMediaInput })[];
   language: string;
