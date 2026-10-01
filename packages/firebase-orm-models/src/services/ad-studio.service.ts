@@ -25,6 +25,7 @@ import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { deleteAdStudioBriefMedia } from './ad-studio-video.service';
 import { deleteAdStudioBriefImages } from './ad-studio-image.service';
+import { deleteAdStudioBriefReferences, unknownSceneReferences } from './ad-studio-reference.service';
 import { deleteAdStudioBriefRuns } from './ad-studio-run.service';
 
 /** Limits a project starts with until an admin changes them. */
@@ -211,6 +212,8 @@ export async function saveAdStudioScript(params: {
   const issues = validateAdStudioScenes(params.scenes);
   if (issues.length) throw new AdStudioScriptInvalidError(issues);
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  const unknown = await unknownSceneReferences(params.organizationId, params.projectId, params.briefId, params.scenes);
+  if (unknown.length) throw new AdStudioScriptInvalidError(unknown);
   // A pronunciation sent back unchanged for narration that changed belongs to the old words. It is
   // dropped here so every client (the editor, MCP, the generator) follows the same rule.
   brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map((scene) => ({ ...scene }));
@@ -272,10 +275,11 @@ export async function saveAdStudioPlan(params: {
 export async function deleteAdStudioBrief(params: { organizationId: string; projectId: string; briefId: string; actorId: string; actorType?: 'user' | 'api_key' }): Promise<void> {
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
   await brief.remove();
-  // Its clips, assembled videos, images and autopilot runs go with it; the engine removes their stored files.
+  // Its clips, assembled videos, images, reference images and autopilot runs go with it; the engine removes their stored files.
   await Promise.all([
     deleteAdStudioBriefMedia(params.organizationId, params.projectId, params.briefId),
     deleteAdStudioBriefImages(params.organizationId, params.projectId, params.briefId),
+    deleteAdStudioBriefReferences(params.organizationId, params.projectId, params.briefId),
     deleteAdStudioBriefRuns(params.organizationId, params.projectId, params.briefId),
   ]);
   try {
@@ -399,7 +403,8 @@ export function utcDay(now?: Date): string {
 }
 
 const VIDEO_KINDS: ReadonlySet<AdStudioUsageKind> = new Set(['video_scene', 'video_edit']);
-const IMAGE_KINDS: ReadonlySet<AdStudioUsageKind> = new Set(['image', 'image_edit']);
+/** An AI illustration for a scene counts toward the image limit like any other image. */
+const IMAGE_KINDS: ReadonlySet<AdStudioUsageKind> = new Set(['image', 'image_edit', 'reference_image']);
 
 export interface AdStudioUsageToday {
   day: string;

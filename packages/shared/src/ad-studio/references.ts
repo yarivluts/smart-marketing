@@ -59,7 +59,8 @@ export function sniffReferenceMimeType(bytes: Uint8Array): AdStudioReferenceMime
   return null;
 }
 
-export type AdStudioReferenceIssueCode = 'too_many_references' | 'duplicate_reference' | 'invalid_reference_use' | 'two_first_frames';
+/** `unknown_reference` - the image is not a ready image of the ad's library - is checked where the library is. */
+export type AdStudioReferenceIssueCode = 'too_many_references' | 'duplicate_reference' | 'invalid_reference_use' | 'two_first_frames' | 'unknown_reference';
 
 /** The rules one scene's references break (the image ids are checked against the library by the caller). */
 export function sceneReferenceIssues(references: readonly AdStudioSceneReference[] | undefined): AdStudioReferenceIssueCode[] {
