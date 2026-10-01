@@ -334,6 +334,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   initialScenes={selected.scenes}
                   generatedByModel={selected.scriptGeneratedBy?.model ?? null}
                   aiAvailable={providers.text !== null}
+                  language={selected.language}
                 />
               </div>
               <ImageStudio

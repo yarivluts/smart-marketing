@@ -136,6 +136,52 @@ describe('Ad Studio routes', () => {
     expect(await patched.json()).toMatchObject({ error: 'invalid_brief' });
   });
 
+  it('Hebrew narration is vocalized when saved and generated, kept while it stands, redone once it changes, and never blocks a save', async () => {
+    const { ownerSession, orgId, projectId } = await setup();
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const created = await createBrief(request('POST', { ...BRIEF, language: 'he' }), { params: Promise.resolve({ orgId, projectId }) });
+    const briefId = ((await created.json()) as { brief: { id: string } }).brief.id;
+    const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
+    // Hebrew as escapes (no Hebrew in code files): a word, and the same word with nikud.
+    const plain = 'שלום';
+    const vocalized = 'שָׁלוֹם';
+    const scene = (voiceover: string, pronunciation?: string) => ({ id: 'a', durationSeconds: 5, visualPrompt: 'A desk', voiceover, onScreenText: '', ...(pronunciation ? { pronunciation } : {}) });
+    const vocalizations = () => listAdStudioUsage(orgId, projectId).then((rows) => rows.filter((row) => row.kind === 'vocalize'));
+
+    // The vocalizer answers with the nikud form of whatever lines it is sent.
+    const vocalizer = vi.fn(async (_url: string, init: RequestInit) => {
+      const prompt = (JSON.parse(String(init.body)) as { contents: { parts: { text: string }[] }[] }).contents[0].parts[0].text;
+      expect(prompt).toContain('Lines to vocalize');
+      const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
+      const answer = { lines: lines.map((line) => ({ id: line.id, pronunciation: line.text.split(plain).join(vocalized) })) };
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', vocalizer);
+    const saved = await saveScript(request('PUT', { scenes: [scene(plain), { ...scene(''), id: 'b' }] }), params);
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { brief: { scenes: { pronunciation?: string }[] } }).brief.scenes.map((entry) => entry.pronunciation)).toEqual([vocalized, undefined]);
+    expect(vocalizer).toHaveBeenCalledTimes(1);
+    expect(await vocalizations()).toEqual([expect.objectContaining({ outcome: 'succeeded', provider: 'gemini' })]);
+
+    // Saved again as it stands: nothing to vocalize, no call.
+    expect((await saveScript(request('PUT', { scenes: [scene(plain, vocalized)] }), params)).status).toBe(200);
+    expect(vocalizer).toHaveBeenCalledTimes(1);
+
+    // The narration changed under an unchanged pronunciation and the model is out of credit: saved, without it.
+    geminiReplies({ status: 402, message: 'Your prepayment credits are depleted.' });
+    expect((await saveScript(request('PUT', { scenes: [scene(`${plain} ${plain}`, vocalized)] }), params)).status).toBe(200);
+    expect((await getAdStudioBrief(orgId, projectId, briefId)).scenes[0]).toEqual(scene(`${plain} ${plain}`));
+    expect((await vocalizations()).map((row) => row.outcome).sort()).toEqual(['failed', 'succeeded']);
+
+    // A generated script comes back vocalized: the script call, then the vocalizer.
+    const generatedScene = { durationSeconds: 5, visualPrompt: 'A phone', voiceover: `${plain} 2`, onScreenText: '' };
+    const script = vi.fn(async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ title: 'Ad', scenes: [generatedScene] }) }] } }] }), { status: 200 }));
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => (String(init.body).includes('Lines to vocalize') ? vocalizer(url, init) : script())));
+    const generated = await generateScript(request('POST'), params);
+    expect(generated.status).toBe(200);
+    expect(((await generated.json()) as { brief: { scenes: { pronunciation?: string }[] } }).brief.scenes[0].pronunciation).toBe(`${vocalized} 2`);
+  });
+
   it('a scene rewrite is a proposal: returned with the same id, the saved script untouched', async () => {
     const { ownerSession, orgId, projectId } = await setup();
     const briefId = await createBriefAs(ownerSession, orgId, projectId);

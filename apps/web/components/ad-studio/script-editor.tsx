@@ -7,6 +7,7 @@ import {
   AD_STUDIO_MAX_SCENES,
   AD_STUDIO_SCENE_MAX_SECONDS,
   AD_STUDIO_SCENE_MIN_SECONDS,
+  isHebrewLanguage,
   validateAdStudioScenes,
   type AdStudioScene,
   type AdStudioSceneIssue,
@@ -25,6 +26,8 @@ export interface ScriptEditorProps {
   generatedByModel: string | null;
   /** False when no text model is configured for the deployment. */
   aiAvailable: boolean;
+  /** The ad language; Hebrew narration gets a pronunciation (nikud) field. */
+  language?: string;
 }
 
 function newScene(): AdStudioScene {
@@ -42,7 +45,7 @@ function issueText(t: ReturnType<typeof useTranslations>, issue: AdStudioSceneIs
  * or proposes a rewrite of one scene that the person keeps or discards - it never overwrites work
  * silently.
  */
-export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generatedByModel, aiAvailable }: ScriptEditorProps): React.ReactElement {
+export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generatedByModel, aiAvailable, language = 'en' }: ScriptEditorProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -62,6 +65,15 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
 
   const issues = validateAdStudioScenes(scenes);
   const dirty = JSON.stringify(scenes) !== savedJson;
+  const hebrew = isHebrewLanguage(language);
+  const savedById = React.useMemo(() => new Map((JSON.parse(savedJson) as AdStudioScene[]).map((scene) => [scene.id, scene])), [savedJson]);
+
+  /** The narration changed since the save but the pronunciation did not: the server redoes it. */
+  function pronunciationStale(scene: AdStudioScene): boolean {
+    const saved = savedById.get(scene.id);
+    const pronunciation = (scene.pronunciation ?? '').trim();
+    return Boolean(saved && pronunciation && saved.voiceover.trim() !== scene.voiceover.trim() && pronunciation === (saved.pronunciation ?? '').trim());
+  }
 
   function update(sceneId: string, patch: Partial<AdStudioScene>): void {
     setScenes((current) => current.map((scene) => (scene.id === sceneId ? { ...scene, ...patch } : scene)));
@@ -87,6 +99,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
         setMessage({ tone: 'error', text: errorMessage(body) });
         return;
       }
+      // The saved script can differ from what was sent: Hebrew narration comes back vocalized.
+      if (body.brief?.scenes) setScenes(body.brief.scenes);
       setSavedJson(JSON.stringify(body.brief?.scenes ?? scenes));
       setMessage({ tone: 'ok', text: t('scriptSaved') });
       router.refresh();
@@ -277,6 +291,22 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                     />
                   </label>
                 </div>
+                {(hebrew || scene.pronunciation) && scene.voiceover.trim() ? (
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground" data-testid={`ad-studio-pronunciation-${index + 1}`}>
+                    {t('pronunciation')}
+                    <textarea
+                      value={scene.pronunciation ?? ''}
+                      onChange={(event) => update(scene.id, { pronunciation: event.target.value })}
+                      rows={2}
+                      dir="auto"
+                      lang={hebrew ? 'he' : undefined}
+                      className="rounded-xl border border-input bg-background px-3 py-2 text-base leading-relaxed text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                    <span className={cn('font-normal', pronunciationStale(scene) ? 'text-warning' : undefined)}>
+                      {pronunciationStale(scene) ? t('pronunciationStale') : scene.pronunciation?.trim() ? t('pronunciationHint') : t('pronunciationAuto')}
+                    </span>
+                  </label>
+                ) : null}
 
                 {rewriting ? (
                   <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3" data-testid="ad-studio-rewrite">

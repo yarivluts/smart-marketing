@@ -3712,7 +3712,8 @@
       "scene_too_long": "Scene {scene} is longer than 10 seconds.",
       "scene_not_whole_seconds": "Scene {scene} must be whole seconds.",
       "empty_visual_prompt": "Scene {scene} needs a description of what the camera shows.",
-      "duplicate_scene_id": "Scene {scene} duplicates another scene."
+      "duplicate_scene_id": "Scene {scene} duplicates another scene.",
+      "pronunciation_too_long": "The pronunciation of scene {scene} is too long."
     },
     "addScene": "Add scene",
     "saving": "Saving...",
@@ -3781,7 +3782,8 @@
       "image_concepts": "Image ideas",
       "image": "Image",
       "image_edit": "Image edit",
-      "video_qa": "AI video check"
+      "video_qa": "AI video check",
+      "vocalize": "Narration nikud"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4302,7 +4304,11 @@
       "qaDescription": "Gemini watches every rendered clip, compares the narration with the script and looks for embarrassing mistakes. The autopilot re-renders a scene that fails.",
       "qaEnabled": "Check every clip",
       "qaRetries": "Automatic re-renders per scene"
-    }
+    },
+    "pronunciation": "Pronunciation (with nikud)",
+    "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
+    "pronunciationHint": "This is what the narrator reads. Fix any word that is vocalized wrong.",
+    "pronunciationStale": "The narration changed - the pronunciation will be redone when you save."
   },
   "MetaConnect": {
     "title": "Connect with Facebook",
