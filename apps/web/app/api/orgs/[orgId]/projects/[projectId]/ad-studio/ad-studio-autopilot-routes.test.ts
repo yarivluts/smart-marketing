@@ -11,6 +11,7 @@ import {
   createSharedCredential,
   ensureUserForFirebaseSession,
   getAdStudioUsageToday,
+  listAdStudioClips,
   inviteMemberToOrganization,
   listAdStudioExports,
   pushResourceAttachment,
@@ -81,7 +82,8 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 9, 9]);
  * synchronous, inline PNG), Gemini Omni video (`interactions` in the background, polled, then a
  * Files API download), and Google Ads OAuth + `assets:mutate` for an image export.
  */
-function fakeGoogle(options: { imageStatus?: number; imageMessage?: string } = {}) {
+function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown } = {}) {
+  let reviews = 0;
   const calls: { url: string; body: Record<string, unknown> | null }[] = [];
   const fileReads = new Map<string, number>();
   let omniStarts = 0;
@@ -95,6 +97,10 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string } = {
     expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-gemini-key');
     if (url.endsWith(':generateContent')) {
       const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
+      if (schema.includes('"transcript"')) {
+        reviews += 1;
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(options.qa ? options.qa(reviews) : { transcript: '', issues: [] }) }] } }] });
+      }
       const answer = schema.includes('"concepts"')
         ? { concepts: [{ visualPrompt: 'A lawyer signing on a phone in a bright office', headline: 'Sign in 30 seconds', formats: ['square', 'story', 'landscape'] }] }
         : {
@@ -130,7 +136,7 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string } = {
     return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { calls, fetchMock };
+  return { calls, fetchMock, reviews: () => reviews };
 }
 
 function unique(prefix: string): string {
@@ -357,6 +363,32 @@ describe('autopilot routes', () => {
     const finished = await drive(ctx, run.id);
     expect(finished.status).toBe('done');
     expect(finished.steps.find((step) => step.id === 'images')).toMatchObject({ status: 'done', progress: { done: 1, total: 1 } });
+  });
+
+  it('waits for the AI check of every clip, re-renders a scene that fails it once, and finishes with qa_issues if it fails again', async () => {
+    const STUTTER = { transcript: 'To-too much paper?', issues: [{ kind: 'audio', severity: 'major', detail: 'Stutter', atSeconds: 0.1 }] };
+    // Scene 1 fails the check on both renders; scene 2 passes.
+    const google = fakeGoogle({ qa: (n) => (n === 1 || n === 3 ? STUTTER : { transcript: 'Sign in seconds.', issues: [] }) });
+    const ctx = await setup();
+    await saveScript(
+      request('PUT', {
+        scenes: [
+          { id: 's1', durationSeconds: 5, visualPrompt: 'A lawyer at a desk', voiceover: 'Too much paper?', onScreenText: '' },
+          { id: 's2', durationSeconds: 8, visualPrompt: 'The lawyer signs on a phone', voiceover: 'Sign in seconds.', onScreenText: '' },
+        ],
+      }),
+      ctx.p(),
+    );
+    const run = ((await (await startRun(request('POST', { options: { plan: false, images: false, video: true, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    const finished = await drive(ctx, run.id);
+    expect(finished.status).toBe('done');
+    expect(finished.steps.find((step) => step.id === 'clips')).toMatchObject({ status: 'done', reason: 'qa_issues' });
+    expect(finished.steps.find((step) => step.id === 'assemble')).toMatchObject({ status: 'done' });
+    // Two renders of scene 1 (the first and one automatic retry), one of scene 2, and every clip checked once.
+    const clips = await listAdStudioClips(ctx.orgId, ctx.projectId, ctx.briefId);
+    expect(clips.filter((clip) => clip.scene_id === 's1').map((clip) => clip.qa_status)).toEqual(['issues', 'issues']);
+    expect(clips.filter((clip) => clip.scene_id === 's2').map((clip) => clip.qa_status)).toEqual(['passed']);
+    expect(google.reviews()).toBe(3);
   });
 
   it('a waiting plan can be discarded without creating anything', async () => {

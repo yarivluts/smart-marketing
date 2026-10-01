@@ -67,8 +67,9 @@ const BASE = 'https://generativelanguage.googleapis.com/v1beta';
  * `in_progress`, the next interaction read is `completed` with the video in the model_output step,
  * the file is PROCESSING once and then ACTIVE, and the download returns bytes.
  */
-function fakeOmni(options: { startStatus?: number; startMessage?: string } = {}) {
+function fakeOmni(options: { startStatus?: number; startMessage?: string; qa?: (n: number) => unknown } = {}) {
   const starts: Record<string, unknown>[] = [];
+  const reviews: { parts: Record<string, unknown>[] }[] = [];
   const fileReads = new Map<string, number>();
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
@@ -79,6 +80,11 @@ function fakeOmni(options: { startStatus?: number; startMessage?: string } = {})
       if (options.startStatus) return new Response(JSON.stringify({ error: { message: options.startMessage ?? 'failed' } }), { status: options.startStatus });
       starts.push(JSON.parse(String(init.body)));
       return Response.json({ id: `v1_${starts.length}`, status: 'in_progress' });
+    }
+    if (url.endsWith(':generateContent') && options.qa) {
+      const body = JSON.parse(String(init?.body)) as { contents: { parts: Record<string, unknown>[] }[] };
+      reviews.push({ parts: body.contents[0].parts });
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(options.qa(reviews.length)) }] } }] });
     }
     const interaction = /\/interactions\/(v1_\d+)$/.exec(url);
     if (interaction) {
@@ -96,7 +102,7 @@ function fakeOmni(options: { startStatus?: number; startMessage?: string } = {})
     return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { fetchMock, starts };
+  return { fetchMock, starts, reviews };
 }
 
 function unique(prefix: string): string {
@@ -140,7 +146,16 @@ async function setup() {
   return { ownerSession, owner, orgId, projectId, briefId, p };
 }
 
-type ClipJson = { id: string; sceneId: string; status: string; version: number; kind: string; failureReason: string | null; instruction: string | null };
+type ClipJson = {
+  id: string;
+  sceneId: string;
+  status: string;
+  version: number;
+  kind: string;
+  failureReason: string | null;
+  instruction: string | null;
+  qa: { status: string; issues: { kind: string; severity: string; detail: string; atSeconds: number | null }[]; transcript: string | null } | null;
+};
 type Listing = { clips: ClipJson[]; videos: { id: string; status: string; durationSeconds: number; clipIds: string[] }[] };
 
 async function poll(p: ReturnType<Awaited<ReturnType<typeof setup>>['p']>): Promise<Listing> {
@@ -180,6 +195,58 @@ describe('Ad Studio video routes (KAN-231)', () => {
     const partial = await clipMedia(request('GET', undefined, { range: 'bytes=0-2' }), ctx.p({ clipId }));
     expect(partial.status).toBe(206);
     expect(await partial.text()).toBe('mp4');
+  });
+
+  it('checks each ready clip with AI on a status poll: a clean clip passes, a stuttered one is marked with what was heard', async () => {
+    const ctx = await setup();
+    const verdicts = [
+      { transcript: 'Too much paper?', issues: [] },
+      {
+        transcript: 'ma-ma Too much paper?',
+        issues: [
+          { kind: 'audio', severity: 'major', detail: 'Stutter on the first word', atSeconds: 0.2 },
+          { kind: 'visual', severity: 'minor', detail: 'Slight blur', atSeconds: null },
+        ],
+      },
+    ];
+    const { reviews } = fakeOmni({ qa: (n) => verdicts[n - 1] });
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    let listing = await poll(ctx.p());
+    for (let i = 0; i < 3 && !listing.clips[0].qa; i += 1) listing = await poll(ctx.p());
+    expect(listing.clips[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', issues: [], transcript: 'Too much paper?' } });
+    // The reviewer got the stored clip as video bytes, with the scene's narration in the prompt.
+    expect(reviews[0].parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: Buffer.from('mp4-bytes-of-f1').toString('base64') } });
+    expect(String(reviews[0].parts[1].text)).toContain('Intended narration, word for word: "Too much paper?"');
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).find((row) => row.kind === 'video_qa')).toMatchObject({ units: 1, outcome: 'succeeded' });
+    // Later polls do not check the same clip again.
+    await poll(ctx.p());
+    expect(reviews).toHaveLength(1);
+
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    for (let i = 0; i < 4; i += 1) listing = await poll(ctx.p());
+    const newest = listing.clips.find((clip) => clip.version === 2) as ClipJson;
+    expect(newest.qa).toMatchObject({
+      status: 'issues',
+      transcript: 'ma-ma Too much paper?',
+      issues: [
+        { kind: 'audio', severity: 'major', detail: 'Stutter on the first word', atSeconds: 0.2 },
+        { kind: 'visual', severity: 'minor', detail: 'Slight blur', atSeconds: null },
+      ],
+    });
+  });
+
+  it('marks clips skipped when the project turns the check off, without calling the reviewer', async () => {
+    const ctx = await setup();
+    const { reviews } = fakeOmni({ qa: () => ({ transcript: '', issues: [] }) });
+    const saved = await putSettings(request('PUT', { dailyTextGenerations: 50, dailyVideoSeconds: 300, videoQa: { enabled: false, retries: 1 } }), {
+      params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }),
+    });
+    expect(saved.status).toBe(200);
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    let listing = await poll(ctx.p());
+    for (let i = 0; i < 3 && !listing.clips[0].qa; i += 1) listing = await poll(ctx.p());
+    expect(listing.clips[0].qa).toMatchObject({ status: 'skipped', issues: [] });
+    expect(reviews).toHaveLength(0);
   });
 
   it('a depleted Gemini account is reported as provider_billing, the clip reads failed, and the usage is logged', async () => {

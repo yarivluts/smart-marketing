@@ -101,6 +101,7 @@ export async function setAdStudioSettings(params: {
   dailyTextGenerations: number;
   dailyVideoSeconds: number;
   dailyImages?: number;
+  videoQa?: { enabled: boolean; retries: number };
   actorId: string;
 }): Promise<AdStudioSettingsView> {
   await ensureFirestoreOrm();

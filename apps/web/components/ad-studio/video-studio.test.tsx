@@ -32,6 +32,7 @@ function clip(id: string, sceneId: string, version: number, status: AdStudioClip
     instruction: null,
     requestedOn: '2026-09-27T10:00:00.000Z',
     completedOn: null,
+    qa: null,
     ...extra,
   };
 }
