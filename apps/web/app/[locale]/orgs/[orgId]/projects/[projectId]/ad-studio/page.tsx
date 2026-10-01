@@ -189,11 +189,12 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
               id: slot.selected.id,
               label: `${t('images.ideaLabel', { index: conceptIndex(slot.conceptId) })} · ${t(`images.format.${slot.format}`)}`,
               previewSrc: `${mediaBase}/images/${slot.selected.id}/media`,
+              copy: selected?.imageConcepts.find((concept) => concept.id === slot.conceptId)?.copy ?? null,
             },
           ]
         : [],
     ),
-    ...(exportableVideo ? [{ key: 'video', kind: 'video' as const, id: exportableVideo.id, label: t('publish.video'), previewSrc: `${mediaBase}/videos/${exportableVideo.id}/media` }] : []),
+    ...(exportableVideo ? [{ key: 'video', kind: 'video' as const, id: exportableVideo.id, label: t('publish.video'), previewSrc: `${mediaBase}/videos/${exportableVideo.id}/media`, copy: selected?.videoCopy ?? null }] : []),
   ];
   const publishedAds = exportsView.filter((row) => row.resultKind === 'ad');
   const stepHref = (id: AdStudioStepId) => `${base}?brief=${selected?.id}&step=${id}`;
@@ -415,6 +416,9 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   initialVideos={videos}
                   videoAvailable={videoAvailable}
                   videoSecondsLeft={Math.max(0, settings.dailyVideoSeconds - usageToday.videoSeconds)}
+                  videoCopy={selected.videoCopy}
+                  advertiser={selected.name}
+                  textAvailable={providers.text !== null}
                 />
               </div>
             </>

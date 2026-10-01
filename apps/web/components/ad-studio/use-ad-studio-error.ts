@@ -39,6 +39,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'assembly_failed' && body.code && ASSEMBLY_CODES.has(body.code)) return t(`assemblyErrors.${body.code}`);
     if (body.error === 'image_request' && body.code && IMAGE_REQUEST_CODES.has(body.code)) return t(`images.requestErrors.${body.code}`);
     if (body.error === 'invalid_concepts') return t('images.errorInvalidConcepts');
+    if (body.error === 'invalid_copy') return t('copy.errorInvalid');
     if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');
     if (body.error === 'invalid_options') return t('autopilot.errorInvalidOptions');

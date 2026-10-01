@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -81,6 +81,10 @@ export class AdStudioBriefModel extends BaseModel {
   @Field({ is_required: false })
   public image_concepts_generated_by?: AdStudioGeneratedBy | null;
 
+  /** The ad copy that runs next to the assembled video in the feed (KAN-278); absent until written. */
+  @Field({ is_required: false })
+  public video_copy?: AdStudioAdCopy | null;
+
   @Field({ is_required: true })
   public created_by!: string;
 
@@ -142,7 +146,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**

@@ -7,6 +7,7 @@ import {
   type AdStudioFormat,
   type AdStudioScene,
 } from './scenes';
+import { AD_COPY_RULES } from './copy';
 
 /** What a person tells the studio about the ad they want. */
 export interface AdStudioBriefInput {
@@ -66,6 +67,9 @@ export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioSc
       'You write scripts for short video ads that are generated scene by scene with an AI video model.',
       'Rules:',
       ...SCRIPT_RULES.map((rule) => `- ${rule}`),
+      // Read at call time, not at module load: copy.ts imports this module (KAN-278).
+      '- copy is the ad text that runs next to the finished video in the feed.',
+      ...AD_COPY_RULES.map((rule) => `- ${rule}`),
     ].join('\n'),
     user: [
       `Ad name: ${brief.name}`,

@@ -18,6 +18,9 @@ import { PUT as saveScript } from './briefs/[briefId]/script/route';
 import { POST as generateScript } from './briefs/[briefId]/script/generate/route';
 import { POST as rewriteScene } from './briefs/[briefId]/scenes/[sceneId]/rewrite/route';
 import { PUT as putSettings } from './settings/route';
+import { POST as generateConcepts } from './briefs/[briefId]/image-concepts/generate/route';
+import { PUT as saveCopy } from './briefs/[briefId]/copy/route';
+import { POST as writeCopy } from './briefs/[briefId]/copy/generate/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -180,6 +183,57 @@ describe('Ad Studio routes', () => {
     const generated = await generateScript(request('POST'), params);
     expect(generated.status).toBe(200);
     expect(((await generated.json()) as { brief: { scenes: { pronunciation?: string }[] } }).brief.scenes[0].pronunciation).toBe(`${vocalized} 2`);
+  });
+
+  it('ad copy: ideas come with it, the AI fills only what is missing in one call, a person edits it within the limits', async () => {
+    const { ownerSession, orgId, projectId } = await setup();
+    const briefId = await createBriefAs(ownerSession, orgId, projectId);
+    const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
+    await saveScript(request('PUT', { scenes: [{ id: 's1', durationSeconds: 5, visualPrompt: 'A lawyer signs on a phone', voiceover: 'Sign in seconds', onScreenText: '' }] }), params);
+    type Brief = { videoCopy: unknown; imageConcepts: { id: string; copy?: unknown }[] };
+
+    const ideaCopy = { headline: 'Sign in 30 seconds', primaryText: 'Upload, send, signed.', description: 'Start free' };
+    geminiReplies(
+      JSON.stringify({
+        concepts: [
+          { visualPrompt: 'A phone with a green check', headline: '', formats: ['square'], copy: ideaCopy },
+          { visualPrompt: 'A desk without paper', headline: '', formats: ['square'] },
+        ],
+      }),
+    );
+    const ideas = (await (await generateConcepts(request('POST', {}), params)).json()) as { concepts: { id: string; copy?: unknown }[] };
+    expect(ideas.concepts.map((concept) => concept.copy ?? null)).toEqual([ideaCopy, null]);
+    const [first, second] = ideas.concepts.map((concept) => concept.id);
+
+    // One call writes the video's copy and the second idea's; the first idea keeps its own.
+    const fetchMock = geminiReplies(
+      JSON.stringify({
+        items: [
+          { key: 'video', headline: 'E-sign for lawyers, a much longer headline than allowed', primaryText: 'Clients sign from WhatsApp.', description: '' },
+          { key: second, headline: 'No more paper', primaryText: 'Every contract signed online.', description: 'Try it free' },
+        ],
+      }),
+    );
+    const written = (await (await writeCopy(request('POST', {}), params)).json()) as { brief: Brief };
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const sent = String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body);
+    expect(sent).toContain('\\"key\\":\\"video\\"');
+    expect(sent).not.toContain(first);
+    expect(written.brief.videoCopy).toEqual({ headline: 'E-sign for lawyers, a much', primaryText: 'Clients sign from WhatsApp.', description: '' });
+    expect(written.brief.imageConcepts.map((concept) => (concept.copy as { headline: string } | undefined)?.headline)).toEqual(['Sign in 30 seconds', 'No more paper']);
+    expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'ad_copy')).toHaveLength(1);
+
+    // Nothing missing: no call.
+    const idle = geminiReplies();
+    expect((await writeCopy(request('POST', {}), params)).status).toBe(200);
+    expect(idle).not.toHaveBeenCalled();
+
+    const tooLong = await saveCopy(request('PUT', { conceptCopies: { [first]: { headline: 'x'.repeat(31), primaryText: '', description: '' } } }), params);
+    expect(tooLong.status).toBe(400);
+    expect(await tooLong.json()).toEqual({ error: 'invalid_copy', issues: [{ code: 'copy_headline_too_long', target: first }] });
+    const edited = (await (await saveCopy(request('PUT', { videoCopy: null, conceptCopies: { [first]: { headline: 'Signed. Done.', primaryText: 'x', description: '' } } }), params)).json()) as { brief: Brief };
+    expect(edited.brief.videoCopy).toBeNull();
+    expect(edited.brief.imageConcepts[0].copy).toEqual({ headline: 'Signed. Done.', primaryText: 'x', description: '' });
   });
 
   it('a scene rewrite is a proposal: returned with the same id, the saved script untouched', async () => {

@@ -3789,7 +3789,8 @@
       "image_edit": "Image edit",
       "video_qa": "AI video check",
       "vocalize": "Narration nikud",
-      "reference_image": "Scene illustration"
+      "reference_image": "Scene illustration",
+      "ad_copy": "Ad text"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4221,7 +4222,10 @@
         "headline_too_long": "The headline is too long.",
         "no_formats": "Pick at least one placement.",
         "unknown_format": "Unknown placement.",
-        "duplicate_concept_id": "Duplicate idea."
+        "duplicate_concept_id": "Duplicate idea.",
+        "copy_headline_too_long": "The headline is longer than 30 characters.",
+        "copy_primary_text_too_long": "The main text is longer than 90 characters.",
+        "copy_description_too_long": "The description is longer than 90 characters."
       },
       "requestErrors": {
         "concept_not_found": "That idea is no longer saved.",
@@ -4387,7 +4391,27 @@
         "library_full": "This ad already has the most images it can hold. Delete one first."
       }
     },
-    "sceneHasIssues": "{count, plural, one {# problem} other {# problems}}"
+    "sceneHasIssues": "{count, plural, one {# problem} other {# problems}}",
+    "copy": {
+      "sponsored": "Sponsored",
+      "missingPrimary": "No ad text yet - without it the picture does not carry the message.",
+      "missingHeadline": "No headline yet",
+      "cta": "Learn more",
+      "headline": "Headline",
+      "primaryText": "Main text (above the picture)",
+      "description": "Description (under the headline)",
+      "save": "Save text",
+      "cancel": "Cancel",
+      "edit": "Edit text",
+      "write": "Write the text with AI",
+      "rewrite": "Rewrite with AI",
+      "errorInvalid": "The ad text is too long for the platforms.",
+      "issue": {
+        "copy_headline_too_long": "The headline is longer than 30 characters.",
+        "copy_primary_text_too_long": "The main text is longer than 90 characters.",
+        "copy_description_too_long": "The description is longer than 90 characters."
+      }
+    }
   },
   "MetaConnect": {
     "title": "Connect with Facebook",

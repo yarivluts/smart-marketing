@@ -1,13 +1,16 @@
 import { z } from 'zod/v4';
+import { AdCopySchema } from './copy-writing';
 import {
   buildSceneRewritePrompt,
   buildScriptPrompt,
+  fitAdCopy,
   fitAdStudioScenes,
+  isAdCopyEmpty,
   planToScriptContext,
   type AdStudioScene,
   type AdStudioScriptContext,
 } from '@growthos/shared';
-import { adStudioBriefInput, getAdStudioBrief, newAdStudioSceneId, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { adStudioBriefInput, getAdStudioBrief, newAdStudioSceneId, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
 import { ensureOrm } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
@@ -23,6 +26,7 @@ const GeneratedSceneSchema = z.object({
 export const GeneratedScriptSchema = z.object({
   title: z.string(),
   scenes: z.array(GeneratedSceneSchema),
+  copy: AdCopySchema.optional().describe('The ad text that runs next to the finished video in the feed, in the ad language (KAN-278).'),
 });
 
 export type GeneratedScript = z.infer<typeof GeneratedScriptSchema>;
@@ -54,6 +58,9 @@ export async function generateAdStudioScript(
   if (scenes.length === 0 || scenes.some((scene) => scene.visualPrompt.length === 0)) {
     throw new AdStudioProviderError('invalid_output', 'The model returned a scene without a visual description.');
   }
+  // The video's ad copy comes with the script; a person's own copy is never replaced by a new script.
+  const videoCopy = fitAdCopy(generated.copy);
+  if (videoCopy && isAdCopyEmpty(brief.video_copy)) await saveAdStudioCopy({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, videoCopy });
   // Hebrew narration is vocalized before it is stored (best effort - see the vocalizer).
   return saveAdStudioScriptWithPronunciation({
     organizationId: ctx.organizationId,

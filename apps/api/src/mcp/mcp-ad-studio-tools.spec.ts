@@ -39,6 +39,11 @@ beforeEach(() => {
     if (url.endsWith(':generateContent')) {
       const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
       const prompt = (body?.contents as { parts: { text: string }[] }[] | undefined)?.[0]?.parts?.[0]?.text ?? '';
+      if (schema.includes('"key"')) {
+        // The copywriter: one entry per creative it was asked about.
+        const targets = JSON.parse(prompt.split('\n').at(-1) as string) as { key: string }[];
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items: targets.map((target) => ({ key: target.key, headline: `Head ${target.key}`.slice(0, 30), primaryText: 'Sign from WhatsApp.', description: '' })) }) }] } }] });
+      }
       if (schema.includes('"lines"')) {
         // The vocalizer: every line comes back with a marker standing in for the nikud.
         const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
@@ -192,6 +197,27 @@ describe('Ad Studio MCP tools', () => {
     const state = await json<{ scenes: Scene[] }>('get_ad_brief', { brief_id: ad.id });
     expect(state.scenes[0].references).toEqual([{ image_id: drawn.image_id, use: 'subject' }]);
     expect((await json<{ today: { images: number } }>('get_ad_studio_usage')).today.images).toBe(1);
+  });
+
+  it('lets an agent write the ad copy of every creative, read it in get_ad_brief, edit it and clear it', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    await json('save_ad_script', { brief_id: ad.id, scenes: [{ id: 's1', duration_seconds: 5, visual_prompt: 'A desk', voiceover: 'Sign fast', on_screen_text: '' }] });
+    const ideas = await json<{ id: string }[]>('save_ad_image_ideas', { brief_id: ad.id, ideas: [{ id: 'c1', visual_prompt: 'A phone', headline: '', formats: ['square'] }] });
+    type Copy = { headline: string; primary_text: string; description: string } | null;
+    const written = await json<{ video: Copy; image_ideas: { id: string; copy: Copy }[] }>('write_ad_copy', { brief_id: ad.id });
+    expect(written.video).toEqual({ headline: 'Head video', primary_text: 'Sign from WhatsApp.', description: '' });
+    expect(written.image_ideas).toEqual([{ id: ideas[0].id, copy: { headline: `Head ${ideas[0].id}`.slice(0, 30), primary_text: 'Sign from WhatsApp.', description: '' } }]);
+
+    const edited = await json<{ video: Copy }>('save_ad_copy', { brief_id: ad.id, video_copy: { headline: 'Signed. Done.', primary_text: 'x', description: 'y' } });
+    expect(edited.video).toEqual({ headline: 'Signed. Done.', primary_text: 'x', description: 'y' });
+    const state = await json<{ video: { copy: Copy }; image_ideas: { copy: Copy }[] }>('get_ad_brief', { brief_id: ad.id });
+    expect(state.video.copy?.headline).toBe('Signed. Done.');
+    expect(state.image_ideas[0].copy).not.toBeNull();
+    const tooLong = await call('save_ad_copy', { brief_id: ad.id, image_copies: { [ideas[0].id]: { headline: 'x'.repeat(31), primary_text: '', description: '' } } });
+    expect((tooLong.content[0] as { text: string }).text).toBe(`The ad copy breaks these rules: copy_headline_too_long (${ideas[0].id}).`);
+    const cleared = await json<{ image_ideas: { copy: Copy }[] }>('save_ad_copy', { brief_id: ad.id, image_copies: { [ideas[0].id]: null } });
+    expect(cleared.image_ideas[0].copy).toBeNull();
   });
 
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {

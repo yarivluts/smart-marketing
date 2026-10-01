@@ -1,5 +1,6 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
 import type { AdStudioScene } from './scenes';
+import { AD_COPY_RULES, adCopyIssues, fitAdCopy, type AdStudioAdCopy, type AdStudioAdCopyIssueCode } from './copy';
 
 /**
  * Ad Studio image ads: the static creatives that run next to the video. A brief holds a few image
@@ -44,6 +45,8 @@ export interface AdStudioImageConcept {
   headline: string;
   /** The placements to render this concept in. */
   formats: AdStudioImageFormat[];
+  /** The ad copy that runs next to this idea's images (KAN-278); absent until written. */
+  copy?: AdStudioAdCopy;
 }
 
 export type AdStudioImageConceptIssueCode =
@@ -53,7 +56,8 @@ export type AdStudioImageConceptIssueCode =
   | 'headline_too_long'
   | 'no_formats'
   | 'unknown_format'
-  | 'duplicate_concept_id';
+  | 'duplicate_concept_id'
+  | AdStudioAdCopyIssueCode;
 
 export interface AdStudioImageConceptIssue {
   code: AdStudioImageConceptIssueCode;
@@ -76,24 +80,27 @@ export function validateAdStudioImageConcepts(concepts: readonly AdStudioImageCo
     if (concept.headline.trim().length > AD_STUDIO_IMAGE_HEADLINE_MAX) issues.push({ code: 'headline_too_long', concept: at });
     if (concept.formats.length === 0) issues.push({ code: 'no_formats', concept: at });
     if (concept.formats.some((format) => !isAdStudioImageFormat(format))) issues.push({ code: 'unknown_format', concept: at });
+    for (const code of adCopyIssues(concept.copy)) issues.push({ code, concept: at });
   });
   return issues;
 }
 
 /** Fits a model's concepts to the rules: trims text, drops bad formats and extra concepts, defaults formats. */
 export function fitAdStudioImageConcepts(
-  concepts: readonly { visualPrompt: string; headline: string; formats: readonly string[] }[],
+  concepts: readonly { visualPrompt: string; headline: string; formats: readonly string[]; copy?: Partial<AdStudioAdCopy> | null }[],
   newId: () => string,
   defaultFormats: readonly AdStudioImageFormat[] = ['square', 'portrait'],
 ): AdStudioImageConcept[] {
   return concepts
     .map((concept) => {
       const formats = [...new Set(concept.formats.filter(isAdStudioImageFormat))];
+      const copy = fitAdCopy(concept.copy);
       return {
         id: newId(),
         visualPrompt: concept.visualPrompt.trim().slice(0, AD_STUDIO_IMAGE_VISUAL_MAX),
         headline: concept.headline.trim().slice(0, AD_STUDIO_IMAGE_HEADLINE_MAX),
         formats: formats.length ? formats : [...defaultFormats],
+        ...(copy ? { copy } : {}),
       };
     })
     .filter((concept) => concept.visualPrompt.length > 0)
@@ -111,6 +118,8 @@ const CONCEPT_RULES = [
   `headline is the only text drawn into the image: at most ${AD_STUDIO_IMAGE_HEADLINE_MAX} characters, in the ad language, or empty. Prefer short, concrete benefit statements.`,
   'formats lists the placements the idea suits: square and portrait for feeds, story for full-screen vertical, landscape for Google display.',
   'Do not invent facts about the product, prices, discounts, awards, statistics or testimonials. Use only what the brief and context state.',
+  'copy is the ad text that runs next to this idea in the feed (not drawn into the image); write it for every idea.',
+  ...AD_COPY_RULES,
 ];
 
 /** The instructions for proposing image concepts from a brief (and, when present, its plan and video script). */
