@@ -28,7 +28,7 @@ Template for each entry:
     - Copy has a headline (30), primary text (90) and description (90).
     - It is written by AI together with the ideas and the script, and is editable.
     - It shows as a feed-style ad preview in Review, and the publish form starts from it.
-    - MCP:  and .
+    - MCP: `write_ad_copy` and `save_ad_copy`.
   - **Prod:** copy written for both EasySign ads (Hebrew and English), for the video and 3 image ideas each.
   - **Jira:** KAN-278 Done.
 - **In progress (exact stopping point):** none.
