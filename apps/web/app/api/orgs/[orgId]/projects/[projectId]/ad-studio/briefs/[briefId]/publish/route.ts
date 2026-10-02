@@ -16,7 +16,8 @@ function text(value: unknown): string {
 
 /**
  * Creates a real ad from a finished creative on Meta or Google Ads - campaign, ad set / ad group,
- * creative and ad, all PAUSED for review on the platform - and returns it with its link. An outward
+ * creative and ad, all PAUSED for review on the platform - and returns it with its link. `source:
+ * {kind: "search"}` publishes the saved search ad and keywords as a Google Search campaign. An outward
  * change on an ad platform: gated on `automation.execute` and audited.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
@@ -33,7 +34,9 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       ? { kind: 'image', imageId: sourceRaw.imageId }
       : sourceRaw.kind === 'video' && typeof sourceRaw.videoId === 'string'
         ? { kind: 'video', videoId: sourceRaw.videoId }
-        : null;
+        : sourceRaw.kind === 'search'
+          ? { kind: 'search' }
+          : null;
   if ((destination !== 'meta' && destination !== 'google_ads') || !source) return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   const copy = (body.copy && typeof body.copy === 'object' ? body.copy : {}) as Record<string, unknown>;
   try {

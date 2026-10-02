@@ -71,6 +71,84 @@ describe('GoogleAdsHttpApiClient', () => {
     ]);
   });
 
+  it('creates a paused Google-Search-only campaign targeted by location and language, with the RSA, keywords and negatives', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/8' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/56' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{}, {}] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroups/67' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroupAds/67~78' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{}, {}] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).createSearchAdCampaign('123', {
+      name: 'Search',
+      dailyBudgetMicros: 50_000_000,
+      cpcBidMicros: 6_000_000,
+      containsEuPoliticalAdvertising: false,
+      headlines: ['A1', 'A2', 'A3'],
+      descriptions: ['D1', 'D2'],
+      path1: 'sign',
+      path2: 'now',
+      finalUrl: 'https://easysign.example',
+      keywords: [{ text: 'sign pdf', matchType: 'EXACT' }],
+      negativeKeywords: ['free'],
+      geoTargetConstants: ['geoTargetConstants/2376'],
+      languageConstants: ['languageConstants/1027'],
+    });
+    expect(result).toEqual({
+      campaignBudgetResourceName: 'customers/123/campaignBudgets/8',
+      campaignResourceName: 'customers/123/campaigns/56',
+      adGroupResourceName: 'customers/123/adGroups/67',
+      adResourceName: 'customers/123/adGroupAds/67~78',
+    });
+    const calls = fetchMock.mock.calls.slice(1).map(([url, init]) => [String(url).split('/').pop(), JSON.parse(String((init as RequestInit).body)).operations]);
+    expect(calls[1][1][0].create).toMatchObject({
+      advertisingChannelType: 'SEARCH',
+      status: 'PAUSED',
+      networkSettings: { targetGoogleSearch: true, targetSearchNetwork: false, targetContentNetwork: false, targetPartnerSearchNetwork: false },
+      containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
+    });
+    expect(calls[2]).toEqual([
+      'campaignCriteria:mutate',
+      [
+        { create: { campaign: 'customers/123/campaigns/56', location: { geoTargetConstant: 'geoTargetConstants/2376' } } },
+        { create: { campaign: 'customers/123/campaigns/56', language: { languageConstant: 'languageConstants/1027' } } },
+      ],
+    ]);
+    expect(calls[3][1][0].create).toMatchObject({ type: 'SEARCH_STANDARD', cpcBidMicros: '6000000' });
+    expect(calls[4][1][0].create).toMatchObject({
+      status: 'PAUSED',
+      ad: { finalUrls: ['https://easysign.example'], responsiveSearchAd: { headlines: [{ text: 'A1' }, { text: 'A2' }, { text: 'A3' }], descriptions: [{ text: 'D1' }, { text: 'D2' }], path1: 'sign', path2: 'now' } },
+    });
+    expect(calls[5]).toEqual([
+      'adGroupCriteria:mutate',
+      [
+        { create: { adGroup: 'customers/123/adGroups/67', status: 'ENABLED', keyword: { text: 'sign pdf', matchType: 'EXACT' } } },
+        { create: { adGroup: 'customers/123/adGroups/67', negative: true, keyword: { text: 'free', matchType: 'PHRASE' } } },
+      ],
+    ]);
+  });
+
+  it('removes the search campaign and budget it created when a later step fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/8' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/56' }] }))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'Bad location' } }, false, 400))
+      .mockResolvedValue(jsonResponse({ results: [{}] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const params = { name: 'S', dailyBudgetMicros: 1, cpcBidMicros: 1, containsEuPoliticalAdvertising: false, headlines: [], descriptions: [], path1: '', path2: '', finalUrl: 'https://x.example', keywords: [], negativeKeywords: [], geoTargetConstants: ['geoTargetConstants/1'], languageConstants: [] };
+    await expect(new GoogleAdsHttpApiClient(OPTIONS).createSearchAdCampaign('123', params)).rejects.toBeInstanceOf(GoogleAdsApiError);
+    const cleanup = fetchMock.mock.calls.slice(4).map(([url, init]) => [String(url).split('/').pop(), JSON.parse(String((init as RequestInit).body))]);
+    expect(cleanup).toEqual([
+      ['campaigns:mutate', { operations: [{ remove: 'customers/123/campaigns/56' }] }],
+      ['campaignBudgets:mutate', { operations: [{ remove: 'customers/123/campaignBudgets/8' }] }],
+    ]);
+  });
+
   it('refreshes an OAuth access token once and reuses it across multiple calls', async () => {
     const fetchMock = vi
       .fn()

@@ -8,6 +8,10 @@ import {
   speakerFields,
   voiceIssue,
   videoSettingsIssue,
+  searchKeywordsIssues,
+  normalizeSearchKeywords,
+  searchAdIssues,
+  normalizeSearchAd,
   normalizeVideoSettings,
   isDefaultVideoSettings,
   validateAdStudioImageConcepts,
@@ -16,6 +20,9 @@ import {
   type AdStudioVoice,
   type AdStudioVoiceIssueCode,
   type AdStudioVideoSettings,
+  type AdStudioSearchAd,
+  type AdStudioSearchKeywords,
+  type AdStudioSearchIssue,
   type AdStudioVideoSettingsIssueCode,
   type AdStudioAdCopyIssueCode,
   type AdStudioBriefInput,
@@ -94,6 +101,13 @@ export class AdStudioVideoSettingsInvalidError extends Error {
   constructor(public readonly code: AdStudioVideoSettingsIssueCode) {
     super(`The video settings are not valid: ${code}`);
     this.name = 'AdStudioVideoSettingsInvalidError';
+  }
+}
+
+export class AdStudioSearchInvalidError extends Error {
+  constructor(public readonly issues: AdStudioSearchIssue[]) {
+    super(`The search ad breaks these rules: ${issues.map((issue) => issue.code).join(', ')}`);
+    this.name = 'AdStudioSearchInvalidError';
   }
 }
 
@@ -321,6 +335,34 @@ export async function saveAdStudioVideoSettings(params: { organizationId: string
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
   const next = normalizeVideoSettings({ ...normalizeVideoSettings(brief.video_settings), ...params.settings });
   brief.video_settings = isDefaultVideoSettings(next) ? null : next;
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/** Saves the keywords the ad's search ad bids on and the negatives, or clears them with null. */
+export async function saveAdStudioSearchKeywords(params: { organizationId: string; projectId: string; briefId: string; keywords: AdStudioSearchKeywords | null; now?: Date }): Promise<AdStudioBriefModel> {
+  const value = params.keywords ? normalizeSearchKeywords(params.keywords) : null;
+  if (value) {
+    const issues = searchKeywordsIssues(value);
+    if (issues.length) throw new AdStudioSearchInvalidError(issues);
+  }
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  brief.search_keywords = value;
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/** Saves the responsive search ad, or clears it with null. Refused with every broken rule. */
+export async function saveAdStudioSearchAd(params: { organizationId: string; projectId: string; briefId: string; ad: AdStudioSearchAd | null; now?: Date }): Promise<AdStudioBriefModel> {
+  const value = params.ad ? normalizeSearchAd(params.ad) : null;
+  if (value) {
+    const issues = searchAdIssues(value);
+    if (issues.length) throw new AdStudioSearchInvalidError(issues);
+  }
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  brief.search_ad = value;
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;

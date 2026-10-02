@@ -1,5 +1,5 @@
 import 'server-only';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
@@ -157,6 +157,10 @@ export interface AdStudioBriefView {
   voice: AdStudioVoice | null;
   /** The advanced video settings; null means the defaults. */
   videoSettings: AdStudioVideoSettings | null;
+  /** The keywords the search ad bids on; null until chosen. */
+  searchKeywords: AdStudioSearchKeywords | null;
+  /** The responsive search ad; null until written. */
+  searchAd: AdStudioSearchAd | null;
   createdOn: string;
   lastChangedOn: string;
 }
@@ -185,6 +189,10 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
     videoCopy: brief.video_copy ? { ...brief.video_copy } : null,
     voice: brief.narrator_voice ? { ...brief.narrator_voice } : null,
     videoSettings: brief.video_settings ? { ...brief.video_settings } : null,
+    searchKeywords: brief.search_keywords
+      ? { targeting: { ...brief.search_keywords.targeting }, keywords: brief.search_keywords.keywords.map((keyword) => ({ ...keyword })), negatives: [...brief.search_keywords.negatives] }
+      : null,
+    searchAd: brief.search_ad ? { ...brief.search_ad, headlines: [...brief.search_ad.headlines], descriptions: [...brief.search_ad.descriptions] } : null,
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
   };
@@ -204,7 +212,7 @@ export async function listAdStudioExports(organizationId: string, projectId: str
 export interface AdStudioExportView {
   id: string;
   /** Rows written before image ads existed are videos. */
-  mediaKind: 'video' | 'image';
+  mediaKind: 'video' | 'image' | 'search';
   videoId: string | null;
   imageId: string | null;
   destination: 'meta' | 'youtube' | 'google_ads';

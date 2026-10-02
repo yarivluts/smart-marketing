@@ -8,6 +8,7 @@ import { GoogleAdsApiError, GoogleAdsHttpApiClient, type GoogleAdsApiClient } fr
 import { AdStudioExportInvalidError, AdStudioExportUnavailableError, resolveAdStudioExportDestinations } from './ad-studio-export.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
 import { recordAuditLogEntry } from './audit-log.service';
+import { searchAdIssues, searchTargetingToGoogle, type AdStudioSearchAd, type AdStudioSearchKeyword, type AdStudioSearchTargeting } from '@growthos/shared';
 
 /**
  * Publishing an Ad Studio creative as a real ad (the stepper's last step): not just uploading media
@@ -19,6 +20,8 @@ import { recordAuditLogEntry } from './audit-log.service';
  *   targeting the chosen countries, and a link ad (image) or video ad with a Learn More button.
  * - Google Ads: a Display campaign with a responsive display ad built from a 1.91:1 and a 1:1 image
  *   (Google's required ratios). Google video ads run from YouTube, so a video is not published here.
+ *   A search ad becomes a Search campaign (Google Search only) in the country and language its
+ *   keywords were researched in, with the responsive search ad, the keywords and the negatives.
  *
  * Same gates as exports: an approved, writable attachment with a saved secret, and (at the route)
  * `automation.execute`.
@@ -39,7 +42,8 @@ export interface AdStudioAdCopy {
 
 export type AdStudioPublishMedia =
   | { kind: 'image'; imageId: string; square: Uint8Array | null; landscape: Uint8Array | null; primary: Uint8Array }
-  | { kind: 'video'; videoId: string; video: Uint8Array; thumbnail: Uint8Array };
+  | { kind: 'video'; videoId: string; video: Uint8Array; thumbnail: Uint8Array }
+  | { kind: 'search'; ad: AdStudioSearchAd; keywords: AdStudioSearchKeyword[]; negatives: string[]; targeting: AdStudioSearchTargeting };
 
 export interface PublishAdStudioAdParams {
   organizationId: string;
@@ -106,12 +110,20 @@ function validate(params: PublishAdStudioAdParams): string[] {
   const reasons: string[] = [];
   const { copy } = params;
   if (!params.campaignName.trim() || params.campaignName.trim().length > 120) reasons.push('campaign name must be 1-120 characters');
-  if (!copy.headline.trim()) reasons.push('headline is required');
-  if (!copy.primaryText.trim()) reasons.push('primary text is required');
+  if (params.media.kind === 'search') {
+    if (params.destination !== 'google_ads') reasons.push('a search ad runs on Google Ads');
+    if (params.media.keywords.length === 0) reasons.push('choose at least one keyword');
+    if (searchAdIssues(params.media.ad).length) reasons.push('the search ad breaks Google limits - fix it in the Review step');
+  } else {
+    if (!copy.headline.trim()) reasons.push('headline is required');
+    if (!copy.primaryText.trim()) reasons.push('primary text is required');
+  }
   if (!/^https?:\/\/\S+$/i.test(copy.linkUrl.trim())) reasons.push('link must be an http(s) URL');
   if (!Number.isFinite(params.dailyBudget) || params.dailyBudget <= 0) reasons.push('daily budget must be a positive number');
   if (params.destination === 'meta' && params.countries.length === 0) reasons.push('choose at least one country');
-  if (params.destination === 'google_ads') {
+  if (params.destination === 'google_ads' && params.media.kind === 'search') {
+    if (typeof params.containsEuPoliticalAdvertising !== 'boolean') reasons.push('answer whether the campaign contains EU political advertising');
+  } else if (params.destination === 'google_ads') {
     if (params.media.kind !== 'image') reasons.push('Google Ads video ads run from YouTube; publish an image ad to Google Ads');
     if (typeof params.containsEuPoliticalAdvertising !== 'boolean') reasons.push('answer whether the campaign contains EU political advertising');
     if (copy.headline.trim().length > 30) reasons.push('Google headline must be at most 30 characters');
@@ -161,7 +173,7 @@ async function buildMetaAd(
       linkUrl: params.copy.linkUrl.trim(),
       imageHash,
     }));
-  } else {
+  } else if (params.media.kind === 'video') {
     const upload = params.clients?.uploadVideo ?? uploadMetaAdVideo;
     const video = await upload({ accessToken: secret.accessToken, adAccountId: account, title: params.copy.headline.trim(), description: params.copy.primaryText.trim(), bytes: params.media.video });
     const { imageHash } = await client.uploadAdImage(account, { base64Bytes: b64(params.media.thumbnail) });
@@ -176,6 +188,9 @@ async function buildMetaAd(
       ...(params.copy.description.trim() ? { description: params.copy.description.trim() } : {}),
       linkUrl: params.copy.linkUrl.trim(),
     }));
+  } else {
+    // Never reached: a search ad is refused for Meta before anything is created.
+    throw new AdStudioExportInvalidError(['a search ad runs on Google Ads']);
   }
   refs.creative_id = creativeId;
   const { adId } = await client.createAd(account, { name: params.campaignName.trim(), adSetId, creativeId });
@@ -188,19 +203,66 @@ async function buildMetaAd(
   };
 }
 
-async function publishToGoogle(params: PublishAdStudioAdParams, secretJson: string): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
-  if (params.media.kind !== 'image' || !params.media.square || !params.media.landscape) throw new AdStudioExportInvalidError(['Google needs a square and a 1.91:1 image']);
+/**
+ * The ad group's max CPC: the middle of what the chosen keywords' top-of-page bids reach (Google's
+ * own numbers), else a twentieth of the daily budget (at least 0.5) - never above the budget.
+ */
+export function searchCpcBid(keywords: readonly Pick<AdStudioSearchKeyword, 'highTopOfPageBid'>[], dailyBudget: number): number {
+  const bids = keywords.map((keyword) => keyword.highTopOfPageBid).filter((bid): bid is number => typeof bid === 'number' && bid > 0).sort((a, b) => a - b);
+  const median = bids.length ? (bids.length % 2 ? bids[(bids.length - 1) / 2] : (bids[bids.length / 2 - 1] + bids[bids.length / 2]) / 2) : Math.max(0.5, dailyBudget / 20);
+  return Math.min(median, dailyBudget);
+}
+
+async function publishSearchToGoogle(
+  params: PublishAdStudioAdParams,
+  media: Extract<AdStudioPublishMedia, { kind: 'search' }>,
+  client: GoogleAdsApiClient,
+  customer: string,
+): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
+  const google = searchTargetingToGoogle(media.targeting);
+  const created = await client.createSearchAdCampaign(customer, {
+    name: params.campaignName.trim(),
+    dailyBudgetMicros: params.dailyBudget * 1_000_000,
+    cpcBidMicros: searchCpcBid(media.keywords, params.dailyBudget) * 1_000_000,
+    containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising === true,
+    headlines: media.ad.headlines,
+    descriptions: media.ad.descriptions,
+    path1: media.ad.path1,
+    path2: media.ad.path2,
+    finalUrl: params.copy.linkUrl.trim(),
+    keywords: media.keywords.map((keyword) => ({ text: keyword.text, matchType: keyword.matchType })),
+    negativeKeywords: media.negatives,
+    geoTargetConstants: google.geoTargetConstants,
+    languageConstants: google.language ? [google.language] : [],
+  });
+  const campaignId = created.campaignResourceName.split('/').pop() as string;
+  return {
+    refs: { customer_id: customer, campaign: created.campaignResourceName, ad_group: created.adGroupResourceName, ad: created.adResourceName },
+    externalId: created.adResourceName,
+    url: `https://ads.google.com/aw/ads?campaignId=${campaignId}&__e=${customer}`,
+  };
+}
+
+/**
+ * The Google Ads client and customer id for a credential. Google's own UI shows account ids with
+ * dashes (123-456-7890) and people paste them that way; the API takes the digits only.
+ */
+function googleClientFor(params: PublishAdStudioAdParams, secretJson: string): { client: GoogleAdsApiClient; customer: string } {
   const secret = parseGoogleAdsCredentialSecret(secretJson);
+  const loginCustomerId = secret.loginCustomerId?.replace(/-/g, '');
   const client =
     params.clients?.google?.(secret) ??
-    new GoogleAdsHttpApiClient({
-      developerToken: secret.developerToken,
-      clientId: secret.clientId,
-      clientSecret: secret.clientSecret,
-      refreshToken: secret.refreshToken,
-      loginCustomerId: secret.loginCustomerId,
-    });
-  const customer = secret.customerId;
+    new GoogleAdsHttpApiClient({ developerToken: secret.developerToken, clientId: secret.clientId, clientSecret: secret.clientSecret, refreshToken: secret.refreshToken, loginCustomerId });
+  return { client, customer: secret.customerId.replace(/-/g, '') };
+}
+
+async function publishToGoogle(params: PublishAdStudioAdParams, secretJson: string): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
+  if (params.media.kind === 'search') {
+    const { client, customer } = googleClientFor(params, secretJson);
+    return publishSearchToGoogle(params, params.media, client, customer);
+  }
+  if (params.media.kind !== 'image' || !params.media.square || !params.media.landscape) throw new AdStudioExportInvalidError(['Google needs a square and a 1.91:1 image']);
+  const { client, customer } = googleClientFor(params, secretJson);
   const name = params.campaignName.trim();
   const landscape = await client.uploadImageAsset(customer, { name: `${name} - landscape`, base64Data: b64(params.media.landscape) });
   const square = await client.uploadImageAsset(customer, { name: `${name} - square`, base64Data: b64(params.media.square) });
@@ -253,7 +315,7 @@ export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promis
   row.destination = params.destination;
   row.attachment_id = target.attachmentId;
   row.title = params.campaignName.trim();
-  row.description = params.copy.primaryText.trim();
+  row.description = params.media.kind === 'search' ? (params.media.ad.headlines[0] ?? '') : params.copy.primaryText.trim();
   row.privacy = null;
   row.status = 'uploading';
   row.requested_by = params.actorId;
@@ -288,7 +350,7 @@ export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promis
       action: row.status === 'done' ? 'ad_studio.ad_published' : 'ad_studio.ad_publish_failed',
       targetType: 'ad_studio_export',
       targetId: row.id,
-      summary: row.status === 'done' ? `Created a paused ${params.media.kind} ad "${row.title}" on ${platform}` : `Creating a ${params.media.kind} ad "${row.title}" on ${platform} failed (${row.failure_code})`,
+      summary: row.status === 'done' ? `Created a paused ${params.media.kind === 'search' ? 'search' : params.media.kind} ad "${row.title}" on ${platform}` : `Creating a ${params.media.kind} ad "${row.title}" on ${platform} failed (${row.failure_code})`,
       after: { destination: params.destination, status: row.status, platform_refs: row.platform_refs ?? null },
     });
   } catch {

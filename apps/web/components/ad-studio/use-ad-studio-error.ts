@@ -7,6 +7,8 @@ export interface AdStudioApiError {
   error?: string;
   code?: string;
   reasons?: string[];
+  /** The broken search-ad rules (`invalid_search`). */
+  issues?: { code: string; index?: number }[];
   limitKind?: 'text' | 'video' | 'image';
   used?: number;
   limit?: number;
@@ -18,6 +20,24 @@ const ASSEMBLY_CODES = new Set(['ffmpeg_unavailable', 'ffmpeg_failed', 'storage_
 const IMAGE_REQUEST_CODES = new Set(['concept_not_found', 'format_not_in_concept', 'image_not_editable', 'invalid_instruction', 'image_not_ready']);
 const VOICE_CODES = new Set(['unknown_voice', 'voice_description_required', 'voice_description_too_long']);
 const VIDEO_SETTINGS_CODES = new Set(['unknown_resolution', 'unknown_style', 'unknown_music', 'music_description_required', 'music_description_too_long', 'avoid_too_long']);
+const SEARCH_CODES = new Set([
+  'invalid_targeting',
+  'too_many_keywords',
+  'keyword_empty',
+  'keyword_too_long',
+  'keyword_too_many_words',
+  'invalid_match_type',
+  'duplicate_keyword',
+  'too_many_negatives',
+  'too_few_headlines',
+  'too_many_headlines',
+  'headline_too_long',
+  'duplicate_headline',
+  'too_few_descriptions',
+  'too_many_descriptions',
+  'description_too_long',
+  'path_too_long',
+]);
 const REFERENCE_REQUEST_CODES = new Set([
   'unsupported_image',
   'image_too_large',
@@ -43,6 +63,9 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'invalid_concepts') return t('images.errorInvalidConcepts');
     if (body.error === 'invalid_copy') return t('copy.errorInvalid');
     if (body.error === 'invalid_voice' && body.code && VOICE_CODES.has(body.code)) return t(`voice.errors.${body.code}`);
+    if (body.error === 'invalid_search') {
+      return t('search.errorInvalid', { reasons: (body.issues ?? []).map((issue) => t(`search.issues.${SEARCH_CODES.has(issue.code) ? issue.code : 'unknown'}`, { index: issue.index ?? 0 })).join('; ') });
+    }
     if (body.error === 'invalid_video_settings' && body.code && VIDEO_SETTINGS_CODES.has(body.code)) return t(`advanced.errors.${body.code}`);
     if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');

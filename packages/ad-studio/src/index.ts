@@ -14,6 +14,7 @@ export * from './planning-sources';
 export * from './script-generation';
 export * from './vocalize';
 export * from './copy-writing';
+export * from './search';
 export * from './references';
 export * from './video-pipeline';
 export * from './qa';

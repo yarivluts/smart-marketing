@@ -79,6 +79,8 @@ import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
+import { KeywordResearch } from '@/components/ad-studio/keyword-research';
+import { SearchAdEditor } from '@/components/ad-studio/search-ad-editor';
 import { DeleteBriefButton } from '@/components/ad-studio/delete-brief-button';
 import { AutopilotPanel } from '@/components/ad-studio/autopilot-panel';
 import { ImageStudio } from '@/components/ad-studio/image-studio';
@@ -114,6 +116,12 @@ const STAGE_STATUS: Record<AdStudioStageStatus, VizStatus> = {
  * edits scene by scene, and the studio's admin surface - which models it uses, whether keyword data
  * is available, and the project's daily AI limits. Gated on `ai.use`; limits need `project.configure`.
  */
+/** The seeds a keyword lookup starts from: the plan's theme keywords, else the ad's name. */
+function keywordSeedsFor(brief: { name: string; plan: { keywordThemes: { keywords: string[] }[] } | null }): string[] {
+  const fromPlan = brief.plan?.keywordThemes.flatMap((theme) => theme.keywords) ?? [];
+  return [...new Set(fromPlan.length ? fromPlan : [brief.name])].slice(0, 10);
+}
+
 export default async function AdStudioPage({
   params,
   searchParams,
@@ -300,6 +308,19 @@ export default async function AdStudioPage({
             previewSrc: `${mediaBase}/videos/${exportableVideo.id}/media`,
             copy: selected?.videoCopy ?? null,
             vertical: selected?.format === 'vertical',
+          },
+        ]
+      : []),
+    // The search ad, once written: published to Google Search with its keywords.
+    ...(selected?.searchAd
+      ? [
+          {
+            key: 'search',
+            kind: 'search' as const,
+            id: 'search',
+            label: t('publish.searchAd'),
+            previewSrc: '',
+            search: { ...selected.searchAd, keywordCount: selected.searchKeywords?.keywords.length ?? 0 },
           },
         ]
       : []),
@@ -494,6 +515,17 @@ export default async function AdStudioPage({
                 aiAvailable={providers.text !== null}
               />
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <KeywordResearch
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  language={selected.language}
+                  landingPageUrl={selected.landingPageUrl}
+                  initial={selected.searchKeywords}
+                  suggestedSeeds={keywordSeedsFor(selected)}
+                />
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <ReferenceLibrary
                   orgId={orgId}
                   projectId={projectId}
@@ -614,6 +646,18 @@ export default async function AdStudioPage({
                   advertiser={selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}
+                />
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <SearchAdEditor
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  initial={selected.searchAd}
+                  keywordCount={selected.searchKeywords?.keywords.length ?? 0}
+                  linkUrl={selected.landingPageUrl}
+                  advertiser={selected.name}
+                  aiAvailable={providers.text !== null}
                 />
               </div>
             </>

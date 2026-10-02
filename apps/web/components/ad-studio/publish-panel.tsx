@@ -4,7 +4,16 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import type { AdStudioAdCopy, AdStudioImageFormat } from '@growthos/shared';
 import { AdPlacementPreview, type AdPlacement, type AdPreviewMedia } from './ad-placement-preview';
-import { CheckCircle2, ExternalLink, Film, ImageIcon, Loader2, Megaphone } from 'lucide-react';
+import {
+  CheckCircle2,
+  ExternalLink,
+  Film,
+  ImageIcon,
+  Loader2,
+  Megaphone,
+  Search,
+} from 'lucide-react';
+import { SearchResultPreview } from './search-result-preview';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
@@ -13,8 +22,8 @@ type Destination = 'meta' | 'google_ads';
 
 export interface PublishCreative {
   key: string;
-  kind: 'image' | 'video';
-  /** The image id or the assembled video id. */
+  kind: 'image' | 'video' | 'search';
+  /** The image id, the assembled video id, or `search` for the search ad. */
   id: string;
   label: string;
   /** Media route for a preview (image) or poster-less video. */
@@ -25,12 +34,20 @@ export interface PublishCreative {
   format?: AdStudioImageFormat;
   /** For the video: whether it is vertical. */
   vertical?: boolean;
+  /** For the search ad: what is published - the ad and how many keywords it bids on. */
+  search?: {
+    headlines: string[];
+    descriptions: string[];
+    path1: string;
+    path2: string;
+    keywordCount: number;
+  };
 }
 
 export interface PublishedAdRow {
   id: string;
   destination: string;
-  mediaKind: 'video' | 'image';
+  mediaKind: 'video' | 'image' | 'search';
   title: string;
   status: 'uploading' | 'done' | 'failed';
   externalUrl: string | null;
@@ -56,13 +73,17 @@ export interface PublishPanelProps {
 }
 
 /** The placements a published ad can run in on each platform (Google Ads takes images only). */
-function placementsFor(destination: Destination, kind: 'image' | 'video'): AdPlacement[] {
+function placementsFor(
+  destination: Destination,
+  kind: 'image' | 'video' | 'search',
+): AdPlacement[] {
   if (destination === 'google_ads') return ['google_display'];
   return kind === 'video'
     ? ['facebook_feed', 'instagram_story']
     : ['facebook_feed', 'instagram_feed', 'instagram_story'];
 }
 
+/** The feed preview of an image or the video (the search ad has its own). */
 function previewMedia(creative: PublishCreative): AdPreviewMedia {
   return creative.kind === 'video'
     ? {
@@ -137,12 +158,16 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   /** Picking a creative brings its own words into the form; one without copy keeps what is typed. */
   function choose(entry: PublishCreative): void {
     setSelected(entry.key);
+    // A search ad runs on Google Search only.
+    if (entry.kind === 'search') setDestination('google_ads');
     if (!entry.copy) return;
     setHeadline(entry.copy.headline);
     setPrimaryText(entry.copy.primaryText);
     setDescription(entry.copy.description);
   }
   const googleBlocked = destination === 'google_ads' && creative?.kind === 'video';
+  const isSearch = creative?.kind === 'search';
+  const metaBlocked = destination === 'meta' && isSearch;
   const missingEu = destination === 'google_ads' && euPolitical === '';
 
   async function publish(event: React.FormEvent): Promise<void> {
@@ -159,9 +184,11 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
           body: JSON.stringify({
             destination,
             source:
-              creative.kind === 'image'
-                ? { kind: 'image', imageId: creative.id }
-                : { kind: 'video', videoId: creative.id },
+              creative.kind === 'search'
+                ? { kind: 'search' }
+                : creative.kind === 'image'
+                  ? { kind: 'image', imageId: creative.id }
+                  : { kind: 'video', videoId: creative.id },
             campaignName,
             copy: { headline, primaryText, description, linkUrl, businessName },
             dailyBudget: Number(dailyBudget),
@@ -259,7 +286,12 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                 className="sr-only"
               />
               <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-muted">
-                {entry.kind === 'image' ? (
+                {entry.kind === 'search' ? (
+                  <span className="flex flex-col items-center gap-1 p-2 text-center text-[11px] text-muted-foreground">
+                    <Search className="h-6 w-6 text-primary" aria-hidden="true" />
+                    {t('publish.searchKeywords', { count: entry.search?.keywordCount ?? 0 })}
+                  </span>
+                ) : entry.kind === 'image' ? (
                   // A plain img: private media served by our own authenticated route.
                   <img src={entry.previewSrc} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -273,7 +305,9 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                 )}
               </span>
               <span className="flex min-w-0 items-center gap-1 font-medium">
-                {entry.kind === 'image' ? (
+                {entry.kind === 'search' ? (
+                  <Search className="h-3 w-3 shrink-0" aria-hidden="true" />
+                ) : entry.kind === 'image' ? (
                   <ImageIcon className="h-3 w-3 shrink-0" aria-hidden="true" />
                 ) : (
                   <Film className="h-3 w-3 shrink-0" aria-hidden="true" />
@@ -311,6 +345,12 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
           ))}
         </div>
         {googleBlocked ? <p className="text-xs text-warning">{t('publish.googleVideo')}</p> : null}
+        {metaBlocked ? (
+          <p className="text-xs text-warning">{t('publish.searchGoogleOnly')}</p>
+        ) : null}
+        {isSearch && destination === 'google_ads' ? (
+          <p className="text-xs text-muted-foreground">{t('publish.searchNote')}</p>
+        ) : null}
         {!destinations[destination] ? (
           <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {t('publish.connectFirst')}
@@ -351,37 +391,41 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
               className={input}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            {t('publish.headline')}
-            <input
-              value={headline}
-              onChange={(event) => setHeadline(event.target.value)}
-              maxLength={destination === 'google_ads' ? 30 : 40}
-              dir="auto"
-              className={input}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            {t('publish.primaryText')}
-            <input
-              value={primaryText}
-              onChange={(event) => setPrimaryText(event.target.value)}
-              maxLength={destination === 'google_ads' ? 90 : 500}
-              dir="auto"
-              className={input}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-            {t('publish.descriptionLabel')}
-            <input
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={90}
-              dir="auto"
-              className={input}
-            />
-          </label>
-          {destination === 'google_ads' ? (
+          {!isSearch ? (
+            <>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                {t('publish.headline')}
+                <input
+                  value={headline}
+                  onChange={(event) => setHeadline(event.target.value)}
+                  maxLength={destination === 'google_ads' ? 30 : 40}
+                  dir="auto"
+                  className={input}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                {t('publish.primaryText')}
+                <input
+                  value={primaryText}
+                  onChange={(event) => setPrimaryText(event.target.value)}
+                  maxLength={destination === 'google_ads' ? 90 : 500}
+                  dir="auto"
+                  className={input}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                {t('publish.descriptionLabel')}
+                <input
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  maxLength={90}
+                  dir="auto"
+                  className={input}
+                />
+              </label>
+            </>
+          ) : null}
+          {isSearch ? null : destination === 'google_ads' ? (
             <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
               {t('publish.businessName')}
               <input
@@ -414,7 +458,15 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
             />
           </label>
         </div>
-        {creative && !googleBlocked ? (
+        {creative?.kind === 'search' && creative.search ? (
+          <div
+            className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3"
+            data-testid="ad-studio-publish-preview"
+          >
+            <span className="text-sm font-semibold">{t('publish.previewTitle')}</span>
+            <SearchResultPreview {...creative.search} linkUrl={linkUrl} advertiser={briefName} />
+          </div>
+        ) : creative && !googleBlocked ? (
           <div
             className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3"
             data-testid="ad-studio-publish-preview"
@@ -467,6 +519,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
               !canPublish ||
               !destinations[destination] ||
               googleBlocked ||
+              metaBlocked ||
               missingEu
             }
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
@@ -538,7 +591,14 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                     {t(
                       `publish.destination.${row.destination === 'google_ads' ? 'google_ads' : 'meta'}`,
                     )}{' '}
-                    · {t(row.mediaKind === 'video' ? 'publish.kindVideo' : 'publish.kindImage')}
+                    ·{' '}
+                    {t(
+                      row.mediaKind === 'video'
+                        ? 'publish.kindVideo'
+                        : row.mediaKind === 'search'
+                          ? 'publish.kindSearch'
+                          : 'publish.kindImage',
+                    )}
                   </span>
                 </span>
                 {row.externalUrl ? (

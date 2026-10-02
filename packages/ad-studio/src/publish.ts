@@ -1,7 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { defaultSearchTargeting } from '@growthos/shared';
 import {
+  AdStudioExportInvalidError,
+  getAdStudioBrief,
   getAdStudioImage,
   getAdStudioVideo,
   listAdStudioImages,
@@ -19,7 +22,7 @@ import { AdStudioImageRequestError } from './image-pipeline';
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
 
-export type AdStudioPublishSource = { kind: 'image'; imageId: string } | { kind: 'video'; videoId: string };
+export type AdStudioPublishSource = { kind: 'image'; imageId: string } | { kind: 'video'; videoId: string } | { kind: 'search' };
 
 async function withTemp<T>(run: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-publish-'));
@@ -67,7 +70,18 @@ export async function publishBriefAd(params: {
   const storage = params.storage ?? resolveAdStudioMediaStorage();
   const runner = params.runner ?? defaultFfmpegRunner();
   let media: AdStudioPublishMedia;
-  if (params.source.kind === 'image') {
+  if (params.source.kind === 'search') {
+    // The saved search ad and keywords, as they are now: nothing to render or crop.
+    const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+    if (!brief.search_ad) throw new AdStudioExportInvalidError(['write the search ad first']);
+    media = {
+      kind: 'search',
+      ad: brief.search_ad,
+      keywords: brief.search_keywords?.keywords ?? [],
+      negatives: brief.search_keywords?.negatives ?? [],
+      targeting: brief.search_keywords?.targeting ?? defaultSearchTargeting(brief.language),
+    };
+  } else if (params.source.kind === 'image') {
     const image = await getAdStudioImage(params.organizationId, params.projectId, params.briefId, params.source.imageId);
     if (image.status !== 'ready' || !image.gcs_path) throw new AdStudioImageRequestError('image_not_ready');
     const primary = await readAdStudioObject(storage, image.gcs_path, MAX_IMAGE_BYTES);

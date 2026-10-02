@@ -69,6 +69,29 @@ export interface GoogleAdsDisplayAdCampaignParams {
   finalUrl: string;
 }
 
+export interface GoogleAdsSearchAdCampaignParams {
+  name: string;
+  /** Daily budget in the account's currency, in micros. */
+  dailyBudgetMicros: number;
+  /** Max CPC for the ad group, in micros. */
+  cpcBidMicros: number;
+  /** The advertiser's own EU political advertising self-declaration (required on every campaign). */
+  containsEuPoliticalAdvertising: boolean;
+  /** The responsive search ad: 3-15 headlines (30 characters), 2-4 descriptions (90). */
+  headlines: string[];
+  descriptions: string[];
+  path1: string;
+  path2: string;
+  finalUrl: string;
+  keywords: { text: string; matchType: 'BROAD' | 'PHRASE' | 'EXACT' }[];
+  /** Searches that must not show the ad, added as phrase-match negatives on the ad group. */
+  negativeKeywords: string[];
+  /** `geoTargetConstants/...` resource names; empty targets every location. */
+  geoTargetConstants: string[];
+  /** `languageConstants/...` resource names; empty targets every language. */
+  languageConstants: string[];
+}
+
 export interface GoogleAdsDisplayAdCampaignResult {
   campaignBudgetResourceName: string;
   campaignResourceName: string;
@@ -249,6 +272,12 @@ export interface GoogleAdsApiClient {
   uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }>;
   /** Creates a paused Display campaign (budget, campaign, ad group) with one responsive display ad. */
   createDisplayAdCampaign(customerId: string, params: GoogleAdsDisplayAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult>;
+  /**
+   * Creates a paused Search campaign (Google Search only, no Display expansion) targeting the given
+   * locations and languages, with one ad group holding a responsive search ad, the keywords and the
+   * negative keywords.
+   */
+  createSearchAdCampaign(customerId: string, params: GoogleAdsSearchAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult>;
 }
 
 /**
@@ -673,6 +702,68 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
       },
     ]);
     return { campaignBudgetResourceName, campaignResourceName, adGroupResourceName, adResourceName: ad.results[0].resourceName };
+  }
+
+  async createSearchAdCampaign(customerId: string, params: GoogleAdsSearchAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult> {
+    // Everything is created PAUSED for a person to review; the budget is named after its campaign.
+    const budget = await this.mutate(customerId, 'campaignBudgets', [
+      { create: { name: `${params.name} Budget`, amountMicros: String(Math.round(params.dailyBudgetMicros)), deliveryMethod: 'STANDARD', explicitlyShared: false } },
+    ]);
+    const campaignBudgetResourceName = budget.results[0].resourceName;
+    const campaign = await this.mutate(customerId, 'campaigns', [
+      {
+        create: {
+          name: params.name,
+          advertisingChannelType: 'SEARCH',
+          status: 'PAUSED',
+          campaignBudget: campaignBudgetResourceName,
+          manualCpc: {},
+          // Google Search only: no search partners and no Display expansion, so the spend goes where the keywords were researched.
+          networkSettings: { targetGoogleSearch: true, targetSearchNetwork: false, targetContentNetwork: false, targetPartnerSearchNetwork: false },
+          containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising ? 'CONTAINS_EU_POLITICAL_ADVERTISING' : 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
+        },
+      },
+    ]);
+    const campaignResourceName = campaign.results[0].resourceName;
+    try {
+      const criteria = [
+        ...params.geoTargetConstants.map((geoTargetConstant) => ({ create: { campaign: campaignResourceName, location: { geoTargetConstant } } })),
+        ...params.languageConstants.map((languageConstant) => ({ create: { campaign: campaignResourceName, language: { languageConstant } } })),
+      ];
+      if (criteria.length) await this.mutate(customerId, 'campaignCriteria', criteria);
+      const adGroup = await this.mutate(customerId, 'adGroups', [
+        { create: { name: `${params.name} - ad group`, campaign: campaignResourceName, status: 'ENABLED', type: 'SEARCH_STANDARD', cpcBidMicros: String(Math.round(params.cpcBidMicros)) } },
+      ]);
+      const adGroupResourceName = adGroup.results[0].resourceName;
+      const ad = await this.mutate(customerId, 'adGroupAds', [
+        {
+          create: {
+            adGroup: adGroupResourceName,
+            status: 'PAUSED',
+            ad: {
+              finalUrls: [params.finalUrl],
+              responsiveSearchAd: {
+                headlines: params.headlines.map((text) => ({ text })),
+                descriptions: params.descriptions.map((text) => ({ text })),
+                ...(params.path1 ? { path1: params.path1 } : {}),
+                ...(params.path1 && params.path2 ? { path2: params.path2 } : {}),
+              },
+            },
+          },
+        },
+      ]);
+      const keywordOperations = [
+        ...params.keywords.map((keyword) => ({ create: { adGroup: adGroupResourceName, status: 'ENABLED', keyword: { text: keyword.text, matchType: keyword.matchType } } })),
+        ...params.negativeKeywords.map((text) => ({ create: { adGroup: adGroupResourceName, negative: true, keyword: { text, matchType: 'PHRASE' } } })),
+      ];
+      if (keywordOperations.length) await this.mutate(customerId, 'adGroupCriteria', keywordOperations);
+      return { campaignBudgetResourceName, campaignResourceName, adGroupResourceName, adResourceName: ad.results[0].resourceName };
+    } catch (error) {
+      // Nothing half-built is left behind: remove the campaign (with its criteria and ad group) and its budget.
+      await this.mutate(customerId, 'campaigns', [{ remove: campaignResourceName }]).catch(() => undefined);
+      await this.mutate(customerId, 'campaignBudgets', [{ remove: campaignBudgetResourceName }]).catch(() => undefined);
+      throw error;
+    }
   }
 
   async uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }> {

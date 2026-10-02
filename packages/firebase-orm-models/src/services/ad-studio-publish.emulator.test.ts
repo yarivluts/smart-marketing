@@ -130,6 +130,84 @@ describe('publishAdStudioAd', () => {
     );
   });
 
+  it('creates a paused Google Search campaign from the search ad, its keywords and negatives, where they were researched', async () => {
+    const ctx = await setup('google_ads', { developerToken: 'd', clientId: 'c', clientSecret: 's', refreshToken: 'r', customerId: '4816235600' });
+    const google = {
+      createSearchAdCampaign: vi.fn(async () => ({
+        campaignBudgetResourceName: 'customers/4816235600/campaignBudgets/8',
+        campaignResourceName: 'customers/4816235600/campaigns/56',
+        adGroupResourceName: 'customers/4816235600/adGroups/67',
+        adResourceName: 'customers/4816235600/adGroupAds/67~78',
+      })),
+    } as unknown as GoogleAdsApiClient & { createSearchAdCampaign: ReturnType<typeof vi.fn> };
+    const ad = { headlines: ['Sign in seconds', 'E-signatures for lawyers', 'Start free'], descriptions: ['Upload, send, signed.', 'Legally binding.'], path1: 'sign', path2: '' };
+    const keywords = [
+      { text: 'electronic signature', matchType: 'PHRASE' as const, avgMonthlySearches: 12100, competition: 'HIGH' as const, lowTopOfPageBid: 2, highTopOfPageBid: 9 },
+      { text: 'sign pdf', matchType: 'EXACT' as const, avgMonthlySearches: 880, competition: 'LOW' as const, lowTopOfPageBid: 1, highTopOfPageBid: 3 },
+    ];
+    const row = await publishAdStudioAd({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: 'b1',
+      destination: 'google_ads',
+      media: { kind: 'search', ad, keywords, negatives: ['free'], targeting: { country: 'IL', language: 'he' } },
+      // The feed copy is not used by a search ad: only the link is.
+      copy: { headline: '', primaryText: '', description: '', linkUrl: 'https://easysign.example', businessName: '' },
+      campaignName: 'Sign fast - search',
+      dailyBudget: 50,
+      countries: [],
+      containsEuPoliticalAdvertising: false,
+      kms,
+      actorId: ctx.owner.id,
+      clients: { google: () => google },
+    });
+    expect(row).toMatchObject({ status: 'done', media_kind: 'search', description: 'Sign in seconds', external_url: 'https://ads.google.com/aw/ads?campaignId=56&__e=4816235600' });
+    expect(google.createSearchAdCampaign).toHaveBeenCalledWith('4816235600', {
+      name: 'Sign fast - search',
+      dailyBudgetMicros: 50_000_000,
+      // The middle of the keywords' top-of-page bids (3 and 9).
+      cpcBidMicros: 6_000_000,
+      containsEuPoliticalAdvertising: false,
+      headlines: ad.headlines,
+      descriptions: ad.descriptions,
+      path1: 'sign',
+      path2: '',
+      finalUrl: 'https://easysign.example',
+      keywords: [
+        { text: 'electronic signature', matchType: 'PHRASE' },
+        { text: 'sign pdf', matchType: 'EXACT' },
+      ],
+      negativeKeywords: ['free'],
+      geoTargetConstants: ['geoTargetConstants/2376'],
+      languageConstants: ['languageConstants/1027'],
+    });
+  });
+
+  it('refuses a search ad on Meta, without keywords, or breaking Google limits - before calling anything', async () => {
+    const ctx = await setup('google_ads', { developerToken: 'd', clientId: 'c', clientSecret: 's', refreshToken: 'r', customerId: '1' });
+    const ad = { headlines: ['A', 'B'], descriptions: ['x', 'y'], path1: '', path2: '' };
+    const base = {
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: 'b1',
+      copy: { ...COPY, headline: '', primaryText: '' },
+      campaignName: 'Search',
+      dailyBudget: 20,
+      countries: [],
+      kms,
+      actorId: ctx.owner.id,
+    };
+    await expect(
+      publishAdStudioAd({ ...base, destination: 'google_ads', media: { kind: 'search', ad, keywords: [], negatives: [], targeting: { country: 'IL', language: 'he' } } }),
+    ).rejects.toMatchObject({
+      reasons: ['choose at least one keyword', 'the search ad breaks Google limits - fix it in the Review step', 'answer whether the campaign contains EU political advertising'],
+    });
+    await expect(
+      publishAdStudioAd({ ...base, destination: 'meta', countries: ['IL'], media: { kind: 'search', ad: { ...ad, headlines: ['A', 'B', 'C'] }, keywords: [{ text: 'k', matchType: 'EXACT', avgMonthlySearches: null, competition: null, lowTopOfPageBid: null, highTopOfPageBid: null }], negatives: [], targeting: { country: 'IL', language: 'he' } } }),
+    ).rejects.toMatchObject({ reasons: ['a search ad runs on Google Ads'] });
+    expect(await listAdStudioExports(ctx.orgId, ctx.projectId, 'b1')).toEqual([]);
+  });
+
   it('deletes the Meta campaign it created when a later step fails, and records the failure', async () => {
     const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
     const meta = fakeMeta();

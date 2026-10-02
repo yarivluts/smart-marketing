@@ -3,8 +3,8 @@ import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 export const AD_STUDIO_EXPORT_DESTINATIONS = ['meta', 'youtube', 'google_ads'] as const;
 export type AdStudioExportDestination = (typeof AD_STUDIO_EXPORT_DESTINATIONS)[number];
 
-/** What was exported: an assembled video, or an image ad (rows written before image ads existed have none and are videos). */
-export const AD_STUDIO_EXPORT_MEDIA_KINDS = ['video', 'image'] as const;
+/** What was exported: an assembled video, an image ad or a search ad (rows written before image ads existed have none and are videos). */
+export const AD_STUDIO_EXPORT_MEDIA_KINDS = ['video', 'image', 'search'] as const;
 export type AdStudioExportMediaKind = (typeof AD_STUDIO_EXPORT_MEDIA_KINDS)[number];
 
 export const AD_STUDIO_EXPORT_STATUSES = ['uploading', 'done', 'failed'] as const;
