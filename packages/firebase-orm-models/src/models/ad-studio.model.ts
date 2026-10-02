@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -96,6 +96,10 @@ export class AdStudioBriefModel extends BaseModel {
   /** The responsive search ad; absent until written. */
   @Field({ is_required: false })
   public search_ad?: AdStudioSearchAd | null;
+
+  /** The Meta audience the ad is planned for (countries, ages, genders, audiences, interests); absent until chosen. */
+  @Field({ is_required: false })
+  public meta_targeting?: AdStudioMetaTargeting | null;
 
   /** The ad copy that runs next to the assembled video in the feed (KAN-278); absent until written. */
   @Field({ is_required: false })

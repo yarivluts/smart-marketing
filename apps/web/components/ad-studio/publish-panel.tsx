@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import type { AdStudioAdCopy, AdStudioImageFormat } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioImageFormat, AdStudioMetaTargeting } from '@growthos/shared';
 import { AdPlacementPreview, type AdPlacement, type AdPreviewMedia } from './ad-placement-preview';
 import {
   CheckCircle2,
@@ -68,6 +68,8 @@ export interface PublishPanelProps {
   canPublish: boolean;
   published: PublishedAdRow[];
   resourcesHref: string;
+  /** The Meta audience planned for the ad; the Meta ad set targets it (countries can be changed here). */
+  metaTargeting?: AdStudioMetaTargeting | null;
   /** Starts "Connect with Facebook" and comes back here; null when the viewer cannot connect accounts or no Meta app is configured. */
   metaConnectHref?: string | null;
 }
@@ -141,7 +143,9 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const [linkUrl, setLinkUrl] = React.useState(props.defaultLink);
   const [businessName, setBusinessName] = React.useState('');
   const [dailyBudget, setDailyBudget] = React.useState('20');
-  const [countries, setCountries] = React.useState('IL');
+  const [countries, setCountries] = React.useState(
+    props.metaTargeting?.countries.join(', ') || 'IL',
+  );
   const [euPolitical, setEuPolitical] = React.useState<'' | 'yes' | 'no'>('');
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{
@@ -347,6 +351,20 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         {googleBlocked ? <p className="text-xs text-warning">{t('publish.googleVideo')}</p> : null}
         {metaBlocked ? (
           <p className="text-xs text-warning">{t('publish.searchGoogleOnly')}</p>
+        ) : null}
+        {destination === 'meta' && !isSearch ? (
+          <p className="text-xs text-muted-foreground" data-testid="ad-studio-publish-audience">
+            {props.metaTargeting
+              ? t('publish.audiencePlanned', {
+                  ages: `${props.metaTargeting.ageMin}-${props.metaTargeting.ageMax}${props.metaTargeting.ageMax === 65 ? '+' : ''}`,
+                  genders: t(
+                    `audience.genders.${props.metaTargeting.genders.length === 1 ? props.metaTargeting.genders[0] : 'all'}`,
+                  ),
+                  audiences: props.metaTargeting.customAudiences.length,
+                  interests: props.metaTargeting.interests.length,
+                })
+              : t('publish.audienceBroad')}
+          </p>
         ) : null}
         {isSearch && destination === 'google_ads' ? (
           <p className="text-xs text-muted-foreground">{t('publish.searchNote')}</p>

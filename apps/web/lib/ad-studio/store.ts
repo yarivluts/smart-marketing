@@ -1,5 +1,5 @@
 import 'server-only';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
@@ -161,6 +161,8 @@ export interface AdStudioBriefView {
   searchKeywords: AdStudioSearchKeywords | null;
   /** The responsive search ad; null until written. */
   searchAd: AdStudioSearchAd | null;
+  /** The Meta audience the ad is planned for; null until chosen. */
+  metaTargeting: AdStudioMetaTargeting | null;
   createdOn: string;
   lastChangedOn: string;
 }
@@ -193,6 +195,9 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
       ? { targeting: { ...brief.search_keywords.targeting }, keywords: brief.search_keywords.keywords.map((keyword) => ({ ...keyword })), negatives: [...brief.search_keywords.negatives] }
       : null,
     searchAd: brief.search_ad ? { ...brief.search_ad, headlines: [...brief.search_ad.headlines], descriptions: [...brief.search_ad.descriptions] } : null,
+    metaTargeting: brief.meta_targeting
+      ? { ...brief.meta_targeting, countries: [...brief.meta_targeting.countries], genders: [...brief.meta_targeting.genders], customAudiences: brief.meta_targeting.customAudiences.map((audience) => ({ ...audience })), interests: brief.meta_targeting.interests.map((interest) => ({ ...interest })) }
+      : null,
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
   };

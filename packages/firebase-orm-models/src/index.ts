@@ -134,6 +134,7 @@ export * from './services/ad-studio.service';
 export * from './services/ad-studio-export.service';
 export * from './services/ad-studio-video.service';
 export * from './services/ad-studio-planning.service';
+export * from './services/ad-studio-audience.service';
 export * from './services/ad-studio-image.service';
 export * from './services/ad-studio-reference.service';
 export * from './services/ad-studio-run.service';

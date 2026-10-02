@@ -46,6 +46,10 @@ import {
   saveAdStudioVideoSettings,
   AdStudioVideoSettingsInvalidError,
   saveAdStudioSearchKeywords,
+  saveAdStudioMetaTargeting,
+  AdStudioTargetingInvalidError,
+  META_BREAKDOWNS,
+  type MetaBreakdown,
   saveAdStudioSearchAd,
   AdStudioSearchInvalidError,
   saveAdStudioImageConcepts,
@@ -70,6 +74,10 @@ import {
   removeBriefReference,
   writeAdStudioCopy,
   researchAdStudioKeywords,
+  loadAdStudioMetaAudiences,
+  searchAdStudioMetaInterests,
+  estimateAdStudioMetaReach,
+  loadAdStudioMetaPerformance,
   writeAdStudioSearchAd,
   toAdStudioReferenceView,
   type AdStudioReferenceView,
@@ -113,7 +121,7 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, isSearchTargeting, defaultSearchTargeting, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, type AdStudioMetaTargeting, defaultMetaTargeting, metaTargetingIssues, normalizeMetaTargeting, isSearchTargeting, defaultSearchTargeting, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -165,6 +173,7 @@ function describeAdStudioToolError(error: unknown): string {
   if (error instanceof AdStudioScriptInvalidError) return `The script breaks these rules: ${error.issues.map((issue) => (issue.scene ? `${issue.code} (scene ${issue.scene})` : issue.code)).join(', ')}.`;
   if (error instanceof AdStudioVoiceInvalidError) return `Invalid voice: ${error.code}.`;
   if (error instanceof AdStudioVideoSettingsInvalidError) return `Invalid video settings: ${error.code}.`;
+  if (error instanceof AdStudioTargetingInvalidError) return `The audience breaks these rules: ${error.issues.join(', ')}.`;
   if (error instanceof AdStudioSearchInvalidError) return `The search ad breaks these rules: ${error.issues.map((issue) => (issue.index ? `${issue.code} (#${issue.index})` : issue.code)).join(', ')}.`;
   if (error instanceof AdStudioCopyInvalidError) return `The ad copy breaks these rules: ${error.issues.map((issue) => `${issue.code} (${issue.target})`).join(', ')}.`;
   if (error instanceof AdStudioImageConceptsInvalidError) {
@@ -354,6 +363,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       assembled_video: assembled.latest ? { video_id: assembled.latest.id, current: assembled.current, duration_seconds: assembled.latest.durationSeconds } : null,
     },
     search: searchOutput(brief.search_keywords, brief.search_ad),
+    meta_targeting: brief.meta_targeting ? targetingOutput(brief.meta_targeting) : null,
     autopilot: run ? runOutput(toAdStudioRunView(run)) : null,
     exports: exports.map(exportOutput),
     web_url: webUrl(auth, briefId),
@@ -386,6 +396,44 @@ function keywordOutput(keyword: AdStudioSearchKeyword) {
     high_top_of_page_bid: keyword.highTopOfPageBid,
   };
 }
+
+/** Meta targeting in snake case. */
+function targetingOutput(targeting: AdStudioMetaTargeting) {
+  const ref = (item: { id: string; name: string; sizeLower: number | null; sizeUpper: number | null }) => ({ id: item.id, name: item.name, size_lower: item.sizeLower, size_upper: item.sizeUpper });
+  return { countries: targeting.countries, age_min: targeting.ageMin, age_max: targeting.ageMax, genders: targeting.genders, custom_audiences: targeting.customAudiences.map(ref), interests: targeting.interests.map(ref) };
+}
+
+/** Meta targeting from MCP arguments (snake case), over the saved one or the default. */
+function targetingFromArgs(base: AdStudioMetaTargeting, a: any): AdStudioMetaTargeting {
+  const refs = (list: any[] | undefined, current: AdStudioMetaTargeting['interests']) =>
+    list ? list.map((item) => ({ id: String(item.id), name: String(item.name ?? ''), sizeLower: item.size_lower ?? null, sizeUpper: item.size_upper ?? null })) : current;
+  return {
+    countries: a.countries ?? base.countries,
+    ageMin: a.age_min ?? base.ageMin,
+    ageMax: a.age_max ?? base.ageMax,
+    genders: a.genders ?? base.genders,
+    customAudiences: refs(a.custom_audiences, base.customAudiences),
+    interests: refs(a.interests, base.interests),
+  };
+}
+
+const audienceRefShape = z.array(
+  z.object({
+    id: z.string().describe('The Meta id, from get_ad_audiences or search_ad_interests.'),
+    name: z.string().describe('Its name.'),
+    size_lower: z.number().nullable().optional().describe('Meta size range, low end.'),
+    size_upper: z.number().nullable().optional().describe('Meta size range, high end.'),
+  }),
+);
+
+const targetingFields = {
+  countries: z.array(z.string()).optional().describe('ISO 2-letter country codes, 1-25.'),
+  age_min: z.number().optional().describe('18-65.'),
+  age_max: z.number().optional().describe('18-65; 65 means 65 and over.'),
+  genders: z.array(z.string()).optional().describe('[] for everyone, or ["female"] / ["male"].'),
+  custom_audiences: audienceRefShape.optional().describe('Custom or lookalike audiences of the ad account (at most 10); saved audiences cannot be used.'),
+  interests: audienceRefShape.optional().describe('Meta interests (at most 25).'),
+};
 
 const targetingShape = z
   .object({
@@ -792,6 +840,102 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; headlines: string[]; descriptions: string[]; path1?: string; path2?: string }) => {
         const brief = await saveAdStudioSearchAd({ ...ctx(a.brief_id), ad: { headlines: a.headlines, descriptions: a.descriptions, path1: a.path1 ?? '', path2: a.path2 ?? '' } });
         return textResult(searchOutput(brief.search_keywords, brief.search_ad).ad);
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'get_ad_audiences',
+    {
+      title: "List the Meta ad account's audiences",
+      description:
+        "The project's Meta ad account audiences - custom, lookalike and saved - with Meta's size ranges. Read only. When no Meta account is connected or Meta refuses, says why (status unavailable + reason). Requires \"ai.use\".",
+      inputSchema: toolInputSchema({ brief_id: briefId }),
+    },
+    auditedToolHandler(auth, 'get_ad_audiences', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async () => {
+        const result = await loadAdStudioMetaAudiences({ organizationId: auth.organizationId, projectId: auth.projectId });
+        if (result.status !== 'ok') return textResult(result);
+        return textResult({ status: 'ok', audiences: result.data.map((audience) => ({ id: audience.id, name: audience.name, kind: audience.kind, subtype: audience.subtype, size_lower: audience.sizeLower, size_upper: audience.sizeUpper })) });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'search_ad_interests',
+    {
+      title: 'Search Meta interests',
+      description: 'Meta interests matching a word, with audience size ranges, named in the ad language when Meta has it. Read only. Requires "ai.use".',
+      inputSchema: toolInputSchema({ brief_id: briefId, query: z.string().describe('A word or two, e.g. "law".') }),
+    },
+    auditedToolHandler(auth, 'search_ad_interests', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; query: string }) => {
+        const brief = await getAdStudioBrief(auth.organizationId, auth.projectId, a.brief_id);
+        const result = await searchAdStudioMetaInterests({ organizationId: auth.organizationId, projectId: auth.projectId, query: a.query, language: brief.language });
+        if (result.status !== 'ok') return textResult(result);
+        return textResult({ status: 'ok', interests: result.data.map((interest) => ({ id: interest.id, name: interest.name, size_lower: interest.sizeLower, size_upper: interest.sizeUpper, path: interest.path })) });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'estimate_ad_reach',
+    {
+      title: 'Estimate the reach of an audience',
+      description: "Meta's estimate of how many people a month the ad's audience reaches: the saved targeting, with any fields given here changed (not saved). Read only. Requires \"ai.use\".",
+      inputSchema: toolInputSchema({ brief_id: briefId, ...targetingFields }),
+    },
+    auditedToolHandler(auth, 'estimate_ad_reach', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: any) => {
+        const brief = await getAdStudioBrief(auth.organizationId, auth.projectId, a.brief_id);
+        const targeting = normalizeMetaTargeting(targetingFromArgs(brief.meta_targeting ?? defaultMetaTargeting(brief.language), a));
+        const issues = metaTargetingIssues(targeting);
+        if (issues.length) return errorResult(`The audience breaks these rules: ${issues.join(', ')}.`);
+        const result = await estimateAdStudioMetaReach({ organizationId: auth.organizationId, projectId: auth.projectId, targeting });
+        if (result.status !== 'ok') return textResult(result);
+        return textResult({ status: 'ok', monthly_lower: result.data.monthlyLower, monthly_upper: result.data.monthlyUpper, ready: result.data.ready });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'get_ad_performance_breakdown',
+    {
+      title: 'What worked before on Meta',
+      description:
+        "The Meta ad account's last 90 days (every campaign) by breakdown age_gender, placement or country: spend, impressions, clicks, link clicks and conversions per segment, biggest spend first, in the account currency. Read only. Requires \"ai.use\".",
+      inputSchema: toolInputSchema({ brief_id: briefId, breakdown: z.string().describe('age_gender, placement or country.') }),
+    },
+    auditedToolHandler(auth, 'get_ad_performance_breakdown', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; breakdown: string }) => {
+        if (!(a.breakdown in META_BREAKDOWNS)) return errorResult('Invalid: breakdown is age_gender, placement or country.');
+        const result = await loadAdStudioMetaPerformance({ organizationId: auth.organizationId, projectId: auth.projectId, breakdown: a.breakdown as MetaBreakdown });
+        if (result.status !== 'ok') return textResult(result);
+        return textResult({
+          status: 'ok',
+          rows: result.data.slice(0, 50).map((row) => ({ segment: row.segment, spend: row.spend, impressions: row.impressions, clicks: row.clicks, link_clicks: row.linkClicks, conversions: row.conversions })),
+        });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'set_ad_targeting',
+    {
+      title: 'Set the Meta audience of the ad',
+      description:
+        'Saves who the Meta ad targets - fields given change the saved targeting (or the default: the ad language country, every adult); clear: true removes it. Publishing to Meta targets it. Refused with every broken rule. Requires "ai.use".',
+      inputSchema: toolInputSchema({ brief_id: briefId, ...targetingFields, clear: z.boolean().optional().describe('Remove the saved targeting.') }),
+    },
+    auditedToolHandler(auth, 'set_ad_targeting', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: any) => {
+        if (a.clear === true) {
+          await saveAdStudioMetaTargeting({ ...ctx(a.brief_id), targeting: null });
+          return textResult({ meta_targeting: null });
+        }
+        const brief = await getAdStudioBrief(auth.organizationId, auth.projectId, a.brief_id);
+        const saved = await saveAdStudioMetaTargeting({ ...ctx(a.brief_id), targeting: targetingFromArgs(brief.meta_targeting ?? defaultMetaTargeting(brief.language), a) });
+        return textResult({ meta_targeting: saved.meta_targeting ? targetingOutput(saved.meta_targeting) : null });
       }),
     ),
   );

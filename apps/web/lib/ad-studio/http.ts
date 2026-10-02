@@ -8,6 +8,7 @@ import {
   AdStudioVoiceInvalidError,
   AdStudioVideoSettingsInvalidError,
   AdStudioSearchInvalidError,
+  AdStudioTargetingInvalidError,
   AdStudioQuotaExceededError,
   AdStudioScriptInvalidError,
   AdStudioVideoNotFoundError,
@@ -78,6 +79,9 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof AdStudioVideoRequestError) {
     return NextResponse.json({ error: 'video_request', code: error.code }, { status: VIDEO_REQUEST_STATUS[error.code] });
+  }
+  if (error instanceof AdStudioTargetingInvalidError) {
+    return NextResponse.json({ error: 'invalid_targeting', issues: error.issues.map((code) => ({ code })) }, { status: 400 });
   }
   if (error instanceof AdStudioSearchInvalidError) {
     return NextResponse.json({ error: 'invalid_search', issues: error.issues }, { status: 400 });
