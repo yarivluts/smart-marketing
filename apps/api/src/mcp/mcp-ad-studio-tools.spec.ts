@@ -287,6 +287,9 @@ describe('Ad Studio MCP tools', () => {
     expect((tooFew.content[0] as { text: string }).text).toBe('The search ad breaks these rules: too_few_headlines.');
     expect(await json('save_search_ad', { brief_id: ad.id, headlines: ['One', 'Two', 'Three'], descriptions: ['a', 'b'], path1: 'x' })).toEqual({ headlines: ['One', 'Two', 'Three'], descriptions: ['a', 'b'], path1: 'x', path2: '' });
     expect(await json('save_ad_keywords', { brief_id: ad.id, clear: true })).toMatchObject({ keywords: [], targeting: null });
+    // Publishing it creates a real (paused) campaign: that needs automation.execute, which this key lacks.
+    const publish = await call('publish_ad', { brief_id: ad.id, destination: 'google_ads', search: true, campaign_name: 'Search', link_url: 'https://easysign.example', daily_budget: 10 });
+    expect((publish.content[0] as { text: string }).text).toContain('"automation.execute"');
   });
 
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {

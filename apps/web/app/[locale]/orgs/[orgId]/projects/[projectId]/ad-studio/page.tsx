@@ -311,6 +311,19 @@ export default async function AdStudioPage({
           },
         ]
       : []),
+    // The search ad, once written: published to Google Search with its keywords.
+    ...(selected?.searchAd
+      ? [
+          {
+            key: 'search',
+            kind: 'search' as const,
+            id: 'search',
+            label: t('publish.searchAd'),
+            previewSrc: '',
+            search: { ...selected.searchAd, keywordCount: selected.searchKeywords?.keywords.length ?? 0 },
+          },
+        ]
+      : []),
   ];
   const publishedAds = exportsView.filter((row) => row.resultKind === 'ad');
   const stepHref = (id: AdStudioStepId) => `${base}?brief=${selected?.id}&step=${id}`;

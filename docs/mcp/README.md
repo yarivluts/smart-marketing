@@ -213,7 +213,7 @@ Rendering takes minutes, so no tool waits for it to finish. Start the work with 
 | `list_ad_export_destinations` | `ai.use` | Where creatives can go (Meta, YouTube, Google Ads) and why not where they cannot |
 | `export_ad_video` | `automation.execute` (OAuth/human only) | Upload the assembled video to the Meta ad account or the YouTube channel |
 | `export_ad_image` | `automation.execute` (OAuth/human only) | Upload an image to Meta's ad image library or as a Google Ads image asset |
-| `publish_ad` | `automation.execute` (OAuth/human only) | Create a real, PAUSED ad from an image or the video: Meta campaign + ad set + creative + ad, or a Google Display campaign + responsive display ad (images). Returns the link to the ad |
+| `publish_ad` | `automation.execute` (OAuth/human only) | Create a real, PAUSED ad from an image or the video: Meta campaign + ad set + creative + ad, or a Google Display campaign + responsive display ad (images), or with `search: true` a Google Search campaign (Google Search only) from the saved search ad, keywords and negatives, targeted where the keywords were researched. Returns the link to the ad |
 | `get_ad_studio_usage` | `ai.use` | Daily limits, today's usage, which models are configured, and the clip quality-check setting |
 | `set_ad_studio_limits` | `project.configure` | Set the daily limits for AI text calls, video seconds and images, and the clip quality check (`video_qa_enabled`, `video_qa_retries` 0-2) |
 

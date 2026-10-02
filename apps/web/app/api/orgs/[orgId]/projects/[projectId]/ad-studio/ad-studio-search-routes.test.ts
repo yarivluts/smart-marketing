@@ -11,7 +11,9 @@ import {
   ensureUserForFirebaseSession,
   getAdStudioBrief,
   listAdStudioUsage,
+  pushResourceAttachment,
   requestResourceAttachment,
+  setResourceAttachmentWriteTier,
   setSharedCredentialSecret,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -21,6 +23,7 @@ import { POST as research } from './briefs/[briefId]/keywords/research/route';
 import { PUT as saveKeywords } from './briefs/[briefId]/keywords/route';
 import { PUT as saveSearchAd } from './briefs/[briefId]/search-ad/route';
 import { POST as writeSearchAd } from './briefs/[briefId]/search-ad/generate/route';
+import { POST as publish } from './briefs/[briefId]/publish/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -165,6 +168,52 @@ describe('Ad Studio search ads', () => {
     expect((await saveKeywords(request('PUT', { keywords: 'nope' }), ctx.p)).status).toBe(400);
     await saveKeywords(request('PUT', { keywords: null }), ctx.p);
     expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).search_keywords).toBeNull();
+  });
+
+  it('publishes the saved search ad as a paused Google Search campaign with its keywords, in the researched country and language', async () => {
+    const ctx = await setup();
+    const credential = await createSharedCredential({ organizationId: ctx.orgId, name: 'Google Ads', provider: 'google_ads', availableScopes: ['ads'], createdByUserId: ctx.owner.id });
+    await setSharedCredentialSecret({
+      organizationId: ctx.orgId,
+      credentialId: credential.id,
+      secret: JSON.stringify({ developerToken: 'dev', clientId: 'cid', clientSecret: 'cs', refreshToken: 'rt', customerId: '123-456-7890' }),
+      kms: getServerKmsProvider(),
+      actorId: ctx.owner.id,
+    });
+    const attachment = await pushResourceAttachment({ organizationId: ctx.orgId, projectId: ctx.projectId, resourceKind: 'credential', resourceId: credential.id, pushedByUserId: ctx.owner.id, scopeSelection: ['ads'] });
+    await setResourceAttachmentWriteTier({ organizationId: ctx.orgId, attachmentId: attachment.id, tier: 'manage', actorId: ctx.owner.id });
+    await saveKeywords(request('PUT', { keywords: KEYWORDS }), ctx.p);
+    // Without a search ad there is nothing to publish.
+    const early = await publish(request('POST', { destination: 'google_ads', source: { kind: 'search' }, campaignName: 'Search', copy: { linkUrl: BRIEF.landingPageUrl }, dailyBudget: 40, containsEuPoliticalAdvertising: false }), ctx.p);
+    expect(await early.json()).toEqual({ error: 'invalid_export', reasons: ['write the search ad first'] });
+    await saveSearchAd(request('PUT', { ad: { headlines: ['Sign in seconds', 'E-signatures', 'Start free'], descriptions: ['Upload, send, signed.', 'Legally binding.'], path1: 'sign', path2: '' } }), ctx.p);
+
+    const mutations: [string, unknown][] = [];
+    const created: Record<string, string> = { campaignBudgets: 'customers/1234567890/campaignBudgets/8', campaigns: 'customers/1234567890/campaigns/56', adGroups: 'customers/1234567890/adGroups/67', adGroupAds: 'customers/1234567890/adGroupAds/67~78' };
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url === 'https://oauth2.googleapis.com/token') return new Response(JSON.stringify({ access_token: 'a', expires_in: 3600 }), { status: 200 });
+      const resource = url.match(/customers\/1234567890\/(\w+):mutate$/)?.[1];
+      if (!resource) throw new Error(`Unexpected request to ${url}`);
+      mutations.push([resource, JSON.parse(String(init?.body)).operations]);
+      return new Response(JSON.stringify({ results: [{ resourceName: created[resource] ?? '' }] }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await publish(
+      request('POST', { destination: 'google_ads', source: { kind: 'search' }, campaignName: 'Sign fast - search', copy: { linkUrl: BRIEF.landingPageUrl }, dailyBudget: 40, containsEuPoliticalAdvertising: false }),
+      ctx.p,
+    );
+    const published = (await response.json()) as { ad: unknown };
+    expect(published.ad).toMatchObject({ mediaKind: 'search', status: 'done', destination: 'google_ads' });
+    expect(mutations.map(([resource]) => resource)).toEqual(['campaignBudgets', 'campaigns', 'campaignCriteria', 'adGroups', 'adGroupAds', 'adGroupCriteria']);
+    expect(mutations[2][1]).toEqual([
+      { create: { campaign: created.campaigns, location: { geoTargetConstant: 'geoTargetConstants/2376' } } },
+      { create: { campaign: created.campaigns, language: { languageConstant: 'languageConstants/1027' } } },
+    ]);
+    // Max CPC: the middle of the keywords' top-of-page bids (only one reported: 9.4).
+    expect((mutations[3][1] as { create: { cpcBidMicros: string } }[])[0].create.cpcBidMicros).toBe('9400000');
+    expect((mutations[5][1] as unknown[]).length).toBe(4);
   });
 
   it('the AI writes a search ad for the chosen keywords, fitted to Google limits; a person edits it within them', async () => {

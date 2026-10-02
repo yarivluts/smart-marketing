@@ -1266,15 +1266,16 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     {
       title: 'Publish as a real ad',
       description:
-        'Creates a real ad from a finished creative: on Meta a campaign, ad set, creative and ad (an image or the assembled video); on Google Ads a Display campaign, ad group and responsive display ad (images only; the image is cropped to 1.91:1 and square). Everything is created PAUSED - nothing spends until the person turns it on in the platform - and the result carries the link to the ad. Requires "automation.execute" (OAuth connections only).',
+        'Creates a real ad from a finished creative: on Meta a campaign, ad set, creative and ad (an image or the assembled video); on Google Ads a Display campaign, ad group and responsive display ad (images only; the image is cropped to 1.91:1 and square), or with search: true a Search campaign (Google Search only) from the saved search ad and keywords, in the country and language they were researched in. Everything is created PAUSED - nothing spends until the person turns it on in the platform - and the result carries the link to the ad. Requires "automation.execute" (OAuth connections only).',
       inputSchema: toolInputSchema({
         brief_id: briefId,
         destination: z.string().describe('"meta" or "google_ads".'),
         image_id: z.string().optional().describe('A ready image id; give this or video_id.'),
         video_id: z.string().optional().describe('A ready assembled video id (Meta only).'),
+        search: z.boolean().optional().describe('Publish the saved search ad (google_ads only) instead of an image or video; headline and primary_text are then ignored.'),
         campaign_name: z.string().describe('1-120 characters.'),
-        headline: z.string().describe('Meta up to 40, Google up to 30 characters.'),
-        primary_text: z.string().describe('The main ad text (Google: the long headline, up to 90).'),
+        headline: z.string().optional().describe('Meta up to 40, Google up to 30 characters. Not used for search.'),
+        primary_text: z.string().optional().describe('The main ad text (Google: the long headline, up to 90). Not used for search.'),
         description: z.string().optional().describe('Up to 90 characters.'),
         link_url: z.string().describe('The landing page, https.'),
         business_name: z.string().optional().describe('Google only, up to 25 characters.'),
@@ -1293,9 +1294,10 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
           destination: string;
           image_id?: string;
           video_id?: string;
+          search?: boolean;
           campaign_name: string;
-          headline: string;
-          primary_text: string;
+          headline?: string;
+          primary_text?: string;
           description?: string;
           link_url: string;
           business_name?: string;
@@ -1304,11 +1306,11 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
           contains_eu_political_advertising?: boolean;
         }) => {
           if (a.destination !== 'meta' && a.destination !== 'google_ads') return errorResult('Invalid: ads publish to meta or google_ads.');
-          if (Boolean(a.image_id) === Boolean(a.video_id)) return errorResult('Invalid: give exactly one of image_id or video_id.');
+          if ([Boolean(a.image_id), Boolean(a.video_id), a.search === true].filter(Boolean).length !== 1) return errorResult('Invalid: give exactly one of image_id, video_id or search: true.');
           const row = await publishBriefAd({
             ...ctx(a.brief_id),
             destination: a.destination,
-            source: a.image_id ? { kind: 'image', imageId: a.image_id } : { kind: 'video', videoId: a.video_id as string },
+            source: a.search ? { kind: 'search' } : a.image_id ? { kind: 'image', imageId: a.image_id } : { kind: 'video', videoId: a.video_id as string },
             copy: { headline: a.headline ?? '', primaryText: a.primary_text ?? '', description: a.description ?? '', linkUrl: a.link_url ?? '', businessName: a.business_name ?? '' },
             campaignName: a.campaign_name ?? '',
             dailyBudget: a.daily_budget,

@@ -212,7 +212,7 @@ export async function listAdStudioExports(organizationId: string, projectId: str
 export interface AdStudioExportView {
   id: string;
   /** Rows written before image ads existed are videos. */
-  mediaKind: 'video' | 'image';
+  mediaKind: 'video' | 'image' | 'search';
   videoId: string | null;
   imageId: string | null;
   destination: 'meta' | 'youtube' | 'google_ads';

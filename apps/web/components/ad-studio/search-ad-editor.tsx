@@ -9,13 +9,13 @@ import {
   AD_STUDIO_RSA_HEADLINE_MAX,
   AD_STUDIO_RSA_HEADLINES,
   AD_STUDIO_RSA_PATH_MAX,
-  searchAdDisplayUrl,
   searchAdIssues,
   type AdStudioSearchAd,
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
+import { SearchResultPreview } from './search-result-preview';
 
 export interface SearchAdEditorProps {
   orgId: string;
@@ -122,14 +122,6 @@ export function SearchAdEditor({
   const issues = searchAdIssues(draft);
   const headlines = draft.headlines.map((line) => line.trim()).filter(Boolean);
   const descriptions = draft.descriptions.map((line) => line.trim()).filter(Boolean);
-  // A preview shows three headlines and two descriptions; "another combination" rotates them as Google would.
-  const pick = (lines: string[], count: number) =>
-    lines.length
-      ? Array.from(
-          { length: Math.min(count, lines.length) },
-          (_, index) => lines[(index + combination) % lines.length],
-        )
-      : [];
 
   const setLine = (field: 'headlines' | 'descriptions', position: number, value: string) =>
     setDraft((current) => ({
@@ -316,34 +308,15 @@ export function SearchAdEditor({
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-muted-foreground">{t('previewTitle')}</span>
-          <div
-            className="rounded-xl border border-border bg-background p-4 shadow-sm"
-            data-testid="ad-studio-search-preview"
-          >
-            <div className="flex items-center gap-2 text-xs">
-              <span
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-[11px] font-semibold"
-                aria-hidden="true"
-              >
-                {advertiser.trim().charAt(0).toUpperCase() || 'A'}
-              </span>
-              <div className="flex min-w-0 flex-col">
-                <span className="truncate font-medium" dir="auto">
-                  {advertiser}
-                </span>
-                <span className="truncate text-muted-foreground" dir="ltr">
-                  {searchAdDisplayUrl(linkUrl, draft)}
-                </span>
-              </div>
-            </div>
-            <p className="mt-1 text-[11px] font-semibold">{t('sponsored')}</p>
-            <p className="mt-1 text-lg leading-snug text-[#1a0dab] dark:text-[#8ab4f8]" dir="auto">
-              {pick(headlines, 3).join(' | ') || t('previewHeadlinePlaceholder')}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground" dir="auto">
-              {pick(descriptions, 2).join(' ') || t('previewDescriptionPlaceholder')}
-            </p>
-          </div>
+          <SearchResultPreview
+            headlines={headlines}
+            descriptions={descriptions}
+            path1={draft.path1}
+            path2={draft.path2}
+            linkUrl={linkUrl}
+            advertiser={advertiser}
+            combination={combination}
+          />
           <button
             type="button"
             onClick={() => setCombination((current) => current + 1)}

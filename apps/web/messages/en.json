@@ -4310,7 +4310,12 @@
       "video": "The video",
       "connectMeta": "Connect with Facebook",
       "platformSaid": "The platform said: {detail}",
-      "previewTitle": "How the ad will look"
+      "previewTitle": "How the ad will look",
+      "searchAd": "Search ad (Google)",
+      "searchKeywords": "{count} keywords",
+      "searchGoogleOnly": "A search ad runs on Google Search - choose Google Ads.",
+      "searchNote": "Creates a paused Google Search campaign (Google Search only, no Display) in the country and language its keywords were researched in, with the search ad, the keywords and the negative keywords. The max CPC starts from the keywords' top-of-page bids.",
+      "kindSearch": "Search ad"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
