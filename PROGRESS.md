@@ -17,6 +17,42 @@ Template for each entry:
 
 ---
 
+## 2026-10-02 - Who speaks + narrator voice, advanced video settings, search ads, Meta audiences (KAN-279..282)
+
+- **Last completed:** all requested by Yariv after his review; every PR deployed to prod and preprod.
+  - **PR #573:** in Review, edit a scene's description, an "Add nikud" button, and AI edit suggestions you accept or cancel.
+  - **PR #574 (KAN-279, deployed e253224): who speaks each scene, and one narrator voice per ad.**
+    - Each narrated scene is a voice-over (default) or spoken on screen by a person in the shot, optionally a named one when several are in frame.
+    - The clip QA checks it: wrong speaker, lips out of sync, or an unseen narrator.
+    - Narrator voice: 5 presets or a custom description, written identically into every scene prompt. Omni has no voice id, so this is what keeps the scenes consistent.
+    - New fingerprint fields are included only when set, so earlier clips stay current.
+  - **PR #575 (KAN-280, deployed dfac87c): "Advanced settings" dialog.**
+    - Resolution 360p, 720p or 1080p, sent as Omni `response_format.resolution`. Edits keep their clip's resolution, and assembly runs at 1080p for 1080p clips, else 720p. 4K is left out on purpose because of server-side assembly cost.
+    - Visual style, background music and a "never show" list. Omni has no fields for these (its docs say to use the prompt), so they become prompt lines.
+    - The image library now takes any image (product, logo, person, place). WebP and photos over 4 MB are converted in the browser to a JPEG.
+  - **PR #576 (KAN-281, deployed 1cd5be6): search ads.**
+    - Keyword research through Keyword Planner by country and language, with keyword, match-type and negative selection.
+    - An AI-written responsive search ad (15/4, Google limits enforced) with a SERP preview.
+    - Publish creates a PAUSED Google-Search-only campaign targeted at the researched country and language, with max CPC from the keywords' top-of-page bids.
+    - Fix: customer and login-customer ids pasted with dashes now publish. Display publishing failed on them before.
+  - **PR #577 (KAN-282, deployed 509c7b8): Meta audience planning, read only from the project's Meta ad account.**
+    - Custom, lookalike and saved audiences with sizes; interest search with sizes; a `delivery_estimate` reach estimate.
+    - The last 90 days by age & gender, placement and country.
+    - Publishing to Meta targets the saved countries, ages, gender, audiences and interests.
+  - **MCP:**
+    - `set_ad_voice`, `set_ad_video_settings`
+    - `research_ad_keywords`, `save_ad_keywords`, `write_search_ad`, `save_search_ad`
+    - `get_ad_audiences`, `search_ad_interests`, `estimate_ad_reach`, `get_ad_performance_breakdown`, `set_ad_targeting`
+    - `publish_ad` takes `search: true`.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** live Keyword Planner volumes and any future Google performance reports need the Google Ads developer token approved (KAN-43). Until then the keyword panel shows the reason.
+- **Next step:**
+  - Google Ads performance reports (search terms, keyword_view) to feed the plan.
+  - Retry transient Gemini 503 errors.
+- **Waiting on human:**
+  - KAN-43 (developer token).
+  - Earlier open questions: re-publishing the Hebrew EasySign ad, and the "end-to-end encryption" claim in one image idea's copy.
+
 ## 2026-10-01 - Ad placement previews, narration editing with nikud in Review, shorter phone layout
 
 - **Last completed:** PR #571, deployed 48a08bc. Yariv asked for these after his phone review.
