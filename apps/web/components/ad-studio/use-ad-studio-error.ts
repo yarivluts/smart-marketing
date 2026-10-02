@@ -20,6 +20,7 @@ const ASSEMBLY_CODES = new Set(['ffmpeg_unavailable', 'ffmpeg_failed', 'storage_
 const IMAGE_REQUEST_CODES = new Set(['concept_not_found', 'format_not_in_concept', 'image_not_editable', 'invalid_instruction', 'image_not_ready']);
 const VOICE_CODES = new Set(['unknown_voice', 'voice_description_required', 'voice_description_too_long']);
 const VIDEO_SETTINGS_CODES = new Set(['unknown_resolution', 'unknown_style', 'unknown_music', 'music_description_required', 'music_description_too_long', 'avoid_too_long']);
+const TARGETING_CODES = new Set(['no_countries', 'too_many_countries', 'invalid_country', 'invalid_age', 'invalid_gender', 'too_many_audiences', 'too_many_interests', 'invalid_audience']);
 const SEARCH_CODES = new Set([
   'invalid_targeting',
   'too_many_keywords',
@@ -63,6 +64,9 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'invalid_concepts') return t('images.errorInvalidConcepts');
     if (body.error === 'invalid_copy') return t('copy.errorInvalid');
     if (body.error === 'invalid_voice' && body.code && VOICE_CODES.has(body.code)) return t(`voice.errors.${body.code}`);
+    if (body.error === 'invalid_targeting') {
+      return t('audience.errorInvalid', { reasons: (body.issues ?? []).map((issue) => t(`audience.issues.${TARGETING_CODES.has(issue.code) ? issue.code : 'unknown'}`)).join('; ') });
+    }
     if (body.error === 'invalid_search') {
       return t('search.errorInvalid', { reasons: (body.issues ?? []).map((issue) => t(`search.issues.${SEARCH_CODES.has(issue.code) ? issue.code : 'unknown'}`, { index: issue.index ?? 0 })).join('; ') });
     }

@@ -8,7 +8,7 @@ import { GoogleAdsApiError, GoogleAdsHttpApiClient, type GoogleAdsApiClient } fr
 import { AdStudioExportInvalidError, AdStudioExportUnavailableError, resolveAdStudioExportDestinations } from './ad-studio-export.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
 import { recordAuditLogEntry } from './audit-log.service';
-import { searchAdIssues, searchTargetingToGoogle, type AdStudioSearchAd, type AdStudioSearchKeyword, type AdStudioSearchTargeting } from '@growthos/shared';
+import { metaAdSetTargeting, searchAdIssues, searchTargetingToGoogle, type AdStudioMetaTargeting, type AdStudioSearchAd, type AdStudioSearchKeyword, type AdStudioSearchTargeting } from '@growthos/shared';
 
 /**
  * Publishing an Ad Studio creative as a real ad (the stepper's last step): not just uploading media
@@ -57,6 +57,8 @@ export interface PublishAdStudioAdParams {
   dailyBudget: number;
   /** ISO country codes the Meta ad set targets. */
   countries: string[];
+  /** Meta: the ad's planned audience (ages, genders, audiences, interests); absent targets every adult in `countries`. */
+  metaTargeting?: AdStudioMetaTargeting | null;
   /** Google only: the advertiser's EU political advertising self-declaration - never defaulted. */
   containsEuPoliticalAdvertising?: boolean;
   kms: KmsProvider;
@@ -159,7 +161,7 @@ async function buildMetaAd(
   campaignId: string,
 ): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
   const account = secret.adAccountId;
-  const { adSetId } = await client.createAdSet(account, { campaignId, name: `${params.campaignName.trim()} - ad set`, targeting: { countries: params.countries, ageMin: 18, ageMax: 65 } });
+  const { adSetId } = await client.createAdSet(account, { campaignId, name: `${params.campaignName.trim()} - ad set`, targeting: params.metaTargeting ? { ...metaAdSetTargeting(params.metaTargeting), countries: params.countries } : { countries: params.countries, ageMin: 18, ageMax: 65 } });
   let creativeId: string;
   const refs: Record<string, string> = { campaign_id: campaignId, ad_set_id: adSetId };
   if (params.media.kind === 'image') {

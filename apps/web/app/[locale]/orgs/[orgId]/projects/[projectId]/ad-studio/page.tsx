@@ -81,6 +81,7 @@ import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { KeywordResearch } from '@/components/ad-studio/keyword-research';
 import { SearchAdEditor } from '@/components/ad-studio/search-ad-editor';
+import { AudiencePanel } from '@/components/ad-studio/audience-panel';
 import { DeleteBriefButton } from '@/components/ad-studio/delete-brief-button';
 import { AutopilotPanel } from '@/components/ad-studio/autopilot-panel';
 import { ImageStudio } from '@/components/ad-studio/image-studio';
@@ -526,6 +527,15 @@ export default async function AdStudioPage({
                 />
               </div>
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <AudiencePanel
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  language={selected.language}
+                  initial={selected.metaTargeting}
+                />
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <ReferenceLibrary
                   orgId={orgId}
                   projectId={projectId}
@@ -672,6 +682,7 @@ export default async function AdStudioPage({
                 briefName={selected.name}
                 defaultLink={selected.landingPageUrl ?? ''}
                 defaultPrimaryText={selected.objective}
+                metaTargeting={selected.metaTargeting}
                 creatives={publishCreatives}
                 destinations={{
                   meta: Boolean(exportDestinations?.meta.available),

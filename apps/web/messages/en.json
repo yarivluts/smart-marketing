@@ -4315,7 +4315,9 @@
       "searchKeywords": "{count} keywords",
       "searchGoogleOnly": "A search ad runs on Google Search - choose Google Ads.",
       "searchNote": "Creates a paused Google Search campaign (Google Search only, no Display) in the country and language its keywords were researched in, with the search ad, the keywords and the negative keywords. The max CPC starts from the keywords' top-of-page bids.",
-      "kindSearch": "Search ad"
+      "kindSearch": "Search ad",
+      "audiencePlanned": "Audience from the plan: ages {ages}, {genders}, {audiences} audiences, {interests} interests - in the countries below.",
+      "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step."
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
@@ -4672,6 +4674,100 @@
         "too_many_descriptions": "at most 4 descriptions",
         "description_too_long": "description {index} is longer than 90 characters",
         "path_too_long": "a display path is longer than 15 characters",
+        "unknown": "a rule was broken"
+      }
+    },
+    "audience": {
+      "title": "Audience (Facebook & Instagram)",
+      "description": "Who the ad is for, planned from your real Meta ad account: your own audiences and Meta interests with their sizes, a reach estimate, and what your past ads achieved by age, placement and country. The Meta ad targets what you save here.",
+      "countriesLabel": "Countries (e.g. IL, US)",
+      "ageMin": "Age from",
+      "ageMax": "Age to",
+      "gendersLabel": "Gender",
+      "genders": {
+        "all": "Everyone",
+        "female": "Women",
+        "male": "Men"
+      },
+      "audiencesTitle": "Your audiences ({count} of up to {max} chosen)",
+      "loading": "Reading your Meta ad account...",
+      "noAudiences": "The ad account has no custom or lookalike audiences yet.",
+      "kinds": {
+        "custom": "Custom",
+        "lookalike": "Lookalike",
+        "saved": "Saved"
+      },
+      "savedNote": "Saved audiences are targeting presets in Ads Manager - they are listed for reference and cannot be added here.",
+      "sizeUnknown": "size unknown",
+      "interestsTitle": "Interests ({count} of up to {max})",
+      "interestPlaceholder": "Search Meta interests, e.g. law, real estate",
+      "searchInterests": "Search",
+      "noInterests": "Meta has no interests matching this word.",
+      "addInterest": "Add {name}",
+      "removeInterest": "Remove {name}",
+      "interestsHint": "People with any of the chosen interests (or in any chosen audience) can see the ad. Fewer, closer interests usually work better than many broad ones.",
+      "estimate": "Estimate reach",
+      "estimateValue": "About {range} people a month",
+      "estimateNone": "Meta gave no estimate for this audience.",
+      "pastTitle": "What worked before",
+      "pastDescription": "Your Meta ad account's last 90 days, every campaign: spend, clicks and conversions per segment.",
+      "breakdowns": {
+        "age_gender": "Age & gender",
+        "placement": "Placement",
+        "country": "Country"
+      },
+      "pastEmpty": "No results in the last 90 days.",
+      "columns": {
+        "segment": "Segment",
+        "spend": "Spend",
+        "linkClicks": "Link clicks",
+        "ctr": "CTR",
+        "costPerClick": "Cost / click",
+        "conversions": "Conversions"
+      },
+      "segments": {
+        "female": "women",
+        "male": "men",
+        "unknown": "unknown",
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "audience_network": "Audience Network",
+        "messenger": "Messenger",
+        "feed": "feed",
+        "story": "stories",
+        "reels": "reels",
+        "instagram_reels": "reels",
+        "facebook_reels": "reels",
+        "instagram_stories": "stories",
+        "facebook_stories": "stories",
+        "marketplace": "marketplace",
+        "video_feeds": "video feeds",
+        "instagram_explore": "explore",
+        "right_hand_column": "right column",
+        "search": "search"
+      },
+      "currencyNote": "Amounts are in the ad account currency.",
+      "unavailable": {
+        "no_meta_credential": "No Meta ad account is connected to this project. Connect one in the Publish step.",
+        "credential_not_configured": "The Meta account attached to this project has no working credential. Reconnect it.",
+        "vault_not_configured": "This deployment cannot read stored credentials (no vault configured).",
+        "meta_auth_failed": "Meta refused the connection - the access may have expired. Reconnect the Meta account.",
+        "meta_permission_denied": "The Meta connection lacks permission to read this (ads_read). Reconnect and allow it.",
+        "meta_rate_limited": "Meta is limiting requests right now. Try again in a few minutes.",
+        "meta_error": "Meta could not answer right now. Try again in a minute."
+      },
+      "save": "Save audience",
+      "saved": "Audience saved. The Meta ad will target it.",
+      "errorInvalid": "The audience was not saved: {reasons}.",
+      "issues": {
+        "no_countries": "choose at least one country",
+        "too_many_countries": "at most 25 countries",
+        "invalid_country": "use 2-letter country codes, e.g. IL, US",
+        "invalid_age": "ages run 18 to 65+, from not above to",
+        "invalid_gender": "unknown gender",
+        "too_many_audiences": "at most 10 audiences",
+        "too_many_interests": "at most 25 interests",
+        "invalid_audience": "an audience or interest is not a Meta one",
         "unknown": "a rule was broken"
       }
     }

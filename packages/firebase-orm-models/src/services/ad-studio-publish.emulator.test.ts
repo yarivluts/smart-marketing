@@ -75,6 +75,38 @@ describe('publishAdStudioAd', () => {
     expect((await listAdStudioExports(ctx.orgId, ctx.projectId, 'b1'))[0].platform_refs).toMatchObject({ campaign_id: 'c1', ad_set_id: 's1', ad_id: 'a1' });
   });
 
+  it('targets the planned audience on Meta: ages, gender, custom audiences and interests, in the countries chosen at publish', async () => {
+    const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
+    const meta = fakeMeta();
+    await publishAdStudioAd({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: 'b1',
+      destination: 'meta',
+      media: { kind: 'image', imageId: 'i1', primary: IMG, square: null, landscape: null },
+      copy: COPY,
+      campaignName: 'Sign fast - lawyers',
+      dailyBudget: 20,
+      countries: ['IL', 'US'],
+      metaTargeting: {
+        countries: ['IL'],
+        ageMin: 25,
+        ageMax: 54,
+        genders: ['female'],
+        customAudiences: [{ id: '2385', name: 'Website visitors', sizeLower: 1000, sizeUpper: 1200 }],
+        interests: [{ id: '6003107902433', name: 'Law', sizeLower: null, sizeUpper: null }],
+      },
+      kms,
+      actorId: ctx.owner.id,
+      clients: { meta: () => meta },
+    });
+    expect(meta.createAdSet).toHaveBeenCalledWith('99', {
+      campaignId: 'c1',
+      name: 'Sign fast - lawyers - ad set',
+      targeting: { countries: ['IL', 'US'], ageMin: 25, ageMax: 54, genders: ['female'], customAudiences: ['2385'], interests: [{ id: '6003107902433', name: 'Law' }] },
+    });
+  });
+
   it('creates a paused Meta video ad with a thumbnail', async () => {
     const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
     const meta = fakeMeta();

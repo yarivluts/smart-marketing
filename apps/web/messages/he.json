@@ -4315,7 +4315,9 @@
       "searchKeywords": "{count} מילות מפתח",
       "searchGoogleOnly": "מודעת חיפוש רצה בחיפוש של גוגל - בחרו Google Ads.",
       "searchNote": "נוצר קמפיין חיפוש מושהה בגוגל (חיפוש בלבד, בלי רשת המדיה) במדינה ובשפה שבהן נחקרו מילות המפתח, עם מודעת החיפוש, מילות המפתח ומילות המפתח השליליות. הצעת המחיר המקסימלית לקליק מתחילה מהצעות ראש העמוד של מילות המפתח.",
-      "kindSearch": "מודעת חיפוש"
+      "kindSearch": "מודעת חיפוש",
+      "audiencePlanned": "קהל מהתוכנית: גילאי {ages}, {genders}, {audiences} קהלים, {interests} תחומי עניין - במדינות שלמטה.",
+      "audienceBroad": "לא תוכנן קהל: כל המבוגרים במדינות שלמטה. תכננו קהל בשלב התוכנית."
     },
     "imageFailure": {
       "not_configured": "לא הוגדר מודל תמונה",
@@ -4672,6 +4674,100 @@
         "too_many_descriptions": "עד 4 תיאורים",
         "description_too_long": "תיאור {index} ארוך מ-90 תווים",
         "path_too_long": "נתיב תצוגה ארוך מ-15 תווים",
+        "unknown": "הופר אחד הכללים"
+      }
+    },
+    "audience": {
+      "title": "קהל (פייסבוק ואינסטגרם)",
+      "description": "למי המודעה מיועדת, לפי חשבון המודעות האמיתי שלכם במטא: הקהלים שלכם ותחומי עניין של מטא עם הגדלים שלהם, הערכת חשיפה, ומה המודעות הקודמות שלכם השיגו לפי גיל, מיקום ומדינה. מודעת מטא תטרגט את מה שתשמרו כאן.",
+      "countriesLabel": "מדינות (למשל IL, US)",
+      "ageMin": "מגיל",
+      "ageMax": "עד גיל",
+      "gendersLabel": "מגדר",
+      "genders": {
+        "all": "כולם",
+        "female": "נשים",
+        "male": "גברים"
+      },
+      "audiencesTitle": "הקהלים שלכם ({count} מתוך עד {max} נבחרו)",
+      "loading": "קורא את חשבון המודעות במטא...",
+      "noAudiences": "בחשבון המודעות עדיין אין קהלים מותאמים או קהלים דומים.",
+      "kinds": {
+        "custom": "מותאם",
+        "lookalike": "דומה",
+        "saved": "שמור"
+      },
+      "savedNote": "קהלים שמורים הם הגדרות טירגוט במנהל המודעות - הם מוצגים לעיון ואי אפשר להוסיף אותם כאן.",
+      "sizeUnknown": "גודל לא ידוע",
+      "interestsTitle": "תחומי עניין ({count} מתוך עד {max})",
+      "interestPlaceholder": "חיפוש תחומי עניין במטא, למשל משפטים, נדל\"ן",
+      "searchInterests": "חיפוש",
+      "noInterests": "אין במטא תחומי עניין שמתאימים למילה הזו.",
+      "addInterest": "הוספת {name}",
+      "removeInterest": "הסרת {name}",
+      "interestsHint": "אנשים עם אחד מתחומי העניין שנבחרו (או באחד הקהלים שנבחרו) יכולים לראות את המודעה. מעט תחומים קרובים עובדים בדרך כלל טוב יותר מהרבה תחומים רחבים.",
+      "estimate": "הערכת חשיפה",
+      "estimateValue": "כ-{range} אנשים בחודש",
+      "estimateNone": "מטא לא נתנה הערכה לקהל הזה.",
+      "pastTitle": "מה עבד בעבר",
+      "pastDescription": "90 הימים האחרונים בחשבון המודעות במטא, כל הקמפיינים: הוצאה, קליקים והמרות לפי פלח.",
+      "breakdowns": {
+        "age_gender": "גיל ומגדר",
+        "placement": "מיקום",
+        "country": "מדינה"
+      },
+      "pastEmpty": "אין תוצאות ב-90 הימים האחרונים.",
+      "columns": {
+        "segment": "פלח",
+        "spend": "הוצאה",
+        "linkClicks": "קליקים לקישור",
+        "ctr": "CTR",
+        "costPerClick": "עלות לקליק",
+        "conversions": "המרות"
+      },
+      "segments": {
+        "female": "נשים",
+        "male": "גברים",
+        "unknown": "לא ידוע",
+        "facebook": "פייסבוק",
+        "instagram": "אינסטגרם",
+        "audience_network": "Audience Network",
+        "messenger": "מסנג'ר",
+        "feed": "פיד",
+        "story": "סטוריז",
+        "reels": "רילס",
+        "instagram_reels": "רילס",
+        "facebook_reels": "רילס",
+        "instagram_stories": "סטוריז",
+        "facebook_stories": "סטוריז",
+        "marketplace": "מרקטפלייס",
+        "video_feeds": "פידי וידאו",
+        "instagram_explore": "אקספלור",
+        "right_hand_column": "עמודה ימנית",
+        "search": "חיפוש"
+      },
+      "currencyNote": "הסכומים במטבע של חשבון המודעות.",
+      "unavailable": {
+        "no_meta_credential": "לא מחובר חשבון מודעות של מטא לפרויקט. חברו אחד בשלב הפרסום.",
+        "credential_not_configured": "לחשבון מטא שמחובר לפרויקט אין פרטי גישה תקינים. חברו אותו מחדש.",
+        "vault_not_configured": "הסביבה הזו לא יכולה לקרוא פרטי גישה שמורים (לא הוגדרה כספת).",
+        "meta_auth_failed": "מטא סירבה לחיבור - ייתכן שההרשאה פגה. חברו מחדש את חשבון מטא.",
+        "meta_permission_denied": "לחיבור למטא אין הרשאה לקרוא את זה (ads_read). חברו מחדש ואשרו אותה.",
+        "meta_rate_limited": "מטא מגבילה בקשות כרגע. נסו שוב בעוד כמה דקות.",
+        "meta_error": "מטא לא הצליחה לענות כרגע. נסו שוב בעוד דקה."
+      },
+      "save": "שמירת הקהל",
+      "saved": "הקהל נשמר. מודעת מטא תטרגט אותו.",
+      "errorInvalid": "הקהל לא נשמר: {reasons}.",
+      "issues": {
+        "no_countries": "בחרו לפחות מדינה אחת",
+        "too_many_countries": "עד 25 מדינות",
+        "invalid_country": "השתמשו בקודי מדינה בני 2 אותיות, למשל IL, US",
+        "invalid_age": "הגילאים הם 18 עד 65+, וגיל ההתחלה לא גדול מגיל הסיום",
+        "invalid_gender": "מגדר לא מוכר",
+        "too_many_audiences": "עד 10 קהלים",
+        "too_many_interests": "עד 25 תחומי עניין",
+        "invalid_audience": "קהל או תחום עניין שאינו של מטא",
         "unknown": "הופר אחד הכללים"
       }
     }

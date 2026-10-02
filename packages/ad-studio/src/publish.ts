@@ -69,10 +69,10 @@ export async function publishBriefAd(params: {
   await ensureOrm();
   const storage = params.storage ?? resolveAdStudioMediaStorage();
   const runner = params.runner ?? defaultFfmpegRunner();
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
   let media: AdStudioPublishMedia;
   if (params.source.kind === 'search') {
     // The saved search ad and keywords, as they are now: nothing to render or crop.
-    const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
     if (!brief.search_ad) throw new AdStudioExportInvalidError(['write the search ad first']);
     media = {
       kind: 'search',
@@ -118,6 +118,7 @@ export async function publishBriefAd(params: {
     campaignName: params.campaignName,
     dailyBudget: params.dailyBudget,
     countries: params.countries,
+    metaTargeting: brief.meta_targeting ?? null,
     ...(params.containsEuPoliticalAdvertising !== undefined ? { containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising } : {}),
     kms: getServerKmsProvider(),
     actorId: params.actorId,

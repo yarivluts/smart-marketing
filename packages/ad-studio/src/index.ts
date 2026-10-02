@@ -15,6 +15,7 @@ export * from './script-generation';
 export * from './vocalize';
 export * from './copy-writing';
 export * from './search';
+export * from './audiences';
 export * from './references';
 export * from './video-pipeline';
 export * from './qa';

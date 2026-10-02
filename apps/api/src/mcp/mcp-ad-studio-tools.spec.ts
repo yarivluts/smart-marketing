@@ -292,6 +292,30 @@ describe('Ad Studio MCP tools', () => {
     expect((publish.content[0] as { text: string }).text).toContain('"automation.execute"');
   });
 
+  it('lets an agent plan the Meta audience: lookups say why without an account, targeting saves and validates', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    expect(await json('get_ad_audiences', { brief_id: ad.id })).toEqual({ status: 'unavailable', reason: 'no_meta_credential' });
+    expect(await json('get_ad_performance_breakdown', { brief_id: ad.id, breakdown: 'country' })).toEqual({ status: 'unavailable', reason: 'no_meta_credential' });
+    expect((await call('get_ad_performance_breakdown', { brief_id: ad.id, breakdown: 'weather' })).isError).toBe(true);
+    expect(await json('estimate_ad_reach', { brief_id: ad.id, countries: ['IL'] })).toEqual({ status: 'unavailable', reason: 'no_meta_credential' });
+
+    const saved = await json<{ meta_targeting: Record<string, unknown> }>('set_ad_targeting', {
+      brief_id: ad.id,
+      countries: ['il'],
+      age_min: 25,
+      genders: ['female'],
+      interests: [{ id: '600', name: 'Law', size_lower: 100, size_upper: 200 }],
+    });
+    expect(saved.meta_targeting).toEqual({ countries: ['IL'], age_min: 25, age_max: 65, genders: ['female'], custom_audiences: [], interests: [{ id: '600', name: 'Law', size_lower: 100, size_upper: 200 }] });
+    // Fields left out keep the saved value.
+    expect((await json<{ meta_targeting: { age_min: number; interests: unknown[] } }>('set_ad_targeting', { brief_id: ad.id, age_max: 44 })).meta_targeting).toMatchObject({ age_min: 25, age_max: 44, interests: [{ id: '600' }] });
+    const bad = await call('set_ad_targeting', { brief_id: ad.id, age_min: 50 });
+    expect((bad.content[0] as { text: string }).text).toBe('The audience breaks these rules: invalid_age.');
+    expect((await json<{ meta_targeting: unknown }>('get_ad_brief', { brief_id: ad.id })).meta_targeting).toMatchObject({ age_max: 44 });
+    expect(await json('set_ad_targeting', { brief_id: ad.id, clear: true })).toEqual({ meta_targeting: null });
+  });
+
   it('refuses without the permission each tool needs, and never lets an API key export', async () => {
     const readOnly = await setup(['mcp.read']);
     const refused = await readOnly.call('list_ad_briefs');

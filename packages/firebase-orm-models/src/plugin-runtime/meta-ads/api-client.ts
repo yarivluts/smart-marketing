@@ -48,6 +48,10 @@ export interface MetaAdSetTargeting {
    * the person chose is used exactly; an edit keeps the ad set's own value. Absent when unknown.
    */
   advantageAudience?: 0 | 1;
+  /** Custom or lookalike audience ids the ad set reaches (people in any of them). */
+  customAudiences?: string[];
+  /** Interests (Meta ids and names); people with any of them. */
+  interests?: { id: string; name: string }[];
 }
 
 export interface MetaCreateAdSetParams {
@@ -351,7 +355,7 @@ const GENDER_CODES_REVERSE: Record<number, 'male' | 'female'> = { 1: 'male', 2: 
  * follow-up: ad-set targeting-spec edits, an already-created one) so the two
  * never drift.
  */
-function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, unknown> {
+export function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, unknown> {
   const targetingSpec: Record<string, unknown> = {
     geo_locations: { countries: targeting.countries },
     age_min: targeting.ageMin,
@@ -362,6 +366,12 @@ function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, u
   }
   if (targeting.advantageAudience !== undefined) {
     targetingSpec.targeting_automation = { advantage_audience: targeting.advantageAudience };
+  }
+  if (targeting.customAudiences && targeting.customAudiences.length > 0) {
+    targetingSpec.custom_audiences = targeting.customAudiences.map((id) => ({ id }));
+  }
+  if (targeting.interests && targeting.interests.length > 0) {
+    targetingSpec.flexible_spec = [{ interests: targeting.interests.map((interest) => ({ id: interest.id, name: interest.name })) }];
   }
   return targetingSpec;
 }
