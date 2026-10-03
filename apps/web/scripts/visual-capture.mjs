@@ -148,8 +148,8 @@ async function main() {
         const url = `${BASE_URL}${expandRoute(token, ids, locale)}`;
         const file = join(outDir, `${slug(token)}.${viewportName}.${locale}.png`);
         try {
-          const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 120_000 });
-          await page.waitForTimeout(600);
+          const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+          await page.waitForTimeout(800);
           await page.screenshot({ path: file, fullPage: true });
           results.push({ token, viewportName, locale, status: response?.status() ?? 0, finalUrl: page.url(), file });
           console.log(`[visual] ${response?.status()} ${viewportName} ${locale} ${token} -> ${file}`);
