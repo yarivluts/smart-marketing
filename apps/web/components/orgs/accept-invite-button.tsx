@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { ArrowRight, Loader2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface AcceptInviteButtonProps {
   orgId: string;
@@ -33,12 +34,24 @@ export function AcceptInviteButton({ orgId, membershipId }: AcceptInviteButtonPr
   }
 
   return (
-    <div className="flex flex-col items-center gap-2">
-      <Button onClick={handleClick} disabled={submitting}>
-        {t('accept')}
-      </Button>
+    <div className="w-full flex flex-col items-center gap-3">
+      <PpButton
+        variant="primary"
+        onClick={handleClick}
+        disabled={submitting}
+        className="w-full h-12 rounded-full font-pp-display text-pp-body-lg font-bold shadow-pp-candy active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+      >
+        {submitting ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <>
+            <span>{t('accept')}</span>
+            <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+          </>
+        )}
+      </PpButton>
       {errorMessage ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-pp-body-sm text-pp-error font-medium text-center">
           {errorMessage}
         </p>
       ) : null}

@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
+import { Edit2, Save, X } from 'lucide-react';
 import { blankFieldMappingRuleRow, FieldMappingRuleEditor, type FieldMappingRuleRow } from './field-mapping-rule-editor';
 
 export interface EditFieldMappingInitialRule {
@@ -23,7 +23,7 @@ export interface EditFieldMappingFormProps {
   initialName: string;
   initialSchemaName: string;
   initialRules: readonly EditFieldMappingInitialRule[];
-  /** This mapping's own kind's currently-active registered schema names (KAN-31) — `initialSchemaName` is always included even if it's fallen out of this set, so re-saving without touching the picker never silently changes the target. */
+  /** This mapping's own kind's currently-active registered schema names (KAN-31). */
   schemaOptions: readonly string[];
 }
 
@@ -38,16 +38,7 @@ function toRuleRow(rule: EditFieldMappingInitialRule): FieldMappingRuleRow {
   };
 }
 
-/**
- * Toggles between a compact "Edit" button and an inline edit form for one
- * field mapping row on the Field Mappings admin page (KAN-121 — the same
- * "create + list only, no way to fix a typo'd name or a wrong JSONPath
- * rule" gap KAN-100/KAN-117/KAN-119/KAN-120 already closed for their own
- * sibling registries). Reuses the exact `FieldMappingRuleEditor` the
- * create-mapping form already uses for its own rule rows, rather than
- * re-implementing a second rule editor. `kind` stays immutable — see
- * `updateFieldMapping`'s own doc comment.
- */
+/** Toggles between an Edit button and an inline edit form for one field mapping row. */
 export function EditFieldMappingForm({
   orgId,
   projectId,
@@ -117,56 +108,53 @@ export function EditFieldMappingForm({
 
   if (!editing) {
     return (
-      <Button type="button" variant="outline" size="sm" onClick={startEditing}>
+      <PpButton type="button" variant="ghost" size="sm" icon={Edit2} onClick={startEditing}>
         {t('editMapping')}
-      </Button>
+      </PpButton>
     );
   }
 
   const schemaChoices = schemaOptions.includes(schemaName) ? schemaOptions : [schemaName, ...schemaOptions];
 
   return (
-    <form className="flex w-full flex-col gap-3" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor={`edit-field-mapping-name-${fieldMappingId}`}>
-          {t('nameLabel')}
-        </label>
-        <Input
-          id={`edit-field-mapping-name-${fieldMappingId}`}
-          required
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor={`edit-field-mapping-schema-${fieldMappingId}`}>
-          {t('schemaNameLabel')}
-        </label>
-        <select
-          id={`edit-field-mapping-schema-${fieldMappingId}`}
-          required
-          value={schemaName}
-          onChange={(event) => setSchemaName(event.target.value)}
-          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
-        >
-          {schemaChoices.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+    <form className="flex w-full flex-col gap-4 rounded-2xl bg-pp-surface-container-low/50 p-4 border border-pp-outline-variant/30 mt-2" onSubmit={handleSubmit} noValidate>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <PpField label={t('nameLabel')} htmlFor={`edit-field-mapping-name-${fieldMappingId}`}>
+          <input
+            id={`edit-field-mapping-name-${fieldMappingId}`}
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className={ppInputClass}
+          />
+        </PpField>
+        <PpField label={t('schemaNameLabel')} htmlFor={`edit-field-mapping-schema-${fieldMappingId}`}>
+          <select
+            id={`edit-field-mapping-schema-${fieldMappingId}`}
+            required
+            value={schemaName}
+            onChange={(event) => setSchemaName(event.target.value)}
+            className={ppInputClass}
+          >
+            {schemaChoices.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </PpField>
       </div>
       <FieldMappingRuleEditor rules={rules} onChange={setRules} />
       <div className="flex items-center gap-3">
-        <Button type="submit" disabled={submitting || name.trim().length === 0 || rules.length === 0}>
+        <PpButton type="submit" variant="primary" size="sm" icon={Save} disabled={submitting || name.trim().length === 0 || rules.length === 0}>
           {t('saveMapping')}
-        </Button>
-        <Button type="button" variant="outline" disabled={submitting} onClick={() => setEditing(false)}>
+        </PpButton>
+        <PpButton type="button" variant="ghost" size="sm" icon={X} disabled={submitting} onClick={() => setEditing(false)}>
           {t('cancelEditMapping')}
-        </Button>
+        </PpButton>
       </div>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-medium text-pp-error">
           {error}
         </p>
       ) : null}

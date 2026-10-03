@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface DisableHookEndpointButtonProps {
   orgId: string;
@@ -36,11 +36,11 @@ export function DisableHookEndpointButton({ orgId, projectId, hookEndpointId }: 
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button type="button" variant="destructive" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton type="button" variant="danger" size="sm" onClick={handleClick} disabled={submitting}>
         {t('disableEndpoint')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('disableEndpointError')}
         </p>
       ) : null}

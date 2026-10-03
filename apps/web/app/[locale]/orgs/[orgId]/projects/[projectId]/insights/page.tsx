@@ -7,6 +7,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, listProjectInsights } from '@/lib/orgs/queries';
 import { buildInsightsView } from '@/lib/orgs/insights-view';
 import { PeerBenchmarksHub } from '@/components/insights/peer-benchmarks-hub';
+import { PpPage, PpCard } from '@/components/pastel/primitives';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -58,39 +59,42 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
   const insights = await listProjectInsights(orgId, projectId);
   const view = buildInsightsView(insights);
 
-  const t = await getTranslations('Insights');
+  const t = await getTranslations({ locale, namespace: 'Insights' });
 
   return (
-    <main className="w-full space-y-10">
+    <PpPage className="space-y-10">
       {/* Stitch Dynamic Peer Benchmarks Cockpit */}
       <PeerBenchmarksHub orgId={orgId} projectId={projectId} isDataConnected={true} />
 
       {/* Real-Time Project Insights & Anomaly Feed */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="border-b border-border pb-4 mb-4">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
-
+      <PpCard
+        title={t('title', { projectName: project.name })}
+        subtitle={t('description')}
+      >
         {view.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t('empty')}</p>
+          <p className="font-pp-body-sm text-pp-body-sm text-pp-on-surface-variant">{t('empty')}</p>
         ) : (
           <ul className="flex flex-col gap-2.5">
             {view.map((insight) => (
-              <li key={insight.id} className="flex flex-col gap-1 rounded-xl border border-border bg-background p-3.5 text-xs shadow-xs">
+              <li
+                key={insight.id}
+                className="flex flex-col gap-1 rounded-2xl border border-pp-outline-variant/50 bg-pp-surface-container-low p-4 font-pp-body-sm text-pp-body-sm shadow-2xs"
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-semibold text-foreground">{t(insight.titleKey, insight.args)}</span>
-                  <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="font-pp-label-md text-pp-label-md font-bold text-pp-on-surface">
+                    {t(insight.titleKey, insight.args)}
+                  </span>
+                  <span className="rounded-full bg-pp-surface-container px-2 py-0.5 font-pp-label-sm text-[10px] font-bold uppercase tracking-wider text-pp-outline">
                     {t(`severityLabel.${insight.severity}`)}
                   </span>
                 </div>
-                <span className="text-muted-foreground">{t(insight.detailKey, insight.args)}</span>
-                <span className="text-[10px] text-muted-foreground">{insight.occurredAt}</span>
+                <span className="text-pp-on-surface-variant">{t(insight.detailKey, insight.args)}</span>
+                <span className="text-[10px] text-pp-outline">{insight.occurredAt}</span>
               </li>
             ))}
           </ul>
         )}
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

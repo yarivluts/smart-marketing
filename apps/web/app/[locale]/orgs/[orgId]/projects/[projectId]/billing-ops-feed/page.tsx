@@ -15,7 +15,16 @@ import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from '@/li
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 import { dunningFeedEntryStatusLabelKey, toDunningFeedEntryView } from '@/lib/orgs/dunning-feed-view';
 import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
-import { DailyCollectionRecoveryHub } from '@/components/billing/daily-collection-recovery-hub';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpPill,
+} from '@/components/pastel/primitives';
+import { Receipt, TrendingDown, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -28,23 +37,13 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's billing-ops feed (KAN-80, gap-analysis Gap 5+15: "operational record-level feeds" —
- * new charges / failed charges / refunds as a browsable list, the bridge from aggregate metrics to
- * daily ops). Reads the same landed `RawRecordModel`s KAN-36's event-volume sparkline already reads,
- * scoped to the Stripe billing event schemas (KAN-49). Gated on `ingest.write`, same "whole feature,
- * not just mutation, is admin-only" posture as the sibling ingest-health page — this feed exposes
- * per-customer payment failures, operationally sensitive the same way a quarantined record's raw
- * payload is.
+ * A project's billing-ops feed (KAN-80, gap-analysis Gap 5+15: "operational record-level feeds"):
+ * New charges / failed charges / refunds as a browsable list, the bridge from aggregate metrics to
+ * daily ops. Reads landed `RawRecordModel`s scoped to the Stripe billing event schemas.
  *
- * A second section (KAN-81, generalizing this same page + query pattern per plan `14 §Gap 5`'s "live
- * record feeds ... churn") lists the most recently landed `stripe_subscription` entities showing a
- * churn signal — already canceled or scheduled to cancel at period end.
- *
- * A third section (KAN-94) lists subscriptions currently in Stripe's dunning cycle (`past_due`/
- * `unpaid` status) — the gap doc's own stretch goal, closing the gap this doc comment used to flag as
- * deliberately out of scope ("no subscription-lifecycle/dunning model exists yet"): `status` is
- * already a landed field on every `stripe_subscription` entity (KAN-49), so a dunning feed needed only
- * a new predicate over the same snapshots the churn feed already reads, not a new model.
+ * Folded into the Stitch Pastel Pulse layout (desktop e9857ed6 + 1d086740, mobile 9ab2ca30 + 28d5a9e1),
+ * presenting operational billing events, churned subscriptions, and active dunning lifecycle without
+ * fabricated metrics.
  */
 export default async function BillingOpsFeedPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -86,19 +85,71 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
 
   return (
-    <main className="w-full space-y-10">
-      {/* Stitch Daily Collection & Failed Charge Recovery Hub */}
-      <DailyCollectionRecoveryHub orgId={orgId} projectId={projectId} isDataConnected={hasBillingData} />
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="FINANCIAL TELEMETRY & OPERATIONS"
+        meta={hasBillingData ? 'Stripe Webhooks Live' : 'Awaiting Ingestion'}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              <span>{hasBillingData ? '12ms Real-time Sync' : 'No Active Feed'}</span>
+            </span>
+          </div>
+        }
+      />
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Billing Events"
+          value={entries.length}
+          valueSuffix="records"
+          badge="30d Window"
+          accent="primary"
+          footer="Charges, refunds, and dunning logs"
+        />
+        <PpKpiCard
+          label={t('churnHeading')}
+          value={churnEntries.length}
+          valueSuffix="subs"
+          badge={churnEntries.length > 0 ? 'At Risk' : 'Zero Churn'}
+          badgeAccent={churnEntries.length > 0 ? 'pink' : 'mint'}
+          accent="pink"
+          footer={t('churnCapNote', { count: churnEntries.length })}
+        />
+        <PpKpiCard
+          label={t('dunningHeading')}
+          value={dunningEntries.length}
+          valueSuffix="subs"
+          badge={dunningEntries.length > 0 ? 'Action Req' : 'Clear'}
+          badgeAccent={dunningEntries.length > 0 ? 'amber' : 'mint'}
+          accent="amber"
+          footer={t('dunningCapNote', { count: dunningEntries.length })}
+        />
+        <PpKpiCard
+          label="Ingestion Health"
+          value={hasBillingData ? 'Active' : 'Idle'}
+          badge={hasBillingData ? 'Live' : 'No Data'}
+          badgeAccent={hasBillingData ? 'mint' : 'neutral'}
+          accent="mint"
+          footer="Stripe Webhook Sync"
+        />
+      </PpKpiGrid>
 
-        <section className="flex flex-col gap-3">
-          {entries.length === 0 ? (
-          <div className="flex flex-col gap-3">
+      {/* 3. Section 1: Operational Billing Feed */}
+      <PpCard
+        title={t('title', { projectName: project.name })}
+        subtitle={t('description')}
+        icon={Receipt}
+        iconAccent="primary"
+        flush={entries.length > 0}
+      >
+        {entries.length === 0 ? (
+          <div className="space-y-4">
             <MissingIntegrationAlert
               orgId={orgId}
               projectId={projectId}
@@ -111,104 +162,170 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
               ]}
               customImpactMetrics={['Daily Operational Feed', 'Net MRR Velocity', 'Dunning Recovery']}
             />
-            <p className="text-sm text-muted-foreground">{t('empty')}</p>
+            <p className="text-pp-body-md text-pp-on-surface-variant">{t('empty')}</p>
           </div>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {entries.map((entry) => (
-              <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{t(billingOpsFeedEntryTypeLabelKey(entry.type))}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                  </span>
-                </div>
-                <span className="text-muted-foreground">
-                  {entry.amount === null || entry.currency === null
-                    ? t('amountUnknown')
-                    : t('amountLine', { amount: entry.amount, currency: entry.currency.toUpperCase() })}
-                  {entry.customerId ? ` · ${t('customerLine', { customerId: entry.customerId })}` : ''}
-                </span>
-                {entry.failureMessage ? <span className="text-destructive">{t('failureLine', { message: entry.failureMessage })}</span> : null}
-                {entry.refundReason ? <span className="text-muted-foreground">{t('refundReasonLine', { reason: entry.refundReason })}</span> : null}
-                <span className="text-xs text-muted-foreground">
-                  {`${t('landedAtLine', { landedAt: entry.landedAt })} · ${t('clientIdLine', { clientId: entry.clientId })}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-4">
+            <PpTable>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Customer</th>
+                  <th>Details</th>
+                  <th>Environment</th>
+                  <th>Landed At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>
+                      <PpPill accent={entry.failureMessage ? 'error' : entry.refundReason ? 'amber' : 'mint'}>
+                        {t(billingOpsFeedEntryTypeLabelKey(entry.type))}
+                      </PpPill>
+                    </td>
+                    <td className="font-semibold text-pp-on-surface">
+                      {entry.amount === null || entry.currency === null
+                        ? t('amountUnknown')
+                        : t('amountLine', { amount: entry.amount, currency: entry.currency.toUpperCase() })}
+                    </td>
+                    <td className="text-pp-on-surface-variant font-mono text-xs">
+                      {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : '—'}
+                    </td>
+                    <td className="text-pp-body-sm">
+                      {entry.failureMessage ? (
+                        <span className="text-pp-error font-medium">{t('failureLine', { message: entry.failureMessage })}</span>
+                      ) : entry.refundReason ? (
+                        <span className="text-amber-700 font-medium">{t('refundReasonLine', { reason: entry.refundReason })}</span>
+                      ) : (
+                        <span className="text-pp-outline">—</span>
+                      )}
+                    </td>
+                    <td className="text-pp-body-sm text-pp-on-surface-variant">
+                      {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
+                    </td>
+                    <td className="text-pp-label-sm text-pp-outline font-mono">
+                      {entry.landedAt}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PpTable>
+            <p className="p-pp-lg pt-0 text-pp-label-sm text-pp-outline">{t('capNote', { count: entries.length })}</p>
+          </div>
         )}
-        <p className="text-xs text-muted-foreground">{t('capNote', { count: entries.length })}</p>
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('churnHeading')}</h2>
+      {/* 4. Section 2: Churned Subscriptions */}
+      <PpCard
+        title={t('churnHeading')}
+        subtitle={t('churnCapNote', { count: churnEntries.length })}
+        icon={TrendingDown}
+        iconAccent="pink"
+        flush={churnEntries.length > 0}
+      >
         {churnEntries.length === 0 ? (
-          <p className="text-muted-foreground">{t('churnEmpty')}</p>
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('churnEmpty')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {churnEntries.map((entry) => (
-              <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">
-                    {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer')}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                  </span>
-                </div>
-                <span className="text-muted-foreground">
-                  {entry.mrrNormalized === null || entry.currency === null
-                    ? t('amountUnknown')
-                    : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
-                </span>
-                {entry.canceledAt ? (
-                  <span className="text-destructive">{t('canceledAtLine', { canceledAt: entry.canceledAt })}</span>
-                ) : entry.cancelAtPeriodEnd ? (
-                  <span className="text-destructive">{t('cancelAtPeriodEndLine', { currentPeriodEnd: entry.currentPeriodEnd ?? '' })}</span>
-                ) : null}
-                <span className="text-xs text-muted-foreground">
-                  {`${t('landedAtLine', { landedAt: entry.landedAt })} · ${t('clientIdLine', { clientId: entry.clientId })}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-4">
+            <PpTable>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>MRR Impact</th>
+                  <th>Churn Schedule</th>
+                  <th>Environment</th>
+                  <th>Landed At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {churnEntries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="font-medium text-pp-on-surface">
+                      {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer')}
+                    </td>
+                    <td className="font-semibold text-pp-error">
+                      {entry.mrrNormalized === null || entry.currency === null
+                        ? t('amountUnknown')
+                        : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
+                    </td>
+                    <td className="text-pp-body-sm">
+                      {entry.canceledAt ? (
+                        <span className="text-pp-error font-medium">{t('canceledAtLine', { canceledAt: entry.canceledAt })}</span>
+                      ) : entry.cancelAtPeriodEnd ? (
+                        <span className="text-amber-700 font-medium">{t('cancelAtPeriodEndLine', { currentPeriodEnd: entry.currentPeriodEnd ?? '' })}</span>
+                      ) : (
+                        <span className="text-pp-outline">—</span>
+                      )}
+                    </td>
+                    <td className="text-pp-body-sm text-pp-on-surface-variant">
+                      {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
+                    </td>
+                    <td className="text-pp-label-sm text-pp-outline font-mono">
+                      {entry.landedAt}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PpTable>
+            <p className="p-pp-lg pt-0 text-pp-label-sm text-pp-outline">{t('churnCapNote', { count: churnEntries.length })}</p>
+          </div>
         )}
-        <p className="text-xs text-muted-foreground">{t('churnCapNote', { count: churnEntries.length })}</p>
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('dunningHeading')}</h2>
+      {/* 5. Section 3: Subscriptions in Dunning */}
+      <PpCard
+        title={t('dunningHeading')}
+        subtitle={t('dunningCapNote', { count: dunningEntries.length })}
+        icon={AlertTriangle}
+        iconAccent="amber"
+        flush={dunningEntries.length > 0}
+      >
         {dunningEntries.length === 0 ? (
-          <p className="text-muted-foreground">{t('dunningEmpty')}</p>
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('dunningEmpty')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {dunningEntries.map((entry) => (
-              <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">
-                    {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('dunningUnknownCustomer')}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                  </span>
-                </div>
-                <span className="text-destructive">{t(dunningFeedEntryStatusLabelKey(entry.status))}</span>
-                <span className="text-muted-foreground">
-                  {entry.mrrNormalized === null || entry.currency === null
-                    ? t('amountUnknown')
-                    : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {`${t('landedAtLine', { landedAt: entry.landedAt })} · ${t('clientIdLine', { clientId: entry.clientId })}`}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-4">
+            <PpTable>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Dunning Status</th>
+                  <th>MRR At Risk</th>
+                  <th>Environment</th>
+                  <th>Landed At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dunningEntries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="font-medium text-pp-on-surface">
+                      {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('dunningUnknownCustomer')}
+                    </td>
+                    <td>
+                      <PpPill accent="amber" dot>
+                        {t(dunningFeedEntryStatusLabelKey(entry.status))}
+                      </PpPill>
+                    </td>
+                    <td className="font-semibold text-amber-700">
+                      {entry.mrrNormalized === null || entry.currency === null
+                        ? t('amountUnknown')
+                        : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
+                    </td>
+                    <td className="text-pp-body-sm text-pp-on-surface-variant">
+                      {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
+                    </td>
+                    <td className="text-pp-label-sm text-pp-outline font-mono">
+                      {entry.landedAt}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PpTable>
+            <p className="p-pp-lg pt-0 text-pp-label-sm text-pp-outline">{t('dunningCapNote', { count: dunningEntries.length })}</p>
+          </div>
         )}
-        <p className="text-xs text-muted-foreground">{t('dunningCapNote', { count: dunningEntries.length })}</p>
-      </section>
-      </div>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

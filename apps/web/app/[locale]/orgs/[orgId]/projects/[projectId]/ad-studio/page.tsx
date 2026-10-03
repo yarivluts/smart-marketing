@@ -4,6 +4,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
+import { PpPage } from '@/components/pastel/primitives';
 import { AdStudioNavHeader } from './components/ad-studio-nav-header';
 import { AdStudioHub } from './components/ad-studio-hub';
 
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * AI Ad Studio - Creative Synthesis & Pipeline Hub:
+ * AI Ad Studio - Creative Synthesis & Pipeline Hub (Stitch eb84664d / c02cf824, mobile c3956ff9 / 9a74afe8)
  * Multi-format campaign generator, algorithmic creative scoring radar,
  * storyboard workflow links, and real-time autopilot status monitor.
  */
@@ -47,9 +48,9 @@ export default async function AdStudioPage({ params }: PageProps): Promise<React
   }
 
   return (
-    <div className="w-full space-y-8">
+    <PpPage>
       <AdStudioNavHeader orgId={orgId} projectId={projectId} />
       <AdStudioHub orgId={orgId} projectId={projectId} projectName={project.name} />
-    </div>
+    </PpPage>
   );
 }

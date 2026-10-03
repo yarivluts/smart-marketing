@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface RetryFailedPipelineMessagesButtonProps {
   orgId: string;
@@ -50,16 +51,23 @@ export function RetryFailedPipelineMessagesButton({
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={handleClick}
+        disabled={submitting}
+        icon={RefreshCw}
+      >
         {t('retryFailedDeliveries')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('retryFailedDeliveriesError')}
         </p>
       ) : null}
       {result ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-pp-on-surface-variant font-medium">
           {t('retryFailedDeliveriesResult', { delivered: result.delivered, failed: result.failed })}
         </p>
       ) : null}

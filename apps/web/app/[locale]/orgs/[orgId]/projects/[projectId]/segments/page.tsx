@@ -25,6 +25,8 @@ import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
 import { SegmentWorkListControls } from '@/components/orgs/segment-work-list-controls';
 import { SegmentCrmSyncControls } from '@/components/orgs/segment-crm-sync-controls';
 import { Link } from '@/i18n/navigation';
+import { PpPage, PpPageHeader, PpCard, PpEmptyState, PpPill, PpIconChip } from '@/components/pastel/primitives';
+import { Users, Plus, Layers, Filter } from 'lucide-react';
 
 /** Bounds the "view members" panel's own inline page render — a smaller, page-weight-conscious cap than `listSegmentMembers`'s own `MAX_SEGMENT_MEMBER_LIST_LIMIT`, since this renders inline on a page that already fans out a member-count query per segment. */
 const INLINE_MEMBER_LIST_LIMIT = 50;
@@ -147,132 +149,197 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
     : undefined;
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow="COHORT ENGINE"
+        meta={segments.length > 0 ? `${segments.length} segments` : undefined}
+        title={t('title', { projectName: project.name })}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('segmentsHeading')}</h2>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-pp-display text-pp-headline-md text-pp-on-surface">{t('segmentsHeading')}</h2>
+          {segments.length > 0 ? (
+            <span className="text-pp-label-sm text-pp-outline">
+              {segments.length} {segments.length === 1 ? 'segment' : 'segments'}
+            </span>
+          ) : null}
+        </div>
+
         {segments.length === 0 ? (
-          <p className="text-muted-foreground">{t('noSegments')}</p>
+          <PpEmptyState
+            icon={Users}
+            title={t('segmentsHeading')}
+            description={t('noSegments')}
+          />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="space-y-pp-md">
             {segments.map((segment) => {
               const memberCountView = memberCountViews.get(segment.id);
+              const isViewingMembers = segment.id === viewMembersSegmentId;
               return (
-                <li key={segment.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{segment.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{t('filterCount', { count: segment.filterCount })}</span>
+                <div
+                  key={segment.id}
+                  className="rounded-2xl bg-pp-surface-container-lowest p-pp-lg shadow-pp-candy space-y-4"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-pp-outline-variant/30 pb-3">
+                    <div className="flex items-center gap-3">
+                      <PpIconChip icon={Users} accent="primary" />
+                      <div>
+                        <h3 className="font-pp-display text-pp-headline-md text-pp-on-surface">
+                          {segment.name}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-pp-label-sm text-pp-outline">
+                          <span>{t('schemaLabel', { schemaName: segment.schemaName })}</span>
+                          <span>•</span>
+                          <span>{t('createdByLabel', { createdAt: segment.createdAt })}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PpPill accent="mint">{t('filterCount', { count: segment.filterCount })}</PpPill>
                       {segment.eventConditionCount > 0 ? (
-                        <span className="text-xs text-muted-foreground">{t('eventConditionCount', { count: segment.eventConditionCount })}</span>
+                        <PpPill accent="sky">{t('eventConditionCount', { count: segment.eventConditionCount })}</PpPill>
                       ) : null}
                       <DeleteSegmentButton orgId={orgId} projectId={projectId} segmentId={segment.id} />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{t('schemaLabel', { schemaName: segment.schemaName })}</span>
-                    <span>{t('createdByLabel', { createdAt: segment.createdAt })}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground" data-testid="segment-member-count">
-                    {memberCountView?.kind === 'ok'
-                      ? t('memberCount', { count: memberCountView.count })
-                      : memberCountView?.kind === 'warehouse_not_configured'
-                        ? t('memberCountNotConfigured')
-                        : memberCountView?.kind === 'quota_exceeded'
-                          ? t('memberCountQuotaExceeded')
-                          : t('memberCountError')}
-                  </div>
-                  <EditSegmentForm
-                    orgId={orgId}
-                    projectId={projectId}
-                    segmentId={segment.id}
-                    entitySchemaNames={entitySchemaNames}
-                    eventSchemaNames={eventSchemaNames}
-                    initialName={segment.name}
-                    initialSchemaName={segment.schemaName}
-                    initialFilters={segment.filters}
-                    initialEventConditions={segment.eventConditions}
-                  />
-                  <SegmentWorkListControls
-                    orgId={orgId}
-                    projectId={projectId}
-                    segmentId={segment.id}
-                    ownerPersonId={segment.ownerPersonId}
-                    status={segment.status}
-                    people={ownerPickerOptions(segment.ownerPersonId)}
-                  />
-                  <SegmentCrmSyncControls
-                    orgId={orgId}
-                    projectId={projectId}
-                    segmentId={segment.id}
-                    actionInstalls={actionInstalls}
-                    latestRun={latestCrmSyncRuns.get(segment.id) ?? null}
-                  />
-                  {segment.id === viewMembersSegmentId ? (
-                    <Link
-                      href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }}
-                      className="self-start text-xs text-muted-foreground underline"
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div
+                      className="text-pp-body-md font-semibold text-pp-on-surface"
+                      data-testid="segment-member-count"
                     >
-                      {t('hideMembers')}
-                    </Link>
-                  ) : (
-                    <Link
-                      href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments`, query: { viewMembers: segment.id } }}
-                      className="self-start text-xs text-muted-foreground underline"
+                      {memberCountView?.kind === 'ok'
+                        ? t('memberCount', { count: memberCountView.count })
+                        : memberCountView?.kind === 'warehouse_not_configured'
+                          ? t('memberCountNotConfigured')
+                          : memberCountView?.kind === 'quota_exceeded'
+                            ? t('memberCountQuotaExceeded')
+                            : t('memberCountError')}
+                    </div>
+
+                    {isViewingMembers ? (
+                      <Link
+                        href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }}
+                        className="text-pp-label-md text-pp-primary font-bold hover:underline"
+                      >
+                        {t('hideMembers')}
+                      </Link>
+                    ) : (
+                      <Link
+                        href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments`, query: { viewMembers: segment.id } }}
+                        className="text-pp-label-md text-pp-primary font-bold hover:underline"
+                      >
+                        {t('viewMembers')}
+                      </Link>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-pp-md pt-2 border-t border-pp-outline-variant/20">
+                    <SegmentWorkListControls
+                      orgId={orgId}
+                      projectId={projectId}
+                      segmentId={segment.id}
+                      ownerPersonId={segment.ownerPersonId}
+                      status={segment.status}
+                      people={ownerPickerOptions(segment.ownerPersonId)}
+                    />
+                    <SegmentCrmSyncControls
+                      orgId={orgId}
+                      projectId={projectId}
+                      segmentId={segment.id}
+                      actionInstalls={actionInstalls}
+                      latestRun={latestCrmSyncRuns.get(segment.id) ?? null}
+                    />
+                  </div>
+
+                  <div className="pt-2 border-t border-pp-outline-variant/20">
+                    <EditSegmentForm
+                      orgId={orgId}
+                      projectId={projectId}
+                      segmentId={segment.id}
+                      entitySchemaNames={entitySchemaNames}
+                      eventSchemaNames={eventSchemaNames}
+                      initialName={segment.name}
+                      initialSchemaName={segment.schemaName}
+                      initialFilters={segment.filters}
+                      initialEventConditions={segment.eventConditions}
+                    />
+                  </div>
+
+                  {isViewingMembers && memberListView ? (
+                    <div
+                      className="mt-3 rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/60 p-pp-md space-y-3"
+                      data-testid="segment-members-panel"
                     >
-                      {t('viewMembers')}
-                    </Link>
-                  )}
-                  {segment.id === viewMembersSegmentId && memberListView ? (
-                    <div className="mt-1 flex flex-col gap-2 rounded-md border border-input bg-muted/30 p-2" data-testid="segment-members-panel">
+                      <h4 className="font-pp-display text-pp-headline-sm text-pp-on-surface">
+                        {t('viewMembers')} ({segment.name})
+                      </h4>
                       {memberListView.kind === 'ok' ? (
                         memberListView.entries.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">{t('membersEmpty')}</p>
+                          <p className="text-pp-body-sm text-pp-on-surface-variant">{t('membersEmpty')}</p>
                         ) : (
                           <>
-                            <ul className="flex flex-col gap-1">
+                            <div className="space-y-2">
                               {memberListView.entries.map((entry) => (
-                                <li key={entry.entityId} className="flex flex-col gap-0.5 rounded border border-input bg-background px-2 py-1 text-xs">
-                                  <div className="flex items-center justify-between text-muted-foreground">
-                                    <span>{t('memberEntityIdLine', { entityId: entry.entityId })}</span>
+                                <div
+                                  key={entry.entityId}
+                                  className="rounded-xl border border-pp-outline-variant/20 bg-pp-surface-container-lowest p-3 text-pp-body-sm space-y-1 shadow-xs"
+                                >
+                                  <div className="flex items-center justify-between text-pp-label-sm text-pp-outline">
+                                    <span className="font-semibold text-pp-on-surface">
+                                      {t('memberEntityIdLine', { entityId: entry.entityId })}
+                                    </span>
                                     <span>{t('memberLastSeenLine', { lastSeenAt: entry.lastSeenAt })}</span>
                                   </div>
-                                  {entry.fields.map((field) => (
-                                    <span key={field.name} className={field.isPii ? 'text-muted-foreground' : ''}>
-                                      {t('memberFieldLine', { name: field.name, value: field.value })}
-                                    </span>
-                                  ))}
-                                </li>
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-pp-body-sm">
+                                    {entry.fields.map((field) => (
+                                      <span key={field.name} className={field.isPii ? 'text-pp-outline italic' : 'text-pp-on-surface'}>
+                                        {t('memberFieldLine', { name: field.name, value: field.value })}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
                               ))}
-                            </ul>
-                            <p className="text-xs text-muted-foreground">{t('membersCapNote', { count: memberListView.entries.length })}</p>
+                            </div>
+                            <p className="text-pp-label-sm text-pp-outline">
+                              {t('membersCapNote', { count: memberListView.entries.length })}
+                            </p>
                           </>
                         )
                       ) : memberListView.kind === 'warehouse_not_configured' ? (
-                        <p className="text-xs text-muted-foreground">{t('membersNotConfigured')}</p>
+                        <p className="text-pp-body-sm text-pp-on-surface-variant">{t('membersNotConfigured')}</p>
                       ) : memberListView.kind === 'quota_exceeded' ? (
-                        <p className="text-xs text-muted-foreground">{t('membersQuotaExceeded')}</p>
+                        <p className="text-pp-body-sm text-pp-on-surface-variant">{t('membersQuotaExceeded')}</p>
                       ) : (
-                        <p className="text-xs text-muted-foreground">{t('membersError')}</p>
+                        <p className="text-pp-body-sm text-pp-on-surface-variant">{t('membersError')}</p>
                       )}
                     </div>
                   ) : null}
-                </li>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
+      <PpCard
+        icon={Plus}
+        iconAccent="primary"
+        title={t('createHeading')}
+      >
         {entitySchemaNames.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t('noEntitySchemasRegistered')}</p>
+          <p className="text-pp-body-sm text-pp-on-surface-variant">{t('noEntitySchemasRegistered')}</p>
         ) : (
-          <CreateSegmentForm orgId={orgId} projectId={projectId} entitySchemaNames={entitySchemaNames} eventSchemaNames={eventSchemaNames} />
+          <CreateSegmentForm
+            orgId={orgId}
+            projectId={projectId}
+            entitySchemaNames={entitySchemaNames}
+            eventSchemaNames={eventSchemaNames}
+          />
         )}
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

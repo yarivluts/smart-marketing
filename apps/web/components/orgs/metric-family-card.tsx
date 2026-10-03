@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
+import { PpButton, PpCard, PpPill } from '@/components/pastel/primitives';
+import { GitBranch, Calculator } from 'lucide-react';
 import { EvolveMetricDefForm } from './evolve-metric-def-form';
 import { metricVersionToFormState, type MetricVersionView } from './metric-definition-editor';
 
@@ -10,7 +11,7 @@ export interface MetricFamilyCardProps {
   orgId: string;
   projectId: string;
   name: string;
-  /** Oldest first, so every past version renders and historical versions stay visible even after an evolve. */
+  /** Oldest first. */
   versions: MetricVersionView[];
 }
 
@@ -33,38 +34,71 @@ export function MetricFamilyCard({ orgId, projectId, name, versions }: MetricFam
   }
 
   return (
-    <li className="flex flex-col gap-3 rounded-md border border-input p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-medium">{name}</span>
-        {!evolving ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setEvolving(true)}>
-            {t('evolve')}
-          </Button>
+    <PpCard
+      as="article"
+      title={name}
+      subtitle={
+        latest ? (
+          <span className="font-mono text-xs">
+            {latest.definitionKind === 'formula' ? 'Formula' : latest.aggregation?.function.toUpperCase()}
+          </span>
+        ) : null
+      }
+      icon={Calculator}
+      iconAccent="primary"
+      action={
+        <div className="flex items-center gap-2">
+          {latest ? (
+            <PpPill accent={latest.definitionKind === 'formula' ? 'pink' : 'mint'}>
+              {latest.definitionKind}
+            </PpPill>
+          ) : null}
+          {!evolving ? (
+            <PpButton type="button" variant="secondary" size="sm" icon={GitBranch} onClick={() => setEvolving(true)}>
+              {t('evolve')}
+            </PpButton>
+          ) : null}
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        {versions.map((version) => (
+          <div
+            key={version.id}
+            className="flex flex-col gap-2 rounded-2xl bg-pp-surface-container-low/60 p-4 border border-pp-outline-variant/20"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-xs font-semibold text-pp-on-surface-variant">
+                {t('versionStatusLabel', {
+                  version: String(version.version),
+                  status: version.status === 'active' ? t('activeLabel') : t('supersededLabel'),
+                })}
+              </span>
+              <PpPill accent={version.status === 'active' ? 'mint' : 'neutral'} dot={version.status === 'active'}>
+                {version.status === 'active' ? t('activeLabel') : t('supersededLabel')}
+              </PpPill>
+            </div>
+            <div className="font-mono text-sm font-bold text-pp-primary">
+              {formulaOrAggregationSummary(version)}
+            </div>
+            {version.dimensions.length > 0 ? (
+              <div className="text-xs text-pp-on-surface-variant">
+                {t('dimensionsSummary', { dimensions: version.dimensions.join(', ') })}
+              </div>
+            ) : null}
+          </div>
+        ))}
+
+        {evolving && latest ? (
+          <EvolveMetricDefForm
+            orgId={orgId}
+            projectId={projectId}
+            name={name}
+            initialState={metricVersionToFormState(latest)}
+            onClose={() => setEvolving(false)}
+          />
         ) : null}
       </div>
-
-      {versions.map((version) => (
-        <div key={version.id} className="flex flex-col gap-1 text-sm">
-          <span className="text-muted-foreground">
-            {t('versionStatusLabel', {
-              version: String(version.version),
-              status: version.status === 'active' ? t('activeLabel') : t('supersededLabel'),
-            })}
-          </span>
-          <span>{formulaOrAggregationSummary(version)}</span>
-          {version.dimensions.length > 0 ? <span className="text-muted-foreground">{t('dimensionsSummary', { dimensions: version.dimensions.join(', ') })}</span> : null}
-        </div>
-      ))}
-
-      {evolving && latest ? (
-        <EvolveMetricDefForm
-          orgId={orgId}
-          projectId={projectId}
-          name={name}
-          initialState={metricVersionToFormState(latest)}
-          onClose={() => setEvolving(false)}
-        />
-      ) : null}
-    </li>
+    </PpCard>
   );
 }

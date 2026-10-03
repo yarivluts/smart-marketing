@@ -377,7 +377,21 @@
     "weakPasswordError": "בחר סיסמה עם 6 תווים לפחות.",
     "tokenSignInPending": "מתחבר...",
     "invalidOrExpiredTokenError": "קישור ההתחברות הזה לא תקף או פג תוקף.",
-    "backToSignIn": "חזרה להתחברות"
+    "backToSignIn": "חזרה להתחברות",
+    "enterpriseBadge": "בינה שיווקית 4.0",
+    "heroTitle": "מנוע הצמיחה המדויק לצוותים מונעי תוצאות",
+    "heroSubtitle": "איחוד צנרות שיוך, ניתוב תקציבים אוטומטי ומסירת נתוני ROAS מדויקים ישירות להנהלה.",
+    "rememberDevice": "זכור מכשיר זה ל-30 יום",
+    "twoFactorEnforced": "אימות דו-שלבי מופעל",
+    "soc2Verified": "מאומת SOC-2",
+    "isoCertified": "תואם ISO 27001",
+    "e2eEncrypted": "מוצפן מקצה לקצה",
+    "termsNotice": "בהמשך הגלישה אתה מסכים לתנאי השימוש ומדיניות הפרטיות של GrowthOS Enterprise.",
+    "activePipelines": "צינורות פעילים",
+    "adSetsActive": "קמפיינים פעילים",
+    "slaUptime": "זמינות מערכת SLA",
+    "blendedPayback": "החזר השקעה משוקלל",
+    "roasTelemetry": "טלמטריית ROAS משוקללת"
   },
   "AccountStatus": {
     "signedInAs": "מחובר בתור {email}",
@@ -480,7 +494,11 @@
     "stackStripe": "Stripe",
     "stackWoocommerce": "WooCommerce",
     "uptimeScore": "99.98% זמינות",
-    "workspacesHeading": "סביבות עבודה ומרכזי שליטה"
+    "workspacesHeading": "סביבות עבודה ומרכזי שליטה",
+    "statusNoData": "אין פעילות זרם",
+    "noPipelines": "אין מחוברים",
+    "sectionOrganizations": "ארגונים",
+    "noActivityEvents": "לא נרשמו אירועים בפעילות לאחרונה."
   },
   "OrgsPage": {
     "title": "הארגונים שלך",
@@ -489,13 +507,28 @@
     "roleLabel": "תפקיד: {role}",
     "pendingInvites": "הזמנות ממתינות",
     "open": "פתיחה",
-    "viewInvite": "צפייה בהזמנה"
+    "viewInvite": "צפייה בהזמנה",
+    "eyebrow": "סביבות עבודה",
+    "description": "מעבר בין ארגונים, אשכולות טלמטריה והזמנות צוות ממתינות.",
+    "activeOrganizations": "ארגונים פעילים",
+    "emptyDesc": "צור ארגון חדש או בקש ממנהל הצוות שלך לשלוח הזמנה.",
+    "quickAccess": "גישה מהירה"
   },
   "NewOrgPage": {
     "title": "יצירת ארגון",
     "nameLabel": "שם הארגון",
     "submit": "יצירת ארגון",
-    "genericError": "משהו השתבש. נסה שוב."
+    "genericError": "משהו השתבש. נסה שוב.",
+    "stepIndicator": "שלב 1 מתוך 2: סביבת ארגון",
+    "pageSubtitle": "הגדר את פוד הטלמטריה הייעודי, גבולות ממשל הצוות וזרימות הנתונים הראשוניות שלך.",
+    "slugLabel": "מזהה סביבה (Slug) ונקודת קצה לקליטה",
+    "slugAvailable": "זמין ושמור",
+    "featurePodTitle": "פוד טלמטריה ייעודי",
+    "featurePodDesc": "אחסון VPC מבודד וכוח מחשוב ייעודי עבור הארגון שלך.",
+    "featureRbacTitle": "ממשל ובקרה ארגונית",
+    "featureRbacDesc": "בקרת גישה מבוססת תפקידים עם הרשאות פרויקט פרטניות.",
+    "featureStreamTitle": "הקצאת זרימות מיידית",
+    "featureStreamDesc": "מאזיני צנרת ללא שיהוי מוכנים מיד עם היצירה."
   },
   "OrgSwitcher": {
     "label": "ארגון"
@@ -575,7 +608,8 @@
     "statusSuspended": "מושהה",
     "statusInvited": "מוזמן",
     "inviteTeamMemberTitle": "הזמנת חבר צוות",
-    "inviteTeamMemberDesc": "שלח הזמנה עם הרשאות ארגון או פרויקט מותאמות אישית."
+    "inviteTeamMemberDesc": "שלח הזמנה עם הרשאות ארגון או פרויקט מותאמות אישית.",
+    "kpiYourRole": "התפקיד שלך"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -635,7 +669,9 @@
     "stackCustom": "פיתוח מותאם (Next.js / React / Node)",
     "stackMobile": "מובייל Native (React Native / Flutter)",
     "stackCrm": "מערכת CRM (HubSpot / Salesforce)",
-    "creating": "מקים סביבת עבודה..."
+    "creating": "מקים סביבת עבודה...",
+    "eyebrow": "הגדרת פרויקט",
+    "description": "הגדרת סביבת טלמטריה, צינורות נתונים ומודלים עבור סביבת עבודה זו."
   },
   "Onboarding": {
     "metaTitle": "צעדים ראשונים",
@@ -700,7 +736,24 @@
     "acceptError": "לא ניתן היה לאשר את ההזמנה. נסה שוב.",
     "verifyEmailError": "יש לאמת את כתובת הדוא\"ל לפני אישור ההזמנה. בדוק את תיבת הדואר הנכנס שלך לקבלת קישור האימות.",
     "emailMismatch": "הזמנה זו נשלחה אל {email}, אך אתה מחובר עם חשבון אחר.",
-    "switchAccount": "התנתק והחלף חשבון"
+    "switchAccount": "התנתק והחלף חשבון",
+    "workspaceBadge": "הזמנה לסביבת עבודה",
+    "leadAnalyst": "אנליסט צמיחה מוביל",
+    "teamDirect": "הזמנת צוות ישירה",
+    "targetIdentity": "זהות יעד",
+    "reservedSeat": "מושב שמור #08",
+    "entitlementsHeading": "הרשאות סביבת עבודה מוקצות",
+    "entitlementDashboardsTitle": "13+ לוחות מחוונים אנליטיים",
+    "entitlementDashboardsDesc": "MRR בזמן אמת, קוהורטות LTV ו-ROAS",
+    "entitlementAttributionTitle": "צינורות שיוך מתקדמים",
+    "entitlementAttributionDesc": "מודלים רב-ערוציים של מרקוב ושאפלי",
+    "entitlementAgentTitle": "סטודיו סוכני MCP",
+    "entitlementAgentDesc": "אלגוריתמים אוטונומיים לחלוקת תקציב",
+    "entitlementAlertsTitle": "טלמטריה והתראות בזמן אמת",
+    "entitlementAlertsDesc": "התראות סלאק מיידיות וזיהוי חריגות",
+    "ssoTitle": "התחברות אחידה (SSO / SAML)",
+    "ssoSubtitle": "מוכן לקישור אימות עבור {email}",
+    "decline": "דחה הזמנה"
   },
   "ResourceLibrary": {
     "title": "ספריית משאבים",
@@ -764,7 +817,9 @@
     "archive": "העברה לארכיון",
     "unarchive": "שחזור",
     "archiveError": "לא ניתן היה להעביר את המשאב לארכיון. נסה שוב.",
-    "unarchiveError": "לא ניתן היה לשחזר את המשאב. נסה שוב."
+    "unarchiveError": "לא ניתן היה לשחזר את המשאב. נסה שוב.",
+    "eyebrow": "ספריית משאבים",
+    "description": "ניהול אישורי גישה משותפים, תבניות תהליך ומרשם אנשי הארגון."
   },
   "ProjectResources": {
     "metaTitle": "משאבי הפרויקט",
@@ -785,7 +840,9 @@
     "writeTierRead": "קריאה בלבד",
     "writeTierOptimize": "אופטימיזציה",
     "writeTierManage": "ניהול מלא",
-    "writeTierError": "לא ניתן היה לעדכן את רמת הרשאת הכתיבה. נסה שוב."
+    "writeTierError": "לא ניתן היה לעדכן את רמת הרשאת הכתיבה. נסה שוב.",
+    "eyebrow": "משאבי פרויקט",
+    "description": "ניהול אישורי גישה, תבניות והקצאות אנשי צוות המחוברים לפרויקט."
   },
   "ApiKeys": {
     "metaTitle": "מפתחות API",
@@ -828,7 +885,15 @@
     "mcpConnectionNeverUsedLabel": "מעולם לא נעשה בו שימוש",
     "mcpConnectionGrantedLabel": "אושר בתאריך {createdAt}",
     "revokeMcpConnection": "ביטול",
-    "revokeMcpConnectionError": "לא ניתן היה לבטל את החיבור. נסה שוב."
+    "revokeMcpConnectionError": "לא ניתן היה לבטל את החיבור. נסה שוב.",
+    "eyebrow": "כספת אבטחה ואישורים",
+    "description": "ניהול מפתחות גישה מתוכנתים, מפתחות טלמטריה ואישורי חיבור לקוחות MCP.",
+    "kpiActiveKeys": "מפתחות פעילים",
+    "kpiTotalKeys": "סה״כ הונפקו",
+    "kpiRevokedKeys": "מבוטלים",
+    "kpiMcpGrants": "חיבורי MCP",
+    "noKeysDesc": "הנפק את מפתח ה-API הראשון שלך לאימות צינורות נתונים, SDKs או סוכני MCP.",
+    "noMcpConnectionsDesc": "לקוחות MCP חיצוניים המתחברים דרך OAuth 2.1 יופיעו כאן."
   },
   "McpConsent": {
     "metaTitle": "חיבור לקוח MCP",
@@ -1021,7 +1086,15 @@
     "markReviewed": "סימון כנבדק",
     "discardDelivery": "מחיקה",
     "deliveryStatusError": "לא ניתן היה לעדכן את המשלוח. נסה שוב.",
-    "appliedViaMapping": "מופה ונקלט (אצווה {batchId})"
+    "appliedViaMapping": "מופה ונקלט (אצווה {batchId})",
+    "eyebrow": "מרכז וובהוק וטלמטריה",
+    "description": "הגדר מנויי אירועים, אימות חתימה קריפטוגרפית ובדוק תורי סקירה של מטענים נכנסים.",
+    "kpiTotalEndpoints": "נקודות קצה",
+    "kpiActiveEndpoints": "פעילות",
+    "kpiPendingDeliveries": "ממתינים לסקירה",
+    "kpiTotalDeliveries": "משלוחים",
+    "noEndpointsDesc": "צור נקודת קצה של וובהוק נכנס כדי להתחיל לקבל מטענים בזמן אמת מפלטפורמות חיצוניות.",
+    "noDeliveriesDesc": "מטענים נכנסים שיועברו לנקודות קצה פעילות יופיעו כאן בתור הסקירה."
   },
   "FieldMappings": {
     "metaTitle": "מיפויי שדות",
@@ -1085,7 +1158,16 @@
     "suggestionsHeading": "{count, plural, one {הצעה אחת} other {# הצעות}}",
     "applyAllSuggestions": "החל הכול",
     "applySuggestion": "החל",
-    "suggestionSummary": "{targetField} ← {sourcePath} (התאמה של {confidence}%)"
+    "suggestionSummary": "{targetField} ← {sourcePath} (התאמה של {confidence}%)",
+    "eyebrow": "סטודיו מיפוי שדות AI",
+    "description": "הגדר ובדוק טרנספורמציות סכמה אוטומטיות ממטעני וובהוק גולמיים לסכמות מאומתות.",
+    "kpiTotalMappings": "סך המיפויים",
+    "kpiActiveMappings": "מיפויים פעילים",
+    "kpiDisabledMappings": "מושבתים",
+    "kpiTargetSchemas": "סכמות יעד",
+    "noMappingsDesc": "צור את כלל מיפוי השדות הראשון שלך למטה כדי להמיר אירועי וובהוק נכנסים לרשומות התואמות לסכמה.",
+    "rulesCount": "{count, plural, one {כלל #} other {# כללים}}",
+    "submitting": "שומר..."
   },
   "SchemaRegistry": {
     "metaTitle": "מרשם סכימות",
@@ -1147,7 +1229,14 @@
     "syncMartsError": "לא ניתן היה לסנכרן את תצוגות המחסן. נסה שוב.",
     "syncMartsNotConfigured": "טרם הוגדר מחסן נתונים לפריסה הזו.",
     "syncMartsDone": "{count, plural, one {תצוגה אחת סונכרנה.} other {# תצוגות סונכרנו.}}",
-    "syncMartsSchemaError": "{schemaName}: {message}"
+    "syncMartsSchemaError": "{schemaName}: {message}",
+    "eyebrow": "חוזי נתונים וסטודיו סכמות",
+    "description": "מאגר חוזים מרכזי למודלי אירועים, ישויות ממדיות והתפתחות סכמה ללא השבתה.",
+    "kpiContractFamilies": "משפחות חוזים",
+    "kpiActiveSchemas": "סכמות פעילות",
+    "kpiTrackingAlerts": "התראות מעקב",
+    "kpiEventSchemas": "סכמות אירועים",
+    "noSchemasDesc": "רשום את הגדרת סכמת האירוע, הישות או המדד הראשונה שלך למטה."
   },
   "MetricRegistry": {
     "metaTitle": "קטלוג מדדים",
@@ -1190,7 +1279,15 @@
     "duplicateMetricError": "מדד בשם זה כבר רשום בפרויקט זה.",
     "evolveHeading": "פיתוח \"{name}\" לגרסה חדשה",
     "evolveSubmit": "פיתוח מדד",
-    "evolveError": "משהו השתבש. נסה שוב."
+    "evolveError": "משהו השתבש. נסה שוב.",
+    "eyebrow": "מודל BI וסטודיו נוסחאות",
+    "description": "קטלוג מדדים, מנועי אגרגציה דטרמיניסטיים ומעקב התפתחות נוסחאות.",
+    "kpiRegisteredKpis": "מדדי KPI רשומים",
+    "kpiActiveMetrics": "מדדים פעילים",
+    "kpiBaseAggregations": "אגרגציות בסיס",
+    "kpiDerivedFormulas": "נוסחאות נגזרות",
+    "noMetricsDesc": "הגדר את אגרגציית המדד או נוסחת המדד הראשונה שלך למטה.",
+    "versionsCount": "{count, plural, one {גרסה #} other {# גרסאות}}"
   },
   "IngestHealth": {
     "metaTitle": "תקינות הזרמת הנתונים",
@@ -1249,7 +1346,17 @@
     "warehouseFreshnessLine": "הרשומה האחרונה נקלטה: {latestLandedAt} UTC — {count} רשומות נקלטו בסביבת הייצור. מתרענן כל שעה על ידי משימת המחסן המתוזמנת.",
     "warehouseFreshnessEmpty": "מחסן הנתונים מחובר אך טרם נקלטו רשומות עבור סביבת הייצור של הפרויקט הזה.",
     "warehouseFreshnessNotConfigured": "טרם הוגדר מחסן נתונים לפריסה הזו — העדכניות תופיע כאן ברגע ש-BigQuery יחובר.",
-    "warehouseFreshnessError": "לא ניתן היה לקרוא את עדכניות מחסן הנתונים: {message}"
+    "warehouseFreshnessError": "לא ניתן היה לקרוא את עדכניות מחסן הנתונים: {message}",
+    "eyebrow": "צינור נתונים וקליטה",
+    "description": "ניטור קצב קליטת נתונים, בדיקה וטיפול ברשומות בהסגר וניהול רעננות מחסן הנתונים.",
+    "kpiThroughput": "קצב תעבורה",
+    "kpiDelivered": "רשומות שנמסרו",
+    "kpiIntegrity": "תקינות מסירה",
+    "kpiFreshness": "רעננות הצינור",
+    "noBatchesDesc": "טרם נרשמו אצוות קליטה. שלח אירועים באמצעות Web SDK או Webhooks נכנסים.",
+    "noQuarantinedDesc": "כל הרשומות שנקלטו עברו את חוזי אימות הסכימה בהצלחה ללא שגיאות.",
+    "noPipelineFailuresDesc": "לא זוהו כשלים במסירת הודעות בתור העיבוד.",
+    "noQueuedMessagesDesc": "כל תורי ההודעות נקיים וזורמים ללא עומס מצטבר."
   },
   "BillingOpsFeed": {
     "metaTitle": "פיד אירועי חיוב",
@@ -1300,7 +1407,14 @@
     "filterApply": "סנן",
     "filterClear": "נקה סינון",
     "filterActiveNote": "מסונן לרשומות שבהן {field} הוא {value}.",
-    "filterEmpty": "אין רשומות התואמות לסינון זה."
+    "filterEmpty": "אין רשומות התואמות לסינון זה.",
+    "eyebrow": "טלמטריה בהזרמה חיה",
+    "kpiStreamingRate": "קצב קליטה",
+    "kpiProcessedRecords": "רשומות שעובדו",
+    "kpiActiveSchemas": "סכמות אירועים פעילות",
+    "kpiPiiCompliance": "עמידה בהגנת פרטיות",
+    "piiMaskingBadge": "מיסוך פרטיות פעיל (ללא דליפות)",
+    "piiRedacted": "מידע אישי מוסתר"
   },
   "Customers": {
     "metaTitle": "חיפוש לקוחות",
@@ -1418,7 +1532,10 @@
     "themePerformance": "ביצועים",
     "themeMissingFeatures": "פיצ'רים חסרים",
     "themeOnboarding": "הצטרפות",
-    "themeUsability": "שימושיות"
+    "themeUsability": "שימושיות",
+    "promotersLabel": "ממליצים",
+    "passivesLabel": "פסיביים",
+    "detractorsLabel": "משמיצים"
   },
   "Support": {
     "metaTitle": "תמיכה",
@@ -1434,7 +1551,10 @@
     "rowValueUnavailable": "—",
     "durationSeconds": "{value} שניות",
     "durationMinutes": "{value} דקות",
-    "durationHours": "{value} שעות"
+    "durationHours": "{value} שעות",
+    "ticketsResolvedLabel": "פניות שנפתרו",
+    "avgFirstResponseLabel": "זמן מענה ראשוני ממוצע",
+    "csatLabel": "שביעות רצון כוללת"
   },
   "Demos": {
     "metaTitle": "הדגמות",
@@ -1519,7 +1639,9 @@
     "byCohortHeading": "לפי קוהורט הרשמה",
     "byCohortEmpty": "אין עדיין פילוח לפי קוהורט — חברו מחסן נתונים כדי לראות זאת.",
     "dimensionValueUnknown": "לא ידוע",
-    "dimensionAverageScore": "ממוצע {average} ({count, plural, one {הרשמה אחת} other {# הרשמות}})"
+    "dimensionAverageScore": "ממוצע {average} ({count, plural, one {הרשמה אחת} other {# הרשמות}})",
+    "averageScoreLabel": "ציון כוונה ממוצע",
+    "totalResponsesLabel": "סך הרשמות"
   },
   "Firmographics": {
     "metaTitle": "נתונים פירמוגרפיים",
@@ -1552,7 +1674,9 @@
     "industryManufacturing": "ייצור",
     "industryMediaEntertainment": "מדיה / בידור",
     "industryNonprofit": "מלכ״ר",
-    "industryOther": "אחר"
+    "industryOther": "אחר",
+    "totalAccountsLabel": "סך חשבונות",
+    "activeAlertsLabel": "התראות פעילות"
   },
   "Experiments": {
     "metaTitle": "ניסויים",
@@ -1648,7 +1772,20 @@
     "chainInvalid": "בדיקת התקינות נכשלה ברשומה {entryId}. ייתכן שהיומן הזה שובש.",
     "noEntries": "עדיין לא נרשמו שינויים מבוקרים עבור ארגון זה.",
     "actorLine": "{actorType} {actorId} · {action}",
-    "listCapNote": "מוצגות {count} הרשומות האחרונות."
+    "listCapNote": "מוצגות {count} הרשומות האחרונות.",
+    "eyebrow": "אחסון WORM",
+    "description": "זרם אירועים בלתי ניתן לשינוי, משורשר קריפטוגרפית ומאומת ע״י בדיקות גיבוב.",
+    "bannerVerifiedTitle": "שרשרת גיבוב קריפטוגרפית מאומתת",
+    "bannerCompromisedTitle": "התגלתה פגיעה בשלמות",
+    "zeroModAllowed": "ללא הרשאת שינוי",
+    "kpiLedgerStatus": "סטטוס יומן ביקורת",
+    "kpiValidValue": "תקין ומשורשר",
+    "kpiCompromisedValue": "פגוע",
+    "kpiTotalEvents": "אירועים מבוקרים",
+    "thTimestampActor": "חותמת זמן ומבצע",
+    "thActionSummary": "פעולה ותקציר",
+    "thVerification": "אימות",
+    "verifiedPill": "מאומת"
   },
   "PluginRegistry": {
     "metaTitle": "מרשם תוספים",
@@ -1663,7 +1800,9 @@
     "registeredHeading": "תוספים רשומים",
     "noManifests": "עדיין לא נרשמו מניפסטים של תוספים בארגון זה.",
     "versionLine": "גרסה {version} · {type}",
-    "scopesLine": "היקפים: {scopes}"
+    "scopesLine": "היקפים: {scopes}",
+    "eyebrow": "מרשם תוספים",
+    "description": "רישום וניהול מניפסטים של תוספים ארגוניים, מחברי נתונים וחבילות מדדים."
   },
   "ProjectPlugins": {
     "metaTitle": "תוספים",
@@ -1760,7 +1899,9 @@
     "lookalikeCreateError": "לא ניתן היה ליצור את קהל ה-Lookalike. נסו שוב.",
     "lookalikeListHeading": "קהלי Lookalike שנוצרו",
     "lookalikeListEmpty": "טרם נוצרו קהלי Lookalike.",
-    "lookalikeListItem": "{name} · {ratio}% · {country} · נוצר {createdAt}"
+    "lookalikeListItem": "{name} · {ratio}% · {country} · נוצר {createdAt}",
+    "eyebrow": "תוספים ומחברים",
+    "description": "פריסת מודלי מדדים מוכנים מראש, ניטור צינורות תוספים וניהול אינטגרציות מקור מותאמות אישית."
   },
   "Boards": {
     "metaTitle": "לוחות בקרה",
@@ -1859,7 +2000,9 @@
       "not_yet_backed": "עדיין לא מגובה בנתונים אמיתיים",
       "query_error": "לא ניתן היה לטעון אריח זה"
     },
-    "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה"
+    "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה",
+    "viewBoardLink": "פתח לוח",
+    "createSubtitle": "בנה לוח מחוונים עם אריחי טלמטריה מותאמים אישית"
   },
   "Goals": {
     "metaTitle": "יעדים",
@@ -1952,7 +2095,12 @@
     "progressLabel": "התקדמות",
     "editTarget": "עדכון יעד",
     "smartRecDescription": "היעד בפיגור ביחס לקצב הרצוי. עוזר ה-AI ממליץ על הגדלת תקציב להשלמת הפער.",
-    "smartRecAction": "הגדלת תקציב בקליק אחד"
+    "smartRecAction": "הגדלת תקציב בקליק אחד",
+    "eyebrow": "יעדי הנהלה וקצב ביצוע",
+    "backToGoals": "חזרה ליעדים",
+    "thermometerSubtitle": "מסלול התקדמות מכויל מול נתונים בזמן אמת",
+    "settingsSubtitle": "קצב מדידה, שיוך מדד ובעלות על היעד",
+    "editGoalSubtitle": "עדכון ערך יעד, תאריכים, קצב מדידה או בעלים"
   },
   "Segments": {
     "metaTitle": "סגמנטים",
@@ -2094,7 +2242,30 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "היסטוריית ניצחונות",
     "historyEmpty": "טרם נרשמו ניצחונות.",
-    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים."
+    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים.",
+    "eyebrow": "מנוע המרות",
+    "description": "טריגרים להמרות בזמן אמת, אבני דרך של תשואה אמיתית ונתוני חגיגות הישגים.",
+    "kpiActiveRules": "חוקי הישג פעילים",
+    "kpiTrialPipeline": "קצב המרת תקופות ניסיון",
+    "kpiTopCloser": "מוביל/ת המכירות השבוע",
+    "kpiRecentWins": "הישגים שתועדו לאחרונה",
+    "kpiWinsSuffix": "הישגים",
+    "rulesSubtitle": "קריטריוני הישגים מוגדרים, סכמות ופעולות אוטומטיות",
+    "feedSubtitle": "ערוץ שידור אירועים חי ונתוני חגיגות הישגים",
+    "createSubtitle": "הגדרת סכמת אירוע, מסנני תנאים וסיווג הישג",
+    "pipelineHeading": "צינור המרת תקופות ניסיון",
+    "pipelineSubtitle": "קצב תקופות ניסיון פעילות שהופכות להכנסה",
+    "leaderboardCardHeading": "לוח מובילי גביה בספרינט",
+    "leaderboardSubtitle": "הכנסות משויכות לנציגים השבוע",
+    "kpiActiveBadge": "{count} פעילים",
+    "kpiDefinedFooter": "{count, plural, one {חוק מוגדר אחד} other {# חוקים מוגדרים}}",
+    "kpiConvertingFooter": "המרת תקופות ניסיון להכנסה",
+    "kpiWarehouseFooter": "חיבור מחסן נתונים נדרש",
+    "kpiDealsClosedFooter": "{count, plural, one {עסקה אחת שנסגרה} other {# עסקאות שנסגרו}}",
+    "kpiNoDealsFooter": "אין עסקאות שבועיות עדיין",
+    "kpiPersistedFooter": "אירועי הישג מתועדים",
+    "kpiLoggedBadge": "תועד",
+    "activeRulesCount": "{count, plural, one {חוק פעיל אחד} other {# חוקים פעילים}}"
   },
   "TrialPipeline": {
     "heading": "תהליך תקופות ניסיון (Trial Pipeline)",
@@ -2135,7 +2306,29 @@
     "reducedMotionLabel": "תנועה מופחתת (ביטול קונפטי)",
     "claimButton": "צמד טלוויזיה",
     "claimError": "לא ניתן היה לצמד את הטלוויזיה. בדוק את הקוד ונסה שוב.",
-    "claimErrorInvalidCode": "קוד הצימוד אינו תקף, פג תוקפו, או שכבר נעשה בו שימוש. בקש מהטלוויזיה להציג קוד חדש."
+    "claimErrorInvalidCode": "קוד הצימוד אינו תקף, פג תוקפו, או שכבר נעשה בו שימוש. בקש מהטלוויזיה להציג קוד חדש.",
+    "eyebrow": "לוח תצוגה משרדי",
+    "openBillboard": "פתיחת לוח תצוגה לטלוויזיה",
+    "heroTitle": "מצב חדר מלחמה: לוח תצוגה משרדי",
+    "heroDescription": "תצוגת מסך מלא ייעודית ללא צורך בהתחברות, עם קצב הכנסות חי, חגיגות עסקאות, צלילים ורוטציית לוחות אוטומטית.",
+    "step1": "פתחו את /tv בטלוויזיה המשרדית או בדפדפן",
+    "step2": "הטלוויזיה תציג קוד שיוך בן 6 ספרות",
+    "step3": "הזינו את הקוד למטה כדי לשייך את המסך",
+    "kpiPairedDisplays": "מסכים פעילים",
+    "kpiPinRotation": "פרוטוקול אבטחה",
+    "kpiRotationSuffix": "קוד",
+    "kpiPinRotationDesc": "קוד שיוך מתחלף ומאובטח",
+    "kpiZeroLogin": "אימות וגישה",
+    "kpiZeroLoginVal": "מצב קיוסק",
+    "kpiZeroLoginDesc": "חיבור ללא צורך בהזנת סיסמה במסך",
+    "kpiChannelStatus": "ערוץ סנכרון",
+    "kpiWsConnected": "סנכרון חי",
+    "kpiWsDesc": "עדכונים בזמן אמת בתת-שנייה",
+    "pairedSubtitle": "ניהול מסכים מחוברים, רוטציית לוחות והגדרות תצוגה",
+    "pairSubtitle": "הזנת הקוד המוצג על גבי הטלוויזיה לשיוך לפרויקט זה",
+    "liveStatus": "פעיל",
+    "kpiActiveDisplaysFooter": "{count, plural, one {מסך פעיל אחד} other {# מסכים פעילים}}",
+    "tvsPairedCount": "{count, plural, one {טלוויזיה אחת משויכת} other {# טלוויזיות משויכות}}"
   },
   "TvMode": {
     "metaTitle": "חדר מלחמה",
@@ -2395,7 +2588,20 @@
     "templateHelp": "הדביקו כתובת מתוך כלי ההקלטות שלכם. ‏{landing_page} יוחלף בכתובת הדף. השאירו ריק כדי לא להציג קישור.",
     "save": "שמירה",
     "saved": "נשמר.",
-    "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה."
+    "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה.",
+    "eyebrow": "הגדרות הקלטות והקפות חום",
+    "kpiStatus": "סטטוס אינטגרציה",
+    "kpiStatusActive": "תבנית פעילה",
+    "kpiStatusNotConfigured": "לא מוגדר",
+    "kpiSupportedVendors": "ספקים נתמכים",
+    "kpiPrivacyPosture": "מדיניות פרטיות",
+    "previewHeading": "תצוגה מקדימה של הקישור",
+    "previewSubtitle": "כתובת יעד מדומה שנפתרה באמצעות ערכי דוגמה.",
+    "availableTokensHeading": "משתנים זמינים להזרקה",
+    "vendorsHeading": "מדריך ספקים והמלצות",
+    "clarityDesc": "חינמי לחלוטין מבית מיקרוסופט. מפות חום והקלטות ללא מגבלות נפח.",
+    "posthogDesc": "ניתוח מוצר והקלטות הפעלה בקוד פתוח עם מתאמי משפכי המרה.",
+    "fullstoryDesc": "פלטפורמת חוויית משתמש ארגונית עם זיהוי קליקים עצבניים."
   },
   "OrganizationSettings": {
     "metaTitle": "הגדרות ארגון",
@@ -2437,7 +2643,27 @@
     "nameRequiredError": "שם הפרויקט הוא שדה חובה.",
     "save": "שמירה",
     "saved": "נשמר.",
-    "saveError": "שמירת ההגדרות נכשלה. נסו שוב."
+    "saveError": "שמירת ההגדרות נכשלה. נסו שוב.",
+    "coreConfiguration": "הגדרת ליבה",
+    "planKpi": "תוכנית ארגון",
+    "workspacesKpi": "סביבות עבודה",
+    "teamKpi": "חברי צוות",
+    "credentialsKpi": "אישורי גישה מקושרים",
+    "identityCardTitle": "זהות הפרויקט ופרופיל סביבת העבודה",
+    "identityCardSubtitle": "ניהול זהות זמן ריצה ומרחבי שמות של מעקב",
+    "governanceCardTitle": "ממשל וחיבורים",
+    "governanceCardSubtitle": "חיבורי ערוצים ומדיניות אבטחה",
+    "noCredentials": "עדיין לא קושרו חיבורי שיווק.",
+    "active": "פעיל",
+    "none": "אין",
+    "checklistLink": "צ'קליסט הגדרה",
+    "securityEnforcements": "אכיפת אבטחה",
+    "hardware2fa": "אימות דו-שלבי חומרתי / WebAuthn",
+    "hardware2faDesc": "חובת מפתחות אבטחה FIDO2 למנהלי סביבת עבודה",
+    "auditTamper": "יומן ביקורת חסין שיבוש",
+    "auditTamperDesc": "יומן אירועים קריפטוגרפי בלתי ניתן לשינוי",
+    "dataRetention": "שער שימור נתונים",
+    "retentionValue": "365 ימים ללא שינוי"
   },
   "RepCollections": {
     "metaTitle": "גביית נציגים וערך לקוח",
@@ -2493,7 +2719,25 @@
     "deleteConfirm": "למחוק את רשומת היומן? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחיקה",
     "deleteError": "מחיקת הרשומה נכשלה. נסו שוב.",
-    "amountInputLabel": "סכום"
+    "amountInputLabel": "סכום",
+    "eyebrow": "ניהול הכנסות",
+    "kpiMtdCollections": "גביות החודש",
+    "kpiMtdSubtitle": "{count, plural, one {עסקה אחת שנסגרה} other {# עסקאות שנסגרו}}",
+    "kpiActiveClosers": "נציגי מכירות פעילים",
+    "kpiRepsSuffix": "נציגים",
+    "kpiUnattributedFooter": "{count} טרם שויכו לנציג",
+    "kpiAllAttributed": "כל העסקאות משויכות",
+    "kpiBillingSignals": "חיובי מערכת הממתינים לשיוך",
+    "kpiSignalsSuffix": "חיובים",
+    "needsTriage": "דרוש שיוך",
+    "allSignalsTriaged": "כל החיובים שויכו",
+    "kpiTopCloser": "מוביל/ת המכירות",
+    "noClosersYet": "אין עדיין עסקאות משויכות",
+    "signalsSubtitle": "תשלומי חשבוניות שזוהו אוטומטית משערי התשלום וממתינים לשיוך לנציג",
+    "ledgerSubtitle": "{count, plural, one {פעולה אחת מתועדת} other {# פעולות מתועדות בספר}}",
+    "createSubtitle": "רישום ידני של שדרוג, הרחבה, שימור או חידוש",
+    "weekSubtitle": "קצב ספרינט שבועי נוכחי",
+    "monthSubtitle": "קצב מצטבר חודשי"
   },
   "RepCollectionLeaderboard": {
     "heading": "מובילי הגבייה השבוע",
@@ -2641,7 +2885,14 @@
       "contact_us": "צור קשר",
       "apply_now": "הגש מועמדות",
       "book_travel": "הזמן עכשיו"
-    }
+    },
+    "targetBreadcrumb": "יעד #{id}",
+    "perDaySuffix": "/יום",
+    "spendSubtitle": "הוצאות פרסום ב-28 הימים האחרונים מתוך מחסן הנתונים",
+    "creativesSubtitle": "מודעות פעילות, קריאייטיבים ומצב נכסי פרסום",
+    "historySubtitle": "יומן ביצוע מאומת של פעולות אוטומציה",
+    "soc2Badge": "SOC-2 / מבוקר",
+    "budgetPacingNote": "תקרת תקציב יומית מוגדרת"
   },
   "FunnelGoals": {
     "metaTitle": "משפך ויעדים",

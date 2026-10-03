@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface EnableHookEndpointButtonProps {
   orgId: string;
@@ -36,11 +36,11 @@ export function EnableHookEndpointButton({ orgId, projectId, hookEndpointId }: E
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton type="button" variant="secondary" size="sm" onClick={handleClick} disabled={submitting}>
         {t('enableEndpoint')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('enableEndpointError')}
         </p>
       ) : null}

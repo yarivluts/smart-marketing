@@ -9,6 +9,8 @@ import { listBoardsForProject, listOrgProjects } from '@/lib/orgs/queries';
 import { toBoardSummaryView } from '@/lib/orgs/board-view';
 import { CreateBoardForm } from '@/components/orgs/create-board-form';
 import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
+import { PpPage, PpPageHeader, PpCard, PpEmptyState, PpPill, PpIconChip } from '@/components/pastel/primitives';
+import { LayoutDashboard, Plus, ArrowRight } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -67,8 +69,12 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   const t = await getTranslations('Boards');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow="TELEMETRY"
+        meta={project.name}
+        title={t('title', { projectName: project.name })}
+      />
 
       <MissingIntegrationAlert
         orgId={orgId}
@@ -83,30 +89,59 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
         customImpactMetrics={['MRR Waterfall', 'Gross & Net Churn', 'Executive KPI Cards']}
       />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('boardsHeading')}</h2>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-pp-display text-pp-headline-md text-pp-on-surface">{t('boardsHeading')}</h2>
+          {boardViews.length > 0 ? (
+            <span className="text-pp-label-sm text-pp-outline">
+              {boardViews.length} {boardViews.length === 1 ? 'board' : 'boards'}
+            </span>
+          ) : null}
+        </div>
+
         {boardViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noBoards')}</p>
+          <PpEmptyState
+            icon={LayoutDashboard}
+            title={t('noBoards')}
+            description={t('createSubtitle')}
+          />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-pp-md">
             {boardViews.map((board) => (
-              <li key={board.id} className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm">
-                <Link className="font-medium underline" href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}>
-                  {board.name}
-                </Link>
-                <span className="text-xs text-muted-foreground">{t('tileCountLabel', { count: board.tileCount })}</span>
-              </li>
+              <Link
+                key={board.id}
+                href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}
+                className="group relative flex flex-col justify-between rounded-2xl bg-pp-surface-container-lowest p-pp-lg shadow-pp-candy transition-all duration-200 hover:-translate-y-0.5 hover:shadow-pp-candy-hover"
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2">
+                    <PpIconChip icon={LayoutDashboard} accent="primary" />
+                    <PpPill accent="mint">{t('tileCountLabel', { count: board.tileCount })}</PpPill>
+                  </div>
+                  <h3 className="mt-4 font-pp-display text-pp-headline-md text-pp-on-surface group-hover:text-pp-primary transition-colors">
+                    {board.name}
+                  </h3>
+                </div>
+                <div className="mt-6 flex items-center gap-1.5 text-pp-label-sm text-pp-primary font-semibold">
+                  <span>{t('viewBoardLink')}</span>
+                  <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
+                </div>
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
       {canManageBoards ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
+        <PpCard
+          icon={Plus}
+          iconAccent="primary"
+          title={t('createHeading')}
+          subtitle={t('createSubtitle')}
+        >
           <CreateBoardForm orgId={orgId} projectId={projectId} />
-        </section>
+        </PpCard>
       ) : null}
-    </main>
+    </PpPage>
   );
 }

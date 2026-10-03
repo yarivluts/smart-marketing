@@ -10,6 +10,8 @@ import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 import { BoardSettingsForm } from '@/components/orgs/board-settings-form';
 import { BoardGridEditor } from '@/components/orgs/board-grid-editor';
 import { DeleteBoardButton } from '@/components/orgs/delete-board-button';
+import { PpPage, PpPageHeader, PpCard, PpPill } from '@/components/pastel/primitives';
+import { SlidersHorizontal } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string; boardId: string }>;
@@ -18,13 +20,6 @@ type PageProps = Readonly<{
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Boards' });
-  // Deliberately static, not the real board name: generateMetadata runs
-  // independently of the page component's own session/permission check
-  // below, so fetching a caller-supplied board's name here (as an earlier
-  // version of this file did) would leak it into the page <title> for a
-  // caller who isn't even a member of the org that owns it — the same
-  // static-title posture every other per-resource admin page in this
-  // codebase (cost-guardrails, metric-defs, schema-defs, ...) already uses.
   return { title: t('metaTitle') };
 }
 
@@ -88,15 +83,30 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const t = await getTranslations('Boards');
 
   return (
-    <main className="container mx-auto flex max-w-5xl flex-col gap-8 py-16">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">{board.name}</h1>
-        {canManageBoards ? <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} /> : null}
-      </div>
+    <PpPage>
+      <PpPageHeader
+        eyebrow="BOARD"
+        meta={
+          freshness ? (
+            <PpPill accent={freshness.isStale ? 'amber' : 'mint'} dot>
+              {t(freshness.isStale ? 'freshnessStaleLabel' : 'freshnessAsOfLabel', { asOf: freshness.asOf })}
+            </PpPill>
+          ) : undefined
+        }
+        title={board.name}
+        actions={
+          canManageBoards ? (
+            <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} />
+          ) : null
+        }
+      />
 
       {canManageBoards ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('settingsHeading')}</h2>
+        <PpCard
+          icon={SlidersHorizontal}
+          iconAccent="primary"
+          title={t('settingsHeading')}
+        >
           <BoardSettingsForm
             orgId={orgId}
             projectId={projectId}
@@ -106,7 +116,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
             initialCompare={boardView.compare}
             initialGlobalFilters={boardView.globalFilters}
           />
-        </section>
+        </PpCard>
       ) : null}
 
       <section>
@@ -121,6 +131,6 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
           readOnly={!canManageBoards}
         />
       </section>
-    </main>
+    </PpPage>
   );
 }

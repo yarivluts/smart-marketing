@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { Brush } from 'lucide-react';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface SweepQueuedPipelineMessagesButtonProps {
   orgId: string;
@@ -50,16 +51,25 @@ export function SweepQueuedPipelineMessagesButton({
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={handleClick}
+        disabled={submitting}
+        icon={Brush}
+      >
         {t('sweepQueuedMessages')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('sweepQueuedMessagesError')}
         </p>
       ) : null}
       {result ? (
-        <p className="text-xs text-muted-foreground">{t('sweepQueuedMessagesResult', { delivered: result.delivered, failed: result.failed })}</p>
+        <p className="text-xs text-pp-on-surface-variant font-medium">
+          {t('sweepQueuedMessagesResult', { delivered: result.delivered, failed: result.failed })}
+        </p>
       ) : null}
     </div>
   );

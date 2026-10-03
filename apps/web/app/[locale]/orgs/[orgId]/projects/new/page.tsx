@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { OrgShell } from '@/components/orgs/org-shell';
+import { PpPage, PpPageHeader } from '@/components/pastel/primitives';
 import { CreateProjectForm } from '@/components/orgs/create-project-form';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -34,9 +36,15 @@ export default async function NewProjectPage({ params }: PageProps): Promise<Rea
   const t = await getTranslations('NewProjectPage');
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-col gap-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
-      <CreateProjectForm orgId={orgId} />
-    </main>
+    <OrgShell locale={locale} orgId={orgId}>
+      <PpPage className="max-w-4xl">
+        <PpPageHeader
+          eyebrow={t('eyebrow')}
+          title={t('title')}
+          description={t('description')}
+        />
+        <CreateProjectForm orgId={orgId} />
+      </PpPage>
+    </OrgShell>
   );
 }

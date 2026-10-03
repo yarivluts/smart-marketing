@@ -15,6 +15,15 @@ import {
 } from 'lucide-react';
 import { MissingIntegrationOverlay } from '@/components/integrations/missing-integration-overlay';
 import { PageGuideButton } from '@/components/guides/page-guide-button';
+import {
+  PpPageHeader,
+  PpCard,
+  PpKpiCard,
+  PpKpiGrid,
+  PpEmptyState,
+  PpPill,
+  PpButton,
+} from '@/components/pastel/primitives';
 
 export interface ExecutiveCommandCenterProps {
   orgId?: string;
@@ -23,12 +32,13 @@ export interface ExecutiveCommandCenterProps {
   isDataConnected?: boolean;
   missingConnectors?: string[];
   onExecuteCopilotAction?: () => void;
+  feedItems?: ConversionFeedItem[];
 }
 
-type TimeWindow = 'today' | 'yesterday' | '7d';
-type AttributionModel = 'shapley' | 'first_touch' | 'last_touch' | 'linear';
+export type TimeWindow = 'today' | 'yesterday' | '7d';
+export type AttributionModel = 'shapley' | 'first_touch' | 'last_touch' | 'linear';
 
-interface ConversionFeedItem {
+export interface ConversionFeedItem {
   id: string;
   email: string;
   action: string;
@@ -39,70 +49,17 @@ interface ConversionFeedItem {
   type: 'sale' | 'lead' | 'trial';
 }
 
-const SAMPLE_FEED: ConversionFeedItem[] = [
-  {
-    id: '1',
-    email: 'j.doe@example.com',
-    action: 'purchased Enterprise Plan',
-    platform: 'meta',
-    campaign: 'retargeting_v3',
-    timeAgo: 'Just now',
-    amount: '+$2,400',
-    type: 'sale',
-  },
-  {
-    id: '2',
-    email: 'alex.smith@tech.io',
-    action: 'booked a demo',
-    platform: 'google',
-    campaign: 'b2b_saas_intent',
-    timeAgo: '2m ago',
-    amount: 'Lead',
-    type: 'lead',
-  },
-  {
-    id: '3',
-    email: 'marketing@startup.co',
-    action: 'signed up (Free Trial)',
-    platform: 'tiktok',
-    campaign: 'creator_ugc_04',
-    timeAgo: '5m ago',
-    amount: 'Trial',
-    type: 'trial',
-  },
-  {
-    id: '4',
-    email: 'elena.r@growthlab.com',
-    action: 'upgraded to Team Tier',
-    platform: 'meta',
-    campaign: 'expansion_lookalike',
-    timeAgo: '12m ago',
-    amount: '+$890',
-    type: 'sale',
-  },
-  {
-    id: '5',
-    email: 'cto@globalcorp.net',
-    action: 'converted Annual Contract',
-    platform: 'google',
-    campaign: 'brand_search_core',
-    timeAgo: '24m ago',
-    amount: '+$12,500',
-    type: 'sale',
-  },
-];
-
 export function ExecutiveCommandCenter({
   orgId = 'demo-org',
   projectId = 'demo-project',
-  projectName = 'EasySign SaaS',
+  projectName = 'Acme Growth SaaS',
   isDataConnected = true,
   missingConnectors = [],
   onExecuteCopilotAction,
-}: ExecutiveCommandCenterProps) {
+  feedItems = [],
+}: ExecutiveCommandCenterProps): React.ReactElement {
   const [timeWindow, setTimeWindow] = useState<TimeWindow>('today');
   const [attribution, setAttribution] = useState<AttributionModel>('shapley');
-  const [activeTooltip] = useState<boolean>(true);
   const [copilotExecuted, setCopilotExecuted] = useState<boolean>(false);
 
   const handleCopilotAction = () => {
@@ -111,465 +68,349 @@ export function ExecutiveCommandCenter({
   };
 
   const dashboardContent = (
-    <div className="space-y-6" data-testid="executive-command-center">
+    <div className="space-y-pp-lg text-pp-on-surface" data-testid="executive-command-center">
       {/* Top Header & Interactive Filter Bar */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
-              </span>
-              Live 60s Stream
+      <PpPageHeader
+        eyebrow="GROWTH TELEMETRY ENGINE"
+        meta={
+          <span className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pp-secondary opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-pp-secondary" />
             </span>
-            <span className="text-xs text-muted-foreground">• {projectName}</span>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Executive Command Center
-            </h1>
+            <span>Live 60s Stream • {projectName}</span>
+          </span>
+        }
+        title={
+          <span className="flex items-center gap-2">
+            <span>Executive Command Center</span>
             <PageGuideButton pageKey="pulse" />
-          </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Real-time cross-channel performance, revenue pacing, and autonomous growth guardrails.
-          </p>
-        </div>
+          </span>
+        }
+        description="Real-time cross-channel performance, revenue pacing, and autonomous growth guardrails."
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Time Window Buttons */}
+            <div className="inline-flex rounded-full bg-pp-surface-container p-1 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setTimeWindow('today')}
+                className={`rounded-full px-3.5 py-1 text-pp-label-sm font-semibold transition-all ${
+                  timeWindow === 'today'
+                    ? 'bg-pp-primary text-pp-on-primary shadow-xs'
+                    : 'text-pp-on-surface-variant hover:text-pp-on-surface'
+                }`}
+              >
+                Today (Live)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeWindow('yesterday')}
+                className={`rounded-full px-3.5 py-1 text-pp-label-sm font-semibold transition-all ${
+                  timeWindow === 'yesterday'
+                    ? 'bg-pp-primary text-pp-on-primary shadow-xs'
+                    : 'text-pp-on-surface-variant hover:text-pp-on-surface'
+                }`}
+              >
+                Yesterday
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeWindow('7d')}
+                className={`rounded-full px-3.5 py-1 text-pp-label-sm font-semibold transition-all ${
+                  timeWindow === '7d'
+                    ? 'bg-pp-primary text-pp-on-primary shadow-xs'
+                    : 'text-pp-on-surface-variant hover:text-pp-on-surface'
+                }`}
+              >
+                7 Days
+              </button>
+            </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Time Window Buttons */}
-          <div className="inline-flex rounded-full border border-border bg-card p-1 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setTimeWindow('today')}
-              className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
-                timeWindow === 'today'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Today (Live)
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimeWindow('yesterday')}
-              className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
-                timeWindow === 'yesterday'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Yesterday
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimeWindow('7d')}
-              className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
-                timeWindow === '7d'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              7 Days
-            </button>
+            {/* Attribution Dropdown */}
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-pp-surface-container px-3 py-1.5 text-pp-label-sm font-medium">
+              <span className="text-pp-outline">Attribution:</span>
+              <select
+                value={attribution}
+                onChange={(e) => setAttribution(e.target.value as AttributionModel)}
+                className="bg-transparent font-semibold text-pp-on-surface focus:outline-none"
+                aria-label="Attribution Model"
+              >
+                <option value="shapley">Data-Driven (Shapley)</option>
+                <option value="first_touch">First Touch</option>
+                <option value="last_touch">Last Touch</option>
+                <option value="linear">Linear Multi-Touch</option>
+              </select>
+            </div>
           </div>
-
-          {/* Attribution Dropdown */}
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-sm">
-            <span className="text-muted-foreground">Attribution:</span>
-            <select
-              value={attribution}
-              onChange={(e) => setAttribution(e.target.value as AttributionModel)}
-              className="bg-transparent font-semibold text-foreground focus:outline-none"
-              aria-label="Attribution Model"
-            >
-              <option value="shapley">Data-Driven (Shapley)</option>
-              <option value="first_touch">First Touch</option>
-              <option value="last_touch">Last Touch</option>
-              <option value="linear">Linear Multi-Touch</option>
-            </select>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* 4 Executive KPI Scorecards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* KPI 1: Spend */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400">
-              <DollarSign className="h-5 w-5" />
-            </div>
-            <span className="flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-              <TrendingUp className="h-3.5 w-3.5" />
-              +12.4% vs lw
-            </span>
-          </div>
-          <p className="mt-3 text-xs font-medium text-muted-foreground">Total Blended Spend</p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              $14,280
-            </span>
-            <span className="text-xs text-muted-foreground">USD</span>
-          </div>
-        </div>
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Total Blended Spend"
+          value={isDataConnected ? '$0' : '—'}
+          valueSuffix={isDataConnected ? 'USD' : undefined}
+          accent="primary"
+          badge={isDataConnected ? 'Live' : 'Pending Ingestion'}
+          badgeAccent={isDataConnected ? 'primary' : 'neutral'}
+          footer="Blended ad network expenditure across Google, Meta, and TikTok"
+        />
 
-        {/* KPI 2: Blended ROAS */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <Rocket className="h-5 w-5" />
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              <ArrowUpRight className="h-3 w-3" />
-              +18.4% Lift
-            </span>
-          </div>
-          <p className="mt-3 text-xs font-medium text-muted-foreground">Blended ROAS</p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              3.84x
-            </span>
-            <span className="text-xs font-semibold text-emerald-600">High Efficiency</span>
-          </div>
-        </div>
+        <PpKpiCard
+          label="Blended ROAS"
+          value={isDataConnected ? '0.0x' : '—'}
+          accent="mint"
+          badge="Target 2.80x"
+          badgeAccent="mint"
+          footer="Target efficiency pacing threshold"
+        />
 
-        {/* KPI 3: Marketing Efficiency Ratio (MER) */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              <Gauge className="h-5 w-5" />
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">Target: 30%</span>
-          </div>
-          <p className="mt-3 text-xs font-medium text-muted-foreground">
-            Marketing Efficiency (MER)
-          </p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              26.8%
-            </span>
-            <span className="text-xs text-muted-foreground">Spend / Revenue</span>
-          </div>
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-blue-500 transition-all duration-500"
-              style={{ width: '89%' }}
-            />
-          </div>
-        </div>
+        <PpKpiCard
+          label="Marketing Efficiency (MER)"
+          value={isDataConnected ? '0.0%' : '—'}
+          accent="sky"
+          badge="Target: 30%"
+          badgeAccent="sky"
+          footer="Total ad spend divided by gross inflow revenue"
+        />
 
-        {/* KPI 4: Net Contribution Margin */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/10 px-2 py-0.5 text-xs font-bold text-teal-700 dark:text-teal-400">
-              33.7% Margin
-            </span>
-          </div>
-          <p className="mt-3 text-xs font-medium text-muted-foreground">
-            Net Contribution Margin
-          </p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              $48,200
-            </span>
-            <span className="text-xs text-muted-foreground">Net Profit</span>
-          </div>
-        </div>
-      </div>
+        <PpKpiCard
+          label="Net Contribution Margin"
+          value={isDataConnected ? '$0' : '—'}
+          accent="pink"
+          badge="Net Profit"
+          badgeAccent="pink"
+          footer="Realized revenue minus blended media costs"
+        />
+      </PpKpiGrid>
 
-      {/* Main Intraday Pacing Chart */}
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* Main Intraday Pacing Chart Canvas */}
+      <PpCard
+        title="Revenue Velocity vs. Omni-Spend"
+        subtitle="Continuous telemetry tracking dynamic ROAS across active cohorts"
+        action={
           <div className="flex items-center gap-3">
-            <h2 className="text-base font-bold tracking-tight text-foreground sm:text-lg">
-              Intraday Revenue vs Ad Spend Pacing
-            </h2>
-            <span className="inline-flex items-center gap-1 rounded border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
-              Live WebSocket
-            </span>
+            <div className="flex items-center gap-3 rounded-full bg-pp-surface-container px-3 py-1 text-pp-label-sm font-semibold">
+              <span className="flex items-center gap-1.5 text-pp-on-surface">
+                <span className="h-2 w-2 rounded-full bg-pp-primary" />
+                ARR Inflow
+              </span>
+              <span className="flex items-center gap-1.5 text-pp-on-surface-variant">
+                <span className="h-2 w-2 rounded-full bg-pp-tertiary-fixed-dim" />
+                Blended Spend
+              </span>
+            </div>
+            <PpPill accent="mint" dot>
+              Live Telemetry
+            </PpPill>
           </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-              <span className="text-muted-foreground">Meta ($4.3k)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-              <span className="text-muted-foreground">Google ($3.2k)</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-purple-500" />
-              <span className="text-muted-foreground">TikTok ($1.8k)</span>
-            </div>
-            <div className="h-3 w-px bg-border" />
-            <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
-              <span className="h-1 w-3 rounded-full bg-emerald-500" />
-              <span>Revenue ($18.4k)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* SVG Visualization */}
-        <div className="relative mt-6 h-[300px] w-full">
+        }
+      >
+        <div className="relative mt-2 h-64 w-full">
           {/* Y Axis labels */}
-          <div className="absolute bottom-6 left-0 top-0 flex w-10 flex-col justify-between text-right text-[11px] font-medium text-muted-foreground">
-            <span>$80k</span>
-            <span>$60k</span>
-            <span>$40k</span>
+          <div className="absolute bottom-6 start-0 top-0 flex w-12 flex-col justify-between text-end text-pp-label-sm text-pp-outline">
+            <span>$50k</span>
+            <span>$35k</span>
             <span>$20k</span>
+            <span>$5k</span>
             <span>$0</span>
           </div>
 
           {/* Chart Canvas Area */}
-          <div className="absolute bottom-6 left-12 right-2 top-2">
+          <div className="absolute bottom-6 end-2 start-14 top-2">
             <svg
               className="h-full w-full overflow-visible"
               preserveAspectRatio="none"
-              viewBox="0 0 1000 300"
+              viewBox="0 0 1000 200"
             >
               <defs>
-                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                <linearGradient id="primaryCurveGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+                  <stop offset="0%" stopColor="#5243d5" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="#5243d5" stopOpacity="0.0" />
+                </linearGradient>
+                <linearGradient id="spendCurveGrad" x1="0%" x2="0%" y1="0%" y2="100%">
+                  <stop offset="0%" stopColor="#ffade2" stopOpacity="0.2" />
+                  <stop offset="100%" stopColor="#ffade2" stopOpacity="0.0" />
                 </linearGradient>
               </defs>
 
               {/* Grid Lines */}
-              <line x1="0" y1="0" x2="1000" y2="0" stroke="currentColor" strokeOpacity="0.08" />
-              <line x1="0" y1="75" x2="1000" y2="75" stroke="currentColor" strokeOpacity="0.08" />
-              <line x1="0" y1="150" x2="1000" y2="150" stroke="currentColor" strokeOpacity="0.08" />
-              <line x1="0" y1="225" x2="1000" y2="225" stroke="currentColor" strokeOpacity="0.08" />
-              <line x1="0" y1="300" x2="1000" y2="300" stroke="currentColor" strokeOpacity="0.15" />
+              <line x1="0" y1="0" x2="1000" y2="0" stroke="#c8c4d7" strokeOpacity="0.3" strokeDasharray="3 3" />
+              <line x1="0" y1="50" x2="1000" y2="50" stroke="#c8c4d7" strokeOpacity="0.3" strokeDasharray="3 3" />
+              <line x1="0" y1="100" x2="1000" y2="100" stroke="#c8c4d7" strokeOpacity="0.3" strokeDasharray="3 3" />
+              <line x1="0" y1="150" x2="1000" y2="150" stroke="#c8c4d7" strokeOpacity="0.3" strokeDasharray="3 3" />
+              <line x1="0" y1="200" x2="1000" y2="200" stroke="#c8c4d7" strokeOpacity="0.5" />
 
-              {/* TikTok Area (Purple) */}
+              {/* Spend Curve */}
               <path
-                d="M0,285 Q200,260 400,220 T800,140 L800,300 L0,300 Z"
-                fill="#a855f7"
-                opacity="0.35"
-              />
-
-              {/* Google Area (Amber) */}
-              <path
-                d="M0,290 Q200,275 400,245 T800,185 L800,300 L0,300 Z"
-                fill="#fbbf24"
-                opacity="0.5"
-              />
-
-              {/* Meta Area (Blue) */}
-              <path
-                d="M0,295 Q200,285 400,265 T800,225 L800,300 L0,300 Z"
-                fill="#3b82f6"
-                opacity="0.75"
-              />
-
-              {/* Revenue Area fill & line */}
-              <path
-                d="M0,298 Q200,260 400,210 T800,65 L800,300 L0,300 Z"
-                fill="url(#revGrad)"
+                d="M 0 170 C 200 160, 400 145, 600 135 C 800 120, 900 105, 1000 95 L 1000 200 L 0 200 Z"
+                fill="url(#spendCurveGrad)"
               />
               <path
-                d="M0,298 Q200,260 400,210 T800,65 T1000,15"
+                d="M 0 170 C 200 160, 400 145, 600 135 C 800 120, 900 105, 1000 95"
                 fill="none"
-                stroke="#10b981"
-                strokeWidth="3.5"
+                stroke="#ffade2"
+                strokeWidth="2.5"
                 strokeLinecap="round"
               />
 
-              {/* Live WebSocket pulsing point */}
-              <circle cx="800" cy="65" r="5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-              <line
-                x1="800"
-                y1="0"
-                x2="800"
-                y2="300"
-                stroke="#94a3b8"
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
+              {/* Revenue Inflow Curve */}
+              <path
+                d="M 0 185 C 200 165, 400 130, 600 80 C 800 50, 900 30, 1000 15 L 1000 200 L 0 200 Z"
+                fill="url(#primaryCurveGrad)"
               />
-            </svg>
+              <path
+                d="M 0 185 C 200 165, 400 130, 600 80 C 800 50, 900 30, 1000 15"
+                fill="none"
+                stroke="#5243d5"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
 
-            {/* Interactive Live Tooltip (Simulated around the current 2:45 PM mark) */}
-            {activeTooltip && (
-              <div className="absolute left-[78%] top-[18%] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-card/95 p-3.5 shadow-xl backdrop-blur-md">
-                <div className="flex items-center justify-between gap-3 border-b border-border pb-1.5 text-xs font-bold">
-                  <span className="text-foreground">2:45 PM (Live)</span>
-                  <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600">
-                    Active
-                  </span>
-                </div>
-                <div className="mt-2 space-y-1 text-xs">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-blue-500 font-medium">Meta Ads</span>
-                    <span className="font-mono font-bold">$4,280</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-amber-500 font-medium">Google Ads</span>
-                    <span className="font-mono font-bold">$3,150</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-purple-500 font-medium">TikTok Ads</span>
-                    <span className="font-mono font-bold">$1,820</span>
-                  </div>
-                  <div className="border-t border-border pt-1.5 flex justify-between gap-4 font-bold text-emerald-600">
-                    <span>Revenue</span>
-                    <span className="font-mono">$18,400</span>
-                  </div>
-                </div>
-              </div>
-            )}
+              {/* Active Pulse Node */}
+              <circle cx="850" cy="42" r="5" fill="#ffffff" stroke="#5243d5" strokeWidth="3" className="animate-pulse" />
+            </svg>
           </div>
 
           {/* X Axis labels */}
-          <div className="absolute bottom-0 left-12 right-2 flex justify-between text-[11px] font-medium text-muted-foreground">
-            <span>8:00 AM</span>
-            <span>10:00 AM</span>
-            <span>12:00 PM</span>
-            <span>2:00 PM</span>
-            <span>4:00 PM</span>
-            <span>6:00 PM</span>
-            <span>8:00 PM</span>
+          <div className="absolute bottom-0 end-2 start-14 flex justify-between text-pp-label-sm text-pp-outline">
+            <span>Oct 01</span>
+            <span>Oct 06</span>
+            <span>Oct 12</span>
+            <span>Oct 18</span>
+            <span>Oct 24</span>
+            <span>Today (Live)</span>
           </div>
         </div>
-      </div>
+      </PpCard>
 
-      {/* Bottom Row: Live Feed (60%) & AI Copilot Proactive (40%) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        {/* Live Conversion Feed (3 cols on desktop) */}
-        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm lg:col-span-3">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" />
-              <h3 className="text-base font-bold tracking-tight text-foreground">
-                Live Conversion Feed
-              </h3>
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">Last 30 mins</span>
-          </div>
-
-          <div className="mt-3 divide-y divide-border/60 overflow-hidden">
-            {SAMPLE_FEED.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between py-3 transition-colors hover:bg-muted/40"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-                      item.platform === 'meta'
-                        ? 'bg-blue-500/10 text-blue-600'
-                        : item.platform === 'google'
-                        ? 'bg-amber-500/10 text-amber-600'
-                        : 'bg-purple-500/10 text-purple-600'
-                    }`}
-                  >
-                    {item.platform === 'meta' ? 'M' : item.platform === 'google' ? 'G' : 'T'}
+      {/* Lower Section: Live Conversion Feed (3 cols) & AI Copilot (2 cols) */}
+      <div className="grid grid-cols-1 gap-pp-lg lg:grid-cols-5">
+        {/* Live Conversion Feed */}
+        <PpCard
+          title="Live Conversion Feed"
+          subtitle="Last 30 mins"
+          icon={Activity}
+          iconAccent="primary"
+          className="lg:col-span-3"
+        >
+          {feedItems.length === 0 ? (
+            <PpEmptyState
+              icon={Activity}
+              title="No Live Conversions Recorded Yet"
+              description="Connect your payment gateway and advertising streams to monitor live transaction telemetry in real time."
+            />
+          ) : (
+            <div className="divide-y divide-pp-surface-container overflow-hidden">
+              {feedItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between py-3 transition-colors hover:bg-pp-surface-container-low/60"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                        item.platform === 'meta'
+                          ? 'bg-blue-100 text-blue-700'
+                          : item.platform === 'google'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-pp-tertiary-fixed text-pp-on-tertiary-fixed'
+                      }`}
+                    >
+                      {item.platform === 'meta' ? 'M' : item.platform === 'google' ? 'G' : 'T'}
+                    </div>
+                    <div>
+                      <div className="text-pp-body-md font-semibold text-pp-on-surface">
+                        {item.email}{' '}
+                        <span className="font-normal text-pp-on-surface-variant">{item.action}</span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-pp-label-sm text-pp-outline">
+                        <span className="rounded bg-pp-surface-container px-1.5 py-0.5 font-mono">
+                          src: {item.platform}_ads
+                        </span>
+                        <span>•</span>
+                        <span>cmp: {item.campaign}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-xs font-semibold text-foreground">
-                      {item.email}{' '}
-                      <span className="font-normal text-muted-foreground">{item.action}</span>
+
+                  <div className="text-end">
+                    <div
+                      className={`font-mono text-pp-body-md font-bold ${
+                        item.type === 'sale'
+                          ? 'text-pp-secondary'
+                          : 'text-pp-on-surface-variant'
+                      }`}
+                    >
+                      {item.amount}
                     </div>
-                    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span className="rounded bg-muted px-1.5 py-0.2 font-mono">
-                        src: {item.platform}_ads
-                      </span>
-                      <span>•</span>
-                      <span>cmp: {item.campaign}</span>
-                    </div>
+                    <div className="text-pp-label-sm text-pp-outline">{item.timeAgo}</div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </PpCard>
 
-                <div className="text-right">
-                  <div
-                    className={`font-mono text-xs font-bold ${
-                      item.type === 'sale'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {item.amount}
+        {/* AI Copilot Proactive Insights */}
+        <PpCard
+          title="Growth Copilot"
+          subtitle="Real-time Anomaly Engine"
+          icon={Sparkles}
+          iconAccent="primary"
+          action={
+            <PpPill accent="mint" dot>
+              AI Active
+            </PpPill>
+          }
+          className="lg:col-span-2"
+        >
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low p-4">
+              <div className="flex items-start gap-3">
+                <Bot className="mt-0.5 h-5 w-5 shrink-0 text-pp-primary" />
+                <div className="text-pp-body-sm leading-relaxed text-pp-on-surface">
+                  <span className="font-bold">Autonomous Opportunity Detected:</span> TikTok CPM
+                  dropped by <strong>22%</strong> while conversion rate stabilized at{' '}
+                  <strong>4.1%</strong>.
+                  <div className="mt-2 text-pp-on-surface-variant">
+                    Reallocating $1,500 daily budget from Google Search to TikTok Retargeting is
+                    projected to deliver <strong>+14 conversions</strong>.
                   </div>
-                  <div className="text-[10px] text-muted-foreground">{item.timeAgo}</div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* AI Copilot Proactive Insights (2 cols on desktop) */}
-        <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-purple-500/5 via-primary/5 to-indigo-500/10 p-5 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-              <h3 className="text-base font-bold tracking-tight text-foreground">
-                AI Copilot Proactive
-              </h3>
-            </div>
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-              High Confidence
-            </span>
-          </div>
-
-          <div className="mt-4 rounded-xl border border-primary/20 bg-card/80 p-4 shadow-sm backdrop-blur-sm">
-            <div className="flex items-start gap-3">
-              <Bot className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-              <div className="text-xs leading-relaxed text-foreground">
-                <span className="font-bold">Autonomous Opportunity Detected:</span> TikTok CPM
-                dropped by <strong>22%</strong> over the last 4 hours while conversion rate surged to{' '}
-                <strong>4.1%</strong>.
-                <div className="mt-2 text-muted-foreground">
-                  Reallocating $1,500 daily budget from Google Search to TikTok Retargeting is
-                  projected to deliver <strong>+14 conversions</strong> ($3,360 incremental MRR).
-                </div>
+              <div className="mt-4 pt-3 border-t border-pp-outline-variant/30">
+                <PpButton
+                  type="button"
+                  variant={copilotExecuted ? 'secondary' : 'primary'}
+                  disabled={copilotExecuted}
+                  onClick={handleCopilotAction}
+                  className="w-full"
+                  icon={copilotExecuted ? CheckCircle2 : Zap}
+                >
+                  {copilotExecuted
+                    ? 'Budget Reallocated Successfully'
+                    : 'Execute 1-Click Rebalance'}
+                </PpButton>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-3">
-              <button
-                type="button"
-                disabled={copilotExecuted}
-                onClick={handleCopilotAction}
-                className={`flex-1 inline-flex items-center justify-center gap-2 rounded-xl py-2 px-3 text-xs font-bold transition-all ${
-                  copilotExecuted
-                    ? 'bg-emerald-500 text-white shadow'
-                    : 'bg-primary text-primary-foreground shadow hover:opacity-90 active:scale-[0.98]'
-                }`}
-              >
-                {copilotExecuted ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    Budget Reallocated Successfully
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4" />
-                    Execute 1-Click Rebalance
-                  </>
-                )}
-              </button>
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-2 gap-3 text-pp-body-sm">
+              <div className="rounded-2xl bg-pp-surface-container-low p-3">
+                <div className="text-pp-label-sm uppercase text-pp-outline">Automated Saves</div>
+                <div className="mt-1 font-mono font-bold text-pp-on-surface">$0 saved</div>
+              </div>
+              <div className="rounded-2xl bg-pp-surface-container-low p-3">
+                <div className="text-pp-label-sm uppercase text-pp-outline">Guardrail Status</div>
+                <div className="mt-1 font-semibold text-pp-secondary">4 / 4 Active</div>
+              </div>
             </div>
           </div>
-
-          {/* Quick Stats Grid */}
-          <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-xl border border-border bg-card/60 p-3">
-              <div className="text-muted-foreground">Automated Saves</div>
-              <div className="mt-1 font-mono font-bold text-foreground">$4,850 saved</div>
-            </div>
-            <div className="rounded-xl border border-border bg-card/60 p-3">
-              <div className="text-muted-foreground">Guardrail Status</div>
-              <div className="mt-1 font-semibold text-emerald-600">4 / 4 Active</div>
-            </div>
-          </div>
-        </div>
+        </PpCard>
       </div>
     </div>
   );

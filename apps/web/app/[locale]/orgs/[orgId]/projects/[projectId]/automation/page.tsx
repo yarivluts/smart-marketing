@@ -26,6 +26,8 @@ import { synthesizeProactiveRecommendations } from '@/lib/orgs/recommendation-sy
 import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
 import { calculateFunnelStepItems, type FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
 
+import { PpPage } from '@/components/pastel/primitives';
+
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
 }>;
@@ -97,7 +99,18 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     spendOutcome && spendOutcome.ok ? spendOutcome : null,
   );
 
-  // Derive real funnel steps or fallback to baseline steps
+  // Filter out campaigns that lack real spend data to prevent displaying fabricated metrics (KAN-294 / KAN-300 follow-up)
+  const liveUnifiedCampaigns =
+    spendOutcome && spendOutcome.ok && spendOutcome.rows.length > 0
+      ? unifiedCampaigns.filter((c) => {
+          const row = spendOutcome.rows.find(
+            (r) => r.campaignId === c.campaignResourceName || r.campaignId === c.id || r.campaignId === c.label,
+          );
+          return Boolean(row && row.actualSpend > 0);
+        })
+      : [];
+
+  // Derive real funnel steps without hardcoded fabricated fallback
   const funnelSteps: FunnelStepItem[] =
     funnelOutcome && funnelOutcome.ok && funnelOutcome.steps.length > 0
       ? calculateFunnelStepItems(
@@ -108,19 +121,16 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
             conversionRateFromFirst: s.conversionRateFromFirst,
           })),
         )
-      : [
-          { stepOrder: 0, stageKey: 'view', stageLabel: 'Product View', customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
-          { stepOrder: 1, stageKey: 'checkout', stageLabel: 'Checkout Form', customerCount: 380, conversionPercent: 38, dropOffPercent: 62 },
-        ];
+      : [];
 
-  // Synthesize proactive recommendations based on live unified campaign stats and funnel steps
+  // Synthesize proactive recommendations based on live verified campaign stats and real funnel steps
   const proactiveRecs = synthesizeProactiveRecommendations(
-    unifiedCampaigns,
+    liveUnifiedCampaigns,
     funnelSteps,
   );
 
   return (
-    <main className="container mx-auto max-w-5xl py-8">
+    <PpPage>
       <AutomationHubDashboard
         orgId={orgId}
         projectId={projectId}
@@ -134,7 +144,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
         canExecute={true}
         canApprove={canApprove}
       />
-    </main>
+    </PpPage>
   );
 }
 

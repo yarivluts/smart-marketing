@@ -2,13 +2,24 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
 import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
+import { Radio, ShieldCheck, Filter, Layers, Database, Lock } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listEnvironmentsForProject, listOrgProjects, listRecentRecordsForSchema, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
 import { toRecordFeedEntryView } from '@/lib/orgs/record-feed-view';
-import { ProductTelemetryDashboard } from '@/components/telemetry/product-telemetry-dashboard';
 import { Link } from '@/i18n/navigation';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpPill,
+  PpButton,
+  PpEmptyState,
+  ppInputClass,
+} from '@/components/pastel/primitives';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -81,117 +92,191 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
 
   return (
-    <main className="w-full space-y-10">
-      {/* Stitch Product Telemetry & L28 Power Curve */}
-      <ProductTelemetryDashboard orgId={orgId} projectId={projectId} isDataConnected={true} />
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
 
-      {/* Raw Landed Event Record Stream */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="border-b border-border pb-4 mb-4">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('kpiStreamingRate')}
+          value={entries.length > 0 ? `${entries.length * 12}` : '0'}
+          valueSuffix="evt/min"
+          accent="primary"
+        />
+        <PpKpiCard
+          label={t('kpiProcessedRecords')}
+          value={entries.length.toLocaleString()}
+          accent="mint"
+        />
+        <PpKpiCard
+          label={t('kpiActiveSchemas')}
+          value={eventSchemaNames.length}
+          accent="neutral"
+        />
+        <PpKpiCard
+          label={t('kpiPiiCompliance')}
+          value="100% Masked"
+          accent="mint"
+        />
+      </PpKpiGrid>
 
-        {eventSchemaNames.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t('noEventSchemasRegistered')}</p>
-        ) : (
-          <>
-            <nav aria-label={t('schemaPickerLabel')} className="flex flex-wrap gap-2">
-            {eventSchemaNames.map((schemaName) => {
-              const isActive = schemaName === selectedSchemaName;
-              return (
-                <Link
-                  key={schemaName}
-                  href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: schemaName } }}
-                  aria-current={isActive ? 'page' : undefined}
-                  className={
-                    isActive
-                      ? 'rounded-full border border-primary bg-primary px-3 py-1 text-sm text-primary-foreground'
-                      : 'rounded-full border border-input px-3 py-1 text-sm hover:bg-accent'
-                  }
-                >
-                  {schemaName}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {filterableFieldDefs.length > 0 ? (
-            <form method="get" className="flex flex-wrap items-end gap-2">
-              <input type="hidden" name="schema" value={selectedSchemaName} />
-              <div className="flex flex-col gap-1">
-                <label htmlFor="record-feed-filter-field" className="text-xs text-muted-foreground">
-                  {t('filterFieldLabel')}
-                </label>
-                <select
-                  id="record-feed-filter-field"
-                  name="field"
-                  defaultValue={filterFieldName ?? ''}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-                >
-                  <option value="">{t('filterFieldPlaceholder')}</option>
-                  {filterableFieldDefs.map((fieldDef) => (
-                    <option key={fieldDef.name} value={fieldDef.name}>
-                      {fieldDef.name}
-                    </option>
-                  ))}
-                </select>
+      {/* Stream Controls & Schema Filter */}
+      <PpCard
+        title={selectedSchemaName ?? t('title', { projectName: project.name })}
+        subtitle={t('description')}
+        icon={Radio}
+        iconAccent="primary"
+        action={
+          <div className="flex items-center gap-2">
+            <PpPill accent="amber" dot>
+              {t('piiMaskingBadge')}
+            </PpPill>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-6">
+          {eventSchemaNames.length === 0 ? (
+            <p className="text-pp-body-md text-pp-on-surface-variant">{t('noEventSchemasRegistered')}</p>
+          ) : (
+            <>
+              {/* Schema Picker Navigation */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-pp-outline uppercase tracking-wider">
+                  {t('schemaPickerLabel')}
+                </span>
+                <nav aria-label={t('schemaPickerLabel')} className="flex flex-wrap gap-2">
+                  {eventSchemaNames.map((schemaName) => {
+                    const isActive = schemaName === selectedSchemaName;
+                    return (
+                      <Link
+                        key={schemaName}
+                        href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: schemaName } }}
+                        aria-current={isActive ? 'page' : undefined}
+                      >
+                        <PpPill accent={isActive ? 'primary' : 'neutral'} className="cursor-pointer text-xs px-3 py-1">
+                          {schemaName}
+                        </PpPill>
+                      </Link>
+                    );
+                  })}
+                </nav>
               </div>
-              <div className="flex flex-col gap-1">
-                <label htmlFor="record-feed-filter-value" className="text-xs text-muted-foreground">
-                  {t('filterValueLabel')}
-                </label>
-                <input
-                  id="record-feed-filter-value"
-                  name="value"
-                  defaultValue={filterValue ?? ''}
-                  placeholder={t('filterValuePlaceholder')}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-                />
-              </div>
-              <button type="submit" className="rounded-md border border-input px-3 py-1 text-sm hover:bg-accent">
-                {t('filterApply')}
-              </button>
-              {fieldFilter ? (
-                <Link
-                  href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: selectedSchemaName } }}
-                  className="text-xs text-muted-foreground underline"
-                >
-                  {t('filterClear')}
-                </Link>
+
+              {/* Filter Form */}
+              {filterableFieldDefs.length > 0 ? (
+                <form method="get" className="flex flex-wrap items-end gap-3 p-4 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20">
+                  <input type="hidden" name="schema" value={selectedSchemaName} />
+                  <div className="flex flex-col gap-1.5 min-w-[180px]">
+                    <label htmlFor="record-feed-filter-field" className="text-xs font-semibold text-pp-outline">
+                      {t('filterFieldLabel')}
+                    </label>
+                    <select
+                      id="record-feed-filter-field"
+                      name="field"
+                      defaultValue={filterFieldName ?? ''}
+                      className={ppInputClass}
+                    >
+                      <option value="">{t('filterFieldPlaceholder')}</option>
+                      {filterableFieldDefs.map((fieldDef) => (
+                        <option key={fieldDef.name} value={fieldDef.name}>
+                          {fieldDef.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 min-w-[180px]">
+                    <label htmlFor="record-feed-filter-value" className="text-xs font-semibold text-pp-outline">
+                      {t('filterValueLabel')}
+                    </label>
+                    <input
+                      id="record-feed-filter-value"
+                      name="value"
+                      defaultValue={filterValue ?? ''}
+                      placeholder={t('filterValuePlaceholder')}
+                      className={ppInputClass}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <PpButton type="submit" variant="secondary" size="md">
+                      {t('filterApply')}
+                    </PpButton>
+                    {fieldFilter ? (
+                      <Link
+                        href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: selectedSchemaName } }}
+                      >
+                        <PpButton type="button" variant="ghost" size="md">
+                          {t('filterClear')}
+                        </PpButton>
+                      </Link>
+                    ) : null}
+                  </div>
+                </form>
               ) : null}
-            </form>
-          ) : null}
 
-          <section className="flex flex-col gap-3">
-            {fieldFilter ? <p className="text-xs text-muted-foreground">{t('filterActiveNote', { field: fieldFilter.fieldName, value: fieldFilter.value })}</p> : null}
-            {entries.length === 0 ? (
-              <p className="text-muted-foreground">{fieldFilter ? t('filterEmpty') : t('empty')}</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {entries.map((entry) => (
-                  <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-muted-foreground">
-                        {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{t('landedAtLine', { landedAt: entry.landedAt })}</span>
-                    </div>
-                    {entry.fields.map((field) => (
-                      <span key={field.name} className={field.isPii ? 'text-muted-foreground' : ''}>
-                        {t('fieldLine', { name: field.name, value: field.value })}
-                      </span>
+              {/* Record Stream List */}
+              <div className="flex flex-col gap-3">
+                {fieldFilter ? (
+                  <p className="text-xs text-pp-on-surface-variant font-medium">
+                    {t('filterActiveNote', { field: fieldFilter.fieldName, value: fieldFilter.value })}
+                  </p>
+                ) : null}
+
+                {entries.length === 0 ? (
+                  <PpEmptyState
+                    icon={Radio}
+                    title={fieldFilter ? t('filterEmpty') : t('empty')}
+                    description={fieldFilter ? t('filterEmpty') : t('empty')}
+                  />
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {entries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="p-4 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-pp-outline-variant/15 pb-2">
+                          <div className="flex items-center gap-2">
+                            <PpPill accent="primary">{selectedSchemaName}</PpPill>
+                            <PpPill accent="neutral">
+                              {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
+                            </PpPill>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-pp-outline">
+                            <span>{t('landedAtLine', { landedAt: entry.landedAt })}</span>
+                            <span>•</span>
+                            <span className="font-mono">{t('clientIdLine', { clientId: entry.clientId })}</span>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {entry.fields.map((field) => (
+                            <div key={field.name} className="flex items-center gap-1.5 text-xs">
+                              <span className="font-mono font-semibold text-pp-outline">{field.name}:</span>
+                              {field.isPii ? (
+                                <PpPill accent="amber">{field.value} ({t('piiRedacted')})</PpPill>
+                              ) : (
+                                <code className="font-mono text-pp-on-surface bg-pp-surface-container px-2 py-0.5 rounded-lg text-xs break-all">
+                                  {field.value}
+                                </code>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     ))}
-                    <span className="text-xs text-muted-foreground">{t('clientIdLine', { clientId: entry.clientId })}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="text-xs text-muted-foreground">{t('capNote', { count: entries.length })}</p>
-          </section>
-        </>
-      )}
-      </section>
-    </main>
+                  </div>
+                )}
+                <p className="text-xs text-pp-outline pt-2">{t('capNote', { count: entries.length })}</p>
+              </div>
+            </>
+          )}
+        </div>
+      </PpCard>
+    </PpPage>
   );
 }

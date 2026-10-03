@@ -19,6 +19,16 @@ import { CheckTrackingAlertsButton } from '@/components/orgs/check-tracking-aler
 import { SyncSchemaMartsButton } from '@/components/orgs/sync-schema-marts-button';
 import { EventVolumeSparkline } from '@/components/orgs/event-volume-sparkline';
 import { RegisterTouchpointSchemaButton } from '@/components/orgs/register-touchpoint-schema-button';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpPill,
+  PpEmptyState,
+} from '@/components/pastel/primitives';
+import { Layers, Activity, PlusCircle, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -36,10 +46,6 @@ interface SchemaFamily {
   versions: SchemaVersionView[];
 }
 
-// Client components only ever receive plain serializable data (never an
-// `@arbel/firebase-orm` model instance) — reuses the same field mapping the
-// API routes use (`toSchemaDefView`) rather than a second, independently
-// maintained copy of it.
 function groupIntoFamilies(views: readonly SchemaDefView[]): SchemaFamily[] {
   const familiesByKey = new Map<string, SchemaFamily>();
   for (const view of views) {
@@ -52,13 +58,8 @@ function groupIntoFamilies(views: readonly SchemaDefView[]): SchemaFamily[] {
 }
 
 /**
- * A project's Schema Registry (KAN-31): every registered entity/event/measure
- * schema, every version of each ("register v1 -> evolve to v2 -> both
- * queryable"), and a form to register a new one or evolve an existing family
- * to its next version. Gated on `schema.write` for the whole page — same
- * "whole feature, not just mutation, is admin-only" posture as KAN-30's keys
- * page, since a schema's field list (including which fields carry PII) is
- * sensitive enough to keep to roles trusted to manage it.
+ * A project's Schema Registry: every registered entity/event/measure schema,
+ * version evolution, event volume sparklines, and tracking alerts.
  */
 export default async function SchemaRegistryPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -89,45 +90,107 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     redirect(`/${locale}/orgs/${orgId}`);
   }
 
-  // Reuses the schema-defs list just fetched above rather than a second, redundant
-  // Firestore read of the same collection (same `precomputedQuota`-style pass-through
-  // pattern the cost-guardrails page uses for its own equivalent duplicate fetch).
   const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs });
-
   const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
-  // `TrackingAlertModel` only stores `environment_id` — resolve the display name server-side,
-  // same "build an id->name lookup, pass plain strings across the RSC boundary" pattern the
-  // keys page's own `environmentNameById` map already uses.
   const environmentNameById = new Map(environments.map((environment) => [environment.id, environment.name]));
-  const trackingAlertViews = trackingAlerts.map((alert) => toTrackingAlertView(alert, environmentNameById.get(alert.environment_id) ?? alert.environment_id));
+  const trackingAlertViews = trackingAlerts.map((alert) =>
+    toTrackingAlertView(alert, environmentNameById.get(alert.environment_id) ?? alert.environment_id),
+  );
   const touchpointSchemaRegistered = schemaDefs.some((schemaDef) => schemaDef.kind === 'event' && schemaDef.name === 'touchpoint');
 
   const t = await getTranslations('SchemaRegistry');
   const tEnv = await getTranslations('EnvBadge');
 
+  const activeSchemasCount = schemaDefs.filter((d) => d.status === 'active').length;
+  const eventSchemasCount = schemaDefs.filter((d) => d.kind === 'event').length;
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        meta={`${families.length} families · ${schemaDefs.length} versions`}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            <SyncSchemaMartsButton orgId={orgId} projectId={projectId} />
+            {!touchpointSchemaRegistered ? <RegisterTouchpointSchemaButton orgId={orgId} projectId={projectId} /> : null}
+          </div>
+        }
+      />
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('touchpointCaptureHeading')}</h2>
-          {!touchpointSchemaRegistered ? <RegisterTouchpointSchemaButton orgId={orgId} projectId={projectId} /> : null}
-        </div>
-        <p className="text-muted-foreground">
-          {touchpointSchemaRegistered ? t('touchpointSchemaAlreadyRegistered') : t('touchpointSchemaIntro')}
-        </p>
-      </section>
+      {/* KPI Grid */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('kpiContractFamilies')}
+          value={families.length}
+          accent="primary"
+          badge={`${families.length} Families`}
+          badgeAccent="primary"
+        />
+        <PpKpiCard
+          label={t('kpiActiveSchemas')}
+          value={activeSchemasCount}
+          accent="mint"
+          badge="Active"
+          badgeAccent="mint"
+        />
+        <PpKpiCard
+          label={t('kpiEventSchemas')}
+          value={eventSchemasCount}
+          accent="sky"
+          badge="Events"
+          badgeAccent="sky"
+        />
+        <PpKpiCard
+          label={t('kpiTrackingAlerts')}
+          value={trackingAlertViews.length}
+          accent={trackingAlertViews.length > 0 ? 'amber' : 'neutral'}
+          badge={trackingAlertViews.length > 0 ? 'Alerts' : 'Healthy'}
+          badgeAccent={trackingAlertViews.length > 0 ? 'amber' : 'neutral'}
+        />
+      </PpKpiGrid>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
-          <SyncSchemaMartsButton orgId={orgId} projectId={projectId} />
+      {/* Touchpoint Schema Status Banner */}
+      <PpCard
+        title={t('touchpointCaptureHeading')}
+        subtitle={touchpointSchemaRegistered ? t('touchpointSchemaAlreadyRegistered') : t('touchpointSchemaIntro')}
+        icon={touchpointSchemaRegistered ? ShieldCheck : Sparkles}
+        iconAccent={touchpointSchemaRegistered ? 'mint' : 'primary'}
+        action={
+          !touchpointSchemaRegistered ? (
+            <RegisterTouchpointSchemaButton orgId={orgId} projectId={projectId} />
+          ) : (
+            <PpPill accent="mint" dot>Registered</PpPill>
+          )
+        }
+      >
+        <div className="text-pp-body-sm text-pp-on-surface-variant">
+          {touchpointSchemaRegistered
+            ? 'Touchpoint event capture is active and verified across web & CAPI edge endpoints.'
+            : 'Initialize the standardized touchpoint event contract to ingest multi-touch attribution events.'}
         </div>
+      </PpCard>
+
+      {/* Registered Schemas Section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-pp-display text-pp-headline-lg text-pp-on-surface">
+            {t('registeredHeading')}
+          </h2>
+          <span className="text-pp-label-sm text-pp-outline font-bold uppercase tracking-wider">
+            {families.length} {families.length === 1 ? 'Family' : 'Families'}
+          </span>
+        </div>
+
         {families.length === 0 ? (
-          <p className="text-muted-foreground">{t('noSchemas')}</p>
+          <PpEmptyState
+            icon={Layers}
+            title={t('noSchemas')}
+            description={t('noSchemasDesc')}
+          />
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-4 list-none p-0 m-0">
             {families.map((family) => (
               <SchemaFamilyCard
                 key={`${family.kind}:${family.name}`}
@@ -142,62 +205,98 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('eventVolumeHeading')}</h2>
+      {/* Event Volume & Tracking Alerts Section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-pp-display text-pp-headline-lg text-pp-on-surface">
+            {t('eventVolumeHeading')}
+          </h2>
           <CheckTrackingAlertsButton orgId={orgId} projectId={projectId} />
         </div>
 
         {eventVolumeOverview.length === 0 ? (
-          <p className="text-muted-foreground">{t('noEventSchemas')}</p>
+          <PpCard>
+            <p className="text-pp-on-surface-variant text-pp-body-md">{t('noEventSchemas')}</p>
+          </PpCard>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {eventVolumeOverview.map((entry) => (
-              <li
+              <PpCard
                 key={`${entry.schemaName}:${entry.environmentId}`}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm"
+                title={entry.schemaName}
+                subtitle={
+                  entry.lastSeenAt === null
+                    ? t('eventNeverSeen')
+                    : t('eventLastSeen', { lastSeenAt: entry.lastSeenAt })
+                }
+                icon={Activity}
+                iconAccent="sky"
+                action={<PpPill accent="mint">{tEnv(entry.environmentName)}</PpPill>}
               >
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">
-                    {t('eventVolumeSchemaEnvironmentLabel', { schemaName: entry.schemaName, environmentName: tEnv(entry.environmentName) })}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {entry.lastSeenAt === null ? t('eventNeverSeen') : t('eventLastSeen', { lastSeenAt: entry.lastSeenAt })}
-                  </span>
+                <div className="flex items-center justify-between gap-4 pt-2">
+                  <div className="text-pp-body-sm text-pp-outline font-medium">
+                    {t('eventVolumeSchemaEnvironmentLabel', {
+                      schemaName: entry.schemaName,
+                      environmentName: tEnv(entry.environmentName),
+                    })}
+                  </div>
+                  <EventVolumeSparkline dailyCounts={entry.dailyCounts} />
                 </div>
-                <EventVolumeSparkline dailyCounts={entry.dailyCounts} />
-              </li>
+              </PpCard>
             ))}
-          </ul>
+          </div>
         )}
 
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">{t('trackingAlertsHeading')}</h3>
+        {/* Tracking Alerts List */}
+        <div className="space-y-3 pt-2">
+          <h3 className="font-pp-display text-pp-headline-md text-pp-on-surface">
+            {t('trackingAlertsHeading')}
+          </h3>
           {trackingAlertViews.length === 0 ? (
-            <p className="text-muted-foreground">{t('noTrackingAlerts')}</p>
+            <div className="rounded-2xl bg-pp-surface-container-low/60 p-4 text-pp-body-sm text-pp-on-surface-variant">
+              {t('noTrackingAlerts')}
+            </div>
           ) : (
-            <ul className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               {trackingAlertViews.map((alert) => (
-                <li key={alert.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                  <span className="font-medium">
-                    {t('trackingAlertSummary', {
-                      schemaName: alert.schemaName,
-                      environmentName: tEnv(alert.environmentName),
-                      status: t(trackingAlertStatusLabelKey(alert.status)),
-                    })}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{t('trackingAlertLastSeen', { lastSeenAt: alert.lastSeenAt })}</span>
-                </li>
+                <div
+                  key={alert.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-pp-surface-container-lowest p-4 shadow-pp-candy border border-pp-outline-variant/20"
+                >
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" aria-hidden />
+                    <div>
+                      <div className="font-medium text-pp-on-surface text-pp-body-md">
+                        {t('trackingAlertSummary', {
+                          schemaName: alert.schemaName,
+                          environmentName: tEnv(alert.environmentName),
+                          status: t(trackingAlertStatusLabelKey(alert.status)),
+                        })}
+                      </div>
+                      <div className="text-xs text-pp-outline">
+                        {t('trackingAlertLastSeen', { lastSeenAt: alert.lastSeenAt })}
+                      </div>
+                    </div>
+                  </div>
+                  <PpPill accent={alert.status === 'active' ? 'amber' : 'neutral'}>
+                    {t(trackingAlertStatusLabelKey(alert.status))}
+                  </PpPill>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('registerHeading')}</h2>
+      {/* Register New Schema Section */}
+      <PpCard
+        title={t('registerHeading')}
+        subtitle="Define a new schema contract for events, entities, or measures"
+        icon={PlusCircle}
+        iconAccent="primary"
+      >
         <RegisterSchemaDefForm orgId={orgId} projectId={projectId} />
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

@@ -70,16 +70,16 @@ export function IntegrationsHealthStrip({
             onClick={() => onFilterChange?.(card.id)}
             aria-pressed={isSelected}
             aria-label={`${card.label}: ${card.count}`}
-            className={`flex flex-col items-start justify-between rounded-2xl border p-4 text-start transition-all shadow-soft hover:shadow-soft-lg ${
+            className={`flex flex-col items-start justify-between rounded-2xl border p-4 text-start transition-all shadow-pp-candy hover:shadow-pp-candy-hover ${
               card.bg
             } ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
           >
             <div className="flex w-full items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">{card.label}</span>
+              <span className="font-pp-label-sm text-xs font-semibold text-muted-foreground">{card.label}</span>
               <span className={`text-base font-bold ${card.color}`}>{card.icon}</span>
             </div>
             <div className="pt-2">
-              <span className="text-2xl font-black text-foreground tracking-tight">{card.count}</span>
+              <span className="font-pp-display text-2xl font-black text-foreground tracking-tight">{card.count}</span>
             </div>
           </button>
         );

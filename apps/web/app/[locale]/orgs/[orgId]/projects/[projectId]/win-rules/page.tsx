@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Plus, Sliders, Sparkles, TrendingUp, Trophy } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -16,6 +17,16 @@ import {
 import { toWinEventFeedItem, toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
 import { toTrialPipelineWidgetView } from '@/lib/orgs/trial-pipeline-view';
 import { toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
+import {
+  PpButton,
+  PpCard,
+  PpKpiCard,
+  PpKpiGrid,
+  PpMobileActionBar,
+  PpPage,
+  PpPageHeader,
+  PpPill,
+} from '@/components/pastel/primitives';
 import { CreateWinRuleForm } from '@/components/orgs/create-win-rule-form';
 import { WinRuleList } from '@/components/orgs/win-rule-list';
 import { LiveWinFeed } from '@/components/orgs/live-win-feed';
@@ -34,11 +45,10 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's win rules (KAN-65, E12.2, plan `04 §6`): every rule defined in
- * this project, a form to create a new one, and a live feed of wins fired in
- * real time — gated on `dashboards.write` for the whole page, the same
- * "whole feature, not just mutation, is admin-only" posture `goals/page.tsx`
- * (which this page mirrors) uses.
+ * Stitch "Pastel Pulse" win rules & celebration stream (desktop 4b2e8917 / a29b3e9b / 820d7e79, mobile 7a218cb8 / 97717328 / 51797a60).
+ *
+ * Configures real-time event triggers for customer conversions, trial pipeline pacing,
+ * sales sprint leaderboards, and live celebration broadcast feeds.
  */
 export default async function WinRulesPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -64,14 +74,16 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
     redirect(`/${locale}/orgs/${orgId}`);
   }
 
-  const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] = await Promise.all([
-    listWinRulesForProject(orgId, projectId),
-    listActiveEventSchemaNames(orgId, projectId),
-    getTrialPipelineSummary(orgId, projectId),
-    listRecentWinEventsForProject(orgId, projectId),
-    getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
-    listOrgPeople(orgId),
-  ]);
+  const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] =
+    await Promise.all([
+      listWinRulesForProject(orgId, projectId),
+      listActiveEventSchemaNames(orgId, projectId),
+      getTrialPipelineSummary(orgId, projectId),
+      listRecentWinEventsForProject(orgId, projectId),
+      getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
+      listOrgPeople(orgId),
+    ]);
+
   const winRuleViews = winRules.map(toWinRuleSummaryView);
   const trialPipelineView = toTrialPipelineWidgetView(trialPipelineOutcome);
   const winEventHistoryViews = recentWinEvents.map(toWinEventFeedItem);
@@ -81,34 +93,168 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
   );
   const t = await getTranslations('WinRules');
 
+  const activeRulesCount = winRuleViews.filter((r) => r.active).length;
+  const topCloser = repCollectionLeaderboardView.rows[0];
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <PpButton variant="primary" size="sm" icon={Plus} asChild>
+            <a href="#rule-builder">
+              <span>{t('createHeading')}</span>
+            </a>
+          </PpButton>
+        }
+      />
 
-      <TrialPipelineWidget view={trialPipelineView} />
-      <RepCollectionLeaderboardWidget view={repCollectionLeaderboardView} />
+      {/* KPI Overview Grid - 2x2 on mobile, 4-col on desktop */}
+      <PpKpiGrid className="grid-cols-2 lg:grid-cols-4">
+        <PpKpiCard
+          label={t('kpiActiveRules')}
+          value={
+            <span dir="ltr">
+              {activeRulesCount} <span className="text-pp-headline-md text-pp-outline">/ {winRules.length}</span>
+            </span>
+          }
+          accent="primary"
+          badge={t('kpiActiveBadge', { count: activeRulesCount })}
+          badgeAccent="primary"
+          footer={t('kpiDefinedFooter', { count: winRules.length })}
+        />
+        <PpKpiCard
+          label={t('kpiTrialPipeline')}
+          value={
+            <span dir="ltr">
+              {trialPipelineView.status === 'ok' && trialPipelineView.conversionRatePct !== null
+                ? `${trialPipelineView.conversionRatePct.toFixed(1)}%`
+                : '—'}
+            </span>
+          }
+          accent="mint"
+          badge={trialPipelineView.status === 'ok' ? `${trialPipelineView.activeTrials} in trial` : undefined}
+          badgeAccent="mint"
+          footer={trialPipelineView.status === 'ok' ? t('kpiConvertingFooter') : t('kpiWarehouseFooter')}
+        />
+        <PpKpiCard
+          label={t('kpiTopCloser')}
+          value={
+            <span dir="ltr">
+              {topCloser ? `$${topCloser.totalAmount.toLocaleString(locale)}` : '—'}
+            </span>
+          }
+          accent="amber"
+          badge={topCloser ? topCloser.name : undefined}
+          badgeAccent="amber"
+          footer={topCloser ? t('kpiDealsClosedFooter', { count: topCloser.entryCount }) : t('kpiNoDealsFooter')}
+        />
+        <PpKpiCard
+          label={t('kpiRecentWins')}
+          value={<span dir="ltr">{recentWinEvents.length}</span>}
+          valueSuffix={t('kpiWinsSuffix')}
+          accent={recentWinEvents.length > 0 ? 'sky' : 'neutral'}
+          badge={recentWinEvents.length > 0 ? t('kpiLoggedBadge') : undefined}
+          badgeAccent="sky"
+          footer={t('kpiPersistedFooter')}
+        />
+      </PpKpiGrid>
 
-      {/* Persisted history (KAN-65 follow-up, session-B dogfooding QA 2026-08-18): the live feed
-        below is a broadcast-only view that shows nothing once the tab wasn't open when a win fired
-        — this section is the page-load render of the same `win_events` collection so nothing is
-        missed. `listRecentWinEventsForProject` was already built and wired for exactly this
-        purpose but never actually rendered anywhere until now. */}
-      <WinEventHistoryList events={winEventHistoryViews} />
+      {/* Main 2-Column Section */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+        {/* Left Column: Live Win Feed & Configured Rules */}
+        <section className="flex flex-col gap-6 lg:col-span-7">
+          {/* Live Win Stream & Persisted History */}
+          <PpCard
+            title={t('feedHeading')}
+            subtitle={t('feedSubtitle')}
+            icon={Sparkles}
+            iconAccent="mint"
+            action={
+              <PpPill accent="mint" dot>
+                Live
+              </PpPill>
+            }
+          >
+            <div className="space-y-6">
+              <LiveWinFeed orgId={orgId} projectId={projectId} />
+              <div className="border-t border-pp-outline-variant/30 pt-4">
+                <WinEventHistoryList events={winEventHistoryViews} />
+              </div>
+            </div>
+          </PpCard>
 
-      <LiveWinFeed orgId={orgId} projectId={projectId} />
+          {/* Active Rules List */}
+          <PpCard
+            title={t('rulesHeading')}
+            subtitle={t('rulesSubtitle')}
+            icon={Sliders}
+            iconAccent="primary"
+            action={<PpPill accent="primary">{winRuleViews.length} rules</PpPill>}
+          >
+            <WinRuleList orgId={orgId} projectId={projectId} winRules={winRuleViews} />
+          </PpCard>
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('rulesHeading')}</h2>
-        <WinRuleList orgId={orgId} projectId={projectId} winRules={winRuleViews} />
-      </section>
+        {/* Right Column: Rule Builder & Associated Widgets */}
+        <section className="flex flex-col gap-6 lg:col-span-5">
+          {/* Rule Builder */}
+          <div id="rule-builder">
+            <PpCard
+              title={t('createHeading')}
+              subtitle={t('createSubtitle')}
+              icon={Plus}
+              iconAccent="primary"
+            >
+              {eventSchemaNames.length === 0 ? (
+                <p className="text-xs text-pp-outline">{t('noEventSchemas')}</p>
+              ) : (
+                <CreateWinRuleForm
+                  orgId={orgId}
+                  projectId={projectId}
+                  eventSchemaNames={eventSchemaNames}
+                />
+              )}
+            </PpCard>
+          </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
-        {eventSchemaNames.length === 0 ? <p className="text-xs text-muted-foreground">{t('noEventSchemas')}</p> : null}
-        {eventSchemaNames.length > 0 ? (
-          <CreateWinRuleForm orgId={orgId} projectId={projectId} eventSchemaNames={eventSchemaNames} />
-        ) : null}
-      </section>
-    </main>
+          {/* Trial Pipeline Widget */}
+          <PpCard
+            title={t('pipelineHeading')}
+            subtitle={t('pipelineSubtitle')}
+            icon={TrendingUp}
+            iconAccent="mint"
+          >
+            <TrialPipelineWidget view={trialPipelineView} />
+          </PpCard>
+
+          {/* Sprint Leaderboard Widget */}
+          <PpCard
+            title={t('leaderboardCardHeading')}
+            subtitle={t('leaderboardSubtitle')}
+            icon={Trophy}
+            iconAccent="amber"
+          >
+            <RepCollectionLeaderboardWidget view={repCollectionLeaderboardView} />
+          </PpCard>
+        </section>
+      </div>
+
+      {/* Mobile Sticky Action Bar */}
+      <PpMobileActionBar>
+        <div className="flex w-full items-center justify-between gap-2">
+          <span className="text-xs font-medium text-pp-on-surface-variant">
+            {t('activeRulesCount', { count: activeRulesCount })}
+          </span>
+          <PpButton variant="primary" size="sm" icon={Plus} asChild>
+            <a href="#rule-builder">
+              <span>{t('createHeading')}</span>
+            </a>
+          </PpButton>
+        </div>
+      </PpMobileActionBar>
+    </PpPage>
   );
 }

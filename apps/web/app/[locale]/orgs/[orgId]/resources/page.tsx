@@ -1,7 +1,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { KeyRound, FileCode, Users, Clock } from 'lucide-react';
 import { OrgShell } from '@/components/orgs/org-shell';
+import {
+  PpPage,
+  PpPageHeader,
+  PpCard,
+  PpPill,
+} from '@/components/pastel/primitives';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -75,180 +82,228 @@ export default async function ResourceLibraryPage({
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+      <PpPage>
+        <PpPageHeader
+          eyebrow={t('eyebrow')}
+          title={t('title')}
+          description={t('description')}
+        />
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('credentialsHeading')}</h2>
-          {credentials.length === 0 ? (
-            <p className="text-muted-foreground">{t('noCredentials')}</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {credentials.map((credential) => (
-                <li
-                  key={credential.id}
-                  className="flex flex-col gap-2 rounded-md border border-input px-3 py-2 text-sm"
-                >
-                  <span>
-                    {t('credentialSummary', {
-                      name: credential.name,
-                      provider: credential.provider,
-                      scopeCount: credential.available_scopes?.length ?? 0,
-                    })}
-                    {credential.archived_at ? (
-                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {t('archivedBadge')}
+        {/* 1. Shared Credentials Section */}
+        <PpCard
+          title={t('credentialsHeading')}
+          icon={KeyRound}
+          iconAccent="primary"
+        >
+          <div className="space-y-4">
+            {credentials.length === 0 ? (
+              <p className="text-pp-body-md text-pp-on-surface-variant">{t('noCredentials')}</p>
+            ) : (
+              <ul className="space-y-3">
+                {credentials.map((credential) => (
+                  <li
+                    key={credential.id}
+                    className="flex flex-col gap-2 rounded-2xl bg-pp-surface-container-low p-4 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-pp-on-surface">
+                        {t('credentialSummary', {
+                          name: credential.name,
+                          provider: credential.provider,
+                          scopeCount: credential.available_scopes?.length ?? 0,
+                        })}
                       </span>
-                    ) : null}
-                  </span>
-                  {canManageResources ? (
-                    <EditCredentialForm
-                      orgId={orgId}
-                      credentialId={credential.id}
-                      initialName={credential.name}
-                      initialAvailableScopes={credential.available_scopes ?? []}
-                    />
-                  ) : null}
-                  {canManageResources ? (
-                    <SetCredentialSecretForm
-                      orgId={orgId}
-                      credentialId={credential.id}
-                      hasSecret={Boolean(credential.encrypted_secret)}
-                    />
-                  ) : null}
-                  {canManageResources ? (
-                    <ArchiveToggleButton
-                      archivePath={`/api/orgs/${orgId}/resources/credentials/${credential.id}`}
-                      unarchivePath={`/api/orgs/${orgId}/resources/credentials/${credential.id}/unarchive`}
-                      archived={Boolean(credential.archived_at)}
-                      archiveLabel={t('archive')}
-                      unarchiveLabel={t('unarchive')}
-                      errorLabel={credential.archived_at ? t('unarchiveError') : t('archiveError')}
-                    />
-                  ) : null}
-                  {canManageResources && !credential.archived_at ? (
-                    <PushAttachmentForm
-                      orgId={orgId}
-                      resourceKind="credential"
-                      resourceId={credential.id}
-                      projects={pushTargets}
-                      availableScopes={credential.available_scopes}
-                    />
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-          {canManageResources ? <CreateCredentialForm orgId={orgId} /> : null}
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('templatesHeading')}</h2>
-          {templates.length === 0 ? (
-            <p className="text-muted-foreground">{t('noTemplates')}</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {templates.map((template) => (
-                <li
-                  key={template.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
-                >
-                  <span>
-                    {t('templateSummary', {
-                      name: template.name,
-                      type: template.type,
-                      version: template.version,
-                    })}
-                    {template.archived_at ? (
-                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {t('archivedBadge')}
-                      </span>
-                    ) : null}
-                  </span>
-                  {canManageResources ? (
-                    <div className="flex w-full flex-wrap items-center gap-2">
-                      <EditTemplateForm
-                        orgId={orgId}
-                        templateId={template.id}
-                        initialName={template.name}
-                        initialConfig={template.config}
-                      />
-                      <ArchiveToggleButton
-                        archivePath={`/api/orgs/${orgId}/resources/templates/${template.id}`}
-                        unarchivePath={`/api/orgs/${orgId}/resources/templates/${template.id}/unarchive`}
-                        archived={Boolean(template.archived_at)}
-                        archiveLabel={t('archive')}
-                        unarchiveLabel={t('unarchive')}
-                        errorLabel={template.archived_at ? t('unarchiveError') : t('archiveError')}
-                      />
-                      {!template.archived_at ? (
-                        <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                      {credential.archived_at ? (
+                        <PpPill accent="amber">
+                          {t('archivedBadge')}
+                        </PpPill>
                       ) : null}
                     </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-          {canManageResources ? <CreateTemplateForm orgId={orgId} /> : null}
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('peopleHeading')}</h2>
-          {people.length === 0 ? (
-            <p className="text-muted-foreground">{t('noPeople')}</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {people.map((person) => (
-                <li
-                  key={person.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
-                >
-                  <span>
-                    {person.title ? `${person.name} — ${person.title}` : person.name}
-                    {person.archived_at ? (
-                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        {t('archivedBadge')}
-                      </span>
+                    {canManageResources ? (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-pp-surface-container">
+                        <EditCredentialForm
+                          orgId={orgId}
+                          credentialId={credential.id}
+                          initialName={credential.name}
+                          initialAvailableScopes={credential.available_scopes ?? []}
+                        />
+                        <SetCredentialSecretForm
+                          orgId={orgId}
+                          credentialId={credential.id}
+                          hasSecret={Boolean(credential.encrypted_secret)}
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ArchiveToggleButton
+                            archivePath={`/api/orgs/${orgId}/resources/credentials/${credential.id}`}
+                            unarchivePath={`/api/orgs/${orgId}/resources/credentials/${credential.id}/unarchive`}
+                            archived={Boolean(credential.archived_at)}
+                            archiveLabel={t('archive')}
+                            unarchiveLabel={t('unarchive')}
+                            errorLabel={credential.archived_at ? t('unarchiveError') : t('archiveError')}
+                          />
+                        </div>
+                        {!credential.archived_at ? (
+                          <PushAttachmentForm
+                            orgId={orgId}
+                            resourceKind="credential"
+                            resourceId={credential.id}
+                            projects={pushTargets}
+                            availableScopes={credential.available_scopes}
+                          />
+                        ) : null}
+                      </div>
                     ) : null}
-                  </span>
-                  {canManageResources ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <EditPersonForm
-                        orgId={orgId}
-                        personId={person.id}
-                        initialName={person.name}
-                        initialEmail={person.email}
-                        initialTitle={person.title}
-                        initialPhotoUrl={person.photo_url}
-                      />
-                      <ArchiveToggleButton
-                        archivePath={`/api/orgs/${orgId}/resources/people/${person.id}`}
-                        unarchivePath={`/api/orgs/${orgId}/resources/people/${person.id}/unarchive`}
-                        archived={Boolean(person.archived_at)}
-                        archiveLabel={t('archive')}
-                        unarchiveLabel={t('unarchive')}
-                        errorLabel={person.archived_at ? t('unarchiveError') : t('archiveError')}
-                      />
-                      {!person.archived_at ? (
-                        <PushAttachmentForm orgId={orgId} resourceKind="person" resourceId={person.id} projects={pushTargets} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canManageResources ? (
+              <div className="pt-2 border-t border-pp-surface-container">
+                <CreateCredentialForm orgId={orgId} />
+              </div>
+            ) : null}
+          </div>
+        </PpCard>
+
+        {/* 2. Resource Templates Section */}
+        <PpCard
+          title={t('templatesHeading')}
+          icon={FileCode}
+          iconAccent="sky"
+        >
+          <div className="space-y-4">
+            {templates.length === 0 ? (
+              <p className="text-pp-body-md text-pp-on-surface-variant">{t('noTemplates')}</p>
+            ) : (
+              <ul className="space-y-3">
+                {templates.map((template) => (
+                  <li
+                    key={template.id}
+                    className="flex flex-col gap-2 rounded-2xl bg-pp-surface-container-low p-4 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-pp-on-surface">
+                        {t('templateSummary', {
+                          name: template.name,
+                          type: template.type,
+                          version: template.version,
+                        })}
+                      </span>
+                      {template.archived_at ? (
+                        <PpPill accent="amber">
+                          {t('archivedBadge')}
+                        </PpPill>
                       ) : null}
                     </div>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-          {canManageResources ? <CreatePersonForm orgId={orgId} /> : null}
-        </section>
+                    {canManageResources ? (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-pp-surface-container">
+                        <EditTemplateForm
+                          orgId={orgId}
+                          templateId={template.id}
+                          initialName={template.name}
+                          initialConfig={template.config}
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ArchiveToggleButton
+                            archivePath={`/api/orgs/${orgId}/resources/templates/${template.id}`}
+                            unarchivePath={`/api/orgs/${orgId}/resources/templates/${template.id}/unarchive`}
+                            archived={Boolean(template.archived_at)}
+                            archiveLabel={t('archive')}
+                            unarchiveLabel={t('unarchive')}
+                            errorLabel={template.archived_at ? t('unarchiveError') : t('archiveError')}
+                          />
+                        </div>
+                        {!template.archived_at ? (
+                          <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canManageResources ? (
+              <div className="pt-2 border-t border-pp-surface-container">
+                <CreateTemplateForm orgId={orgId} />
+              </div>
+            ) : null}
+          </div>
+        </PpCard>
 
+        {/* 3. People Directory Section */}
+        <PpCard
+          title={t('peopleHeading')}
+          icon={Users}
+          iconAccent="pink"
+        >
+          <div className="space-y-4">
+            {people.length === 0 ? (
+              <p className="text-pp-body-md text-pp-on-surface-variant">{t('noPeople')}</p>
+            ) : (
+              <ul className="space-y-3">
+                {people.map((person) => (
+                  <li
+                    key={person.id}
+                    className="flex flex-col gap-2 rounded-2xl bg-pp-surface-container-low p-4 text-sm"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-pp-on-surface">
+                        {person.title ? `${person.name} — ${person.title}` : person.name}
+                      </span>
+                      {person.archived_at ? (
+                        <PpPill accent="amber">
+                          {t('archivedBadge')}
+                        </PpPill>
+                      ) : null}
+                    </div>
+                    {canManageResources ? (
+                      <div className="flex flex-col gap-2 pt-2 border-t border-pp-surface-container">
+                        <EditPersonForm
+                          orgId={orgId}
+                          personId={person.id}
+                          initialName={person.name}
+                          initialEmail={person.email}
+                          initialTitle={person.title}
+                          initialPhotoUrl={person.photo_url}
+                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ArchiveToggleButton
+                            archivePath={`/api/orgs/${orgId}/resources/people/${person.id}`}
+                            unarchivePath={`/api/orgs/${orgId}/resources/people/${person.id}/unarchive`}
+                            archived={Boolean(person.archived_at)}
+                            archiveLabel={t('archive')}
+                            unarchiveLabel={t('unarchive')}
+                            errorLabel={person.archived_at ? t('unarchiveError') : t('archiveError')}
+                          />
+                        </div>
+                        {!person.archived_at ? (
+                          <PushAttachmentForm orgId={orgId} resourceKind="person" resourceId={person.id} projects={pushTargets} />
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {canManageResources ? (
+              <div className="pt-2 border-t border-pp-surface-container">
+                <CreatePersonForm orgId={orgId} />
+              </div>
+            ) : null}
+          </div>
+        </PpCard>
+
+        {/* 4. Pending Attachment Requests Section */}
         {canManageResources ? (
-          <section className="flex flex-col gap-3">
-            <h2 className="text-lg font-semibold">{t('pendingRequestsHeading')}</h2>
+          <PpCard
+            title={t('pendingRequestsHeading')}
+            icon={Clock}
+            iconAccent="amber"
+          >
             <PendingAttachmentRequests orgId={orgId} requests={pendingRequests} />
-          </section>
+          </PpCard>
         ) : null}
-      </main>
+      </PpPage>
     </OrgShell>
   );
 }

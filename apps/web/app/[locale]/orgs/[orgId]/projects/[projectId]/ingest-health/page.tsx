@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { Activity, ShieldAlert, AlertTriangle, Clock, Database, CheckCircle2, Radio, Server } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -30,6 +31,15 @@ import {
   toOrchestrationRunView,
   type OrchestrationRunView,
 } from '@/lib/orgs/orchestration-view';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpPill,
+  PpEmptyState,
+} from '@/components/pastel/primitives';
 import { DismissQuarantinedRecordButton } from '@/components/orgs/dismiss-quarantined-record-button';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
 import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-failed-pipeline-messages-button';
@@ -108,201 +118,330 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   const tEnv = await getTranslations('EnvBadge');
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
 
-  function renderRollup(rollup: IngestHealthRollup, key: string) {
+  function renderRollupCard(rollup: IngestHealthRollup, key: string) {
     return (
-      <li key={key} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-        <span className="font-medium">{rollup.kind === 'overall' ? t('overallHeading') : t(rollup.kind)}</span>
-        <span className="text-muted-foreground">
+      <div
+        key={key}
+        className="flex flex-col gap-2 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 p-4"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-bold text-pp-body-md text-pp-on-surface">
+            {rollup.kind === 'overall' ? t('overallHeading') : t(rollup.kind)}
+          </span>
+          <PpPill accent={rollup.errorRatePercent > 5 ? 'error' : rollup.errorRatePercent > 0 ? 'amber' : 'mint'}>
+            {rollup.errorRatePercent.toFixed(1)}% error
+          </PpPill>
+        </div>
+        <div className="text-xs text-pp-on-surface-variant">
           {t('countsLine', {
             total: rollup.totalRecords,
             accepted: rollup.acceptedCount,
             quarantined: rollup.quarantinedCount,
             duplicate: rollup.duplicateCount,
           })}
-        </span>
-        <span className="text-muted-foreground">
-          {t('rateLine', { percent: rollup.errorRatePercent.toFixed(1), perMinute: formatThroughput(rollup.throughputPerMinute) })}
-        </span>
-        <span className="text-muted-foreground">
-          {rollup.freshnessMinutes === null
-            ? t('neverIngestedLabel')
-            : t('freshnessLabel', { minutes: formatMinutesAgo(rollup.freshnessMinutes) })}
-        </span>
-      </li>
+        </div>
+        <div className="flex items-center justify-between text-xs text-pp-outline pt-1 border-t border-pp-outline-variant/15">
+          <span>{formatThroughput(rollup.throughputPerMinute)} rec/min</span>
+          <span>
+            {rollup.freshnessMinutes === null
+              ? t('neverIngestedLabel')
+              : t('freshnessLabel', { minutes: formatMinutesAgo(rollup.freshnessMinutes) })}
+          </span>
+        </div>
+      </div>
     );
   }
 
+  const integrityPct = Math.max(0, 100 - summary.overall.errorRatePercent).toFixed(1);
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('summaryHeading')}</h2>
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('kpiThroughput')}
+          value={formatThroughput(summary.overall.throughputPerMinute)}
+          valueSuffix="rec/m"
+          accent="primary"
+        />
+        <PpKpiCard
+          label={t('kpiDelivered')}
+          value={summary.overall.acceptedCount.toLocaleString()}
+          valueSuffix={`/ ${summary.overall.totalRecords.toLocaleString()}`}
+          accent="mint"
+        />
+        <PpKpiCard
+          label={t('kpiIntegrity')}
+          value={`${integrityPct}%`}
+          accent={summary.overall.errorRatePercent > 5 ? 'error' : 'mint'}
+        />
+        <PpKpiCard
+          label={t('kpiFreshness')}
+          value={
+            summary.overall.freshnessMinutes !== null
+              ? formatMinutesAgo(summary.overall.freshnessMinutes)
+              : t('neverIngestedLabel')
+          }
+          accent="neutral"
+        />
+      </PpKpiGrid>
+
+      {/* Summary & Ingestion Batches Overview */}
+      <PpCard
+        title={t('summaryHeading')}
+        subtitle={t('batchCapNote', { count: summary.batchesConsidered })}
+        icon={Activity}
+        iconAccent="primary"
+      >
         {batches.length === 0 ? (
-          <p className="text-muted-foreground">{t('noBatches')}</p>
+          <PpEmptyState
+            icon={Activity}
+            title={t('noBatches')}
+            description={t('noBatchesDesc')}
+          />
         ) : (
-          <ul className="flex flex-col gap-3">
-            {renderRollup(summary.overall, 'overall')}
-            {summary.byKind.map((rollup) => renderRollup(rollup, rollup.kind))}
-          </ul>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {renderRollupCard(summary.overall, 'overall')}
+            {summary.byKind.map((rollup) => renderRollupCard(rollup, rollup.kind))}
+          </div>
         )}
-        <p className="text-xs text-muted-foreground">{t('batchCapNote', { count: summary.batchesConsidered })}</p>
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('quarantineHeading')}</h2>
-        {quarantinedViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noQuarantinedRecords')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {quarantinedViews.map((record) => (
-              <li key={record.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="font-medium">
-                      {t('quarantinedRecordSummary', {
-                        clientId: record.clientId,
-                        kind: t(record.kind),
-                        environment: environmentDisplayNameById.get(record.environmentId) ?? record.environmentId,
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Quarantine Browser (7 Cols) */}
+        <div className="lg:col-span-7 flex flex-col gap-6">
+          <PpCard
+            title={t('quarantineHeading')}
+            subtitle={t('quarantineCapNote', { count: quarantinedViews.length })}
+            icon={ShieldAlert}
+            iconAccent="amber"
+            action={
+              quarantinedViews.length > 0 ? (
+                <PpPill accent="amber">{quarantinedViews.length} Quarantined</PpPill>
+              ) : undefined
+            }
+          >
+            {quarantinedViews.length === 0 ? (
+              <PpEmptyState
+                icon={CheckCircle2}
+                title={t('noQuarantinedRecords')}
+                description={t('noQuarantinedDesc')}
+              />
+            ) : (
+              <div className="flex flex-col gap-3">
+                {quarantinedViews.map((record) => (
+                  <div
+                    key={record.id}
+                    className="p-4 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-2.5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-pp-body-md text-pp-on-surface">
+                            {t('quarantinedRecordSummary', {
+                              clientId: record.clientId,
+                              kind: t(record.kind),
+                              environment: environmentDisplayNameById.get(record.environmentId) ?? record.environmentId,
+                            })}
+                          </span>
+                        </div>
+                        <span className="text-xs text-pp-error font-medium">
+                          {t('reasonsLabel', { reasons: record.reasons.join(', ') })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <ReplayQuarantinedRecordButton
+                          orgId={orgId}
+                          projectId={projectId}
+                          quarantinedRecordId={record.id}
+                        />
+                        <DismissQuarantinedRecordButton
+                          orgId={orgId}
+                          projectId={projectId}
+                          quarantinedRecordId={record.id}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </PpCard>
+        </div>
+
+        {/* Right Column: Pipeline Failures & Queued Messages (5 Cols) */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          {/* Pipeline delivery failures (DLQ) */}
+          <PpCard
+            title={t('pipelineFailuresHeading')}
+            subtitle={failedPipelineMessages.length > 0 ? undefined : t('noPipelineFailuresDesc')}
+            icon={AlertTriangle}
+            iconAccent="error"
+            action={
+              failedPipelineMessages.length > 0 ? (
+                <RetryFailedPipelineMessagesButton orgId={orgId} projectId={projectId} />
+              ) : undefined
+            }
+          >
+            {failedPipelineMessages.length === 0 ? (
+              <PpEmptyState
+                icon={CheckCircle2}
+                title={t('noPipelineFailures')}
+                description={t('noPipelineFailuresDesc')}
+              />
+            ) : (
+              <div className="flex flex-col gap-3">
+                {failedPipelineMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className="p-3.5 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-1"
+                  >
+                    <span className="font-medium text-xs text-pp-on-surface">
+                      {t('pipelineFailureSummary', {
+                        clientId: message.client_id,
+                        kind: t(message.kind),
+                        environment: environmentDisplayNameById.get(message.environment_id) ?? message.environment_id,
+                        reason: message.failure_reason ?? '',
                       })}
                     </span>
-                    <span className="text-muted-foreground">{t('reasonsLabel', { reasons: record.reasons.join(', ') })}</span>
                   </div>
-                  <div className="flex items-start gap-2">
-                    <ReplayQuarantinedRecordButton orgId={orgId} projectId={projectId} quarantinedRecordId={record.id} />
-                    <DismissQuarantinedRecordButton orgId={orgId} projectId={projectId} quarantinedRecordId={record.id} />
+                ))}
+              </div>
+            )}
+          </PpCard>
+
+          {/* Stuck Queued Messages */}
+          <PpCard
+            title={t('queuedMessagesHeading')}
+            subtitle={queuedPipelineMessageViews.length > 0 ? undefined : t('noQueuedMessagesDesc')}
+            icon={Clock}
+            iconAccent="neutral"
+            action={
+              queuedPipelineMessageViews.length > 0 ? (
+                <SweepQueuedPipelineMessagesButton orgId={orgId} projectId={projectId} />
+              ) : undefined
+            }
+          >
+            {queuedPipelineMessageViews.length === 0 ? (
+              <PpEmptyState
+                icon={CheckCircle2}
+                title={t('noQueuedMessages')}
+                description={t('noQueuedMessagesDesc')}
+              />
+            ) : (
+              <div className="flex flex-col gap-3">
+                {queuedPipelineMessageViews.map((message) => (
+                  <div
+                    key={message.id}
+                    className="p-3.5 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-1"
+                  >
+                    <span className="font-medium text-xs text-pp-on-surface">
+                      {t('queuedMessageSummary', {
+                        clientId: message.clientId,
+                        kind: t(message.kind),
+                        environment: environmentDisplayNameById.get(message.environmentId) ?? message.environmentId,
+                        minutes: formatMinutesAgo(message.minutesAgo),
+                      })}
+                    </span>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-xs text-muted-foreground">{t('quarantineCapNote', { count: quarantinedViews.length })}</p>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('pipelineFailuresHeading')}</h2>
-          {failedPipelineMessages.length > 0 ? (
-            <RetryFailedPipelineMessagesButton orgId={orgId} projectId={projectId} />
-          ) : null}
+                ))}
+              </div>
+            )}
+          </PpCard>
         </div>
-        {failedPipelineMessages.length === 0 ? (
-          <p className="text-muted-foreground">{t('noPipelineFailures')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {failedPipelineMessages.map((message) => (
-              <li key={message.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <span className="font-medium">
-                  {t('pipelineFailureSummary', {
-                    clientId: message.client_id,
-                    kind: t(message.kind),
-                    environment: environmentDisplayNameById.get(message.environment_id) ?? message.environment_id,
-                    reason: message.failure_reason ?? '',
-                  })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      </div>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('queuedMessagesHeading')}</h2>
-          {queuedPipelineMessageViews.length > 0 ? (
-            <SweepQueuedPipelineMessagesButton orgId={orgId} projectId={projectId} />
-          ) : null}
-        </div>
-        {queuedPipelineMessageViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noQueuedMessages')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {queuedPipelineMessageViews.map((message) => (
-              <li key={message.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <span className="font-medium">
-                  {t('queuedMessageSummary', {
-                    clientId: message.clientId,
-                    kind: t(message.kind),
-                    environment: environmentDisplayNameById.get(message.environmentId) ?? message.environmentId,
-                    minutes: formatMinutesAgo(message.minutesAgo),
-                  })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* Orchestration & Warehouse Mart Freshness */}
+      <PpCard
+        title={t('orchestrationHeading')}
+        subtitle={t('warehouseFreshnessHeading')}
+        icon={Database}
+        iconAccent="primary"
+        action={<TriggerOrchestrationRunButton orgId={orgId} projectId={projectId} />}
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Warehouse Freshness Card */}
+          <div className="p-4 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Server className="w-4 h-4 text-pp-primary" />
+              <h3 className="text-sm font-semibold text-pp-on-surface">{t('warehouseFreshnessHeading')}</h3>
+            </div>
+            {warehouseFreshness.status === 'ok' ? (
+              <p className="text-xs text-pp-on-surface-variant">
+                {warehouseFreshness.latestLandedAt
+                  ? t('warehouseFreshnessLine', {
+                      latestLandedAt: warehouseFreshness.latestLandedAt,
+                      count: warehouseFreshness.landedRecordCount,
+                    })
+                  : t('warehouseFreshnessEmpty')}
+              </p>
+            ) : warehouseFreshness.status === 'not_configured' ? (
+              <p className="text-xs text-pp-outline">{t('warehouseFreshnessNotConfigured')}</p>
+            ) : (
+              <p className="text-xs text-pp-error font-medium">
+                {t('warehouseFreshnessError', { message: warehouseFreshness.message })}
+              </p>
+            )}
+          </div>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{t('orchestrationHeading')}</h2>
-          <TriggerOrchestrationRunButton orgId={orgId} projectId={projectId} />
-        </div>
+          {/* Current Table Freshness */}
+          <div className="p-4 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-2">
+            <h3 className="text-sm font-semibold text-pp-on-surface">{t('orchestrationFreshnessHeading')}</h3>
+            {currentFreshness?.freshness && currentFreshness.freshness.length > 0 ? (
+              <ul className="flex flex-col gap-1.5">
+                {currentFreshness.freshness.map((entry) => (
+                  <li key={entry.table} className="text-xs text-pp-on-surface-variant flex items-center justify-between">
+                    <span className="font-mono font-medium">{t(freshnessTableLabelKey(entry.table))}</span>
+                    <span className="text-pp-outline">
+                      {entry.rowCount.toLocaleString()} rows · {entry.latestRecordAt ?? t('orchestrationNeverLanded')}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-pp-outline">{t('orchestrationNoFreshnessYet')}</p>
+            )}
+          </div>
 
-        {/* Live warehouse freshness (KAN-38 follow-up): read from the real
-          warehouse itself, so it reflects EVERY refresh mechanism — the
-          hourly scheduled dbt-refresh Cloud Run Job included — not just the
-          in-app "Run now" history below, which only tracks its own runs
-          (session-B QA, 2026-08-20: this panel looked permanently empty
-          while the scheduled refresh ran like clockwork). */}
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">{t('warehouseFreshnessHeading')}</h3>
-          {warehouseFreshness.status === 'ok' ? (
-            <p className="text-sm text-muted-foreground">
-              {warehouseFreshness.latestLandedAt
-                ? t('warehouseFreshnessLine', {
-                    latestLandedAt: warehouseFreshness.latestLandedAt,
-                    count: warehouseFreshness.landedRecordCount,
-                  })
-                : t('warehouseFreshnessEmpty')}
-            </p>
-          ) : warehouseFreshness.status === 'not_configured' ? (
-            <p className="text-sm text-muted-foreground">{t('warehouseFreshnessNotConfigured')}</p>
-          ) : (
-            <p className="text-sm text-destructive">{t('warehouseFreshnessError', { message: warehouseFreshness.message })}</p>
-          )}
+          {/* Orchestration History */}
+          <div className="p-4 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-2">
+            <h3 className="text-sm font-semibold text-pp-on-surface">{t('orchestrationHistoryHeading')}</h3>
+            {orchestrationRunViews.length === 0 ? (
+              <p className="text-xs text-pp-outline">{t('orchestrationNoRuns')}</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {orchestrationRunViews.slice(0, 5).map((run: OrchestrationRunView) => (
+                  <li
+                    key={run.id}
+                    className="flex flex-col gap-1 p-2.5 rounded-xl bg-pp-surface-container-lowest/80 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-pp-on-surface font-medium">{run.startedAt}</span>
+                      <PpPill
+                        accent={
+                          run.status === 'succeeded' ? 'mint' : run.status === 'failed' ? 'error' : 'primary'
+                        }
+                      >
+                        {t(runStatusLabelKey(run.status))}
+                      </PpPill>
+                    </div>
+                    {run.errorMessage ? (
+                      <span className="text-pp-error font-medium">
+                        {t('orchestrationRunError', { message: run.errorMessage })}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationFreshnessHeading')}</h3>
-          {currentFreshness?.freshness ? (
-            <ul className="flex flex-col gap-1">
-              {currentFreshness.freshness.map((entry) => (
-                <li key={entry.table} className="text-sm text-muted-foreground">
-                  {t('orchestrationFreshnessRow', {
-                    table: t(freshnessTableLabelKey(entry.table)),
-                    count: entry.rowCount,
-                    freshness: entry.latestRecordAt ?? t('orchestrationNeverLanded'),
-                  })}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">{t('orchestrationNoFreshnessYet')}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationHistoryHeading')}</h3>
-          {orchestrationRunViews.length === 0 ? (
-            <p className="text-muted-foreground">{t('orchestrationNoRuns')}</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {orchestrationRunViews.map((run: OrchestrationRunView) => (
-                <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                  <span className="font-medium">
-                    {t('orchestrationRunSummary', { status: t(runStatusLabelKey(run.status)), startedAt: run.startedAt })}
-                  </span>
-                  {run.errorMessage ? (
-                    <span className="text-xs text-destructive">{t('orchestrationRunError', { message: run.errorMessage })}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

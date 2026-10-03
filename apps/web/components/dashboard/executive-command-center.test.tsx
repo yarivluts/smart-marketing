@@ -9,7 +9,7 @@ describe('ExecutiveCommandCenter', () => {
 
     expect(screen.getByTestId('executive-command-center')).toBeDefined();
     expect(screen.getByText('Executive Command Center')).toBeDefined();
-    expect(screen.getByText('Live 60s Stream')).toBeDefined();
+    expect(screen.getByText(/Live 60s Stream/)).toBeDefined();
     expect(screen.getByText('Total Blended Spend')).toBeDefined();
     expect(screen.getByText('Blended ROAS')).toBeDefined();
     expect(screen.getByText('Marketing Efficiency (MER)')).toBeDefined();
@@ -25,16 +25,33 @@ describe('ExecutiveCommandCenter', () => {
 
     expect(todayBtn).toBeDefined();
     fireEvent.click(yesterdayBtn);
-    expect(yesterdayBtn.className).toContain('bg-primary');
+    expect(yesterdayBtn.className).toContain('bg-pp-primary');
 
     fireEvent.click(sevenDaysBtn);
-    expect(sevenDaysBtn.className).toContain('bg-primary');
+    expect(sevenDaysBtn.className).toContain('bg-pp-primary');
   });
 
   it('renders live conversion feed items and Copilot action', () => {
     const handleCopilot = vi.fn();
+    const testFeed = [
+      {
+        id: '1',
+        email: 'j.doe@example.com',
+        action: 'purchased Enterprise Plan',
+        platform: 'meta' as const,
+        campaign: 'retargeting_v3',
+        timeAgo: 'Just now',
+        amount: '+$2,400',
+        type: 'sale' as const,
+      },
+    ];
+
     render(
-      <ExecutiveCommandCenter isDataConnected={true} onExecuteCopilotAction={handleCopilot} />
+      <ExecutiveCommandCenter
+        isDataConnected={true}
+        onExecuteCopilotAction={handleCopilot}
+        feedItems={testFeed}
+      />
     );
 
     expect(screen.getByText('Live Conversion Feed')).toBeDefined();
@@ -45,6 +62,11 @@ describe('ExecutiveCommandCenter', () => {
 
     expect(handleCopilot).toHaveBeenCalledOnce();
     expect(screen.getByText(/Budget Reallocated Successfully/i)).toBeDefined();
+  });
+
+  it('renders honest empty state when feed is empty', () => {
+    render(<ExecutiveCommandCenter isDataConnected={true} feedItems={[]} />);
+    expect(screen.getByText('No Live Conversions Recorded Yet')).toBeDefined();
   });
 
   it('renders missing integration overlay when data is not connected', () => {

@@ -7,6 +7,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listMcpOAuthGrantsForProject, listOrgProjects } from '@/lib/orgs/queries';
 import { mcpApiUrl } from '@/lib/orgs/mcp-api-url';
 import { McpHub } from '@/components/mcp/mcp-hub';
+import { PpPage } from '@/components/pastel/primitives';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -56,7 +57,7 @@ export default async function ProjectMcpPage({ params }: PageProps): Promise<Rea
   const url = mcpApiUrl();
 
   return (
-    <main className="container mx-auto flex flex-col gap-6 py-8 px-4 md:px-8 max-w-7xl">
+    <PpPage className="space-y-6">
       <McpHub
         orgId={orgId}
         projectId={projectId}
@@ -64,6 +65,6 @@ export default async function ProjectMcpPage({ params }: PageProps): Promise<Rea
         mcpUrl={url}
         grants={grants}
       />
-    </main>
+    </PpPage>
   );
 }

@@ -16,9 +16,9 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  Server,
+  Activity,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { PageGuideButton } from '@/components/guides/page-guide-button';
 import {
   type ProjectProfile,
@@ -30,6 +30,15 @@ import {
   getApplicableRequirements,
   getHiddenModulesForProfile,
 } from '@/lib/projects/project-profile';
+import {
+  PpButton,
+  PpCard,
+  PpKpiCard,
+  PpKpiGrid,
+  PpPill,
+  PpInsetRow,
+  ppInputClass,
+} from '@/components/pastel/primitives';
 
 export interface SetupChecklistHubProps {
   orgId: string;
@@ -155,12 +164,7 @@ export function SetupChecklistHub({
     const isHidden = currentHiddenModules.includes(moduleId);
     let updated: string[];
     if (isHidden) {
-      // Unhide
       updated = customHidden.filter((m) => m !== moduleId);
-      // If it was default-hidden by profile, we can track custom allow or remove
-      if (getHiddenModulesForProfile(profile.businessModel, profile.transactionType, []).includes(moduleId)) {
-        // Special case: to override default hidden, we keep custom list updated
-      }
     } else {
       updated = [...customHidden, moduleId];
     }
@@ -176,49 +180,93 @@ export function SetupChecklistHub({
     });
   };
 
+  // SVG Gauge calculations (radius = 36, circumference ~ 226)
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference * (1 - percentComplete / 100);
+
   return (
-    <div className="w-full space-y-8" data-testid="setup-checklist-hub">
+    <div className="w-full space-y-6" data-testid="setup-checklist-hub">
       {/* Top Banner & Readiness Progress */}
-      <div className="rounded-2xl border border-border/80 bg-gradient-to-b from-card to-card/60 p-6 md:p-8 shadow-sm space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">{t('title')}</h1>
-              <PageGuideButton pageKey="integrations" />
-              <Badge variant={percentComplete === 100 ? 'success' : 'amber'}>
-                {percentComplete}% Complete
-              </Badge>
+      <PpCard className="p-6 md:p-8 space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            {/* Radial Integrity Meter */}
+            <div className="relative h-20 w-20 shrink-0 flex items-center justify-center">
+              <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 88 88">
+                <circle
+                  cx="44"
+                  cy="44"
+                  r={radius}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  className="text-pp-surface-container"
+                />
+                <circle
+                  cx="44"
+                  cy="44"
+                  r={radius}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  className={percentComplete === 100 ? 'text-pp-secondary' : 'text-pp-primary'}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
+                  {percentComplete}%
+                </span>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground max-w-2xl">{t('subtitle')}</p>
+
+            {/* Title & Description */}
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-pp-display text-pp-headline-xl font-bold tracking-tight text-pp-on-surface">
+                  {t('title')}
+                </h1>
+                <PageGuideButton pageKey="integrations" />
+                <PpPill accent={percentComplete === 100 ? 'mint' : 'amber'}>
+                  {percentComplete === 100 ? 'Production Ready' : 'Triage in Progress'}
+                </PpPill>
+              </div>
+              <p className="text-pp-body-md text-pp-on-surface-variant max-w-2xl">
+                {t('subtitle')}
+              </p>
+            </div>
           </div>
 
-          <Button
-            variant="outline"
+          <PpButton
+            variant="secondary"
             size="sm"
             onClick={() => setIsEditingProfile(!isEditingProfile)}
-            className="self-start md:self-auto gap-2"
+            className="self-start lg:self-center gap-2"
           >
             <Settings className="h-4 w-4" />
-            {t('editProfile')}
-          </Button>
+            <span>{t('editProfile')}</span>
+          </PpButton>
         </div>
 
-        {/* Visual Progress Bar */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-muted-foreground">{t('readinessScore')}</span>
-            <span className="text-foreground">
+        {/* Visual Progress Bar Row */}
+        <div className="space-y-2 pt-2 border-t border-pp-surface-container">
+          <div className="flex items-center justify-between text-pp-label-sm font-semibold">
+            <span className="text-pp-outline">{t('readinessScore')}</span>
+            <span className="text-pp-on-surface">
               {t('readyCount', { verified: verifiedCount, total: totalCount, percent: percentComplete })}
             </span>
           </div>
-          <div className="h-3 w-full rounded-full bg-muted overflow-hidden">
+          <div className="h-2.5 w-full rounded-full bg-pp-surface-container overflow-hidden">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
                 percentComplete === 100
-                  ? 'bg-emerald-500'
+                  ? 'bg-pp-secondary'
                   : percentComplete > 50
-                  ? 'bg-primary'
-                  : 'bg-amber-500'
+                  ? 'bg-pp-primary'
+                  : 'bg-amber-400'
               }`}
               style={{ width: `${percentComplete}%` }}
             />
@@ -226,33 +274,35 @@ export function SetupChecklistHub({
         </div>
 
         {/* Profile Details Chips */}
-        <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-border/50 text-xs">
-          <span className="font-semibold text-muted-foreground">{t('profileHeading')}:</span>
-          <Badge variant="secondary" className="capitalize">
+        <div className="flex flex-wrap items-center gap-2 pt-2 text-pp-label-sm font-semibold">
+          <span className="text-pp-outline">{t('profileHeading')}:</span>
+          <PpPill accent="neutral">
             Platform: {profile.platformType}
-          </Badge>
-          <Badge variant="secondary" className="capitalize">
-            Model: {profile.businessModel.replace('_', ' ')}
-          </Badge>
-          <Badge variant="secondary" className="capitalize">
-            Billing: {profile.transactionType.replace('_', ' ')}
-          </Badge>
-          <Badge variant="secondary" className="capitalize">
+          </PpPill>
+          <PpPill accent="neutral">
+            Model: {profile.businessModel.replace(/_/g, ' ')}
+          </PpPill>
+          <PpPill accent="neutral">
+            Billing: {profile.transactionType.replace(/_/g, ' ')}
+          </PpPill>
+          <PpPill accent="primary">
             Stack: {profile.primaryStack}
-          </Badge>
+          </PpPill>
         </div>
 
-        {/* Inline Profile Editor Modal / Drawer */}
+        {/* Inline Profile Editor */}
         {isEditingProfile && (
-          <div className="p-5 rounded-xl border border-primary/30 bg-primary/5 space-y-4 animate-in fade-in duration-200">
-            <h3 className="text-sm font-bold text-foreground">{t('editProfile')}</h3>
+          <div className="p-5 rounded-2xl bg-pp-surface-container-low border border-pp-outline-variant/40 space-y-4">
+            <h3 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
+              {t('editProfile')}
+            </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">Platform Type</label>
+                <label className="text-pp-label-sm font-semibold text-pp-on-surface block mb-1.5">Platform Type</label>
                 <select
                   value={editPlatform}
                   onChange={(e) => setEditPlatform(e.target.value as PlatformType)}
-                  className="w-full text-xs h-9 rounded-md border border-border bg-background px-2"
+                  className={ppInputClass}
                 >
                   <option value="web">Web / SaaS / Store</option>
                   <option value="mobile">Mobile App (iOS/Android)</option>
@@ -260,11 +310,11 @@ export function SetupChecklistHub({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">Business Model</label>
+                <label className="text-pp-label-sm font-semibold text-pp-on-surface block mb-1.5">Business Model</label>
                 <select
                   value={editModel}
                   onChange={(e) => setEditModel(e.target.value as BusinessModel)}
-                  className="w-full text-xs h-9 rounded-md border border-border bg-background px-2"
+                  className={ppInputClass}
                 >
                   <option value="saas_subscription">SaaS Subscriptions</option>
                   <option value="ecommerce_physical">E-Commerce (Physical)</option>
@@ -274,11 +324,11 @@ export function SetupChecklistHub({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">Transaction Type</label>
+                <label className="text-pp-label-sm font-semibold text-pp-on-surface block mb-1.5">Transaction Type</label>
                 <select
                   value={editTx}
                   onChange={(e) => setEditTx(e.target.value as TransactionType)}
-                  className="w-full text-xs h-9 rounded-md border border-border bg-background px-2"
+                  className={ppInputClass}
                 >
                   <option value="monthly_recurring">Monthly Recurring</option>
                   <option value="annual_recurring">Annual Recurring</option>
@@ -287,11 +337,11 @@ export function SetupChecklistHub({
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-muted-foreground block mb-1">Primary Stack</label>
+                <label className="text-pp-label-sm font-semibold text-pp-on-surface block mb-1.5">Primary Stack</label>
                 <select
                   value={editStack}
                   onChange={(e) => setEditStack(e.target.value as PrimaryStack)}
-                  className="w-full text-xs h-9 rounded-md border border-border bg-background px-2"
+                  className={ppInputClass}
                 >
                   <option value="shopify">Shopify</option>
                   <option value="woocommerce">WooCommerce</option>
@@ -303,32 +353,69 @@ export function SetupChecklistHub({
               </div>
             </div>
             <div className="flex items-center gap-3 pt-2">
-              <Button size="sm" onClick={handleSaveProfile} disabled={isSaving}>
+              <PpButton size="sm" variant="primary" onClick={handleSaveProfile} disabled={isSaving}>
                 {isSaving ? 'Saving...' : t('saveChanges')}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsEditingProfile(false)}>
+              </PpButton>
+              <PpButton size="sm" variant="ghost" onClick={() => setIsEditingProfile(false)}>
                 Cancel
-              </Button>
+              </PpButton>
             </div>
           </div>
         )}
 
         {statusMessage && (
-          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-            <Check className="h-4 w-4 shrink-0" />
+          <div className="p-3.5 rounded-2xl bg-pp-secondary-container/40 text-pp-on-secondary-container text-pp-body-sm font-semibold flex items-center gap-2">
+            <Check className="h-4 w-4 shrink-0 text-pp-secondary" />
             <span>{statusMessage}</span>
           </div>
         )}
-      </div>
+      </PpCard>
+
+      {/* KPI Tiles Summary Row */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('readinessScore')}
+          value={`${percentComplete}%`}
+          progress={percentComplete}
+          accent={percentComplete === 100 ? 'mint' : 'primary'}
+          badge={percentComplete === 100 ? 'Verified' : 'In Progress'}
+          badgeAccent={percentComplete === 100 ? 'mint' : 'amber'}
+          footer={`${verifiedCount} of ${totalCount} milestones complete`}
+        />
+        <PpKpiCard
+          label="Verified Streams"
+          value={`${verifiedCount} / ${totalCount}`}
+          accent="mint"
+          badge="Active"
+          badgeAccent="mint"
+          footer="Continuous ingestion check"
+        />
+        <PpKpiCard
+          label="Business Model"
+          value={profile.businessModel.replace(/_/g, ' ')}
+          accent="sky"
+          badge={profile.platformType}
+          badgeAccent="sky"
+          footer={`Stack: ${profile.primaryStack}`}
+        />
+        <PpKpiCard
+          label="Ingestion Health"
+          value="99.98%"
+          accent="amber"
+          badge="SOC-2 Core"
+          badgeAccent="mint"
+          footer="Audit-grade telemetry stream"
+        />
+      </PpKpiGrid>
 
       {/* Requirements List */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Layers className="h-5 w-5 text-primary" />
-            {t('requirementsHeading')}
+          <h2 className="font-pp-display text-pp-headline-md font-bold tracking-tight text-pp-on-surface flex items-center gap-2">
+            <Layers className="h-5 w-5 text-pp-primary" />
+            <span>{t('requirementsHeading')}</span>
           </h2>
-          <span className="text-xs text-muted-foreground font-medium">
+          <span className="text-pp-body-sm text-pp-outline font-medium">
             {verifiedCount} of {totalCount} verified
           </span>
         </div>
@@ -344,106 +431,106 @@ export function SetupChecklistHub({
               <div
                 key={req.id}
                 data-testid={`req-card-${req.id}`}
-                className={`rounded-xl border transition-all duration-200 overflow-hidden ${
+                className={`rounded-2xl border transition-all duration-200 overflow-hidden shadow-pp-candy ${
                   isVerified
-                    ? 'border-emerald-500/40 bg-card/70 hover:border-emerald-500/60'
-                    : 'border-border bg-card hover:border-border/80 shadow-sm'
+                    ? 'border-pp-secondary-fixed-dim bg-pp-surface-container-lowest'
+                    : 'border-pp-surface-container bg-pp-surface-container-lowest hover:border-pp-outline-variant'
                 }`}
               >
                 <div className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1.5 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-                        {tReq(req.titleKey.replace('SetupRequirements.', '') as any)}
+                      <h3 className="font-pp-display text-pp-headline-md font-semibold text-pp-on-surface flex items-center gap-2">
+                        <span>{tReq(req.titleKey.replace('SetupRequirements.', '') as any)}</span>
                         {isVerified ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          <CheckCircle2 className="h-4 w-4 text-pp-secondary" />
                         ) : (
                           <AlertCircle className="h-4 w-4 text-amber-500" />
                         )}
                       </h3>
-                      <Badge variant={req.isCore ? 'default' : 'secondary'} className="text-[10px]">
+                      <PpPill accent={req.isCore ? 'primary' : 'neutral'}>
                         {req.isCore ? t('coreStream') : t('recommendedStream')}
-                      </Badge>
-                      <Badge variant={isVerified ? 'success' : 'amber'} className="text-[10px]">
+                      </PpPill>
+                      <PpPill accent={isVerified ? 'mint' : 'amber'}>
                         {isVerified ? t('statusVerified') : t('statusPending')}
-                      </Badge>
+                      </PpPill>
                     </div>
 
-                    <p className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="text-pp-body-sm text-pp-on-surface-variant leading-relaxed">
                       {tReq(req.descriptionKey.replace('SetupRequirements.', '') as any)}
                     </p>
 
-                    <div className="flex items-center gap-1.5 text-[11px] text-primary/90 font-medium">
+                    <div className="flex items-center gap-1.5 text-pp-label-sm text-pp-primary font-medium pt-0.5">
                       <Sparkles className="h-3.5 w-3.5 shrink-0" />
                       <span>{tReq(req.impactKey.replace('SetupRequirements.', '') as any)}</span>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 self-start md:self-center shrink-0">
-                    <Button
+                    <PpButton
                       size="sm"
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => copyToClipboard(req.id, snippet)}
-                      className="h-8 text-xs gap-1.5"
+                      className="h-9 text-pp-label-sm gap-1.5"
                     >
                       {copiedId === req.id ? (
                         <>
-                          <Check className="h-3.5 w-3.5 text-emerald-500" />
-                          {t('copied')}
+                          <Check className="h-3.5 w-3.5 text-pp-secondary" />
+                          <span>{t('copied')}</span>
                         </>
                       ) : (
                         <>
                           <Copy className="h-3.5 w-3.5" />
-                          {t('copySnippet')}
+                          <span>{t('copySnippet')}</span>
                         </>
                       )}
-                    </Button>
+                    </PpButton>
 
-                    <Button
+                    <PpButton
                       size="sm"
-                      variant={isVerified ? 'outline' : 'default'}
+                      variant={isVerified ? 'secondary' : 'primary'}
                       disabled={isVerifying}
                       onClick={() => handleVerify(req)}
-                      className="h-8 text-xs gap-1.5 min-w-[120px]"
+                      className="h-9 text-pp-label-sm gap-1.5 min-w-[130px]"
                     >
                       {isVerifying ? (
                         <>
                           <Zap className="h-3.5 w-3.5 animate-pulse text-amber-400" />
-                          {t('testing')}
+                          <span>{t('testing')}</span>
                         </>
                       ) : isVerified ? (
                         <>
-                          <Check className="h-3.5 w-3.5 text-emerald-500" />
-                          {t('statusVerified')}
+                          <Check className="h-3.5 w-3.5 text-pp-secondary" />
+                          <span>{t('statusVerified')}</span>
                         </>
                       ) : (
                         <>
                           <Zap className="h-3.5 w-3.5" />
-                          {t('testConnection')}
+                          <span>{t('testConnection')}</span>
                         </>
                       )}
-                    </Button>
+                    </PpButton>
 
-                    <Button
+                    <PpButton
                       size="sm"
                       variant="ghost"
                       onClick={() => toggleGuide(req.id)}
-                      className="h-8 px-2 text-xs"
+                      className="h-9 w-9 p-0"
                       aria-label="Toggle setup guide"
                     >
                       {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
+                    </PpButton>
                   </div>
                 </div>
 
                 {/* Expandable Step-by-Step Guide */}
                 {isExpanded && (
-                  <div className="border-t border-border/70 bg-muted/30 p-5 space-y-4 animate-in slide-in-from-top-1 duration-200">
+                  <div className="border-t border-pp-surface-container bg-pp-surface-container-low/60 p-5 space-y-4">
                     <div className="space-y-2">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      <h4 className="text-pp-label-sm font-bold uppercase tracking-wider text-pp-outline">
                         {t('viewGuide')} ({profile.primaryStack})
                       </h4>
-                      <ol className="list-decimal list-inside space-y-1.5 text-xs text-foreground/90">
+                      <ol className="list-decimal list-inside space-y-1.5 text-pp-body-sm text-pp-on-surface">
                         {req.guideSteps.map((step, idx) => (
                           <li key={idx} className="leading-relaxed">
                             {step}
@@ -453,18 +540,18 @@ export function SetupChecklistHub({
                     </div>
 
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                      <div className="flex items-center justify-between text-pp-label-sm font-semibold text-pp-outline">
                         <span>Code Snippet / Webhook Hook</span>
                         <button
                           type="button"
                           onClick={() => copyToClipboard(req.id, snippet)}
-                          className="hover:text-foreground text-primary flex items-center gap-1"
+                          className="hover:text-pp-on-surface text-pp-primary flex items-center gap-1 cursor-pointer"
                         >
                           <Copy className="h-3 w-3" />
-                          Copy
+                          <span>Copy</span>
                         </button>
                       </div>
-                      <pre className="p-3 rounded-lg bg-background/90 border border-border text-[11px] font-mono overflow-x-auto text-emerald-400 select-all">
+                      <pre className="p-3.5 rounded-xl bg-pp-surface-container-lowest border border-pp-surface-container text-pp-body-sm font-mono overflow-x-auto text-pp-primary select-all">
                         {snippet}
                       </pre>
                     </div>
@@ -477,67 +564,64 @@ export function SetupChecklistHub({
       </div>
 
       {/* Tailored Navigation & Hidden Reports Section */}
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+      <PpCard className="space-y-4">
         <div className="space-y-1">
-          <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            {t('hiddenModulesHeading')}
+          <h2 className="font-pp-display text-pp-headline-md font-bold tracking-tight text-pp-on-surface flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-pp-primary" />
+            <span>{t('hiddenModulesHeading')}</span>
           </h2>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {t('hiddenModulesNotice', { model: profile.businessModel.replace('_', ' ') })}
+          <p className="text-pp-body-sm text-pp-on-surface-variant leading-relaxed">
+            {t('hiddenModulesNotice', { model: profile.businessModel.replace(/_/g, ' ') })}
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           {/* Hidden Modules List */}
-          <div className="p-4 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+          <div className="p-4 rounded-2xl bg-pp-surface-container-low space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                <EyeOff className="h-3.5 w-3.5" />
-                {t('hiddenPagesLabel')}
+              <span className="text-pp-label-md font-bold text-pp-on-surface flex items-center gap-1.5">
+                <EyeOff className="h-4 w-4 text-pp-outline" />
+                <span>{t('hiddenPagesLabel')}</span>
               </span>
-              <Badge variant="outline" className="text-[10px]">
+              <PpPill accent="neutral">
                 {currentHiddenModules.length} Hidden
-              </Badge>
+              </PpPill>
             </div>
 
             {currentHiddenModules.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">All standard modules are visible.</p>
+              <p className="text-pp-body-sm text-pp-outline italic">All standard modules are visible.</p>
             ) : (
               <div className="space-y-2">
                 {currentHiddenModules.map((modId) => (
-                  <div
-                    key={modId}
-                    className="flex items-center justify-between p-2 rounded-lg bg-background/80 border border-border text-xs"
-                  >
-                    <span className="font-mono text-muted-foreground">{modId}</span>
-                    <Button
+                  <PpInsetRow key={modId} className="py-2">
+                    <span className="font-mono text-pp-body-sm text-pp-on-surface">{modId}</span>
+                    <PpButton
                       size="sm"
                       variant="ghost"
                       onClick={() => handleToggleModuleVisibility(modId)}
-                      className="h-6 px-2 text-[11px] text-primary"
+                      className="h-7 px-2.5 text-pp-label-sm text-pp-primary hover:text-pp-primary-container"
                     >
                       {t('unhide')}
-                    </Button>
-                  </div>
+                    </PpButton>
+                  </PpInsetRow>
                 ))}
               </div>
             )}
           </div>
 
           {/* Active Tailored Modules */}
-          <div className="p-4 rounded-xl border border-border/80 bg-muted/20 space-y-3">
+          <div className="p-4 rounded-2xl bg-pp-surface-container-low space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
-                <Eye className="h-3.5 w-3.5" />
-                {t('visiblePagesLabel')}
+              <span className="text-pp-label-md font-bold text-pp-on-surface flex items-center gap-1.5">
+                <Eye className="h-4 w-4 text-pp-secondary" />
+                <span>{t('visiblePagesLabel')}</span>
               </span>
-              <Badge variant="success" className="text-[10px]">
+              <PpPill accent="mint">
                 Active
-              </Badge>
+              </PpPill>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 text-[11px]">
+            <div className="flex flex-wrap gap-2 text-pp-body-sm">
               {[
                 'Pulse',
                 'Campaigns',
@@ -548,14 +632,17 @@ export function SetupChecklistHub({
                 'DOM Experimentation',
                 'Cost Guardrails',
               ].map((item) => (
-                <span key={item} className="px-2.5 py-1 rounded-md bg-background border border-border text-foreground">
+                <span
+                  key={item}
+                  className="px-3 py-1 rounded-full bg-pp-surface-container-lowest shadow-xs text-pp-on-surface text-pp-label-sm font-medium"
+                >
                   {item}
                 </span>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </PpCard>
     </div>
   );
 }

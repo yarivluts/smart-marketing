@@ -1,12 +1,34 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { Bell, Coins, FileText, Plus, Trophy, Users } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { aggregateRepCollectionLeaderboard } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listBillingCollectionSignalsForProject, listOrgPeople, listOrgProjects, listRepCollectionEntriesForProject } from '@/lib/orgs/queries';
-import { repCollectionTypeLabelKey, toRepCollectionBillingSignalRow, toRepCollectionEntryRow, toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
+import {
+  listBillingCollectionSignalsForProject,
+  listOrgPeople,
+  listOrgProjects,
+  listRepCollectionEntriesForProject,
+} from '@/lib/orgs/queries';
+import {
+  repCollectionTypeLabelKey,
+  toRepCollectionBillingSignalRow,
+  toRepCollectionEntryRow,
+  toRepCollectionLeaderboardView,
+} from '@/lib/orgs/rep-collection-view';
+import {
+  PpButton,
+  PpCard,
+  PpEmptyState,
+  PpKpiCard,
+  PpKpiGrid,
+  PpPage,
+  PpPageHeader,
+  PpPill,
+  PpTable,
+} from '@/components/pastel/primitives';
 import { CreateRepCollectionEntryForm } from '@/components/orgs/create-rep-collection-entry-form';
 import { RepCollectionEntryControls } from '@/components/orgs/rep-collection-entry-controls';
 
@@ -20,14 +42,19 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
+const TYPE_ACCENTS: Record<string, 'primary' | 'mint' | 'amber' | 'sky' | 'neutral'> = {
+  upgrade: 'primary',
+  expansion: 'mint',
+  save: 'amber',
+  renewal: 'sky',
+  other: 'neutral',
+};
+
 /**
- * A project's rep-attributed collections ledger (KAN-88, E20.x, plan `14
- * §Gap 13`, "Get them Moneys"): weekly/monthly leaderboards per rep,
- * billing-auto-suggested candidates awaiting attribution, and the full
- * ledger table with inline rep/amount editing — gated on `dashboards.write`,
- * the same permission Goals/Segments/Campaign Ops use for a project-scoped
- * editable-attribution admin surface. Not a commission system; see
- * `RepCollectionEntryModel`'s own doc comment.
+ * Stitch "Pastel Pulse" rep-attributed collections ledger (desktop bcb541bd, mobile 507d4d2b).
+ *
+ * Weekly/monthly sales leaderboards, live billing signals awaiting attribution,
+ * reconciled ledger table with inline editing, and manual collection logger.
  */
 export default async function RepCollectionsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -53,16 +80,16 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
     redirect(`/${locale}/orgs/${orgId}`);
   }
 
-  // Fetched once and reused for both leaderboard periods (via the pure
-  // `aggregateRepCollectionLeaderboard`) and the billing-signal linked-id
-  // check, rather than four independent full-ledger reads per page load.
-  const [rawEntries, people] = await Promise.all([listRepCollectionEntriesForProject(orgId, projectId), listOrgPeople(orgId)]);
-  const billingSignals = (await listBillingCollectionSignalsForProject(orgId, projectId, rawEntries)).map(toRepCollectionBillingSignalRow);
+  const [rawEntries, people] = await Promise.all([
+    listRepCollectionEntriesForProject(orgId, projectId),
+    listOrgPeople(orgId),
+  ]);
+  const billingSignals = (await listBillingCollectionSignalsForProject(orgId, projectId, rawEntries)).map(
+    toRepCollectionBillingSignalRow,
+  );
   const entries = rawEntries.map(toRepCollectionEntryRow);
   const peopleById = new Map(people.map((person) => [person.id, person.name]));
-  // An archived person (KAN-129) drops out of the rep picker below — except an entry already
-  // attributed to one keeps that option available too, so the picker still renders the entry's
-  // real current rep instead of silently falling back to unattributed in the UI.
+
   const activePeople = people.filter((person) => !person.archived_at).map((person) => ({ id: person.id, name: person.name }));
   const peopleRows = activePeople;
   function repPickerOptions(orgPersonId: string | null) {
@@ -72,107 +99,323 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
     const archivedRep = people.find((person) => person.id === orgPersonId);
     return archivedRep ? [...activePeople, { id: archivedRep.id, name: archivedRep.name }] : activePeople;
   }
+
   const weekView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'week'), peopleById);
   const monthView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'month'), peopleById);
   const t = await getTranslations('RepCollections');
 
-  return (
-    <div className="w-full space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+  const monthTotal =
+    monthView.rows.reduce((sum, row) => sum + row.totalAmount, 0) + monthView.unattributedTotal;
+  const monthEntriesCount =
+    monthView.rows.reduce((sum, row) => sum + row.entryCount, 0) + monthView.unattributedCount;
+  const billingSignalsTotal = billingSignals.reduce((sum, s) => sum + s.amount, 0);
+  const topCloser = monthView.rows[0];
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {[
-          { key: 'week' as const, view: weekView },
-          { key: 'month' as const, view: monthView },
-        ].map(({ key, view }) => (
-          <section key={key} className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-            <h2 className="text-lg font-semibold">{t(`leaderboardHeading.${key}`)}</h2>
-            {view.rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('leaderboardEmpty')}</p>
-            ) : (
-              <ol className="flex flex-col gap-1">
-                {view.rows.map((row, index) => (
-                  <li key={row.orgPersonId} className="flex items-baseline justify-between gap-4 text-sm">
-                    <span className="font-medium">{t('leaderboardRank', { rank: index + 1, name: row.name })}</span>
-                    <span className="tabular-nums text-muted-foreground">{t('leaderboardRowSummary', { amount: row.totalAmount.toLocaleString(locale), count: row.entryCount })}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {view.unattributedCount > 0 ? (
-              <p className="text-xs text-muted-foreground">{t('leaderboardUnattributed', { amount: view.unattributedTotal.toLocaleString(locale), count: view.unattributedCount })}</p>
-            ) : null}
-          </section>
-        ))}
+  return (
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <PpButton variant="primary" size="sm" icon={Plus} asChild>
+            <a href="#log-collection">
+              <span>{t('createHeading')}</span>
+            </a>
+          </PpButton>
+        }
+      />
+
+      {/* KPI Overview */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('kpiMtdCollections')}
+          value={`$${monthTotal.toLocaleString(locale, { maximumFractionDigits: 0 })}`}
+          accent="primary"
+          badge={monthEntriesCount > 0 ? `${monthEntriesCount} deals` : undefined}
+          badgeAccent="primary"
+          footer={t('kpiMtdSubtitle', { count: monthEntriesCount })}
+        />
+        <PpKpiCard
+          label={t('kpiActiveClosers')}
+          value={monthView.rows.length}
+          valueSuffix={t('kpiRepsSuffix')}
+          accent="mint"
+          badge={monthView.rows.length > 0 ? `${monthView.rows.length} active` : undefined}
+          badgeAccent="mint"
+          footer={
+            monthView.unattributedCount > 0
+              ? t('kpiUnattributedFooter', { count: monthView.unattributedCount })
+              : t('kpiAllAttributed')
+          }
+        />
+        <PpKpiCard
+          label={t('kpiBillingSignals')}
+          value={billingSignals.length}
+          valueSuffix={t('kpiSignalsSuffix')}
+          accent={billingSignals.length > 0 ? 'amber' : 'neutral'}
+          badge={billingSignals.length > 0 ? t('needsTriage') : undefined}
+          badgeAccent="amber"
+          footer={
+            billingSignals.length > 0
+              ? `$${billingSignalsTotal.toLocaleString(locale, { maximumFractionDigits: 0 })} awaiting claim`
+              : t('allSignalsTriaged')
+          }
+        />
+        <PpKpiCard
+          label={t('kpiTopCloser')}
+          value={topCloser ? `$${topCloser.totalAmount.toLocaleString(locale, { maximumFractionDigits: 0 })}` : '—'}
+          accent={topCloser ? 'pink' : 'neutral'}
+          badge={topCloser ? topCloser.name : undefined}
+          badgeAccent="pink"
+          footer={topCloser ? `${topCloser.entryCount} deals closed` : t('noClosersYet')}
+        />
+      </PpKpiGrid>
+
+      {/* Weekly & Monthly Leaderboards (Bento Modules) */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Weekly Leaderboard */}
+        <PpCard
+          title={t('leaderboardHeading.week')}
+          subtitle={t('weekSubtitle')}
+          icon={Trophy}
+          iconAccent="amber"
+          action={
+            <PpPill accent="amber" dot>
+              {weekView.rows.reduce((sum, r) => sum + r.entryCount, 0)} deals
+            </PpPill>
+          }
+        >
+          {weekView.rows.length === 0 ? (
+            <PpEmptyState icon={Trophy} title={t('leaderboardEmpty')} />
+          ) : (
+            <div className="flex flex-col gap-3">
+              {weekView.rows.map((row, index) => (
+                <div
+                  key={row.orgPersonId}
+                  className="flex items-center justify-between rounded-xl bg-pp-surface-container-low/60 p-3 transition-colors hover:bg-pp-surface-container"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+                        index === 0
+                          ? 'bg-amber-100 text-amber-900'
+                          : index === 1
+                            ? 'bg-slate-200 text-slate-800'
+                            : index === 2
+                              ? 'bg-orange-100 text-orange-900'
+                              : 'bg-pp-surface-container text-pp-outline'
+                      }`}
+                    >
+                      #{index + 1}
+                    </span>
+                    <div>
+                      <div className="font-semibold text-pp-on-surface">{row.name}</div>
+                      <div className="text-xs text-pp-outline">
+                        {row.entryCount} {row.entryCount === 1 ? 'deal' : 'deals'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-end">
+                    <div className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
+                      ${row.totalAmount.toLocaleString(locale)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {weekView.unattributedCount > 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-3 text-xs text-amber-900">
+              {t('leaderboardUnattributed', {
+                amount: `$${weekView.unattributedTotal.toLocaleString(locale)}`,
+                count: weekView.unattributedCount,
+              })}
+            </div>
+          ) : null}
+        </PpCard>
+
+        {/* Monthly Leaderboard */}
+        <PpCard
+          title={t('leaderboardHeading.month')}
+          subtitle={t('monthSubtitle')}
+          icon={Coins}
+          iconAccent="mint"
+          action={
+            <PpPill accent="mint" dot>
+              ${monthTotal.toLocaleString(locale, { maximumFractionDigits: 0 })}
+            </PpPill>
+          }
+        >
+          {monthView.rows.length === 0 ? (
+            <PpEmptyState icon={Coins} title={t('leaderboardEmpty')} />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {monthView.rows.map((row, index) => {
+                const maxAmount = monthView.rows[0]?.totalAmount || 1;
+                const pct = Math.round((row.totalAmount / maxAmount) * 100);
+                return (
+                  <div key={row.orgPersonId} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-pp-on-surface">
+                          {index + 1}. {row.name}
+                        </span>
+                        <span className="text-xs text-pp-outline">({row.entryCount} deals)</span>
+                      </div>
+                      <span className="font-bold text-pp-on-surface">${row.totalAmount.toLocaleString(locale)}</span>
+                    </div>
+                    <div
+                      className="h-2 w-full overflow-hidden rounded-full bg-pp-surface-container"
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                    >
+                      <div
+                        className="h-full rounded-full bg-pp-secondary transition-all duration-300"
+                        style={{ width: `${Math.max(5, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {monthView.unattributedCount > 0 ? (
+            <div className="mt-4 rounded-xl border border-dashed border-pp-outline-variant bg-pp-surface-container-low/60 p-3 text-xs text-pp-outline">
+              {t('leaderboardUnattributed', {
+                amount: `$${monthView.unattributedTotal.toLocaleString(locale)}`,
+                count: monthView.unattributedCount,
+              })}
+            </div>
+          ) : null}
+        </PpCard>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('signalsHeading')}</h2>
+      {/* Suggested from Billing Signals */}
+      <PpCard
+        title={t('signalsHeading')}
+        subtitle={t('signalsSubtitle')}
+        icon={Bell}
+        iconAccent="amber"
+        action={
+          billingSignals.length > 0 ? (
+            <PpPill accent="amber" dot>
+              {billingSignals.length} {t('needsTriage')}
+            </PpPill>
+          ) : undefined
+        }
+      >
         {billingSignals.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('noSignals')}</p>
+          <PpEmptyState icon={Bell} title={t('noSignals')} />
         ) : (
-          <ul className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {billingSignals.map((signal) => (
-              <li key={signal.rawRecordId} className="flex flex-col gap-2 rounded-md border border-input px-3 py-3 text-sm">
-                <span className="text-xs text-muted-foreground">
-                  {t('signalSummary', { customerId: signal.customerId, amount: signal.amount.toLocaleString(locale), currency: signal.currency.toUpperCase() })}
-                </span>
-                <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} signal={signal} />
-              </li>
+              <div
+                key={signal.rawRecordId}
+                className="flex flex-col justify-between gap-3 rounded-2xl border border-pp-outline-variant/40 bg-pp-surface-container-low/40 p-4 transition-all hover:bg-pp-surface-container-low"
+              >
+                <div className="flex items-center justify-between">
+                  <PpPill accent="amber">{signal.currency.toUpperCase()}</PpPill>
+                  <span className="font-mono text-xs text-pp-outline">{signal.occurredAt.slice(0, 10)}</span>
+                </div>
+                <div>
+                  <div className="font-semibold text-pp-on-surface">Customer: {signal.customerId}</div>
+                  <div className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
+                    ${signal.amount.toLocaleString(locale)}
+                  </div>
+                </div>
+                <div className="border-t border-pp-outline-variant/30 pt-3">
+                  <CreateRepCollectionEntryForm
+                    orgId={orgId}
+                    projectId={projectId}
+                    people={peopleRows}
+                    signal={signal}
+                  />
+                </div>
+              </div>
             ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('ledgerHeading')}</h2>
-        {entries.length === 0 ? (
-          <p className="text-muted-foreground">{t('noEntries')}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-input text-start text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 font-medium">{t('columnCompany')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnType')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnPlan')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnWhen')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnNote')}</th>
-                  <th className="py-2 font-medium">{t('columnRepAndAmount')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id} className="border-b border-input last:border-0">
-                    <td className="py-2 pe-3 font-medium">{entry.company}</td>
-                    <td className="py-2 pe-3">{t(repCollectionTypeLabelKey(entry.collectionType))}</td>
-                    <td className="py-2 pe-3 text-xs text-muted-foreground">
-                      {entry.planFrom && entry.planTo
-                        ? t('planSummary', { from: entry.planFrom, to: entry.planTo })
-                        : entry.planFrom
-                          ? t('planFromOnly', { from: entry.planFrom })
-                          : entry.planTo
-                            ? t('planToOnly', { to: entry.planTo })
-                            : ''}
-                    </td>
-                    <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.occurredAt}</td>
-                    <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.note ?? ''}</td>
-                    <td className="py-2">
-                      <RepCollectionEntryControls orgId={orgId} projectId={projectId} entryId={entry.id} orgPersonId={entry.orgPersonId} amount={entry.amount} people={repPickerOptions(entry.orgPersonId)} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         )}
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
-        <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} />
-      </section>
-    </div>
+      {/* Reconciled Collections Ledger */}
+      <PpCard
+        title={t('ledgerHeading')}
+        subtitle={t('ledgerSubtitle', { count: entries.length })}
+        icon={FileText}
+        iconAccent="primary"
+        flush
+      >
+        {entries.length === 0 ? (
+          <div className="p-pp-lg">
+            <PpEmptyState icon={FileText} title={t('noEntries')} />
+          </div>
+        ) : (
+          <PpTable>
+            <thead>
+              <tr>
+                <th>{t('columnCompany')}</th>
+                <th>{t('columnType')}</th>
+                <th>{t('columnPlan')}</th>
+                <th>{t('columnWhen')}</th>
+                <th>{t('columnNote')}</th>
+                <th>{t('columnRepAndAmount')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => {
+                const typeAccent = TYPE_ACCENTS[entry.collectionType] ?? 'neutral';
+                const planText =
+                  entry.planFrom && entry.planTo
+                    ? t('planSummary', { from: entry.planFrom, to: entry.planTo })
+                    : entry.planFrom
+                      ? t('planFromOnly', { from: entry.planFrom })
+                      : entry.planTo
+                        ? t('planToOnly', { to: entry.planTo })
+                        : '—';
+
+                return (
+                  <tr key={entry.id}>
+                    <td className="font-semibold text-pp-on-surface">{entry.company}</td>
+                    <td>
+                      <PpPill accent={typeAccent}>{t(repCollectionTypeLabelKey(entry.collectionType))}</PpPill>
+                    </td>
+                    <td className="text-xs text-pp-outline">{planText}</td>
+                    <td className="font-mono text-xs text-pp-outline">{entry.occurredAt}</td>
+                    <td className="max-w-[200px] truncate text-xs text-pp-on-surface-variant" title={entry.note ?? ''}>
+                      {entry.note || '—'}
+                    </td>
+                    <td>
+                      <RepCollectionEntryControls
+                        orgId={orgId}
+                        projectId={projectId}
+                        entryId={entry.id}
+                        orgPersonId={entry.orgPersonId}
+                        amount={entry.amount}
+                        people={repPickerOptions(entry.orgPersonId)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </PpTable>
+        )}
+      </PpCard>
+
+      {/* Manual Log Entry Section */}
+      <div id="log-collection">
+        <PpCard
+          title={t('createHeading')}
+          subtitle={t('createSubtitle')}
+          icon={Plus}
+          iconAccent="primary"
+        >
+          <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} />
+        </PpCard>
+      </div>
+    </PpPage>
   );
 }

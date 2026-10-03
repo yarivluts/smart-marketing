@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Radar } from 'lucide-react';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
 import { BoardTileView } from '@/components/orgs/board-tile-view';
 import { RepCollectionLeaderboardWidget } from '@/components/orgs/rep-collection-leaderboard-widget';
@@ -104,50 +105,96 @@ export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProp
 
   if (!currentFrame) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
-        <p className="text-2xl text-muted-foreground">{t('noFrames')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-pp-surface p-8 text-center font-pp-body">
+        <p className="text-2xl text-pp-outline">{t('noFrames')}</p>
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen flex-col gap-8 bg-background p-12">
+    <main className="flex min-h-screen flex-col gap-6 bg-pp-surface text-pp-on-surface p-6 xl:p-8 2xl:p-10 font-pp-body select-none overflow-hidden">
       <WarRoomWinOverlay deviceToken={deviceToken} reducedMotion={manifest.reducedMotion} />
 
-      <header className="flex items-center justify-between">
-        <h1 className="text-4xl font-bold tracking-tight">{manifest.label}</h1>
-        <span className="text-lg text-muted-foreground">
-          {currentFrame.kind === 'board'
-            ? currentFrame.name
-            : currentFrame.kind === 'goals'
-              ? t('goalsFrameHeading')
-              : t('leaderboardFrameHeading')}
-        </span>
+      {/* Top TV Billboard Bar (Stitch 627edf90) */}
+      <header className="flex items-center justify-between bg-pp-surface-container-lowest/90 backdrop-blur-md px-8 py-4 rounded-3xl shadow-pp-candy border border-pp-outline-variant/30">
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-2xl bg-brand-gradient flex items-center justify-center text-white shadow-md">
+            <Radar className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-pp-display font-black text-2xl tracking-tight text-pp-on-surface">{manifest.label}</h1>
+              <span className="px-3 py-0.5 rounded-full bg-pp-on-surface text-pp-surface font-mono text-[11px] font-bold uppercase tracking-wider">
+                WAR-ROOM LIVE BILLBOARD
+              </span>
+            </div>
+            <p className="text-[11px] font-semibold text-pp-outline tracking-wide font-mono mt-0.5">
+              HIGH-VELOCITY TELEMETRY • HUD /TV
+            </p>
+          </div>
+
+          <div className="h-7 w-px bg-pp-outline-variant/30 mx-2 hidden sm:block"></div>
+
+          <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-pp-primary-container/10 text-pp-primary border border-pp-primary/20 text-xs font-semibold">
+            <span className="w-2 h-2 rounded-full bg-pp-primary"></span>
+            <span className="font-mono text-pp-primary text-[10px] opacity-80">me-west1 (Multi-AZ)</span>
+          </div>
+        </div>
+
+        {/* Right side: live stream indicator & frame label */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-mono font-bold">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+            </span>
+            <span>Live Stream</span>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 bg-pp-surface-container-low px-4 py-2 rounded-2xl border border-pp-outline-variant/20 font-mono text-xs text-pp-outline">
+            <span className="font-bold text-pp-on-surface">
+              {currentFrame.kind === 'board'
+                ? currentFrame.name
+                : currentFrame.kind === 'goals'
+                  ? t('goalsFrameHeading')
+                  : t('leaderboardFrameHeading')}
+            </span>
+          </div>
+        </div>
       </header>
 
+      {/* Frame content */}
       {currentFrame.kind === 'goals' ? (
-        <div className="grid flex-1 grid-cols-2 gap-8">
+        <div className="grid flex-1 grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
           {manifest.goals.map((goal) => (
-            <section key={goal.id} className="flex flex-col gap-3 rounded-xl border border-input p-6">
-              <h2 className="text-2xl font-semibold">{goal.name}</h2>
+            <section
+              key={goal.id}
+              className="flex flex-col gap-3 rounded-3xl bg-pp-surface-container-lowest p-6 shadow-pp-candy border border-pp-outline-variant/30"
+            >
+              <h2 className="text-2xl font-bold font-pp-display text-pp-on-surface">{goal.name}</h2>
               <GoalThermometer view={goal.thermometer} />
             </section>
           ))}
         </div>
       ) : currentFrame.kind === 'leaderboard' ? (
         <div className="flex flex-1 items-start">
-          <div className="w-full max-w-2xl text-xl [&_h2]:text-3xl [&_li]:text-xl [&_p]:text-lg">
+          <div className="w-full max-w-3xl rounded-3xl bg-pp-surface-container-lowest p-8 shadow-pp-candy border border-pp-outline-variant/30 text-xl [&_h2]:text-3xl [&_li]:text-xl [&_p]:text-lg">
             <RepCollectionLeaderboardWidget view={manifest.repCollectionLeaderboard} />
           </div>
         </div>
       ) : (
-        <div className="grid flex-1 grid-cols-2 gap-8">
+        <div className="grid flex-1 grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
           {boardFrame === null ? (
-            <p className="text-xl text-muted-foreground">{t('loadingBoard')}</p>
+            <div className="col-span-2 flex items-center justify-center p-12">
+              <p className="text-xl text-pp-outline font-mono animate-pulse">{t('loadingBoard')}</p>
+            </div>
           ) : (
             boardFrame.tiles.map(({ tile, view }) => (
-              <section key={tile.id} className="flex flex-col gap-3 rounded-xl border border-input p-6">
-                <h2 className="text-xl font-semibold">{tile.title}</h2>
+              <section
+                key={tile.id}
+                className="flex flex-col gap-3 rounded-3xl bg-pp-surface-container-lowest p-6 shadow-pp-candy border border-pp-outline-variant/30"
+              >
+                <h2 className="text-xl font-bold font-pp-display text-pp-on-surface">{tile.title}</h2>
                 <div className="flex-1 text-lg">
                   <BoardTileView tile={tile} view={view} />
                 </div>

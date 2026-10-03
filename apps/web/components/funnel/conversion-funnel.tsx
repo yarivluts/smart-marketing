@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, Layers } from 'lucide-react';
+import { PpEmptyState } from '@/components/pastel/primitives';
 import type { FunnelStep, FunnelSummaryMetrics, FunnelChannelFilter } from './funnel-types';
 import { FunnelStepCard } from './funnel-step-card';
 import { FunnelFlowConnector } from './funnel-flow-connector';
@@ -58,7 +59,22 @@ export function ConversionFunnel({
   const [selectedChannel, setSelectedChannel] = useState<FunnelChannelFilter>('all');
   const [selectedStep, setSelectedStep] = useState<FunnelStep | null>(null);
 
-  const initialSteps = passedSteps && passedSteps.length > 0 ? passedSteps : DEFAULT_EASYSIGN_STEPS;
+  if (!passedSteps || passedSteps.length === 0) {
+    return (
+      <div
+        data-testid="visual-funnel-container"
+        className={`rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-8 shadow-pp-candy ${className}`}
+      >
+        <PpEmptyState
+          icon={Layers}
+          title={t('noFunnelSteps', { defaultMessage: 'No conversion funnel steps detected' })}
+          description="Connect tracking SDK or configure funnel stages to begin measuring drop-off and conversion rates."
+        />
+      </div>
+    );
+  }
+
+  const initialSteps = passedSteps;
 
   // Filter steps by channel if applicable
   const steps = useMemo(() => {
@@ -105,17 +121,17 @@ export function ConversionFunnel({
   return (
     <div
       data-testid="visual-funnel-container"
-      className={`flex flex-col gap-6 rounded-2xl border border-border bg-card p-6 shadow-xs ${className}`}
+      className={`flex flex-col gap-6 rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-pp-candy ${className}`}
     >
       {/* Top Header Row */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2.5">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
+            <h2 className="font-pp-display text-xl font-bold tracking-tight text-pp-on-surface">
               {t('visualFunnelHeading', { funnelName })}
             </h2>
             {isSimulated ? (
-              <span className="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+              <span className="inline-flex items-center rounded-full bg-pp-primary-fixed/40 px-2.5 py-0.5 text-[11px] font-semibold text-pp-primary border border-pp-primary/20">
                 {t('simulatedBadge')}
               </span>
             ) : (
@@ -124,21 +140,21 @@ export function ConversionFunnel({
               </span>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('visualFunnelSubtitle')}</p>
+          <p className="font-pp-body-sm text-xs text-pp-on-surface-variant mt-0.5">{t('visualFunnelSubtitle')}</p>
         </div>
 
         {/* Channel Segment Filter Pills */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-border/80 bg-muted/30 p-1 text-xs">
+        <div className="flex items-center gap-1.5 rounded-full border border-pp-outline-variant/60 bg-pp-surface-container-low p-1 text-xs">
           {(['all', 'meta', 'google', 'email'] as const).map((channel) => (
             <button
               key={channel}
               type="button"
               data-testid={`channel-filter-${channel}`}
               onClick={() => setSelectedChannel(channel)}
-              className={`rounded-md px-2.5 py-1 font-medium transition-all cursor-pointer ${
+              className={`rounded-full px-2.5 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-all cursor-pointer ${
                 selectedChannel === channel
-                  ? 'bg-background text-foreground shadow-2xs font-semibold'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-pp-primary text-pp-on-primary shadow-xs'
+                  : 'text-pp-on-surface-variant hover:text-pp-on-surface'
               }`}
             >
               {channel === 'all'

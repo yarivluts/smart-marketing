@@ -19,7 +19,17 @@ import { campaignSpendStatusLabelKey } from '@/lib/orgs/campaign-ops-view';
 import { signupQualityScoreTierLabelKey } from '@/lib/orgs/quality-score-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { CampaignTargetInput } from '@/components/orgs/campaign-target-input';
-import { CreativeFatigueRadar } from '@/components/campaigns/creative-fatigue-radar';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpEmptyState,
+  PpPill,
+} from '@/components/pastel/primitives';
+import { TrendingUp, Activity, ShieldCheck, Target, Radar } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -32,20 +42,11 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * Campaign ops (KAN-86, E18.x, plan `14 §Gap 12`): a fixed-window payback
- * overview, a per-campaign `collection_40d`/`roi_40d` breakdown (2026-08-25
- * follow-up — the AC's own "true per-campaign roi_nd/collection_nd" bullet,
- * `getCampaignPaybackBreakdownForProject`), a predicted-vs-actual quality
- * calibration table (`quality_calibration_*`, the Campaign Ops pack), and a
- * per-campaign spend budget table with inline-editable targets driving
- * red/green (`ad_spend`-by-`campaign_id`, no pack install required —
- * `ad_spend` is the SaaS pack's own metric). Spend targets are independent
- * of the other three: a project can have spend targets with the Campaign
- * Ops pack never installed, and vice versa; the payback overview, the
- * per-campaign breakdown, and calibration all share one pack-install gate
- * since every one of them reads a mart that pack registers. Gated on
- * `dashboards.write`, the same permission Goals/Segments use for a
- * project-scoped editable-target admin surface.
+ * Campaign ops (KAN-86, E18.x): Fixed-window payback overview, per-campaign 40d ROI breakdown,
+ * predicted-vs-actual quality calibration table, and spend target controls.
+ *
+ * Converted to Stitch Pastel Pulse design (desktop 6bf1b35b, mobile eb811927), folding real
+ * tables and controls without fabricated fatigue radar metrics.
  */
 export default async function CampaignOpsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -86,142 +87,284 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
 
   const t = await getTranslations('CampaignOps');
 
+  const overTargetCount = spendOutcome.ok ? spendOutcome.rows.filter((r) => r.status === 'over_target').length : 0;
+  const totalTrackedSpend = spendOutcome.ok ? spendOutcome.rows.reduce((sum, r) => sum + r.actualSpend, 0) : 0;
+
   return (
-    <div className="w-full space-y-10">
-      {/* Stitch Creative Asset Performance & Fatigue Radar */}
-      <CreativeFatigueRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="CAMPAIGN OPS & WEAR-OUT RADAR"
+        meta={isDataConnected ? 'Multi-Channel Telemetry Active' : 'Awaiting Ingestion'}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+              <span className="w-1.5 h-1.5 rounded-full bg-pp-secondary animate-pulse" />
+              <span>{isDataConnected ? 'TELEMETRY LIVE' : 'NO LIVE DATA'}</span>
+            </span>
+          </div>
+        }
+      />
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Tracked Campaigns"
+          value={spendOutcome.ok ? spendOutcome.rows.length : 0}
+          valueSuffix="campaigns"
+          badge={spendOutcome.ok ? `$${totalTrackedSpend.toLocaleString(locale)}` : undefined}
+          accent="primary"
+          footer={`Trailing ${CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS} Days Spend Window`}
+        />
+        <PpKpiCard
+          label="Campaign Ops Pack"
+          value={paybackPackInstalled ? 'Installed' : 'Pack Required'}
+          badge={paybackPackInstalled ? 'Active' : 'Not Installed'}
+          badgeAccent={paybackPackInstalled ? 'mint' : 'amber'}
+          accent={paybackPackInstalled ? 'mint' : 'amber'}
+          footer="Payback & Calibration Marts"
+        />
+        <PpKpiCard
+          label="Budget Health"
+          value={overTargetCount}
+          valueSuffix="over target"
+          badge={overTargetCount > 0 ? 'Budget Alert' : 'On Target'}
+          badgeAccent={overTargetCount > 0 ? 'error' : 'mint'}
+          accent={overTargetCount > 0 ? 'error' : 'sky'}
+          footer="Inline Editable Target Ceilings"
+        />
+        <PpKpiCard
+          label="40-Day Payback"
+          value={
+            campaignPaybackOutcome && campaignPaybackOutcome.ok && campaignPaybackOutcome.rows.length > 0
+              ? `${campaignPaybackOutcome.rows.length}`
+              : '—'
+          }
+          valueSuffix={
+            campaignPaybackOutcome && campaignPaybackOutcome.ok && campaignPaybackOutcome.rows.length > 0
+              ? 'tracked'
+              : undefined
+          }
+          badge={paybackPackInstalled ? '40D Mart' : 'No Pack'}
+          badgeAccent={paybackPackInstalled ? 'pink' : 'neutral'}
+          accent="pink"
+          footer="Cohort Revenue Realization"
+        />
+      </PpKpiGrid>
 
-        <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold tracking-tight">{t('paybackHeading')}</h3>
-          {!paybackPackInstalled ? (
-          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={builtinMetricPacks().filter((pack) => pack.pluginId === CAMPAIGN_OPS_PACK_PLUGIN_ID)} />
+      {/* 3. Payback Overview Section */}
+      <PpCard
+        title={t('paybackHeading')}
+        subtitle="Cumulative customer cohort collection across standard maturity windows"
+        icon={TrendingUp}
+        iconAccent="primary"
+      >
+        {!paybackPackInstalled ? (
+          <div className="space-y-4">
+            <InstallBuiltinPackSection
+              orgId={orgId}
+              projectId={projectId}
+              packs={builtinMetricPacks().filter((pack) => pack.pluginId === CAMPAIGN_OPS_PACK_PLUGIN_ID)}
+            />
+          </div>
         ) : !paybackOutcome || !paybackOutcome.ok ? (
-          <p className="text-muted-foreground">{t('paybackUnavailable')}</p>
+          <PpEmptyState
+            icon={TrendingUp}
+            title={t('paybackHeading')}
+            description={t('paybackUnavailable')}
+          />
         ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {paybackOutcome.windows.map((window) => (
-              <li key={window.windowDays} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2">
-                <span className="text-xs text-muted-foreground">{t('paybackWindowLabel', { days: window.windowDays })}</span>
-                <span className="text-lg font-semibold tabular-nums">{window.collectedRevenue.toLocaleString(locale)}</span>
-              </li>
+              <div
+                key={window.windowDays}
+                className="rounded-2xl bg-pp-subtle-inset p-4 space-y-1 text-start"
+              >
+                <span className="text-pp-label-sm text-pp-outline block uppercase tracking-wider">
+                  {t('paybackWindowLabel', { days: window.windowDays })}
+                </span>
+                <span className="font-pp-display text-pp-headline-lg text-pp-on-surface font-bold tabular-nums block">
+                  ${window.collectedRevenue.toLocaleString(locale)}
+                </span>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-      </section>
+      </PpCard>
 
+      {/* 4. Campaign Payback Breakdown Section */}
       {paybackPackInstalled && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">{t('campaignPaybackHeading')}</h2>
-          <p className="text-xs text-muted-foreground">{t('campaignPaybackDescription')}</p>
+        <PpCard
+          title={t('campaignPaybackHeading')}
+          subtitle={t('campaignPaybackDescription')}
+          icon={Activity}
+          iconAccent="mint"
+          flush={Boolean(campaignPaybackOutcome && campaignPaybackOutcome.ok && campaignPaybackOutcome.rows.length > 0)}
+        >
           {!campaignPaybackOutcome || !campaignPaybackOutcome.ok ? (
-            <p className="text-muted-foreground">{t('campaignPaybackUnavailable')}</p>
+            <PpEmptyState
+              icon={Activity}
+              title={t('campaignPaybackHeading')}
+              description={t('campaignPaybackUnavailable')}
+            />
           ) : campaignPaybackOutcome.rows.length === 0 ? (
-            <p className="text-muted-foreground">{t('campaignPaybackEmpty')}</p>
+            <PpEmptyState
+              icon={Activity}
+              title={t('campaignPaybackHeading')}
+              description={t('campaignPaybackEmpty')}
+            />
           ) : (
-            <table className="w-full text-sm">
+            <PpTable>
               <thead>
-                <tr className="border-b border-input text-start text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 font-medium">{t('columnCampaign')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnCollectedRevenue40d')}</th>
-                  <th className="py-2 font-medium">{t('columnRoi40d')}</th>
+                <tr>
+                  <th>{t('columnCampaign')}</th>
+                  <th>{t('columnCollectedRevenue40d')}</th>
+                  <th>{t('columnRoi40d')}</th>
                 </tr>
               </thead>
               <tbody>
                 {campaignPaybackOutcome.rows.map((row) => (
-                  <tr key={row.campaignId} className="border-b border-input last:border-0">
-                    <td className="py-2 pe-3 font-medium">{row.campaignId}</td>
-                    <td className="py-2 pe-3 tabular-nums">{row.collectedRevenue40d.toLocaleString(locale)}</td>
-                    <td className="py-2 tabular-nums">{row.roi40d === null ? t('campaignPaybackNoData') : row.roi40d.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
+                  <tr key={row.campaignId}>
+                    <td className="font-semibold text-pp-on-surface">{row.campaignId}</td>
+                    <td className="tabular-nums font-mono text-pp-on-surface">
+                      ${row.collectedRevenue40d.toLocaleString(locale)}
+                    </td>
+                    <td className="tabular-nums font-mono">
+                      {row.roi40d === null ? (
+                        <span className="text-pp-outline">{t('campaignPaybackNoData')}</span>
+                      ) : (
+                        <PpPill accent={row.roi40d >= 1 ? 'mint' : 'amber'}>
+                          {row.roi40d.toLocaleString(locale, { maximumFractionDigits: 2 })}x
+                        </PpPill>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PpTable>
           )}
-        </section>
+        </PpCard>
       )}
 
+      {/* 5. Quality Calibration Section */}
       {paybackPackInstalled && (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">{t('calibrationHeading')}</h2>
-          <p className="text-xs text-muted-foreground">{t('calibrationDescription')}</p>
+        <PpCard
+          title={t('calibrationHeading')}
+          subtitle={t('calibrationDescription')}
+          icon={ShieldCheck}
+          iconAccent="sky"
+          flush={Boolean(calibrationOutcome && calibrationOutcome.ok && calibrationOutcome.tiers.length > 0)}
+        >
           {!calibrationOutcome || !calibrationOutcome.ok ? (
-            <p className="text-muted-foreground">{t('calibrationUnavailable')}</p>
+            <PpEmptyState
+              icon={ShieldCheck}
+              title={t('calibrationHeading')}
+              description={t('calibrationUnavailable')}
+            />
           ) : (
-            <table className="w-full text-sm">
+            <PpTable>
               <thead>
-                <tr className="border-b border-input text-start text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 font-medium">{t('columnQualityTier')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnSignups')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnPayingRate')}</th>
-                  <th className="py-2 font-medium">{t('columnAvgRevenue40d')}</th>
+                <tr>
+                  <th>{t('columnQualityTier')}</th>
+                  <th>{t('columnSignups')}</th>
+                  <th>{t('columnPayingRate')}</th>
+                  <th>{t('columnAvgRevenue40d')}</th>
                 </tr>
               </thead>
               <tbody>
                 {calibrationOutcome.tiers.map((tier) => (
-                  <tr key={tier.qualityTier} className="border-b border-input last:border-0">
-                    <td className="py-2 pe-3 font-medium">{t(signupQualityScoreTierLabelKey(tier.qualityTier))}</td>
-                    <td className="py-2 pe-3 tabular-nums">{tier.signups.toLocaleString(locale)}</td>
-                    <td className="py-2 pe-3 tabular-nums">{tier.payingRate === null ? t('calibrationNoData') : `${(tier.payingRate * 100).toFixed(1)}%`}</td>
-                    <td className="py-2 tabular-nums">{tier.avgCollectedRevenue40d === null ? t('calibrationNoData') : tier.avgCollectedRevenue40d.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
+                  <tr key={tier.qualityTier}>
+                    <td className="font-semibold text-pp-on-surface">
+                      {t(signupQualityScoreTierLabelKey(tier.qualityTier))}
+                    </td>
+                    <td className="tabular-nums font-mono">{tier.signups.toLocaleString(locale)}</td>
+                    <td className="tabular-nums font-mono">
+                      {tier.payingRate === null ? (
+                        <span className="text-pp-outline">{t('calibrationNoData')}</span>
+                      ) : (
+                        `${(tier.payingRate * 100).toFixed(1)}%`
+                      )}
+                    </td>
+                    <td className="tabular-nums font-mono">
+                      {tier.avgCollectedRevenue40d === null ? (
+                        <span className="text-pp-outline">{t('calibrationNoData')}</span>
+                      ) : (
+                        `$${tier.avgCollectedRevenue40d.toLocaleString(locale, { maximumFractionDigits: 2 })}`
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </PpTable>
           )}
-        </section>
+        </PpCard>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('spendTargetsHeading')}</h2>
-        <p className="text-xs text-muted-foreground">{t('spendTargetsDescription', { days: CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS })}</p>
+      {/* 6. Spend Targets & Inline Target Governance Section */}
+      <PpCard
+        title={t('spendTargetsHeading')}
+        subtitle={t('spendTargetsDescription', { days: CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS })}
+        icon={Target}
+        iconAccent="amber"
+        flush={Boolean(spendOutcome.ok && spendOutcome.rows.length > 0)}
+      >
         {!spendOutcome.ok ? (
-          <p className="text-muted-foreground">{t('spendTargetsUnavailable')}</p>
+          <PpEmptyState
+            icon={Target}
+            title={t('spendTargetsHeading')}
+            description={t('spendTargetsUnavailable')}
+          />
         ) : spendOutcome.rows.length === 0 ? (
-          <p className="text-muted-foreground">{t('spendTargetsEmpty')}</p>
+          <PpEmptyState
+            icon={Target}
+            title={t('spendTargetsHeading')}
+            description={t('spendTargetsEmpty')}
+          />
         ) : (
-          <table className="w-full text-sm">
+          <PpTable>
             <thead>
-              <tr className="border-b border-input text-start text-xs text-muted-foreground">
-                <th className="py-2 pe-3 font-medium">{t('columnCampaign')}</th>
-                <th className="py-2 pe-3 font-medium">{t('columnActualSpend')}</th>
-                <th className="py-2 pe-3 font-medium">{t('columnTarget')}</th>
-                <th className="py-2 font-medium">{t('columnStatus')}</th>
+              <tr>
+                <th>{t('columnCampaign')}</th>
+                <th>{t('columnActualSpend')}</th>
+                <th>{t('columnTarget')}</th>
+                <th>{t('columnStatus')}</th>
               </tr>
             </thead>
             <tbody>
               {spendOutcome.rows.map((row) => (
-                <tr key={row.campaignId} className="border-b border-input last:border-0">
-                  <td className="py-2 pe-3 font-medium">{row.campaignId}</td>
-                  <td className="py-2 pe-3 tabular-nums">{row.actualSpend.toLocaleString(locale)}</td>
-                  <td className="py-2 pe-3">
-                    <CampaignTargetInput orgId={orgId} projectId={projectId} campaignId={row.campaignId} monthlyBudget={row.monthlyBudget} />
+                <tr key={row.campaignId}>
+                  <td className="font-semibold text-pp-on-surface">{row.campaignId}</td>
+                  <td className="tabular-nums font-mono">${row.actualSpend.toLocaleString(locale)}</td>
+                  <td>
+                    <CampaignTargetInput
+                      orgId={orgId}
+                      projectId={projectId}
+                      campaignId={row.campaignId}
+                      monthlyBudget={row.monthlyBudget}
+                    />
                   </td>
-                  <td className="py-2">
-                    <span
-                      className={
+                  <td>
+                    <PpPill
+                      accent={
                         row.status === 'over_target'
-                          ? 'text-destructive'
+                          ? 'error'
                           : row.status === 'on_target'
-                            ? 'text-green-600 dark:text-green-500'
-                            : 'text-muted-foreground'
+                            ? 'mint'
+                            : 'neutral'
                       }
+                      dot
                     >
                       {t(campaignSpendStatusLabelKey(row.status))}
-                    </span>
+                    </PpPill>
                   </td>
                 </tr>
               ))}
             </tbody>
-          </table>
+          </PpTable>
         )}
-      </section>
-      </div>
-    </div>
+      </PpCard>
+    </PpPage>
   );
 }

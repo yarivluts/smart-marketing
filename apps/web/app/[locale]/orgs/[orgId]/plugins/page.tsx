@@ -1,7 +1,15 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { Puzzle, PlusCircle } from 'lucide-react';
 import { OrgShell } from '@/components/orgs/org-shell';
+import {
+  PpPage,
+  PpPageHeader,
+  PpCard,
+  PpPill,
+  PpEmptyState,
+} from '@/components/pastel/primitives';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -51,48 +59,72 @@ export default async function PluginRegistryPage({
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+      <PpPage>
+        <PpPageHeader
+          eyebrow={t('eyebrow')}
+          title={t('title')}
+          description={t('description')}
+        />
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('registerHeading')}</h2>
+        {/* Register Manifest Section */}
+        <PpCard
+          title={t('registerHeading')}
+          icon={PlusCircle}
+          iconAccent="primary"
+        >
           <RegisterPluginManifestForm orgId={orgId} />
-        </section>
+        </PpCard>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
+        {/* Registered Plugins Section */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2.5">
+            <h2 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
+              {t('registeredHeading')}
+            </h2>
+            <PpPill accent="primary">{families.length}</PpPill>
+          </div>
+
           {families.length === 0 ? (
-            <p className="text-muted-foreground">{t('noManifests')}</p>
+            <PpEmptyState
+              icon={Puzzle}
+              title={t('noManifests')}
+            />
           ) : (
-            <ul className="flex flex-col gap-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {families.map((family) => (
-                <li
+                <PpCard
                   key={family.pluginId}
-                  className="flex flex-col gap-2 rounded-md border border-input px-3 py-2 text-sm"
+                  title={family.displayName}
+                  subtitle={family.pluginId}
+                  icon={Puzzle}
+                  iconAccent="primary"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium">{family.displayName}</span>
-                    <span className="text-xs text-muted-foreground">{family.pluginId}</span>
-                  </div>
-                  <ul className="flex flex-col gap-1">
+                  <ul className="divide-y divide-pp-surface-container space-y-2">
                     {family.versions.map((version) => (
                       <li
                         key={version.id}
-                        className="flex items-center justify-between gap-3 text-xs text-muted-foreground"
+                        className="flex flex-col gap-1 pt-2 first:pt-0"
                       >
-                        <span>
-                          {t('versionLine', { version: version.version, type: version.type })}
-                        </span>
-                        <span>{t('scopesLine', { scopes: version.scopes.join(', ') })}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <PpPill accent="primary">
+                            {t('versionLine', { version: version.version, type: version.type })}
+                          </PpPill>
+                          <span className="font-mono text-pp-label-sm text-pp-outline">
+                            {version.id.slice(0, 8)}
+                          </span>
+                        </div>
+                        <p className="text-pp-body-sm text-pp-on-surface-variant">
+                          {t('scopesLine', { scopes: version.scopes.join(', ') })}
+                        </p>
                       </li>
                     ))}
                   </ul>
-                </li>
+                </PpCard>
               ))}
-            </ul>
+            </div>
           )}
         </section>
-      </main>
+      </PpPage>
     </OrgShell>
   );
 }

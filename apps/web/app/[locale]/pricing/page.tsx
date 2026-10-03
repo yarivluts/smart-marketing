@@ -1,4 +1,6 @@
 import { setRequestLocale } from 'next-intl/server';
+import { LandingHeader } from '@/components/landing/landing-header';
+import { LandingFooter } from '@/components/landing/landing-footer';
 import { PricingMtuCalculator } from '@/components/pricing/pricing-mtu-calculator';
 
 type PageProps = Readonly<{
@@ -17,8 +19,12 @@ export default async function PricingPage({ params }: PageProps): Promise<React.
   setRequestLocale(locale);
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-7xl">
-      <PricingMtuCalculator />
-    </main>
+    <div className="flex min-h-screen flex-col bg-pp-surface text-pp-on-surface">
+      <LandingHeader />
+      <main id="main-content" className="flex-1 container mx-auto px-4 py-8 max-w-7xl">
+        <PricingMtuCalculator />
+      </main>
+      <LandingFooter />
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Link } from '@/i18n/navigation';
 import { Sparkles, Film, Bot, Video, ArrowLeft } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { PpPill } from '@/components/pastel/primitives';
 
 interface AdStudioNavHeaderProps {
   orgId: string;
@@ -55,12 +56,12 @@ export function AdStudioNavHeader({ orgId, projectId }: AdStudioNavHeaderProps):
   };
 
   return (
-    <div className="flex flex-col gap-4 border-b border-[#ECE8F6] pb-4">
+    <div className="flex flex-col gap-4 border-b border-pp-outline-variant/30 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
             href={`/orgs/${orgId}/projects/${projectId}/campaigns`}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#ECE8F6] text-[#6B6A78] transition-colors hover:bg-[#EBE9FD] hover:text-[#7064F4]"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-pp-surface-container text-pp-on-surface-variant transition-colors hover:bg-pp-surface-container-high hover:text-pp-on-surface"
             title={t('btnBackToStudio')}
             aria-label={t('btnBackToStudio')}
           >
@@ -68,12 +69,11 @@ export function AdStudioNavHeader({ orgId, projectId }: AdStudioNavHeaderProps):
           </Link>
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EBE9FD] px-2.5 py-0.5 text-xs font-semibold text-[#5243D5]">
-                <Sparkles className="h-3 w-3 text-[#7064F4]" />
+              <PpPill accent="primary" dot>
                 {t('badge')}
-              </span>
+              </PpPill>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#181820]">
+            <h1 className="mt-1 font-pp-display text-pp-headline-xl-mobile text-pp-on-surface md:text-pp-headline-xl">
               {t('title')}
             </h1>
           </div>
@@ -88,10 +88,10 @@ export function AdStudioNavHeader({ orgId, projectId }: AdStudioNavHeaderProps):
             <Link
               key={tab.id}
               href={tab.href}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 rounded-full px-4 py-2 font-pp-body text-pp-label-md transition-all ${
                 active
-                  ? 'bg-[#7064F4] text-white shadow-sm'
-                  : 'bg-[#ECE8F6] text-[#6B6A78] hover:bg-[#EBE9FD] hover:text-[#5243D5]'
+                  ? 'bg-pp-primary text-pp-on-primary shadow-pp-candy'
+                  : 'bg-pp-surface-container text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface'
               }`}
             >
               <Icon className="h-4 w-4" />

@@ -10,6 +10,7 @@ import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, LogOut, Mail } from 'lucide-react';
 import { PageGuideButton } from '@/components/guides/page-guide-button';
+import { PpPage, PpPageHeader } from '@/components/pastel/primitives';
 
 import {
   DashboardTelemetryGrid,
@@ -41,11 +42,13 @@ export interface DashboardTelemetryMetrics {
 export interface DashboardContentProps {
   initialWorkspaces?: WorkspaceCardData[];
   telemetryMetrics?: DashboardTelemetryMetrics;
+  userEmail?: string;
 }
 
 export function DashboardContent({
   initialWorkspaces,
   telemetryMetrics,
+  userEmail,
 }: DashboardContentProps = {}): React.ReactElement | null {
   const t = useTranslations('DashboardPage');
   const router = useRouter();
@@ -141,34 +144,31 @@ export function DashboardContent({
     return Math.round(sum / workspaces.length);
   }, [workspaces]);
 
-  if (!user) {
+  if (!user && !userEmail) {
     return null;
   }
 
   return (
-    <main className="container mx-auto flex max-w-7xl flex-col gap-10 py-10 px-4 sm:px-6 lg:px-8">
+    <PpPage className="gap-8">
       {/* Top Executive Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-border/50">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider">
+      <PpPageHeader
+        eyebrow={
+          <span className="inline-flex items-center gap-2 text-xs font-semibold text-primary uppercase tracking-wider">
             <span className="relative flex h-2 w-2 shrink-0">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
             </span>
             <span>{t('executivePulseBadge')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
-              {t('title')}
-            </h1>
+          </span>
+        }
+        title={
+          <span className="inline-flex items-center gap-2">
+            <span>{t('title')}</span>
             <PageGuideButton pageKey="pulse" />
-          </div>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            {t('welcome', { email: user.email ?? '' })}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 self-start sm:self-center">
+          </span>
+        }
+        description={t('welcome', { email: user?.email ?? userEmail ?? '' })}
+        actions={
           <Button
             variant="outline"
             size="sm"
@@ -178,17 +178,17 @@ export function DashboardContent({
             <LogOut className="h-4 w-4" />
             <span>{t('signOut')}</span>
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       {/* R1: Executive KPI & Health Telemetry Grid */}
       <DashboardTelemetryGrid
         activeWorkspacesCount={workspaces.length}
         overallReadinessPercent={overallReadinessPercent}
-        ingestUptime={telemetryMetrics?.ingestUptime ?? '99.98%'}
-        ingestLatency={telemetryMetrics?.ingestLatency ?? '<18ms'}
-        connectedPipelinesCount={telemetryMetrics?.connectedPipelinesCount ?? 3}
-        totalPipelinesCount={telemetryMetrics?.totalPipelinesCount ?? 3}
+        ingestUptime={telemetryMetrics?.ingestUptime}
+        ingestLatency={telemetryMetrics?.ingestLatency}
+        connectedPipelinesCount={telemetryMetrics?.connectedPipelinesCount}
+        totalPipelinesCount={telemetryMetrics?.totalPipelinesCount}
         pendingInvitesCount={pendingInvites.length}
       />
 
@@ -196,11 +196,11 @@ export function DashboardContent({
       {pendingInvites.length > 0 ? (
         <section
           aria-label="Pending Invitations"
-          className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-soft"
+          className="rounded-2xl border border-pp-warning/40 bg-pp-warning-wash/50 p-5 shadow-pp-sm"
         >
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pp-warning/15 text-pp-warning">
                 <Mail className="h-5 w-5" />
               </div>
               <div>
@@ -243,6 +243,6 @@ export function DashboardContent({
 
       {/* R2: Interactive Workspace Launchpads & Setup Readiness */}
       <WorkspaceLaunchpads workspaces={workspaces} loading={orgsLoading} />
-    </main>
+    </PpPage>
   );
 }

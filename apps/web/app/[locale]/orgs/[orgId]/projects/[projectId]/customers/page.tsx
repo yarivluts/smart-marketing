@@ -8,6 +8,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, listPluginInstallsForProject, listSchemaDefinitionsForProject, searchProjectCustomers } from '@/lib/orgs/queries';
 import { buildCustomerSearchView } from '@/lib/orgs/customer-search-view';
 import { ExpansionRadar } from '@/components/customers/expansion-radar';
+import { PpPage, PpCard, ppInputClass } from '@/components/pastel/primitives';
 import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
@@ -83,101 +84,116 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
         )
       : undefined;
 
-  const t = await getTranslations('Customers');
+  const t = await getTranslations({ locale, namespace: 'Customers' });
 
   return (
-    <main className="w-full space-y-10">
+    <PpPage className="space-y-10">
       {/* Stitch Expansion & Upgrade Radar */}
       <ExpansionRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
 
       {/* Customer 360 Warehouse Search */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="border-b border-border pb-4 mb-4">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
-
+      <PpCard
+        title={t('title', { projectName: project.name })}
+        subtitle={t('description')}
+      >
         {entitySchemaNames.length === 0 ? (
-          <p className="text-muted-foreground text-xs">{t('noEntitySchemasRegistered')}</p>
+          <p className="text-pp-on-surface-variant font-pp-body-sm text-pp-body-sm">{t('noEntitySchemasRegistered')}</p>
         ) : (
-          <>
-            <form method="get" className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <label htmlFor="customer-search-q" className="text-xs text-muted-foreground">
-                {t('searchLabel')}
-              </label>
-              <input
-                id="customer-search-q"
-                name="q"
-                defaultValue={queryParam ?? ''}
-                placeholder={t('searchPlaceholder')}
-                className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label htmlFor="customer-search-schema" className="text-xs text-muted-foreground">
-                {t('schemaFilterLabel')}
-              </label>
-              <select
-                id="customer-search-schema"
-                name="schema"
-                defaultValue={selectedSchemaName ?? ''}
-                className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-              >
-                <option value="">{t('schemaFilterAll')}</option>
-                {entitySchemaNames.map((schemaName) => (
-                  <option key={schemaName} value={schemaName}>
-                    {schemaName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className="rounded-md border border-input px-3 py-1 text-sm hover:bg-accent">
-              {t('searchButton')}
-            </button>
-            {trimmedQuery ? (
-              <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/customers` }} className="text-xs text-muted-foreground underline">
-                {t('clearSearch')}
-              </Link>
-            ) : null}
-          </form>
-
-          <section className="flex flex-col gap-3">
-            {!view ? (
-              <p className="text-muted-foreground">{t('prompt')}</p>
-            ) : view.kind === 'warehouse_not_configured' ? (
-              <p className="text-muted-foreground">{t('notConfigured')}</p>
-            ) : view.kind === 'quota_exceeded' ? (
-              <p className="text-muted-foreground">{t('quotaExceeded')}</p>
-            ) : view.kind === 'query_error' ? (
-              <p className="text-muted-foreground">{t('queryError')}</p>
-            ) : view.entries.length === 0 ? (
-              <p className="text-muted-foreground">{t('empty', { query: trimmedQuery ?? '' })}</p>
-            ) : (
-              <>
-                <ul className="flex flex-col gap-2">
-                  {view.entries.map((entry) => (
-                    <li key={`${entry.schemaName}:${entry.entityId}`} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs text-muted-foreground">{t('resultSchemaLine', { schemaName: entry.schemaName })}</span>
-                        <span className="text-xs text-muted-foreground">{t('resultLastSeenLine', { lastSeenAt: entry.lastSeenAt })}</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">{t('resultEntityIdLine', { entityId: entry.entityId })}</span>
-                      {entry.fields.map((field) => (
-                        <span key={field.name} className={field.isPii ? 'text-muted-foreground' : ''}>
-                          {t('resultFieldLine', { name: field.name, value: field.value })}
-                        </span>
-                      ))}
-                    </li>
+          <div className="space-y-6">
+            <form method="get" className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="customer-search-q" className="font-pp-label-sm text-pp-label-sm text-pp-on-surface-variant">
+                  {t('searchLabel')}
+                </label>
+                <input
+                  id="customer-search-q"
+                  name="q"
+                  defaultValue={queryParam ?? ''}
+                  placeholder={t('searchPlaceholder')}
+                  className={`h-9 rounded-xl px-3 py-1 font-pp-body-sm text-pp-body-sm ${ppInputClass}`}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="customer-search-schema" className="font-pp-label-sm text-pp-label-sm text-pp-on-surface-variant">
+                  {t('schemaFilterLabel')}
+                </label>
+                <select
+                  id="customer-search-schema"
+                  name="schema"
+                  defaultValue={selectedSchemaName ?? ''}
+                  className={`h-9 rounded-xl px-3 py-1 font-pp-body-sm text-pp-body-sm ${ppInputClass}`}
+                >
+                  <option value="">{t('schemaFilterAll')}</option>
+                  {entitySchemaNames.map((schemaName) => (
+                    <option key={schemaName} value={schemaName}>
+                      {schemaName}
+                    </option>
                   ))}
-                </ul>
-                <p className="text-xs text-muted-foreground">{t('capNote', { count: view.entries.length })}</p>
-              </>
-            )}
-          </section>
-        </>
-      )}
-      </section>
-    </main>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="h-9 rounded-full bg-pp-primary px-4 py-1.5 font-pp-label-sm text-pp-label-sm font-bold text-pp-on-primary shadow-pp-candy hover:bg-pp-primary-container transition-all cursor-pointer"
+              >
+                {t('searchButton')}
+              </button>
+              {trimmedQuery ? (
+                <Link
+                  href={{ pathname: `/orgs/${orgId}/projects/${projectId}/customers` }}
+                  className="font-pp-body-sm text-xs text-pp-on-surface-variant underline hover:text-pp-on-surface"
+                >
+                  {t('clearSearch')}
+                </Link>
+              ) : null}
+            </form>
+
+            <div className="flex flex-col gap-3">
+              {!view ? (
+                <p className="font-pp-body-sm text-pp-body-sm text-pp-on-surface-variant">{t('prompt')}</p>
+              ) : view.kind === 'warehouse_not_configured' ? (
+                <p className="font-pp-body-sm text-pp-body-sm text-pp-on-surface-variant">{t('notConfigured')}</p>
+              ) : view.kind === 'quota_exceeded' ? (
+                <p className="font-pp-body-sm text-pp-body-sm text-pp-on-surface-variant">{t('quotaExceeded')}</p>
+              ) : view.kind === 'query_error' ? (
+                <p className="font-pp-body-sm text-pp-body-sm text-pp-on-surface-variant">{t('queryError')}</p>
+              ) : view.entries.length === 0 ? (
+                <p className="font-pp-body-sm text-pp-body-sm text-pp-on-surface-variant">{t('empty', { query: trimmedQuery ?? '' })}</p>
+              ) : (
+                <div className="space-y-4">
+                  <ul className="flex flex-col gap-2">
+                    {view.entries.map((entry) => (
+                      <li
+                        key={`${entry.schemaName}:${entry.entityId}`}
+                        className="flex flex-col gap-1 rounded-2xl border border-pp-outline-variant/50 bg-pp-surface-container-low p-4 font-pp-body-sm text-pp-body-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-pp-label-sm text-pp-label-sm font-bold text-pp-primary">
+                            {t('resultSchemaLine', { schemaName: entry.schemaName })}
+                          </span>
+                          <span className="text-xs text-pp-outline">
+                            {t('resultLastSeenLine', { lastSeenAt: entry.lastSeenAt })}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono text-pp-on-surface-variant">
+                          {t('resultEntityIdLine', { entityId: entry.entityId })}
+                        </span>
+                        <div className="mt-1 space-y-0.5">
+                          {entry.fields.map((field) => (
+                            <div key={field.name} className={field.isPii ? 'text-pp-outline italic' : 'text-pp-on-surface'}>
+                              {t('resultFieldLine', { name: field.name, value: field.value })}
+                            </div>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-pp-outline">{t('capNote', { count: view.entries.length })}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </PpCard>
+    </PpPage>
   );
 }

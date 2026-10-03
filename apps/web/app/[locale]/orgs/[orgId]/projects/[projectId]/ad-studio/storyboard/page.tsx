@@ -4,6 +4,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
+import { PpPage } from '@/components/pastel/primitives';
 import { AdStudioNavHeader } from '../components/ad-studio-nav-header';
 import { StoryboardEditor } from '../components/storyboard-editor';
 
@@ -47,9 +48,9 @@ export default async function StoryboardPage({ params }: PageProps): Promise<Rea
   }
 
   return (
-    <div className="w-full space-y-8">
+    <PpPage className="space-y-8">
       <AdStudioNavHeader orgId={orgId} projectId={projectId} />
       <StoryboardEditor orgId={orgId} projectId={projectId} projectName={project.name} />
-    </div>
+    </PpPage>
   );
 }

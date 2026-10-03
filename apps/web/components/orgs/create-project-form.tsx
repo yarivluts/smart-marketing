@@ -3,10 +3,31 @@
 import React, { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Globe, Smartphone, Layers, CreditCard, ShoppingBag, Download, Users, RefreshCw, CheckCircle2 } from 'lucide-react';
-import type { PlatformType, BusinessModel, TransactionType, PrimaryStack } from '@/lib/projects/project-profile';
+import {
+  Globe,
+  Smartphone,
+  Layers,
+  CreditCard,
+  ShoppingBag,
+  Download,
+  Users,
+  RefreshCw,
+  CheckCircle2,
+} from 'lucide-react';
+import {
+  PpCard,
+  PpButton,
+  PpIconChip,
+  PpField,
+  ppInputClass,
+} from '@/components/pastel/primitives';
+import { cn } from '@/lib/utils';
+import type {
+  PlatformType,
+  BusinessModel,
+  TransactionType,
+  PrimaryStack,
+} from '@/lib/projects/project-profile';
 
 export interface CreateProjectFormProps {
   orgId: string;
@@ -74,28 +95,25 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
 
   return (
     <form className="flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
-      {/* Project Identity */}
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-semibold text-foreground" htmlFor="project-name">
-          {t('nameLabel')}
-        </label>
-        <Input
-          id="project-name"
-          data-testid="project-name-input"
-          required
-          placeholder="e.g. Acme SaaS, Storefront, Mobile App"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className="h-11 text-base bg-background/80"
-        />
-      </div>
+      {/* 1. Project Identity */}
+      <PpCard title={t('nameLabel')}>
+        <PpField label={t('nameLabel')} htmlFor="project-name">
+          <input
+            id="project-name"
+            aria-label="Project name"
+            data-testid="project-name-input"
+            required
+            placeholder="e.g. Acme SaaS, Storefront, Mobile App"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className={ppInputClass}
+          />
+        </PpField>
+      </PpCard>
 
-      {/* Platform Type Selection */}
-      <div className="flex flex-col gap-2.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t('platformTypeLabel')}
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* 2. Platform Type Selection */}
+      <PpCard title={t('platformTypeLabel')}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             { id: 'web' as PlatformType, label: t('platformWeb'), icon: Globe },
             { id: 'mobile' as PlatformType, label: t('platformMobile'), icon: Smartphone },
@@ -108,34 +126,61 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
                 key={item.id}
                 type="button"
                 onClick={() => setPlatformType(item.id)}
-                className={`flex items-center gap-3 p-3.5 rounded-xl border text-start transition-all cursor-pointer ${
+                className={cn(
+                  'flex items-center gap-3.5 rounded-2xl border p-4 text-start transition-all duration-150 active:scale-[0.99]',
                   isSelected
-                    ? 'border-primary bg-primary/10 text-foreground ring-2 ring-primary/20 shadow-sm'
-                    : 'border-border/70 hover:border-border hover:bg-muted/40 text-muted-foreground'
-                }`}
+                    ? 'border-pp-primary bg-pp-primary-fixed/20 shadow-sm ring-2 ring-pp-primary/30 text-pp-on-surface'
+                    : 'border-pp-outline-variant/40 bg-pp-surface-container-lowest text-pp-on-surface-variant hover:border-pp-primary/50 hover:bg-pp-surface-container-low',
+                )}
               >
-                <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium">{item.label}</span>
+                <PpIconChip
+                  icon={Icon}
+                  accent={isSelected ? 'primary' : 'neutral'}
+                  size="sm"
+                />
+                <span className="font-pp-body text-pp-label-md font-semibold text-pp-on-surface">
+                  {item.label}
+                </span>
               </button>
             );
           })}
         </div>
-      </div>
+      </PpCard>
 
-      {/* Business / Monetization Model */}
-      <div className="flex flex-col gap-2.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t('businessModelLabel')}
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* 3. Business / Monetization Model */}
+      <PpCard title={t('businessModelLabel')}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {[
-            { id: 'saas_subscription' as BusinessModel, label: t('modelSaas'), icon: CreditCard, desc: 'MRR, Churn & LTV' },
-            { id: 'ecommerce_physical' as BusinessModel, label: t('modelEcomPhysical'), icon: ShoppingBag, desc: 'Orders, ROAS & Repeat Cohorts' },
-            { id: 'digital_products' as BusinessModel, label: t('modelDigital'), icon: Download, desc: 'Downloads & Single Purchases' },
-            { id: 'leadgen_b2b' as BusinessModel, label: t('modelLeadGen'), icon: Users, desc: 'Form Leads, Deals & PQL Pipeline' },
-            { id: 'marketplace_hybrid' as BusinessModel, label: t('modelMarketplace'), icon: RefreshCw, desc: 'Mixed Transactions' },
+            {
+              id: 'saas_subscription' as BusinessModel,
+              label: t('modelSaas'),
+              icon: CreditCard,
+              desc: 'MRR, Churn & LTV',
+            },
+            {
+              id: 'ecommerce_physical' as BusinessModel,
+              label: t('modelEcomPhysical'),
+              icon: ShoppingBag,
+              desc: 'Orders, ROAS & Repeat Cohorts',
+            },
+            {
+              id: 'digital_products' as BusinessModel,
+              label: t('modelDigital'),
+              icon: Download,
+              desc: 'Downloads & Single Purchases',
+            },
+            {
+              id: 'leadgen_b2b' as BusinessModel,
+              label: t('modelLeadGen'),
+              icon: Users,
+              desc: 'Form Leads, Deals & PQL Pipeline',
+            },
+            {
+              id: 'marketplace_hybrid' as BusinessModel,
+              label: t('modelMarketplace'),
+              icon: RefreshCw,
+              desc: 'Mixed Transactions',
+            },
           ].map((item) => {
             const Icon = item.icon;
             const isSelected = businessModel === item.id;
@@ -144,34 +189,39 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
                 key={item.id}
                 type="button"
                 onClick={() => handleModelSelect(item.id)}
-                className={`flex items-start gap-3 p-3.5 rounded-xl border text-start transition-all cursor-pointer ${
+                className={cn(
+                  'flex items-start gap-3.5 rounded-2xl border p-4 text-start transition-all duration-150 active:scale-[0.99] min-w-0',
                   isSelected
-                    ? 'border-primary bg-primary/10 text-foreground ring-2 ring-primary/20 shadow-sm'
-                    : 'border-border/70 hover:border-border hover:bg-muted/40 text-muted-foreground'
-                }`}
+                    ? 'border-pp-primary bg-pp-primary-fixed/20 shadow-sm ring-2 ring-pp-primary/30 text-pp-on-surface'
+                    : 'border-pp-outline-variant/40 bg-pp-surface-container-lowest text-pp-on-surface-variant hover:border-pp-primary/50 hover:bg-pp-surface-container-low',
+                )}
               >
-                <div className={`p-2 rounded-lg mt-0.5 ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                    {item.label}
-                    {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-primary" />}
+                <PpIconChip
+                  icon={Icon}
+                  accent={isSelected ? 'primary' : 'neutral'}
+                  size="sm"
+                  className="mt-0.5"
+                />
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="font-pp-body text-pp-label-md font-semibold text-pp-on-surface flex items-center justify-between gap-1 break-words">
+                    <span className="break-words">{item.label}</span>
+                    {isSelected && (
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-pp-primary" />
+                    )}
                   </span>
-                  <span className="text-xs text-muted-foreground">{item.desc}</span>
+                  <span className="text-pp-body-sm text-pp-on-surface-variant mt-0.5 break-words">
+                    {item.desc}
+                  </span>
                 </div>
               </button>
             );
           })}
         </div>
-      </div>
+      </PpCard>
 
-      {/* Transaction Structure */}
-      <div className="flex flex-col gap-2.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t('transactionTypeLabel')}
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {/* 4. Transaction Structure */}
+      <PpCard title={t('transactionTypeLabel')}>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           {[
             { id: 'monthly_recurring' as TransactionType, label: t('txMonthly') },
             { id: 'annual_recurring' as TransactionType, label: t('txAnnual') },
@@ -184,25 +234,23 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
                 key={item.id}
                 type="button"
                 onClick={() => setTransactionType(item.id)}
-                className={`px-3 py-2.5 rounded-lg border text-xs font-medium text-center transition-all cursor-pointer ${
+                className={cn(
+                  'rounded-xl border px-3 py-2.5 text-center font-pp-body text-pp-label-sm font-semibold transition-all duration-150 active:scale-[0.98]',
                   isSelected
-                    ? 'border-primary bg-primary text-primary-foreground shadow-sm'
-                    : 'border-border hover:bg-muted text-muted-foreground'
-                }`}
+                    ? 'border-pp-primary bg-pp-primary text-pp-on-primary shadow-sm'
+                    : 'border-pp-outline-variant/40 bg-pp-surface-container-lowest text-pp-on-surface-variant hover:bg-pp-surface-container hover:text-pp-on-surface',
+                )}
               >
                 {item.label}
               </button>
             );
           })}
         </div>
-      </div>
+      </PpCard>
 
-      {/* Tech Stack Presets */}
-      <div className="flex flex-col gap-2.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t('primaryStackLabel')}
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      {/* 5. Tech Stack Presets */}
+      <PpCard title={t('primaryStackLabel')}>
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {[
             { id: 'shopify' as PrimaryStack, label: t('stackShopify') },
             { id: 'woocommerce' as PrimaryStack, label: t('stackWoo') },
@@ -217,28 +265,37 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
                 key={item.id}
                 type="button"
                 onClick={() => setPrimaryStack(item.id)}
-                className={`px-3 py-2 rounded-lg border text-xs font-medium text-center transition-all cursor-pointer ${
+                className={cn(
+                  'rounded-xl border px-3 py-2.5 text-center font-pp-body text-pp-label-sm font-semibold transition-all duration-150 active:scale-[0.98]',
                   isSelected
-                    ? 'border-primary bg-primary/10 text-primary font-semibold'
-                    : 'border-border/70 hover:bg-muted text-muted-foreground'
-                }`}
+                    ? 'border-pp-primary bg-pp-primary-fixed text-pp-on-primary-fixed shadow-sm'
+                    : 'border-pp-outline-variant/40 bg-pp-surface-container-lowest text-pp-on-surface-variant hover:bg-pp-surface-container hover:text-pp-on-surface',
+                )}
               >
                 {item.label}
               </button>
             );
           })}
         </div>
-      </div>
+      </PpCard>
 
       {error ? (
-        <p role="alert" className="text-sm font-medium text-destructive">
+        <p role="alert" className="text-pp-body-sm font-medium text-pp-error">
           {t('genericError')}
         </p>
       ) : null}
 
-      <Button type="submit" size="lg" disabled={submitting || !name.trim()} className="h-11 font-semibold">
-        {submitting ? t('creating') : t('submit')}
-      </Button>
+      <div className="flex items-center justify-end pt-2">
+        <PpButton
+          type="submit"
+          variant="primary"
+          size="md"
+          disabled={submitting || !name.trim()}
+          className="w-full sm:w-auto"
+        >
+          {submitting ? t('creating') : t('submit')}
+        </PpButton>
+      </div>
     </form>
   );
 }

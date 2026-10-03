@@ -377,7 +377,21 @@
     "weakPasswordError": "Choose a password with at least 6 characters.",
     "tokenSignInPending": "Signing you in...",
     "invalidOrExpiredTokenError": "This sign-in link is invalid or has expired.",
-    "backToSignIn": "Back to sign in"
+    "backToSignIn": "Back to sign in",
+    "enterpriseBadge": "Growth Intelligence 4.0",
+    "heroTitle": "The Precision Growth Engine Trusted by High-Velocity Teams",
+    "heroSubtitle": "Unify attribution pipelines, orchestrate automated budget routing, and deliver audit-grade ROAS telemetry straight to your executive suite.",
+    "rememberDevice": "Remember device for 30 days",
+    "twoFactorEnforced": "2FA Enforced",
+    "soc2Verified": "SOC-2 Verified",
+    "isoCertified": "ISO 27001 Certified",
+    "e2eEncrypted": "E2E Encrypted",
+    "termsNotice": "By continuing, you agree to GrowthOS Enterprise Terms of Service and Privacy Policy.",
+    "activePipelines": "Active Pipelines",
+    "adSetsActive": "Ad Sets Active",
+    "slaUptime": "SLA Uptime",
+    "blendedPayback": "Blended Payback",
+    "roasTelemetry": "Blended ROAS Telemetry"
   },
   "AccountStatus": {
     "signedInAs": "Signed in as {email}",
@@ -480,7 +494,11 @@
     "stackStripe": "Stripe",
     "stackWoocommerce": "WooCommerce",
     "uptimeScore": "99.98% Uptime",
-    "workspacesHeading": "Workspace Launchpads"
+    "workspacesHeading": "Workspace Launchpads",
+    "statusNoData": "No stream activity",
+    "noPipelines": "None connected",
+    "sectionOrganizations": "Organizations",
+    "noActivityEvents": "No recent activity events recorded."
   },
   "OrgsPage": {
     "title": "Your organizations",
@@ -489,13 +507,28 @@
     "roleLabel": "Role: {role}",
     "pendingInvites": "Pending invites",
     "open": "Open",
-    "viewInvite": "View invite"
+    "viewInvite": "View invite",
+    "eyebrow": "Workspaces",
+    "description": "Switch between enterprise organizations, telemetry clusters, and pending team invitations.",
+    "activeOrganizations": "Active Organizations",
+    "emptyDesc": "Create a new organization or ask your team administrator to send an invitation.",
+    "quickAccess": "Quick Access"
   },
   "NewOrgPage": {
     "title": "Create an organization",
     "nameLabel": "Organization name",
     "submit": "Create organization",
-    "genericError": "Something went wrong. Please try again."
+    "genericError": "Something went wrong. Please try again.",
+    "stepIndicator": "Step 1 of 2: Organization Workspace",
+    "pageSubtitle": "Set up your dedicated telemetry pod, team governance boundaries, and initial data streams.",
+    "slugLabel": "Workspace Slug & Ingestion Endpoint",
+    "slugAvailable": "Available & Reserved",
+    "featurePodTitle": "Dedicated Telemetry Pod",
+    "featurePodDesc": "Isolated VPC storage and streaming compute for your organization.",
+    "featureRbacTitle": "Enterprise Governance",
+    "featureRbacDesc": "Role-based access control with granular project permissions.",
+    "featureStreamTitle": "Instant Stream Provisioning",
+    "featureStreamDesc": "Zero-latency pipeline listeners ready on creation."
   },
   "OrgSwitcher": {
     "label": "Organization"
@@ -575,7 +608,8 @@
     "statusSuspended": "Suspended",
     "statusInvited": "Invited",
     "inviteTeamMemberTitle": "Invite Team Member",
-    "inviteTeamMemberDesc": "Send an invitation with custom organization or project permissions."
+    "inviteTeamMemberDesc": "Send an invitation with custom organization or project permissions.",
+    "kpiYourRole": "Your Role"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -635,7 +669,9 @@
     "stackCustom": "Custom Web (Next.js / React / Node)",
     "stackMobile": "Mobile Native (React Native / Flutter)",
     "stackCrm": "B2B CRM (HubSpot / Salesforce)",
-    "creating": "Provisioning workspace..."
+    "creating": "Provisioning workspace...",
+    "eyebrow": "Project Setup",
+    "description": "Configure your telemetry environment, data pipelines, and telemetry models for this workspace."
   },
   "Onboarding": {
     "metaTitle": "Get started",
@@ -700,7 +736,24 @@
     "acceptError": "Couldn't accept this invite. Please try again.",
     "verifyEmailError": "Verify your email address before accepting this invite. Check your inbox for the verification link.",
     "emailMismatch": "This invite was sent to {email}, but you're signed in with a different account.",
-    "switchAccount": "Sign out and switch account"
+    "switchAccount": "Sign out and switch account",
+    "workspaceBadge": "Workspace Invitation",
+    "leadAnalyst": "Lead Growth Analyst",
+    "teamDirect": "Team Direct",
+    "targetIdentity": "Target Identity",
+    "reservedSeat": "Reserved Seat #08",
+    "entitlementsHeading": "Provisioned Workspace Entitlements",
+    "entitlementDashboardsTitle": "13+ Analytics Dashboards",
+    "entitlementDashboardsDesc": "Real-time MRR, LTV Cohorts & ROAS",
+    "entitlementAttributionTitle": "Attribution Pipelines",
+    "entitlementAttributionDesc": "Markov & Shapley multi-touch models",
+    "entitlementAgentTitle": "MCP Agent Studio",
+    "entitlementAgentDesc": "Autonomous AI budget reallocators",
+    "entitlementAlertsTitle": "Live Telemetry & Alerts",
+    "entitlementAlertsDesc": "Instant Slack & anomaly triggers",
+    "ssoTitle": "Single Sign-On (Okta / SAML)",
+    "ssoSubtitle": "Ready to bind credential for {email}",
+    "decline": "Decline Invitation"
   },
   "ResourceLibrary": {
     "title": "Resource library",
@@ -764,7 +817,9 @@
     "archive": "Archive",
     "unarchive": "Restore",
     "archiveError": "Couldn't archive this resource. Please try again.",
-    "unarchiveError": "Couldn't restore this resource. Please try again."
+    "unarchiveError": "Couldn't restore this resource. Please try again.",
+    "eyebrow": "Resource Library",
+    "description": "Manage shared credentials, workflow templates, and organization people registry."
   },
   "ProjectResources": {
     "metaTitle": "Project resources",
@@ -785,7 +840,9 @@
     "writeTierRead": "Read",
     "writeTierOptimize": "Optimize",
     "writeTierManage": "Manage",
-    "writeTierError": "Couldn't update the write tier. Please try again."
+    "writeTierError": "Couldn't update the write tier. Please try again.",
+    "eyebrow": "Project Resources",
+    "description": "Manage project-attached credentials, templates, and team member assignments."
   },
   "ApiKeys": {
     "metaTitle": "API keys",
@@ -828,7 +885,15 @@
     "mcpConnectionNeverUsedLabel": "Never used",
     "mcpConnectionGrantedLabel": "Granted {createdAt}",
     "revokeMcpConnection": "Revoke",
-    "revokeMcpConnectionError": "Couldn't revoke this connection. Please try again."
+    "revokeMcpConnectionError": "Couldn't revoke this connection. Please try again.",
+    "eyebrow": "Security Vault & Credentials",
+    "description": "Manage scoped programmatic tokens, automated telemetry access keys, and MCP client credentials.",
+    "kpiActiveKeys": "Active Keys",
+    "kpiTotalKeys": "Total Minted",
+    "kpiRevokedKeys": "Revoked",
+    "kpiMcpGrants": "MCP Connections",
+    "noKeysDesc": "Mint your first API key to authenticate data pipelines, telemetry SDKs, or MCP agents.",
+    "noMcpConnectionsDesc": "External MCP clients connecting via OAuth 2.1 PKCE will be listed here."
   },
   "McpConsent": {
     "metaTitle": "Connect an MCP client",
@@ -1021,7 +1086,15 @@
     "markReviewed": "Mark reviewed",
     "discardDelivery": "Discard",
     "deliveryStatusError": "Couldn't update this delivery. Please try again.",
-    "appliedViaMapping": "Mapped and ingested (batch {batchId})"
+    "appliedViaMapping": "Mapped and ingested (batch {batchId})",
+    "eyebrow": "Webhook Hub & Telemetry",
+    "description": "Configure event subscriptions, cryptographic signature verification, and inspect inbound payload review queues.",
+    "kpiTotalEndpoints": "Endpoints",
+    "kpiActiveEndpoints": "Active",
+    "kpiPendingDeliveries": "Pending Review",
+    "kpiTotalDeliveries": "Deliveries",
+    "noEndpointsDesc": "Create an inbound webhook endpoint to start receiving real-time payloads from external platforms.",
+    "noDeliveriesDesc": "Inbound payloads delivered to active endpoints will appear here in the review queue."
   },
   "FieldMappings": {
     "metaTitle": "Field mappings",
@@ -1085,7 +1158,16 @@
     "suggestionsHeading": "{count, plural, one {# suggestion} other {# suggestions}}",
     "applyAllSuggestions": "Apply all",
     "applySuggestion": "Apply",
-    "suggestionSummary": "{targetField} ← {sourcePath} ({confidence}% match)"
+    "suggestionSummary": "{targetField} ← {sourcePath} ({confidence}% match)",
+    "eyebrow": "AI Field Mapping Studio",
+    "description": "Configure and test automated schema transformations from raw webhook payloads into validated schemas.",
+    "kpiTotalMappings": "Total Mappings",
+    "kpiActiveMappings": "Active Mappings",
+    "kpiDisabledMappings": "Disabled",
+    "kpiTargetSchemas": "Target Schemas",
+    "noMappingsDesc": "Create your first field mapping rule below to transform inbound webhook events into schema-compliant records.",
+    "rulesCount": "{count, plural, one {# rule} other {# rules}}",
+    "submitting": "Saving..."
   },
   "SchemaRegistry": {
     "metaTitle": "Schema registry",
@@ -1147,7 +1229,14 @@
     "syncMartsError": "Could not sync the warehouse views. Please try again.",
     "syncMartsNotConfigured": "No warehouse is configured for this deployment yet.",
     "syncMartsDone": "{count, plural, one {# view synced.} other {# views synced.}}",
-    "syncMartsSchemaError": "{schemaName}: {message}"
+    "syncMartsSchemaError": "{schemaName}: {message}",
+    "eyebrow": "Data Contracts & Schema Studio",
+    "description": "Central contract repository for event models, dimensional entities, and zero-downtime schema evolution.",
+    "kpiContractFamilies": "Contract Families",
+    "kpiActiveSchemas": "Active Schemas",
+    "kpiTrackingAlerts": "Tracking Alerts",
+    "kpiEventSchemas": "Event Schemas",
+    "noSchemasDesc": "Register your first event, entity, or measure schema definition below."
   },
   "MetricRegistry": {
     "metaTitle": "Metric catalog",
@@ -1190,7 +1279,15 @@
     "duplicateMetricError": "A metric with this name is already registered in this project.",
     "evolveHeading": "Evolve \"{name}\" to a new version",
     "evolveSubmit": "Evolve metric",
-    "evolveError": "Something went wrong. Please try again."
+    "evolveError": "Something went wrong. Please try again.",
+    "eyebrow": "BI Modeling & Formula Studio",
+    "description": "Metric catalog, deterministic aggregation engines, and formula evolution tracking.",
+    "kpiRegisteredKpis": "Registered KPIs",
+    "kpiActiveMetrics": "Active Metrics",
+    "kpiBaseAggregations": "Base Aggregations",
+    "kpiDerivedFormulas": "Derived Formulas",
+    "noMetricsDesc": "Define your first aggregation or formula metric definition below.",
+    "versionsCount": "{count, plural, one {# version} other {# versions}}"
   },
   "IngestHealth": {
     "metaTitle": "Ingest health",
@@ -1249,7 +1346,17 @@
     "warehouseFreshnessLine": "Latest landed record: {latestLandedAt} UTC — {count} records landed in the production environment. Refreshed hourly by the scheduled warehouse job.",
     "warehouseFreshnessEmpty": "The warehouse is connected but no records have landed for this project's production environment yet.",
     "warehouseFreshnessNotConfigured": "No warehouse is configured for this deployment yet — freshness will appear here once BigQuery is connected.",
-    "warehouseFreshnessError": "Couldn't read warehouse freshness: {message}"
+    "warehouseFreshnessError": "Couldn't read warehouse freshness: {message}",
+    "eyebrow": "Data & Ingestion Pipeline",
+    "description": "Monitor stream ingestion throughput, inspect and resolve quarantined payloads, and manage data warehouse freshness.",
+    "kpiThroughput": "Throughput Rate",
+    "kpiDelivered": "Delivered Records",
+    "kpiIntegrity": "Delivery Integrity",
+    "kpiFreshness": "Pipeline Freshness",
+    "noBatchesDesc": "No ingestion batches recorded yet. Send events using the Web SDK or inbound webhooks.",
+    "noQuarantinedDesc": "All ingested records passed schema validation contracts with zero errors.",
+    "noPipelineFailuresDesc": "No delivery failures detected in downstream message processing queues.",
+    "noQueuedMessagesDesc": "All message queues are clear and streaming without backlog."
   },
   "BillingOpsFeed": {
     "metaTitle": "Billing ops feed",
@@ -1300,7 +1407,14 @@
     "filterApply": "Filter",
     "filterClear": "Clear filter",
     "filterActiveNote": "Filtered to records where {field} is {value}.",
-    "filterEmpty": "No records match this filter."
+    "filterEmpty": "No records match this filter.",
+    "eyebrow": "Live Streaming Telemetry",
+    "kpiStreamingRate": "Ingestion Rate",
+    "kpiProcessedRecords": "Processed Records",
+    "kpiActiveSchemas": "Active Event Schemas",
+    "kpiPiiCompliance": "Zero-PII Compliance",
+    "piiMaskingBadge": "Active PII Masking (Zero-Leakage SHA-256)",
+    "piiRedacted": "PII Redacted"
   },
   "Customers": {
     "metaTitle": "Customer search",
@@ -1418,7 +1532,10 @@
     "themePerformance": "Performance",
     "themeMissingFeatures": "Missing features",
     "themeOnboarding": "Onboarding",
-    "themeUsability": "Usability"
+    "themeUsability": "Usability",
+    "promotersLabel": "Promoters",
+    "passivesLabel": "Passives",
+    "detractorsLabel": "Detractors"
   },
   "Support": {
     "metaTitle": "Support",
@@ -1434,7 +1551,10 @@
     "rowValueUnavailable": "—",
     "durationSeconds": "{value}s",
     "durationMinutes": "{value}m",
-    "durationHours": "{value}h"
+    "durationHours": "{value}h",
+    "ticketsResolvedLabel": "Tickets Resolved",
+    "avgFirstResponseLabel": "Avg First Response",
+    "csatLabel": "Overall CSAT"
   },
   "Demos": {
     "metaTitle": "Demos",
@@ -1519,7 +1639,9 @@
     "byCohortHeading": "By signup cohort",
     "byCohortEmpty": "No cohort breakdown available yet — connect a data warehouse to see this.",
     "dimensionValueUnknown": "Unknown",
-    "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})"
+    "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})",
+    "averageScoreLabel": "Avg Intent Score",
+    "totalResponsesLabel": "Total Signups"
   },
   "Firmographics": {
     "metaTitle": "Firmographics",
@@ -1552,7 +1674,9 @@
     "industryManufacturing": "Manufacturing",
     "industryMediaEntertainment": "Media / Entertainment",
     "industryNonprofit": "Nonprofit",
-    "industryOther": "Other"
+    "industryOther": "Other",
+    "totalAccountsLabel": "Total Accounts",
+    "activeAlertsLabel": "Active Alerts"
   },
   "Experiments": {
     "metaTitle": "Experiments",
@@ -1648,7 +1772,20 @@
     "chainInvalid": "Integrity check failed at entry {entryId}. This log may have been tampered with.",
     "noEntries": "No audited changes recorded for this organization yet.",
     "actorLine": "{actorType} {actorId} · {action}",
-    "listCapNote": "Showing the {count} most recent entries."
+    "listCapNote": "Showing the {count} most recent entries.",
+    "eyebrow": "WORM Storage",
+    "description": "Cryptographically chained, immutable append-only event stream verified by consensus hash checks.",
+    "bannerVerifiedTitle": "Cryptographic Hash-Chain Verified",
+    "bannerCompromisedTitle": "Integrity Compromised",
+    "zeroModAllowed": "Zero Modification Allowed",
+    "kpiLedgerStatus": "Audit Ledger Status",
+    "kpiValidValue": "Valid & Chained",
+    "kpiCompromisedValue": "Compromised",
+    "kpiTotalEvents": "Audited Events",
+    "thTimestampActor": "Timestamp & Actor",
+    "thActionSummary": "Action & Summary",
+    "thVerification": "Verification",
+    "verifiedPill": "Verified"
   },
   "PluginRegistry": {
     "metaTitle": "Plugin registry",
@@ -1663,7 +1800,9 @@
     "registeredHeading": "Registered plugins",
     "noManifests": "No plugin manifests have been registered in this organization yet.",
     "versionLine": "v{version} · {type}",
-    "scopesLine": "Scopes: {scopes}"
+    "scopesLine": "Scopes: {scopes}",
+    "eyebrow": "Plugin Registry",
+    "description": "Register and manage organization plugin manifests, data source connectors, and metric packs."
   },
   "ProjectPlugins": {
     "metaTitle": "Plugins",
@@ -1760,7 +1899,9 @@
     "lookalikeCreateError": "Couldn't create the Lookalike Audience. Please try again.",
     "lookalikeListHeading": "Created Lookalike Audiences",
     "lookalikeListEmpty": "No Lookalike Audiences created yet.",
-    "lookalikeListItem": "{name} · {ratio}% · {country} · created {createdAt}"
+    "lookalikeListItem": "{name} · {ratio}% · {country} · created {createdAt}",
+    "eyebrow": "Plugins & Connectors",
+    "description": "Deploy pre-built metric models, monitor plugin pipelines, and manage custom source integrations."
   },
   "Boards": {
     "metaTitle": "Boards",
@@ -1859,7 +2000,9 @@
       "not_yet_backed": "Not backed by real data yet",
       "query_error": "Couldn't load this tile"
     },
-    "sessionReplayLinkTitle": "Open the session recordings for this landing page"
+    "sessionReplayLinkTitle": "Open the session recordings for this landing page",
+    "viewBoardLink": "Open board",
+    "createSubtitle": "Build a dashboard with custom telemetry tiles"
   },
   "Goals": {
     "metaTitle": "Goals",
@@ -1952,7 +2095,12 @@
     "progressLabel": "Progress",
     "editTarget": "Adjust Target",
     "smartRecDescription": "Goal is pacing behind projected target. AI Copilot recommends budget reallocation.",
-    "smartRecAction": "1-Click Boost Budget"
+    "smartRecAction": "1-Click Boost Budget",
+    "eyebrow": "EXECUTIVE TARGET VELOCITY",
+    "backToGoals": "Back to goals",
+    "thermometerSubtitle": "Linear trajectory calibrated against real-time telemetry",
+    "settingsSubtitle": "Cadence, metric binding, and owner attribution",
+    "editGoalSubtitle": "Adjust target value, dates, rhythm, or owner"
   },
   "Segments": {
     "metaTitle": "Segments",
@@ -2094,7 +2242,30 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "Win history",
     "historyEmpty": "No wins recorded yet.",
-    "historyListCapNote": "Showing the most recent {count} win(s)."
+    "historyListCapNote": "Showing the most recent {count} win(s).",
+    "eyebrow": "CONVERSION ENGINE",
+    "description": "Real-time conversion triggers, true ROI milestones, and live win celebration telemetry.",
+    "kpiActiveRules": "Active Win Rules",
+    "kpiTrialPipeline": "Trial-to-Paid Velocity",
+    "kpiTopCloser": "Top Closer this Week",
+    "kpiRecentWins": "Recent Wins Logged",
+    "kpiWinsSuffix": "Wins",
+    "rulesSubtitle": "Configured win criteria, schemas, and automated trigger actions",
+    "feedSubtitle": "Real-time SSE event broadcast stream and celebration telemetry",
+    "createSubtitle": "Define event schema, condition filters, and win classification",
+    "pipelineHeading": "Trial Conversion Pipeline",
+    "pipelineSubtitle": "Active trials pacing into paid revenue",
+    "leaderboardCardHeading": "Sprint Collections Leaderboard",
+    "leaderboardSubtitle": "Rep attributed revenue this week",
+    "kpiActiveBadge": "{count} Active",
+    "kpiDefinedFooter": "{count, plural, one {# rule defined} other {# rules defined}}",
+    "kpiConvertingFooter": "Converting trials into revenue",
+    "kpiWarehouseFooter": "Warehouse integration pending",
+    "kpiDealsClosedFooter": "{count, plural, one {# deal closed} other {# deals closed}}",
+    "kpiNoDealsFooter": "No weekly deals yet",
+    "kpiPersistedFooter": "Persisted win events",
+    "kpiLoggedBadge": "Logged",
+    "activeRulesCount": "{count, plural, one {# active rule} other {# active rules}}"
   },
   "TrialPipeline": {
     "heading": "Trial pipeline",
@@ -2135,7 +2306,29 @@
     "reducedMotionLabel": "Reduced motion (disable confetti)",
     "claimButton": "Pair TV",
     "claimError": "Could not pair this TV. Check the code and try again.",
-    "claimErrorInvalidCode": "That pairing code is invalid, expired, or already used. Ask the TV to display a new one."
+    "claimErrorInvalidCode": "That pairing code is invalid, expired, or already used. Ask the TV to display a new one.",
+    "eyebrow": "WAR-ROOM BILLBOARD",
+    "openBillboard": "Open TV Billboard",
+    "heroTitle": "War-Room Office Billboard",
+    "heroDescription": "Dedicated zero-auth kiosk display with full-screen live revenue pacing, deal celebrations, audio chimes, and automatic board rotation.",
+    "step1": "Open /tv on your conference TV or browser",
+    "step2": "The TV displays a 6-digit pairing code",
+    "step3": "Enter the code below to claim and pair",
+    "kpiPairedDisplays": "Active Displays",
+    "kpiPinRotation": "Security Protocol",
+    "kpiRotationSuffix": "PIN",
+    "kpiPinRotationDesc": "Dynamic rolling pairing PIN",
+    "kpiZeroLogin": "Authentication",
+    "kpiZeroLoginVal": "Kiosk Mode",
+    "kpiZeroLoginDesc": "Zero-auth TV browser client",
+    "kpiChannelStatus": "Channel Status",
+    "kpiWsConnected": "Live Relay",
+    "kpiWsDesc": "Sub-second real-time sync",
+    "pairedSubtitle": "Manage connected screens, board rotation, and display settings",
+    "pairSubtitle": "Redeem code displayed on TV to link it to this project",
+    "liveStatus": "Live",
+    "kpiActiveDisplaysFooter": "{count, plural, one {# active display} other {# active displays}}",
+    "tvsPairedCount": "{count, plural, one {# TV paired} other {# TVs paired}}"
   },
   "TvMode": {
     "metaTitle": "War room",
@@ -2395,7 +2588,20 @@
     "templateHelp": "Paste a URL from your replay tool. {landing_page} is replaced with the page URL. Leave empty to show no link.",
     "save": "Save",
     "saved": "Saved.",
-    "saveError": "Could not save the template. Check that it is an http(s) URL."
+    "saveError": "Could not save the template. Check that it is an http(s) URL.",
+    "eyebrow": "Replay & Heatmap Configuration",
+    "kpiStatus": "Integration Status",
+    "kpiStatusActive": "Active Template",
+    "kpiStatusNotConfigured": "Not Configured",
+    "kpiSupportedVendors": "Tested Vendors",
+    "kpiPrivacyPosture": "Privacy Posture",
+    "previewHeading": "Deep-Link Target Preview",
+    "previewSubtitle": "Simulated destination resolved using sample session tokens.",
+    "availableTokensHeading": "Available Interactive Tokens",
+    "vendorsHeading": "Vendor Playbook & Recommendations",
+    "clarityDesc": "Free forever from Microsoft. Full heatmaps and unlimited session recordings without volume caps.",
+    "posthogDesc": "Open-source product analytics and session replay with powerful event funnel correlation.",
+    "fullstoryDesc": "Enterprise digital experience intelligence with automated rage-click detection."
   },
   "OrganizationSettings": {
     "metaTitle": "Organization settings",
@@ -2437,7 +2643,27 @@
     "nameRequiredError": "Project name is required.",
     "save": "Save",
     "saved": "Saved.",
-    "saveError": "Could not save these settings. Please try again."
+    "saveError": "Could not save these settings. Please try again.",
+    "coreConfiguration": "CORE CONFIGURATION",
+    "planKpi": "ORGANIZATION PLAN",
+    "workspacesKpi": "PROJECT WORKSPACES",
+    "teamKpi": "TEAM MEMBERS",
+    "credentialsKpi": "CONNECTED CREDENTIALS",
+    "identityCardTitle": "Project Identity & Workspace Profile",
+    "identityCardSubtitle": "Manage runtime identity and canonical tracking namespaces",
+    "governanceCardTitle": "Governance & Connectors",
+    "governanceCardSubtitle": "Channel bindings and security policies",
+    "noCredentials": "No marketing connectors linked yet.",
+    "active": "Active",
+    "none": "None",
+    "checklistLink": "Setup Checklist",
+    "securityEnforcements": "Security Enforcements",
+    "hardware2fa": "Hardware 2FA / WebAuthn",
+    "hardware2faDesc": "Mandate FIDO2 security keys for workspace admins",
+    "auditTamper": "Tamper-Evident Logging",
+    "auditTamperDesc": "Cryptographic append-only event ledger",
+    "dataRetention": "Data Retention Gate",
+    "retentionValue": "365 Days Immutable"
   },
   "RepCollections": {
     "metaTitle": "Rep collections",
@@ -2493,7 +2719,25 @@
     "deleteConfirm": "Delete this ledger entry? This cannot be undone.",
     "deleteButton": "Delete",
     "deleteError": "Could not delete this entry. Please try again.",
-    "amountInputLabel": "Amount"
+    "amountInputLabel": "Amount",
+    "eyebrow": "REVENUE OPS",
+    "kpiMtdCollections": "MTD Collections",
+    "kpiMtdSubtitle": "{count, plural, one {# settled deal} other {# settled deals}}",
+    "kpiActiveClosers": "Active Closers",
+    "kpiRepsSuffix": "Reps",
+    "kpiUnattributedFooter": "{count} not yet attributed",
+    "kpiAllAttributed": "All deals attributed",
+    "kpiBillingSignals": "Billing Signals Awaiting Rep",
+    "kpiSignalsSuffix": "Signals",
+    "needsTriage": "Needs Triage",
+    "allSignalsTriaged": "All signals triaged",
+    "kpiTopCloser": "Top Closer Velocity",
+    "noClosersYet": "No attributed deals yet",
+    "signalsSubtitle": "Stripe webhook invoice payments automatically detected from payment gateway",
+    "ledgerSubtitle": "{count, plural, one {# transaction logged} other {# transactions logged}}",
+    "createSubtitle": "Manually record an upgrade, expansion, save, or renewal",
+    "weekSubtitle": "Current sprint cadence",
+    "monthSubtitle": "Monthly cumulative pacing"
   },
   "RepCollectionLeaderboard": {
     "heading": "Top collections this week",
@@ -2641,7 +2885,14 @@
       "contact_us": "Contact Us",
       "apply_now": "Apply Now",
       "book_travel": "Book Now"
-    }
+    },
+    "targetBreadcrumb": "Target #{id}",
+    "perDaySuffix": "/day",
+    "spendSubtitle": "Warehouse-backed ad spend over the last 28 days",
+    "creativesSubtitle": "Interactive creatives and asset group status",
+    "historySubtitle": "Verified telemetry execution log",
+    "soc2Badge": "SOC-2 / Audited",
+    "budgetPacingNote": "Configured daily cap"
   },
   "FunnelGoals": {
     "metaTitle": "Funnel & Goals",

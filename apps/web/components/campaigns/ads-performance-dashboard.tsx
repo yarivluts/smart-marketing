@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Search,
 } from 'lucide-react';
+import { PpEmptyState, ppInputClass } from '@/components/pastel/primitives';
 import { AdsKpiScorecards } from './ads-kpi-scorecards';
 import { CampaignListTable } from './campaign-list-table';
 import { CreativePreviewGallery } from './creative-preview-gallery';
@@ -119,12 +120,12 @@ export function AdsPerformanceDashboard({
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            <h1 className="font-pp-display text-pp-headline-xl-mobile font-bold tracking-tight text-pp-on-surface sm:text-pp-headline-xl">
               {t('cockpitTitle')}
             </h1>
             <PageGuideButton pageKey="campaigns" />
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-pp-body-sm text-pp-on-surface-variant mt-1">
             {t('cockpitDescription')}
           </p>
         </div>
@@ -137,18 +138,18 @@ export function AdsPerformanceDashboard({
       {topCampaign && (
         <div
           data-testid="proactive-recommendation-banner"
-          className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-emerald-500/10 p-5 shadow-xs transition-all"
+          className="relative overflow-hidden rounded-2xl border border-pp-primary/20 bg-gradient-to-r from-pp-primary-fixed/30 via-pp-surface-container-lowest to-pp-secondary-container/20 p-5 shadow-pp-candy transition-all"
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3.5">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pp-primary text-pp-on-primary shadow-xs">
                 <Sparkles className="h-5 w-5" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-foreground">
+                <h3 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
                   {t('proactiveRecommendationHeading')}
                 </h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">
+                <p className="mt-0.5 text-pp-body-sm text-pp-on-surface-variant">
                   {t('proactiveRecommendationDesc')}
                 </p>
               </div>
@@ -158,7 +159,7 @@ export function AdsPerformanceDashboard({
               {recommendationApplied ? (
                 <span
                   data-testid="rec-applied-badge"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 dark:bg-emerald-950 px-3 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950 px-3 py-1.5 font-pp-label-sm text-pp-label-sm font-bold text-emerald-800 dark:text-emerald-300"
                 >
                   <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                   <span>{t('recommendationApplied')}</span>
@@ -170,7 +171,7 @@ export function AdsPerformanceDashboard({
                     onClick={handleApplyRecommendation}
                     disabled={isApplyingRec}
                     data-testid="apply-ads-rec-btn"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-pp-primary px-4 py-2 font-pp-label-sm text-pp-label-sm font-bold text-pp-on-primary shadow-pp-candy hover:bg-pp-primary-container transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{t('applyRecommendationButton')}</span>
@@ -183,20 +184,20 @@ export function AdsPerformanceDashboard({
       )}
 
       {/* 3. Sub-Navigation Tabs */}
-      <div className="border-b border-border">
+      <div className="border-b border-pp-outline-variant/60">
         <div className="flex gap-4">
           <button
             type="button"
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 border-b-2 py-3 px-1 font-pp-label-sm text-pp-label-sm font-bold transition-colors cursor-pointer ${
               activeTab === 'overview'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-pp-primary text-pp-primary'
+                : 'border-transparent text-pp-on-surface-variant hover:text-pp-on-surface'
             }`}
           >
             <Layers className="h-4 w-4" aria-hidden="true" />
             <span>{t('tabOverview')}</span>
-            <span className="ms-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+            <span className="ms-1 rounded-full bg-pp-primary/10 px-2 py-0.5 text-[10px] font-bold text-pp-primary">
               {initialItems.length}
             </span>
           </button>
@@ -204,10 +205,10 @@ export function AdsPerformanceDashboard({
           <button
             type="button"
             onClick={() => setActiveTab('creatives')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 border-b-2 py-3 px-1 font-pp-label-sm text-pp-label-sm font-bold transition-colors cursor-pointer ${
               activeTab === 'creatives'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-pp-primary text-pp-primary'
+                : 'border-transparent text-pp-on-surface-variant hover:text-pp-on-surface'
             }`}
           >
             <ImageIcon className="h-4 w-4" aria-hidden="true" />
@@ -217,10 +218,10 @@ export function AdsPerformanceDashboard({
           <button
             type="button"
             onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex items-center gap-2 border-b-2 py-3 px-1 font-pp-label-sm text-pp-label-sm font-bold transition-colors cursor-pointer ${
               activeTab === 'analytics'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'border-pp-primary text-pp-primary'
+                : 'border-transparent text-pp-on-surface-variant hover:text-pp-on-surface'
             }`}
           >
             <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -236,14 +237,14 @@ export function AdsPerformanceDashboard({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               {/* Platform Filters */}
-              <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
+              <div className="flex items-center rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-low p-1 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('all')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     platformFilter === 'all'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterAllPlatforms')}
@@ -251,10 +252,10 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('meta_ads')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     platformFilter === 'meta_ads'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterMetaAds')}
@@ -262,10 +263,10 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('google_ads')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     platformFilter === 'google_ads'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterGoogleAds')}
@@ -273,10 +274,10 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('simulated')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     platformFilter === 'simulated'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterSimulated')}
@@ -284,14 +285,14 @@ export function AdsPerformanceDashboard({
               </div>
 
               {/* Status Filters */}
-              <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
+              <div className="flex items-center rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-low p-1 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setStatusFilter('all')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     statusFilter === 'all'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterAllStatuses')}
@@ -299,10 +300,10 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('enabled')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     statusFilter === 'enabled'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterActive')}
@@ -310,10 +311,10 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('paused')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`rounded-xl px-3 py-1 font-pp-label-sm text-pp-label-sm font-semibold transition-colors cursor-pointer ${
                     statusFilter === 'paused'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-pp-primary text-pp-on-primary shadow-2xs'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {t('filterPaused')}
@@ -323,22 +324,25 @@ export function AdsPerformanceDashboard({
 
             {/* Search Input */}
             <div className="relative min-w-[220px]">
-              <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-pp-outline" aria-hidden="true" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('searchPlaceholder')}
-                className="h-9 w-full rounded-xl border border-input bg-background ps-8 pe-3 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary shadow-2xs"
+                className={`h-9 w-full rounded-full ps-8 pe-3 font-pp-label-sm text-pp-label-sm ${ppInputClass}`}
               />
             </div>
           </div>
 
           {/* Campaigns Table */}
           {filteredItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
-              <Layers className="h-8 w-8 text-muted-foreground/40 mb-2" aria-hidden="true" />
-              <p className="text-sm font-medium">{t('noCampaigns')}</p>
+            <div className="rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-8 shadow-pp-candy">
+              <PpEmptyState
+                icon={Layers}
+                title={t('noCampaigns')}
+                description="Synchronize your Google and Meta ad accounts or create a new campaign draft below."
+              />
             </div>
           ) : (
             <CampaignListTable
@@ -353,8 +357,8 @@ export function AdsPerformanceDashboard({
           {/* Creation Section / Action Drawers */}
           {canExecute && (
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
-                <h3 className="text-sm font-bold text-foreground mb-4">{t('seedTargetHeading')}</h3>
+              <div className="rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-pp-candy">
+                <h3 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface mb-4">{t('seedTargetHeading')}</h3>
                 <AutomationSeedTargetForm
                   orgId={orgId}
                   projectId={projectId}
@@ -362,8 +366,8 @@ export function AdsPerformanceDashboard({
                 />
               </div>
 
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
-                <h3 className="text-sm font-bold text-foreground mb-4">{t('newCampaignHeading')}</h3>
+              <div className="rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-pp-candy">
+                <h3 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface mb-4">{t('newCampaignHeading')}</h3>
                 <AutomationProposeCampaignDraftForm
                   orgId={orgId}
                   projectId={projectId}

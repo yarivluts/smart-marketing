@@ -9,6 +9,7 @@ import {
 } from '@/lib/orgs/queries';
 import { toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { IntegrationsHub } from '@/components/integrations/integrations-hub';
+import { PpPage } from '@/components/pastel/primitives';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -63,13 +64,13 @@ export default async function IntegrationsPage({ params }: PageProps): Promise<R
     .map((install) => install.pluginId);
 
   return (
-    <main className="container mx-auto max-w-6xl py-8 px-4">
+    <PpPage className="max-w-6xl space-y-8">
       <IntegrationsHub
         orgId={orgId}
         projectId={projectId}
         projectName={project.name}
         initialActiveConnectors={initialActiveConnectors}
       />
-    </main>
+    </PpPage>
   );
 }

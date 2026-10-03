@@ -4,8 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Environment } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
 import { hookSignatureModeLabelKey } from '@/lib/orgs/hook-view';
 
 // Client components must never import a *value* from `@growthos/firebase-orm-models` (its barrel
@@ -69,73 +68,78 @@ export function CreateHookEndpointForm({ orgId, projectId, environments }: Creat
 
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="hook-endpoint-name">
-          {t('nameLabel')}
-        </label>
-        <Input id="hook-endpoint-name" required value={name} onChange={(event) => setName(event.target.value)} />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="hook-endpoint-environment">
-          {t('environmentLabel')}
-        </label>
-        <select
-          id="hook-endpoint-environment"
-          value={environmentId}
-          onChange={(event) => setEnvironmentId(event.target.value)}
-          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
-        >
-          {environments.map((environment) => (
-            <option key={environment.id} value={environment.id}>
-              {tEnv(environment.name)}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="hook-endpoint-signature-mode">
-          {t('signatureModeLabel')}
-        </label>
-        <select
-          id="hook-endpoint-signature-mode"
-          value={signatureMode}
-          onChange={(event) => setSignatureMode(event.target.value as HookSignatureMode)}
-          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
-        >
-          {HOOK_SIGNATURE_MODES.map((mode) => (
-            <option key={mode} value={mode}>
-              {t(hookSignatureModeLabelKey(mode))}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {signatureMode === 'hmac_sha256' ? (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="hook-endpoint-signature-header">
-            {t('signatureHeaderNameLabel')}
-          </label>
-          <Input
-            id="hook-endpoint-signature-header"
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <PpField label={t('nameLabel')} htmlFor="hook-endpoint-name">
+          <input
+            id="hook-endpoint-name"
             required
-            placeholder="X-Hub-Signature-256"
-            value={signatureHeaderName}
-            onChange={(event) => setSignatureHeaderName(event.target.value)}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className={ppInputClass}
+            placeholder="e.g. Hubspot Leads Sync"
           />
-          <p className="text-xs text-muted-foreground">{t('signatureHeaderNameHint')}</p>
-        </div>
-      ) : null}
+        </PpField>
+
+        <PpField label={t('environmentLabel')} htmlFor="hook-endpoint-environment">
+          <select
+            id="hook-endpoint-environment"
+            value={environmentId}
+            onChange={(event) => setEnvironmentId(event.target.value)}
+            className={ppInputClass}
+          >
+            {environments.map((environment) => (
+              <option key={environment.id} value={environment.id}>
+                {tEnv(environment.name)}
+              </option>
+            ))}
+          </select>
+        </PpField>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <PpField label={t('signatureModeLabel')} htmlFor="hook-endpoint-signature-mode">
+          <select
+            id="hook-endpoint-signature-mode"
+            value={signatureMode}
+            onChange={(event) => setSignatureMode(event.target.value as HookSignatureMode)}
+            className={ppInputClass}
+          >
+            {HOOK_SIGNATURE_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {t(hookSignatureModeLabelKey(mode))}
+              </option>
+            ))}
+          </select>
+        </PpField>
+
+        {signatureMode === 'hmac_sha256' ? (
+          <PpField
+            label={t('signatureHeaderNameLabel')}
+            htmlFor="hook-endpoint-signature-header"
+            hint={t('signatureHeaderNameHint')}
+          >
+            <input
+              id="hook-endpoint-signature-header"
+              required
+              placeholder="X-Hub-Signature-256"
+              value={signatureHeaderName}
+              onChange={(event) => setSignatureHeaderName(event.target.value)}
+              className={ppInputClass}
+            />
+          </PpField>
+        ) : null}
+      </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-pp-error font-medium">
           {t('createEndpointError')}
         </p>
       ) : null}
-      <Button type="submit" disabled={submitting || environments.length === 0}>
-        {t('createEndpoint')}
-      </Button>
+      <div className="flex justify-end pt-2">
+        <PpButton type="submit" variant="primary" disabled={submitting || environments.length === 0}>
+          {t('createEndpoint')}
+        </PpButton>
+      </div>
     </form>
   );
 }

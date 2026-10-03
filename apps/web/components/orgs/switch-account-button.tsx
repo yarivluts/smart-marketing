@@ -1,9 +1,10 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { LogOut } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
-import { Button } from '@/components/ui/button';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface SwitchAccountButtonProps {
   fromPath: string;
@@ -21,8 +22,9 @@ export function SwitchAccountButton({ fromPath }: SwitchAccountButtonProps): Rea
   }
 
   return (
-    <Button size="sm" variant="outline" onClick={handleClick}>
-      {t('switchAccount')}
-    </Button>
+    <PpButton size="sm" variant="secondary" onClick={handleClick}>
+      <LogOut className="h-4 w-4 rtl:rotate-180" />
+      <span>{t('switchAccount')}</span>
+    </PpButton>
   );
 }

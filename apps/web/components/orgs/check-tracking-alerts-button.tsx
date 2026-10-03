@@ -3,14 +3,15 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { PpButton } from '@/components/pastel/primitives';
+import { Activity } from 'lucide-react';
 
 export interface CheckTrackingAlertsButtonProps {
   orgId: string;
   projectId: string;
 }
 
-/** Manually checks every active event schema's volume for a project right now (KAN-36) from the schema registry's tracking-alerts section. */
+/** Manually checks every active event schema's volume for a project right now (KAN-36). */
 export function CheckTrackingAlertsButton({ orgId, projectId }: CheckTrackingAlertsButtonProps): React.ReactElement {
   const t = useTranslations('SchemaRegistry');
   const router = useRouter();
@@ -36,11 +37,11 @@ export function CheckTrackingAlertsButton({ orgId, projectId }: CheckTrackingAle
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton type="button" variant="secondary" size="sm" icon={Activity} onClick={handleClick} disabled={submitting}>
         {t('trackingAlertCheckButton')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error">
           {t('trackingAlertCheckError')}
         </p>
       ) : null}

@@ -16,7 +16,18 @@ import {
 } from '@/lib/orgs/queries';
 import { formatEstimatedCostUsd, formatLabels, outcomeLabelKey, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
 import { SetCostQuotaForm } from '@/components/orgs/set-cost-quota-form';
-import { SpendProtectionConsole } from '@/components/guardrails/spend-protection-console';
+import { AutomationKillSwitchPanel } from '@/components/orgs/automation-kill-switch-panel';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpEmptyState,
+  PpPill,
+} from '@/components/pastel/primitives';
+import { Flame, Database, Activity, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -29,14 +40,11 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's KAN-39 cost guardrails (plan `13 §E4.3`): the daily query
- * quota + labels config a real BigQuery job would carry, today's usage
- * against that quota, and the query cost log every non-cache-hit
- * `queryMetrics` call writes to — the AC's "cost per project visible on an
- * internal dashboard". Gated on `project.manage`, the same per-project
- * admin-config permission `project_admin` already holds — see
- * `cost-guardrails/quota/route.ts`'s own doc comment for why that permission
- * over `metrics.write`/`billing.manage`.
+ * A project's KAN-39 cost guardrails:
+ * Daily query quota + labels, usage against quota, query cost log, and emergency circuit breaker.
+ *
+ * Converted to Stitch Pastel Pulse layout (desktop 389d9edf, mobile b6efd552).
+ * When engaging the kill switch, a reason is strictly required.
  */
 export default async function CostGuardrailsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -78,89 +86,180 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
     redirect(`/${locale}/orgs/${orgId}`);
   }
 
-  const activePluginIds = new Set(
-    installs
-      .filter((i) => i.status === 'installed')
-      .map((i) => i.plugin_id.toLowerCase()),
-  );
-
-  const hasAdOrAutomationConnector =
-    activePluginIds.has('google_ads') ||
-    activePluginIds.has('meta_ads') ||
-    activePluginIds.has('tiktok_ads') ||
-    activePluginIds.has('automation') ||
-    activePluginIds.has('guardrails');
-
-  const hasActiveGuardrailData =
-    Boolean(guardrailPolicy && (guardrailPolicy.setAt !== null || (guardrailPolicy.protectedTargetIds && guardrailPolicy.protectedTargetIds.length > 0))) ||
-    interventions.length > 0 ||
-    Boolean(killSwitchStatus && killSwitchStatus.engaged);
-
-  const isDataConnected = hasAdOrAutomationConnector || hasActiveGuardrailData;
+  const isHalted = Boolean(killSwitchStatus && killSwitchStatus.engaged);
 
   // Passes the quota already fetched above so this doesn't re-read the same ProjectCostQuotaModel doc a second time.
   const quotaStatus = await checkProjectQueryQuota(orgId, projectId, quota);
-
   const quotaView = toProjectCostQuotaView(quota);
   const logViews = logEntries.map(toQueryCostLogEntryView);
 
   const t = await getTranslations('CostGuardrails');
 
   return (
-    <main className="w-full space-y-8">
-      {/* Stitch Spend Protection & Emergency Console */}
-      <SpendProtectionConsole
-        orgId={orgId}
-        projectId={projectId}
-        isDataConnected={isDataConnected}
-        initialKillSwitchActive={Boolean(killSwitchStatus && killSwitchStatus.engaged)}
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="COST GUARDRAILS & PACING"
+        meta={isHalted ? 'Emergency Circuit Breaker Engaged' : 'Query & Spend Guardrails Active'}
+        title={t('title', { projectName: project.name })}
+        description={t('usageHeading')}
+        actions={
+          <div className="flex items-center gap-2">
+            {isHalted ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-error-container px-3 py-1.5 text-xs font-bold text-pp-error shadow-pp-candy">
+                <Flame className="h-4 w-4" aria-hidden="true" />
+                <span>KILL SWITCH ACTIVE</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                <span>Safe Operations</span>
+              </span>
+            )}
+          </div>
+        }
       />
 
-      {/* Internal BigQuery Admin Quota Settings (Collapsible) */}
-      <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-        <p className="text-xs text-muted-foreground mt-1 mb-6">{t('usageHeading')}</p>
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Daily Query Quota"
+          value={quotaStatus.attemptedToday}
+          valueSuffix={quotaStatus.limit !== null ? `/ ${quotaStatus.limit}` : ''}
+          accent="primary"
+          footer={
+            quotaStatus.remaining !== null
+              ? `${quotaStatus.remaining} queries remaining today`
+              : 'Unlimited quota configured'
+          }
+        />
+        <PpKpiCard
+          label="Query Cost Logs"
+          value={logViews.length}
+          valueSuffix="runs"
+          accent="mint"
+          footer="Audited BigQuery calls"
+        />
+        <PpKpiCard
+          label="Spend Ceiling"
+          value={guardrailPolicy?.spendCeilingUsd ? `$${guardrailPolicy.spendCeilingUsd.toLocaleString()}` : '—'}
+          accent="amber"
+          footer="Global Daily Ad Spend Cap"
+        />
+        <PpKpiCard
+          label="Emergency Circuit Breaker"
+          value={isHalted ? 'Halted' : 'Guarded'}
+          badge={isHalted ? 'PAUSED' : 'ACTIVE'}
+          badgeAccent={isHalted ? 'error' : 'mint'}
+          accent={isHalted ? 'error' : 'sky'}
+          footer={isHalted ? ('reason' in killSwitchStatus && killSwitchStatus.reason ? killSwitchStatus.reason : 'Emergency Halt Active') : '0 Anomalies Detected'}
+        />
+      </PpKpiGrid>
 
-        <section className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
-            {t('usageLine', { attempted: quotaStatus.attemptedToday, limit: quotaStatus.limit, remaining: quotaStatus.remaining })}
-          </p>
-          {quotaView.setAt ? (
-            <p className="text-xs text-muted-foreground">{t('labelsCurrent', { labels: formatLabels(quotaView.labels) || t('noLabels') })}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">{t('defaultQuotaNote')}</p>
-          )}
-        </section>
+      {/* 3. Section 1: Emergency Kill Switch Panel */}
+      <PpCard
+        title={t('killSwitchHeading', { defaultValue: 'Emergency Circuit Breaker' })}
+        subtitle="Halt all automated mutations and optimization actions across channels (requires explicit reason)"
+        icon={Flame}
+        iconAccent={isHalted ? 'error' : 'primary'}
+      >
+        <AutomationKillSwitchPanel orgId={orgId} status={killSwitchStatus} />
+      </PpCard>
 
-        <section className="flex flex-col gap-3 mt-6">
-          <h3 className="text-sm font-semibold">{t('setQuotaHeading')}</h3>
-          <SetCostQuotaForm orgId={orgId} projectId={projectId} dailyQueryLimit={quotaView.dailyQueryLimit} labels={quotaView.labels} />
-        </section>
+      {/* 4. Section 2: BigQuery Daily Query Quota Settings */}
+      <PpCard
+        title={t('setQuotaHeading')}
+        subtitle={t('usageLine', {
+          attempted: quotaStatus.attemptedToday,
+          limit: quotaStatus.limit ?? '—',
+          remaining: quotaStatus.remaining ?? '—',
+        })}
+        icon={Database}
+        iconAccent="primary"
+      >
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-pp-subtle-inset p-4 text-xs space-y-1">
+            {quotaView.setAt ? (
+              <p className="text-pp-on-surface-variant font-medium">
+                {t('labelsCurrent', { labels: formatLabels(quotaView.labels) || t('noLabels') })}
+              </p>
+            ) : (
+              <p className="text-pp-outline">{t('defaultQuotaNote')}</p>
+            )}
+          </div>
+          <SetCostQuotaForm
+            orgId={orgId}
+            projectId={projectId}
+            dailyQueryLimit={quotaView.dailyQueryLimit}
+            labels={quotaView.labels}
+          />
+        </div>
+      </PpCard>
 
-        <section className="flex flex-col gap-3 mt-6">
-          <h3 className="text-sm font-semibold">{t('logHeading')}</h3>
-          {logViews.length === 0 ? (
-            <p className="text-muted-foreground text-xs">{t('noLogEntries')}</p>
-          ) : (
-            <ul className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+      {/* 5. Section 3: Query Cost Audit Log */}
+      <PpCard
+        title={t('logHeading')}
+        subtitle="Non-cached query executions with recorded compute metrics"
+        icon={Activity}
+        iconAccent="mint"
+        flush={logViews.length > 0}
+      >
+        {logViews.length === 0 ? (
+          <PpEmptyState
+            icon={Activity}
+            title={t('logHeading')}
+            description={t('noLogEntries')}
+          />
+        ) : (
+          <PpTable>
+            <thead>
+              <tr>
+                <th>Outcome</th>
+                <th>Estimated Cost</th>
+                <th>Executed At</th>
+                <th>Definition References</th>
+              </tr>
+            </thead>
+            <tbody>
               {logViews.map((entry) => (
-                <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
-                  <span className="font-medium">{t('logEntrySummary', { outcome: t(outcomeLabelKey(entry.outcome)), executedAt: entry.executedAt })}</span>
-                  <span className="text-muted-foreground">
-                    {Object.keys(entry.definitionRefs).length > 0
-                      ? t('logEntryDefinitions', { definitions: Object.values(entry.definitionRefs).join(', ') })
-                      : t('logEntryNoDefinitions')}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {entry.estimatedCostUsd !== null ? t('logEntryCost', { cost: formatEstimatedCostUsd(entry.estimatedCostUsd) }) : t('logEntryCostUnknown')}
-                  </span>
-                </li>
+                <tr key={entry.id}>
+                  <td>
+                    <PpPill
+                      accent={
+                        entry.outcome === 'executed'
+                          ? 'mint'
+                          : entry.outcome === 'blocked_quota_exceeded'
+                            ? 'error'
+                            : 'amber'
+                      }
+                      dot
+                    >
+                      {t(outcomeLabelKey(entry.outcome))}
+                    </PpPill>
+                  </td>
+                  <td className="font-mono tabular-nums font-semibold text-pp-on-surface">
+                    {formatEstimatedCostUsd(entry.estimatedCostUsd ?? 0)}
+                  </td>
+                  <td className="text-pp-outline font-mono text-xs">
+                    {entry.executedAt}
+                  </td>
+                  <td className="text-pp-body-sm text-pp-on-surface-variant">
+                    {Object.keys(entry.definitionRefs).length > 0 ? (
+                      <span className="font-mono text-xs">
+                        {Object.entries(entry.definitionRefs)
+                          .map(([kind, id]) => `${kind}:${id}`)
+                          .join(', ')}
+                      </span>
+                    ) : (
+                      <span className="text-pp-outline">—</span>
+                    )}
+                  </td>
+                </tr>
               ))}
-            </ul>
-          )}
-          <p className="text-xs text-muted-foreground">{t('logCapNote', { count: logViews.length })}</p>
-        </section>
-      </div>
-    </main>
+            </tbody>
+          </PpTable>
+        )}
+      </PpCard>
+    </PpPage>
   );
 }

@@ -9,6 +9,8 @@ import { builtinMetricPacks, getSupportLeaderboardForProject, listOrgPeople, lis
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { formatDurationSeconds, toSupportLeaderboardView } from '@/lib/orgs/support-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import { PpPage, PpPageHeader, PpCard, PpKpiCard, PpKpiGrid, PpEmptyState, PpPill, PpTable } from '@/components/pastel/primitives';
+import { Headphones, LifeBuoy, Trophy, Clock, Star, CheckCircle2 } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -71,11 +73,17 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === SUPPORT_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="SUPPORT OPERATIONS"
+          meta={project.name}
+          title={t('title', { projectName: project.name })}
+          description={t('setupIntro')}
+        />
+        <PpCard>
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+        </PpCard>
+      </PpPage>
     );
   }
 
@@ -89,46 +97,122 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
     return t(unitKey, { value });
   };
 
+  const totalResolved = leaderboard.rows.reduce((sum, r) => sum + r.ticketsResolved, 0);
+  const firstResponseRows = leaderboard.rows.filter((r) => r.avgFirstResponseSeconds !== null);
+  const avgFirstResponse =
+    firstResponseRows.length > 0
+      ? formatDuration(
+          Math.round(firstResponseRows.reduce((sum, r) => sum + r.avgFirstResponseSeconds!, 0) / firstResponseRows.length),
+        )
+      : '—';
+
+  const csatRows = leaderboard.rows.filter((r) => r.avgCsatScore !== null);
+  const avgCsat = csatRows.length > 0 ? (csatRows.reduce((sum, r) => sum + r.avgCsatScore!, 0) / csatRows.length).toFixed(1) : null;
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <PpPage>
+      <PpPageHeader
+        eyebrow="SUPPORT OPERATIONS"
+        meta={leaderboard.rows.length > 0 ? `${leaderboard.rows.length} agents` : undefined}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('backlogHeading')}</h2>
-        <div className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-          <span className="text-4xl font-bold tracking-tight">{leaderboard.openBacklog}</span>
-          <span className="text-sm text-muted-foreground">{t('backlogLine', { opened: leaderboard.ticketsOpened })}</span>
-        </div>
-      </section>
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('backlogHeading')}
+          value={leaderboard.openBacklog}
+          badge={leaderboard.openBacklog > 20 ? 'HIGH' : 'NORMAL'}
+          badgeAccent={leaderboard.openBacklog > 20 ? 'amber' : 'mint'}
+          accent={leaderboard.openBacklog > 20 ? 'amber' : 'mint'}
+          footer={t('backlogLine', { opened: leaderboard.ticketsOpened })}
+        />
+        <PpKpiCard
+          label={t('ticketsResolvedLabel')}
+          value={totalResolved}
+          accent="primary"
+          footer={`${leaderboard.rows.length} active agents`}
+        />
+        <PpKpiCard
+          label={t('avgFirstResponseLabel')}
+          value={avgFirstResponse}
+          accent="sky"
+          footer="Average first reply"
+        />
+        <PpKpiCard
+          label={t('csatLabel')}
+          value={avgCsat !== null ? avgCsat : '—'}
+          valueSuffix={avgCsat !== null ? '/ 5.0' : undefined}
+          accent="mint"
+          footer="Customer satisfaction average"
+        />
+      </PpKpiGrid>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('leaderboardHeading')}</h2>
+      <PpCard
+        icon={Trophy}
+        iconAccent="amber"
+        title={t('leaderboardHeading')}
+        flush={leaderboard.rows.length > 0}
+      >
         {leaderboard.rows.length === 0 ? (
-          <p className="text-muted-foreground">{t('leaderboardEmpty')}</p>
+          <PpEmptyState
+            icon={LifeBuoy}
+            title={t('leaderboardHeading')}
+            description={t('leaderboardEmpty')}
+          />
         ) : (
-          <ol className="flex flex-col gap-2">
-            {leaderboard.rows.map((row, index) => (
-              <li key={row.agentOrgPersonId} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                <span className="flex items-center gap-2 font-medium">
-                  {row.photoUrl ? (
-                    <img src={row.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
-                  ) : null}
-                  {t('rankedName', { rank: index + 1, name: row.name })}
-                </span>
-                <span className="text-muted-foreground">
-                  {t('rowSummary', {
-                    resolved: row.ticketsResolved,
-                    firstResponse: formatDuration(row.avgFirstResponseSeconds),
-                    resolution: formatDuration(row.avgResolutionSeconds),
-                    csat: row.avgCsatScore === null ? t('rowValueUnavailable') : row.avgCsatScore.toFixed(1),
-                  })}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <PpTable>
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th className="text-end">Resolved</th>
+                <th className="text-end">First Response</th>
+                <th className="text-end">Resolution</th>
+                <th className="text-end">CSAT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboard.rows.map((row, index) => (
+                <tr key={row.agentOrgPersonId}>
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-pp-surface-container text-[11px] font-bold text-pp-on-surface-variant">
+                        {index + 1}
+                      </span>
+                      {row.photoUrl ? (
+                        <img src={row.photoUrl} alt="" className="h-8 w-8 rounded-full object-cover ring-2 ring-pp-surface-container" />
+                      ) : (
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pp-primary-fixed text-pp-primary font-bold text-pp-label-sm">
+                          {row.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="font-semibold text-pp-on-surface">{row.name}</span>
+                    </div>
+                  </td>
+                  <td className="text-end font-semibold text-pp-on-surface">
+                    {row.ticketsResolved}
+                  </td>
+                  <td className="text-end text-pp-on-surface-variant">
+                    {formatDuration(row.avgFirstResponseSeconds)}
+                  </td>
+                  <td className="text-end text-pp-on-surface-variant">
+                    {formatDuration(row.avgResolutionSeconds)}
+                  </td>
+                  <td className="text-end">
+                    {row.avgCsatScore === null ? (
+                      <span className="text-pp-outline">{t('rowValueUnavailable')}</span>
+                    ) : (
+                      <PpPill accent={row.avgCsatScore >= 4.5 ? 'mint' : row.avgCsatScore >= 3.5 ? 'amber' : 'pink'}>
+                        ★ {row.avgCsatScore.toFixed(1)}
+                      </PpPill>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </PpTable>
         )}
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

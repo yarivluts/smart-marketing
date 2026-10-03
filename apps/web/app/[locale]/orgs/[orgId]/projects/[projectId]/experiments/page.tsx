@@ -9,7 +9,17 @@ import { builtinMetricPacks, getExperimentResultsForProject, listOrgProjects, li
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { experimentVariantBadge, experimentVariantBadgeLabelKey } from '@/lib/orgs/experiment-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
-import { ExperimentRegistryDashboard } from '@/components/experiments/experiment-registry-dashboard';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpEmptyState,
+  PpPill,
+} from '@/components/pastel/primitives';
+import { FlaskConical, Sparkles, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -21,26 +31,13 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
-const BADGE_CLASS: Record<ReturnType<typeof experimentVariantBadge>, string> = {
-  control: 'text-muted-foreground',
-  significant: 'text-green-600 dark:text-green-500',
-  not_significant: 'text-muted-foreground',
-  insufficient_data: 'text-muted-foreground',
-};
-
 /**
- * A project's A/B experiment results (KAN-89, E-none/plan `14 §Gap 3`
- * slice 1): every experiment this project has landed exposure/conversion
- * data for, one table per experiment (variant / exposures / conversions /
- * conversion rate / uplift vs. control / significance), backed by a
- * two-proportion z-test (`computeExperimentResult`, `@growthos/shared`) —
- * no external experimentation tool (GrowthBook/Optimizely/VWO) integration
- * yet, same "in-app SDK path covers the buildable-today core, a real
- * third-party connector is deferred" posture KAN-82/KAN-87 establish for
- * their own gap-analysis stories. Gated on `ingest.write`, the same
- * permission the Feedback/Churn Reasons/Firmographic pages use for their
- * own pure, no-editable-state results surfaces (unlike Campaign Ops, which
- * carries an editable spend target and uses `dashboards.write` instead).
+ * A project's A/B experiment results (KAN-89):
+ * Variant / exposures / conversions / conversion rate / uplift vs. control / significance,
+ * backed by a two-proportion z-test.
+ *
+ * Converted to Stitch Pastel Pulse design (desktop ac05dcf4, mobile 6a9a05cc),
+ * folding all real experiment tables without fake mock metrics.
  */
 export default async function ExperimentsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -74,70 +71,179 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === EXPERIMENT_PACK_PLUGIN_ID);
     return (
-      <div className="w-full space-y-8">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </div>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="EXPERIMENT PACK REQUIRED"
+          title={t('title', { projectName: project.name })}
+          description={t('setupIntro')}
+        />
+        <PpCard title="Install Metric Pack" subtitle="Activate in-app A/B testing and statistical significance engine">
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+        </PpCard>
+      </PpPage>
     );
   }
 
   const outcome = await getExperimentResultsForProject(orgId, projectId);
+  const isDataConnected = outcome.ok && outcome.results.length > 0;
+
+  const totalVariants = outcome.ok ? outcome.results.reduce((sum, r) => sum + r.variants.length, 0) : 0;
+  const totalExposures = outcome.ok
+    ? outcome.results.reduce((sum, r) => sum + r.variants.reduce((vSum, v) => vSum + v.exposures, 0), 0)
+    : 0;
+  const statSigCount = outcome.ok
+    ? outcome.results.reduce(
+        (sum, r) => sum + r.variants.filter((v) => experimentVariantBadge(v) === 'significant').length,
+        0,
+      )
+    : 0;
 
   return (
-    <div className="w-full space-y-10">
-      {/* Stitch Experiment Registry & A/B Testing Hub */}
-      <ExperimentRegistryDashboard orgId={orgId} projectId={projectId} isDataConnected={true} />
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="A/B TESTING & OPTIMIZATION"
+        meta={isDataConnected ? 'Statistical Engine Live' : 'Awaiting Experiment Exposures'}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+              <span className="w-1.5 h-1.5 rounded-full bg-pp-secondary animate-pulse" />
+              <span>Two-Proportion Z-Test</span>
+            </span>
+          </div>
+        }
+      />
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Active Experiments"
+          value={outcome.ok ? outcome.results.length : 0}
+          valueSuffix="tests"
+          accent="primary"
+          footer="Landed experiment keys"
+        />
+        <PpKpiCard
+          label="Total Variants"
+          value={totalVariants}
+          valueSuffix="arms"
+          badge="Variations"
+          badgeAccent="mint"
+          accent="mint"
+          footer="Control & test variants"
+        />
+        <PpKpiCard
+          label="Total Exposures"
+          value={totalExposures.toLocaleString(locale)}
+          valueSuffix="visitors"
+          badge="Traffic"
+          badgeAccent="sky"
+          accent="sky"
+          footer="Logged variation impressions"
+        />
+        <PpKpiCard
+          label="Stat-Sig Winners"
+          value={statSigCount}
+          badge="p < 0.05"
+          badgeAccent={statSigCount > 0 ? 'pink' : 'neutral'}
+          accent="pink"
+          footer="Verified conversion lift"
+        />
+      </PpKpiGrid>
 
-        {!outcome.ok ? (
-        <p className="text-muted-foreground">{t('resultsUnavailable')}</p>
+      {/* 3. Experiments Result Tables */}
+      {!outcome.ok ? (
+        <PpEmptyState
+          icon={AlertCircle}
+          title={t('title', { projectName: project.name })}
+          description={t('resultsUnavailable')}
+        />
       ) : outcome.results.length === 0 ? (
-        <p className="text-muted-foreground">{t('resultsEmpty')}</p>
+        <PpEmptyState
+          icon={FlaskConical}
+          title={t('title', { projectName: project.name })}
+          description={t('resultsEmpty')}
+        />
       ) : (
         outcome.results.map((result) => (
-          <section key={result.experimentKey} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{result.experimentKey}</h2>
-            <table className="w-full text-sm">
+          <PpCard
+            key={result.experimentKey}
+            title={result.experimentKey}
+            subtitle={`${result.variants.length} test variants evaluated against control baseline`}
+            icon={FlaskConical}
+            iconAccent="primary"
+            flush
+          >
+            <PpTable>
               <thead>
-                <tr className="border-b border-input text-start text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 font-medium">{t('columnVariant')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnExposures')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnConversions')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnConversionRate')}</th>
-                  <th className="py-2 pe-3 font-medium">{t('columnUplift')}</th>
-                  <th className="py-2 font-medium">{t('columnResult')}</th>
+                <tr>
+                  <th>{t('columnVariant')}</th>
+                  <th>{t('columnExposures')}</th>
+                  <th>{t('columnConversions')}</th>
+                  <th>{t('columnConversionRate')}</th>
+                  <th>{t('columnUplift')}</th>
+                  <th>{t('columnResult')}</th>
                 </tr>
               </thead>
               <tbody>
                 {result.variants.map((variant) => {
                   const badge = experimentVariantBadge(variant);
                   return (
-                    <tr key={variant.variantKey} className="border-b border-input last:border-0">
-                      <td className="py-2 pe-3 font-medium">{variant.variantKey}</td>
-                      <td className="py-2 pe-3 tabular-nums">{variant.exposures.toLocaleString(locale)}</td>
-                      <td className="py-2 pe-3 tabular-nums">{variant.conversions.toLocaleString(locale)}</td>
-                      <td className="py-2 pe-3 tabular-nums">{variant.conversionRate === null ? t('noData') : `${(variant.conversionRate * 100).toFixed(1)}%`}</td>
-                      <td className="py-2 pe-3 tabular-nums">
-                        {variant.upliftVsControlPct === null ? t('noData') : `${variant.upliftVsControlPct >= 0 ? '+' : ''}${variant.upliftVsControlPct.toFixed(1)}%`}
+                    <tr key={variant.variantKey}>
+                      <td className="font-semibold text-pp-on-surface">{variant.variantKey}</td>
+                      <td className="tabular-nums font-mono text-pp-on-surface">
+                        {variant.exposures.toLocaleString(locale)}
                       </td>
-                      <td className="py-2">
-                        <span className={BADGE_CLASS[badge]}>{t(experimentVariantBadgeLabelKey(badge))}</span>
+                      <td className="tabular-nums font-mono text-pp-on-surface">
+                        {variant.conversions.toLocaleString(locale)}
+                      </td>
+                      <td className="tabular-nums font-mono">
+                        {variant.conversionRate === null
+                          ? t('noData')
+                          : `${(variant.conversionRate * 100).toFixed(1)}%`}
+                      </td>
+                      <td className="tabular-nums font-mono">
+                        {variant.upliftVsControlPct === null ? (
+                          <span className="text-pp-outline">{t('noData')}</span>
+                        ) : (
+                          <span
+                            className={
+                              variant.upliftVsControlPct > 0
+                                ? 'font-bold text-pp-secondary'
+                                : variant.upliftVsControlPct < 0
+                                  ? 'text-pp-error'
+                                  : 'text-pp-outline'
+                            }
+                          >
+                            {variant.upliftVsControlPct >= 0 ? '+' : ''}
+                            {variant.upliftVsControlPct.toFixed(1)}%
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <PpPill
+                          accent={
+                            badge === 'significant'
+                              ? 'mint'
+                              : badge === 'control'
+                                ? 'primary'
+                                : 'neutral'
+                          }
+                          dot={badge === 'significant'}
+                        >
+                          {t(experimentVariantBadgeLabelKey(badge))}
+                        </PpPill>
                       </td>
                     </tr>
                   );
                 })}
               </tbody>
-            </table>
-          </section>
+            </PpTable>
+          </PpCard>
         ))
       )}
-      </div>
-    </div>
+    </PpPage>
   );
 }

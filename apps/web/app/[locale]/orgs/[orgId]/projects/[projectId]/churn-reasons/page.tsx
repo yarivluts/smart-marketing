@@ -19,7 +19,17 @@ import {
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { cancellationReasonCodeLabelKey, cancellationReasonThemeLabelKey, toCancellationReasonDimensionBreakdownRows } from '@/lib/orgs/churn-reason-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
-import { ChurnSurvivalDashboard } from '@/components/churn/churn-survival-dashboard';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpEmptyState,
+  PpPill,
+} from '@/components/pastel/primitives';
+import { TrendingDown, MessageSquare, Layers, ListOrdered, Calendar, UserCheck } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -31,24 +41,18 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
-const DIMENSIONS: readonly { key: CancellationReasonBreakdownDimension; headingKey: string; emptyKey: string }[] = [
-  { key: 'plan_interval', headingKey: 'byPlanHeading', emptyKey: 'byPlanEmpty' },
-  { key: 'channel_id', headingKey: 'byChannelHeading', emptyKey: 'byChannelEmpty' },
-  { key: 'cohort_month', headingKey: 'byCohortHeading', emptyKey: 'byCohortEmpty' },
+const DIMENSIONS: readonly { key: CancellationReasonBreakdownDimension; headingKey: string; emptyKey: string; icon: typeof Calendar }[] = [
+  { key: 'plan_interval', headingKey: 'byPlanHeading', emptyKey: 'byPlanEmpty', icon: Layers },
+  { key: 'channel_id', headingKey: 'byChannelHeading', emptyKey: 'byChannelEmpty', icon: UserCheck },
+  { key: 'cohort_month', headingKey: 'byCohortHeading', emptyKey: 'byCohortEmpty', icon: Calendar },
 ];
 
 /**
- * A project's structured + free-text churn-reason breakdown (KAN-84, plan
- * `14 §Gap 10`) — mirrors the Feedback & NPS page's own shape exactly (same
- * gating, same install-card-until-installed posture, KAN-82). The
- * structured `reason_code` breakdown and free-text theme digest are
- * computed fresh from bounded Firestore reads (no warehouse needed, same
- * posture `getNpsOverviewForProject`/`getFeedbackThemeDigestForProject`
- * take); the plan/channel/cohort breakdown is the one section that reads
- * the warehouse-backed `fact_cancellation_reason` mart via the metrics
- * compiler, degrading per-dimension (not blanking the whole page) the same
- * way a board tile degrades when the warehouse isn't configured yet
- * (`queryBoardTile`, KAN-60).
+ * A project's structured + free-text churn-reason breakdown (KAN-84):
+ * Evaluates reason codes, themes, and dimensions.
+ *
+ * Converted to Stitch Pastel Pulse design (desktop 381c5ffe, mobile 67f4a38f),
+ * folding all real breakdown and verbatim themes without fabricated survey answers.
  */
 export default async function ChurnReasonsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -82,11 +86,16 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === CHURN_REASON_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="CHURN DIAGNOSTICS PACK REQUIRED"
+          title={t('title', { projectName: project.name })}
+          description={t('setupIntro')}
+        />
+        <PpCard title="Install Metric Pack" subtitle="Activate churn reasons, cancellation themes, and cohort exit analysis">
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+        </PpCard>
+      </PpPage>
     );
   }
 
@@ -109,110 +118,196 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
     Promise.all(DIMENSIONS.map((dimension) => getCancellationReasonDimensionBreakdownForProject(orgId, projectId, dimension.key))),
   ]);
 
-  const activePluginIds = new Set(
-    installs
-      .filter((i) => i.status === 'installed')
-      .map((i) => i.plugin_id.toLowerCase()),
-  );
-
   const hasCancellationData = cancellationRecords.length > 0;
   const hasChurnedSubs = churnedSubs.length > 0;
   const hasChurnMetrics = Boolean(churnMetricsOutcome && churnMetricsOutcome.series && churnMetricsOutcome.series.length > 0);
-  const hasBillingConnector = activePluginIds.has('stripe') || activePluginIds.has('stripe_billing') || activePluginIds.has('churn_reasons');
+  const isDataConnected = hasCancellationData || hasChurnedSubs || hasChurnMetrics;
 
-  const isDataConnected = hasCancellationData || hasChurnedSubs || hasChurnMetrics || hasBillingConnector;
-
-  const initialSurveys =
-    churnedSubs.length > 0
-      ? churnedSubs.map((sub, idx) => ({
-          id: sub.id,
-          accountName: `Customer #${sub.id.slice(0, 6)}`,
-          plan: 'Pro ($199)',
-          mrrLost: '-$199',
-          tenure: '6 Mo Tenure',
-          reasonQuote: 'Budget consolidation and downsizing seat count',
-          winBackScore: Math.max(35, Math.min(90, 85 - idx * 10)),
-        }))
-      : undefined;
+  const totalReasonsCount = codeBreakdown.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <main className="w-full space-y-10">
-      {/* Stitch Customer Survival Curves & Churn Diagnostics */}
-      <ChurnSurvivalDashboard
-        orgId={orgId}
-        projectId={projectId}
-        isDataConnected={isDataConnected}
-        initialSurveys={initialSurveys}
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="RETENTION & EXIT INTELLIGENCE"
+        meta={isDataConnected ? 'Live Retention Telemetry' : 'Awaiting Ingestion'}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+              <span className="w-1.5 h-1.5 rounded-full bg-pp-secondary animate-pulse" />
+              <span>{isDataConnected ? 'v2.8 Diagnostics Live' : 'Awaiting Signals'}</span>
+            </span>
+          </div>
+        }
       />
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Logged Reason Records"
+          value={cancellationRecords.length}
+          valueSuffix="events"
+          accent="primary"
+          footer="Captured cancellation events"
+        />
+        <PpKpiCard
+          label="Reason Categories"
+          value={codeBreakdown.length}
+          valueSuffix="categories"
+          badge={codeBreakdown.length > 0 ? 'Ranked' : 'Zero'}
+          badgeAccent="mint"
+          accent="mint"
+          footer="Structured exit selections"
+        />
+        <PpKpiCard
+          label="Verbatim Themes"
+          value={themeDigest.length}
+          valueSuffix="themes"
+          badge={themeDigest.length > 0 ? 'Synthesized' : 'None'}
+          badgeAccent="sky"
+          accent="sky"
+          footer="Free-text comment clusters"
+        />
+        <PpKpiCard
+          label="Recent Churned Subs"
+          value={churnedSubs.length}
+          valueSuffix="subscriptions"
+          badge={churnedSubs.length > 0 ? 'Logged' : 'None'}
+          badgeAccent={churnedSubs.length > 0 ? 'pink' : 'mint'}
+          accent="pink"
+          footer="Recent cancellation queue"
+        />
+      </PpKpiGrid>
 
-        <section className="flex flex-col gap-3">
-          <h3 className="text-sm font-semibold tracking-tight">{t('reasonCodeHeading')}</h3>
+      {/* 3. Section 1: Structured Reason Codes */}
+      <PpCard
+        title={t('reasonCodeHeading')}
+        subtitle="Distribution of customer-selected cancellation drivers ranked by frequency"
+        icon={ListOrdered}
+        iconAccent="primary"
+        flush={codeBreakdown.length > 0}
+      >
         {codeBreakdown.length === 0 ? (
-          <p className="text-muted-foreground">{t('reasonCodeEmpty')}</p>
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('reasonCodeEmpty')}</p>
         ) : (
-          <ul className="flex flex-col gap-1">
-            {codeBreakdown.map((entry) => (
-              <li key={entry.reasonCode} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                <span>{t(cancellationReasonCodeLabelKey(entry.reasonCode))}</span>
-                <span className="text-muted-foreground">{t('reasonCodeCount', { count: entry.count })}</span>
-              </li>
-            ))}
-          </ul>
+          <PpTable>
+            <thead>
+              <tr>
+                <th>Reason Code</th>
+                <th>Count</th>
+                <th>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {codeBreakdown.map((entry) => {
+                const sharePct = totalReasonsCount > 0 ? ((entry.count / totalReasonsCount) * 100).toFixed(1) : '0.0';
+                return (
+                  <tr key={entry.reasonCode}>
+                    <td className="font-semibold text-pp-on-surface">
+                      {t(cancellationReasonCodeLabelKey(entry.reasonCode))}
+                    </td>
+                    <td className="tabular-nums font-mono text-pp-on-surface">
+                      {t('reasonCodeCount', { count: entry.count })}
+                    </td>
+                    <td className="tabular-nums font-mono">
+                      <PpPill accent="neutral">
+                        {sharePct}%
+                      </PpPill>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </PpTable>
         )}
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('themeDigestHeading')}</h2>
+      {/* 4. Section 2: Free-Text Themes Digest */}
+      <PpCard
+        title={t('themeDigestHeading')}
+        subtitle="AI-synthesized themes and representative quotes from user exit comments"
+        icon={MessageSquare}
+        iconAccent="sky"
+      >
         {themeDigest.length === 0 ? (
-          <p className="text-muted-foreground">{t('themeDigestEmpty')}</p>
+          <PpEmptyState
+            icon={MessageSquare}
+            title={t('themeDigestHeading')}
+            description={t('themeDigestEmpty')}
+          />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="space-y-4">
             {themeDigest.map((cluster) => (
-              <li key={cluster.theme} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+              <div
+                key={cluster.theme}
+                className="rounded-2xl bg-pp-subtle-inset p-4 space-y-2.5"
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{t(cancellationReasonThemeLabelKey(cluster.theme))}</span>
-                  <span className="text-xs text-muted-foreground">{t('themeCommentCount', { count: cluster.commentCount })}</span>
-                </div>
-                {cluster.exampleComments.map((comment, index) => (
-                  <span key={index} className="text-muted-foreground">
-                    {t('themeExampleComment', { comment })}
+                  <span className="font-semibold text-sm text-pp-on-surface">
+                    {t(cancellationReasonThemeLabelKey(cluster.theme))}
                   </span>
-                ))}
-              </li>
+                  <PpPill accent="sky">
+                    {t('themeCommentCount', { count: cluster.commentCount })}
+                  </PpPill>
+                </div>
+                {cluster.exampleComments.length > 0 && (
+                  <ul className="space-y-1.5 pl-2 border-s-2 border-pp-outline-variant/40">
+                    {cluster.exampleComments.map((comment, index) => (
+                      <li key={index} className="text-pp-body-sm text-pp-on-surface-variant italic">
+                        &ldquo;{comment}&rdquo;
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-      </section>
+      </PpCard>
 
-      {DIMENSIONS.map((dimension, index) => {
-        const outcome = dimensionOutcomes[index];
-        return (
-          <section key={dimension.key} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
-            {!outcome.ok ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : outcome.rows.length === 0 ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {toCancellationReasonDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
-                  <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                    <span>{row.value || t('dimensionValueUnknown')}</span>
-                    <span className="text-muted-foreground">{t('reasonCodeCount', { count: row.count })}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+      {/* 5. Section 3: Dimensional Breakdown Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {DIMENSIONS.map((dimension, index) => {
+          const outcome = dimensionOutcomes[index];
+          const IconComp = dimension.icon;
+          return (
+            <PpCard
+              key={dimension.key}
+              title={t(dimension.headingKey)}
+              icon={IconComp}
+              iconAccent="mint"
+              flush={Boolean(outcome.ok && outcome.rows.length > 0)}
+            >
+              {!outcome.ok || outcome.rows.length === 0 ? (
+                <p className="text-pp-body-sm text-pp-on-surface-variant p-4 pt-0">{t(dimension.emptyKey)}</p>
+              ) : (
+                <PpTable>
+                  <thead>
+                    <tr>
+                      <th>Dimension</th>
+                      <th>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toCancellationReasonDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
+                      <tr key={row.value}>
+                        <td className="font-semibold text-pp-on-surface">
+                          {row.value || t('dimensionValueUnknown')}
+                        </td>
+                        <td className="tabular-nums font-mono text-pp-on-surface">
+                          {t('reasonCodeCount', { count: row.count })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </PpTable>
+              )}
+            </PpCard>
+          );
+        })}
       </div>
-    </main>
+    </PpPage>
   );
 }

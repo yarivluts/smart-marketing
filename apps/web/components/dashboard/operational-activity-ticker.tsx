@@ -173,28 +173,6 @@ export function OperationalActivityTicker({
     };
   }, [orgId, projectId, isPaused]);
 
-  // Simulated live event ticker when not paused
-  useEffect(() => {
-    if (isPaused) return;
-
-    const interval = setInterval(() => {
-      setEvents((prevEvents) => {
-        // Rotate the first event or refresh relative timestamps
-        const updated = [...prevEvents];
-        const last = updated.pop();
-        if (last) {
-          updated.unshift({
-            ...last,
-            id: `evt-${Date.now()}`,
-            timestamp: 'Just now',
-          });
-        }
-        return updated;
-      });
-    }, 8000);
-
-    return () => clearInterval(interval);
-  }, [isPaused]);
 
   const categoryCounts = useMemo(() => {
     return {
@@ -304,7 +282,11 @@ export function OperationalActivityTicker({
 
       {/* Feed Stream Items */}
       <div className="mt-2 divide-y divide-border/50 max-h-[360px] overflow-y-auto pe-1">
-        {filteredEvents.length === 0 ? (
+        {events.length === 0 ? (
+          <div className="py-8 text-center text-xs text-muted-foreground">
+            {t('noActivityEvents')}
+          </div>
+        ) : filteredEvents.length === 0 ? (
           <div className="py-8 text-center text-xs text-muted-foreground">
             {t('noFeedEvents')}
           </div>

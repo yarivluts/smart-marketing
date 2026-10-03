@@ -447,7 +447,9 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
       );
 
       const campaignLinks = screen.getAllByRole('link', { name: /Campaigns Cockpit/i });
-      const activeLink = campaignLinks.find((el) => el.className.includes('bg-primary/10'));
+      const activeLink = campaignLinks.find(
+        (el) => el.className.includes('bg-pp-primary-fixed') || el.className.includes('bg-primary/10'),
+      );
       expect(activeLink).toBeDefined();
     });
   });

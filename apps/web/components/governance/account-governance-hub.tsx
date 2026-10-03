@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Shield, Users, FileText, CheckCircle2, AlertTriangle, Key } from 'lucide-react';
 import { MissingIntegrationOverlay } from '@/components/integrations/missing-integration-overlay';
+import { PpCard, PpTable, PpPill, PpEmptyState } from '@/components/pastel/primitives';
 
 export interface ConnectedPlatform {
   name: string;
   type: string;
-  status: 'connected' | 'disconnected';
+  status: 'connected' | 'disconnected' | 'pending';
   accounts: string;
   syncRate: string;
   scopes: string[];
@@ -26,7 +28,7 @@ export interface AuditLogEntry {
   actor: string;
   action: string;
   target: string;
-  status: 'success' | 'warning';
+  status: 'success' | 'warning' | 'error';
 }
 
 export interface AccountGovernanceHubProps {
@@ -38,70 +40,6 @@ export interface AccountGovernanceHubProps {
   initialAuditLogs?: AuditLogEntry[];
 }
 
-const DEFAULT_PLATFORMS: ConnectedPlatform[] = [
-  {
-    name: 'Meta Graph API',
-    type: 'Social Paid Media',
-    status: 'connected',
-    accounts: '3 Active Ad Accounts',
-    syncRate: '60s polling',
-    scopes: ['ads_read', 'ads_management'],
-    expiresIn: '54 days',
-  },
-  {
-    name: 'Google Ads API',
-    type: 'Search & Performance Max',
-    status: 'connected',
-    accounts: '2 Active CID Accounts (404-892)',
-    syncRate: 'Real-time Webhook',
-    scopes: ['read', 'guardrail_write'],
-    expiresIn: 'Active OAuth',
-  },
-  {
-    name: 'TikTok Marketing API',
-    type: 'Short-Form Video',
-    status: 'connected',
-    accounts: '1 Active (adv_984210)',
-    syncRate: '5m polling',
-    scopes: ['campaign_read', 'creative_write'],
-    expiresIn: '89 days',
-  },
-];
-
-const DEFAULT_MEMBERS: GovernanceMember[] = [
-  { name: 'Sarah Jenkins', initials: 'SJ', role: 'Agency Admin', lastActive: 'Online now' },
-  { name: 'Alex Rivera', initials: 'AR', role: 'Media Buyer', lastActive: '2h ago' },
-  { name: 'Elena Rostova', initials: 'ER', role: 'Experimenter', lastActive: '1d ago' },
-  { name: 'Marcus Chen', initials: 'MC', role: 'Client Viewer', lastActive: '3d ago' },
-];
-
-const DEFAULT_AUDIT_LOGS: AuditLogEntry[] = [
-  {
-    id: 'a-1',
-    timestamp: '10 mins ago',
-    actor: 'Autonomous Guardrail Bot',
-    action: 'Auto-paused ad set #382 (ROAS < 2.0x)',
-    target: 'Meta Ads: Lawyers Retargeting',
-    status: 'success',
-  },
-  {
-    id: 'a-2',
-    timestamp: '1 hour ago',
-    actor: 'Alex Rivera (Media Buyer)',
-    action: 'Scaled daily budget from $150 to $250',
-    target: 'Google Search: Brand Term PMax',
-    status: 'success',
-  },
-  {
-    id: 'a-3',
-    timestamp: 'Yesterday at 16:42',
-    actor: 'Sarah Jenkins (Admin)',
-    action: 'Invited new Experimenter member',
-    target: 'Elena Rostova (elena@partner.com)',
-    status: 'success',
-  },
-];
-
 export function AccountGovernanceHub({
   orgId = 'demo-org',
   projectId = 'demo-project',
@@ -110,131 +48,156 @@ export function AccountGovernanceHub({
   initialMembers,
   initialAuditLogs,
 }: AccountGovernanceHubProps) {
-  const [platforms, setPlatforms] = useState<ConnectedPlatform[]>(initialPlatforms && initialPlatforms.length > 0 ? initialPlatforms : DEFAULT_PLATFORMS);
-  const [members, setMembers] = useState<GovernanceMember[]>(initialMembers && initialMembers.length > 0 ? initialMembers : DEFAULT_MEMBERS);
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(initialAuditLogs && initialAuditLogs.length > 0 ? initialAuditLogs : DEFAULT_AUDIT_LOGS);
+  const platforms = initialPlatforms ?? [];
+  const members = initialMembers ?? [];
+  const auditLogs = initialAuditLogs ?? [];
   const [activeTab, setActiveTab] = useState<'connections' | 'rbac' | 'audit'>('connections');
 
+  const connectedCount = platforms.filter((p) => p.status === 'connected').length;
+
   const content = (
-    <div className="space-y-8" data-testid="account-governance-hub">
+    <div className="space-y-6" data-testid="account-governance-hub">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-pp-outline">
             <span>GrowthOS</span>
             <span>&gt;</span>
-            <span className="text-foreground">Settings & Governance</span>
+            <span className="text-pp-on-surface">Settings &amp; Governance</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Account Governance, Ad Connections & Audit Logs
-          </h1>
-          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+          <h2 className="mt-1 font-pp-display text-xl font-bold tracking-tight text-pp-on-surface sm:text-2xl">
+            Account Governance, Ad Connections &amp; Audit Logs
+          </h2>
+          <p className="mt-0.5 text-xs text-pp-on-surface-variant sm:text-sm">
             Platform OAuth credential status, role-based access control matrix, and complete immutable audit trails.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 border border-emerald-500/20">
-            3 Connected APIs
-          </span>
-          <span className="rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold text-foreground shadow-sm">
+          <PpPill accent={connectedCount > 0 ? 'mint' : 'neutral'} dot>
+            {connectedCount > 0 ? `${connectedCount} Connected APIs` : 'No APIs Connected'}
+          </PpPill>
+          <span className="rounded-full border border-pp-outline-variant/40 bg-pp-surface-container-lowest px-3 py-1 text-xs font-semibold text-pp-on-surface shadow-pp-candy">
             RBAC Active
           </span>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-4 border-b border-border text-xs font-bold">
+      <div className="flex items-center gap-4 border-b border-pp-outline-variant/30 text-xs font-bold">
         <button
           type="button"
           onClick={() => setActiveTab('connections')}
           className={`pb-3 border-b-2 transition-all ${
             activeTab === 'connections'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+              ? 'border-pp-primary text-pp-primary'
+              : 'border-transparent text-pp-outline hover:text-pp-on-surface'
           }`}
         >
-          Connected Platforms (3)
+          Connected Platforms ({platforms.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('rbac')}
           className={`pb-3 border-b-2 transition-all ${
             activeTab === 'rbac'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+              ? 'border-pp-primary text-pp-primary'
+              : 'border-transparent text-pp-outline hover:text-pp-on-surface'
           }`}
         >
-          Team & RBAC Matrix (4)
+          Team &amp; RBAC Matrix ({members.length})
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('audit')}
           className={`pb-3 border-b-2 transition-all ${
             activeTab === 'audit'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
+              ? 'border-pp-primary text-pp-primary'
+              : 'border-transparent text-pp-outline hover:text-pp-on-surface'
           }`}
         >
-          Audit Trail Log
+          Audit Trail Log ({auditLogs.length})
         </button>
       </div>
 
       {/* Tab 1: Connected Platforms */}
       {activeTab === 'connections' && (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          {platforms.map((platform) => (
-            <div
-              key={platform.name}
-              className="flex flex-col justify-between rounded-2xl border border-border bg-card p-6 shadow-sm"
-            >
-              <div>
-                <div className="flex items-start justify-between">
+        <div>
+          {platforms.length === 0 ? (
+            <PpEmptyState
+              icon={Key}
+              title="No Connected Platforms"
+              description="No external marketing APIs or data ingestion credentials are configured for this organization."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              {platforms.map((platform) => (
+                <div
+                  key={platform.name}
+                  className="flex flex-col justify-between rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest p-5 shadow-pp-candy"
+                >
                   <div>
-                    <h2 className="text-base font-bold text-foreground">{platform.name}</h2>
-                    <span className="text-xs text-muted-foreground">{platform.type}</span>
-                  </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Connected
-                  </span>
-                </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-pp-display text-base font-bold text-pp-on-surface">{platform.name}</h3>
+                        <span className="text-xs text-pp-outline">{platform.type}</span>
+                      </div>
+                      <PpPill
+                        accent={
+                          platform.status === 'connected'
+                            ? 'mint'
+                            : platform.status === 'pending'
+                              ? 'amber'
+                              : 'error'
+                        }
+                        dot
+                      >
+                        {platform.status === 'connected'
+                          ? 'Connected'
+                          : platform.status === 'pending'
+                            ? 'Pending'
+                            : 'Disconnected'}
+                      </PpPill>
+                    </div>
 
-                <div className="mt-4 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Accounts:</span>
-                    <span className="font-semibold text-foreground">{platform.accounts}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Sync Rate:</span>
-                    <span className="font-mono text-foreground">{platform.syncRate}</span>
-                  </div>
-                  <div className="pt-2">
-                    <span className="text-muted-foreground text-[11px]">Scopes:</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {platform.scopes.map((s) => (
-                        <span
-                          key={s}
-                          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                        >
-                          {s}
-                        </span>
-                      ))}
+                    <div className="mt-4 space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-pp-outline">Accounts:</span>
+                        <span className="font-semibold text-pp-on-surface">{platform.accounts}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-pp-outline">Sync Rate:</span>
+                        <span className="font-mono text-pp-on-surface">{platform.syncRate}</span>
+                      </div>
+                      <div className="pt-1">
+                        <span className="text-[11px] text-pp-outline">Scopes:</span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {platform.scopes.map((s) => (
+                            <span
+                              key={s}
+                              className="rounded bg-pp-surface-container px-1.5 py-0.5 font-mono text-[10px] text-pp-on-surface-variant"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="mt-6 flex items-center justify-between border-t border-border pt-4 text-xs">
-                <span className="text-[11px] text-muted-foreground">{platform.expiresIn}</span>
-                <button
-                  type="button"
-                  className="rounded-lg bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                >
-                  Manage
-                </button>
-              </div>
+                  <div className="mt-5 flex items-center justify-between border-t border-pp-outline-variant/20 pt-3 text-xs">
+                    <span className="text-[11px] text-pp-outline">{platform.expiresIn}</span>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-pp-primary-fixed px-2.5 py-1 text-xs font-semibold text-pp-on-primary-fixed hover:opacity-90 transition-opacity"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -242,86 +205,109 @@ export function AccountGovernanceHub({
       {activeTab === 'rbac' && (
         <div className="space-y-6">
           {/* Role hierarchy breakdown */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 text-xs">
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <strong className="block text-primary font-bold">Agency Admin</strong>
-              <span className="text-[11px] text-muted-foreground">Global root access & billing</span>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
+            <div className="rounded-xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest p-3 shadow-pp-candy">
+              <strong className="block text-pp-primary font-bold">Agency Admin</strong>
+              <span className="text-[11px] text-pp-outline">Global root access &amp; billing</span>
             </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <strong className="block text-secondary font-bold">Media Buyer</strong>
-              <span className="text-[11px] text-muted-foreground">Budget edits & ad guardrails</span>
+            <div className="rounded-xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest p-3 shadow-pp-candy">
+              <strong className="block text-pp-secondary font-bold">Media Buyer</strong>
+              <span className="text-[11px] text-pp-outline">Budget edits &amp; ad guardrails</span>
             </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <strong className="block text-teal-600 font-bold">Experimenter</strong>
-              <span className="text-[11px] text-muted-foreground">A/B tests & DOM editor</span>
+            <div className="rounded-xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest p-3 shadow-pp-candy">
+              <strong className="block text-teal-700 dark:text-teal-400 font-bold">Experimenter</strong>
+              <span className="text-[11px] text-pp-outline">A/B tests &amp; DOM editor</span>
             </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <strong className="block text-muted-foreground font-bold">Client Viewer</strong>
-              <span className="text-[11px] text-muted-foreground">Read-only dashboards</span>
+            <div className="rounded-xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest p-3 shadow-pp-candy">
+              <strong className="block text-pp-outline font-bold">Client Viewer</strong>
+              <span className="text-[11px] text-pp-outline">Read-only dashboards</span>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-muted/30 text-muted-foreground">
-                  <th className="py-3 px-5 font-semibold">MEMBER</th>
-                  <th className="py-3 px-4 font-semibold">ASSIGNED ROLE</th>
-                  <th className="py-3 px-4 font-semibold">LAST ACTIVE</th>
-                  <th className="py-3 px-5 font-semibold text-right">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {members.map((m) => (
-                  <tr key={m.name} className="transition-colors hover:bg-muted/40">
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 font-bold text-xs text-primary">
-                          {m.initials}
-                        </div>
-                        <span className="font-bold text-foreground">{m.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-foreground">{m.role}</td>
-                    <td className="py-3.5 px-4 text-muted-foreground">{m.lastActive}</td>
-                    <td className="py-3.5 px-5 text-right text-muted-foreground">Manage</td>
+          {members.length === 0 ? (
+            <PpEmptyState
+              icon={Users}
+              title="No Team Members Found"
+              description="No members are currently linked to this organization."
+            />
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest shadow-pp-candy">
+              <PpTable>
+                <thead>
+                  <tr className="border-b border-pp-outline-variant/20 bg-pp-surface-container/30 text-start text-xs font-semibold text-pp-outline">
+                    <th className="py-3 px-4">MEMBER</th>
+                    <th className="py-3 px-4">ASSIGNED ROLE</th>
+                    <th className="py-3 px-4">LAST ACTIVE</th>
+                    <th className="py-3 px-4 text-end">ACTION</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-pp-outline-variant/20 text-xs">
+                  {members.map((m) => (
+                    <tr key={m.name} className="transition-colors hover:bg-pp-surface-container/20">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-pp-primary-fixed font-bold text-xs text-pp-on-primary-fixed">
+                            {m.initials}
+                          </div>
+                          <span className="font-semibold text-pp-on-surface">{m.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-medium text-pp-on-surface">{m.role}</td>
+                      <td className="py-3 px-4 text-pp-outline">{m.lastActive}</td>
+                      <td className="py-3 px-4 text-end text-pp-outline">Manage</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </PpTable>
+            </div>
+          )}
         </div>
       )}
 
       {/* Tab 3: Audit Trail Log */}
       {activeTab === 'audit' && (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-muted/30 text-muted-foreground">
-                <th className="py-3 px-5 font-semibold">TIME</th>
-                <th className="py-3 px-4 font-semibold">ACTOR</th>
-                <th className="py-3 px-4 font-semibold">ACTION EXECUTED</th>
-                <th className="py-3 px-4 font-semibold">TARGET RESOURCE</th>
-                <th className="py-3 px-5 font-semibold text-right">STATUS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
-              {auditLogs.map((log) => (
-                <tr key={log.id} className="transition-colors hover:bg-muted/40">
-                  <td className="py-3.5 px-5 font-mono text-muted-foreground">{log.timestamp}</td>
-                  <td className="py-3.5 px-4 font-semibold text-foreground">{log.actor}</td>
-                  <td className="py-3.5 px-4 text-foreground">{log.action}</td>
-                  <td className="py-3.5 px-4 font-mono text-muted-foreground">{log.target}</td>
-                  <td className="py-3.5 px-5 text-right">
-                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-bold text-emerald-600">
-                      Executed
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div>
+          {auditLogs.length === 0 ? (
+            <PpEmptyState
+              icon={FileText}
+              title="No Audit Logs Recorded"
+              description="No administrative or automated actions have been recorded in the organization audit ledger yet."
+            />
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-lowest shadow-pp-candy">
+              <PpTable>
+                <thead>
+                  <tr className="border-b border-pp-outline-variant/20 bg-pp-surface-container/30 text-start text-xs font-semibold text-pp-outline">
+                    <th className="py-3 px-4">TIME</th>
+                    <th className="py-3 px-4">ACTOR</th>
+                    <th className="py-3 px-4">ACTION EXECUTED</th>
+                    <th className="py-3 px-4">TARGET RESOURCE</th>
+                    <th className="py-3 px-4 text-end">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-pp-outline-variant/20 text-xs">
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} className="transition-colors hover:bg-pp-surface-container/20">
+                      <td className="py-3 px-4 font-mono text-pp-outline">{log.timestamp}</td>
+                      <td className="py-3 px-4 font-semibold text-pp-on-surface">{log.actor}</td>
+                      <td className="py-3 px-4 text-pp-on-surface">{log.action}</td>
+                      <td className="py-3 px-4 font-mono text-pp-outline">{log.target}</td>
+                      <td className="py-3 px-4 text-end">
+                        <PpPill
+                          accent={
+                            log.status === 'success' ? 'mint' : log.status === 'warning' ? 'amber' : 'error'
+                          }
+                          dot
+                        >
+                          {log.status === 'success' ? 'Executed' : log.status === 'warning' ? 'Warning' : 'Failed'}
+                        </PpPill>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </PpTable>
+            </div>
+          )}
         </div>
       )}
     </div>

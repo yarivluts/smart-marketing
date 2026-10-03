@@ -143,8 +143,8 @@ export function TvApp(): React.ReactElement {
 
   if (phase === 'error') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
-        <p className="text-2xl text-muted-foreground">{t('pairingError')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-pp-surface p-8 text-center font-pp-body">
+        <p className="text-2xl text-pp-error font-medium">{t('pairingError')}</p>
       </main>
     );
   }
@@ -154,8 +154,8 @@ export function TvApp(): React.ReactElement {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
-      <p className="text-xl text-muted-foreground">{t('loading')}</p>
+    <main className="flex min-h-screen items-center justify-center bg-pp-surface p-8 text-center font-pp-body">
+      <p className="text-xl text-pp-outline font-mono animate-pulse">{t('loading')}</p>
     </main>
   );
 }

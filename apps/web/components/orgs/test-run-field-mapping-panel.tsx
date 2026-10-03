@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { PpButton, ppInputClass } from '@/components/pastel/primitives';
+import { Play, Check, X, FlaskConical } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export interface TestRunHookDeliveryOption {
   id: string;
@@ -32,14 +34,7 @@ interface ApplyResponseBody extends TestRunResponseBody {
 
 /**
  * Runs a saved mapping against a sample payload without persisting anything
- * (KAN-54 AC: "test-run on sample") — the sample is either pasted JSON or an
- * already-queued hook delivery's raw payload (KAN-53). Collapsed by default
- * on the field-mappings list so browsing the list stays uncluttered. Once a
- * test-run against a real queued delivery comes back clean, an "apply to
- * delivery" action (KAN-54 follow-up) lands the mapped record for real via
- * the ingest pipeline and marks the delivery handled — see
- * `applyFieldMappingToDelivery`'s own doc comment for why this reuses the
- * exact same validation path rather than trusting the earlier preview.
+ * (KAN-54 AC: "test-run on sample").
  */
 export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hookDeliveries }: TestRunFieldMappingPanelProps): React.ReactElement {
   const t = useTranslations('FieldMappings');
@@ -96,8 +91,6 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
       }
       const body = (await response.json()) as ApplyResponseBody;
       if (!body.applied) {
-        // Re-validation at apply time disagreed with the earlier preview (e.g. the schema evolved,
-        // or the delivery changed, in between) — show the same error rendering a test-run would.
         setResult(body);
         setApplyError(t('applyToDeliveryValidationChanged'));
         return;
@@ -112,9 +105,9 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
 
   if (!open) {
     return (
-      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
+      <PpButton type="button" variant="secondary" size="sm" icon={FlaskConical} onClick={() => setOpen(true)}>
         {t('testRun')}
-      </Button>
+      </PpButton>
     );
   }
 
@@ -126,13 +119,13 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
     result.schemaValidationErrors.length === 0;
 
   return (
-    <div className="flex w-full flex-col gap-2 rounded-md border border-input p-2">
+    <div className="flex w-full flex-col gap-3 rounded-2xl bg-pp-surface-container-low/70 p-4 border border-pp-outline-variant/30 mt-2">
       {hookDeliveries.length > 0 ? (
         <select
           aria-label={t('sampleFromDeliveryLabel')}
           value={hookDeliveryId}
           onChange={(event) => setHookDeliveryId(event.target.value)}
-          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+          className={cn(ppInputClass, 'text-xs py-2')}
         >
           <option value="">{t('samplePastedLabel')}</option>
           {hookDeliveries.map((delivery) => (
@@ -148,46 +141,62 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
           placeholder={t('samplePayloadPlaceholder')}
           value={samplePayload}
           onChange={(event) => setSamplePayload(event.target.value)}
-          className="min-h-24 rounded-md border border-input bg-background p-2 font-mono text-xs"
+          className={cn(ppInputClass, 'min-h-24 p-3 font-mono text-xs')}
         />
       ) : null}
       <div className="flex items-center gap-2">
-        <Button type="button" size="sm" onClick={handleRun} disabled={submitting || (!hookDeliveryId && samplePayload.trim().length === 0)}>
+        <PpButton
+          type="button"
+          size="sm"
+          icon={Play}
+          onClick={handleRun}
+          disabled={submitting || (!hookDeliveryId && samplePayload.trim().length === 0)}
+        >
           {t('runTestRun')}
-        </Button>
+        </PpButton>
         {isSuccess && hookDeliveryId ? (
-          <Button type="button" variant="outline" size="sm" onClick={handleApply} disabled={applying}>
+          <PpButton type="button" variant="secondary" size="sm" icon={Check} onClick={handleApply} disabled={applying}>
             {t('applyToDelivery')}
-          </Button>
+          </PpButton>
         ) : null}
-        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
+        <PpButton type="button" variant="ghost" size="sm" icon={X} onClick={() => setOpen(false)}>
           {t('close')}
-        </Button>
+        </PpButton>
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {error}
         </p>
       ) : null}
       {applyError ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {applyError}
         </p>
       ) : null}
       {result ? (
-        <div className="flex flex-col gap-1 text-xs">
-          <pre className="max-h-40 overflow-auto rounded-md bg-muted/50 p-2">{JSON.stringify(result.record, null, 2)}</pre>
-          {result.errors.length > 0 ? <p className="text-destructive">{t('mappingErrors', { errors: result.errors.join(', ') })}</p> : null}
-          {result.envelopeErrors.length > 0 ? <p className="text-destructive">{t('envelopeErrors', { errors: result.envelopeErrors.join(', ') })}</p> : null}
-          {!result.schemaRegistered ? <p className="text-muted-foreground">{t('schemaNotRegisteredWarning')}</p> : null}
-          {result.schemaValidationErrors.length > 0 ? (
-            <p className="text-destructive">{t('schemaValidationErrors', { errors: result.schemaValidationErrors.join(', ') })}</p>
+        <div className="flex flex-col gap-2 text-xs">
+          <pre className="max-h-48 overflow-auto rounded-xl bg-[#1e1e24] text-[#f2eff8] p-3 font-mono text-xs">
+            {JSON.stringify(result.record, null, 2)}
+          </pre>
+          {result.errors.length > 0 ? (
+            <p className="text-pp-error font-medium">{t('mappingErrors', { errors: result.errors.join(', ') })}</p>
           ) : null}
-          {isSuccess ? <p className="text-green-600 dark:text-green-400">{t('testRunSuccess')}</p> : null}
+          {result.envelopeErrors.length > 0 ? (
+            <p className="text-pp-error font-medium">{t('envelopeErrors', { errors: result.envelopeErrors.join(', ') })}</p>
+          ) : null}
+          {!result.schemaRegistered ? (
+            <p className="text-pp-outline font-medium">{t('schemaNotRegisteredWarning')}</p>
+          ) : null}
+          {result.schemaValidationErrors.length > 0 ? (
+            <p className="text-pp-error font-medium">
+              {t('schemaValidationErrors', { errors: result.schemaValidationErrors.join(', ') })}
+            </p>
+          ) : null}
+          {isSuccess ? <p className="text-pp-secondary font-bold">{t('testRunSuccess')}</p> : null}
         </div>
       ) : null}
       {applySummary ? (
-        <p className="text-xs text-green-600 dark:text-green-400">
+        <p className="text-xs text-pp-secondary font-bold">
           {t('applyToDeliverySuccess', {
             accepted: applySummary.accepted,
             quarantined: applySummary.quarantined,

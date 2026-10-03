@@ -25,10 +25,10 @@ vi.mock('@/lib/orgs/org-context', () => ({
   useOrgContext: () => mockUseOrgContext(),
 }));
 
-function renderDashboard(): void {
+function renderDashboard(props?: React.ComponentProps<typeof DashboardContent>): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <DashboardContent />
+      <DashboardContent {...props} />
     </NextIntlClientProvider>,
   );
 }
@@ -116,7 +116,14 @@ describe('DashboardContent', () => {
         },
       ],
     });
-    renderDashboard();
+    renderDashboard({
+      telemetryMetrics: {
+        ingestUptime: '99.98%',
+        ingestLatency: '<18ms',
+        connectedPipelinesCount: 3,
+        totalPipelinesCount: 3,
+      },
+    });
 
     const kpiSection = screen.getByLabelText('Key Health Indicators');
     expect(kpiSection).toBeInTheDocument();
@@ -131,6 +138,25 @@ describe('DashboardContent', () => {
     expect(screen.getByText('99.98%')).toBeInTheDocument();
     expect(screen.getByText('<18ms')).toBeInTheDocument();
     expect(screen.getByText('All Pipelines Synced')).toBeInTheDocument();
+  });
+
+  it('renders honest empty states when telemetry metrics are absent', () => {
+    mockUseOrgContext.mockReturnValue({
+      loading: false,
+      memberships: [
+        {
+          membershipId: 'm1',
+          organizationId: 'org-1',
+          organizationName: 'Acme',
+          role: 'owner',
+          status: 'active',
+        },
+      ],
+    });
+    renderDashboard();
+
+    expect(screen.getByText('No stream activity')).toBeInTheDocument();
+    expect(screen.getByText('None connected')).toBeInTheDocument();
   });
 
   /* ---------------- R2: Interactive Workspace Launchpads & Setup Readiness ---------------- */

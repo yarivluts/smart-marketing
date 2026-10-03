@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { TokenSignIn } from '@/components/auth/token-sign-in';
+import { AuthCard } from '@/components/auth/auth-card';
 import { getServerSession } from '@/lib/auth/get-server-session';
 
 type PageProps = Readonly<{
@@ -25,8 +26,10 @@ export default async function TokenSignInPage({ params }: PageProps): Promise<Re
   }
 
   return (
-    <Suspense>
-      <TokenSignIn />
-    </Suspense>
+    <AuthCard showBrandingSide={true}>
+      <Suspense>
+        <TokenSignIn />
+      </Suspense>
+    </AuthCard>
   );
 }

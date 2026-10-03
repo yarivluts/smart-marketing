@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { Trash2 } from 'lucide-react';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface RevokeApiKeyButtonProps {
   orgId: string;
@@ -34,11 +35,18 @@ export function RevokeApiKeyButton({ orgId, projectId, apiKeyId }: RevokeApiKeyB
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button type="button" variant="destructive" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton
+        type="button"
+        variant="danger"
+        size="sm"
+        onClick={handleClick}
+        disabled={submitting}
+        icon={Trash2}
+      >
         {t('revoke')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('revokeError')}
         </p>
       ) : null}

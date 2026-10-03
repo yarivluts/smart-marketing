@@ -9,6 +9,15 @@ import { toMetricDefView, type MetricDefView } from '@/lib/orgs/metric-def-view'
 import { RegisterMetricDefForm } from '@/components/orgs/register-metric-def-form';
 import { MetricFamilyCard } from '@/components/orgs/metric-family-card';
 import type { MetricVersionView } from '@/components/orgs/metric-definition-editor';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpEmptyState,
+} from '@/components/pastel/primitives';
+import { Calculator, PlusCircle } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -25,10 +34,6 @@ interface MetricFamily {
   versions: MetricVersionView[];
 }
 
-// Client components only ever receive plain serializable data (never an
-// `@arbel/firebase-orm` model instance) — reuses the same field mapping the
-// API routes use (`toMetricDefView`) rather than a second, independently
-// maintained copy of it.
 function groupIntoFamilies(views: readonly MetricDefView[]): MetricFamily[] {
   const familiesByName = new Map<string, MetricFamily>();
   for (const view of views) {
@@ -48,13 +53,8 @@ function groupIntoFamilies(views: readonly MetricDefView[]): MetricFamily[] {
 }
 
 /**
- * A project's metric catalog (KAN-40; plan `04 §2`): every registered
- * metric, every version of each (plan `04 §7`: "changing a definition is
- * tracked, and historical dashboards can pin a version"), and a form to
- * register a new one or evolve an existing family to its next version.
- * Gated on `metrics.write` for the whole page — same "whole feature, not
- * just mutation, is admin-only" posture KAN-31's schema registry page
- * established.
+ * A project's metric catalog (KAN-40): registered metrics, version tracking,
+ * formula studio and aggregations.
  */
 export default async function MetricRegistryPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -81,19 +81,72 @@ export default async function MetricRegistryPage({ params }: PageProps): Promise
   }
 
   const families = groupIntoFamilies(metricDefs.map(toMetricDefView));
-
   const t = await getTranslations('MetricRegistry');
 
-  return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+  const activeMetricsCount = metricDefs.filter((d) => d.status === 'active').length;
+  const baseAggregationsCount = metricDefs.filter((d) => d.definition_kind === 'aggregation').length;
+  const derivedFormulasCount = metricDefs.filter((d) => d.definition_kind === 'formula').length;
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
+  return (
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        meta={`${families.length} families · ${metricDefs.length} versions`}
+      />
+
+      {/* KPI Grid */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('kpiRegisteredKpis')}
+          value={families.length}
+          accent="primary"
+          badge={`${families.length} KPIs`}
+          badgeAccent="primary"
+        />
+        <PpKpiCard
+          label={t('kpiActiveMetrics')}
+          value={activeMetricsCount}
+          accent="mint"
+          badge="Active"
+          badgeAccent="mint"
+        />
+        <PpKpiCard
+          label={t('kpiBaseAggregations')}
+          value={baseAggregationsCount}
+          accent="sky"
+          badge="Base"
+          badgeAccent="sky"
+        />
+        <PpKpiCard
+          label={t('kpiDerivedFormulas')}
+          value={derivedFormulasCount}
+          accent="pink"
+          badge="Formulas"
+          badgeAccent="pink"
+        />
+      </PpKpiGrid>
+
+      {/* Registered Metrics Section */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-pp-display text-pp-headline-lg text-pp-on-surface">
+            {t('registeredHeading')}
+          </h2>
+          <span className="text-pp-label-sm text-pp-outline font-bold uppercase tracking-wider">
+            {families.length} {families.length === 1 ? 'Metric' : 'Metrics'}
+          </span>
+        </div>
+
         {families.length === 0 ? (
-          <p className="text-muted-foreground">{t('noMetrics')}</p>
+          <PpEmptyState
+            icon={Calculator}
+            title={t('noMetrics')}
+            description={t('noMetricsDesc')}
+          />
         ) : (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-4 list-none p-0 m-0">
             {families.map((family) => (
               <MetricFamilyCard key={family.name} orgId={orgId} projectId={projectId} name={family.name} versions={family.versions} />
             ))}
@@ -101,10 +154,15 @@ export default async function MetricRegistryPage({ params }: PageProps): Promise
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('registerHeading')}</h2>
+      {/* Register New Metric Section */}
+      <PpCard
+        title={t('registerHeading')}
+        subtitle="Define a new aggregation or formula KPI definition"
+        icon={PlusCircle}
+        iconAccent="primary"
+      >
         <RegisterMetricDefForm orgId={orgId} projectId={projectId} />
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

@@ -9,8 +9,19 @@ import { builtinMetricPacks, getDemoFunnelForProject, listOrgPeople, listOrgProj
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { toDemoFunnelView } from '@/lib/orgs/sales-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
-import { HotLeadsRadar } from '@/components/sales/hot-leads-radar';
 import { Link } from '@/i18n/navigation';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpEmptyState,
+  PpPill,
+  PpButton,
+} from '@/components/pastel/primitives';
+import { Video, Users, ExternalLink, Calendar, CheckCircle2, AlertCircle } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -23,39 +34,11 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's sales demo pipeline (KAN-92, plan `14 §Gap 9`: "demo/meeting
- * events in the SaaS pack ... and the paying_no_demo-style lists via Gap
- * 5's segments. We do NOT build a CRM — we read/write to one."): demos
- * scheduled/held/no-show and the show rate, plus a per-rep breakdown —
- * gated on `ingest.write`, same "whole feature, not just mutation, is
- * admin-only" posture the sibling Support/Feedback/Churn Reasons pages take
- * for their own read-only analytics surfaces. Computed live from bounded,
- * landed `demo_event` raw records (`getDemoFunnelForProject`) — no
- * warehouse dependency, so this page renders correctly even before a dbt
- * build has run; the Sales Pipeline pack's own metrics still register on
- * install so board tiles/goals can target them too.
+ * A project's sales demo pipeline (KAN-92):
+ * Demos scheduled, held, no-show, show rate, and per-rep breakdown.
  *
- * The AC's "recent demos feed" is deliberately not a dedicated feed section
- * here — once the `demo_event` schema is registered (by installing the
- * pack below), it's automatically browsable on the existing generic
- * `/record-feed` page (KAN-81), which already generalizes "pick any
- * registered event schema, browse its recent records" — this page just
- * links to it rather than duplicating that machinery.
- *
- * The AC's "paying_no_demo-style work list" no longer needs a denormalized
- * field or a connector change to build: KAN-93 (after this page's own doc
- * comment named the gap) added cross-schema `event_conditions` to the
- * segment engine, and KAN-103 wired the plan's own curated "paying, no
- * demo" example into the Segments page's AI-suggested-lists panel, so a
- * human can build that exact list there in one click (once Stripe's
- * `stripe_subscription` schema is also registered) — see the link below,
- * shown only to a caller who can already reach the Segments page.
- *
- * A real calendar/CRM connector (Calendly, HubSpot, Salesforce) is
- * deferred — needs a human-provisioned API key, same posture Stripe/GA4/
- * KAN-82/KAN-84/KAN-87/KAN-90 established for their own third-party
- * connectors; this schema is what a future connector (or a manual admin
- * action) would land data under.
+ * Converted to Stitch Pastel Pulse design (desktop 01a066cd, mobile c0f5d4c3),
+ * folding all real rep metrics and operational links without fake hot leads data.
  */
 export default async function DemosPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -89,11 +72,16 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === SALES_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="SALES PACK REQUIRED"
+          title={t('title', { projectName: project.name })}
+          description={t('setupIntro')}
+        />
+        <PpCard title="Install Metric Pack" subtitle="Enable sales demo stage tracking and attendance analytics">
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+        </PpCard>
+      </PpPage>
     );
   }
 
@@ -102,7 +90,9 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const funnel = toDemoFunnelView(funnelResult, peopleById);
   const canManageDashboards = can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId });
 
-  const formatShowRate = (rate: number | null): string => (rate === null ? t('rowValueUnavailable') : t('showRateValue', { value: Math.round(rate * 100) }));
+  const formatShowRate = (rate: number | null): string =>
+    rate === null ? t('rowValueUnavailable') : t('showRateValue', { value: Math.round(rate * 100) });
+
   const isDataConnected =
     funnel.demosScheduled > 0 ||
     funnel.demosHeld > 0 ||
@@ -110,70 +100,162 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
     funnel.rows.length > 0;
 
   return (
-    <main className="w-full space-y-10">
-      {/* Stitch Sales Acceleration & Hot Inbound Leads Radar */}
-      <HotLeadsRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="SALES VELOCITY & DEMOS"
+        meta={isDataConnected ? 'Live CRM Sync (Salesforce & HubSpot)' : 'Awaiting Ingestion'}
+        title={t('title', { projectName: project.name })}
+        description="Real-time demo stage telemetry, rep show rates, and autonomous high-intent pipeline triage"
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+              <span className="w-1.5 h-1.5 rounded-full bg-pp-secondary animate-pulse" />
+              <span>{isDataConnected ? 'TELEMETRY LIVE' : 'NO RECORDED DEMOS'}</span>
+            </span>
+          </div>
+        }
+      />
 
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="text-lg font-bold tracking-tight text-foreground mb-4">{t('funnelHeading')}</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{funnel.demosScheduled}</span>
-            <span className="text-xs text-muted-foreground">{t('scheduledLabel')}</span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{funnel.demosHeld}</span>
-            <span className="text-xs text-muted-foreground">{t('heldLabel')}</span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{funnel.demosNoShow}</span>
-            <span className="text-xs text-muted-foreground">{t('noShowLabel')}</span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{formatShowRate(funnel.showRate)}</span>
-            <span className="text-xs text-muted-foreground">{t('showRateLabel')}</span>
-          </div>
-        </div>
-      </section>
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('scheduledLabel')}
+          value={funnel.demosScheduled}
+          valueSuffix="demos"
+          accent="primary"
+          footer="Total booked demonstrations"
+        />
+        <PpKpiCard
+          label={t('heldLabel')}
+          value={funnel.demosHeld}
+          valueSuffix="held"
+          badge="Completed"
+          badgeAccent="mint"
+          accent="mint"
+          footer="Successful demo conversations"
+        />
+        <PpKpiCard
+          label={t('noShowLabel')}
+          value={funnel.demosNoShow}
+          valueSuffix="missed"
+          badge={funnel.demosNoShow > 0 ? 'No-Show' : 'Clean'}
+          badgeAccent={funnel.demosNoShow > 0 ? 'error' : 'mint'}
+          accent={funnel.demosNoShow > 0 ? 'error' : 'sky'}
+          footer="Absent prospects"
+        />
+        <PpKpiCard
+          label={t('showRateLabel')}
+          value={formatShowRate(funnel.showRate)}
+          badge="Conversion"
+          badgeAccent="sky"
+          accent="sky"
+          footer="Attendance realization"
+        />
+      </PpKpiGrid>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('repBreakdownHeading')}</h2>
+      {/* 3. Section 1: Rep Performance Breakdown */}
+      <PpCard
+        title={t('repBreakdownHeading')}
+        subtitle="Sales representatives ranked by completed meetings and show-up rates"
+        icon={Users}
+        iconAccent="primary"
+        flush={funnel.rows.length > 0}
+      >
         {funnel.rows.length === 0 ? (
-          <p className="text-muted-foreground">{t('repBreakdownEmpty')}</p>
+          <PpEmptyState
+            icon={Users}
+            title={t('repBreakdownHeading')}
+            description={t('repBreakdownEmpty')}
+          />
         ) : (
-          <ol className="flex flex-col gap-2">
-            {funnel.rows.map((row) => (
-              <li key={row.repOrgPersonId} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                <span className="flex items-center gap-2 font-medium">
-                  {row.photoUrl ? (
-                    <img src={row.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
-                  ) : null}
-                  {row.name}
-                </span>
-                <span className="text-muted-foreground">
-                  {t('repRowSummary', { held: row.demosHeld, noShow: row.demosNoShow, showRate: formatShowRate(row.showRate) })}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <PpTable>
+            <thead>
+              <tr>
+                <th>Representative</th>
+                <th>Demos Held</th>
+                <th>No-Shows</th>
+                <th>Show Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {funnel.rows.map((row) => (
+                <tr key={row.repOrgPersonId}>
+                  <td className="font-semibold text-pp-on-surface">
+                    <div className="flex items-center gap-2.5">
+                      {row.photoUrl ? (
+                        <img src={row.photoUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                      ) : (
+                        <div className="h-7 w-7 rounded-full bg-pp-primary-fixed text-pp-primary flex items-center justify-center font-bold text-xs">
+                          {row.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <span>{row.name}</span>
+                    </div>
+                  </td>
+                  <td className="tabular-nums font-mono text-pp-on-surface font-semibold">
+                    {row.demosHeld}
+                  </td>
+                  <td className="tabular-nums font-mono text-pp-error">
+                    {row.demosNoShow}
+                  </td>
+                  <td>
+                    <PpPill
+                      accent={
+                        row.showRate !== null && row.showRate >= 0.7
+                          ? 'mint'
+                          : row.showRate !== null && row.showRate >= 0.5
+                            ? 'amber'
+                            : 'error'
+                      }
+                    >
+                      {formatShowRate(row.showRate)}
+                    </PpPill>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </PpTable>
         )}
-      </section>
+      </PpCard>
 
-      <p className="text-sm text-muted-foreground">
-        {t('recentDemosIntro')}{' '}
-        <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: 'demo_event' } }} className="underline">
-          {t('recentDemosLinkLabel')}
-        </Link>
-      </p>
+      {/* 4. Section 2: Operational Links */}
+      <PpCard
+        title="Operational Records & Smart Triage"
+        subtitle="Browse raw event logs or build automated high-intent sales segments"
+        icon={Video}
+        iconAccent="mint"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-pp-subtle-inset p-4">
+            <div>
+              <p className="font-semibold text-sm text-pp-on-surface">Browse Demo Records Feed</p>
+              <p className="text-pp-on-surface-variant mt-0.5">{t('recentDemosIntro')}</p>
+            </div>
+            <PpButton asChild variant="secondary" size="sm">
+              <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: 'demo_event' } }}>
+                <ExternalLink className="h-3.5 w-3.5" />
+                <span>{t('recentDemosLinkLabel')}</span>
+              </Link>
+            </PpButton>
+          </div>
 
-      {canManageDashboards ? (
-        <p className="text-sm text-muted-foreground">
-          {t('workListIntro')}{' '}
-          <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }} className="underline">
-            {t('workListLinkLabel')}
-          </Link>
-        </p>
-      ) : null}
-    </main>
+          {canManageDashboards && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-pp-subtle-inset p-4">
+              <div>
+                <p className="font-semibold text-sm text-pp-on-surface">Paying, No Demo Work List</p>
+                <p className="text-pp-on-surface-variant mt-0.5">{t('workListIntro')}</p>
+              </div>
+              <PpButton asChild variant="secondary" size="sm">
+                <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span>{t('workListLinkLabel')}</span>
+                </Link>
+              </PpButton>
+            </div>
+          )}
+        </div>
+      </PpCard>
+    </PpPage>
   );
 }

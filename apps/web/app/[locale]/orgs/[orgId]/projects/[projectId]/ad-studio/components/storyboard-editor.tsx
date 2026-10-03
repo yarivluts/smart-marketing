@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
+import { PpCard, PpButton, ppInputClass, PpPill } from '@/components/pastel/primitives';
 import {
   Film,
   Sparkles,
@@ -17,6 +18,8 @@ import {
   Clock,
   ArrowRight,
   Eye,
+  Timer,
+  Zap,
 } from 'lucide-react';
 
 interface StoryboardEditorProps {
@@ -113,14 +116,14 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
   const activeScene = scenes[activeSceneIndex];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header & Format Settings Card */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
         <div>
-          <h2 className="text-xl font-bold text-[#181820]">
+          <h2 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
             {t('storyboardTitle')}
           </h2>
-          <p className="mt-1 text-sm text-[#6B6A78]">
+          <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
             {t('storyboardSubtitle')}
           </p>
         </div>
@@ -128,7 +131,7 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
         {/* Global Controls: Aspect Ratio & Duration */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Aspect Ratio Switcher */}
-          <div className="flex items-center rounded-full bg-[#ECE8F6] p-1">
+          <div className="flex items-center rounded-full bg-pp-surface-container p-1">
             {[
               { id: '9:16', label: '9:16' },
               { id: '1:1', label: '1:1' },
@@ -138,10 +141,10 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
                 key={ratio.id}
                 type="button"
                 onClick={() => setAspectRatio(ratio.id as any)}
-                className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                className={`rounded-full px-3 py-1 font-label-sm text-label-sm font-bold transition-all ${
                   aspectRatio === ratio.id
-                    ? 'bg-[#7064F4] text-white shadow-xs'
-                    : 'text-[#6B6A78] hover:text-[#181820]'
+                    ? 'bg-pp-primary text-pp-on-primary shadow-xs'
+                    : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                 }`}
               >
                 {ratio.label}
@@ -150,7 +153,7 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
           </div>
 
           {/* Duration Selector */}
-          <div className="flex items-center rounded-full bg-[#ECE8F6] p-1">
+          <div className="flex items-center rounded-full bg-pp-surface-container p-1">
             {[
               { id: '15s', label: '15s' },
               { id: '30s', label: '30s' },
@@ -160,10 +163,10 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
                 key={dur.id}
                 type="button"
                 onClick={() => setTotalDuration(dur.id as any)}
-                className={`rounded-full px-3 py-1 text-xs font-bold transition-all ${
+                className={`rounded-full px-3 py-1 font-label-sm text-label-sm font-bold transition-all ${
                   totalDuration === dur.id
-                    ? 'bg-[#1E1E24] text-white shadow-xs'
-                    : 'text-[#6B6A78] hover:text-[#181820]'
+                    ? 'bg-pp-inverse-surface text-pp-inverse-on-surface shadow-xs'
+                    : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                 }`}
               >
                 {dur.label}
@@ -175,19 +178,55 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
           <button
             type="button"
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#ECE8F6] px-4 py-2 text-xs font-bold text-[#181820] transition-colors hover:bg-[#EBE9FD] hover:text-[#5243D5]"
+            className="inline-flex items-center gap-1.5 rounded-full bg-pp-surface-container px-4 py-2 font-label-sm text-label-sm font-bold text-pp-on-surface transition-colors hover:bg-pp-surface-container-high"
           >
-            {isSaved ? <CheckCircle2 className="h-4 w-4 text-[#0E624C]" /> : <Save className="h-4 w-4" />}
+            {isSaved ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Save className="h-4 w-4 text-pp-primary" />}
             <span>{isSaved ? 'Saved!' : t('btnSaveStoryboard')}</span>
           </button>
 
           <Link
             href={`/orgs/${orgId}/projects/${projectId}/ad-studio/video-export`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#7064F4] px-5 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#5243D5]"
+            className="inline-flex items-center gap-1.5 rounded-full bg-pp-primary px-5 py-2 font-label-sm text-label-sm font-bold text-pp-on-primary shadow-xs transition-all hover:bg-pp-primary-container"
           >
             <span>{t('btnProceedToExport')}</span>
             <ArrowRight className="h-4 w-4 rtl:rotate-180" />
           </Link>
+        </div>
+      </div>
+
+      {/* Timeline Sub-Bar (Stitch sub-header) */}
+      <div className="rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-4 shadow-xs">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 rounded-full bg-pp-surface-container px-3 py-1 font-label-sm text-label-sm font-bold text-pp-on-surface">
+              <Timer className="h-3.5 w-3.5 text-pp-primary" />
+              <span>00:{scenes[activeSceneIndex].durationSec.toString().padStart(2, '0')} / {totalDuration} Duration</span>
+            </div>
+            <span className="rounded-full bg-pp-primary-fixed px-2.5 py-1 font-label-sm text-label-sm font-bold text-pp-on-primary-fixed-variant">
+              5 Beats
+            </span>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-label-sm text-label-sm font-bold text-emerald-800">
+              145 WPM (Optimal UGC Pace)
+            </span>
+          </div>
+
+          {/* Timeline Bar */}
+          <div className="flex flex-1 max-w-md items-center gap-1 rounded-full bg-pp-surface-container p-1">
+            {scenes.map((s, idx) => {
+              const bgColors = ['bg-pp-primary', 'bg-amber-200', 'bg-pp-primary-fixed-dim', 'bg-emerald-300', 'bg-pink-200'];
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setActiveSceneIndex(idx)}
+                  className={`h-2.5 flex-1 rounded-full transition-all ${bgColors[idx % bgColors.length]} ${
+                    activeSceneIndex === idx ? 'ring-2 ring-pp-primary' : 'opacity-80 hover:opacity-100'
+                  }`}
+                  title={`${s.id} - ${t(s.titleKey as any)} (${s.durationSec}s)`}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -196,10 +235,10 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
         {/* Left Column: Scene Breakdown Stepper / Timeline (5 Cols) */}
         <div className="space-y-3 lg:col-span-5">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-[#9B99A8]">
+            <h3 className="font-label-sm text-label-sm font-bold uppercase tracking-wider text-pp-outline">
               {t('sceneBreakdownTitle')}
             </h3>
-            <span className="text-xs font-semibold text-[#6B6A78]">
+            <span className="font-label-sm text-label-sm font-semibold text-pp-on-surface-variant">
               5 Scenes • {totalDuration} Total
             </span>
           </div>
@@ -213,8 +252,8 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
                   onClick={() => setActiveSceneIndex(idx)}
                   className={`cursor-pointer rounded-2xl border p-4 transition-all ${
                     isActive
-                      ? 'border-[#7064F4] bg-white shadow-[0_8px_24px_-4px_rgba(112,100,244,0.12)]'
-                      : 'border-[#ECE8F6] bg-white/70 hover:border-[#7064F4]/30 hover:bg-white'
+                      ? 'border-2 border-pp-primary bg-pp-surface-container-lowest shadow-sm'
+                      : 'border-pp-outline-variant/60 bg-pp-surface-container-low hover:border-pp-primary/40 hover:bg-pp-surface-container-lowest'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -222,21 +261,21 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
                       <span
                         className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                           isActive
-                            ? 'bg-[#7064F4] text-white'
-                            : 'bg-[#ECE8F6] text-[#6B6A78]'
+                            ? 'bg-pp-primary text-pp-on-primary'
+                            : 'bg-pp-surface-container text-pp-on-surface-variant'
                         }`}
                       >
                         {scene.id}
                       </span>
-                      <span className="text-sm font-bold text-[#181820]">
+                      <span className="font-label-md text-label-md font-bold text-pp-on-surface">
                         {t(scene.titleKey as any)}
                       </span>
                     </div>
-                    <span className="rounded-md bg-[#ECE8F6] px-2 py-0.5 text-xs font-bold text-[#6B6A78]">
+                    <span className="rounded-md bg-pp-surface-container px-2 py-0.5 font-label-sm text-label-sm font-semibold text-pp-on-surface-variant">
                       {scene.durationSec}s
                     </span>
                   </div>
-                  <p className="mt-2 text-xs text-[#6B6A78] line-clamp-2">
+                  <p className="mt-2 line-clamp-2 font-body-sm text-body-sm text-pp-on-surface-variant">
                     {scene.voiceoverScript}
                   </p>
                 </div>
@@ -247,18 +286,18 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
 
         {/* Right Column: Active Scene Detail & Prompt Studio (7 Cols) */}
         <div className="space-y-6 lg:col-span-7">
-          <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
-            <div className="flex items-center justify-between border-b border-[#ECE8F6] pb-4">
+          <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
+            <div className="flex items-center justify-between border-b border-pp-outline-variant/40 pb-4">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#7064F4]">
+                <span className="font-label-sm text-label-sm font-bold uppercase tracking-wider text-pp-primary">
                   Editing Scene {activeScene.id} of 5
                 </span>
-                <h3 className="text-lg font-bold text-[#181820]">
+                <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
                   {t(activeScene.titleKey as any)}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <span className="flex items-center gap-1 rounded-full bg-[#EBE9FD] px-3 py-1 text-xs font-semibold text-[#5243D5]">
+                <span className="flex items-center gap-1 rounded-full bg-pp-primary-fixed/50 px-3 py-1 font-label-sm text-label-sm font-semibold text-pp-on-primary-fixed-variant">
                   <Clock className="h-3 w-3" />
                   {activeScene.durationSec} seconds
                 </span>
@@ -266,74 +305,70 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
             </div>
 
             {/* Scene Preview Mockup Box */}
-            <div className="mt-4 flex aspect-video w-full flex-col items-center justify-center rounded-xl bg-gradient-to-br from-[#F5F3FB] to-[#EBE9FD] p-6 text-center">
-              <Film className="h-8 w-8 text-[#7064F4]" />
-              <p className="mt-2 text-xs font-medium text-[#181820] max-w-md">
+            <div className="mt-4 flex aspect-video w-full flex-col items-center justify-center rounded-2xl border border-pp-outline-variant/40 bg-gradient-to-br from-pp-surface-container-low to-pp-primary-fixed/20 p-6 text-center">
+              <Film className="h-8 w-8 text-pp-primary" />
+              <p className="mt-2 max-w-md font-body-md text-body-md font-medium text-pp-on-surface">
                 &ldquo;{activeScene.voiceoverScript}&rdquo;
               </p>
-              <span className="mt-1 text-[11px] text-[#6B6A78]">
+              <span className="mt-1 font-label-sm text-label-sm text-pp-outline">
                 Aspect Ratio: {aspectRatio} • Format Target: Meta / TikTok
               </span>
             </div>
 
             {/* Voiceover Script Input */}
             <div className="mt-6">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="voiceover-input"
-                  className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6A78]"
-                >
-                  <Mic className="h-3.5 w-3.5 text-[#7064F4]" />
-                  <span>{t('voiceoverLabel')}</span>
-                </label>
-              </div>
+              <label
+                htmlFor="voiceover-input"
+                className="flex items-center gap-1.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-on-surface-variant"
+              >
+                <Mic className="h-3.5 w-3.5 text-pp-primary" />
+                <span>{t('voiceoverLabel')}</span>
+              </label>
               <textarea
                 id="voiceover-input"
                 rows={3}
                 value={activeScene.voiceoverScript}
                 onChange={(e) => updateSceneVoiceover(activeSceneIndex, e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-[#ECE8F6] bg-[#F5F3FB]/50 px-4 py-2.5 text-sm text-[#181820] placeholder-[#9B99A8] transition-all focus:border-[#7064F4] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#7064F4]/20"
+                className={`mt-1.5 w-full rounded-2xl resize-none ${ppInputClass}`}
               />
             </div>
 
             {/* Visual Generation Prompt Input */}
             <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="visual-prompt-input"
-                  className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6A78]"
-                >
-                  <Sparkles className="h-3.5 w-3.5 text-[#7064F4]" />
-                  <span>{t('visualPromptLabel')}</span>
-                </label>
-              </div>
+              <label
+                htmlFor="visual-prompt-input"
+                className="flex items-center gap-1.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-on-surface-variant"
+              >
+                <Sparkles className="h-3.5 w-3.5 text-pp-primary" />
+                <span>{t('visualPromptLabel')}</span>
+              </label>
               <textarea
                 id="visual-prompt-input"
                 rows={3}
                 value={activeScene.visualPrompt}
                 onChange={(e) => updateScenePrompt(activeSceneIndex, e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-[#ECE8F6] bg-[#F5F3FB]/50 px-4 py-2.5 text-sm text-[#181820] placeholder-[#9B99A8] transition-all focus:border-[#7064F4] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#7064F4]/20"
+                className={`mt-1.5 w-full rounded-2xl resize-none ${ppInputClass}`}
               />
             </div>
           </div>
 
           {/* Asset Selector & Media Library Panel */}
-          <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
-            <h4 className="text-base font-bold text-[#181820]">
+          <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
+            <h4 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
               {t('mediaAssetsTitle')}
             </h4>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="audio-track-select" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6A78]">
-                  <Music className="h-3.5 w-3.5 text-[#7064F4]" />
+                <label htmlFor="audio-track-select" className="flex items-center gap-1.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-on-surface-variant">
+                  <Music className="h-3.5 w-3.5 text-pp-primary" />
                   <span>{t('audioTrackLabel')}</span>
                 </label>
                 <select
                   id="audio-track-select"
                   value={selectedAudioTrack}
                   onChange={(e) => setSelectedAudioTrack(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-[#ECE8F6] bg-[#F5F3FB]/50 px-3.5 py-2 text-sm text-[#181820] transition-all focus:border-[#7064F4] focus:bg-white focus:outline-none"
+                  className={`mt-1.5 w-full rounded-2xl ${ppInputClass}`}
                 >
                   <option value="energetic">{t('trackEnergetic')}</option>
                   <option value="ambient">{t('trackAmbient')}</option>
@@ -342,15 +377,15 @@ export function StoryboardEditor({ orgId, projectId, projectName }: StoryboardEd
               </div>
 
               <div>
-                <label htmlFor="voice-actor-select" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#6B6A78]">
-                  <Mic className="h-3.5 w-3.5 text-[#7064F4]" />
+                <label htmlFor="voice-actor-select" className="flex items-center gap-1.5 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-on-surface-variant">
+                  <Mic className="h-3.5 w-3.5 text-pp-primary" />
                   <span>{t('voiceActorLabel')}</span>
                 </label>
                 <select
                   id="voice-actor-select"
                   value={selectedVoiceActor}
                   onChange={(e) => setSelectedVoiceActor(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-[#ECE8F6] bg-[#F5F3FB]/50 px-3.5 py-2 text-sm text-[#181820] transition-all focus:border-[#7064F4] focus:bg-white focus:outline-none"
+                  className={`mt-1.5 w-full rounded-2xl ${ppInputClass}`}
                 >
                   <option value="rachel">{t('voiceActorFemale')}</option>
                   <option value="marcus">{t('voiceActorMale')}</option>

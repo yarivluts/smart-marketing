@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/components/ui/button';
+import { PpButton } from '@/components/pastel/primitives';
+import { RefreshCw } from 'lucide-react';
 
 export interface SyncSchemaMartsButtonProps {
   orgId: string;
@@ -17,9 +18,7 @@ type SyncState =
 
 /**
  * (Re)creates the warehouse mart view for every active measure/entity
- * schema (KAN-18 custom-schema marts) — the backfill path for schemas
- * registered before mart generation existed; register/evolve keep their own
- * schema's view in sync automatically from here on.
+ * schema (KAN-18 custom-schema marts).
  */
 export function SyncSchemaMartsButton({ orgId, projectId }: SyncSchemaMartsButtonProps): React.ReactElement {
   const t = useTranslations('SchemaRegistry');
@@ -48,20 +47,20 @@ export function SyncSchemaMartsButton({ orgId, projectId }: SyncSchemaMartsButto
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton type="button" variant="secondary" size="sm" icon={RefreshCw} onClick={handleClick} disabled={submitting}>
         {t('syncMartsButton')}
-      </Button>
+      </PpButton>
       {state.kind === 'error' ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error">
           {t('syncMartsError')}
         </p>
       ) : null}
-      {state.kind === 'not_configured' ? <p className="text-xs text-muted-foreground">{t('syncMartsNotConfigured')}</p> : null}
+      {state.kind === 'not_configured' ? <p className="text-xs text-pp-outline">{t('syncMartsNotConfigured')}</p> : null}
       {state.kind === 'done' ? (
         <div className="flex flex-col gap-0.5">
-          <p className="text-xs text-muted-foreground">{t('syncMartsDone', { count: state.syncedCount })}</p>
+          <p className="text-xs text-pp-secondary font-medium">{t('syncMartsDone', { count: state.syncedCount })}</p>
           {state.errors.map((entry) => (
-            <p key={entry.schemaName} role="alert" className="text-xs text-destructive">
+            <p key={entry.schemaName} role="alert" className="text-xs text-pp-error">
               {t('syncMartsSchemaError', { schemaName: entry.schemaName, message: entry.message })}
             </p>
           ))}

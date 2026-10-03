@@ -2,9 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Activity, Building2, Database, Users } from 'lucide-react';
-import { StatCard } from '@/components/ui/stat-card';
-import { Badge } from '@/components/ui/badge';
+import { PpKpiCard } from '@/components/pastel/primitives';
 
 export interface DashboardTelemetryGridProps {
   activeWorkspacesCount: number;
@@ -19,88 +17,63 @@ export interface DashboardTelemetryGridProps {
 export function DashboardTelemetryGrid({
   activeWorkspacesCount,
   overallReadinessPercent = 100,
-  ingestUptime = '99.98%',
-  ingestLatency = '<18ms',
-  connectedPipelinesCount = 3,
-  totalPipelinesCount = 3,
+  ingestUptime,
+  ingestLatency,
+  connectedPipelinesCount,
+  totalPipelinesCount,
   pendingInvitesCount,
 }: DashboardTelemetryGridProps): React.ReactElement {
   const t = useTranslations('DashboardPage');
 
+  const hasUptime = Boolean(ingestUptime && ingestUptime !== '—');
+  const hasPipelines = Boolean(
+    typeof connectedPipelinesCount === 'number' &&
+      typeof totalPipelinesCount === 'number' &&
+      (connectedPipelinesCount > 0 || totalPipelinesCount > 0),
+  );
+
   return (
-    <section
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-      aria-label="Key Health Indicators"
-    >
+    <section aria-label="Key Health Indicators" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* 1. Active Workspaces */}
-      <StatCard
-        title={t('statsActiveWorkspaces')}
-        value={activeWorkspacesCount}
-        icon={Building2}
-        progress={overallReadinessPercent}
-        badge={
-          <Badge variant="secondary" size="sm" className="gap-1.5">
-            <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-            </span>
-            <span>{t('statusActive')}</span>
-          </Badge>
-        }
-        subtext={t('statsActiveWorkspacesDesc')}
-      />
+        <PpKpiCard
+          label={t('statsActiveWorkspaces')}
+          value={activeWorkspacesCount}
+          progress={overallReadinessPercent}
+          badge={t('statusActive')}
+          badgeAccent="primary"
+          accent="primary"
+          footer={t('statsActiveWorkspacesDesc')}
+        />
 
-      {/* 2. Ingestion Health */}
-      <StatCard
-        title={t('statsIngestHealth')}
-        value={ingestUptime}
-        icon={Activity}
-        progress={99.98}
-        badge={
-          <div className="flex items-center gap-1.5">
-            <Badge variant="emerald" dot size="sm">
-              {t('statusHealthy')}
-            </Badge>
-            <Badge variant="outline" size="sm" className="font-mono text-[10px]">
-              <span dir="ltr">{ingestLatency}</span>
-            </Badge>
-          </div>
-        }
-        subtext={t('statsIngestHealthDesc')}
-      />
+        {/* 2. Ingestion Health */}
+        <PpKpiCard
+          label={t('statsIngestHealth')}
+          value={ingestUptime ?? '—'}
+          badge={hasUptime ? t('statusHealthy') : t('statusNoData')}
+          badgeAccent={hasUptime ? 'mint' : 'neutral'}
+          accent={hasUptime ? 'mint' : 'neutral'}
+          footer={ingestLatency ? <span dir="ltr">{ingestLatency}</span> : t('statsIngestHealthDesc')}
+        />
 
-      {/* 3. Connected Pipelines */}
-      <StatCard
-        title={t('statsConnectedPipelines')}
-        value={`${connectedPipelinesCount}/${totalPipelinesCount}`}
-        icon={Database}
-        progress={100}
-        badge={
-          <Badge variant="info" dot size="sm">
-            {t('pipelinesSynced')}
-          </Badge>
-        }
-        subtext={t('statsConnectedPipelinesDesc')}
-      />
+        {/* 3. Connected Pipelines */}
+        <PpKpiCard
+          label={t('statsConnectedPipelines')}
+          value={hasPipelines ? `${connectedPipelinesCount}/${totalPipelinesCount}` : '—'}
+          badge={hasPipelines ? t('pipelinesSynced') : t('noPipelines')}
+          badgeAccent={hasPipelines ? 'sky' : 'neutral'}
+          accent="sky"
+          footer={t('statsConnectedPipelinesDesc')}
+        />
 
-      {/* 4. Pending Invitations */}
-      <StatCard
-        title={t('statsPendingInvites')}
-        value={pendingInvitesCount}
-        icon={Users}
-        badge={
-          pendingInvitesCount > 0 ? (
-            <Badge variant="warning" dot size="sm">
-              {t('badgeAction')}
-            </Badge>
-          ) : (
-            <Badge variant="secondary" size="sm">
-              {t('noPendingInvites')}
-            </Badge>
-          )
-        }
-        subtext={t('statsPendingInvitesDesc')}
-      />
+        {/* 4. Pending Invitations */}
+        <PpKpiCard
+          label={t('statsPendingInvites')}
+          value={pendingInvitesCount}
+          badge={pendingInvitesCount > 0 ? t('badgeAction') : t('noPendingInvites')}
+          badgeAccent={pendingInvitesCount > 0 ? 'amber' : 'neutral'}
+          accent={pendingInvitesCount > 0 ? 'amber' : 'neutral'}
+          footer={t('statsPendingInvitesDesc')}
+        />
     </section>
   );
 }

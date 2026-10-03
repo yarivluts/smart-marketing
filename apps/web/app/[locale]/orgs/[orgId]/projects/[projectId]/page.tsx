@@ -9,6 +9,7 @@ import {
   listPluginInstallsForProject,
 } from '@/lib/orgs/queries';
 import { toPluginInstallView } from '@/lib/orgs/plugin-view';
+import { PpPage } from '@/components/pastel/primitives';
 import { ExecutiveCommandCenter } from '@/components/dashboard/executive-command-center';
 
 type PageProps = Readonly<{
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * Flagship Executive Command Center & Pulse Dashboard (Stitch Screen 07d71f1946bf4dfebc40de82be1713bb)
+ * Flagship Executive Command Center & Pulse Dashboard (Stitch Screen 3458ff3a, mobile a3b6ca32)
  * Real-time cross-channel performance, intraday spend vs revenue pacing, live conversion feed,
  * proactive AI Copilot recommendations, and contextual missing-integration alerts.
  */
@@ -86,12 +87,12 @@ export default async function ProjectRootPage({ params }: PageProps): Promise<Re
   const isDataConnected = activeConnectors.length > 0;
 
   return (
-    <div className="w-full">
+    <PpPage>
       <ExecutiveCommandCenter
         projectName={project.name}
         isDataConnected={isDataConnected}
         missingConnectors={missingConnectors}
       />
-    </div>
+    </PpPage>
   );
 }

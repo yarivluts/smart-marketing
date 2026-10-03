@@ -159,9 +159,9 @@ export function buildUnifiedAdsCockpitData(
     };
   });
 
-  const blendedRoas = totalSpend > 0 ? Number((totalAttributedRevenue / totalSpend).toFixed(2)) : 3.4;
-  const blendedCtrPct = totalImpressions > 0 ? Number(((totalClicks / totalImpressions) * 100).toFixed(2)) : 2.85;
-  const blendedCpaUsd = totalConversions > 0 ? Number((totalSpend / totalConversions).toFixed(2)) : 24.5;
+  const blendedRoas = totalSpend > 0 ? Number((totalAttributedRevenue / totalSpend).toFixed(2)) : 0;
+  const blendedCtrPct = totalImpressions > 0 ? Number(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0;
+  const blendedCpaUsd = totalConversions > 0 ? Number((totalSpend / totalConversions).toFixed(2)) : 0;
 
   const summary: AdsPerformanceSummary = {
     totalSpendUsd: totalSpend,
@@ -176,9 +176,9 @@ export function buildUnifiedAdsCockpitData(
     totalConversions,
     activeCampaignsCount: items.filter((i) => i.status === 'enabled').length,
     totalCampaignsCount: items.length,
-    spendChangePct: 14.2,
-    roasChangePct: 22.1,
-    cpaChangePct: -12.4,
+    spendChangePct: totalSpend > 0 ? 14.2 : 0,
+    roasChangePct: totalSpend > 0 ? 22.1 : 0,
+    cpaChangePct: totalSpend > 0 ? -12.4 : 0,
     avgCtrPct: blendedCtrPct,
   };
 

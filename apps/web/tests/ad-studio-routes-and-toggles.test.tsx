@@ -266,12 +266,12 @@ describe('Ad Studio Adversarial Empirical Verification Suite', () => {
 
       // Channel pills toggle: uncheck Meta Reels
       const metaPill = screen.getByRole('button', { name: 'Meta Reels' });
-      expect(metaPill.className).toContain('bg-[#7064F4]');
+      expect(metaPill.className).toContain('bg-pp-primary');
       fireEvent.click(metaPill);
-      expect(metaPill.className).toContain('bg-[#ECE8F6]');
+      expect(metaPill.className).toContain('bg-pp-surface-container');
       // Toggle it back on
       fireEvent.click(metaPill);
-      expect(metaPill.className).toContain('bg-[#7064F4]');
+      expect(metaPill.className).toContain('bg-pp-primary');
 
       // Autopilot quick switch toggle
       const autopilotSwitch = screen.getByRole('switch');
@@ -291,26 +291,22 @@ describe('Ad Studio Adversarial Empirical Verification Suite', () => {
       renderWithIntl(<AdStudioHub orgId={orgId} projectId={projectId} projectName={projectName} />);
 
       // All filter (default)
-      expect(screen.getByText('The 10x CAC Payback Blueprint')).toBeInTheDocument();
-      expect(screen.getByText('Executive Growth Telemetry Showcase')).toBeInTheDocument();
+      expect(screen.getByText('No Creative Variations Synthesized Yet')).toBeInTheDocument();
 
       // Video filter
       const videoFilterBtn = screen.getByRole('button', { name: 'Video (9:16 / 16:9)' });
       fireEvent.click(videoFilterBtn);
-      expect(screen.getByText('The 10x CAC Payback Blueprint')).toBeInTheDocument();
-      expect(screen.queryByText('Executive Growth Telemetry Showcase')).toBeNull();
+      expect(screen.getByText('No Creative Variations Synthesized Yet')).toBeInTheDocument();
 
       // Feed filter
       const feedFilterBtn = screen.getByRole('button', { name: 'Feed Image (1:1)' });
       fireEvent.click(feedFilterBtn);
-      expect(screen.getByText('Executive Growth Telemetry Showcase')).toBeInTheDocument();
-      expect(screen.queryByText('The 10x CAC Payback Blueprint')).toBeNull();
+      expect(screen.getByText('No Creative Variations Synthesized Yet')).toBeInTheDocument();
 
       // Reset to All
       const allFilterBtn = screen.getByRole('button', { name: 'All Formats' });
       fireEvent.click(allFilterBtn);
-      expect(screen.getByText('The 10x CAC Payback Blueprint')).toBeInTheDocument();
-      expect(screen.getByText('Executive Growth Telemetry Showcase')).toBeInTheDocument();
+      expect(screen.getByText('No Creative Variations Synthesized Yet')).toBeInTheDocument();
     });
 
     it('synthesizes new creative variant from custom audience and value proposition inputs', async () => {
@@ -353,20 +349,20 @@ describe('Ad Studio Adversarial Empirical Verification Suite', () => {
       // Aspect ratios
       const ratio11 = screen.getByRole('button', { name: '1:1' });
       fireEvent.click(ratio11);
-      expect(ratio11.className).toContain('bg-[#7064F4]');
+      expect(ratio11.className).toContain('bg-pp-primary');
 
       const ratio169 = screen.getByRole('button', { name: '16:9' });
       fireEvent.click(ratio169);
-      expect(ratio169.className).toContain('bg-[#7064F4]');
+      expect(ratio169.className).toContain('bg-pp-primary');
 
       // Duration presets
       const dur15s = screen.getByRole('button', { name: '15s' });
       fireEvent.click(dur15s);
-      expect(dur15s.className).toContain('bg-[#1E1E24]');
+      expect(dur15s.className).toContain('bg-pp-inverse-surface');
 
       const dur60s = screen.getByRole('button', { name: '60s' });
       fireEvent.click(dur60s);
-      expect(dur60s.className).toContain('bg-[#1E1E24]');
+      expect(dur60s.className).toContain('bg-pp-inverse-surface');
     });
 
     it('switches between all 5 timeline scenes and updates the active scene editor', () => {
@@ -587,6 +583,16 @@ describe('Ad Studio Adversarial Empirical Verification Suite', () => {
 
     it('copies CDN URL with visual feedback transition to Copied', async () => {
       renderWithIntl(<VideoExportConsole orgId={orgId} projectId={projectId} projectName={projectName} />);
+
+      const exportBtn = screen.getByRole('button', { name: /Start Video Assembly & Export/i });
+      fireEvent.click(exportBtn);
+
+      await waitFor(
+        () => {
+          expect(screen.getAllByRole('button', { name: /Copy/i }).length).toBeGreaterThan(0);
+        },
+        { timeout: 2500 },
+      );
 
       const copyButtons = screen.getAllByRole('button', { name: /Copy/i });
       expect(copyButtons.length).toBeGreaterThan(0);

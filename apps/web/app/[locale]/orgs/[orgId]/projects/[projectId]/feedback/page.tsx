@@ -17,6 +17,8 @@ import {
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { feedbackThemeLabelKey, toNpsDimensionBreakdownRows } from '@/lib/orgs/feedback-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import { PpPage, PpPageHeader, PpCard, PpKpiCard, PpKpiGrid, PpEmptyState, PpPill, PpTable } from '@/components/pastel/primitives';
+import { MessageSquare, Sparkles, Database, Layers } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -84,11 +86,17 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === FEEDBACK_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="VOICE OF CUSTOMER"
+          meta={project.name}
+          title={t('title', { projectName: project.name })}
+          description={t('setupIntro')}
+        />
+        <PpCard>
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+        </PpCard>
+      </PpPage>
     );
   }
 
@@ -99,87 +107,180 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
     Promise.all(DIMENSIONS.map((dimension) => getNpsDimensionBreakdownForProject(orgId, projectId, dimension.key))),
   ]);
 
+  const total = overview.overall.totalResponses;
+  const npsScore = overview.overall.npsScore;
+  const npsAccent = total === 0 || npsScore === null ? 'neutral' : npsScore >= 50 ? 'mint' : npsScore >= 0 ? 'amber' : 'error';
+  const npsBadge = total === 0 || npsScore === null ? undefined : npsScore >= 50 ? 'EXCELLENT' : npsScore >= 0 ? 'GOOD' : 'NEEDS ATTENTION';
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <PpPage>
+      <PpPageHeader
+        eyebrow="VOICE OF CUSTOMER"
+        meta={total > 0 ? `${total} responses` : undefined}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('npsHeading')}</h2>
-        {overview.overall.totalResponses === 0 ? (
-          <p className="text-muted-foreground">{t('npsEmpty')}</p>
-        ) : (
-          <div className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-            <span className="text-4xl font-bold tracking-tight">{overview.overall.npsScore}</span>
-            <span className="text-sm text-muted-foreground">
-              {t('npsBreakdownLine', {
-                promoters: overview.overall.promoters,
-                passives: overview.overall.passives,
-                detractors: overview.overall.detractors,
-                total: overview.overall.totalResponses,
-              })}
-            </span>
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('npsHeading')}
+          value={total === 0 || npsScore === null ? '—' : npsScore >= 0 ? `+${npsScore}` : `${npsScore}`}
+          badge={npsBadge}
+          badgeAccent={npsAccent}
+          accent={npsAccent}
+          footer={
+            total === 0
+              ? t('npsEmpty')
+              : t('npsBreakdownLine', {
+                  promoters: overview.overall.promoters,
+                  passives: overview.overall.passives,
+                  detractors: overview.overall.detractors,
+                  total,
+                })
+          }
+        />
+        <PpKpiCard
+          label={t('promotersLabel')}
+          value={total === 0 ? '—' : `${Math.round((overview.overall.promoters / total) * 100)}%`}
+          progress={total === 0 ? 0 : (overview.overall.promoters / total) * 100}
+          accent="mint"
+          footer={`${overview.overall.promoters} ${t('promotersLabel').toLowerCase()}`}
+        />
+        <PpKpiCard
+          label={t('passivesLabel')}
+          value={total === 0 ? '—' : `${Math.round((overview.overall.passives / total) * 100)}%`}
+          progress={total === 0 ? 0 : (overview.overall.passives / total) * 100}
+          accent="amber"
+          footer={`${overview.overall.passives} ${t('passivesLabel').toLowerCase()}`}
+        />
+        <PpKpiCard
+          label={t('detractorsLabel')}
+          value={total === 0 ? '—' : `${Math.round((overview.overall.detractors / total) * 100)}%`}
+          progress={total === 0 ? 0 : (overview.overall.detractors / total) * 100}
+          accent="pink"
+          footer={`${overview.overall.detractors} ${t('detractorsLabel').toLowerCase()}`}
+        />
+      </PpKpiGrid>
+
+      {total === 0 ? (
+        <PpEmptyState
+          icon={MessageSquare}
+          title={t('npsHeading')}
+          description={t('npsEmpty')}
+        />
+      ) : (
+        <PpCard
+          icon={MessageSquare}
+          iconAccent="primary"
+          title={t('npsHeading')}
+          subtitle={t('npsBreakdownLine', {
+            promoters: overview.overall.promoters,
+            passives: overview.overall.passives,
+            detractors: overview.overall.detractors,
+            total,
+          })}
+        >
+          <div className="space-y-3">
+            <div className="flex items-center gap-1.5 overflow-x-auto py-1" aria-label={t('trendSparklineLabel')}>
+              {overview.dailyTrend.map((point) => (
+                <div
+                  key={point.date}
+                  title={`${point.date}: ${point.breakdown.totalResponses === 0 ? t('trendPointEmpty') : point.breakdown.npsScore}`}
+                  className="h-8 w-3 rounded-md bg-pp-primary transition-opacity"
+                  style={{ opacity: point.breakdown.totalResponses > 0 ? 0.35 + Math.min(point.breakdown.totalResponses, 6) * 0.1 : 0.12 }}
+                />
+              ))}
+            </div>
+            <p className="text-pp-label-sm text-pp-outline">{t('trendSparklineLabel')}</p>
           </div>
-        )}
-        <ul className="flex flex-wrap gap-1" aria-label={t('trendSparklineLabel')}>
-          {overview.dailyTrend.map((point) => (
-            <li
-              key={point.date}
-              title={`${point.date}: ${point.breakdown.totalResponses === 0 ? t('trendPointEmpty') : point.breakdown.npsScore}`}
-              className="h-6 w-2 rounded-sm bg-muted"
-              style={point.breakdown.totalResponses > 0 ? { opacity: 0.4 + Math.min(point.breakdown.totalResponses, 5) * 0.12 } : undefined}
-            />
-          ))}
-        </ul>
-      </section>
+        </PpCard>
+      )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('themeDigestHeading')}</h2>
+      <PpCard
+        icon={Sparkles}
+        iconAccent="primary"
+        title={t('themeDigestHeading')}
+      >
         {themeDigest.length === 0 ? (
-          <p className="text-muted-foreground">{t('themeDigestEmpty')}</p>
+          <PpEmptyState
+            icon={Sparkles}
+            title={t('themeDigestHeading')}
+            description={t('themeDigestEmpty')}
+          />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-pp-md">
             {themeDigest.map((cluster) => (
-              <li key={cluster.theme} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{t(feedbackThemeLabelKey(cluster.theme))}</span>
-                  <span className="text-xs text-muted-foreground">{t('themeCommentCount', { count: cluster.commentCount })}</span>
+              <div
+                key={cluster.theme}
+                className="flex flex-col justify-between rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/40 p-pp-md space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-pp-display text-pp-headline-sm font-semibold text-pp-on-surface">
+                    {t(feedbackThemeLabelKey(cluster.theme))}
+                  </span>
+                  <PpPill accent="primary">{t('themeCommentCount', { count: cluster.commentCount })}</PpPill>
                 </div>
                 {cluster.exampleComments.map((comment, index) => (
-                  <span key={index} className="text-muted-foreground">
-                    {t('themeExampleComment', { comment })}
-                  </span>
+                  <blockquote
+                    key={index}
+                    className="rounded-xl bg-pp-surface-container-lowest p-3 text-pp-body-sm text-pp-on-surface-variant italic border-s-2 border-pp-primary shadow-xs"
+                  >
+                    "{comment}"
+                  </blockquote>
                 ))}
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
-      </section>
+      </PpCard>
 
-      {DIMENSIONS.map((dimension, index) => {
-        const outcome = dimensionOutcomes[index];
-        return (
-          <section key={dimension.key} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
-            {!outcome.ok ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : outcome.rows.length === 0 ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {toNpsDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
-                  <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                    <span>{row.value || t('dimensionValueUnknown')}</span>
-                    <span className="text-muted-foreground">
-                      {row.npsScore === null ? t('dimensionScoreUnavailable') : t('dimensionScoreLine', { score: row.npsScore, respondents: row.respondents })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
-    </main>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-pp-lg">
+        {DIMENSIONS.map((dimension, index) => {
+          const outcome = dimensionOutcomes[index];
+          return (
+            <PpCard
+              key={dimension.key}
+              icon={dimension.key === 'plan_interval' ? Database : dimension.key === 'channel_id' ? Layers : Sparkles}
+              iconAccent={dimension.key === 'plan_interval' ? 'primary' : dimension.key === 'channel_id' ? 'mint' : 'sky'}
+              title={t(dimension.headingKey)}
+              flush={outcome.ok && outcome.rows.length > 0}
+            >
+              {!outcome.ok || outcome.rows.length === 0 ? (
+                <PpEmptyState
+                  icon={Database}
+                  title={t(dimension.headingKey)}
+                  description={t(dimension.emptyKey)}
+                />
+              ) : (
+                <PpTable>
+                  <thead>
+                    <tr>
+                      <th>Dimension</th>
+                      <th className="text-end">NPS Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {toNpsDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
+                      <tr key={row.value}>
+                        <td className="font-medium text-pp-on-surface">{row.value || t('dimensionValueUnknown')}</td>
+                        <td className="text-end">
+                          {row.npsScore === null ? (
+                            <span className="text-pp-outline">{t('dimensionScoreUnavailable')}</span>
+                          ) : (
+                            <PpPill accent={row.npsScore >= 50 ? 'mint' : row.npsScore >= 0 ? 'amber' : 'error'}>
+                              {t('dimensionScoreLine', { score: row.npsScore, respondents: row.respondents })}
+                            </PpPill>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </PpTable>
+              )}
+            </PpCard>
+          );
+        })}
+      </div>
+    </PpPage>
   );
 }

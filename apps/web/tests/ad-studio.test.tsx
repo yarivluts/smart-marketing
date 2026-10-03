@@ -54,13 +54,12 @@ describe('GrowthOS AI Ad Studio Suite', () => {
       renderWithIntl(<AdStudioHub orgId={orgId} projectId={projectId} projectName={projectName} />);
 
       expect(screen.getByText('Active Campaigns')).toBeDefined();
-      expect(screen.getByText('14')).toBeDefined();
+      expect(screen.getByText('0')).toBeDefined();
       expect(screen.getByText('Creative Quality Score')).toBeDefined();
-      expect(screen.getByText('94.2')).toBeDefined();
+      expect(screen.getAllByText('—').length).toBeGreaterThan(0);
       expect(screen.getByText('Autopilot Pacing')).toBeDefined();
-      expect(screen.getByText('98.6%')).toBeDefined();
       expect(screen.getByText('Generation Quota')).toBeDefined();
-      expect(screen.getByText('420')).toBeDefined();
+      expect(screen.getByText('500')).toBeDefined();
       expect(screen.getByText('Creative Synthesis Studio')).toBeDefined();
       expect(screen.getByText('Autopilot Pacing & Safety Guardrails')).toBeDefined();
     });
@@ -68,7 +67,7 @@ describe('GrowthOS AI Ad Studio Suite', () => {
     it('allows synthesis form input and trigger generation', async () => {
       renderWithIntl(<AdStudioHub orgId={orgId} projectId={projectId} projectName={projectName} />);
 
-      const audienceInput = screen.getByDisplayValue('B2B SaaS Founders & Growth VPs');
+      const audienceInput = screen.getByPlaceholderText('e.g., B2B SaaS Founders, VP Marketing, Growth Directors');
       fireEvent.change(audienceInput, { target: { value: 'E-commerce DTC Leaders' } });
       expect(screen.getByDisplayValue('E-commerce DTC Leaders')).toBeDefined();
 
@@ -89,9 +88,7 @@ describe('GrowthOS AI Ad Studio Suite', () => {
       const videoFilterBtn = screen.getByRole('button', { name: 'Video (9:16 / 16:9)' });
       fireEvent.click(videoFilterBtn);
 
-      expect(screen.getByText('The 10x CAC Payback Blueprint')).toBeDefined();
-      expect(screen.getByText('Autopilot Ad Rebalancing Demo')).toBeDefined();
-      expect(screen.queryByText('Executive Growth Telemetry Showcase')).toBeNull();
+      expect(screen.getByText('No Creative Variations Synthesized Yet')).toBeDefined();
     });
   });
 
@@ -194,6 +191,7 @@ describe('GrowthOS AI Ad Studio Suite', () => {
       expect(screen.getAllByText('Desktop Web & YouTube').length).toBeGreaterThan(0);
       expect(screen.getByText('Subtitles & Dynamic Captions')).toBeDefined();
       expect(screen.getByText('Recent Render Pipeline Jobs')).toBeDefined();
+      expect(screen.getByText('No video renders yet')).toBeDefined();
     });
 
     it('triggers video rendering and completion state', async () => {

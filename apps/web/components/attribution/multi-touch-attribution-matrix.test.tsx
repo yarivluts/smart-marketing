@@ -9,7 +9,7 @@ describe('MultiTouchAttributionMatrix', () => {
 
     expect(screen.getByTestId('multi-touch-attribution-matrix')).toBeDefined();
     expect(screen.getByText('Multi-Touch Attribution Matrix')).toBeDefined();
-    expect(screen.getByText('Meta Ads')).toBeDefined();
+    expect(screen.getAllByText('Meta Ads').length).toBeGreaterThan(0);
     expect(screen.getByText('Google Search Ads')).toBeDefined();
     expect(screen.getByText('TikTok UGC')).toBeDefined();
     expect(screen.getByText('Channel Credit Allocation Comparison')).toBeDefined();
@@ -21,7 +21,7 @@ describe('MultiTouchAttributionMatrix', () => {
 
     const btn90 = screen.getByRole('button', { name: '90 Days' });
     fireEvent.click(btn90);
-    expect(btn90.className).toContain('bg-primary');
+    expect(btn90.className).toContain('bg-pp-primary');
   });
 
   it('renders missing integration overlay when disconnected', () => {

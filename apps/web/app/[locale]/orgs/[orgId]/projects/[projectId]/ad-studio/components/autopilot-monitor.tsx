@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { PpCard, PpButton, ppInputClass, PpPill, PpEmptyState } from '@/components/pastel/primitives';
 import {
   Bot,
   ShieldCheck,
@@ -43,101 +44,27 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
   const [isEditingGuardrails, setIsEditingGuardrails] = useState(false);
   const [killSwitchTriggered, setKillSwitchTriggered] = useState(false);
 
-  const channels = [
-    {
-      id: 'meta',
-      nameKey: 'channelMeta',
-      spend: 2450,
-      share: 49,
-      roas: 3.8,
-      status: 'Scaling (+12%)',
-      statusVariant: 'success',
-    },
-    {
-      id: 'google',
-      nameKey: 'channelGoogle',
-      spend: 1650,
-      share: 33,
-      roas: 3.2,
-      status: 'Steady',
-      statusVariant: 'neutral',
-    },
-    {
-      id: 'tiktok',
-      nameKey: 'channelTiktok',
-      spend: 650,
-      share: 13,
-      roas: 2.1,
-      status: 'Pacing Capped',
-      statusVariant: 'warning',
-    },
-    {
-      id: 'linkedin',
-      nameKey: 'channelLinkedin',
-      spend: 250,
-      share: 5,
-      roas: 2.7,
-      status: 'Testing',
-      statusVariant: 'neutral',
-    },
-  ];
+  // Channels, fatigue alerts, and action ledger use honest state when no actions have occurred
+  const channels: Array<{
+    id: string;
+    nameKey: string;
+    spend: number;
+    share: number;
+    status: string;
+    statusVariant: 'success' | 'neutral' | 'warning';
+  }> = [];
 
-  const fatigueAlerts = [
-    {
-      id: 'fa-1',
-      adTitle: 'Summer Growth Hack V2 (Reels 9:16)',
-      frequency: 4.8,
-      ctrDrop: '-38%',
-      actionKey: 'fatigueActionReplaced',
-      actionVariant: 'success',
-      timestamp: '28m ago',
-    },
-    {
-      id: 'fa-2',
-      adTitle: 'Legacy Spreadsheet Chaos (Feed 1:1)',
-      frequency: 5.6,
-      ctrDrop: '-46%',
-      actionKey: 'fatigueActionPaused',
-      actionVariant: 'danger',
-      timestamp: '2h ago',
-    },
-    {
-      id: 'fa-3',
-      adTitle: 'Enterprise ROI Demo (Web 16:9)',
-      frequency: 3.9,
-      ctrDrop: '-18%',
-      actionKey: 'fatigueActionPending',
-      actionVariant: 'warning',
-      timestamp: '4h ago',
-    },
-  ];
+  const fatigueAlerts: Array<{
+    id: string;
+    adTitle: string;
+    frequency: number;
+    ctrDrop: string;
+    actionKey: string;
+    actionVariant: 'success' | 'danger' | 'warning';
+    timestamp: string;
+  }> = [];
 
-  const [ledgerItems, setLedgerItems] = useState<ActionLedgerItem[]>([
-    {
-      id: 'act-1',
-      timestamp: '14:22:05',
-      action: 'Shifted $450 from TikTok to Meta Reels',
-      reason: 'ROAS surpassed 3.8x with +15% conversion volume surge',
-      impact: '+$1,710 Projected Revenue',
-      channel: 'Meta Reels',
-    },
-    {
-      id: 'act-2',
-      timestamp: '12:05:18',
-      action: 'Auto-paused adset #CR-104 (Spreadsheet Chaos)',
-      reason: 'Fatigue threshold triggered: frequency > 5.2 and CTR drop > 40%',
-      impact: 'Protected $320 daily burn',
-      channel: 'Google RSA',
-    },
-    {
-      id: 'act-3',
-      timestamp: '09:41:50',
-      action: 'Scaled daily budget pacing by +10%',
-      reason: 'Morning CPA beat target ceiling ($24.80 vs $32.00 threshold)',
-      impact: '+24 Qualified Signups',
-      channel: 'Meta Feed',
-    },
-  ]);
+  const [ledgerItems, setLedgerItems] = useState<ActionLedgerItem[]>([]);
 
   const handleToggleAutopilot = () => {
     setAutopilotActive((prev) => !prev);
@@ -154,34 +81,34 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header Pipeline Status Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <Bot className="h-6 w-6 text-[#7064F4]" />
-            <h2 className="text-xl font-bold text-[#181820]">
+            <Bot className="h-6 w-6 text-pp-primary" />
+            <h2 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
               {t('autopilotTitle')}
             </h2>
           </div>
-          <p className="mt-1 text-sm text-[#6B6A78]">
+          <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
             {t('autopilotSubtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-label-sm text-label-sm font-bold ${
               autopilotActive && !killSwitchTriggered
-                ? 'bg-[#E6FAF5] text-[#0E624C]'
-                : 'bg-[#FFF1F1] text-[#D63031]'
+                ? 'bg-emerald-50 text-emerald-800'
+                : 'bg-red-50 text-red-800'
             }`}
           >
             <span
               className={`h-2.5 w-2.5 rounded-full ${
                 autopilotActive && !killSwitchTriggered
-                  ? 'animate-pulse bg-[#55EFC4]'
-                  : 'bg-[#FF5252]'
+                  ? 'animate-pulse bg-emerald-500'
+                  : 'bg-red-500'
               }`}
             />
             {autopilotActive && !killSwitchTriggered
@@ -192,10 +119,10 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
           <button
             type="button"
             onClick={handleToggleAutopilot}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition-all ${
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 font-label-sm text-label-sm font-bold transition-all ${
               autopilotActive
-                ? 'bg-[#ECE8F6] text-[#181820] hover:bg-[#EBE9FD]'
-                : 'bg-[#7064F4] text-white hover:bg-[#5243D5]'
+                ? 'bg-pp-surface-container text-pp-on-surface hover:bg-pp-surface-container-high'
+                : 'bg-pp-primary text-pp-on-primary hover:bg-pp-primary-container'
             }`}
           >
             <Power className="h-3.5 w-3.5" />
@@ -206,7 +133,7 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
             <button
               type="button"
               onClick={handleKillSwitch}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF1F1] px-4 py-2 text-xs font-bold text-[#D63031] transition-all hover:bg-[#FF7675] hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-4 py-2 font-label-sm text-label-sm font-bold text-red-700 transition-all hover:bg-red-100"
             >
               <Power className="h-3.5 w-3.5" />
               <span>{t('btnEmergencyKill')}</span>
@@ -215,7 +142,7 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
             <button
               type="button"
               onClick={handleResetKillSwitch}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#E6FAF5] px-4 py-2 text-xs font-bold text-[#0E624C] transition-all hover:bg-[#55EFC4]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-4 py-2 font-label-sm text-label-sm font-bold text-emerald-800 transition-all hover:bg-emerald-100"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Resume Operations</span>
@@ -227,54 +154,54 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
       {/* Grid: Spend Allocation Guardrails & Channel Distribution */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Spend Allocation Guardrails Card */}
-        <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
+        <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-[#7064F4]" />
-              <h3 className="text-base font-bold text-[#181820]">
+              <ShieldCheck className="h-5 w-5 text-pp-primary" />
+              <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
                 {t('spendGuardrailsTitle')}
               </h3>
             </div>
             <button
               type="button"
               onClick={() => setIsEditingGuardrails((prev) => !prev)}
-              className="inline-flex items-center gap-1 rounded-full bg-[#ECE8F6] px-3 py-1 text-xs font-semibold text-[#181820] transition-colors hover:bg-[#EBE9FD]"
+              className="inline-flex items-center gap-1 rounded-full bg-pp-surface-container px-3 py-1 font-label-sm text-label-sm font-semibold text-pp-on-surface transition-colors hover:bg-pp-surface-container-high"
             >
               <Sliders className="h-3 w-3" />
               <span>{isEditingGuardrails ? 'Close' : t('btnAdjustGuardrails')}</span>
             </button>
           </div>
-          <p className="mt-1 text-xs text-[#6B6A78]">
+          <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
             {t('spendGuardrailsDesc')}
           </p>
 
           <div className="mt-6 grid grid-cols-2 gap-4">
             {/* Daily Cap */}
-            <div className="rounded-xl bg-[#F5F3FB]/70 p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9B99A8]">
+            <div className="rounded-2xl bg-pp-surface-container-low p-4 border border-pp-outline-variant/40">
+              <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-outline">
                 {t('dailyCapLabel')}
               </span>
               {isEditingGuardrails ? (
                 <div className="mt-1 flex items-center">
-                  <span className="text-sm font-bold text-[#181820]">$</span>
+                  <span className="font-headline-md text-headline-md font-bold text-pp-on-surface me-1">$</span>
                   <input
                     type="number"
                     value={dailyCap}
                     onChange={(e) => setDailyCap(Number(e.target.value))}
-                    className="w-24 rounded-md border border-[#ECE8F6] bg-white px-2 py-0.5 text-base font-bold text-[#181820]"
+                    className={`w-28 rounded-xl ${ppInputClass}`}
                   />
                 </div>
               ) : (
-                <p className="mt-1 text-2xl font-extrabold text-[#181820]">
+                <p className="mt-1 font-metric-display text-metric-display font-extrabold text-pp-on-surface">
                   ${dailyCap.toLocaleString()}
                 </p>
               )}
-              <span className="text-[11px] text-[#6B6A78]">Hard spend ceiling</span>
+              <span className="font-label-sm text-label-sm text-pp-on-surface-variant">Hard spend ceiling</span>
             </div>
 
             {/* Min ROAS Floor */}
-            <div className="rounded-xl bg-[#F5F3FB]/70 p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9B99A8]">
+            <div className="rounded-2xl bg-pp-surface-container-low p-4 border border-pp-outline-variant/40">
+              <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-outline">
                 {t('minRoasFloorLabel')}
               </span>
               {isEditingGuardrails ? (
@@ -284,205 +211,213 @@ export function AutopilotMonitor({ orgId, projectId, projectName }: AutopilotMon
                     step="0.1"
                     value={minRoasFloor}
                     onChange={(e) => setMinRoasFloor(Number(e.target.value))}
-                    className="w-20 rounded-md border border-[#ECE8F6] bg-white px-2 py-0.5 text-base font-bold text-[#181820]"
+                    className={`w-24 rounded-xl ${ppInputClass}`}
                   />
-                  <span className="text-sm font-bold text-[#181820] ms-1">x</span>
+                  <span className="font-headline-md text-headline-md font-bold text-pp-on-surface ms-1">x</span>
                 </div>
               ) : (
-                <p className="mt-1 text-2xl font-extrabold text-[#0E624C]">
+                <p className="mt-1 font-metric-display text-metric-display font-extrabold text-emerald-600">
                   {minRoasFloor}x
                 </p>
               )}
-              <span className="text-[11px] text-[#6B6A78]">Trigger auto-pause if below</span>
+              <span className="font-label-sm text-label-sm text-pp-on-surface-variant">Trigger auto-pause if below</span>
             </div>
 
             {/* Max CPA Ceiling */}
-            <div className="rounded-xl bg-[#F5F3FB]/70 p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9B99A8]">
+            <div className="rounded-2xl bg-pp-surface-container-low p-4 border border-pp-outline-variant/40">
+              <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-outline">
                 {t('maxCpaCeilingLabel')}
               </span>
               {isEditingGuardrails ? (
                 <div className="mt-1 flex items-center">
-                  <span className="text-sm font-bold text-[#181820]">$</span>
+                  <span className="font-headline-md text-headline-md font-bold text-pp-on-surface me-1">$</span>
                   <input
                     type="number"
                     value={maxCpaCeiling}
                     onChange={(e) => setMaxCpaCeiling(Number(e.target.value))}
-                    className="w-20 rounded-md border border-[#ECE8F6] bg-white px-2 py-0.5 text-base font-bold text-[#181820]"
+                    className={`w-24 rounded-xl ${ppInputClass}`}
                   />
                 </div>
               ) : (
-                <p className="mt-1 text-2xl font-extrabold text-[#181820]">
+                <p className="mt-1 font-metric-display text-metric-display font-extrabold text-pp-on-surface">
                   ${maxCpaCeiling}
                 </p>
               )}
-              <span className="text-[11px] text-[#6B6A78]">Target acquisition limit</span>
+              <span className="font-label-sm text-label-sm text-pp-on-surface-variant">Target acquisition limit</span>
             </div>
 
             {/* Max Shift Velocity */}
-            <div className="rounded-xl bg-[#F5F3FB]/70 p-4">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#9B99A8]">
+            <div className="rounded-2xl bg-pp-surface-container-low p-4 border border-pp-outline-variant/40">
+              <span className="font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-outline">
                 {t('reallocationVelocityLabel')}
               </span>
-              <p className="mt-1 text-2xl font-extrabold text-[#5243D5]">
+              <p className="mt-1 font-metric-display text-metric-display font-extrabold text-pp-primary">
                 15%
               </p>
-              <span className="text-[11px] text-[#6B6A78]">Cap per 4-hour evaluation cycle</span>
+              <span className="font-label-sm text-label-sm text-pp-on-surface-variant">Cap per 4-hour evaluation cycle</span>
             </div>
           </div>
         </div>
 
         {/* Channel Spend Allocation Card */}
-        <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-[#181820]">
-              {t('pacingDistributionTitle')}
-            </h3>
-            <span className="text-xs font-semibold text-[#6B6A78]">
-              $5,000 Total Active
-            </span>
-          </div>
+        <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
+                {t('pacingDistributionTitle')}
+              </h3>
+              <span className="font-label-sm text-label-sm font-semibold text-pp-on-surface-variant">
+                $0 Active Spend
+              </span>
+            </div>
 
-          <div className="mt-6 space-y-4">
-            {channels.map((ch) => (
-              <div key={ch.id} className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-[#181820]">
-                    {t(ch.nameKey as any)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-[#181820]">
-                      ${ch.spend.toLocaleString()} ({ch.share}%)
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        ch.statusVariant === 'success'
-                          ? 'bg-[#E6FAF5] text-[#0E624C]'
-                          : ch.statusVariant === 'warning'
-                          ? 'bg-[#FFF6E5] text-[#684805]'
-                          : 'bg-[#ECE8F6] text-[#6B6A78]'
-                      }`}
-                    >
-                      {ch.status}
-                    </span>
-                  </div>
-                </div>
-                {/* Progress bar */}
-                <div className="h-2 w-full overflow-hidden rounded-full bg-[#ECE8F6]">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#7064F4] to-[#55EFC4]"
-                    style={{ width: `${ch.share}%` }}
-                  />
-                </div>
+            {channels.length === 0 ? (
+              <div className="py-8">
+                <PpEmptyState
+                  icon={Layers}
+                  title="No active channel pacing"
+                  description="Connect ad network accounts or publish campaigns to activate autonomous pacing distribution."
+                />
               </div>
-            ))}
+            ) : (
+              <div className="mt-6 space-y-4">
+                {channels.map((ch) => (
+                  <div key={ch.id} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-pp-on-surface">
+                        {t(ch.nameKey as any)}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-pp-on-surface">
+                          ${ch.spend.toLocaleString()} ({ch.share}%)
+                        </span>
+                        <span className="rounded-full bg-pp-surface-container px-2 py-0.5 text-[10px] font-bold text-pp-on-surface-variant">
+                          {ch.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-pp-surface-container">
+                      <div
+                        className="h-full rounded-full bg-pp-primary"
+                        style={{ width: `${ch.share}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Creative Fatigue Radar Alerts Section */}
-      <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
+      <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-[#FDCB6E]" />
-              <h3 className="text-base font-bold text-[#181820]">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
                 {t('fatigueAlertsTitle')}
               </h3>
             </div>
-            <p className="mt-1 text-xs text-[#6B6A78]">
+            <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
               {t('fatigueAlertsDesc')}
             </p>
           </div>
-          <span className="rounded-full bg-[#FFF6E5] px-3 py-1 text-xs font-bold text-[#684805]">
-            3 Active Wear-Out Alerts
+          <span className="rounded-full bg-pp-surface-container px-3 py-1 font-label-sm text-label-sm font-bold text-pp-on-surface-variant">
+            {fatigueAlerts.length} Active Wear-Out Alerts
           </span>
         </div>
 
-        <div className="mt-4 space-y-3">
-          {fatigueAlerts.map((alert) => (
-            <div
-              key={alert.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#ECE8F6] bg-[#F5F3FB]/40 p-4 transition-colors hover:bg-white"
-            >
-              <div>
-                <h4 className="text-sm font-bold text-[#181820]">
-                  {alert.adTitle}
-                </h4>
-                <div className="mt-1 flex items-center gap-3 text-xs text-[#6B6A78]">
-                  <span>Frequency: <strong className="text-[#181820]">{alert.frequency}x</strong></span>
-                  <span>7d CTR Delta: <strong className="text-[#D63031]">{alert.ctrDrop}</strong></span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {alert.timestamp}
-                  </span>
+        {fatigueAlerts.length === 0 ? (
+          <div className="py-8">
+            <PpEmptyState
+              icon={ShieldCheck}
+              title="No creative fatigue detected"
+              description="All running ad creatives are operating within healthy frequency and click-through thresholds."
+            />
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {fatigueAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-pp-outline-variant/40 bg-pp-surface-container-low p-4"
+              >
+                <div>
+                  <h4 className="font-label-md text-label-md font-bold text-pp-on-surface">
+                    {alert.adTitle}
+                  </h4>
+                  <div className="mt-1 flex items-center gap-3 font-body-sm text-body-sm text-pp-on-surface-variant">
+                    <span>Frequency: <strong className="text-pp-on-surface">{alert.frequency}x</strong></span>
+                    <span>7d CTR Delta: <strong className="text-red-600">{alert.ctrDrop}</strong></span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {alert.timestamp}
+                    </span>
+                  </div>
                 </div>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
-                    alert.actionVariant === 'success'
-                      ? 'bg-[#E6FAF5] text-[#0E624C]'
-                      : alert.actionVariant === 'danger'
-                      ? 'bg-[#FFF1F1] text-[#D63031]'
-                      : 'bg-[#FFF6E5] text-[#684805]'
-                  }`}
-                >
-                  <CheckCircle2 className="h-3 w-3" />
-                  {t(alert.actionKey as any)}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Autonomous Action Audit Ledger */}
-      <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
+      <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
         <div className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-[#7064F4]" />
-          <h3 className="text-base font-bold text-[#181820]">
+          <Activity className="h-5 w-5 text-pp-primary" />
+          <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
             {t('executionLedgerTitle')}
           </h3>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-start text-sm">
-            <thead>
-              <tr className="border-b border-[#ECE8F6] text-[11px] font-semibold uppercase tracking-wider text-[#9B99A8]">
-                <th className="pb-3 text-start">Timestamp</th>
-                <th className="pb-3 text-start">Autonomous Action</th>
-                <th className="pb-3 text-start">Trigger Rationale</th>
-                <th className="pb-3 text-start">Observed Impact</th>
-                <th className="pb-3 text-start">Target Channel</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#ECE8F6]/60 text-xs">
-              {ledgerItems.map((item) => (
-                <tr key={item.id} className="hover:bg-[#F5F3FB]/50 transition-colors">
-                  <td className="py-3 font-mono text-[#6B6A78]">
-                    {item.timestamp}
-                  </td>
-                  <td className="py-3 font-bold text-[#181820]">
-                    {item.action}
-                  </td>
-                  <td className="py-3 text-[#6B6A78]">
-                    {item.reason}
-                  </td>
-                  <td className="py-3 font-semibold text-[#0E624C]">
-                    {item.impact}
-                  </td>
-                  <td className="py-3">
-                    <span className="rounded-md bg-[#ECE8F6] px-2 py-0.5 font-medium text-[#181820]">
-                      {item.channel}
-                    </span>
-                  </td>
+        {ledgerItems.length === 0 ? (
+          <div className="py-8">
+            <PpEmptyState
+              icon={Activity}
+              title="No autonomous actions recorded"
+              description="Pacing and fatigue guardrails are active and continuously evaluating connected channels. Actions will be logged here."
+            />
+          </div>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-start text-sm">
+              <thead>
+                <tr className="border-b border-pp-outline-variant/40 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-outline">
+                  <th className="pb-3 text-start">Timestamp</th>
+                  <th className="pb-3 text-start">Autonomous Action</th>
+                  <th className="pb-3 text-start">Trigger Rationale</th>
+                  <th className="pb-3 text-start">Observed Impact</th>
+                  <th className="pb-3 text-start">Target Channel</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-pp-outline-variant/40 font-body-sm text-body-sm">
+                {ledgerItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-pp-surface-container-low transition-colors">
+                    <td className="py-3 font-mono text-pp-on-surface-variant">
+                      {item.timestamp}
+                    </td>
+                    <td className="py-3 font-bold text-pp-on-surface">
+                      {item.action}
+                    </td>
+                    <td className="py-3 text-pp-on-surface-variant">
+                      {item.reason}
+                    </td>
+                    <td className="py-3 font-semibold text-emerald-600">
+                      {item.impact}
+                    </td>
+                    <td className="py-3">
+                      <span className="rounded-md bg-pp-surface-container px-2 py-0.5 font-medium text-pp-on-surface">
+                        {item.channel}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { PpCard, PpButton, ppInputClass, PpPill, PpEmptyState } from '@/components/pastel/primitives';
 import {
   Video,
   Play,
@@ -50,38 +51,7 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
   const [googleSyncStatus, setGoogleSyncStatus] = useState<'synced' | 'pending' | 'syncing'>('synced');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const [jobs, setJobs] = useState<RenderJobItem[]>([
-    {
-      id: 'JOB-9041',
-      format: 'Vertical Reels & TikTok',
-      aspectRatio: '9:16',
-      resolution: '1080x1920 (60fps)',
-      duration: '00:30',
-      fileSize: '42.8 MB',
-      status: 'synced',
-      timestamp: '12m ago',
-    },
-    {
-      id: 'JOB-9040',
-      format: 'Square Feed & Carousel',
-      aspectRatio: '1:1',
-      resolution: '1080x1080 (60fps)',
-      duration: '00:30',
-      fileSize: '36.2 MB',
-      status: 'completed',
-      timestamp: '45m ago',
-    },
-    {
-      id: 'JOB-9039',
-      format: 'Desktop Web & YouTube',
-      aspectRatio: '16:9',
-      resolution: '1920x1080 (60fps)',
-      duration: '00:15',
-      fileSize: '24.1 MB',
-      status: 'synced',
-      timestamp: '2h ago',
-    },
-  ]);
+  const [jobs, setJobs] = useState<RenderJobItem[]>([]);
 
   const handleStartExport = () => {
     setIsExporting(true);
@@ -91,7 +61,7 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
       setIsExporting(false);
       setExportComplete(true);
       const newJob: RenderJobItem = {
-        id: `JOB-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: `JOB-${Date.now().toString().slice(-4)}`,
         format: activeAspectRatio === '9:16' ? 'Vertical Reels' : activeAspectRatio === '1:1' ? 'Square Feed' : 'Landscape Web',
         aspectRatio: activeAspectRatio,
         resolution: activeAspectRatio === '9:16' ? '1080x1920' : activeAspectRatio === '1:1' ? '1080x1080' : '1920x1080',
@@ -124,23 +94,23 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header Pipeline Card */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
-            <Video className="h-6 w-6 text-[#7064F4]" />
-            <h2 className="text-xl font-bold text-[#181820]">
+            <Video className="h-6 w-6 text-pp-primary" />
+            <h2 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
               {t('exportTitle')}
             </h2>
           </div>
-          <p className="mt-1 text-sm text-[#6B6A78]">
+          <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
             {t('exportSubtitle')}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E6FAF5] px-3 py-1 text-xs font-bold text-[#0E624C]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 font-label-sm text-label-sm font-bold text-emerald-800">
             <CheckCircle2 className="h-3.5 w-3.5" />
             <span>Render Engine Active (v2.8)</span>
           </span>
@@ -148,7 +118,7 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
             type="button"
             onClick={handleStartExport}
             disabled={isExporting}
-            className="inline-flex items-center gap-2 rounded-full bg-[#7064F4] px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-[#5243D5] disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-pp-primary px-6 py-2.5 font-label-sm text-label-sm font-bold text-pp-on-primary shadow-xs transition-all hover:bg-pp-primary-container disabled:opacity-50"
           >
             {isExporting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             <span>{isExporting ? t('btnRendering') : t('btnRenderExport')}</span>
@@ -157,15 +127,15 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
       </div>
 
       {exportComplete && (
-        <div className="flex items-center justify-between rounded-2xl border border-[#55EFC4]/40 bg-[#E6FAF5] p-4 text-sm font-semibold text-[#0E624C] shadow-sm">
+        <div className="flex items-center justify-between rounded-2xl border border-emerald-300 bg-emerald-50 p-4 font-body-sm text-body-sm font-semibold text-emerald-800 shadow-xs">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-[#0E624C]" />
+            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
             <span>{t('exportSuccess')}</span>
           </div>
           <button
             type="button"
             onClick={() => setExportComplete(false)}
-            className="text-xs text-[#0E624C] underline hover:no-underline"
+            className="text-xs text-emerald-800 underline hover:no-underline"
           >
             Dismiss
           </button>
@@ -175,23 +145,23 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
       {/* Grid: Viewport Preview Player (Left) & Export Settings / Matrix (Right) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left: Viewport Preview Player (5 Cols) */}
-        <div className="flex flex-col rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)] lg:col-span-5">
-          <div className="flex items-center justify-between border-b border-[#ECE8F6] pb-4">
-            <h3 className="text-sm font-bold text-[#181820]">
+        <div className="flex flex-col rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs lg:col-span-5">
+          <div className="flex items-center justify-between border-b border-pp-outline-variant/40 pb-4">
+            <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
               {t('renderPreviewTitle')}
             </h3>
 
             {/* Aspect Ratio Toggle Pills */}
-            <div className="flex items-center rounded-full bg-[#ECE8F6] p-1">
+            <div className="flex items-center rounded-full bg-pp-surface-container p-1">
               {(['9:16', '1:1', '16:9'] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => setActiveAspectRatio(r)}
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold transition-all ${
+                  className={`rounded-full px-2.5 py-0.5 font-label-sm text-label-sm font-bold transition-all ${
                     activeAspectRatio === r
-                      ? 'bg-[#7064F4] text-white'
-                      : 'text-[#6B6A78] hover:text-[#181820]'
+                      ? 'bg-pp-primary text-pp-on-primary'
+                      : 'text-pp-on-surface-variant hover:text-pp-on-surface'
                   }`}
                 >
                   {r}
@@ -203,7 +173,7 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
           {/* Player Viewport Mockup */}
           <div className="my-6 flex flex-1 items-center justify-center">
             <div
-              className={`relative flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-[#1E1E24] to-[#2D3436] p-4 text-white shadow-xl transition-all duration-300 ${
+              className={`relative flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-pp-inverse-surface to-slate-800 p-4 text-white shadow-xl transition-all duration-300 ${
                 activeAspectRatio === '9:16'
                   ? 'h-[360px] w-[202px]'
                   : activeAspectRatio === '1:1'
@@ -244,13 +214,13 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
           </div>
 
           {/* Timecode & Scrubber Bar */}
-          <div className="space-y-1.5 border-t border-[#ECE8F6] pt-4">
-            <div className="flex justify-between text-xs font-medium text-[#6B6A78]">
+          <div className="space-y-1.5 border-t border-pp-outline-variant/40 pt-4">
+            <div className="flex justify-between font-label-sm text-label-sm text-pp-on-surface-variant">
               <span>Timeline: 60%</span>
-              <span className="font-mono text-[#181820]">1080p • 60fps</span>
+              <span className="font-mono text-pp-on-surface">1080p • 60fps</span>
             </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#ECE8F6]">
-              <div className="h-full w-3/5 rounded-full bg-[#7064F4]" />
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-pp-surface-container">
+              <div className="h-full w-3/5 rounded-full bg-pp-primary" />
             </div>
           </div>
         </div>
@@ -258,11 +228,11 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
         {/* Right: Export Matrix, Subtitle Burn-In & CAPI Integration (7 Cols) */}
         <div className="space-y-6 lg:col-span-7">
           {/* Multi-Format Export Matrix Card */}
-          <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
-            <h3 className="text-base font-bold text-[#181820]">
+          <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
+            <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
               {t('exportMatrixTitle')}
             </h3>
-            <p className="mt-1 text-xs text-[#6B6A78]">
+            <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
               {t('exportMatrixDesc')}
             </p>
 
@@ -270,19 +240,19 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
               {/* Vertical Reels */}
               <div
                 onClick={() => setActiveAspectRatio('9:16')}
-                className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                className={`cursor-pointer rounded-2xl border p-3.5 transition-all ${
                   activeAspectRatio === '9:16'
-                    ? 'border-[#7064F4] bg-[#EBE9FD]/30 shadow-xs'
-                    : 'border-[#ECE8F6] bg-white hover:border-[#7064F4]/30'
+                    ? 'border-2 border-pp-primary bg-pp-surface-container-lowest shadow-sm'
+                    : 'border-pp-outline-variant/60 bg-pp-surface-container-low hover:border-pp-primary/40'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#181820]">
+                  <span className="font-label-md text-label-md font-bold text-pp-on-surface">
                     {t('formatReelsTitle')}
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-[#55EFC4]" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 </div>
-                <p className="mt-1 text-[11px] text-[#6B6A78]">
+                <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
                   {t('formatReelsSpecs')}
                 </p>
               </div>
@@ -290,19 +260,19 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
               {/* Square Feed */}
               <div
                 onClick={() => setActiveAspectRatio('1:1')}
-                className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                className={`cursor-pointer rounded-2xl border p-3.5 transition-all ${
                   activeAspectRatio === '1:1'
-                    ? 'border-[#7064F4] bg-[#EBE9FD]/30 shadow-xs'
-                    : 'border-[#ECE8F6] bg-white hover:border-[#7064F4]/30'
+                    ? 'border-2 border-pp-primary bg-pp-surface-container-lowest shadow-sm'
+                    : 'border-pp-outline-variant/60 bg-pp-surface-container-low hover:border-pp-primary/40'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#181820]">
+                  <span className="font-label-md text-label-md font-bold text-pp-on-surface">
                     {t('formatSquareTitle')}
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-[#55EFC4]" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 </div>
-                <p className="mt-1 text-[11px] text-[#6B6A78]">
+                <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
                   {t('formatSquareSpecs')}
                 </p>
               </div>
@@ -310,32 +280,32 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
               {/* Landscape YouTube */}
               <div
                 onClick={() => setActiveAspectRatio('16:9')}
-                className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+                className={`cursor-pointer rounded-2xl border p-3.5 transition-all ${
                   activeAspectRatio === '16:9'
-                    ? 'border-[#7064F4] bg-[#EBE9FD]/30 shadow-xs'
-                    : 'border-[#ECE8F6] bg-white hover:border-[#7064F4]/30'
+                    ? 'border-2 border-pp-primary bg-pp-surface-container-lowest shadow-sm'
+                    : 'border-pp-outline-variant/60 bg-pp-surface-container-low hover:border-pp-primary/40'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#181820]">
+                  <span className="font-label-md text-label-md font-bold text-pp-on-surface">
                     {t('formatLandscapeTitle')}
                   </span>
-                  <span className="h-2 w-2 rounded-full bg-[#55EFC4]" />
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 </div>
-                <p className="mt-1 text-[11px] text-[#6B6A78]">
+                <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
                   {t('formatLandscapeSpecs')}
                 </p>
               </div>
             </div>
 
             {/* Captions Options */}
-            <div className="mt-6 border-t border-[#ECE8F6] pt-4">
+            <div className="mt-6 border-t border-pp-outline-variant/40 pt-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#181820]">
+                  <h4 className="font-label-md text-label-md font-bold text-pp-on-surface">
                     {t('captionsTitle')}
                   </h4>
-                  <p className="text-[11px] text-[#6B6A78]">
+                  <p className="font-body-sm text-body-sm text-pp-on-surface-variant">
                     {t('captionsDesc')}
                   </p>
                 </div>
@@ -343,10 +313,10 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
                   <button
                     type="button"
                     onClick={() => setCaptionsEnabled(!captionsEnabled)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                    className={`rounded-full px-3 py-1 font-label-sm text-label-sm font-semibold transition-all ${
                       captionsEnabled
-                        ? 'bg-[#7064F4] text-white'
-                        : 'bg-[#ECE8F6] text-[#6B6A78]'
+                        ? 'bg-pp-primary text-pp-on-primary'
+                        : 'bg-pp-surface-container text-pp-on-surface-variant'
                     }`}
                   >
                     {captionsEnabled ? 'Captions ON' : 'Captions OFF'}
@@ -355,10 +325,10 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
                   <button
                     type="button"
                     onClick={() => setBilingualCaptions(!bilingualCaptions)}
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${
+                    className={`rounded-full px-3 py-1 font-label-sm text-label-sm font-semibold transition-all ${
                       bilingualCaptions
-                        ? 'bg-[#E6FAF5] text-[#0E624C]'
-                        : 'bg-[#ECE8F6] text-[#6B6A78]'
+                        ? 'bg-emerald-50 text-emerald-800'
+                        : 'bg-pp-surface-container text-pp-on-surface-variant'
                     }`}
                   >
                     {t('captionsBilingual')}
@@ -369,26 +339,26 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
           </div>
 
           {/* Ad Platform & CAPI Direct Sync Card */}
-          <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
-            <h3 className="text-base font-bold text-[#181820]">
+          <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
+            <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
               {t('capiSyncTitle')}
             </h3>
-            <p className="mt-1 text-xs text-[#6B6A78]">
+            <p className="mt-1 font-body-sm text-body-sm text-pp-on-surface-variant">
               {t('capiSyncDesc')}
             </p>
 
             <div className="mt-4 space-y-3">
               {/* Meta CAPI Sync */}
-              <div className="flex items-center justify-between rounded-xl bg-[#F5F3FB]/50 p-3.5">
+              <div className="flex items-center justify-between rounded-2xl border border-pp-outline-variant/40 bg-pp-surface-container-low p-3.5">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EBE9FD] text-[#7064F4]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pp-primary-fixed text-pp-primary">
                     <Share2 className="h-4 w-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[#181820]">
+                    <span className="font-label-md text-label-md font-bold text-pp-on-surface">
                       {t('syncMetaStatus')}
                     </span>
-                    <span className="block text-[11px] text-[#6B6A78]">
+                    <span className="block font-body-sm text-body-sm text-pp-on-surface-variant">
                       Auto-sync to Meta Creative Vault
                     </span>
                   </div>
@@ -397,23 +367,23 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
                 <button
                   type="button"
                   onClick={handleSyncMeta}
-                  className="rounded-full bg-[#ECE8F6] px-3.5 py-1 text-xs font-semibold text-[#181820] hover:bg-[#EBE9FD] hover:text-[#5243D5]"
+                  className="rounded-full bg-pp-surface-container px-3.5 py-1 font-label-sm text-label-sm font-semibold text-pp-on-surface hover:bg-pp-surface-container-high hover:text-pp-primary"
                 >
                   {metaSyncStatus === 'syncing' ? 'Syncing...' : metaSyncStatus === 'synced' ? 'Synced (Live)' : 'Push Now'}
                 </button>
               </div>
 
               {/* Google Ads Asset Vault */}
-              <div className="flex items-center justify-between rounded-xl bg-[#F5F3FB]/50 p-3.5">
+              <div className="flex items-center justify-between rounded-2xl border border-pp-outline-variant/40 bg-pp-surface-container-low p-3.5">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF6E5] text-[#684805]">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-800">
                     <Layers className="h-4 w-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-[#181820]">
+                    <span className="font-label-md text-label-md font-bold text-pp-on-surface">
                       {t('syncGoogleStatus')}
                     </span>
-                    <span className="block text-[11px] text-[#6B6A78]">
+                    <span className="block font-body-sm text-body-sm text-pp-on-surface-variant">
                       PMax Asset Library (#412-902)
                     </span>
                   </div>
@@ -422,7 +392,7 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
                 <button
                   type="button"
                   onClick={handleSyncGoogle}
-                  className="rounded-full bg-[#ECE8F6] px-3.5 py-1 text-xs font-semibold text-[#181820] hover:bg-[#EBE9FD] hover:text-[#5243D5]"
+                  className="rounded-full bg-pp-surface-container px-3.5 py-1 font-label-sm text-label-sm font-semibold text-pp-on-surface hover:bg-pp-surface-container-high hover:text-pp-primary"
                 >
                   {googleSyncStatus === 'syncing' ? 'Syncing...' : googleSyncStatus === 'synced' ? 'Synced (Live)' : 'Push Now'}
                 </button>
@@ -433,79 +403,89 @@ export function VideoExportConsole({ orgId, projectId, projectName }: VideoExpor
       </div>
 
       {/* Render Queue & Download Ledger Table */}
-      <div className="rounded-2xl border border-[#ECE8F6] bg-white p-6 shadow-[0_8px_24px_-4px_rgba(112,100,244,0.08)]">
-        <h3 className="text-base font-bold text-[#181820]">
+      <div className="rounded-3xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest p-6 shadow-xs">
+        <h3 className="font-headline-md text-headline-md font-bold text-pp-on-surface">
           {t('queueTitle')}
         </h3>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-start text-sm">
-            <thead>
-              <tr className="border-b border-[#ECE8F6] text-[11px] font-semibold uppercase tracking-wider text-[#9B99A8]">
-                <th className="pb-3 text-start">{t('colJobId')}</th>
-                <th className="pb-3 text-start">{t('colFormat')}</th>
-                <th className="pb-3 text-start">{t('colResolution')}</th>
-                <th className="pb-3 text-start">{t('colDuration')}</th>
-                <th className="pb-3 text-start">File Size</th>
-                <th className="pb-3 text-start">{t('colStatus')}</th>
-                <th className="pb-3 text-end">{t('colActions')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#ECE8F6]/60 text-xs">
-              {jobs.map((job) => (
-                <tr key={job.id} className="hover:bg-[#F5F3FB]/50 transition-colors">
-                  <td className="py-3 font-mono font-bold text-[#181820]">
-                    {job.id}
-                  </td>
-                  <td className="py-3 text-[#6B6A78]">
-                    {job.format}
-                  </td>
-                  <td className="py-3 font-mono text-[#6B6A78]">
-                    {job.resolution}
-                  </td>
-                  <td className="py-3 font-mono text-[#181820]">
-                    {job.duration}
-                  </td>
-                  <td className="py-3 font-mono text-[#6B6A78]">
-                    {job.fileSize}
-                  </td>
-                  <td className="py-3">
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                        job.status === 'synced'
-                          ? 'bg-[#E6FAF5] text-[#0E624C]'
-                          : 'bg-[#EBE9FD] text-[#5243D5]'
-                      }`}
-                    >
-                      <CheckCircle2 className="h-3 w-3" />
-                      {job.status === 'synced' ? 'CAPI Synced' : 'Ready'}
-                    </span>
-                  </td>
-                  <td className="py-3 text-end">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => copyJobCdn(job.id)}
-                        className="inline-flex items-center gap-1 rounded-full bg-[#ECE8F6] px-2.5 py-1 text-[11px] font-semibold text-[#181820] hover:bg-[#EBE9FD]"
-                        title="Copy CDN URL"
-                      >
-                        {copiedId === job.id ? <Check className="h-3 w-3 text-[#0E624C]" /> : <Copy className="h-3 w-3" />}
-                        <span>{copiedId === job.id ? 'Copied' : 'Copy'}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded-full bg-[#7064F4] px-3 py-1 text-[11px] font-semibold text-white hover:bg-[#5243D5]"
-                      >
-                        <Download className="h-3 w-3" />
-                        <span>Download</span>
-                      </button>
-                    </div>
-                  </td>
+        {jobs.length === 0 ? (
+          <div className="py-8">
+            <PpEmptyState
+              icon={Video}
+              title="No video renders yet"
+              description="Configure your formats above and click 'Render Video' to start your first background export."
+            />
+          </div>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-start text-sm">
+              <thead>
+                <tr className="border-b border-pp-outline-variant/40 font-label-sm text-label-sm font-semibold uppercase tracking-wider text-pp-outline">
+                  <th className="pb-3 text-start">{t('colJobId')}</th>
+                  <th className="pb-3 text-start">{t('colFormat')}</th>
+                  <th className="pb-3 text-start">{t('colResolution')}</th>
+                  <th className="pb-3 text-start">{t('colDuration')}</th>
+                  <th className="pb-3 text-start">File Size</th>
+                  <th className="pb-3 text-start">{t('colStatus')}</th>
+                  <th className="pb-3 text-end">{t('colActions')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-pp-outline-variant/40 font-body-sm text-body-sm">
+                {jobs.map((job) => (
+                  <tr key={job.id} className="hover:bg-pp-surface-container-low transition-colors">
+                    <td className="py-3 font-mono font-bold text-pp-on-surface">
+                      {job.id}
+                    </td>
+                    <td className="py-3 text-pp-on-surface-variant">
+                      {job.format}
+                    </td>
+                    <td className="py-3 font-mono text-pp-on-surface-variant">
+                      {job.resolution}
+                    </td>
+                    <td className="py-3 font-mono text-pp-on-surface">
+                      {job.duration}
+                    </td>
+                    <td className="py-3 font-mono text-pp-on-surface-variant">
+                      {job.fileSize}
+                    </td>
+                    <td className="py-3">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
+                          job.status === 'synced'
+                            ? 'bg-emerald-50 text-emerald-800'
+                            : 'bg-pp-primary-fixed text-pp-on-primary-fixed-variant'
+                        }`}
+                      >
+                        <CheckCircle2 className="h-3 w-3" />
+                        {job.status === 'synced' ? 'CAPI Synced' : 'Ready'}
+                      </span>
+                    </td>
+                    <td className="py-3 text-end">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => copyJobCdn(job.id)}
+                          className="inline-flex items-center gap-1 rounded-full bg-pp-surface-container px-2.5 py-1 text-[11px] font-semibold text-pp-on-surface hover:bg-pp-surface-container-high"
+                          title="Copy CDN URL"
+                        >
+                          {copiedId === job.id ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                          <span>{copiedId === job.id ? 'Copied' : 'Copy'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 rounded-full bg-pp-primary px-3 py-1 text-[11px] font-semibold text-pp-on-primary hover:bg-pp-primary-container"
+                        >
+                          <Download className="h-3 w-3" />
+                          <span>Download</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

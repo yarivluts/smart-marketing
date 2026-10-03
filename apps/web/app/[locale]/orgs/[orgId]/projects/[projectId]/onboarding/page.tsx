@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { Sparkles, Layers, ArrowRight, ShieldCheck, CheckCircle2, ChevronRight } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -26,8 +27,15 @@ import { OnboardingFunnelStep } from '@/components/orgs/onboarding-funnel-step';
 import { CompleteOnboardingButton } from '@/components/orgs/complete-onboarding-button';
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
-import { Button } from '@/components/ui/button';
 import { SdkDeploymentWizard } from '@/components/onboarding/sdk-deployment-wizard';
+import {
+  PpPage,
+  PpPageHeader,
+  PpCard,
+  PpButton,
+  PpPill,
+  PpInsetRow,
+} from '@/components/pastel/primitives';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -40,14 +48,8 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * The onboarding wizard (KAN-68, plan `10 §2.6`/`13 §E13.1`): org/project already exist by the time
- * this page is reached (created via the org page's own "new project" flow, which now redirects
- * straight here) — pick a vertical/metric pack, connect a first source (or push-your-own), confirm an
- * AI-proposed funnel mapping, then land on the starter board with links to invite the team / set a
- * goal / turn on the war room. Every step's actual work happens through its own existing surface
- * (plugin install, key mint, board seeding, invites, goals, TV pairing) — this page only sequences
- * them and tracks progress. Gated on `project.manage`, the same permission every constituent action is
- * already reachable through for a `project_admin`.
+ * The project onboarding wizard (KAN-68, plan `10 §2.6`/`13 §E13.1`): renders inside NavShell.
+ * Stitch design: desktop a96c47fc / 986fc1ad, mobile b959e096 / 22675f2c.
  */
 export default async function OnboardingPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -78,59 +80,93 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
 
   if (!state) {
     return (
-      <main className="container mx-auto flex max-w-2xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <StartOnboardingButton orgId={orgId} projectId={projectId} />
-      </main>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="Setup Journey & Readiness"
+          title={t('title', { projectName: project.name })}
+          description="Complete initialization to activate autonomous attribution, real-time event streaming, and executive dashboard metrics."
+        />
+        <PpCard className="max-w-2xl mx-auto p-8 text-center space-y-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-pp-primary text-pp-on-primary shadow-pp-candy">
+            <Sparkles className="h-7 w-7" />
+          </div>
+          <div>
+            <h2 className="font-pp-display text-pp-headline-lg font-bold text-pp-on-surface">
+              {t('title', { projectName: project.name })}
+            </h2>
+            <p className="text-pp-body-md text-pp-on-surface-variant mt-2 max-w-md mx-auto">
+              Configure your growth metric pack, data sources, and conversion funnel milestones.
+            </p>
+          </div>
+          <div className="pt-2 flex justify-center">
+            <StartOnboardingButton orgId={orgId} projectId={projectId} />
+          </div>
+        </PpCard>
+      </PpPage>
     );
   }
 
   const view = toOnboardingStateView(state);
 
   return (
-    <main className="w-full space-y-12">
+    <PpPage className="space-y-8">
+      <PpPageHeader
+        eyebrow="Setup Journey & Readiness"
+        title={t('title', { projectName: project.name })}
+        description="Configure data streams, metric pack, and conversion funnel for high-velocity telemetry."
+        actions={
+          <div className="flex items-center gap-2">
+            <PpPill accent="mint">
+              <CheckCircle2 className="h-3 w-3" />
+              <span>Pod Provisioned</span>
+            </PpPill>
+          </div>
+        }
+      />
+
       {/* Stitch Onboarding & SDK Deployment Wizard */}
       <SdkDeploymentWizard orgId={orgId} projectId={projectId} isDataConnected={true} />
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8 max-w-2xl mx-auto">
-        <h2 className="text-xl font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-
+      {/* Interactive Step Card */}
+      <PpCard className="max-w-3xl mx-auto space-y-8">
         {view.step === 'pack' ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('packStepHeading')}</h2>
-          <OnboardingPackStep orgId={orgId} projectId={projectId} packs={onboardingMetricPacks()} />
-        </section>
-      ) : null}
+          <section className="space-y-4">
+            <div>
+              <PpPill accent="primary" className="mb-2">Step 1 of 4</PpPill>
+              <h2 className="font-pp-display text-pp-headline-lg font-bold text-pp-on-surface">
+                {t('packStepHeading')}
+              </h2>
+            </div>
+            <OnboardingPackStep orgId={orgId} projectId={projectId} packs={onboardingMetricPacks()} />
+          </section>
+        ) : null}
 
-      {view.step === 'sources' ? <SourcesStep orgId={orgId} projectId={projectId} /> : null}
+        {view.step === 'sources' ? (
+          <SourcesStep orgId={orgId} projectId={projectId} />
+        ) : null}
 
-      {view.step === 'funnel' ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('funnelStepHeading')}</h2>
-          <OnboardingFunnelStep orgId={orgId} projectId={projectId} proposal={await proposeOnboardingFunnelSteps(orgId, projectId)} />
-        </section>
-      ) : null}
+        {view.step === 'funnel' ? (
+          <section className="space-y-4">
+            <div>
+              <PpPill accent="primary" className="mb-2">Step 3 of 4</PpPill>
+              <h2 className="font-pp-display text-pp-headline-lg font-bold text-pp-on-surface">
+                {t('funnelStepHeading')}
+              </h2>
+            </div>
+            <OnboardingFunnelStep orgId={orgId} projectId={projectId} proposal={await proposeOnboardingFunnelSteps(orgId, projectId)} />
+          </section>
+        ) : null}
 
-      {view.step === 'board' || view.step === 'done' ? <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} /> : null}
-      </div>
-    </main>
+        {view.step === 'board' || view.step === 'done' ? (
+          <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} />
+        ) : null}
+      </PpCard>
+    </PpPage>
   );
 }
 
 /**
- * The "connect a first source" step's own sub-tree (KAN-68 AC, plan `10 §2.6`
- * step 2) — kept in its own async component so the page body above stays a
- * flat step switch.
- *
- * A brand-new org has zero registered source manifests, so every first-run
- * visitor hits the `installableSourceManifests.length === 0` branch. That
- * empty state's link to the org plugin registry was previously plain inline
- * text easy to read past as a caveat rather than a next step (found via
- * dogfooding QA); it's a real `Button` now. The "push your own data" path
- * below it — equally valid, and the one that actually works with zero setup
- * — gets its own one-line callout for the same reason: without it, a
- * first-time user reads the plugin dead end as *the* path and the API-key
- * form as an unlabeled afterthought, when it's the faster of the two.
+ * The "connect a first source" step's own sub-tree.
  */
 async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: string }): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
@@ -152,82 +188,109 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
   const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
 
   return (
-    <section className="flex flex-col gap-6">
-      <h2 className="text-lg font-semibold">{t('sourceStepHeading')}</h2>
-      <p className="text-muted-foreground">{t('sourceStepIntro')}</p>
+    <section className="space-y-6">
+      <div>
+        <PpPill accent="primary" className="mb-2">Step 2 of 4</PpPill>
+        <h2 className="font-pp-display text-pp-headline-lg font-bold text-pp-on-surface">
+          {t('sourceStepHeading')}
+        </h2>
+        <p className="text-pp-body-md text-pp-on-surface-variant mt-1">{t('sourceStepIntro')}</p>
+      </div>
 
-      <div className="flex flex-col gap-3">
-        <h3 className="font-medium">{t('sourceStepPluginHeading')}</h3>
+      <div className="space-y-3">
+        <h3 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">{t('sourceStepPluginHeading')}</h3>
         {connectedSourceInstall ? (
-          <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}</p>
+          <PpInsetRow>
+            <span className="text-pp-body-md text-pp-secondary font-semibold">
+              {t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}
+            </span>
+          </PpInsetRow>
         ) : installableSourceManifests.length === 0 ? (
-          <div className="flex flex-col items-start gap-2 rounded-md border border-input p-3">
-            <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
-            <Button asChild size="sm" variant="outline">
+          <div className="flex flex-col items-start gap-2 rounded-2xl bg-pp-surface-container-low p-4">
+            <p className="text-pp-body-md text-pp-on-surface-variant">{t('sourceStepNoManifests')}</p>
+            <PpButton asChild size="sm" variant="secondary">
               <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
-            </Button>
+            </PpButton>
           </div>
         ) : (
           <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableSourceManifests} />
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h3 className="font-medium">{t('sourceStepPushYourOwnHeading')}</h3>
-        <p className="text-sm text-muted-foreground">{t('sourceStepPushYourOwnIntro')}</p>
+      <div className="space-y-3 pt-2">
+        <h3 className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">{t('sourceStepPushYourOwnHeading')}</h3>
+        <p className="text-pp-body-sm text-pp-on-surface-variant">{t('sourceStepPushYourOwnIntro')}</p>
         {environmentOptions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
+          <p className="text-pp-body-sm text-pp-outline">{t('sourceStepNoEnvironments')}</p>
         ) : (
           <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
         )}
       </div>
 
-      {connectedSourceInstall ? (
-        <OnboardingSourceContinueButton orgId={orgId} projectId={projectId} method="plugin" pluginId={connectedSourceInstall.pluginId} />
-      ) : hasIngestKey ? (
-        <OnboardingSourceContinueButton orgId={orgId} projectId={projectId} method="push_your_own" />
-      ) : (
-        <p className="text-sm text-muted-foreground">{t('sourceStepContinueHint')}</p>
-      )}
+      <div className="pt-2">
+        {connectedSourceInstall ? (
+          <OnboardingSourceContinueButton orgId={orgId} projectId={projectId} method="plugin" pluginId={connectedSourceInstall.pluginId} />
+        ) : hasIngestKey ? (
+          <OnboardingSourceContinueButton orgId={orgId} projectId={projectId} method="push_your_own" />
+        ) : (
+          <p className="text-pp-body-sm text-pp-outline">{t('sourceStepContinueHint')}</p>
+        )}
+      </div>
     </section>
   );
 }
 
-/** The wizard's final screen (KAN-68 AC: "starter board" + plan `10 §2.6` step 5's invite/goal/war-room CTAs, folded together — see `OnboardingStateModel.step`'s own doc comment for why `board` carries both). */
+/** The wizard's final screen. */
 async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId: string; done: boolean }): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
   const boards = await listBoardsForProject(orgId, projectId);
 
   return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">{t('boardStepHeading')}</h2>
+    <section className="space-y-6">
+      <div>
+        <PpPill accent="mint" className="mb-2">Step 4 of 4</PpPill>
+        <h2 className="font-pp-display text-pp-headline-lg font-bold text-pp-on-surface">
+          {t('boardStepHeading')}
+        </h2>
+      </div>
+
       {boards.length === 0 ? (
-        <p className="text-muted-foreground">{t('boardStepEmpty')}</p>
+        <p className="text-pp-body-md text-pp-on-surface-variant">{t('boardStepEmpty')}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <div className="space-y-2">
           {boards.map((board) => (
-            <li key={board.id}>
-              <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}>
-                {board.name}
+            <PpInsetRow key={board.id}>
+              <Link
+                className="font-medium text-pp-primary hover:underline flex items-center justify-between w-full"
+                href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}
+              >
+                <span>{board.name}</span>
+                <ChevronRight className="h-4 w-4 text-pp-outline rtl:rotate-180" />
               </Link>
-            </li>
+            </PpInsetRow>
           ))}
-        </ul>
+        </div>
       )}
 
-      <div className="flex flex-wrap gap-4">
-        <Link className="text-sm underline" href={`/orgs/${orgId}`}>
+      <div className="flex flex-wrap gap-4 pt-2">
+        <Link className="text-pp-body-sm font-medium text-pp-primary hover:underline" href={`/orgs/${orgId}`}>
           {t('inviteTeamLink')}
         </Link>
-        <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${projectId}/goals`}>
+        <Link className="text-pp-body-sm font-medium text-pp-primary hover:underline" href={`/orgs/${orgId}/projects/${projectId}/goals`}>
           {t('setGoalLink')}
         </Link>
-        <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${projectId}/tv`}>
+        <Link className="text-pp-body-sm font-medium text-pp-primary hover:underline" href={`/orgs/${orgId}/projects/${projectId}/tv`}>
           {t('warRoomLink')}
         </Link>
       </div>
 
-      {done ? <p className="font-medium">{t('doneMessage')}</p> : <CompleteOnboardingButton orgId={orgId} projectId={projectId} />}
+      <div className="pt-2">
+        {done ? (
+          <p className="font-bold text-pp-secondary text-pp-body-lg">{t('doneMessage')}</p>
+        ) : (
+          <CompleteOnboardingButton orgId={orgId} projectId={projectId} />
+        )}
+      </div>
     </section>
   );
 }

@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
+import { Play } from 'lucide-react';
+import { PpButton } from '@/components/pastel/primitives';
 
 export interface TriggerOrchestrationRunButtonProps {
   orgId: string;
@@ -36,11 +37,18 @@ export function TriggerOrchestrationRunButton({ orgId, projectId }: TriggerOrche
 
   return (
     <div className="flex flex-col items-start gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
+      <PpButton
+        type="button"
+        variant="primary"
+        size="sm"
+        onClick={handleClick}
+        disabled={submitting}
+        icon={Play}
+      >
         {t('orchestrationTriggerButton')}
-      </Button>
+      </PpButton>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('orchestrationTriggerError')}
         </p>
       ) : null}

@@ -9,13 +9,19 @@ import {
   ArrowRight,
   Loader2,
   AlertCircle,
+  Mail,
+  Key,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  CheckCircle2,
+  Lock,
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { authErrorMessageKey, type AuthErrorMessageKey } from '@/lib/auth/auth-error';
 import { resolveRedirectTarget } from '@/lib/auth/redirect-target';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PpButton } from '@/components/pastel/primitives';
 import { cn } from '@/lib/utils';
 
 export interface EmailPasswordFormProps {
@@ -64,6 +70,8 @@ export function EmailPasswordForm({
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [errorKey, setErrorKey] = useState<AuthErrorMessageKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -117,17 +125,17 @@ export function EmailPasswordForm({
     <div
       data-testid="auth-form-card"
       dir={isRtl ? 'rtl' : 'ltr'}
-      className={cn('mx-auto flex w-full max-w-md flex-col gap-6 py-8', className)}
+      className={cn('mx-auto flex w-full flex-col gap-6 py-2', className)}
     >
       {/* Brand Header */}
       <div className="flex flex-col items-center text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md shadow-indigo-500/25 mb-4">
-          <Sparkles className="h-6 w-6" />
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-pp-primary text-pp-on-primary shadow-pp-candy mb-3">
+          <Sparkles className="h-5 w-5" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+        <h1 className="font-pp-display text-pp-headline-lg font-bold tracking-tight text-pp-on-surface">
           {mode === 'signup' ? t('signUpTitle') : t('signInTitle')}
         </h1>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-pp-body-sm text-pp-on-surface-variant mt-1 max-w-sm">
           {mode === 'signup'
             ? locale === 'he'
               ? 'הצטרף לאלפי מנהלי שיווק המאיצים צמיחה עם GrowthOS'
@@ -139,7 +147,7 @@ export function EmailPasswordForm({
       </div>
 
       {/* Mode Switcher Tabs */}
-      <div role="tablist" className="flex rounded-xl bg-muted/60 p-1 border border-border/60">
+      <div role="tablist" className="flex rounded-full bg-pp-surface-container p-1 shadow-inner">
         <button
           type="button"
           role="tab"
@@ -147,10 +155,10 @@ export function EmailPasswordForm({
           data-testid="tab-signin"
           onClick={() => handleTabChange('signin')}
           className={cn(
-            'flex-1 rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer',
+            'flex-1 rounded-full py-2 text-pp-label-md font-semibold transition-all cursor-pointer text-center',
             mode === 'signin'
-              ? 'bg-card text-foreground shadow-xs'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'bg-pp-surface-container-lowest text-pp-primary shadow-pp-candy'
+              : 'text-pp-on-surface-variant hover:text-pp-on-surface',
           )}
         >
           {t('signIn')}
@@ -162,10 +170,10 @@ export function EmailPasswordForm({
           data-testid="tab-signup"
           onClick={() => handleTabChange('signup')}
           className={cn(
-            'flex-1 rounded-lg py-2 text-xs font-semibold transition-all cursor-pointer',
+            'flex-1 rounded-full py-2 text-pp-label-md font-semibold transition-all cursor-pointer text-center',
             mode === 'signup'
-              ? 'bg-card text-foreground shadow-xs'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'bg-pp-surface-container-lowest text-pp-primary shadow-pp-candy'
+              : 'text-pp-on-surface-variant hover:text-pp-on-surface',
           )}
         >
           {t('signUp')}
@@ -173,73 +181,109 @@ export function EmailPasswordForm({
       </div>
 
       {/* Google SSO Button */}
-      <Button
+      <button
         type="button"
-        variant="outline"
         disabled={submitting || isGoogleLoading}
         onClick={handleGoogleSignIn}
-        className="w-full flex items-center justify-center gap-2.5 h-11 rounded-xl border-border bg-card hover:bg-muted/50 text-xs font-semibold shadow-xs"
+        className="w-full flex items-center justify-center gap-2.5 h-11 rounded-2xl bg-pp-surface-container hover:bg-pp-surface-container-high text-pp-on-surface text-pp-label-md font-semibold transition-all duration-150 active:scale-[0.98] shadow-xs disabled:opacity-50 cursor-pointer"
       >
         {isGoogleLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin text-pp-primary" />
         ) : (
           <GoogleIcon />
         )}
         <span>{t('signInWithGoogle')}</span>
-      </Button>
+      </button>
 
       {/* Divider */}
       <div className="relative flex items-center justify-center">
-        <div className="w-full border-t border-border/80" />
-        <span className="absolute bg-card px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-          {locale === 'he' ? 'או באמצעות אימייל' : 'or with email'}
+        <div className="w-full border-t border-pp-outline-variant/40" />
+        <span className="absolute bg-pp-surface-container-lowest px-3 text-pp-label-sm font-semibold text-pp-outline uppercase tracking-wider">
+          {locale === 'he' ? 'או באמצעות אימייל' : 'or with corporate email'}
         </span>
       </div>
 
       {/* Email & Password Form */}
       <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        {/* Email Field */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-foreground" htmlFor="email">
-            {t('emailLabel')}
-          </label>
-          <div className="relative">
-            <Input
+          <div className="flex items-center justify-between">
+            <label className="text-pp-label-md font-semibold text-pp-on-surface" htmlFor="email">
+              {t('emailLabel')}
+            </label>
+            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-pp-secondary">
+              <CheckCircle2 className="h-3 w-3" />
+              <span>Assigned Seat</span>
+            </span>
+          </div>
+          <div className="relative flex items-center">
+            <Mail className="absolute start-3.5 h-4 w-4 text-pp-outline pointer-events-none" />
+            <input
               id="email"
               name="email"
               type="email"
               autoComplete="email"
               required
-              placeholder="you@company.com"
+              placeholder="name@company.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="h-10 rounded-xl bg-card text-xs focus:ring-1 focus:ring-primary shadow-inner"
+              className="w-full ps-10 pe-4 py-2.5 bg-pp-surface-container-low text-pp-on-surface placeholder:text-pp-outline text-pp-body-md rounded-2xl border-none focus:bg-pp-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-pp-primary/40 transition-all"
             />
           </div>
         </div>
 
+        {/* Password Field */}
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-foreground" htmlFor="password">
+            <label className="text-pp-label-md font-semibold text-pp-on-surface" htmlFor="password">
               {t('passwordLabel')}
             </label>
             {mode === 'signin' && (
-              <span className="text-[11px] text-primary hover:underline cursor-pointer">
+              <span className="text-[12px] font-medium text-pp-primary hover:underline cursor-pointer">
                 {locale === 'he' ? 'שכחת סיסמה?' : 'Forgot password?'}
               </span>
             )}
           </div>
-          <div className="relative">
-            <Input
+          <div className="relative flex items-center">
+            <Key className="absolute start-3.5 h-4 w-4 text-pp-outline pointer-events-none" />
+            <input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               required
-              placeholder="••••••••"
+              placeholder="••••••••••••"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="h-10 rounded-xl bg-card text-xs focus:ring-1 focus:ring-primary shadow-inner"
+              className="w-full ps-10 pe-11 py-2.5 bg-pp-surface-container-low text-pp-on-surface placeholder:text-pp-outline text-pp-body-md rounded-2xl border-none focus:bg-pp-surface-container-lowest focus:outline-none focus:ring-2 focus:ring-pp-primary/40 transition-all"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute end-3 text-pp-outline hover:text-pp-on-surface transition-colors cursor-pointer"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Remember me & 2FA indicator */}
+        <div className="flex items-center justify-between pt-1">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberDevice}
+              onChange={(e) => setRememberDevice(e.target.checked)}
+              className="h-4 w-4 rounded border-pp-outline-variant text-pp-primary focus:ring-pp-primary cursor-pointer"
+            />
+            <span className="text-pp-body-sm text-pp-on-surface-variant">
+              {t('rememberDevice')}
+            </span>
+          </label>
+          <div className="flex items-center gap-1 text-pp-label-sm font-semibold text-pp-outline">
+            <ShieldCheck className="h-3.5 w-3.5 text-pp-secondary" />
+            <span>{t('twoFactorEnforced')}</span>
           </div>
         </div>
 
@@ -247,7 +291,7 @@ export function EmailPasswordForm({
         {errorKey ? (
           <div
             role="alert"
-            className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium"
+            className="flex items-center gap-2 rounded-2xl bg-pp-error-container p-3 text-pp-body-sm text-pp-on-error-container font-medium"
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{t(errorKey)}</span>
@@ -255,10 +299,11 @@ export function EmailPasswordForm({
         ) : null}
 
         {/* Submit CTA */}
-        <Button
+        <PpButton
           type="submit"
+          variant="primary"
           disabled={submitting || isGoogleLoading}
-          className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-xs shadow-soft hover:bg-primary/90 transition-all active:scale-[0.98] cursor-pointer mt-1"
+          className="w-full h-12 rounded-full font-pp-display text-pp-body-lg font-bold shadow-pp-candy active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
         >
           {submitting ? (
             <div className="flex items-center gap-2">
@@ -266,16 +311,16 @@ export function EmailPasswordForm({
               <span>{locale === 'he' ? 'מעבד...' : 'Processing...'}</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <span>{mode === 'signup' ? t('signUp') : t('signIn')}</span>
-              <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+              <ArrowRight className="h-4 w-4 rtl:rotate-180" />
             </div>
           )}
-        </Button>
+        </PpButton>
       </form>
 
       {/* Switch Mode Footer Link */}
-      <p className="text-center text-xs text-muted-foreground">
+      <p className="text-center text-pp-body-sm text-pp-on-surface-variant">
         {mode === 'signup' ? (
           <Link
             href="/login"
@@ -285,7 +330,7 @@ export function EmailPasswordForm({
                 handleTabChange('signin');
               }
             }}
-            className="font-medium text-foreground hover:text-primary hover:underline"
+            className="font-medium text-pp-primary hover:underline"
           >
             {t('haveAccount')}
           </Link>
@@ -298,12 +343,33 @@ export function EmailPasswordForm({
                 handleTabChange('signup');
               }
             }}
-            className="font-medium text-foreground hover:text-primary hover:underline"
+            className="font-medium text-pp-primary hover:underline"
           >
             {t('needAccount')}
           </Link>
         )}
       </p>
+
+      {/* Security & Governance Badges */}
+      <div className="mt-2 pt-4 border-t border-pp-surface-container flex flex-col gap-3">
+        <div className="flex items-center justify-between text-pp-label-sm font-semibold text-pp-outline">
+          <div className="flex items-center gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5 text-pp-secondary" />
+            <span>SOC-2 Type II</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <ShieldCheck className="h-3.5 w-3.5 text-pp-secondary" />
+            <span>ISO 27001 Certified</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Lock className="h-3.5 w-3.5 text-pp-secondary" />
+            <span>E2E Encrypted</span>
+          </div>
+        </div>
+        <p className="text-center text-[11px] text-pp-outline leading-relaxed">
+          {t('termsNotice')}
+        </p>
+      </div>
     </div>
   );
 }

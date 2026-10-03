@@ -4,15 +4,12 @@ import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Environment } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
+import { PlusCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { blankFieldMappingRuleRow, FieldMappingRuleEditor, type FieldMappingRuleRow } from './field-mapping-rule-editor';
 import { SuggestFieldMappingsPanel } from './suggest-field-mappings-panel';
 
-// Client components must never import a *value* from `@growthos/firebase-orm-models` — see
-// `create-hook-endpoint-form.tsx`'s own doc comment for why. `MappingRecordKind` and `SchemaDefKind`
-// are the same three strings by design (`field-mapping.model.ts`'s doc comment), so this mirrors
-// `register-schema-def-form.tsx`'s `SCHEMA_DEF_KINDS` local copy.
 const FIELD_MAPPING_KINDS = ['event', 'entity', 'measure'] as const;
 type FieldMappingKind = (typeof FIELD_MAPPING_KINDS)[number];
 
@@ -31,7 +28,7 @@ export interface CreateFieldMappingFormProps {
   projectId: string;
   environments: readonly FieldMappingEnvironmentOption[];
   hookEndpoints: readonly FieldMappingHookEndpointOption[];
-  /** Every kind's currently-active registered schema names (KAN-31) — the mapping's `schemaName` must be one of these, so the picker only ever offers a valid target. */
+  /** Every kind's currently-active registered schema names (KAN-31). */
   schemaNamesByKind: Readonly<Record<FieldMappingKind, readonly string[]>>;
 }
 
@@ -57,18 +54,14 @@ export function CreateFieldMappingForm({
 
   const schemaOptions = schemaNamesByKind[kind] ?? [];
 
-  /**
-   * Merges suggested rules into the rule list without clobbering rows the user already filled in
-   * for the same target field — the suggestion panel's own "user confirms" step is this merge plus
-   * the normal rule editor, not a direct save. A row counts as "already in use" by *any* typed
-   * content, not just a non-empty `targetField` — a row where the user has only typed a
-   * `sourcePath` so far (hasn't named the target field yet) must survive, not be silently dropped
-   * just because a suggestion happened to be applied elsewhere on the form.
-   */
   function applySuggestedRules(suggested: FieldMappingRuleRow[]): void {
     setRules((previousRules) => {
       const keptRows = previousRules.filter(
-        (rule) => rule.targetField.trim().length > 0 || rule.sourcePath.trim().length > 0 || rule.template.trim().length > 0 || rule.staticValue.trim().length > 0,
+        (rule) =>
+          rule.targetField.trim().length > 0 ||
+          rule.sourcePath.trim().length > 0 ||
+          rule.template.trim().length > 0 ||
+          rule.staticValue.trim().length > 0,
       );
       const existingTargets = new Set(
         keptRows.filter((rule) => rule.targetField.trim().length > 0).map((rule) => rule.targetField.trim()),
@@ -124,19 +117,20 @@ export function CreateFieldMappingForm({
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="field-mapping-name">
-          {t('nameLabel')}
-        </label>
-        <Input id="field-mapping-name" required value={name} onChange={(event) => setName(event.target.value)} />
-      </div>
+    <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+      <PpField label={t('nameLabel')} htmlFor="field-mapping-name">
+        <input
+          id="field-mapping-name"
+          required
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          className={ppInputClass}
+          placeholder="e.g. Stripe checkout mapping"
+        />
+      </PpField>
 
-      <div className="flex flex-wrap gap-4">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="field-mapping-kind">
-            {t('kindLabel')}
-          </label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PpField label={t('kindLabel')} htmlFor="field-mapping-kind">
           <select
             id="field-mapping-kind"
             value={kind}
@@ -144,7 +138,7 @@ export function CreateFieldMappingForm({
               setKind(event.target.value as FieldMappingKind);
               setSchemaName('');
             }}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className={ppInputClass}
           >
             {FIELD_MAPPING_KINDS.map((value) => (
               <option key={value} value={value}>
@@ -152,17 +146,14 @@ export function CreateFieldMappingForm({
               </option>
             ))}
           </select>
-        </div>
+        </PpField>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="field-mapping-environment">
-            {t('environmentLabel')}
-          </label>
+        <PpField label={t('environmentLabel')} htmlFor="field-mapping-environment">
           <select
             id="field-mapping-environment"
             value={environmentId}
             onChange={(event) => setEnvironmentId(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className={ppInputClass}
           >
             {environments.map((environment) => (
               <option key={environment.id} value={environment.id}>
@@ -170,18 +161,15 @@ export function CreateFieldMappingForm({
               </option>
             ))}
           </select>
-        </div>
+        </PpField>
 
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="field-mapping-schema-name">
-            {t('schemaNameLabel')}
-          </label>
+        <PpField label={t('schemaNameLabel')} htmlFor="field-mapping-schema-name">
           <select
             id="field-mapping-schema-name"
             required
             value={schemaName}
             onChange={(event) => setSchemaName(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className={ppInputClass}
           >
             <option value="">{t('schemaNamePlaceholder')}</option>
             {schemaOptions.map((option) => (
@@ -190,18 +178,15 @@ export function CreateFieldMappingForm({
               </option>
             ))}
           </select>
-        </div>
+        </PpField>
 
         {hookEndpoints.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" htmlFor="field-mapping-hook-endpoint">
-              {t('hookEndpointLabel')}
-            </label>
+          <PpField label={t('hookEndpointLabel')} htmlFor="field-mapping-hook-endpoint">
             <select
               id="field-mapping-hook-endpoint"
               value={hookEndpointId}
               onChange={(event) => setHookEndpointId(event.target.value)}
-              className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+              className={ppInputClass}
             >
               <option value="">{t('hookEndpointNone')}</option>
               {hookEndpoints.map((endpoint) => (
@@ -210,23 +195,42 @@ export function CreateFieldMappingForm({
                 </option>
               ))}
             </select>
-          </div>
+          </PpField>
         ) : null}
       </div>
 
-      <SuggestFieldMappingsPanel orgId={orgId} projectId={projectId} kind={kind} schemaName={schemaName} onApplySuggestions={applySuggestedRules} />
+      <div className="pt-1">
+        <SuggestFieldMappingsPanel
+          orgId={orgId}
+          projectId={projectId}
+          kind={kind}
+          schemaName={schemaName}
+          onApplySuggestions={applySuggestedRules}
+        />
+      </div>
 
       <FieldMappingRuleEditor rules={rules} onChange={setRules} />
 
-      {schemaOptions.length === 0 ? <p className="text-xs text-muted-foreground">{t('noActiveSchemasForKind')}</p> : null}
+      {schemaOptions.length === 0 ? (
+        <p className="text-xs text-pp-outline font-medium">{t('noActiveSchemasForKind')}</p>
+      ) : null}
+
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-medium text-pp-error">
           {error}
         </p>
       ) : null}
-      <Button type="submit" disabled={submitting || rules.length === 0 || schemaOptions.length === 0 || environments.length === 0}>
-        {t('create')}
-      </Button>
+
+      <div>
+        <PpButton
+          type="submit"
+          variant="primary"
+          icon={PlusCircle}
+          disabled={submitting || rules.length === 0 || schemaOptions.length === 0 || environments.length === 0}
+        >
+          {t('create')}
+        </PpButton>
+      </div>
     </form>
   );
 }

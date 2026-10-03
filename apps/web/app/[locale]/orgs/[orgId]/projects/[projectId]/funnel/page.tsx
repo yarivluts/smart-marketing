@@ -19,6 +19,7 @@ import {
 import { buildFunnelGoalsCockpitData } from '@/lib/orgs/funnel-goals-synthesizer';
 import { FunnelGoalsDashboard } from '@/components/orgs/funnel-goals-dashboard';
 import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
+import { PpPage } from '@/components/pastel/primitives';
 import type {
   FunnelStepsOutcome,
   CohortRetentionOutcome,
@@ -151,7 +152,7 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   });
 
   return (
-    <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <PpPage className="space-y-6">
       {!hasEventData && (
         <MissingIntegrationAlert
           orgId={orgId}
@@ -176,6 +177,6 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
         metricCatalog={metricCatalog}
         people={people.filter((p) => !p.archived_at).map((p) => ({ id: p.id, name: p.name }))}
       />
-    </main>
+    </PpPage>
   );
 }

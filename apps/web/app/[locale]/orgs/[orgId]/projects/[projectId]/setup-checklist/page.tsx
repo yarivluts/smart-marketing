@@ -6,6 +6,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
 import { SetupChecklistHub } from '@/components/projects/setup-checklist-hub';
 import { parseProjectProfile } from '@/lib/projects/project-profile';
+import { PpPage } from '@/components/pastel/primitives';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -17,6 +18,10 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
+/**
+ * Setup Checklist & Missing Integrations Triage Hub (inside NavShell).
+ * Stitch design: desktop a96c47fc / 6941eecc, mobile b959e096 / df5c77f3.
+ */
 export default async function SetupChecklistPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
   setRequestLocale(locale);
@@ -44,13 +49,13 @@ export default async function SetupChecklistPage({ params }: PageProps): Promise
   const profile = parseProjectProfile(project);
 
   return (
-    <main className="w-full space-y-6">
+    <PpPage className="space-y-6">
       <SetupChecklistHub
         orgId={orgId}
         projectId={projectId}
         projectName={project.name}
         initialProfile={profile}
       />
-    </main>
+    </PpPage>
   );
 }

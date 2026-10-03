@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ppInputClass, PpButton } from '@/components/pastel/primitives';
+import { Plus } from 'lucide-react';
 
 export interface CreateBoardFormProps {
   orgId: string;
@@ -42,27 +42,28 @@ export function CreateBoardForm({ orgId, projectId }: CreateBoardFormProps): Rea
   }
 
   return (
-    <form className="flex items-end gap-3" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="create-board-name">
+    <form className="flex flex-col sm:flex-row sm:items-end gap-3" onSubmit={handleSubmit} noValidate>
+      <div className="flex-1 space-y-1.5">
+        <label className="block text-pp-label-md text-pp-on-surface" htmlFor="create-board-name">
           {t('nameLabel')}
         </label>
-        <Input
+        <input
           id="create-board-name"
           required
           placeholder={t('namePlaceholder')}
           value={name}
           onChange={(event) => setName(event.target.value)}
+          className={ppInputClass}
         />
       </div>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-pp-body-sm text-pp-error">
           {error}
         </p>
       ) : null}
-      <Button type="submit" disabled={submitting || name.trim().length === 0}>
+      <PpButton type="submit" disabled={submitting || name.trim().length === 0} icon={Plus}>
         {t('createButton')}
-      </Button>
+      </PpButton>
     </form>
   );
 }

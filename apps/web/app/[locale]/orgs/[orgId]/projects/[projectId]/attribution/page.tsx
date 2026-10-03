@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { getCampaignSpendBreakdownForProject, listOrgProjects, listPluginInstallsForProject } from '@/lib/orgs/queries';
+import { PpPage } from '@/components/pastel/primitives';
 import { MultiTouchAttributionMatrix } from '@/components/attribution/multi-touch-attribution-matrix';
 
 type PageProps = Readonly<{
@@ -81,36 +82,40 @@ export default async function AttributionPage({ params }: PageProps): Promise<Re
 
   const isDataConnected = (hasAdConnector && hasTouchpointConnector) || hasAttributionData || hasAdConnector;
 
+  const totalSpend = campaignSpendOutcome.ok && campaignSpendOutcome.rows
+    ? campaignSpendOutcome.rows.reduce((sum, r) => sum + (r.actualSpend || 0), 0)
+    : 0;
+
   const initialAttributionRows =
     campaignSpendOutcome.ok && campaignSpendOutcome.rows && campaignSpendOutcome.rows.length > 0
       ? campaignSpendOutcome.rows.map((row, idx) => {
-          const spend = row.actualSpend || 1000;
-          const sharePct = Math.max(5, Math.min(60, Math.round(spend / 100)));
+          const spend = row.actualSpend || 0;
+          const share = totalSpend > 0 ? Math.round((spend / totalSpend) * 100) : 0;
           return {
             id: row.campaignId,
             channel: row.campaignId.replace(/[-_]/g, ' '),
             role: idx % 2 === 0 ? 'Top of Funnel & Acquisition' : 'High-Intent Decision & Conversion',
-            firstTouchShare: `${sharePct}%`,
-            firstTouchRevenue: `$${Math.round(spend * 2.8).toLocaleString()}`,
-            lastTouchShare: `${Math.max(4, Math.round(sharePct * 0.8))}%`,
-            lastTouchRevenue: `$${Math.round(spend * 2.2).toLocaleString()}`,
-            shapleyShare: `${Math.round(sharePct * 0.9)}%`,
-            shapleyRevenue: `$${Math.round(spend * 2.5).toLocaleString()}`,
-            roas: `${(2.5 + (idx % 3) * 0.8).toFixed(2)}x`,
-            roasStatus: idx % 3 === 2 ? ('amber' as const) : ('emerald' as const),
-            color: ['bg-blue-500', 'bg-red-500', 'bg-purple-500', 'bg-emerald-500', 'bg-amber-500'][idx % 5],
+            firstTouchShare: `${share}%`,
+            firstTouchRevenue: `$${spend.toLocaleString()}`,
+            lastTouchShare: `${share}%`,
+            lastTouchRevenue: `$${spend.toLocaleString()}`,
+            shapleyShare: `${share}%`,
+            shapleyRevenue: `$${spend.toLocaleString()}`,
+            roas: '—',
+            roasStatus: 'emerald' as const,
+            color: ['bg-pp-primary', 'bg-sky-400', 'bg-emerald-400', 'bg-amber-400', 'bg-purple-400'][idx % 5],
           };
         })
-      : undefined;
+      : [];
 
   return (
-    <main className="w-full space-y-10">
+    <PpPage className="space-y-8">
       <MultiTouchAttributionMatrix
         orgId={orgId}
         projectId={projectId}
         isDataConnected={isDataConnected}
         initialRows={initialAttributionRows}
       />
-    </main>
+    </PpPage>
   );
 }

@@ -46,7 +46,11 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = company.trim().length > 0 && amount.trim().length > 0 && occurredAt.trim().length > 0;
+  const canSubmit =
+    company.trim().length > 0 &&
+    amount.trim().length > 0 &&
+    Number(amount) > 0 &&
+    occurredAt.trim().length > 0;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();

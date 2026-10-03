@@ -4,6 +4,8 @@ import { DashboardContent } from '@/components/auth/dashboard-content';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
+import { NavShell } from '@/components/shell/nav-shell';
+import type { NavShellItem, NavShellSection } from '@/components/shell/nav-types';
 import {
   listActiveAttachmentsForProject,
   listOrgProjects,
@@ -43,6 +45,12 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
 
   const { memberships } = await resolveOrgSessionContext(session);
   const activeMemberships = memberships.filter((m) => isActiveMembershipStatus(m.status));
+
+  const [t, tShell, tOrgs] = await Promise.all([
+    getTranslations({ locale, namespace: 'DashboardPage' }),
+    getTranslations({ locale, namespace: 'AppShell' }),
+    getTranslations({ locale, namespace: 'OrgsPage' }),
+  ]);
 
   const initialWorkspaces: WorkspaceCardData[] = await Promise.all(
     activeMemberships.map(async (m) => {
@@ -93,12 +101,7 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
     }),
   );
 
-  let telemetryMetrics: DashboardTelemetryMetrics = {
-    ingestUptime: '99.98%',
-    ingestLatency: '<18ms',
-    connectedPipelinesCount: 3,
-    totalPipelinesCount: 3,
-  };
+  let telemetryMetrics: DashboardTelemetryMetrics | undefined = undefined;
 
   const primaryMembership = activeMemberships[0];
   if (primaryMembership) {
@@ -117,30 +120,63 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
         const ingestUptime =
           overallRollup && overallRollup.batchCount > 0
             ? `${(100 - overallRollup.errorRatePercent).toFixed(2)}%`
-            : '99.98%';
+            : undefined;
         const ingestLatency =
           overallRollup?.freshnessMinutes !== null && overallRollup?.freshnessMinutes !== undefined
             ? `${Math.round(overallRollup.freshnessMinutes)}m ago`
-            : '<18ms';
-        const connectedPipelinesCount = Math.max(1, activeAttachments.length || sharedCreds.length || 3);
-        const totalPipelinesCount = Math.max(connectedPipelinesCount, 3);
+            : undefined;
+        const connectedPipelinesCount =
+          activeAttachments.length > 0 || sharedCreds.length > 0
+            ? activeAttachments.length
+            : undefined;
+        const totalPipelinesCount =
+          connectedPipelinesCount !== undefined
+            ? Math.max(connectedPipelinesCount, sharedCreds.length)
+            : undefined;
 
-        telemetryMetrics = {
-          ingestUptime,
-          ingestLatency,
-          connectedPipelinesCount,
-          totalPipelinesCount,
-        };
+        if (ingestUptime !== undefined || ingestLatency !== undefined || connectedPipelinesCount !== undefined) {
+          telemetryMetrics = {
+            ingestUptime,
+            ingestLatency,
+            connectedPipelinesCount,
+            totalPipelinesCount,
+          };
+        }
       }
     } catch {
-      // Fall back to default telemetry metrics
+      // Telemetry remains undefined / honest empty
     }
   }
 
+  const orgItems: NavShellItem[] = activeMemberships.map((m) => ({
+    id: `org-${m.organizationId}`,
+    href: `/orgs/${m.organizationId}`,
+    label: m.organizationName,
+    icon: 'Building2',
+  }));
+
+  const sections: NavShellSection[] = [
+    { heading: tOrgs('title'), items: orgItems },
+  ];
+
+  const mobileTabItems: NavShellItem[] = [
+    { id: 'tab-dashboard', href: '/dashboard', label: t('title'), icon: 'LayoutGrid' },
+    { id: 'tab-orgs', href: '/orgs', label: tOrgs('title'), icon: 'Building2' },
+  ];
+
   return (
-    <DashboardContent
-      initialWorkspaces={initialWorkspaces}
-      telemetryMetrics={telemetryMetrics}
-    />
+    <NavShell
+      brandName={tShell('brandName')}
+      organizations={activeMemberships.map((m) => ({ id: m.organizationId, name: m.organizationName }))}
+      userEmail={session.email ?? undefined}
+      sections={sections}
+      mobileTabItems={mobileTabItems}
+    >
+      <DashboardContent
+        initialWorkspaces={initialWorkspaces}
+        telemetryMetrics={telemetryMetrics}
+        userEmail={session.email ?? undefined}
+      />
+    </NavShell>
   );
 }

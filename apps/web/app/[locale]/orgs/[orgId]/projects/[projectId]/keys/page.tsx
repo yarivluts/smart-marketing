@@ -1,12 +1,22 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { Key, ShieldCheck, KeyRound, Network, Clock, ShieldAlert } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listApiKeysForProject, listEnvironmentsForProject, listMcpOAuthGrantsForProject, listOrgProjects } from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { mcpApiUrl } from '@/lib/orgs/mcp-api-url';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpPill,
+  PpEmptyState,
+} from '@/components/pastel/primitives';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
 import { EditApiKeyNameForm } from '@/components/orgs/edit-api-key-name-form';
 import { RevokeApiKeyButton } from '@/components/orgs/revoke-api-key-button';
@@ -64,104 +74,211 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
 
   const t = await getTranslations('ApiKeys');
   const tEnv = await getTranslations('EnvBadge');
-  // Client components can only receive plain serializable data across the
-  // RSC boundary, never `@arbel/firebase-orm` model instances (their
-  // internal ORM/connection state isn't serializable) — same reasoning as
-  // `ProjectSwitcher` staying a server component instead of forwarding
-  // `ProjectModel[]` to client code.
   const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
   const environmentNameById = new Map(environmentOptions.map((environment) => [environment.id, environment.name]));
 
+  const activeKeysCount = apiKeys.filter((k) => !k.revokedAt).length;
+  const revokedKeysCount = apiKeys.filter((k) => Boolean(k.revokedAt)).length;
+  const activeMcpGrantsCount = mcpGrants.filter((g) => !g.revokedAt && g.isActive).length;
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('existingKeysHeading')}</h2>
-        {apiKeys.length === 0 ? (
-          <p className="text-muted-foreground">{t('noKeys')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {apiKeys.map((apiKey) => {
-              const environmentName = environmentNameById.get(apiKey.environmentId);
-              return (
-                <li
-                  key={apiKey.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
-                >
-                  <div className="flex flex-col gap-1">
-                    <span className="font-medium">
-                      {apiKey.name} <code>{apiKey.keyPrefix}</code>
-                      {environmentName ? ` (${tEnv(environmentName)})` : ''}
-                    </span>
-                    <span className="text-muted-foreground">{apiKey.scopes.join(', ')}</span>
-                    <span className="text-muted-foreground">
-                      {apiKey.revokedAt
-                        ? t('revokedLabel')
-                        : apiKey.lastUsedAt
-                          ? t('lastUsedLabel', { lastUsedAt: apiKey.lastUsedAt })
-                          : t('neverUsedLabel')}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <EditApiKeyNameForm orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} initialName={apiKey.name} />
-                    {!apiKey.revokedAt ? (
-                      <RevokeApiKeyButton orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} />
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('kpiActiveKeys')}
+          value={activeKeysCount}
+          valueSuffix={`/ ${apiKeys.length}`}
+          accent="mint"
+        />
+        <PpKpiCard
+          label={t('kpiTotalKeys')}
+          value={apiKeys.length}
+          accent="primary"
+        />
+        <PpKpiCard
+          label={t('kpiRevokedKeys')}
+          value={revokedKeysCount}
+          accent={revokedKeysCount > 0 ? 'error' : 'neutral'}
+        />
+        <PpKpiCard
+          label={t('kpiMcpGrants')}
+          value={mcpGrants.length}
+          accent="neutral"
+        />
+      </PpKpiGrid>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('createKeyHeading')}</h2>
-        {environmentOptions.length === 0 ? (
-          <p className="text-muted-foreground">{t('noEnvironments')}</p>
-        ) : (
-          <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
-        )}
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Create Form & MCP Connections */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          <PpCard
+            title={t('createKeyHeading')}
+            subtitle={t('description')}
+            icon={KeyRound}
+            iconAccent="primary"
+          >
+            {environmentOptions.length === 0 ? (
+              <p className="text-pp-body-md text-pp-on-surface-variant">{t('noEnvironments')}</p>
+            ) : (
+              <CreateApiKeyForm
+                orgId={orgId}
+                projectId={projectId}
+                environments={environmentOptions}
+                ingestBaseUrl={ingestApiUrl()}
+              />
+            )}
+          </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('mcpConnectionsHeading')}</h2>
-        <p className="text-muted-foreground">{t('mcpEndpointIntro')}</p>
-        <p className="text-sm">
-          {t('mcpEndpointLabel')} <code>{mcpApiUrl()}</code>
-        </p>
-        <p className="text-muted-foreground text-sm">{t('mcpApiKeyIntro')}</p>
-        {mcpGrants.length === 0 ? (
-          <p className="text-muted-foreground">{t('noMcpConnections')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {mcpGrants.map((grant) => (
-              <li
-                key={grant.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
-              >
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium">{grant.clientId}</span>
-                  <span className="text-muted-foreground">{t('mcpConnectionGrantedLabel', { createdAt: grant.createdAt })}</span>
-                  <span className="text-muted-foreground">
-                    {grant.revokedAt
-                      ? grant.revokedDueToTokenReuse
-                        ? t('mcpConnectionRevokedDueToTokenReuseLabel')
-                        : t('mcpConnectionRevokedLabel')
-                      : grant.isActive
-                        ? grant.lastUsedAt
-                          ? t('mcpConnectionLastUsedLabel', { lastUsedAt: grant.lastUsedAt })
-                          : t('mcpConnectionNeverUsedLabel')
-                        : t('mcpConnectionPendingLabel')}
-                  </span>
+          <PpCard
+            title={t('mcpConnectionsHeading')}
+            subtitle={t('mcpEndpointIntro')}
+            icon={Network}
+            iconAccent="mint"
+            action={
+              activeMcpGrantsCount > 0 ? (
+                <PpPill accent="mint">{activeMcpGrantsCount} {t('mcpConnectionActiveLabel')}</PpPill>
+              ) : undefined
+            }
+          >
+            <div className="flex flex-col gap-4">
+              <div className="p-3.5 bg-pp-surface-container-low/80 rounded-2xl border border-pp-outline-variant/20 flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-pp-outline uppercase tracking-wider">{t('mcpEndpointLabel')}</span>
+                <code className="font-mono text-xs text-pp-primary break-all select-all font-semibold">
+                  {mcpApiUrl()}
+                </code>
+              </div>
+              <p className="text-xs text-pp-on-surface-variant">{t('mcpApiKeyIntro')}</p>
+
+              {mcpGrants.length === 0 ? (
+                <PpEmptyState
+                  icon={Network}
+                  title={t('noMcpConnections')}
+                  description={t('noMcpConnectionsDesc')}
+                />
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {mcpGrants.map((grant) => (
+                    <div
+                      key={grant.id}
+                      className="p-3.5 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="font-semibold text-sm text-pp-on-surface font-mono">{grant.clientId}</span>
+                        <span className="text-xs text-pp-on-surface-variant">
+                          {t('mcpConnectionGrantedLabel', { createdAt: grant.createdAt })}
+                        </span>
+                        <span className="text-xs text-pp-outline">
+                          {grant.revokedAt
+                            ? grant.revokedDueToTokenReuse
+                              ? t('mcpConnectionRevokedDueToTokenReuseLabel')
+                              : t('mcpConnectionRevokedLabel')
+                            : grant.isActive
+                              ? grant.lastUsedAt
+                                ? t('mcpConnectionLastUsedLabel', { lastUsedAt: grant.lastUsedAt })
+                                : t('mcpConnectionNeverUsedLabel')
+                              : t('mcpConnectionPendingLabel')}
+                        </span>
+                      </div>
+                      {!grant.revokedAt ? (
+                        <RevokeMcpConnectionButton orgId={orgId} projectId={projectId} grantId={grant.id} />
+                      ) : (
+                        <PpPill accent="error">{t('mcpConnectionRevokedLabel')}</PpPill>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {!grant.revokedAt ? <RevokeMcpConnectionButton orgId={orgId} projectId={projectId} grantId={grant.id} /> : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+              )}
+            </div>
+          </PpCard>
+        </div>
+
+        {/* Right Column: Existing API Keys */}
+        <div className="lg:col-span-7 flex flex-col gap-6">
+          <PpCard
+            title={t('existingKeysHeading')}
+            subtitle={`${t('kpiActiveKeys')}: ${activeKeysCount}`}
+            icon={Key}
+            iconAccent="primary"
+            action={<PpPill accent="mint">{activeKeysCount} Active</PpPill>}
+          >
+            {apiKeys.length === 0 ? (
+              <PpEmptyState
+                icon={Key}
+                title={t('noKeys')}
+                description={t('noKeysDesc')}
+              />
+            ) : (
+              <div className="flex flex-col gap-3">
+                {apiKeys.map((apiKey) => {
+                  const environmentName = environmentNameById.get(apiKey.environmentId);
+                  const isRevoked = Boolean(apiKey.revokedAt);
+                  return (
+                    <div
+                      key={apiKey.id}
+                      className={`p-4 rounded-2xl border transition-all flex flex-col gap-3 ${
+                        isRevoked
+                          ? 'bg-pp-surface-container-low/30 border-pp-outline-variant/15 opacity-60'
+                          : 'bg-pp-surface-container-low/60 border-pp-outline-variant/20 hover:border-pp-outline-variant/40'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-pp-body-md text-pp-on-surface">{apiKey.name}</span>
+                            <code className="font-mono text-xs text-pp-primary bg-pp-primary-fixed/40 px-2 py-0.5 rounded-lg font-bold">
+                              {apiKey.keyPrefix}
+                            </code>
+                            {environmentName ? (
+                              <PpPill accent="neutral">
+                                {tEnv(environmentName)}
+                              </PpPill>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {apiKey.scopes.map((scope) => (
+                              <PpPill key={scope} accent="primary">
+                                {scope}
+                              </PpPill>
+                            ))}
+                          </div>
+                          <div className="text-xs text-pp-outline mt-0.5">
+                            {apiKey.revokedAt ? (
+                              <span className="text-pp-error font-medium">{t('revokedLabel')}</span>
+                            ) : apiKey.lastUsedAt ? (
+                              t('lastUsedLabel', { lastUsedAt: apiKey.lastUsedAt })
+                            ) : (
+                              t('neverUsedLabel')
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <EditApiKeyNameForm
+                            orgId={orgId}
+                            projectId={projectId}
+                            apiKeyId={apiKey.id}
+                            initialName={apiKey.name}
+                          />
+                          {!apiKey.revokedAt ? (
+                            <RevokeApiKeyButton orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} />
+                          ) : (
+                            <PpPill accent="error">{t('revokedLabel')}</PpPill>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </PpCard>
+        </div>
+      </div>
+    </PpPage>
   );
 }

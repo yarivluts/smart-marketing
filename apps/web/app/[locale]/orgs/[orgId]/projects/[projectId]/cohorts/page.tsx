@@ -13,7 +13,19 @@ import {
 import { buildCohortRetentionView } from '@/lib/orgs/cohort-retention-view';
 import { Link } from '@/i18n/navigation';
 import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
-import { AcquisitionCohortPaybackMatrix } from '@/components/cohorts/acquisition-cohort-payback-matrix';
+import {
+  PpPage,
+  PpPageHeader,
+  PpKpiGrid,
+  PpKpiCard,
+  PpCard,
+  PpTable,
+  PpEmptyState,
+  PpPill,
+  PpButton,
+  ppInputClass,
+} from '@/components/pastel/primitives';
+import { Users, Calendar, Filter, TrendingUp, Sparkles, Database } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -27,22 +39,11 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's monthly-cohort retention matrix (KAN-113): the exact same warehouse-backed
- * `cohort_month x period_number` read `queryProjectCohortRetention` (`mcp-tools.service.ts`, KAN-75)
- * already exposes to an MCP-connected AI agent through the `query_cohort` tool, but — the same shape of
- * gap KAN-108 (`search_customers`) and KAN-111 (`query_funnel`) already closed — with no route or page
- * anywhere under `apps/web` ever calling it: an operator could ask an agent how a cohort's retention
- * trends, but had no way to see the same matrix themselves in the web app. Wrapped through
- * `queryProjectCohortRetentionForAdmin` so the three expected-not-buggy warehouse failure modes degrade
- * this page's table the same honest way the Customers/Funnel pages already degrade theirs, rather than
- * crashing. Gated on `dashboards.write`, the same "whole feature is admin-only" posture Segments/Goals/
- * Win rules already use for this kind of analytics view.
+ * A project's monthly-cohort retention matrix (KAN-113 & KAN-118):
+ * Evaluates monthly cohorts across period numbers, optionally narrowed by `conversionEvent`.
  *
- * KAN-118: a `?conversionEvent=` query param (the same `<form method="get">` pattern the Customers
- * page's `?q=` already establishes) narrows "retained" from "any activity that period" (the default,
- * `fact_cohort_retention`'s own `__any__` row) to a specific named event — the "conversion cohort"
- * half of plan `04 §5`'s "signup-month x conversion/retention" this model's own v1 doc comment named
- * as a deliberately-deferred follow-on.
+ * Converted to Stitch Pastel Pulse design (desktop 70775cd4 / 39d726ea, mobile 082f05ea / 89f3a829),
+ * rendering the real warehouse retention matrix and payback data without fabricated metrics.
  */
 export default async function CohortRetentionPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -78,162 +79,244 @@ export default async function CohortRetentionPage({ params, searchParams }: Page
 
   const view = buildCohortRetentionView(cohortOutcomeRaw);
 
-  const activePluginIds = new Set(
-    installs
-      .filter((i) => i.status === 'installed')
-      .map((i) => i.plugin_id.toLowerCase()),
-  );
-
   const hasCohortData = view.kind === 'ok' && view.cohorts.length > 0;
   const hasPaybackData = Boolean(paybackOutcome && paybackOutcome.ok && paybackOutcome.windows.length > 0);
-  const hasActiveBillingOrTelemetry =
-    activePluginIds.has('stripe') ||
-    activePluginIds.has('stripe_billing') ||
-    activePluginIds.has('growthos_sdk') ||
-    activePluginIds.has('tracking_sdk');
-
-  const isDataConnected = hasCohortData || hasPaybackData || hasActiveBillingOrTelemetry;
-
-  const initialCohorts =
-    view.kind === 'ok' && view.cohorts.length > 0
-      ? view.cohorts.map((c) => {
-          const getPeriodVal = (pNum: number, defaultVal: number) => {
-            const p = c.periods.find((x) => x.periodNumber === pNum);
-            return p ? p.retentionRatePercent : defaultVal;
-          };
-          const signups = c.cohortSize;
-          const paidAccounts = Math.max(1, Math.round(signups * 0.07));
-          const spendNum = paidAccounts * 140;
-          return {
-            cohort: c.cohortMonth,
-            signups: signups.toLocaleString(),
-            paidAccounts: paidAccounts.toLocaleString(),
-            paidShare: `${((paidAccounts / Math.max(1, signups)) * 100).toFixed(1)}%`,
-            spend: `$${spendNum.toLocaleString()}`,
-            cac: '$140',
-            totalCollected: `$${Math.round(spendNum * 4.2).toLocaleString()}`,
-            m0: getPeriodVal(0, 15),
-            m1: getPeriodVal(1, 48),
-            m2: getPeriodVal(2, 92),
-            m3: getPeriodVal(3, 120),
-            m6: getPeriodVal(6, 190),
-            m12: getPeriodVal(12, 350),
-            m24: getPeriodVal(24, 520),
-          };
-        })
-      : undefined;
 
   const t = await getTranslations('CohortRetention');
 
+  // Discover all distinct period numbers across all cohorts for the table columns
+  const allPeriodNumbers: number[] = [];
+  if (view.kind === 'ok') {
+    const periodSet = new Set<number>();
+    for (const c of view.cohorts) {
+      for (const p of c.periods) {
+        periodSet.add(p.periodNumber);
+      }
+    }
+    allPeriodNumbers.push(...Array.from(periodSet).sort((a, b) => a - b));
+  }
+
+  const totalCohortAccounts = view.kind === 'ok' ? view.cohorts.reduce((sum, c) => sum + c.cohortSize, 0) : 0;
+
   return (
-    <div className="w-full space-y-10">
-      {/* Stitch 12/24-Month Acquisition Cohort & Payback Return Matrix */}
-      <AcquisitionCohortPaybackMatrix
-        orgId={orgId}
-        projectId={projectId}
-        isDataConnected={isDataConnected}
-        initialCohorts={initialCohorts}
+    <PpPage>
+      {/* 1. Header */}
+      <PpPageHeader
+        eyebrow="ECONOMICS & RETENTION"
+        meta={hasCohortData ? 'Warehouse Mart Telemetry Live' : 'Awaiting Warehouse Sync'}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
+              <span className="w-1.5 h-1.5 rounded-full bg-pp-secondary animate-pulse" />
+              <span>{hasCohortData ? 'Live Telemetry' : 'Idle'}</span>
+            </span>
+          </div>
+        }
       />
 
-      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
-        </div>
-
-        <form method="get" className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="cohort-conversion-event" className="text-xs text-muted-foreground">
-            {t('conversionEventLabel')}
-          </label>
-          <input
-            id="cohort-conversion-event"
-            name="conversionEvent"
-            defaultValue={conversionEventParam ?? ''}
-            placeholder={t('conversionEventPlaceholder')}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-          />
-        </div>
-        <button type="submit" className="rounded-md border border-input px-3 py-1 text-sm hover:bg-accent">
-          {t('conversionEventApplyButton')}
-        </button>
-        {trimmedConversionEvent ? (
-          <Link
-            href={{ pathname: `/orgs/${orgId}/projects/${projectId}/cohorts` }}
-            className="text-xs text-muted-foreground underline"
-          >
-            {t('conversionEventClear')}
-          </Link>
-        ) : null}
-      </form>
-
-      {view.kind === 'warehouse_not_configured' ? (
-        <MissingIntegrationAlert
-          orgId={orgId}
-          projectId={projectId}
-          metricKey="ACCOUNT_SURVIVAL"
-          connectorId="growthos_sdk"
-          customTitle="Cohort Data Warehouse & Telemetry Stream"
-          customMissingPoints={[
-            'First-party user signup and session telemetry events',
-            'Subscription renewal and retention event streams',
-          ]}
-          customImpactMetrics={['Account Retention Matrix', 'Breakeven Payback', 'Cohort LTV']}
+      {/* 2. Top KPI Deck */}
+      <PpKpiGrid>
+        <PpKpiCard
+          label="Tracked Cohorts"
+          value={view.kind === 'ok' ? view.cohorts.length : 0}
+          valueSuffix="months"
+          accent="primary"
+          footer="Monthly acquisition cohorts"
         />
-      ) : view.kind === 'quota_exceeded' ? (
-        <p className="text-muted-foreground">{t('quotaExceeded')}</p>
-      ) : view.kind === 'query_error' ? (
-        <p className="text-muted-foreground">{t('queryError')}</p>
-      ) : view.cohorts.length === 0 ? (
-        <div className="flex flex-col gap-4">
-          <MissingIntegrationAlert
-            orgId={orgId}
-            projectId={projectId}
-            metricKey="BREAKEVEN"
-            connectorId="growthos_sdk"
-            customTitle="No Cohort Records Detected"
-            customMissingPoints={[
-              'Web SDK client pings and conversion touchpoints',
-              'Stripe customer subscription timeline data',
-            ]}
-            customImpactMetrics={['12/24-Month Retention Heatmap', 'Cohort Payback Velocity']}
+        <PpKpiCard
+          label="Cohort Accounts"
+          value={totalCohortAccounts.toLocaleString(locale)}
+          valueSuffix="signups"
+          badge="First-Party"
+          badgeAccent="mint"
+          accent="mint"
+          footer="Total landed users"
+        />
+        <PpKpiCard
+          label="Payback Overview"
+          value={paybackOutcome && paybackOutcome.ok ? `${paybackOutcome.windows.length}` : '—'}
+          valueSuffix={paybackOutcome && paybackOutcome.ok ? 'windows' : undefined}
+          badge={hasPaybackData ? 'Mart Active' : 'No Data'}
+          badgeAccent={hasPaybackData ? 'sky' : 'neutral'}
+          accent="sky"
+          footer="Multi-window realization"
+        />
+        <PpKpiCard
+          label="Warehouse Status"
+          value={view.kind === 'ok' ? 'Connected' : view.kind === 'warehouse_not_configured' ? 'Not Configured' : 'Degraded'}
+          badge={view.kind === 'ok' ? 'Healthy' : 'Action Req'}
+          badgeAccent={view.kind === 'ok' ? 'mint' : 'amber'}
+          accent={view.kind === 'ok' ? 'mint' : 'amber'}
+          footer="fact_cohort_retention mart"
+        />
+      </PpKpiGrid>
+
+      {/* 3. Event Filter Form */}
+      <PpCard
+        title="Conversion Event Scope"
+        subtitle="Narrow retention analysis to a specific named conversion event"
+        icon={Filter}
+        iconAccent="sky"
+      >
+        <form method="get" className="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1 space-y-1">
+            <label htmlFor="cohort-conversion-event" className="text-xs font-semibold text-pp-on-surface">
+              {t('conversionEventLabel')}
+            </label>
+            <input
+              id="cohort-conversion-event"
+              name="conversionEvent"
+              defaultValue={trimmedConversionEvent ?? ''}
+              placeholder={t('conversionEventPlaceholder')}
+              className={ppInputClass}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <PpButton type="submit" variant="primary" size="md">
+              {t('filterButton')}
+            </PpButton>
+            {trimmedConversionEvent && (
+              <PpButton asChild variant="ghost" size="md">
+                <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/cohorts` }}>
+                  {t('clearFilterButton')}
+                </Link>
+              </PpButton>
+            )}
+          </div>
+        </form>
+      </PpCard>
+
+      {/* 4. Cohort Retention Matrix Heatmap Table */}
+      <PpCard
+        title="Monthly Cohort Retention Heatmap"
+        subtitle={
+          trimmedConversionEvent
+            ? `Retention matrix filtered by conversion event: "${trimmedConversionEvent}"`
+            : 'Unfiltered retention matrix tracking user activity over month milestones'
+        }
+        icon={Users}
+        iconAccent="primary"
+        flush={view.kind === 'ok' && view.cohorts.length > 0}
+      >
+        {view.kind !== 'ok' ? (
+          <div className="space-y-4">
+            <MissingIntegrationAlert
+              orgId={orgId}
+              projectId={projectId}
+              connectorId="google_bigquery"
+              metricKey="LTV"
+              customTitle={t('cohortTableCaption')}
+              customMissingPoints={[
+                'Warehouse connection or dbt mart generation',
+                'fact_cohort_retention table population',
+              ]}
+              customImpactMetrics={['Long-term retention curves', 'Payback horizon modeling']}
+            />
+            <p className="text-pp-body-md text-pp-on-surface-variant">
+              {view.kind === 'warehouse_not_configured'
+                ? t('notConfigured')
+                : view.kind === 'quota_exceeded'
+                  ? t('quotaExceeded')
+                  : t('queryError')}
+            </p>
+          </div>
+        ) : view.cohorts.length === 0 ? (
+          <PpEmptyState
+            icon={Users}
+            title={t('empty')}
+            description={t('empty')}
           />
-          <p className="text-sm text-muted-foreground">{t('empty')}</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
+        ) : (
+          <PpTable>
             <thead>
               <tr>
-                <th className="border-b border-input px-3 py-2 text-start">{t('cohortColumnHeading')}</th>
-                <th className="border-b border-input px-3 py-2 text-end">{t('cohortSizeColumnHeading')}</th>
-                {view.periodNumbers.map((periodNumber) => (
-                  <th key={periodNumber} className="border-b border-input px-3 py-2 text-end">
-                    {t('periodColumnHeading', { periodNumber })}
+                <th>{t('cohortColumnHeading')}</th>
+                <th>{t('cohortSizeColumnHeading')}</th>
+                {allPeriodNumbers.map((pNum) => (
+                  <th key={pNum} className="text-center">
+                    M{pNum}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {view.cohorts.map((cohort) => {
-                const percentByPeriod = new Map(cohort.periods.map((period) => [period.periodNumber, period.retentionRatePercent]));
+                const periodsByNum = new Map(cohort.periods.map((p) => [p.periodNumber, p]));
                 return (
                   <tr key={cohort.cohortMonth}>
-                    <td className="border-b border-input px-3 py-2">{cohort.cohortMonth}</td>
-                    <td className="border-b border-input px-3 py-2 text-end">{cohort.cohortSize}</td>
-                    {view.periodNumbers.map((periodNumber) => (
-                      <td key={periodNumber} className="border-b border-input px-3 py-2 text-end text-muted-foreground">
-                        {percentByPeriod.has(periodNumber) ? t('retentionCell', { percent: percentByPeriod.get(periodNumber)! }) : ''}
-                      </td>
-                    ))}
+                    <td className="font-semibold text-pp-on-surface font-mono">
+                      {cohort.cohortMonth}
+                    </td>
+                    <td className="tabular-nums font-mono text-pp-on-surface font-semibold">
+                      {cohort.cohortSize.toLocaleString(locale)}
+                    </td>
+                    {allPeriodNumbers.map((pNum) => {
+                      const period = periodsByNum.get(pNum);
+                      if (!period) {
+                        return (
+                          <td key={pNum} className="text-center text-pp-outline font-mono">
+                            —
+                          </td>
+                        );
+                      }
+                      const rate = period.retentionRatePercent;
+                      const cellBg =
+                        rate >= 70
+                          ? 'bg-pp-primary text-pp-on-primary font-bold'
+                          : rate >= 40
+                            ? 'bg-pp-primary-fixed text-pp-on-primary-fixed font-semibold'
+                            : rate >= 20
+                              ? 'bg-pp-secondary-container text-pp-secondary font-medium'
+                              : rate > 0
+                                ? 'bg-pp-surface-container text-pp-on-surface font-normal'
+                                : 'text-pp-outline';
+
+                      return (
+                        <td key={pNum} className="p-1 text-center">
+                          <span
+                            className={`inline-block w-14 py-1 rounded-lg text-xs font-mono tabular-nums ${cellBg}`}
+                            title={`${period.retainedCount} retained (${rate.toFixed(1)}%)`}
+                          >
+                            {rate.toFixed(1)}%
+                          </span>
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}
             </tbody>
-          </table>
-        </div>
+          </PpTable>
+        )}
+      </PpCard>
+
+      {/* 5. Section 2: Payback Windows Overview */}
+      {hasPaybackData && paybackOutcome?.ok && (
+        <PpCard
+          title="Cumulative Payback Collection"
+          subtitle="Collected revenue across standard customer maturity windows"
+          icon={TrendingUp}
+          iconAccent="mint"
+        >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {paybackOutcome.windows.map((window) => (
+              <div
+                key={window.windowDays}
+                className="rounded-2xl bg-pp-subtle-inset p-4 space-y-1 text-start"
+              >
+                <span className="text-pp-label-sm text-pp-outline block uppercase tracking-wider">
+                  {window.windowDays} Days Collection
+                </span>
+                <span className="font-pp-display text-pp-headline-lg text-pp-on-surface font-bold tabular-nums block">
+                  ${window.collectedRevenue.toLocaleString(locale)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </PpCard>
       )}
-      </div>
-    </div>
+    </PpPage>
   );
 }

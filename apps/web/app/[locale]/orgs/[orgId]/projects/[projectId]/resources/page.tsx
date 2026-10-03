@@ -2,6 +2,13 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
 import type { ResourceAttachmentModel, ResourceKind } from '@growthos/firebase-orm-models';
+import { KeyRound, FileCode, Users } from 'lucide-react';
+import {
+  PpPage,
+  PpPageHeader,
+  PpCard,
+  PpPill,
+} from '@/components/pastel/primitives';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -89,22 +96,23 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
     availableScopes?: readonly string[],
   ) {
     const attachment = findAttachment(attachments, resourceId);
-    // An archived resource (KAN-129) with nothing already attached has nothing useful to show a
-    // project here — it can no longer be requested, and there's no existing attachment to manage.
     if (archived && !attachment) {
       return null;
     }
     return (
-      <li key={resourceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm">
-        <span>{label}</span>
+      <li
+        key={resourceId}
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-pp-surface-container-low p-4 text-sm"
+      >
+        <span className="font-semibold text-pp-on-surface">{label}</span>
         {attachment ? (
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2">
+            <PpPill accent={attachment.status === 'approved' ? 'mint' : 'sky'} dot>
               {t('statusLabel', { status: attachment.status })}
               {attachment.scope_selection && attachment.scope_selection.length > 0
                 ? ` (${attachment.scope_selection.join(', ')})`
                 : ''}
-            </span>
+            </PpPill>
             {resourceKind === 'credential' && attachment.status === 'approved' ? (
               <WriteTierSelector orgId={orgId} attachmentId={attachment.id} tier={attachment.write_tier} disabled={!canDetach} />
             ) : null}
@@ -126,39 +134,59 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
   }
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <PpPage>
+      <PpPageHeader
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('credentialsHeading')}</h2>
+      {/* 1. Attached Credentials */}
+      <PpCard
+        title={t('credentialsHeading')}
+        icon={KeyRound}
+        iconAccent="primary"
+      >
         {credentials.length === 0 ? (
-          <p className="text-muted-foreground">{t('noCredentials')}</p>
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('noCredentials')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="space-y-3">
             {credentials.map((credential) =>
               renderRow('credential', credential.id, credential.name, Boolean(credential.archived_at), credential.available_scopes),
             )}
           </ul>
         )}
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('templatesHeading')}</h2>
+      {/* 2. Attached Templates */}
+      <PpCard
+        title={t('templatesHeading')}
+        icon={FileCode}
+        iconAccent="sky"
+      >
         {templates.length === 0 ? (
-          <p className="text-muted-foreground">{t('noTemplates')}</p>
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('noTemplates')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">{templates.map((template) => renderRow('template', template.id, template.name, Boolean(template.archived_at)))}</ul>
+          <ul className="space-y-3">
+            {templates.map((template) => renderRow('template', template.id, template.name, Boolean(template.archived_at)))}
+          </ul>
         )}
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('peopleHeading')}</h2>
+      {/* 3. Team Member Assignments */}
+      <PpCard
+        title={t('peopleHeading')}
+        icon={Users}
+        iconAccent="pink"
+      >
         {people.length === 0 ? (
-          <p className="text-muted-foreground">{t('noPeople')}</p>
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('noPeople')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">{people.map((person) => renderRow('person', person.id, person.name, Boolean(person.archived_at)))}</ul>
+          <ul className="space-y-3">
+            {people.map((person) => renderRow('person', person.id, person.name, Boolean(person.archived_at)))}
+          </ul>
         )}
-      </section>
-    </main>
+      </PpCard>
+    </PpPage>
   );
 }

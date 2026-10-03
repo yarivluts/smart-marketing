@@ -20,6 +20,7 @@ import {
 import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
 import { AdsPerformanceDashboard } from '@/components/campaigns/ads-performance-dashboard';
 import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
+import { PpPage } from '@/components/pastel/primitives';
 import type { CampaignDraftView } from '@/components/campaigns/campaign-creatives-panel';
 import type { CampaignSpendBreakdownOutcome } from '@/lib/orgs/queries';
 
@@ -119,7 +120,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   );
 
   return (
-    <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <PpPage className="space-y-6">
       {(!spendOutcome || !spendOutcome.ok || targetViews.length === 0) && (
         <MissingIntegrationAlert
           orgId={orgId}
@@ -146,6 +147,6 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
         canExecute={canExecute}
         spendOutcome={spendOutcome}
       />
-    </main>
+    </PpPage>
   );
 }

@@ -135,8 +135,10 @@ export function SpendProtectionConsole({
   const [rules, setRules] = useState<GuardrailRule[]>(initialRules ?? DEFAULT_RULES);
   const [interventions, setInterventions] = useState<SafetyIntervention[]>(DEFAULT_INTERVENTIONS);
   const [confirmModalOpen, setConfirmModalOpen] = useState<boolean>(false);
+  const [killSwitchReason, setKillSwitchReason] = useState<string>('Emergency Traffic Halt requested by operator');
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
-  const applyKillSwitchMutation = async (active: boolean) => {
+  const applyKillSwitchMutation = async (active: boolean, reason?: string) => {
     if (orgId && orgId !== 'demo-org') {
       try {
         await fetch(`/api/orgs/${orgId}/automation/kill-switch`, {
@@ -144,7 +146,7 @@ export function SpendProtectionConsole({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             engaged: active,
-            ...(active ? { reason: 'Triggered from Spend Protection Console' } : {}),
+            ...(active ? { reason: reason || killSwitchReason.trim() || 'Triggered from Spend Protection Console' } : {}),
           }),
         });
       } catch (err) {
@@ -164,10 +166,16 @@ export function SpendProtectionConsole({
   };
 
   const confirmActivateKillSwitch = () => {
+    const trimmedReason = killSwitchReason.trim();
+    if (!trimmedReason) {
+      setReasonError('A reason is required to engage the kill switch.');
+      return;
+    }
+    setReasonError(null);
     setKillSwitchActive(true);
     setConfirmModalOpen(false);
     onTriggerKillSwitch?.(true);
-    void applyKillSwitchMutation(true);
+    void applyKillSwitchMutation(true, trimmedReason);
   };
 
   const handleToggleRule = (ruleId: string) => {
@@ -291,6 +299,23 @@ export function SpendProtectionConsole({
                 This will immediately pause <strong>all active ad groups</strong> across Google,
                 Meta, and TikTok. Are you sure you want to halt all paid traffic?
               </p>
+              <div className="mt-4 space-y-1.5 text-left">
+                <label htmlFor="kill-switch-reason-input" className="text-xs font-semibold text-foreground">
+                  Halt Reason (Required)
+                </label>
+                <input
+                  id="kill-switch-reason-input"
+                  type="text"
+                  value={killSwitchReason}
+                  onChange={(e) => {
+                    setKillSwitchReason(e.target.value);
+                    if (e.target.value.trim()) setReasonError(null);
+                  }}
+                  placeholder="e.g. Budget overrun, abnormal CPA surge, broken landing page"
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                {reasonError && <p className="text-xs text-rose-600">{reasonError}</p>}
+              </div>
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   type="button"

@@ -19,6 +19,8 @@ import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { qualityMixAlertStatusLabelKey, signupQualityScoreTierLabelKey, toQualityMixAlertView, toSignupQualityScoreDimensionBreakdownRows } from '@/lib/orgs/quality-score-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { CheckQualityMixAlertsButton } from '@/components/orgs/check-quality-mix-alerts-button';
+import { PpPage, PpPageHeader, PpCard, PpKpiCard, PpKpiGrid, PpEmptyState, PpPill, PpTable } from '@/components/pastel/primitives';
+import { Sparkles, Gauge, AlertTriangle, Layers, Calendar, Database } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -79,11 +81,17 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === QUALITY_SCORE_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PpPage>
+        <PpPageHeader
+          eyebrow="CALIBRATION ENGINE"
+          meta={project.name}
+          title={t('title', { projectName: project.name })}
+          description={t('setupIntro')}
+        />
+        <PpCard>
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+        </PpCard>
+      </PpPage>
     );
   }
 
@@ -96,107 +104,200 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
   ]);
   const alertViews = alerts.map(toQualityMixAlertView);
 
-  return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+  const total = distribution.totalResponses;
+  const avg = distribution.averageScore !== null ? Math.round(distribution.averageScore) : null;
+  const avgAccent = avg === null ? 'neutral' : avg >= 70 ? 'mint' : avg >= 40 ? 'amber' : 'error';
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('distributionHeading')}</h2>
-        {distribution.totalResponses === 0 ? (
-          <p className="text-muted-foreground">{t('distributionEmpty')}</p>
+  return (
+    <PpPage>
+      <PpPageHeader
+        eyebrow="CALIBRATION ENGINE"
+        meta={total > 0 ? `${total} responses` : undefined}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      />
+
+      <PpKpiGrid>
+        <PpKpiCard
+          label={t('averageScoreLabel')}
+          value={avg !== null ? avg : '—'}
+          valueSuffix={avg !== null ? '/ 100' : undefined}
+          accent={avgAccent}
+          footer={
+            total === 0
+              ? t('distributionEmpty')
+              : t('distributionAverage', { average: avg ?? 0, count: total })
+          }
+        />
+        <PpKpiCard
+          label={t('totalResponsesLabel')}
+          value={total === 0 ? '—' : total}
+          accent="mint"
+          footer="Onboarding survey answers"
+        />
+        <PpKpiCard
+          label={t('qualityAdjustedCostPerSignupLabel')}
+          value={
+            adjustedMetrics.ok && adjustedMetrics.metrics.costPerSignup !== null
+              ? `$${adjustedMetrics.metrics.costPerSignup.toFixed(2)}`
+              : '—'
+          }
+          accent="sky"
+          footer={adjustedMetrics.ok ? 'Quality-weighted cost' : t('adjustedMetricsEmpty')}
+        />
+        <PpKpiCard
+          label={t('qualityAdjustedCacLabel')}
+          value={
+            adjustedMetrics.ok && adjustedMetrics.metrics.cac !== null
+              ? `$${adjustedMetrics.metrics.cac.toFixed(2)}`
+              : '—'
+          }
+          accent="amber"
+          footer={adjustedMetrics.ok ? 'Quality-weighted CAC' : t('adjustedMetricsEmpty')}
+        />
+      </PpKpiGrid>
+
+      <PpCard
+        icon={Gauge}
+        iconAccent="primary"
+        title={t('distributionHeading')}
+        subtitle={
+          total > 0
+            ? t('distributionAverage', { average: avg ?? 0, count: total })
+            : undefined
+        }
+      >
+        {total === 0 ? (
+          <PpEmptyState
+            icon={Gauge}
+            title={t('distributionHeading')}
+            description={t('distributionEmpty')}
+          />
         ) : (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">
-              {t('distributionAverage', { average: distribution.averageScore !== null ? Math.round(distribution.averageScore) : 0, count: distribution.totalResponses })}
-            </p>
-            <ul className="flex flex-col gap-1">
-              {(['low', 'medium', 'high'] as const).map((tier) => (
-                <li key={tier} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                  <span>{t(signupQualityScoreTierLabelKey(tier))}</span>
-                  <span className="text-muted-foreground">{t('distributionCount', { count: distribution[tier] })}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-pp-md">
+            {(['high', 'medium', 'low'] as const).map((tier) => {
+              const count = distribution[tier];
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              const accent = tier === 'high' ? 'mint' : tier === 'medium' ? 'amber' : 'pink';
+              return (
+                <div
+                  key={tier}
+                  className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/40 p-pp-lg flex flex-col justify-between space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-pp-display text-pp-headline-sm font-semibold text-pp-on-surface">
+                      {t(signupQualityScoreTierLabelKey(tier))}
+                    </span>
+                    <PpPill accent={accent}>{pct}%</PpPill>
+                  </div>
+                  <div>
+                    <div className="font-pp-display text-pp-metric text-pp-on-surface">
+                      {count}
+                    </div>
+                    <p className="text-pp-body-sm text-pp-on-surface-variant">
+                      {t('distributionCount', { count })}
+                    </p>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-pp-surface-container">
+                    <div
+                      className="h-full rounded-full bg-pp-primary transition-all duration-300"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-      </section>
+      </PpCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('adjustedMetricsHeading')}</h2>
-        {!adjustedMetrics.ok ? (
-          <p className="text-muted-foreground">{t('adjustedMetricsEmpty')}</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            <li className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-              <span>{t('qualityAdjustedCostPerSignupLabel')}</span>
-              <span className="text-muted-foreground">
-                {adjustedMetrics.metrics.costPerSignup !== null ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.costPerSignup.toFixed(2) }) : t('adjustedMetricsValueUnavailable')}
-              </span>
-            </li>
-            <li className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-              <span>{t('qualityAdjustedCacLabel')}</span>
-              <span className="text-muted-foreground">
-                {adjustedMetrics.metrics.cac !== null ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.cac.toFixed(2) }) : t('adjustedMetricsValueUnavailable')}
-              </span>
-            </li>
-          </ul>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">{t('mixAlertsHeading')}</h2>
-          <CheckQualityMixAlertsButton orgId={orgId} projectId={projectId} />
-        </div>
-        {alertViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('mixAlertsEmpty')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {alertViews.map((alert) => (
-              <li key={alert.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{alert.channelId || t('dimensionValueUnknown')}</span>
-                  <span className="text-xs text-muted-foreground">{t(qualityMixAlertStatusLabelKey(alert.status))}</span>
-                </div>
-                <span className="text-muted-foreground">
-                  {t('mixAlertDelta', { baseline: Math.round(alert.baselineAvgScore), current: Math.round(alert.currentAvgScore) })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {DIMENSIONS.map((dimension, index) => {
-        const outcome = dimensionOutcomes[index];
-        return (
-          <section key={dimension.key} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
-            {!outcome.ok ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : (
-              (() => {
-                const rows = toSignupQualityScoreDimensionBreakdownRows(outcome.rows, dimension.key);
-                return rows.length === 0 ? (
-                  <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-                ) : (
-                  <ul className="flex flex-col gap-1">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-pp-lg">
+        {DIMENSIONS.map((dimension, index) => {
+          const outcome = dimensionOutcomes[index];
+          const rows = outcome.ok ? toSignupQualityScoreDimensionBreakdownRows(outcome.rows, dimension.key) : [];
+          return (
+            <PpCard
+              key={dimension.key}
+              icon={dimension.key === 'channel_id' ? Layers : Calendar}
+              iconAccent={dimension.key === 'channel_id' ? 'primary' : 'mint'}
+              title={t(dimension.headingKey)}
+              flush={outcome.ok && rows.length > 0}
+            >
+              {!outcome.ok || rows.length === 0 ? (
+                <PpEmptyState
+                  icon={Database}
+                  title={t(dimension.headingKey)}
+                  description={t(dimension.emptyKey)}
+                />
+              ) : (
+                <PpTable>
+                  <thead>
+                    <tr>
+                      <th>Segment</th>
+                      <th className="text-end">Avg Quality</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {rows.map((row) => (
-                      <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                        <span>{row.value || t('dimensionValueUnknown')}</span>
-                        <span className="text-muted-foreground">
-                          {row.averageScore !== null ? t('dimensionAverageScore', { average: Math.round(row.averageScore), count: row.sampleSize }) : t('dimensionValueUnknown')}
-                        </span>
-                      </li>
+                      <tr key={row.value}>
+                        <td className="font-medium text-pp-on-surface">{row.value || t('dimensionValueUnknown')}</td>
+                        <td className="text-end">
+                          {row.averageScore !== null ? (
+                            <PpPill accent={row.averageScore >= 70 ? 'mint' : row.averageScore >= 40 ? 'amber' : 'pink'}>
+                              {t('dimensionAverageScore', { average: Math.round(row.averageScore), count: row.sampleSize })}
+                            </PpPill>
+                          ) : (
+                            <span className="text-pp-outline">{t('dimensionValueUnknown')}</span>
+                          )}
+                        </td>
+                      </tr>
                     ))}
-                  </ul>
-                );
-              })()
-            )}
-          </section>
-        );
-      })}
-    </main>
+                  </tbody>
+                </PpTable>
+              )}
+            </PpCard>
+          );
+        })}
+      </div>
+
+      <PpCard
+        icon={AlertTriangle}
+        iconAccent="amber"
+        title={t('mixAlertsHeading')}
+        action={<CheckQualityMixAlertsButton orgId={orgId} projectId={projectId} />}
+      >
+        {alertViews.length === 0 ? (
+          <PpEmptyState
+            icon={AlertTriangle}
+            title={t('mixAlertsHeading')}
+            description={t('mixAlertsEmpty')}
+          />
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-pp-md">
+            {alertViews.map((alert) => (
+              <div
+                key={alert.id}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/40 p-pp-md"
+              >
+                <div className="min-w-0">
+                  <div className="font-pp-display text-pp-headline-sm font-semibold text-pp-on-surface">
+                    {alert.channelId || t('dimensionValueUnknown')}
+                  </div>
+                  <div className="text-pp-body-sm text-pp-on-surface-variant mt-0.5">
+                    {t('mixAlertDelta', {
+                      baseline: Math.round(alert.baselineAvgScore),
+                      current: Math.round(alert.currentAvgScore),
+                    })}
+                  </div>
+                </div>
+                <PpPill accent={alert.status === 'active' ? 'amber' : 'neutral'} dot>
+                  {t(qualityMixAlertStatusLabelKey(alert.status))}
+                </PpPill>
+              </div>
+            ))}
+          </div>
+        )}
+      </PpCard>
+    </PpPage>
   );
 }

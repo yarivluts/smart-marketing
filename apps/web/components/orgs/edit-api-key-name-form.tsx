@@ -3,8 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Edit3 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PpButton, ppInputClass } from '@/components/pastel/primitives';
 
 export interface EditApiKeyNameFormProps {
   orgId: string;
@@ -58,9 +59,9 @@ export function EditApiKeyNameForm({ orgId, projectId, apiKeyId, initialName }: 
 
   if (!editing) {
     return (
-      <Button type="button" variant="outline" size="sm" onClick={startEditing}>
+      <PpButton type="button" variant="secondary" size="sm" onClick={startEditing} icon={Edit3}>
         {t('rename')}
-      </Button>
+      </PpButton>
     );
   }
 
@@ -69,23 +70,23 @@ export function EditApiKeyNameForm({ orgId, projectId, apiKeyId, initialName }: 
       <label className="sr-only" htmlFor={`edit-api-key-name-${apiKeyId}`}>
         {t('nameLabel')}
       </label>
-      <Input
+      <input
         id={`edit-api-key-name-${apiKeyId}`}
         required
         value={name}
         onChange={(event) => setName(event.target.value)}
-        className="h-8 w-40 text-sm"
+        className={cn(ppInputClass, 'h-9 w-48 text-sm')}
       />
       <div className="flex items-center gap-2">
-        <Button type="submit" size="sm" disabled={submitting || name.trim().length === 0}>
+        <PpButton type="submit" size="sm" variant="primary" disabled={submitting || name.trim().length === 0}>
           {t('saveRename')}
-        </Button>
-        <Button type="button" variant="outline" size="sm" disabled={submitting} onClick={() => setEditing(false)}>
+        </PpButton>
+        <PpButton type="button" variant="ghost" size="sm" disabled={submitting} onClick={() => setEditing(false)}>
           {t('cancelRename')}
-        </Button>
+        </PpButton>
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-destructive">
+        <p role="alert" className="text-xs text-pp-error font-medium">
           {t('renameError')}
         </p>
       ) : null}
