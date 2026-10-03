@@ -6,13 +6,15 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgPeople, listOrgProjects, listSharedCredentials, listAuditLogEntriesForOrg } from '@/lib/orgs/queries';
+import { listOrgPeople, listOrgProjects, listSharedCredentials, listAuditLogEntriesForOrg, listOrgMembers } from '@/lib/orgs/queries';
 import { ProjectSettingsForm } from '@/components/orgs/project-settings-form';
 import {
   AccountGovernanceHub,
   type ConnectedPlatform,
   type GovernanceMember,
   type AuditLogEntry,
+  type PlatformStatus,
+  type MemberStatus,
 } from '@/components/governance/account-governance-hub';
 import {
   PpPage,
@@ -58,11 +60,12 @@ export default async function ProjectSettingsPage({ params }: PageProps): Promis
     notFound();
   }
 
-  const [projects, sharedCredentials, people, auditLogs] = await Promise.all([
+  const [projects, sharedCredentials, orgMembers, people, auditLogs] = await Promise.all([
     listOrgProjects(orgId),
     listSharedCredentials(orgId).catch(() => []),
+    listOrgMembers(orgId).catch(() => []),
     listOrgPeople(orgId).catch(() => []),
-    listAuditLogEntriesForOrg(orgId, 10).catch(() => []),
+    listAuditLogEntriesForOrg(orgId, 50).catch(() => []),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -74,12 +77,25 @@ export default async function ProjectSettingsPage({ params }: PageProps): Promis
 
   const initialPlatforms: ConnectedPlatform[] = sharedCredentials.map((cred) => {
     const isDisconnected = Boolean(cred.archived_at);
-    const isPending = !cred.encrypted_secret;
-    const status: 'connected' | 'pending' | 'disconnected' = isDisconnected
-      ? 'disconnected'
-      : isPending
-        ? 'pending'
-        : 'connected';
+    const hasSecret = Boolean(cred.encrypted_secret);
+    const hasScopes = Boolean(cred.available_scopes && cred.available_scopes.length > 0);
+
+    let status: PlatformStatus;
+    let expiresIn: string;
+
+    if (isDisconnected) {
+      status = 'disconnected';
+      expiresIn = 'Revoked';
+    } else if (!hasSecret) {
+      status = 'unverified';
+      expiresIn = 'Awaiting Token';
+    } else if (!hasScopes) {
+      status = 'degraded';
+      expiresIn = 'Scopes Unassigned';
+    } else {
+      status = 'connected';
+      expiresIn = 'Active KMS Vault';
+    }
 
     const providerLabel =
       cred.provider === 'google_ads'
@@ -107,59 +123,160 @@ export default async function ProjectSettingsPage({ params }: PageProps): Promis
       name: cred.name || providerLabel,
       type: typeLabel,
       status,
-      accounts: `${cred.available_scopes?.length ?? 1} Connected Scope${(cred.available_scopes?.length ?? 1) === 1 ? '' : 's'}`,
-      syncRate: 'Real-time Webhook',
+      accounts: `${cred.available_scopes?.length ?? 0} Connected Scope${(cred.available_scopes?.length ?? 0) === 1 ? '' : 's'}`,
+      syncRate: hasSecret ? 'Real-time Webhook' : 'Sync Paused',
       scopes: cred.available_scopes && cred.available_scopes.length > 0 ? cred.available_scopes : ['read', 'manage'],
-      expiresIn: cred.archived_at
-        ? 'Revoked'
-        : cred.encrypted_secret
-          ? 'Active KMS Vault'
-          : 'Active Token',
+      expiresIn,
     };
   });
 
-  const activePeople = people.filter((p) => !p.archived_at);
-  const initialMembers: GovernanceMember[] = activePeople.map((person) => {
-    const initials =
-      person.name
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map((w) => w[0].toUpperCase())
-        .join('') || 'U';
+  const latestAuditByUser = new Map<string, Date>();
+  for (const log of auditLogs) {
+    if (log.actor_id && log.created_at) {
+      const existing = latestAuditByUser.get(log.actor_id);
+      const logDate = new Date(log.created_at);
+      if (!existing || logDate > existing) {
+        latestAuditByUser.set(log.actor_id, logDate);
+      }
+    }
+  }
 
-    let role: GovernanceMember['role'] = 'Agency Admin';
-    const titleLower = (person.title || '').toLowerCase();
-    if (titleLower.includes('buyer') || titleLower.includes('media')) {
-      role = 'Media Buyer';
-    } else if (titleLower.includes('exp') || titleLower.includes('growth')) {
-      role = 'Experimenter';
-    } else if (titleLower.includes('viewer') || titleLower.includes('client')) {
-      role = 'Client Viewer';
+  const formatLastActive = (date: Date | undefined, fallbackStatus?: string): { lastActive: string; memberStatus: MemberStatus } => {
+    if (!date) {
+      if (fallbackStatus === 'invited') return { lastActive: 'Invited (Pending)', memberStatus: 'invited' };
+      if (fallbackStatus === 'suspended') return { lastActive: 'Suspended', memberStatus: 'suspended' };
+      return { lastActive: 'No recent activity', memberStatus: 'offline' };
+    }
+    const diffMs = Math.max(0, Date.now() - date.getTime());
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMinutes < 15) return { lastActive: 'Active now', memberStatus: 'active' };
+    if (diffMinutes < 60) return { lastActive: `${diffMinutes}m ago`, memberStatus: 'active' };
+    if (diffHours < 24) return { lastActive: `${diffHours}h ago`, memberStatus: 'active' };
+    if (diffDays < 7) return { lastActive: `${diffDays}d ago`, memberStatus: 'offline' };
+    return { lastActive: date.toLocaleDateString(), memberStatus: 'offline' };
+  };
+
+  const activePeople = people.filter((p) => !p.archived_at);
+  const initialMembers: GovernanceMember[] =
+    orgMembers.length > 0
+      ? orgMembers.map((member) => {
+          const displayName = member.displayName || member.email || 'Member';
+          const initials =
+            displayName
+              .split(' ')
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0].toUpperCase())
+              .join('') || 'U';
+
+          let role: GovernanceMember['role'] = 'Agency Admin';
+          if (member.role === 'editor') {
+            role = 'Media Buyer';
+          } else if (member.role === 'operator') {
+            role = 'Experimenter';
+          } else if (member.role === 'viewer') {
+            role = 'Client Viewer';
+          }
+
+          const latestAudit = latestAuditByUser.get(member.userId);
+          const { lastActive, memberStatus } = formatLastActive(latestAudit, member.status);
+
+          const finalStatus: MemberStatus =
+            member.status === 'suspended'
+              ? 'suspended'
+              : member.status === 'invited'
+                ? 'invited'
+                : memberStatus;
+
+          return {
+            name: displayName,
+            initials,
+            email: member.email,
+            role,
+            lastActive,
+            status: finalStatus,
+          };
+        })
+      : activePeople.map((person) => {
+          const initials =
+            person.name
+              .split(' ')
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0].toUpperCase())
+              .join('') || 'U';
+
+          let role: GovernanceMember['role'] = 'Agency Admin';
+          const titleLower = (person.title || '').toLowerCase();
+          if (titleLower.includes('buyer') || titleLower.includes('media')) {
+            role = 'Media Buyer';
+          } else if (titleLower.includes('exp') || titleLower.includes('growth')) {
+            role = 'Experimenter';
+          } else if (titleLower.includes('viewer') || titleLower.includes('client')) {
+            role = 'Client Viewer';
+          }
+
+          const latestAudit = latestAuditByUser.get(person.id) || latestAuditByUser.get(person.created_by);
+          const { lastActive, memberStatus } = formatLastActive(latestAudit);
+
+          return {
+            name: person.name,
+            initials,
+            email: person.email,
+            role,
+            lastActive,
+            status: memberStatus,
+          };
+        });
+
+  const initialAuditLogs: AuditLogEntry[] = auditLogs.map((entry) => {
+    const actionLower = entry.action.toLowerCase();
+    const summaryLower = (entry.summary || '').toLowerCase();
+
+    let status: 'success' | 'warning' | 'error' = 'success';
+    if (
+      actionLower.includes('fail') ||
+      actionLower.includes('error') ||
+      actionLower.includes('violation') ||
+      actionLower.includes('reject') ||
+      summaryLower.includes('failed') ||
+      summaryLower.includes('error')
+    ) {
+      status = 'error';
+    } else if (
+      actionLower.includes('warn') ||
+      actionLower.includes('suspend') ||
+      actionLower.includes('archive') ||
+      actionLower.includes('revoke') ||
+      actionLower.includes('pause') ||
+      actionLower.includes('kill') ||
+      summaryLower.includes('warn') ||
+      summaryLower.includes('paused')
+    ) {
+      status = 'warning';
     }
 
     return {
-      name: person.name,
-      initials,
-      role,
-      lastActive: person.created_at ? new Date(person.created_at).toLocaleDateString() : 'Active Member',
+      id: entry.id,
+      timestamp: entry.created_at
+        ? new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : 'Recent',
+      actor:
+        entry.actor_id === user.id
+          ? `${user.email ?? 'Current User'}`
+          : `${entry.actor_type}:${entry.actor_id.slice(0, 8)}`,
+      action: entry.summary || entry.action.replace(/\./g, ' ').toUpperCase(),
+      target: entry.target_id
+        ? `${entry.target_type}:${entry.target_id.slice(0, 8)}`
+        : entry.project_id
+          ? `Project ${entry.project_id.slice(0, 8)}`
+          : 'Organization',
+      status,
     };
   });
-
-  const initialAuditLogs: AuditLogEntry[] = auditLogs.map((entry) => ({
-    id: entry.id,
-    timestamp: entry.created_at
-      ? new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : 'Recent',
-    actor: entry.actor_id === user.id ? `${user.email ?? 'Current User'}` : `${entry.actor_type}:${entry.actor_id.slice(0, 8)}`,
-    action: entry.action.replace(/\./g, ' ').toUpperCase(),
-    target: entry.target_id
-      ? `${entry.target_type}:${entry.target_id.slice(0, 8)}`
-      : entry.project_id
-        ? `Project ${entry.project_id.slice(0, 8)}`
-        : 'Organization',
-    status: 'success' as const,
-  }));
 
   const t = await getTranslations('ProjectSettings');
 

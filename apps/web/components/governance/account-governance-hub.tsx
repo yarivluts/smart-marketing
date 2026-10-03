@@ -5,21 +5,27 @@ import { Shield, Users, FileText, CheckCircle2, AlertTriangle, Key } from 'lucid
 import { MissingIntegrationOverlay } from '@/components/integrations/missing-integration-overlay';
 import { PpCard, PpTable, PpPill, PpEmptyState } from '@/components/pastel/primitives';
 
+export type PlatformStatus = 'connected' | 'degraded' | 'disconnected' | 'pending' | 'unverified';
+
 export interface ConnectedPlatform {
   name: string;
   type: string;
-  status: 'connected' | 'disconnected' | 'pending';
+  status: PlatformStatus;
   accounts: string;
   syncRate: string;
   scopes: string[];
   expiresIn: string;
 }
 
+export type MemberStatus = 'active' | 'invited' | 'suspended' | 'offline';
+
 export interface GovernanceMember {
   name: string;
   initials: string;
+  email?: string;
   role: 'Agency Admin' | 'Media Buyer' | 'Experimenter' | 'Client Viewer';
   lastActive: string;
+  status?: MemberStatus;
 }
 
 export interface AuditLogEntry {
@@ -54,6 +60,8 @@ export function AccountGovernanceHub({
   const [activeTab, setActiveTab] = useState<'connections' | 'rbac' | 'audit'>('connections');
 
   const connectedCount = platforms.filter((p) => p.status === 'connected').length;
+  const degradedCount = platforms.filter((p) => p.status === 'degraded').length;
+  const unverifiedCount = platforms.filter((p) => p.status === 'unverified' || p.status === 'pending').length;
 
   const content = (
     <div className="space-y-6" data-testid="account-governance-hub">
@@ -73,9 +81,22 @@ export function AccountGovernanceHub({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <PpPill accent={connectedCount > 0 ? 'mint' : 'neutral'} dot>
-            {connectedCount > 0 ? `${connectedCount} Connected APIs` : 'No APIs Connected'}
+        <div className="flex items-center gap-2 flex-wrap">
+          <PpPill
+            accent={
+              degradedCount > 0
+                ? 'amber'
+                : connectedCount > 0
+                  ? 'mint'
+                  : 'neutral'
+            }
+            dot
+          >
+            {connectedCount > 0
+              ? `${connectedCount} Connected APIs${degradedCount > 0 ? ` (${degradedCount} Degraded)` : ''}`
+              : unverifiedCount > 0
+                ? `${unverifiedCount} Pending Verification`
+                : 'No APIs Connected'}
           </PpPill>
           <span className="rounded-full border border-pp-outline-variant/40 bg-pp-surface-container-lowest px-3 py-1 text-xs font-semibold text-pp-on-surface shadow-pp-candy">
             RBAC Active
@@ -146,17 +167,23 @@ export function AccountGovernanceHub({
                         accent={
                           platform.status === 'connected'
                             ? 'mint'
-                            : platform.status === 'pending'
+                            : platform.status === 'degraded'
                               ? 'amber'
-                              : 'error'
+                              : platform.status === 'pending' || platform.status === 'unverified'
+                                ? 'neutral'
+                                : 'error'
                         }
                         dot
                       >
                         {platform.status === 'connected'
                           ? 'Connected'
-                          : platform.status === 'pending'
-                            ? 'Pending'
-                            : 'Disconnected'}
+                          : platform.status === 'degraded'
+                            ? 'Degraded'
+                            : platform.status === 'unverified'
+                              ? 'Unverified'
+                              : platform.status === 'pending'
+                                ? 'Pending'
+                                : 'Disconnected'}
                       </PpPill>
                     </div>
 
@@ -237,6 +264,7 @@ export function AccountGovernanceHub({
                   <tr className="border-b border-pp-outline-variant/20 bg-pp-surface-container/30 text-start text-xs font-semibold text-pp-outline">
                     <th className="py-3 px-4">MEMBER</th>
                     <th className="py-3 px-4">ASSIGNED ROLE</th>
+                    <th className="py-3 px-4">STATUS</th>
                     <th className="py-3 px-4">LAST ACTIVE</th>
                     <th className="py-3 px-4 text-end">ACTION</th>
                   </tr>
@@ -249,10 +277,37 @@ export function AccountGovernanceHub({
                           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-pp-primary-fixed font-bold text-xs text-pp-on-primary-fixed">
                             {m.initials}
                           </div>
-                          <span className="font-semibold text-pp-on-surface">{m.name}</span>
+                          <div>
+                            <span className="font-semibold text-pp-on-surface">{m.name}</span>
+                            {m.email && <span className="block text-[11px] text-pp-outline">{m.email}</span>}
+                          </div>
                         </div>
                       </td>
                       <td className="py-3 px-4 font-medium text-pp-on-surface">{m.role}</td>
+                      <td className="py-3 px-4">
+                        <PpPill
+                          accent={
+                            m.status === 'active'
+                              ? 'mint'
+                              : m.status === 'invited'
+                                ? 'amber'
+                                : m.status === 'suspended'
+                                  ? 'error'
+                                  : 'neutral'
+                          }
+                          dot
+                        >
+                          {m.status === 'active'
+                            ? 'Active'
+                            : m.status === 'invited'
+                              ? 'Invited'
+                              : m.status === 'suspended'
+                                ? 'Suspended'
+                                : m.status === 'offline'
+                                  ? 'Offline'
+                                  : 'Active'}
+                        </PpPill>
+                      </td>
                       <td className="py-3 px-4 text-pp-outline">{m.lastActive}</td>
                       <td className="py-3 px-4 text-end text-pp-outline">Manage</td>
                     </tr>
