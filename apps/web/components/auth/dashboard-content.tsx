@@ -20,6 +20,7 @@ import {
 } from '@/components/dashboard/dashboard-quick-cockpit';
 import {
   OperationalActivityTicker,
+  type FeedEventItem,
 } from '@/components/dashboard/operational-activity-ticker';
 import {
   WorkspaceLaunchpads,
@@ -42,12 +43,14 @@ export interface DashboardTelemetryMetrics {
 export interface DashboardContentProps {
   initialWorkspaces?: WorkspaceCardData[];
   telemetryMetrics?: DashboardTelemetryMetrics;
+  initialFeedEvents?: FeedEventItem[];
   userEmail?: string;
 }
 
 export function DashboardContent({
   initialWorkspaces,
   telemetryMetrics,
+  initialFeedEvents,
   userEmail,
 }: DashboardContentProps = {}): React.ReactElement | null {
   const t = useTranslations('DashboardPage');
@@ -239,7 +242,11 @@ export function DashboardContent({
       />
 
       {/* R3: Live Operational Activity Feed */}
-      <OperationalActivityTicker orgId={primaryOrgId} projectId={primaryProjectId} />
+      <OperationalActivityTicker
+        initialEvents={initialFeedEvents}
+        orgId={primaryOrgId}
+        projectId={primaryProjectId}
+      />
 
       {/* R2: Interactive Workspace Launchpads & Setup Readiness */}
       <WorkspaceLaunchpads workspaces={workspaces} loading={orgsLoading} />

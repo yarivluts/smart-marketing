@@ -29,7 +29,7 @@ export interface FeedEventItem {
   details?: string;
 }
 
-const INITIAL_EVENTS: FeedEventItem[] = [
+export const MOCK_FEED_EVENTS: FeedEventItem[] = [
   {
     id: 'evt-1',
     timestamp: 'Just now',
@@ -123,7 +123,7 @@ export interface OperationalActivityTickerProps {
 }
 
 export function OperationalActivityTicker({
-  initialEvents = INITIAL_EVENTS,
+  initialEvents = [],
   orgId,
   projectId,
 }: OperationalActivityTickerProps): React.ReactElement {
@@ -131,6 +131,10 @@ export function OperationalActivityTicker({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<'all' | FeedCategory>('all');
   const [events, setEvents] = useState<FeedEventItem[]>(initialEvents);
+
+  useEffect(() => {
+    setEvents(initialEvents);
+  }, [initialEvents]);
 
   // Real-time EventSource listener to project win-rules and live event stream
   useEffect(() => {
@@ -283,8 +287,14 @@ export function OperationalActivityTicker({
       {/* Feed Stream Items */}
       <div className="mt-2 divide-y divide-border/50 max-h-[360px] overflow-y-auto pe-1">
         {events.length === 0 ? (
-          <div className="py-8 text-center text-xs text-muted-foreground">
-            {t('noActivityEvents')}
+          <div className="py-10 text-center flex flex-col items-center justify-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
+              <Activity className="h-5 w-5" />
+            </div>
+            <p className="text-xs font-semibold text-foreground">{t('noActivityEvents')}</p>
+            <p className="text-[11px] text-muted-foreground max-w-sm">
+              {t('noActivityEventsDesc')}
+            </p>
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="py-8 text-center text-xs text-muted-foreground">

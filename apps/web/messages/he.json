@@ -415,7 +415,7 @@
     "statsActiveWorkspaces": "סביבות עבודה פעילות",
     "statsActiveWorkspacesDesc": "ארגונים שיש לך גישה אליהם",
     "statsIngestHealth": "תקינות הזרמת נתונים",
-    "statsIngestHealthValue": "פעיל (99.98%)",
+    "statsIngestHealthValue": "פעיל",
     "statsIngestHealthDesc": "כל מאזיני הזרמת הנתונים פעילים",
     "statsConnectedPipelines": "צינורות נתונים ומחברים",
     "statsConnectedPipelinesValue": "תקין",
@@ -493,12 +493,15 @@
     "stackShopify": "Shopify",
     "stackStripe": "Stripe",
     "stackWoocommerce": "WooCommerce",
-    "uptimeScore": "99.98% זמינות",
+    "uptimeScore": "זמינות חיה",
     "workspacesHeading": "סביבות עבודה ומרכזי שליטה",
     "statusNoData": "אין פעילות זרם",
     "noPipelines": "אין מחוברים",
     "sectionOrganizations": "ארגונים",
-    "noActivityEvents": "לא נרשמו אירועים בפעילות לאחרונה."
+    "noActivityEvents": "לא נרשמו אירועים בפעילות לאחרונה.",
+    "noActivityEventsDesc": "חבר את פלטפורמות הפרסום, ה-webhooks או ה-SDK של GrowthOS כדי להזרים נקודות מגע, המרות והתראות בזמן אמת.",
+    "noStreamActivityDesc": "ממתין להזרמת אצוות ראשונית",
+    "noPipelinesDesc": "אין חיבורי שיווק או חיוב פעילים"
   },
   "OrgsPage": {
     "title": "הארגונים שלך",

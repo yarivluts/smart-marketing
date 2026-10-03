@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { DashboardContent } from './dashboard-content';
+import { MOCK_FEED_EVENTS } from '@/components/dashboard/operational-activity-ticker';
 import messages from '../../messages/en.json';
 
 const replace = vi.fn();
@@ -156,7 +157,9 @@ describe('DashboardContent', () => {
     renderDashboard();
 
     expect(screen.getByText('No stream activity')).toBeInTheDocument();
+    expect(screen.getByText('Awaiting initial batch ingest')).toBeInTheDocument();
     expect(screen.getByText('None connected')).toBeInTheDocument();
+    expect(screen.getByText('No marketing or billing pipelines connected')).toBeInTheDocument();
   });
 
   /* ---------------- R2: Interactive Workspace Launchpads & Setup Readiness ---------------- */
@@ -247,7 +250,7 @@ describe('DashboardContent', () => {
         },
       ],
     });
-    renderDashboard();
+    renderDashboard({ initialFeedEvents: MOCK_FEED_EVENTS });
 
     const activityFeed = screen.getByLabelText('Operational Activity Feed');
     expect(activityFeed).toBeInTheDocument();
@@ -277,6 +280,24 @@ describe('DashboardContent', () => {
     const guardrailsTab = screen.getByRole('button', { name: /Autonomous Guardrails/ });
     fireEvent.click(guardrailsTab);
     expect(screen.getByText('CPA Ceiling Guardrail Triggered')).toBeInTheDocument();
+  });
+
+  it('displays honest empty state when no activity events are available', () => {
+    mockUseOrgContext.mockReturnValue({
+      loading: false,
+      memberships: [
+        {
+          membershipId: 'm1',
+          organizationId: 'org-1',
+          organizationName: 'Acme',
+          role: 'owner',
+          status: 'active',
+        },
+      ],
+    });
+    renderDashboard({ initialFeedEvents: [] });
+
+    expect(screen.getByText('No recent activity events recorded.')).toBeInTheDocument();
   });
 
   /* ---------------- R4: Quick-Action Cockpit ---------------- */

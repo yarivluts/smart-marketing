@@ -52,7 +52,7 @@ export function DashboardTelemetryGrid({
           badge={hasUptime ? t('statusHealthy') : t('statusNoData')}
           badgeAccent={hasUptime ? 'mint' : 'neutral'}
           accent={hasUptime ? 'mint' : 'neutral'}
-          footer={ingestLatency ? <span dir="ltr">{ingestLatency}</span> : t('statsIngestHealthDesc')}
+          footer={hasUptime ? (ingestLatency ? <span dir="ltr">{ingestLatency}</span> : t('statsIngestHealthDesc')) : t('noStreamActivityDesc')}
         />
 
         {/* 3. Connected Pipelines */}
@@ -61,8 +61,8 @@ export function DashboardTelemetryGrid({
           value={hasPipelines ? `${connectedPipelinesCount}/${totalPipelinesCount}` : '—'}
           badge={hasPipelines ? t('pipelinesSynced') : t('noPipelines')}
           badgeAccent={hasPipelines ? 'sky' : 'neutral'}
-          accent="sky"
-          footer={t('statsConnectedPipelinesDesc')}
+          accent={hasPipelines ? 'sky' : 'neutral'}
+          footer={hasPipelines ? t('statsConnectedPipelinesDesc') : t('noPipelinesDesc')}
         />
 
         {/* 4. Pending Invitations */}

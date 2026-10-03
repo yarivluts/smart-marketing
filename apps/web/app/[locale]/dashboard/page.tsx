@@ -8,12 +8,14 @@ import { NavShell } from '@/components/shell/nav-shell';
 import type { NavShellItem, NavShellSection } from '@/components/shell/nav-types';
 import {
   listActiveAttachmentsForProject,
+  listAuditLogEntriesForOrg,
   listOrgProjects,
   listRecentIngestBatchesForProject,
   listSharedCredentials,
 } from '@/lib/orgs/queries';
 import { computeIngestHealthSummary, toIngestBatchView } from '@/lib/orgs/ingest-health-view';
 import type { DashboardTelemetryMetrics } from '@/components/auth/dashboard-content';
+import type { FeedEventItem } from '@/components/dashboard/operational-activity-ticker';
 import { parseProjectProfile } from '@/lib/projects/project-profile';
 import {
   computeWorkspaceReadiness,
@@ -102,6 +104,7 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
   );
 
   let telemetryMetrics: DashboardTelemetryMetrics | undefined = undefined;
+  let initialFeedEvents: FeedEventItem[] = [];
 
   const primaryMembership = activeMemberships[0];
   if (primaryMembership) {
@@ -109,10 +112,11 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
       const primaryProjects = await listOrgProjects(primaryMembership.organizationId);
       const firstProject = primaryProjects[0];
       if (firstProject) {
-        const [batches, sharedCreds, activeAttachments] = await Promise.all([
+        const [batches, sharedCreds, activeAttachments, auditLogs] = await Promise.all([
           listRecentIngestBatchesForProject(primaryMembership.organizationId, firstProject.id, 20).catch(() => []),
           listSharedCredentials(primaryMembership.organizationId).catch(() => []),
           listActiveAttachmentsForProject(primaryMembership.organizationId, firstProject.id).catch(() => []),
+          listAuditLogEntriesForOrg(primaryMembership.organizationId, 15).catch(() => []),
         ]);
 
         const ingestHealth = computeIngestHealthSummary(batches.map(toIngestBatchView), Date.now());
@@ -142,6 +146,89 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
             totalPipelinesCount,
           };
         }
+
+        const batchEvents: FeedEventItem[] = batches.map((batch) => {
+          const isQuarantine = (batch.quarantined_count ?? 0) > 0;
+          const diffMs = Math.max(0, Date.now() - new Date(batch.created_at).getTime());
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          const diffHours = Math.floor(diffMinutes / 60);
+          const timestamp =
+            diffMinutes < 1
+              ? 'Just now'
+              : diffMinutes < 60
+                ? `${diffMinutes}m ago`
+                : `${diffHours}h ago`;
+
+          return {
+            id: `batch-${batch.id}`,
+            timestamp,
+            category: isQuarantine ? 'guardrail' : 'touchpoint',
+            title: `Batch Ingest: ${(batch.kind || 'records').toUpperCase()}`,
+            description: isQuarantine
+              ? `${batch.quarantined_count} quarantined of ${batch.total_count} records`
+              : `Ingested ${batch.total_count} records with 0 errors`,
+            source: batch.environment_id ? `${batch.environment_id} stream` : 'SDK Stream',
+            sourceType: 'sdk',
+            severity: isQuarantine ? 'warning' : 'info',
+            amount: `${batch.total_count} records`,
+            details: batch.kind,
+          };
+        });
+
+        const auditEvents: FeedEventItem[] = auditLogs.map((entry) => {
+          const actionLower = entry.action.toLowerCase();
+          const isGuardrail =
+            actionLower.includes('kill_switch') ||
+            actionLower.includes('guardrail') ||
+            actionLower.includes('pause');
+          const isConversion =
+            actionLower.includes('conversion') ||
+            actionLower.includes('billing') ||
+            actionLower.includes('stripe') ||
+            actionLower.includes('checkout');
+          const diffMs = Math.max(0, Date.now() - new Date(entry.created_at).getTime());
+          const diffMinutes = Math.floor(diffMs / (1000 * 60));
+          const diffHours = Math.floor(diffMinutes / 60);
+          const timestamp =
+            diffMinutes < 1
+              ? 'Just now'
+              : diffMinutes < 60
+                ? `${diffMinutes}m ago`
+                : `${diffHours}h ago`;
+
+          let severity: 'info' | 'success' | 'warning' = 'info';
+          if (
+            actionLower.includes('fail') ||
+            actionLower.includes('error') ||
+            actionLower.includes('kill')
+          ) {
+            severity = 'warning';
+          } else if (isConversion) {
+            severity = 'success';
+          }
+
+          let sourceType: FeedEventItem['sourceType'] = 'sdk';
+          if (actionLower.includes('stripe')) sourceType = 'stripe';
+          else if (actionLower.includes('google')) sourceType = 'google';
+          else if (actionLower.includes('meta')) sourceType = 'meta';
+          else if (isGuardrail) sourceType = 'copilot';
+
+          const isMcp = entry.client_type?.startsWith('mcp') || entry.actor_type === 'service_account';
+
+          return {
+            id: `audit-${entry.id}`,
+            timestamp,
+            category: isGuardrail ? 'guardrail' : isConversion ? 'conversion' : 'touchpoint',
+            title: entry.summary || entry.action.replace(/\./g, ' ').toUpperCase(),
+            description: entry.summary || `${entry.actor_type} performed ${entry.action}`,
+            source: isMcp ? 'Copilot Guardrail' : entry.target_type,
+            sourceType,
+            severity,
+            details: entry.action,
+          };
+        });
+
+        initialFeedEvents = [...batchEvents, ...auditEvents].slice(0, 20);
       }
     } catch {
       // Telemetry remains undefined / honest empty
@@ -175,6 +262,7 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
       <DashboardContent
         initialWorkspaces={initialWorkspaces}
         telemetryMetrics={telemetryMetrics}
+        initialFeedEvents={initialFeedEvents}
         userEmail={session.email ?? undefined}
       />
     </NavShell>

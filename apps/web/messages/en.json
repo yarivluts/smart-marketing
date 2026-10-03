@@ -415,7 +415,7 @@
     "statsActiveWorkspaces": "Active Workspaces",
     "statsActiveWorkspacesDesc": "Organizations you have access to",
     "statsIngestHealth": "Ingestion Health",
-    "statsIngestHealthValue": "Operational (99.98%)",
+    "statsIngestHealthValue": "Operational",
     "statsIngestHealthDesc": "All data stream listeners active",
     "statsConnectedPipelines": "Pipelines & Connectors",
     "statsConnectedPipelinesValue": "Healthy",
@@ -493,12 +493,15 @@
     "stackShopify": "Shopify",
     "stackStripe": "Stripe",
     "stackWoocommerce": "WooCommerce",
-    "uptimeScore": "99.98% Uptime",
+    "uptimeScore": "Live Uptime",
     "workspacesHeading": "Workspace Launchpads",
     "statusNoData": "No stream activity",
     "noPipelines": "None connected",
     "sectionOrganizations": "Organizations",
-    "noActivityEvents": "No recent activity events recorded."
+    "noActivityEvents": "No recent activity events recorded.",
+    "noActivityEventsDesc": "Connect your ad platforms, webhooks, or the GrowthOS Tracking SDK to stream live touchpoints, conversions, and guardrail alerts in real-time.",
+    "noStreamActivityDesc": "Awaiting initial batch ingest",
+    "noPipelinesDesc": "No marketing or billing pipelines connected"
   },
   "OrgsPage": {
     "title": "Your organizations",
