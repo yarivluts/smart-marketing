@@ -75,9 +75,15 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
     listSharedCredentials(orgId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
+  if (!project) {
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/campaigns`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
+  }
   const targetModel = targets.find((candidate) => candidate.id === targetId);
-  if (!project || !targetModel) {
-    notFound();
+  if (!targetModel) {
+    redirect(`/${locale}/orgs/${orgId}/projects/${projectId}/campaigns`);
   }
 
   const target = toAutomationTargetView(targetModel);

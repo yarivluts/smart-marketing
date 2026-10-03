@@ -9,7 +9,9 @@
   },
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
+    "test": "pnpm run test:sprints && turbo run test",
+    "test:sprints": "node --test scripts/sprints.test.mjs",
+    "sprints": "node scripts/sprints.mjs",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "dev": "turbo run dev",

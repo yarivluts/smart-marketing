@@ -17,6 +17,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { CopilotChatPanel } from './copilot-chat-panel';
 import { ProposalDiffCard, type ActionProposalData } from './proposal-diff-card';
 import { ActionAuditTrail, type AuditActionItem } from './action-audit-trail';
+import { PageGuideButton } from '@/components/guides/page-guide-button';
 
 const EMPTY_ACTIONS: AuditActionItem[] = [];
 const EMPTY_PROPOSALS: ActionProposalData[] = [];
@@ -148,6 +149,7 @@ export function AutomationHub({
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
                 {locale === 'he' ? `מרכז האוטומציה וה-AI Copilot` : `AI Automation Hub`}
               </h1>
+              <PageGuideButton pageKey="cost-guardrails" />
               {killSwitchEngaged ? (
                 <span
                   data-testid="kill-switch-active-badge"

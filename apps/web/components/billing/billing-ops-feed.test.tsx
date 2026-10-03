@@ -49,6 +49,26 @@ describe('Billing & Operations Feed Components (Milestone 3)', () => {
     expect(handleUpgrade).toHaveBeenCalledTimes(1);
   });
 
+  it('renders PlanSummaryCard gracefully when max usage limits are 0', () => {
+    renderWithIntl(
+      <PlanSummaryCard
+        plan={{
+          tierName: 'Custom Tier',
+          priceMonthly: 0,
+          currency: 'USD',
+          billingInterval: 'monthly',
+          renewalDate: '2026-10-01',
+          seatUsage: { current: 0, max: 0 },
+          eventUsage: { current: 0, max: 0 },
+          apiUsage: { current: 0, max: 0 },
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('plan-summary-card')).toBeInTheDocument();
+    expect(screen.getByText('Custom Tier')).toBeInTheDocument();
+  });
+
   it('renders InvoicesTable with invoice list and handles download click', () => {
     const handleDownload = vi.fn();
     renderWithIntl(<InvoicesTable onDownloadPdf={handleDownload} />);

@@ -76,7 +76,10 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/plugins`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const manifestViews = manifests.map(toPluginManifestView);

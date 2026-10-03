@@ -9,6 +9,7 @@ import { builtinMetricPacks, getDemoFunnelForProject, listOrgPeople, listOrgProj
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { toDemoFunnelView } from '@/lib/orgs/sales-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import { HotLeadsRadar } from '@/components/sales/hot-leads-radar';
 import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
@@ -74,7 +75,10 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const [projects, installs] = await Promise.all([listOrgProjects(orgId), listPluginInstallsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/demos`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const installViews = installs.map(toPluginInstallView);
@@ -99,14 +103,19 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const canManageDashboards = can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId });
 
   const formatShowRate = (rate: number | null): string => (rate === null ? t('rowValueUnavailable') : t('showRateValue', { value: Math.round(rate * 100) }));
+  const isDataConnected =
+    funnel.demosScheduled > 0 ||
+    funnel.demosHeld > 0 ||
+    funnel.demosNoShow > 0 ||
+    funnel.rows.length > 0;
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="w-full space-y-10">
+      {/* Stitch Sales Acceleration & Hot Inbound Leads Radar */}
+      <HotLeadsRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('funnelHeading')}</h2>
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-bold tracking-tight text-foreground mb-4">{t('funnelHeading')}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
             <span className="text-2xl font-bold tracking-tight">{funnel.demosScheduled}</span>

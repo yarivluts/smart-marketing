@@ -1,0 +1,10 @@
+import { redirectToFirstProject } from '@/lib/orgs/redirect-project';
+
+type PageProps = Readonly<{
+  params: Promise<{ locale: string }>;
+}>;
+
+export default async function BillingOpsFeedShortcutPage({ params }: PageProps) {
+  const { locale } = await params;
+  return redirectToFirstProject(locale, 'billing-ops-feed');
+}

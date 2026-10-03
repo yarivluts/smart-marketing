@@ -7,6 +7,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listEnvironmentsForProject, listOrgProjects, listRecentRecordsForSchema, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
 import { toRecordFeedEntryView } from '@/lib/orgs/record-feed-view';
+import { ProductTelemetryDashboard } from '@/components/telemetry/product-telemetry-dashboard';
 import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
@@ -57,7 +58,10 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/record-feed`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const eventSchemaNames = activeSchemaNamesForKind(schemaDefs, 'event');
@@ -77,15 +81,22 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="w-full space-y-10">
+      {/* Stitch Product Telemetry & L28 Power Curve */}
+      <ProductTelemetryDashboard orgId={orgId} projectId={projectId} isDataConnected={true} />
 
-      {eventSchemaNames.length === 0 ? (
-        <p className="text-muted-foreground">{t('noEventSchemasRegistered')}</p>
-      ) : (
-        <>
-          <nav aria-label={t('schemaPickerLabel')} className="flex flex-wrap gap-2">
+      {/* Raw Landed Event Record Stream */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="border-b border-border pb-4 mb-4">
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
+        </div>
+
+        {eventSchemaNames.length === 0 ? (
+          <p className="text-muted-foreground text-xs">{t('noEventSchemasRegistered')}</p>
+        ) : (
+          <>
+            <nav aria-label={t('schemaPickerLabel')} className="flex flex-wrap gap-2">
             {eventSchemaNames.map((schemaName) => {
               const isActive = schemaName === selectedSchemaName;
               return (
@@ -180,6 +191,7 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
           </section>
         </>
       )}
+      </section>
     </main>
   );
 }

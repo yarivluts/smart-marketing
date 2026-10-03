@@ -83,7 +83,10 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/schema-defs`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   // Reuses the schema-defs list just fetched above rather than a second, redundant

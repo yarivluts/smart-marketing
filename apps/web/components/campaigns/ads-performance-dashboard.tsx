@@ -17,6 +17,7 @@ import { CreativePreviewGallery } from './creative-preview-gallery';
 import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-target-form';
 import { AutomationProposeCampaignDraftForm } from '@/components/orgs/automation-propose-campaign-draft-form';
 import { ExecutiveBlendedReport } from '@/components/reporting/executive-blended-report';
+import { PageGuideButton } from '@/components/guides/page-guide-button';
 import type {
   UnifiedCampaignItem,
   AdsPerformanceSummary,
@@ -117,9 +118,12 @@ export function AdsPerformanceDashboard({
       {/* Top Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {t('cockpitTitle')}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t('cockpitTitle')}
+            </h1>
+            <PageGuideButton pageKey="campaigns" />
+          </div>
           <p className="text-sm text-muted-foreground mt-1">
             {t('cockpitDescription')}
           </p>

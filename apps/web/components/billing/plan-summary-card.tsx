@@ -27,9 +27,9 @@ export function PlanSummaryCard({
   onUpgrade,
   className = '',
 }: PlanSummaryCardProps): React.ReactElement {
-  const seatPct = Math.round((plan.seatUsage.current / plan.seatUsage.max) * 100);
-  const eventPct = Math.round((plan.eventUsage.current / plan.eventUsage.max) * 100);
-  const apiPct = Math.round((plan.apiUsage.current / plan.apiUsage.max) * 100);
+  const seatPct = plan.seatUsage?.max > 0 ? Math.round((plan.seatUsage.current / plan.seatUsage.max) * 100) : 0;
+  const eventPct = plan.eventUsage?.max > 0 ? Math.round((plan.eventUsage.current / plan.eventUsage.max) * 100) : 0;
+  const apiPct = plan.apiUsage?.max > 0 ? Math.round((plan.apiUsage.current / plan.apiUsage.max) * 100) : 0;
 
   return (
     <div

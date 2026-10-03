@@ -47,7 +47,10 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/rep-collections`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   // Fetched once and reused for both leaderboard periods (via the pure
@@ -74,7 +77,7 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
   const t = await getTranslations('RepCollections');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
+    <div className="w-full space-y-8">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
       <p className="text-sm text-muted-foreground">{t('description')}</p>
 
@@ -130,7 +133,7 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                <tr className="border-b border-input text-start text-xs text-muted-foreground">
                   <th className="py-2 pe-3 font-medium">{t('columnCompany')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnType')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnPlan')}</th>
@@ -170,6 +173,6 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
         <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
         <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} />
       </section>
-    </main>
+    </div>
   );
 }

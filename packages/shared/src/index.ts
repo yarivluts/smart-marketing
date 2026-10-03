@@ -31,3 +31,6 @@ export * from './firmographic-enrichment';
 export * from './rep-collections';
 export * from './support';
 export * from './sales';
+export * from './schemas';
+export * from './setup-requirements';
+

@@ -67,8 +67,14 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
     resolveBoardFreshness(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
-  if (!project || !board) {
-    notFound();
+  if (!project) {
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/boards`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
+  }
+  if (!board) {
+    redirect(`/${locale}/orgs/${orgId}/projects/${projectId}/boards`);
   }
 
   const boardView = toBoardView(board);

@@ -31,4 +31,32 @@ export class ProjectModel extends BaseModel {
    */
   @Field()
   public session_replay_url_template?: string;
+
+  /** Platform type: 'web' | 'mobile' | 'hybrid' */
+  @Field()
+  public platform_type?: string;
+
+  /** Business / Monetization model: 'saas_subscription' | 'ecommerce_physical' | 'digital_products' | 'leadgen_b2b' | 'marketplace_hybrid' */
+  @Field()
+  public business_model?: string;
+
+  /** Transaction structure: 'monthly_recurring' | 'annual_recurring' | 'one_time' | 'hybrid_mixed' */
+  @Field()
+  public transaction_type?: string;
+
+  /** Primary tech stack: 'shopify' | 'stripe' | 'woocommerce' | 'custom_web' | 'mobile_native' | 'hubspot_salesforce' */
+  @Field()
+  public primary_stack?: string;
+
+  /** List of verified setup checklist requirement IDs */
+  @Field()
+  public verified_requirements?: string[];
+
+  /** Optional user-customized list of hidden navigation module IDs */
+  @Field()
+  public custom_hidden_modules?: string[];
+
+  /** Timestamp when project was archived, or undefined if active */
+  @Field()
+  public archived_at?: string;
 }

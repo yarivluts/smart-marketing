@@ -58,7 +58,10 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/win-rules`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] = await Promise.all([

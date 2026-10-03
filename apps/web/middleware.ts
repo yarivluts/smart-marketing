@@ -6,8 +6,7 @@ import { SESSION_COOKIE_NAME } from './lib/auth/constants';
 const intlMiddleware = createIntlMiddleware(routing);
 
 // Fail-closed, like the API's PermissionGuard (KAN-24): a locale-prefixed
-// page is protected unless explicitly listed here.
-const PUBLIC_PATHS = new Set(['/', '/login', '/login/token', '/signup']);
+const PUBLIC_PATHS = new Set(['/', '/login', '/login/token', '/signup', '/pricing', '/tv']);
 // Invite links (KAN-25's join flow) are shared before the recipient
 // necessarily has an account, so every `/invite/:orgId/:membershipId` must
 // stay reachable pre-auth; the page itself prompts sign-in/sign-up inline.

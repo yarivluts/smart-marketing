@@ -82,6 +82,12 @@ export interface UpdateProjectDetailsParams {
   name: string;
   /** Omit (or pass an empty string) to clear the vertical. */
   vertical?: string;
+  platformType?: string;
+  businessModel?: string;
+  transactionType?: string;
+  primaryStack?: string;
+  verifiedRequirements?: string[];
+  customHiddenModules?: string[];
   actorUserId: string;
 }
 
@@ -111,10 +117,36 @@ export async function updateProjectDetails(params: UpdateProjectDetailsParams): 
     throw new InvalidProjectNameError();
   }
 
-  const before = { name: project.name, vertical: project.vertical ?? '' };
+  const before = {
+    name: project.name,
+    vertical: project.vertical ?? '',
+    platform_type: project.platform_type ?? '',
+    business_model: project.business_model ?? '',
+    transaction_type: project.transaction_type ?? '',
+    primary_stack: project.primary_stack ?? '',
+  };
 
   project.name = trimmedName;
   project.vertical = params.vertical?.trim() ?? '';
+  if (params.platformType !== undefined) {
+    project.platform_type = params.platformType.trim();
+  }
+  if (params.businessModel !== undefined) {
+    project.business_model = params.businessModel.trim();
+  }
+  if (params.transactionType !== undefined) {
+    project.transaction_type = params.transactionType.trim();
+  }
+  if (params.primaryStack !== undefined) {
+    project.primary_stack = params.primaryStack.trim();
+  }
+  if (params.verifiedRequirements !== undefined) {
+    project.verified_requirements = params.verifiedRequirements;
+  }
+  if (params.customHiddenModules !== undefined) {
+    project.custom_hidden_modules = params.customHiddenModules;
+  }
+
   project.setPathParams({ organization_id: params.organizationId });
   await project.save();
 

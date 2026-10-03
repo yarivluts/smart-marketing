@@ -7,6 +7,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listBoardsForProject, listOrgProjects, listTvPairingsForProject } from '@/lib/orgs/queries';
 import { toBoardSummaryView } from '@/lib/orgs/board-view';
 import { toTvPairingSummaryView } from '@/lib/orgs/tv-pairing-view';
+import { Link } from '@/i18n/navigation';
 import { TvPairingList } from '@/components/orgs/tv-pairing-list';
 import { ClaimTvPairingForm } from '@/components/orgs/claim-tv-pairing-form';
 
@@ -47,7 +48,10 @@ export default async function TvPairingPage({ params }: PageProps): Promise<Reac
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/tv`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const [boards, pairings] = await Promise.all([
@@ -60,8 +64,34 @@ export default async function TvPairingPage({ params }: PageProps): Promise<Reac
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+      {/* War-Room Office Billboard Hero */}
+      <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/20 px-2.5 py-0.5 text-[11px] font-bold text-primary mb-2">
+            📺 War-Room Mode: Office Billboard
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-foreground">
+            Launch Standalone TV Display
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1 max-w-md">
+            Dedicated zero-auth kiosk mode with full-screen live revenue pacing, deal celebrations, audio chimes, and automatic board rotation.
+          </p>
+        </div>
+
+        <Link
+          href="/tv"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 transition-opacity shrink-0"
+        >
+          ⚡ Open TV Billboard ↗
+        </Link>
+      </div>
+
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t('description')}</p>
+      </div>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('pairedHeading')}</h2>

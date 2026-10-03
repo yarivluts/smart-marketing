@@ -6,6 +6,7 @@ import { Public } from '../authz/public.decorator';
 import { McpAuthGuard, type McpAuthenticatedRequest } from './mcp-auth.guard';
 import { registerMcpTools } from './mcp-tools';
 import { registerMcpActTools } from './mcp-act-tools';
+import { registerMcpSetupTools } from './mcp-setup-tools';
 
 const SERVER_NAME = 'growthos';
 const SERVER_VERSION = '1.0.0';
@@ -59,6 +60,7 @@ export class McpController {
     const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
     registerMcpTools(server, auth);
     registerMcpActTools(server, auth);
+    registerMcpSetupTools(server, auth);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
     response.on('close', () => {

@@ -28,6 +28,9 @@ export interface ExecutiveReportData {
   metrics: ExecutiveBlendedMetrics;
   timeWindow: ExecutiveTimeWindow;
   channels: ChannelSpendAllocationItem[];
+  isSimulated?: boolean;
+  missingConnectors?: string[];
+  missingImpactDescription?: string;
   rebalancingRecommendation?: {
     fromChannel: string;
     toChannel: string;
@@ -235,10 +238,18 @@ export function buildExecutiveReportData(
     },
   ];
 
+  const isSimulated = (options.targets ?? []).length === 0 && (!options.spendOutcome || !options.spendOutcome.ok);
+  const missingConnectors: string[] = isSimulated ? ['meta_ads', 'google_ads', 'stripe'] : [];
+
   return {
     metrics,
     timeWindow,
     channels,
+    isSimulated,
+    missingConnectors,
+    missingImpactDescription: isSimulated
+      ? 'Currently presenting baseline synthetic performance metrics. Connect Google Ads and Meta Ads to stream live spend and ROAS.'
+      : undefined,
     rebalancingRecommendation: {
       fromChannel: 'Google Ads',
       toChannel: 'Meta Ads',

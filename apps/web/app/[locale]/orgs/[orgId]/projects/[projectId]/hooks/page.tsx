@@ -51,7 +51,10 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/hooks`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const [environments, hookEndpoints, hookDeliveries] = await Promise.all([

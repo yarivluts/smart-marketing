@@ -9,6 +9,7 @@ import { builtinMetricPacks, getExperimentResultsForProject, listOrgProjects, li
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { experimentVariantBadge, experimentVariantBadgeLabelKey } from '@/lib/orgs/experiment-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import { ExperimentRegistryDashboard } from '@/components/experiments/experiment-registry-dashboard';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -59,7 +60,10 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
   const [projects, installs] = await Promise.all([listOrgProjects(orgId), listPluginInstallsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/experiments`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const installViews = installs.map(toPluginInstallView);
@@ -70,22 +74,28 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === EXPERIMENT_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
+      <div className="w-full space-y-8">
         <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
         <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
         <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      </div>
     );
   }
 
   const outcome = await getExperimentResultsForProject(orgId, projectId);
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <div className="w-full space-y-10">
+      {/* Stitch Experiment Registry & A/B Testing Hub */}
+      <ExperimentRegistryDashboard orgId={orgId} projectId={projectId} isDataConnected={true} />
 
-      {!outcome.ok ? (
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
+        </div>
+
+        {!outcome.ok ? (
         <p className="text-muted-foreground">{t('resultsUnavailable')}</p>
       ) : outcome.results.length === 0 ? (
         <p className="text-muted-foreground">{t('resultsEmpty')}</p>
@@ -95,7 +105,7 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
             <h2 className="text-xl font-semibold tracking-tight">{result.experimentKey}</h2>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                <tr className="border-b border-input text-start text-xs text-muted-foreground">
                   <th className="py-2 pe-3 font-medium">{t('columnVariant')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnExposures')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnConversions')}</th>
@@ -127,6 +137,7 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
           </section>
         ))
       )}
-    </main>
+      </div>
+    </div>
   );
 }

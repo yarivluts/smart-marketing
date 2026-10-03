@@ -65,7 +65,10 @@ export default async function FirmographicsPage({ params }: PageProps): Promise<
   const [projects, installs] = await Promise.all([listOrgProjects(orgId), listPluginInstallsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/firmographics`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const installViews = installs.map(toPluginInstallView);

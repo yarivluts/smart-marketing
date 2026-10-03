@@ -27,6 +27,7 @@ import { CompleteOnboardingButton } from '@/components/orgs/complete-onboarding-
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
 import { Button } from '@/components/ui/button';
+import { SdkDeploymentWizard } from '@/components/onboarding/sdk-deployment-wizard';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -66,7 +67,10 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/onboarding`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const t = await getTranslations('Onboarding');
@@ -84,10 +88,14 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
   const view = toOnboardingStateView(state);
 
   return (
-    <main className="container mx-auto flex max-w-2xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="w-full space-y-12">
+      {/* Stitch Onboarding & SDK Deployment Wizard */}
+      <SdkDeploymentWizard orgId={orgId} projectId={projectId} isDataConnected={true} />
 
-      {view.step === 'pack' ? (
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8 max-w-2xl mx-auto">
+        <h2 className="text-xl font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+
+        {view.step === 'pack' ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">{t('packStepHeading')}</h2>
           <OnboardingPackStep orgId={orgId} projectId={projectId} packs={onboardingMetricPacks()} />
@@ -104,6 +112,7 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
       ) : null}
 
       {view.step === 'board' || view.step === 'done' ? <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} /> : null}
+      </div>
     </main>
   );
 }

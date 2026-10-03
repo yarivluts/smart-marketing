@@ -62,7 +62,10 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/resources`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const principal = { type: 'user' as const, id: user.id };

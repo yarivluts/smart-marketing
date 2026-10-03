@@ -103,3 +103,18 @@ describe('API_KEY_SCOPES', () => {
     expect(isApiKeyScope('not-a-real-permission')).toBe(false);
   });
 });
+
+describe('canonical schemas exports from @growthos/shared', () => {
+  it('exports canonical schemas, validation engine, and mappings', async () => {
+    const shared = await import('./index');
+    expect(shared.validateCanonicalEvent).toBeDefined();
+    expect(shared.CANONICAL_EVENT_TYPES).toHaveLength(5);
+    expect(shared.METRIC_INGESTION_MAPPINGS).toBeDefined();
+    expect(shared.subscriptionStateChangeFixtures).toBeDefined();
+    expect(shared.customerTransactionFixtures).toBeDefined();
+    expect(shared.adSpendFixtures).toBeDefined();
+    expect(shared.productTelemetryFixtures).toBeDefined();
+    expect(shared.crmLifecycleFixtures).toBeDefined();
+  });
+});
+

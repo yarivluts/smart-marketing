@@ -7,11 +7,13 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import {
   getActiveAutomationGuardrailPolicy,
   getAutomationKillSwitchStatus,
+  getCampaignSpendBreakdownForProject,
   listActiveAttachmentsForProject,
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
   listOrgProjects,
   listSharedCredentials,
+  queryProjectFunnelSteps,
 } from '@/lib/orgs/queries';
 import {
   toAutomationActionView,
@@ -21,6 +23,8 @@ import {
 } from '@/lib/orgs/automation-view';
 import { AutomationHubDashboard } from '@/components/orgs/automation-hub-dashboard';
 import { synthesizeProactiveRecommendations } from '@/lib/orgs/recommendation-synthesizer';
+import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
+import { calculateFunnelStepItems, type FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -54,7 +58,17 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   }
   const canApprove = can(bindings, principal, 'automation.approve', { orgId });
 
-  const [projects, killSwitchStatus, policy, targets, actions, activeAttachments, credentials] = await Promise.all([
+  const [
+    projects,
+    killSwitchStatus,
+    policy,
+    targets,
+    actions,
+    activeAttachments,
+    credentials,
+    spendOutcome,
+    funnelOutcome,
+  ] = await Promise.all([
     listOrgProjects(orgId),
     getAutomationKillSwitchStatus(orgId),
     getActiveAutomationGuardrailPolicy(orgId, projectId),
@@ -62,37 +76,47 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     listAutomationActionsForProject(orgId, projectId),
     listActiveAttachmentsForProject(orgId, projectId),
     listSharedCredentials(orgId),
+    getCampaignSpendBreakdownForProject(orgId, projectId).catch(() => ({ ok: false as const, reason: 'query_error' as const })),
+    queryProjectFunnelSteps(orgId, projectId).catch(() => null),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/automation`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const targetViews = targets.map(toAutomationTargetView);
   const actionViews = actions.map(toAutomationActionView);
   const connectionOptions = toAutomationConnectionOptions(activeAttachments, credentials);
 
-  // Synthesize proactive recommendations based on active project targets
+  // Build unified campaign items joining Firestore targets with BigQuery spend breakdown
+  const { items: unifiedCampaigns } = buildUnifiedAdsCockpitData(
+    targetViews,
+    spendOutcome && spendOutcome.ok ? spendOutcome : null,
+  );
+
+  // Derive real funnel steps or fallback to baseline steps
+  const funnelSteps: FunnelStepItem[] =
+    funnelOutcome && funnelOutcome.ok && funnelOutcome.steps.length > 0
+      ? calculateFunnelStepItems(
+          funnelOutcome.steps.map((s, idx) => ({
+            stageKey: s.stageKey,
+            stepOrder: s.stepOrder ?? idx,
+            customerCount: s.customerCount,
+            conversionRateFromFirst: s.conversionRateFromFirst,
+          })),
+        )
+      : [
+          { stepOrder: 0, stageKey: 'view', stageLabel: 'Product View', customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
+          { stepOrder: 1, stageKey: 'checkout', stageLabel: 'Checkout Form', customerCount: 380, conversionPercent: 38, dropOffPercent: 62 },
+        ];
+
+  // Synthesize proactive recommendations based on live unified campaign stats and funnel steps
   const proactiveRecs = synthesizeProactiveRecommendations(
-    targetViews.map((tv) => ({
-      id: `sim-${tv.id}`,
-      targetId: tv.id,
-      label: tv.label,
-      platform: 'meta_ads' as const,
-      status: (tv.campaignStatus || 'enabled') as 'enabled' | 'paused' | 'removed' | 'none',
-      dailyBudgetUsd: tv.dailyBudgetUsd,
-      spend30dUsd: tv.dailyBudgetUsd * 20,
-      impressions: 40000,
-      clicks: 1000,
-      ctrPct: 2.5,
-      cpaUsd: 18,
-      conversions: 45,
-      roas: 3.8,
-    })),
-    [
-      { stepOrder: 0, stageKey: 'view', stageLabel: 'Product View', customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
-      { stepOrder: 1, stageKey: 'checkout', stageLabel: 'Checkout Form', customerCount: 380, conversionPercent: 38, dropOffPercent: 62 },
-    ],
+    unifiedCampaigns,
+    funnelSteps,
   );
 
   return (

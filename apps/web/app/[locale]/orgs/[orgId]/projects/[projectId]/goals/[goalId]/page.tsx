@@ -52,8 +52,14 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
     listMetricsCatalogForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
-  if (!project || !goal) {
-    notFound();
+  if (!project) {
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/goals`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
+  }
+  if (!goal) {
+    redirect(`/${locale}/orgs/${orgId}/projects/${projectId}/goals`);
   }
 
   const outcome = await queryGoalProgress(orgId, projectId, goal);

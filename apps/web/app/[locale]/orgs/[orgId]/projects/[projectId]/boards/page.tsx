@@ -8,6 +8,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listBoardsForProject, listOrgProjects } from '@/lib/orgs/queries';
 import { toBoardSummaryView } from '@/lib/orgs/board-view';
 import { CreateBoardForm } from '@/components/orgs/create-board-form';
+import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -49,7 +50,10 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/boards`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   // Only reached once `projectId` is confirmed to belong to this org —
@@ -65,6 +69,19 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+
+      <MissingIntegrationAlert
+        orgId={orgId}
+        projectId={projectId}
+        metricKey="MRR"
+        connectorId="stripe"
+        customTitle="Billing & Webhook Ingestion"
+        customMissingPoints={[
+          'Stripe customer.subscription.* lifecycle webhooks',
+          'Live charge and refund event streams',
+        ]}
+        customImpactMetrics={['MRR Waterfall', 'Gross & Net Churn', 'Executive KPI Cards']}
+      />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('boardsHeading')}</h2>

@@ -132,7 +132,7 @@ import {
   type MintApiKeyResult,
   renameApiKey as renameApiKeyInOrganization,
   type OrchestrationRunModel,
-  type PluginInstallModel,
+  PluginInstallModel,
   type PluginManifestModel,
   type PluginSourceRunModel,
   type ProcessStripeWebhookEventResult,
@@ -203,7 +203,7 @@ import {
   type RequestTvPairingResult,
   type TvPairingModel,
 } from '@growthos/firebase-orm-models';
-import type { SegmentWorkListStatus } from '@growthos/shared';
+import type { SegmentWorkListStatus, PluginScope } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 interface CreateOrganizationInput {
@@ -233,6 +233,10 @@ interface CreateProjectInput {
   organizationId: string;
   name: string;
   vertical?: string;
+  platformType?: string;
+  businessModel?: string;
+  transactionType?: string;
+  primaryStack?: string;
   createdByUserId?: string;
 }
 
@@ -246,6 +250,12 @@ interface UpdateProjectDetailsInput {
   projectId: string;
   name: string;
   vertical?: string;
+  platformType?: string;
+  businessModel?: string;
+  transactionType?: string;
+  primaryStack?: string;
+  verifiedRequirements?: string[];
+  customHiddenModules?: string[];
   actorUserId: string;
 }
 
@@ -1143,6 +1153,83 @@ interface UpdatePluginInstallConfigInput {
 export async function updatePluginInstallConfig(input: UpdatePluginInstallConfigInput): Promise<PluginInstallModel> {
   await ensureFirestoreOrm();
   return updatePluginInstallConfigInOrganization(input);
+}
+
+export interface EnsurePluginInstallInput {
+  organizationId: string;
+  projectId: string;
+  pluginId: string;
+  installedByUserId?: string;
+  config?: Record<string, unknown>;
+}
+
+/**
+ * Ensures a connector is registered as active/installed in Firestore.
+ * If already existing, re-enables it if disabled. If missing, saves a new PluginInstallModel.
+ */
+export async function ensurePluginInstall(input: EnsurePluginInstallInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  const { organizationId, projectId, pluginId, installedByUserId = 'system', config = {} } = input;
+  const existingInstalls = await PluginInstallModel.initPath({
+    organization_id: organizationId,
+    project_id: projectId,
+  }).query().get();
+
+  const active = existingInstalls.find((inst: PluginInstallModel) => inst.plugin_id === pluginId);
+  if (active) {
+    if (active.status !== 'installed') {
+      active.status = 'installed';
+      active.enabled_at = new Date().toISOString();
+      if (Object.keys(config).length > 0) {
+        active.config = { ...active.config, ...config };
+      }
+      await active.save();
+    }
+    return active;
+  }
+
+  const install = new PluginInstallModel();
+  install.organization_id = organizationId;
+  install.project_id = projectId;
+  install.plugin_id = pluginId;
+  install.version = '1.0.0';
+  install.status = 'installed';
+  install.granted_scopes = ['ingest:write', 'dashboards:write'] as PluginScope[];
+  install.config = config;
+  install.installed_by = installedByUserId;
+  install.installed_at = new Date().toISOString();
+  install.setPathParams({ organization_id: organizationId, project_id: projectId });
+  await install.save();
+  return install;
+}
+
+export interface DisablePluginInstallByPluginIdInput {
+  organizationId: string;
+  projectId: string;
+  pluginId: string;
+}
+
+/**
+ * Pauses/disables a plugin install by plugin ID in a project.
+ */
+export async function disablePluginInstallByPluginId(input: DisablePluginInstallByPluginIdInput): Promise<boolean> {
+  await ensureFirestoreOrm();
+  const { organizationId, projectId, pluginId } = input;
+  const existingInstalls = await PluginInstallModel.initPath({
+    organization_id: organizationId,
+    project_id: projectId,
+  }).query().get();
+
+  const active = existingInstalls.find(
+    (inst: PluginInstallModel) => inst.plugin_id === pluginId && inst.status === 'installed',
+  );
+  if (active) {
+    active.status = 'disabled';
+    active.disabled_at = new Date().toISOString();
+    await active.save();
+    return true;
+  }
+  return false;
 }
 
 interface RunSourcePluginInstallInput {

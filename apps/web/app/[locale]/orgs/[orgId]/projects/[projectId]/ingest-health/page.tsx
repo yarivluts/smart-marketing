@@ -91,7 +91,10 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/ingest-health`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const now = Date.now();

@@ -19,6 +19,7 @@ import { campaignSpendStatusLabelKey } from '@/lib/orgs/campaign-ops-view';
 import { signupQualityScoreTierLabelKey } from '@/lib/orgs/quality-score-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { CampaignTargetInput } from '@/components/orgs/campaign-target-input';
+import { CreativeFatigueRadar } from '@/components/campaigns/creative-fatigue-radar';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -64,7 +65,10 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
   const [projects, installs] = await Promise.all([listOrgProjects(orgId), listPluginInstallsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/campaign-ops`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const installViews = installs.map(toPluginInstallView);
@@ -77,16 +81,25 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
     paybackPackInstalled ? getQualityCalibrationBreakdownForProject(orgId, projectId) : Promise.resolve(null),
   ]);
 
+  const hasSpendData = Boolean(spendOutcome.ok && spendOutcome.rows && spendOutcome.rows.length > 0);
+  const isDataConnected = paybackPackInstalled || hasSpendData;
+
   const t = await getTranslations('CampaignOps');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <div className="w-full space-y-10">
+      {/* Stitch Creative Asset Performance & Fatigue Radar */}
+      <CreativeFatigueRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('paybackHeading')}</h2>
-        {!paybackPackInstalled ? (
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
+        </div>
+
+        <section className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold tracking-tight">{t('paybackHeading')}</h3>
+          {!paybackPackInstalled ? (
           <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={builtinMetricPacks().filter((pack) => pack.pluginId === CAMPAIGN_OPS_PACK_PLUGIN_ID)} />
         ) : !paybackOutcome || !paybackOutcome.ok ? (
           <p className="text-muted-foreground">{t('paybackUnavailable')}</p>
@@ -113,7 +126,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                <tr className="border-b border-input text-start text-xs text-muted-foreground">
                   <th className="py-2 pe-3 font-medium">{t('columnCampaign')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnCollectedRevenue40d')}</th>
                   <th className="py-2 font-medium">{t('columnRoi40d')}</th>
@@ -142,7 +155,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                <tr className="border-b border-input text-start text-xs text-muted-foreground">
                   <th className="py-2 pe-3 font-medium">{t('columnQualityTier')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnSignups')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnPayingRate')}</th>
@@ -174,7 +187,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-input text-left text-xs text-muted-foreground">
+              <tr className="border-b border-input text-start text-xs text-muted-foreground">
                 <th className="py-2 pe-3 font-medium">{t('columnCampaign')}</th>
                 <th className="py-2 pe-3 font-medium">{t('columnActualSpend')}</th>
                 <th className="py-2 pe-3 font-medium">{t('columnTarget')}</th>
@@ -208,6 +221,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           </table>
         )}
       </section>
-    </main>
+      </div>
+    </div>
   );
 }

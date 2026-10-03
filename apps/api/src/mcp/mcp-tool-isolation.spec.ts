@@ -36,9 +36,22 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   approve_action: { kind: 'per-call-permission', permission: 'automation.approve' },
   create_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
   create_segment: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  list_projects: { kind: 'connection-scope', permission: 'mcp.read' },
+  create_project: { kind: 'per-call-permission', permission: 'project.manage' },
+  update_project: { kind: 'per-call-permission', permission: 'project.manage' },
+  archive_project: { kind: 'per-call-permission', permission: 'project.manage' },
+  list_goals: { kind: 'connection-scope', permission: 'mcp.read' },
+  delete_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  get_goal_progress: { kind: 'connection-scope', permission: 'mcp.read' },
+  audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
+  get_setup_health: { kind: 'connection-scope', permission: 'mcp.read' },
+  get_tracking_script: { kind: 'connection-scope', permission: 'mcp.read' },
+  get_installation_instructions: { kind: 'connection-scope', permission: 'mcp.read' },
+  verify_installation: { kind: 'per-call-permission', permission: 'project.manage' },
+  test_integration_event: { kind: 'per-call-permission', permission: 'project.manage' },
 };
 
-const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts'];
+const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-setup-tools.ts'];
 
 function readToolFile(name: string): string {
   return readFileSync(path.join(__dirname, name), 'utf8');

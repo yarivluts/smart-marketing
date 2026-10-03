@@ -152,7 +152,14 @@ describe('Tier 1: Auth, Onboarding & Operations Management (R2.5, R2.6)', () => 
         '/api/orgs/org-1/projects/proj-1',
         expect.objectContaining({
           method: 'PATCH',
-          body: JSON.stringify({ name: 'EasySign Enterprise', vertical: 'FinTech & Legal' }),
+          body: JSON.stringify({
+            name: 'EasySign Enterprise',
+            vertical: 'FinTech & Legal',
+            platformType: 'web',
+            businessModel: 'saas_subscription',
+            transactionType: 'monthly_recurring',
+            primaryStack: 'custom_web',
+          }),
         }),
       );
       expect(screen.getByText(enMessages.ProjectSettings.saved)).toBeInTheDocument();

@@ -11,15 +11,17 @@ interface RouteParams {
 interface UpdateProjectRequestBody {
   name?: unknown;
   vertical?: unknown;
+  platformType?: unknown;
+  businessModel?: unknown;
+  transactionType?: unknown;
+  primaryStack?: unknown;
+  verifiedRequirements?: unknown;
+  customHiddenModules?: unknown;
 }
 
 /**
- * Edits a project's own `name`/`vertical` — the same "create + list only,
- * no way to fix a typo'd definition" gap KAN-100/117/119/120/121 already
- * closed for their own sibling registries. Gated on `project.manage`, the
- * same per-project admin-config permission the session-replay and
- * cost-guardrail routes use. `session_replay_url_template` has its own
- * dedicated route (`.../session-replay`) and is untouched here.
+ * Edits a project's own `name`/`vertical` and full profile metadata.
+ * Gated on `project.manage`.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
@@ -33,7 +35,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     return parsed.error;
   }
 
-  const { name, vertical } = parsed.body;
+  const {
+    name,
+    vertical,
+    platformType,
+    businessModel,
+    transactionType,
+    primaryStack,
+    verifiedRequirements,
+    customHiddenModules,
+  } = parsed.body;
+
   if (typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }
@@ -46,11 +58,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       organizationId: orgId,
       projectId,
       name,
-      vertical,
+      vertical: typeof vertical === 'string' ? vertical : undefined,
+      platformType: typeof platformType === 'string' ? platformType : undefined,
+      businessModel: typeof businessModel === 'string' ? businessModel : undefined,
+      transactionType: typeof transactionType === 'string' ? transactionType : undefined,
+      primaryStack: typeof primaryStack === 'string' ? primaryStack : undefined,
+      verifiedRequirements: Array.isArray(verifiedRequirements) ? verifiedRequirements.filter((r): r is string => typeof r === 'string') : undefined,
+      customHiddenModules: Array.isArray(customHiddenModules) ? customHiddenModules.filter((m): m is string => typeof m === 'string') : undefined,
       actorUserId: user.id,
     });
     return NextResponse.json({
-      project: { id: project.id, name: project.name, vertical: project.vertical ?? '' },
+      project: {
+        id: project.id,
+        name: project.name,
+        vertical: project.vertical ?? '',
+        platformType: project.platform_type ?? 'web',
+        businessModel: project.business_model ?? 'saas_subscription',
+        transactionType: project.transaction_type ?? 'monthly_recurring',
+        primaryStack: project.primary_stack ?? 'custom_web',
+        verifiedRequirements: project.verified_requirements ?? [],
+        customHiddenModules: project.custom_hidden_modules ?? [],
+      },
     });
   } catch (err) {
     if (err instanceof ProjectNotFoundError) {

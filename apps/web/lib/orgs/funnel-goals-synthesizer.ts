@@ -12,6 +12,7 @@ import type {
   GoalProgressOutcome,
   PaybackOverviewOutcome,
   QualityCalibrationBreakdownOutcome,
+  RawRecordModel,
 } from '@growthos/firebase-orm-models';
 import { buildFunnelView, type FunnelView } from './funnel-view';
 import { buildCohortRetentionView, type CohortRetentionView } from './cohort-retention-view';
@@ -236,17 +237,209 @@ export function calculateFunnelStepItems(
 }
 
 /**
+ * Dynamically aggregates landed raw event records from Firestore into canonical funnel steps:
+ * Sent -> Viewed -> Signed / Paid with exact customer drop-offs and conversions.
+ */
+export function aggregateFunnelStepsFromRawRecords(
+  rawRecords: RawRecordModel[],
+  stageLabelLookup?: (key: string) => string,
+): FunnelStepItem[] {
+  if (!rawRecords || rawRecords.length === 0) return [];
+
+  const sentClients = new Set<string>();
+  const viewedClients = new Set<string>();
+  const signedClients = new Set<string>();
+
+  for (const record of rawRecords) {
+    const payload = (record.payload || {}) as Record<string, unknown>;
+    const properties = (payload.properties || {}) as Record<string, unknown>;
+    const clientId = String(
+      record.client_id ||
+      payload.customerId ||
+      payload.anonId ||
+      payload.client_id ||
+      properties.customerId ||
+      record.id ||
+      '',
+    ).trim();
+
+    if (!clientId) continue;
+
+    const schema = (record.schema_name || '').toLowerCase();
+    const eventName = String(
+      payload.event ||
+      payload.eventName ||
+      properties.event ||
+      properties.stage ||
+      '',
+    ).toLowerCase();
+
+    const isSent =
+      schema === 'document_sent' ||
+      schema === 'sent' ||
+      schema === 'invitation_sent' ||
+      schema === 'email_sent' ||
+      schema === 'landing_viewed' ||
+      schema === 'page_view' ||
+      schema === 'product_telemetry' ||
+      schema.includes('sent') ||
+      schema.includes('send') ||
+      eventName.includes('sent') ||
+      eventName.includes('send') ||
+      eventName.includes('page_view') ||
+      eventName.includes('visit') ||
+      eventName.includes('start') ||
+      eventName.includes('lead');
+
+    const isViewed =
+      schema === 'document_viewed' ||
+      schema === 'viewed' ||
+      schema === 'email_opened' ||
+      schema === 'signup_completed' ||
+      schema.includes('view') ||
+      schema.includes('open') ||
+      eventName.includes('view') ||
+      eventName.includes('open') ||
+      eventName.includes('click') ||
+      eventName.includes('signup') ||
+      eventName.includes('held');
+
+    const isSigned =
+      schema === 'document_signed' ||
+      schema === 'signed' ||
+      schema === 'paid' ||
+      schema === 'subscription_state_change' ||
+      schema === 'customer_transaction' ||
+      schema === 'stripe_charge' ||
+      schema.includes('sign') ||
+      schema.includes('paid') ||
+      schema.includes('charge') ||
+      schema.includes('sub') ||
+      eventName.includes('sign') ||
+      eventName.includes('paid') ||
+      eventName.includes('pay') ||
+      eventName.includes('charge') ||
+      eventName.includes('complete') ||
+      eventName.includes('purchase');
+
+    if (isSigned) {
+      signedClients.add(clientId);
+      viewedClients.add(clientId);
+      sentClients.add(clientId);
+    } else if (isViewed) {
+      viewedClients.add(clientId);
+      sentClients.add(clientId);
+    } else if (isSent) {
+      sentClients.add(clientId);
+    } else {
+      sentClients.add(clientId);
+    }
+  }
+
+  const c1 = sentClients.size;
+  const c2 = Math.min(c1, viewedClients.size);
+  const c3 = Math.min(c2, signedClients.size);
+
+  if (c1 === 0) return [];
+
+  return [
+    {
+      stageKey: 'sent',
+      stageLabel: stageLabelLookup ? stageLabelLookup('sent') : 'Document Sent',
+      stepOrder: 1,
+      customerCount: c1,
+      conversionPercent: 100,
+      dropOffPercent: 0,
+    },
+    {
+      stageKey: 'viewed',
+      stageLabel: stageLabelLookup ? stageLabelLookup('viewed') : 'Document Viewed',
+      stepOrder: 2,
+      customerCount: c2,
+      conversionPercent: Math.round((c2 / c1) * 100),
+      dropOffPercent: Math.round(((c1 - c2) / c1) * 100),
+    },
+    {
+      stageKey: 'signed',
+      stageLabel: stageLabelLookup ? stageLabelLookup('signed') : 'Document Signed',
+      stepOrder: 3,
+      customerCount: c3,
+      conversionPercent: Math.round((c3 / c1) * 100),
+      dropOffPercent: c2 > 0 ? Math.round(((c2 - c3) / c2) * 100) : 0,
+    },
+  ];
+}
+
+/**
+ * Generates dynamic proactive recommendation based on the actual bottleneck stage of the funnel.
+ */
+export function generateDynamicFunnelRecommendation(
+  steps: FunnelStepItem[],
+): ProactiveFunnelGoalRecommendation | null {
+  if (!steps || steps.length < 2) return null;
+
+  let bottleneckIndex = -1;
+  let maxDropOff = 0;
+
+  for (let i = 1; i < steps.length; i++) {
+    if (steps[i].dropOffPercent > maxDropOff) {
+      maxDropOff = steps[i].dropOffPercent;
+      bottleneckIndex = i;
+    }
+  }
+
+  if (bottleneckIndex === -1 || maxDropOff === 0) return null;
+
+  const bottleneckStep = steps[bottleneckIndex];
+  const prevStep = steps[bottleneckIndex - 1];
+  const dropOffDelta = prevStep.customerCount - bottleneckStep.customerCount;
+  const recoveredEst = Math.max(1, Math.round(dropOffDelta * 0.25));
+  const projectedDropOff = Math.max(0, Math.round(maxDropOff * 0.75));
+  const projectedLiftPct = Math.max(5, Math.round(maxDropOff * 0.25));
+
+  const targetId = bottleneckStep.stageKey === 'viewed' ? 'easysign_funnel_viewed' : `funnel_${bottleneckStep.stageKey}`;
+  const targetLabel = bottleneckStep.stageKey === 'viewed' ? 'EasySign Conversion Funnel' : `${bottleneckStep.stageLabel} Funnel Step`;
+
+  return {
+    id: `rec-funnel-${bottleneckStep.stageKey}-dropoff`,
+    category: 'funnel_dropoff',
+    title: `High Drop-Off at ${bottleneckStep.stageLabel} Stage`,
+    description: `${maxDropOff}% of users drop off between ${prevStep.stageLabel} and ${bottleneckStep.stageLabel}. Deploying an automated re-engagement workflow can reduce drop-off to ${projectedDropOff}%.`,
+    beforeDiff: `${prevStep.stageLabel} -> ${bottleneckStep.stageLabel} (${maxDropOff}% drop-off)`,
+    afterDiff: `Automated Re-engagement (${projectedDropOff}% projected drop-off)`,
+    projectedImpact: `+${projectedLiftPct}% Completion Rate (~+${recoveredEst} conversions)`,
+    actionType: 'funnel_optimization',
+    targetId,
+    targetLabel,
+  };
+}
+
+/**
  * Synthesizes visual funnel data with zero-config fallback.
  */
 export function buildVisualFunnelData(
   outcome: FunnelStepsOutcome | null,
   seed = 'default-project',
   stageLabelLookup?: (key: string) => string,
+  rawRecords?: RawRecordModel[],
 ): VisualFunnelData {
-  const isSimulated = !outcome || !outcome.ok || outcome.steps.length === 0;
+  let steps: FunnelStepItem[] = [];
+  let isSimulated = false;
 
-  let steps: FunnelStepItem[];
-  if (isSimulated) {
+  if (outcome && outcome.ok && outcome.steps.length > 0) {
+    steps = calculateFunnelStepItems(outcome.steps, stageLabelLookup);
+    isSimulated = false;
+  } else if (rawRecords !== undefined) {
+    if (rawRecords.length > 0) {
+      steps = aggregateFunnelStepsFromRawRecords(rawRecords, stageLabelLookup);
+      isSimulated = false;
+    } else {
+      steps = [];
+      isSimulated = false;
+    }
+  } else {
+    // Backward-compatible fallback for tests/callers omitting rawRecords
+    isSimulated = true;
     const factor = seed === 'default-project' ? 1.0 : getDeterministicFactor(seed);
     steps = createMockEasySignFunnel(factor);
     if (stageLabelLookup) {
@@ -255,8 +448,6 @@ export function buildVisualFunnelData(
         stageLabel: stageLabelLookup(s.stageKey) || s.stageLabel,
       }));
     }
-  } else {
-    steps = calculateFunnelStepItems(outcome.steps, stageLabelLookup);
   }
 
   const totalStarted = steps[0]?.customerCount ?? 0;
@@ -517,6 +708,7 @@ export function buildFunnelGoalsCockpitData(params: {
   paybackOutcome?: PaybackOverviewOutcome | null;
   calibrationOutcome?: QualityCalibrationBreakdownOutcome | null;
   projectId?: string;
+  rawRecords?: RawRecordModel[];
 }): FunnelGoalsCockpitData {
   const {
     funnelOutcome,
@@ -527,11 +719,12 @@ export function buildFunnelGoalsCockpitData(params: {
     paybackOutcome = null,
     calibrationOutcome = null,
     projectId = 'default-project',
+    rawRecords,
   } = params;
 
   // 1. Synthesize Funnel Steps
   const funnelView = funnelOutcome ? buildFunnelView(funnelOutcome) : { kind: 'no_funnel' as const };
-  const visualFunnel = buildVisualFunnelData(funnelOutcome, projectId);
+  const visualFunnel = buildVisualFunnelData(funnelOutcome, projectId, undefined, rawRecords);
   const funnelSteps = visualFunnel.steps;
 
   // 2. Synthesize Goals & Summary
@@ -628,27 +821,19 @@ export function buildFunnelGoalsCockpitData(params: {
         ];
 
   // 5. Executive Summary & Proactive Recommendation
-  const totalConversions = funnelSteps.length > 0 ? funnelSteps[funnelSteps.length - 1].customerCount : 220;
-  const initialEntrants = funnelSteps.length > 0 ? funnelSteps[0].customerCount : 1000;
-  const overallConversionPct = initialEntrants > 0 ? Math.round((totalConversions / initialEntrants) * 100) : 22;
+  const totalConversions = funnelSteps.length > 0 ? funnelSteps[funnelSteps.length - 1].customerCount : 0;
+  const initialEntrants = funnelSteps.length > 0 ? funnelSteps[0].customerCount : 0;
+  const overallConversionPct = initialEntrants > 0 ? Math.round((totalConversions / initialEntrants) * 100) : 0;
 
-  const proactiveRecommendation: ProactiveFunnelGoalRecommendation = {
-    id: 'rec-funnel-viewed-dropoff',
-    category: 'funnel_dropoff',
-    title: 'High Drop-Off at EasySign Viewed Stage',
-    description: '62% of users drop off between Sent and Viewed. Deploying an instant SMS reminder sequence increases completion by +14%.',
-    beforeDiff: 'Manual Follow-up (38% viewed rate)',
-    afterDiff: 'Automated SMS Multi-touch (52% projected viewed rate)',
-    projectedImpact: '+14% Completed Signatures (+31 conversions/mo)',
-    actionType: 'funnel_optimization',
-    targetId: 'easysign_funnel_viewed',
-    targetLabel: 'EasySign Conversion Funnel',
-  };
+  const proactiveRecommendation: ProactiveFunnelGoalRecommendation | null =
+    funnelSteps.length > 0
+      ? generateDynamicFunnelRecommendation(funnelSteps)
+      : null;
 
   return {
     summary: {
       overallFunnelConversionPct: overallConversionPct,
-      topFunnelDropOffPct: visualFunnel.biggestDropOffPercent || 62,
+      topFunnelDropOffPct: visualFunnel.biggestDropOffPercent || 0,
       activeGoalsCount: goalsSummary.totalGoalsCount,
       goalsOnTrackCount: goalsSummary.onTrackCount,
       avgMonth1RetentionPct: 64,

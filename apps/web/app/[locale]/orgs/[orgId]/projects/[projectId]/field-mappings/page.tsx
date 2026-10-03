@@ -57,7 +57,10 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/field-mappings`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const [environments, hookEndpoints, hookDeliveries, fieldMappings, schemaDefs] = await Promise.all([

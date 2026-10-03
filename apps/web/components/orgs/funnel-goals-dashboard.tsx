@@ -19,6 +19,7 @@ import { VisualFunnelSteps } from './visual-funnel-steps';
 import { CohortRetentionMatrix } from './cohort-retention-matrix';
 import { GoalThermometerCard } from './goal-thermometer-card';
 import { CreateGoalModal } from './create-goal-modal';
+import { PageGuideButton } from '@/components/guides/page-guide-button';
 import type {
   FunnelGoalsCockpitData,
   UnifiedGoalItem,
@@ -128,9 +129,12 @@ export function FunnelGoalsDashboard({
       {/* Top Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {t('cockpitTitle')}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              {t('cockpitTitle')}
+            </h1>
+            <PageGuideButton pageKey="funnel" />
+          </div>
           <p className="text-sm text-muted-foreground">
             {t('cockpitDescription')}
           </p>

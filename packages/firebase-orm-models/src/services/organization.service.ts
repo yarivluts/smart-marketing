@@ -158,6 +158,10 @@ export interface CreateProjectParams {
   organizationId: string;
   name: string;
   vertical?: string;
+  platformType?: string;
+  businessModel?: string;
+  transactionType?: string;
+  primaryStack?: string;
   /** The human who created this project, if any — audited when present. Omit for a caller with no real user actor (test fixtures, a future non-human caller), the same "no synthetic system actor" posture `triggerOrchestrationRun`'s optional actor param establishes. */
   createdByUserId?: string;
 }
@@ -178,6 +182,10 @@ export async function createProject(params: CreateProjectParams): Promise<Create
   project.name = params.name;
   project.organization_id = params.organizationId;
   project.vertical = params.vertical;
+  project.platform_type = params.platformType;
+  project.business_model = params.businessModel;
+  project.transaction_type = params.transactionType;
+  project.primary_stack = params.primaryStack;
   project.setPathParams({ organization_id: params.organizationId });
   await project.save();
 

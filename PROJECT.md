@@ -1,70 +1,171 @@
-# Project: GrowthOS UI/UX Overhaul
+# Project: GrowthOS Navigation & Ingestion Architecture
 
 ## Architecture
-- **Framework**: Next.js 15 App Router (`apps/web`), React 19, TypeScript
-- **Styling**: Tailwind CSS, PostCSS, CSS Variables (`globals.css`), Lucide React icons, Radix UI primitives
-- **Internationalization**: `next-intl` with full bi-directional support (`he` RTL, `en` LTR)
-- **State & Data Flow**: Zustand stores, React Query, Firebase Auth & Firestore client/emulator hooks
+GrowthOS is a multi-tenant B2B SaaS Growth & Marketing Intelligence platform built on Next.js 15 App Router, React 19, TypeScript, Tailwind CSS, Lucide icons, `next-intl` bilingual localization (English LTR & Hebrew RTL), and a BigQuery/Firestore dbt semantic metrics layer.
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                Unified Navigation Shell                                │
+│   ┌───────────────────────────────┐ ┌──────────────────────────────────────────────┐   │
+│   │ Desktop Collapsible Sidebar   │ │ Topbar & OmniSearch (Cmd+K) & Language/Theme │   │
+│   │ (w-64 expanded / w-16 rail)   │ ├──────────────────────────────────────────────┤   │
+│   │ • 6 Functional Clusters       │ │ Active Route View                            │   │
+│   │ • Pinned Favorites            │ │ • Missing Integration Alert Overlay          │   │
+│   │ • Missing Alerts Badge        │ │ • Metric Cards & BI Charts                   │   │
+│   └───────────────────────────────┘ └──────────────────────────────────────────────┘   │
+│   ┌────────────────────────────────────────────────────────────────────────────────┐   │
+│   │ Mobile Shell: Slide-over Drawer + 5-Pill Bottom Quick Bar                      │   │
+│   └────────────────────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────┬───────────────────────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                   Contextual Missing-Integration & Quick-Setup Layer                   │
+│   • Missing Data Stream Detector (`useIntegrationPrerequisites`)                       │
+│   • Reusable Alert Banners, Overlays & Chips (`<MissingIntegrationAlert />`)           │
+│   • 1-Click Action Handlers (OAuth Connect, 1-Line Script Copy, Setup Guide)          │
+│   • Mock Event Emission Engine (`/api/orgs/.../mock-event`) -> Instant Live Verify    │
+└────────────────────────────────────────────────┬───────────────────────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                     Dedicated Integrations Hub (`/integrations`)                       │
+│   • Connection Health Overview (Active, Degraded, Missing, Available)                  │
+│   • Categorized Directory (Billing & Revenue, Ad Networks, Telemetry, CRM)             │
+│   • Missing Integrations Triage Checklist                                             │
+│   • Interactive Step-by-Step Setup Modals with Webhook URLs & Live Event Tester       │
+└────────────────────────────────────────────────┬───────────────────────────────────────┘
+                                                 │
+                                                 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                   Canonical Schema Contracts & Ingestion Mapping Layer                 │
+│   • 5 Canonical Schemas (Subscription State, Transactions, Ad Spend, Telemetry, CRM)   │
+│   • Automated JSON Schema Validation Rules & Sample Payloads                           │
+│   • Metric-to-Raw Mapping Engine (TROI, LTV, MRR Waterfall, CAC, DAU/MAU)             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Feature Inventory
-| # | Feature | Description | Milestone | Source |
-|---|---------|-------------|-----------|--------|
-| 1 | Theme Tokens & CSS Palette | Slate backgrounds, Indigo primary, Emerald positive/growth, Amber warning, Rose alert tokens | M1 | ORIGINAL_REQUEST §R1, Explorer 1 |
-| 2 | Standardized UI Primitives | 12+ shadcn/Radix-based primitives (badge, stat-card, table, tabs, dialog, select, skeleton, toast, switch, textarea, button, card) | M1 | ORIGINAL_REQUEST §R1, Explorer 1 |
-| 3 | App Shell & Global Navigation | Modern floating header, workspace switcher, clean active route indicators, mobile navigation drawer | M1 | ORIGINAL_REQUEST §R2.1, Explorer 2 |
-| 4 | Cmd+K Omni-Search Modal | Floating global search dialog with instant visual preview and keyboard navigation | M1 | ORIGINAL_REQUEST §R2.1, Explorer 2 |
-| 5 | Ads KPI Metric Scorecards | Sleek metric scorecards with trend chips, positive/negative delta indicators, period comparisons | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
-| 6 | Meta Feed & Google RSA Previews | Modern creative preview cards with live asset rendering and platform badges | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
-| 7 | Campaign Interactive Controls | 1-click status toggles, inline daily budget sliders/steppers with instant feedback | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
-| 8 | Blended Executive Reporting | Multi-channel aggregated performance charts and summary tables | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
-| 9 | Conversion Funnel Flow | Step-by-step visual funnel with animated flow connectors and drop-off rate chips | M3 | ORIGINAL_REQUEST §R2.3, Explorer 2 |
-| 10 | Dynamic Goal Thermometers | Statistical goal progress bars with pace badges and projected completion dates | M3 | ORIGINAL_REQUEST §R2.3, Explorer 2 |
-| 11 | Cohort Retention Heatmaps | Interactive cohort matrix with color-graded retention cells | M3 | ORIGINAL_REQUEST §R2.3, Explorer 2 |
-| 12 | TV Billboard Display Mode | High-impact full-screen TV dashboard with animated live win-feed | M3 | ORIGINAL_REQUEST §R2.6, Explorer 2 |
-| 13 | Operations & Settings Tables | Modernized settings forms, member management tables with role badges, billing feed | M3 | ORIGINAL_REQUEST §R2.6, Explorer 2 |
-| 14 | AI Copilot Chat Interface | Conversational AI chat panel with streaming message bubbles and suggested actions | M4 | ORIGINAL_REQUEST §R2.4, Explorer 2 |
-| 15 | AI Proposal Diff Cards | Before/After visual diff cards with 1-click approve, reject, and rollback controls | M4 | ORIGINAL_REQUEST §R2.4, Explorer 2 |
-| 16 | Execution Audit Trail | Filterable, searchable audit trail table with status pills and timestamps | M4 | ORIGINAL_REQUEST §R2.4, Explorer 2 |
-| 17 | Auth & Onboarding Overhaul | Branded login, signup, and onboarding wizard cards with smooth transitions and validation | M4 | ORIGINAL_REQUEST §R2.5, Explorer 2 |
-| 18 | Micro-Interactions & Transitions | Smooth hover states, button loading transitions, skeleton loaders, toast notifications | M1-M4 | ORIGINAL_REQUEST §R3, Explorer 1 |
-| 19 | Bilingual RTL/LTR Symmetrical Polish | Complete Hebrew (RTL) and English (LTR) layout symmetry, directional icon flipping | M5 | ORIGINAL_REQUEST §R4, Explorer 3 |
-| 20 | Translation Key Parity | 100% dictionary key parity between messages/he.json and messages/en.json with zero missing keys | M5 | ORIGINAL_REQUEST §R4, Explorer 3 |
-| 21 | Full Monorepo Build, Typecheck, Lint & E2E Tests | Zero build errors, zero type errors, clean lint, 100% passing unit and E2E test suites | M5 | ORIGINAL_REQUEST Acceptance Criteria, Explorer 3 |
+Every requirement from ORIGINAL_REQUEST.md is inventoried and verified:
+
+| # | Feature | Description | Milestone | Status | Source |
+|---|---------|-------------|-----------|--------|--------|
+| F01 | 6 Functional Clusters Navigation | Organize 34+ routes into 6 hierarchical clusters: Executive & Overview, Marketing & Ad Cockpit, Economics & Cohorts, MRR & Revenue Intelligence, Product & Telemetry, Data & Integrations | M2 | DONE | R1 |
+| F02 | Responsive Desktop Sidebar | Collapsible desktop sidebar (expanded w-64 vs icon-rail w-16) with smooth transitions, tooltips, and badges | M2 | DONE | R1 |
+| F03 | Pinned Favorites | Ability to star/pin favorite navigation destinations stored in localStorage | M2 | DONE | R1 |
+| F04 | Mobile Responsive Shell | Slide-over drawer menu + bottom 5-item quick-pill shortcut bar with touch-friendly targets | M2 | DONE | R1 |
+| F05 | Active Route Highlighting | Precise active path prefix matching (`bestMatchingHref`) with visual indicator | M2 | DONE | R1 |
+| F06 | Global Command Palette (Cmd+K) | Unified search dialog combining static 6-cluster navigation routes with live entity search | M2 | DONE | R1 |
+| F07 | Bilingual RTL / LTR Parity | 100% translation coverage in English (`en.json`) and Hebrew (`he.json`), Tailwind logical properties (`ps-`, `pe-`, `start-`, `end-`, `rtl:rotate-180`), no hardcoded strings | M2 | DONE | R1 |
+| F08 | Canonical Schema: Subscription State | JSON Schema contract, validation rules, and sample payload for `subscription_state_change` | M3 | DONE | R2 |
+| F09 | Canonical Schema: Customer Transactions | JSON Schema contract, validation rules, and sample payload for `customer_transaction` | M3 | DONE | R2 |
+| F10 | Canonical Schema: Ad Spend | JSON Schema contract, validation rules, and sample payload for `ad_spend` (Google, Meta, TikTok) | M3 | DONE | R2 |
+| F11 | Canonical Schema: Product Telemetry | JSON Schema contract, validation rules, and sample payload for `product_telemetry` | M3 | DONE | R2 |
+| F12 | Canonical Schema: CRM Lifecycle | JSON Schema contract, validation rules, and sample payload for `crm_lifecycle` | M3 | DONE | R2 |
+| F13 | Automated Schema Validation Engine | Validation utility functions with clear field-level error diagnostics and type inference | M3 | DONE | R2 |
+| F14 | Metric-to-Raw Ingestion Mapping | Formal mapping matrix connecting all 13+ BI metrics to raw stream prerequisites | M3 | DONE | R2 |
+| F15 | Missing Data Stream Detection Hook | React hook / selector `useIntegrationPrerequisites` resolving connector status | M4 | DONE | R3 |
+| F16 | Contextual Missing Alert Banners | Non-intrusive banner & card overlay components rendering missing fields and metric impact | M4 | DONE | R3 |
+| F17 | 1-Click Quick Setup Actions | Interactive buttons: 1-click OAuth modal, 1-line script copy, setup guide generator | M4 | DONE | R3 |
+| F18 | Mock Event Emission Engine | API endpoint and UI action to emit synthetic events and trigger optimistic `Missing -> Connected` transition | M4 | DONE | R3 |
+| F19 | Dashboard Alert Integrations | Wiring contextual alerts into key screens (`/boards`, `/cohorts`, `/billing-ops-feed`, `/campaigns`, `/funnel`) | M4 | DONE | R3 |
+| F20 | Integrations Hub: Health Overview | Bird's-eye health strip displaying Active, Degraded, Missing, and Available connector counts | M5 | DONE | R4 |
+| F21 | Integrations Hub: Categorized Directory | Filterable grid across Billing & Revenue, Ad Networks, Telemetry & Identity, CRM & Sales | M5 | DONE | R4 |
+| F22 | Integrations Hub: Missing Triage Tab | Dedicated checklist of missing integrations prioritized by affected dashboards | M5 | DONE | R4 |
+| F23 | Integrations Hub: Interactive Setup Modals | Step-by-step wizard with API credentials, webhook URL copy, signing secret, and live receiver tester | M5 | DONE | R4 |
+| F24 | E2E & Unit Test Coverage | Comprehensive unit, component, and integration test suite across navigation, schemas, alerts, and hub (1,393+ tests) | M1, M6 | DONE | Acceptance |
 
 ## Milestones
-| # | Name | Scope | Dependencies | Status |
-|---|------|-------|-------------|--------|
-| M1 | Design System Primitives & App Shell | Theme tokens (globals.css, tailwind.config.ts), UI primitives in components/ui/*, App Shell layout, floating header, workspace switcher, Cmd+K search dialog | none | DONE |
-| M2 | Ads & Performance Cockpit | /campaigns page overhaul: KPI scorecards, Meta/Google creative cards, 1-click toggles, daily budget steppers/sliders, blended reporting | M1 | DONE |
-| M3 | Funnel, Goals & Operations Hub | /funnel, /goals, /tv, /settings, /members, /billing-ops-feed: conversion funnel flow, goal thermometers, cohort heatmaps, TV billboard, settings tables | M1 | DONE |
-| M4 | AI Copilot & Auth Screens | /automation, /login, /signup, /onboarding: AI chat panel, Before/After proposal diffs, audit trail, authentication & onboarding cards | M1 | DONE |
-| M5 | Bilingual Polish & E2E Test Suite Pass | RTL/LTR mirroring, translation dictionary parity, E2E test suite pass (Tiers 1-4), adversarial hardening (Tier 5), typecheck, build, lint | M1, M2, M3, M4 | DONE |
+
+| # | Name | Scope | Dependencies | Status | Key Outputs |
+|---|------|-------|-------------|--------|-------------|
+| M1 | E2E Testing Suite Track | Opaque-box test suites for navigation, schemas, alerts, hub, and mock emission (Tiers 1-4) | none | DONE | `TEST_READY.md`, 1,248 tests |
+| M2 | Modern Unified Navigation Shell | Canonical nav config, 6 clusters, desktop collapsible sidebar, mobile drawer/pill bar, Cmd+K, RTL/LTR parity | none | DONE | `apps/web/components/shell/`, 109 tests |
+| M3 | Canonical Schemas & Ingestion Mapping | 5 schema contracts, validation rules, sample payloads, metric-to-raw mappings in `@growthos/shared` | none | DONE | `packages/shared/src/schemas/`, 957 tests |
+| M4 | Contextual Alerts & Mock Event Engine | Alert banners/overlays, `useIntegrationPrerequisites`, mock emission API route, dashboard wiring | M3 | DONE | `apps/web/components/integrations/`, 210 tests |
+| M5 | Dedicated Integrations Hub (/integrations) | `/integrations` page, health strip, categorized directory, missing triage checklist, setup modals | M3, M4 | DONE | `/integrations` page & components, 191 tests |
+| M6 | Final Integration & Test Hardening | 100% E2E test pass (Tiers 1-4), adversarial test hardening (Tier 5), 0 typecheck errors, build verification | M1, M2, M3, M4, M5 | DONE | Gate PASS (2 Reviewers APPROVE, 2 Challengers APPROVE, Forensic Auditor CLEAN, 1,393+ tests pass) |
 
 ## Interface Contracts
-### UI Primitives Contract (`apps/web/components/ui/`)
-- `Button`: `variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'emerald'`, `size: 'default' | 'sm' | 'lg' | 'icon'`, `isLoading?: boolean`
-- `Badge`: `variant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info'`
-- `StatCard`: `title: string`, `value: string | number`, `change?: number`, `changeType?: 'increase' | 'decrease' | 'neutral'`, `period?: string`, `icon?: LucideIcon`, `trendData?: number[]`
-- `Dialog` / `Modal`: Radix UI Dialog primitive with standard overlay, animated content wrapper, header, footer, close trigger
-- `Table`: Standardized `Table`, `TableHeader`, `TableBody`, `TableHead`, `TableRow`, `TableCell` with zebra/hover support
-- `Tabs`: Radix UI Tabs primitive with pill/underline variant, smooth active indicator
-- `Skeleton`: Standardized pulse shimmer loader with configurable radius/height
-- `Toast`: Global toast provider and hook (`useToast`, `toast({ title, description, variant })`)
-- `Switch`: Accessible toggle switch with smooth transition and emerald active state
 
-### Bi-directional Layout Contract
-- Use Tailwind logical classes (`start`, `end`, `ms-*`, `me-*`, `ps-*`, `pe-*`, `text-start`, `text-end`) rather than left/right.
-- Directional icons (arrows, chevrons, flow steps) must include `rtl:rotate-180` or directional context lookup.
-- Numeric and currency strings (e.g. `$100/day`, `+14.2%`) must have `dir="ltr"` and `inline-block` to avoid RTL bi-di number inversion.
+### 1. Navigation Shell (`apps/web/config/nav-config.ts`)
+```typescript
+export interface NavItem {
+  id: string;
+  labelKey: string;
+  href: string;
+  iconName: string;
+  badgeKey?: string;
+  requiredConnector?: string;
+  shortcut?: string;
+}
+
+export interface NavCluster {
+  id: string;
+  labelKey: string;
+  descriptionKey?: string;
+  iconName: string;
+  items: NavItem[];
+}
+
+export interface NavConfig {
+  clusters: NavCluster[];
+  mobileQuickItems: string[]; // item IDs
+  defaultFavorites: string[]; // item IDs
+}
+```
+
+### 2. Canonical Schemas (`packages/shared/src/schemas/`)
+```typescript
+export type CanonicalEventType =
+  | 'subscription_state_change'
+  | 'customer_transaction'
+  | 'ad_spend'
+  | 'product_telemetry'
+  | 'crm_lifecycle';
+
+export interface ValidationResult<T> {
+  valid: boolean;
+  data?: T;
+  errors?: Array<{ path: string; message: string; code: string }>;
+}
+```
+
+### 3. Contextual Missing-Integration Alert (`apps/web/components/integrations/`)
+```typescript
+export interface MissingIntegrationAlertProps {
+  requiredConnectors: string[]; // e.g. ['stripe', 'meta_ads']
+  affectedMetrics: string[]; // e.g. ['mrr_waterfall', 'gross_churn']
+  missingDataPoints: string[]; // e.g. ['Subscription cancellation webhooks']
+  onConnect?: (connectorId: string) => void;
+  onEmitMock?: (connectorId: string) => Promise<void>;
+  variant?: 'banner' | 'overlay' | 'inline' | 'card';
+}
+```
+
+### 4. Mock Event Emission API (`apps/web/app/api/orgs/[orgId]/projects/[projectId]/integrations/mock-event/route.ts`)
+```typescript
+export interface MockEventRequest {
+  connectorId: string;
+  eventType: CanonicalEventType;
+  payload?: Record<string, unknown>;
+}
+
+export interface MockEventResponse {
+  success: boolean;
+  eventCount: number;
+  connectorStatus: 'active' | 'degraded' | 'missing';
+  message: string;
+}
+```
 
 ## Code Layout
-- `apps/web/app/globals.css`: Root CSS theme variables (light/dark mode, slate/indigo/emerald/amber/rose palettes)
-- `apps/web/tailwind.config.ts`: Tailwind color and animation extensions
-- `apps/web/components/ui/`: Standardized UI primitive library
-- `apps/web/components/shell/`: Floating header, workspace switcher, nav menu, Cmd+K omni-search
-- `apps/web/components/campaigns/`: Campaign scorecards, budget sliders, creative preview cards
-- `apps/web/components/funnel/`: Funnel step visualizer, goal thermometers, cohort heatmaps
-- `apps/web/components/automation/`: AI chat panel, proposal diff cards, audit trail
-- `apps/web/components/auth/`: Login, signup, onboarding cards
-- `apps/web/components/tv/`: TV billboard display mode
-- `apps/web/messages/`: `he.json`, `en.json` translation dictionaries
+
+- `apps/web/config/nav-config.ts` — 6 functional clusters and navigation metadata
+- `apps/web/components/shell/` — NavShell, Sidebar, Header, CommandPalette, MobileDrawer, MobileBottomBar
+- `apps/web/components/integrations/` — MissingIntegrationAlert, MissingIntegrationOverlay, SetupModal, HealthOverviewStrip, ConnectorGrid, MissingTriageChecklist
+- `apps/web/hooks/use-integration-status.ts` — Integration status detection hook
+- `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/integrations/page.tsx` — Dedicated Integrations Hub page
+- `apps/web/app/api/orgs/[orgId]/projects/[projectId]/integrations/mock-event/route.ts` — Mock event emission API
+- `packages/shared/src/schemas/` — Canonical schema definitions, validators, sample payloads
+- `apps/web/messages/en.json` & `apps/web/messages/he.json` — 100% bilingual translation keys (2,121 keys in exact parity)

@@ -11,6 +11,12 @@ scheduled Claude agent. This file is the contract every run follows. Read it fir
    `needs-human` or `blocked-by` an unfinished task.
 3. At the **end of every run, update `PROGRESS.md`**: what you completed, the exact stopping point if
    mid-task, anything blocked and why, the next step, and anything waiting on a human.
+4. Follow [the sprint workflow](./docs/sprints.md): inspect `pnpm sprints list`, start the selected
+   sprint, and work within it. Skip `verification-pending` until its acceptance gap is addressed.
+   Synchronize completed issue statuses to Jira, then run `pnpm sprints complete-ready` at the end
+   of every run. A fully finished active sprint closes and archives its done rows automatically.
+   If closing a sprint with unfinished work, explicitly use `complete ID --carry-to ID|backlog`.
+   Never delete task history or archive unfinished rows.
 
 ## Engineering rules (non-negotiable)
 

@@ -74,7 +74,10 @@ export default async function MetricRegistryPage({ params }: PageProps): Promise
   const [projects, metricDefs] = await Promise.all([listOrgProjects(orgId), listMetricDefinitionsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/metric-defs`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const families = groupIntoFamilies(metricDefs.map(toMetricDefView));

@@ -5,8 +5,9 @@ import { activeSchemaNamesForKind, buildActiveSchemaDefsByKindAndName } from '@g
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, listSchemaDefinitionsForProject, searchProjectCustomers } from '@/lib/orgs/queries';
+import { listOrgProjects, listPluginInstallsForProject, listSchemaDefinitionsForProject, searchProjectCustomers } from '@/lib/orgs/queries';
 import { buildCustomerSearchView } from '@/lib/orgs/customer-search-view';
+import { ExpansionRadar } from '@/components/customers/expansion-radar';
 import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
@@ -51,16 +52,28 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
     notFound();
   }
 
-  const [projects, schemaDefs] = await Promise.all([listOrgProjects(orgId), listSchemaDefinitionsForProject(orgId, projectId)]);
+  const [projects, schemaDefs, installs] = await Promise.all([
+    listOrgProjects(orgId),
+    listSchemaDefinitionsForProject(orgId, projectId),
+    listPluginInstallsForProject(orgId, projectId).catch(() => []),
+  ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/customers`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const activeSchemaDefsByKindAndName = buildActiveSchemaDefsByKindAndName(schemaDefs);
   const selectedSchemaName = schemaParam && entitySchemaNames.includes(schemaParam) ? schemaParam : undefined;
   const trimmedQuery = queryParam?.trim();
+
+  const hasBillingOrCrm = installs.some(
+    (i) => i.status === 'installed' && ['stripe', 'chargebee', 'hubspot', 'salesforce'].includes(i.plugin_id.toLowerCase()),
+  );
+  const isDataConnected = entitySchemaNames.length > 0 || hasBillingOrCrm;
 
   const view =
     trimmedQuery && trimmedQuery.length > 0
@@ -73,15 +86,22 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
   const t = await getTranslations('Customers');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="w-full space-y-10">
+      {/* Stitch Expansion & Upgrade Radar */}
+      <ExpansionRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
 
-      {entitySchemaNames.length === 0 ? (
-        <p className="text-muted-foreground">{t('noEntitySchemasRegistered')}</p>
-      ) : (
-        <>
-          <form method="get" className="flex flex-wrap items-end gap-2">
+      {/* Customer 360 Warehouse Search */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="border-b border-border pb-4 mb-4">
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
+        </div>
+
+        {entitySchemaNames.length === 0 ? (
+          <p className="text-muted-foreground text-xs">{t('noEntitySchemasRegistered')}</p>
+        ) : (
+          <>
+            <form method="get" className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1">
               <label htmlFor="customer-search-q" className="text-xs text-muted-foreground">
                 {t('searchLabel')}
@@ -157,6 +177,7 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
           </section>
         </>
       )}
+      </section>
     </main>
   );
 }

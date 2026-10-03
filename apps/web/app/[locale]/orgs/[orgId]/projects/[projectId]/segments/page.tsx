@@ -69,7 +69,10 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/segments`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   // Only reached once `projectId` is confirmed to belong to this org — same

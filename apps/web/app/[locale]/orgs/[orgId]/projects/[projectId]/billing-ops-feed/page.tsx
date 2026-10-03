@@ -14,6 +14,8 @@ import {
 import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from '@/lib/orgs/billing-ops-view';
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 import { dunningFeedEntryStatusLabelKey, toDunningFeedEntryView } from '@/lib/orgs/dunning-feed-view';
+import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
+import { DailyCollectionRecoveryHub } from '@/components/billing/daily-collection-recovery-hub';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -68,25 +70,49 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/billing-ops-feed`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const entries = rawRecords.map(toBillingOpsFeedEntryView);
   const churnEntries = churnRecords.map(toChurnFeedEntryView);
   const dunningEntries = dunningRecords.map(toDunningFeedEntryView);
+  const hasBillingData = entries.length > 0 || churnEntries.length > 0 || dunningEntries.length > 0;
 
   const t = await getTranslations('BillingOpsFeed');
   const tEnv = await getTranslations('EnvBadge');
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="w-full space-y-10">
+      {/* Stitch Daily Collection & Failed Charge Recovery Hub */}
+      <DailyCollectionRecoveryHub orgId={orgId} projectId={projectId} isDataConnected={hasBillingData} />
 
-      <section className="flex flex-col gap-3">
-        {entries.length === 0 ? (
-          <p className="text-muted-foreground">{t('empty')}</p>
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-8">
+        <div>
+          <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('description')}</p>
+        </div>
+
+        <section className="flex flex-col gap-3">
+          {entries.length === 0 ? (
+          <div className="flex flex-col gap-3">
+            <MissingIntegrationAlert
+              orgId={orgId}
+              projectId={projectId}
+              metricKey="MRR"
+              connectorId="stripe"
+              customTitle="No Ingested Billing Events"
+              customMissingPoints={[
+                'customer.subscription.created/updated/deleted webhooks',
+                'invoice.payment_succeeded and payment_failed events',
+              ]}
+              customImpactMetrics={['Daily Operational Feed', 'Net MRR Velocity', 'Dunning Recovery']}
+            />
+            <p className="text-sm text-muted-foreground">{t('empty')}</p>
+          </div>
         ) : (
           <ul className="flex flex-col gap-2">
             {entries.map((entry) => (
@@ -182,6 +208,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
         )}
         <p className="text-xs text-muted-foreground">{t('dunningCapNote', { count: dunningEntries.length })}</p>
       </section>
+      </div>
     </main>
   );
 }

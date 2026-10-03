@@ -50,7 +50,10 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/keys`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const [environments, apiKeys, mcpGrants] = await Promise.all([

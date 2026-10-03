@@ -20,17 +20,49 @@ let connectionPromise: Promise<void> | undefined;
  * `server-only` guarded like `lib/firebase/admin.ts`, since this must never
  * end up in a client bundle.
  */
+import * as net from 'node:net';
+
+function isPortReachable(host: string, port: number, timeoutMs = 150): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host, port, timeout: timeoutMs });
+    socket.once('connect', () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.once('error', () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
 export function ensureFirestoreOrm(): Promise<void> {
   if (!connectionPromise) {
     const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
     const projectId = process.env.FIREBASE_PROJECT_ID ?? EMULATOR_PROJECT_ID;
-    connectionPromise = emulatorHost
-      ? connectFirestoreOrm({
+    connectionPromise = (async () => {
+      if (emulatorHost) {
+        const [host, portStr] = emulatorHost.split(':');
+        const port = Number(portStr) || 8090;
+        const reachable = await isPortReachable(host, port);
+        if (!reachable) {
+          throw new Error(
+            `[ensureFirestoreOrm] Firestore emulator host '${emulatorHost}' is not reachable. ` +
+              `Ensure the Firestore emulator is running on port ${port} before invoking emulator-backed operations.`
+          );
+        }
+        return connectFirestoreOrm({
           projectId,
           apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
           emulatorHost,
-        })
-      : connectFirestoreOrmAdmin({ projectId });
+        });
+      }
+      return connectFirestoreOrmAdmin({ projectId });
+    })();
   }
   return connectionPromise;
 }

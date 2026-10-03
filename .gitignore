@@ -31,6 +31,9 @@ apps/web/repro-tmp.mjs
 
 # Logs
 *.log
+.sprint-lock
+.sprint-transaction.json
+*.sprint-tmp
 npm-debug.log*
 pnpm-debug.log*
 

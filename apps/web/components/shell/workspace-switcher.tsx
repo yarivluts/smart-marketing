@@ -4,19 +4,10 @@ import * as React from 'react';
 import { Building2, Check, ChevronsUpDown, FolderOpen, Search } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { Badge } from '@/components/ui/badge';
+import type { WorkspaceOrg, WorkspaceProject } from './nav-types';
 import { cn } from '@/lib/utils';
 
-export interface WorkspaceOrg {
-  id: string;
-  name: string;
-  slug?: string;
-}
-
-export interface WorkspaceProject {
-  id: string;
-  name: string;
-  env?: string;
-}
+export type { WorkspaceOrg, WorkspaceProject };
 
 export interface WorkspaceSwitcherProps {
   organizations?: WorkspaceOrg[];

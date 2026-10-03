@@ -19,6 +19,7 @@ import {
 } from '@/lib/orgs/automation-view';
 import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
 import { AdsPerformanceDashboard } from '@/components/campaigns/ads-performance-dashboard';
+import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
 import type { CampaignDraftView } from '@/components/campaigns/campaign-creatives-panel';
 import type { CampaignSpendBreakdownOutcome } from '@/lib/orgs/queries';
 
@@ -76,7 +77,10 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
 
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/campaigns`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const connections = toAutomationConnectionOptions(attachments, credentials);
@@ -116,6 +120,21 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
 
   return (
     <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      {(!spendOutcome || !spendOutcome.ok || targetViews.length === 0) && (
+        <MissingIntegrationAlert
+          orgId={orgId}
+          projectId={projectId}
+          metricKey="CAC"
+          connectorId="google_ads"
+          customTitle="Google & Meta Ad Spend Streams"
+          customMissingPoints={[
+            'Daily synchronized campaign spend feeds (Google Search & Meta Feed)',
+            'Creative and adset impression / click breakdowns',
+          ]}
+          customImpactMetrics={['Blended Customer Acquisition Cost (CAC)', 'ROAS by Channel', 'Automated Budget Rebalancing']}
+        />
+      )}
+
       <AdsPerformanceDashboard
         orgId={orgId}
         projectId={projectId}

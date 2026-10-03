@@ -107,7 +107,7 @@ import {
   listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
   listRecentDunningSubscriptionsForProject as listRecentDunningSubscriptionsForProjectInOrganization,
   listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
-  type RawRecordModel,
+  RawRecordModel,
   type RecordFieldFilter,
   type SchemaDefKind,
   listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
@@ -1143,4 +1143,36 @@ export async function getInviteDetails(organizationId: string, membershipId: str
     inviteeUserId: membership.user_id,
     inviteeEmail: invitee?.email ?? '',
   };
+}
+
+/**
+ * Lists bounded landed raw event records for a project from Firestore.
+ * Used for dynamic funnel and telemetry aggregation when BigQuery is unconfigured.
+ */
+export async function listRawRecordEventsForProject(
+  organizationId: string,
+  projectId: string,
+  limit = 500,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  try {
+    return await RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
+      .where('kind', '==', 'event')
+      .limit(limit)
+      .get();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Public queryMetrics wrapper executing analytical metrics queries against the warehouse compiler.
+ */
+export async function queryMetrics(
+  organizationId: string,
+  projectId: string,
+  request: Parameters<typeof queryMetricsInOrganization>[0]['request'],
+) {
+  await ensureFirestoreOrm();
+  return queryMetricsInOrganization({ organizationId, projectId, request });
 }

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sprints": [
+    { "id": "1", "status": "planned" },
+    { "id": "2", "status": "planned" },
+    { "id": "3", "status": "planned" },
+    { "id": "4", "status": "planned" },
+    { "id": "5", "status": "planned" },
+    { "id": "6", "status": "planned" },
+    { "id": "7", "status": "planned" }
+  ]
+}

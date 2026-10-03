@@ -4,9 +4,19 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { checkProjectQueryQuota, getProjectCostQuota, listOrgProjects, listQueryCostLogEntriesForProject } from '@/lib/orgs/queries';
+import {
+  checkProjectQueryQuota,
+  getActiveAutomationGuardrailPolicy,
+  getAutomationKillSwitchStatus,
+  getProjectCostQuota,
+  listAutomationActionsForProject,
+  listOrgProjects,
+  listPluginInstallsForProject,
+  listQueryCostLogEntriesForProject,
+} from '@/lib/orgs/queries';
 import { formatEstimatedCostUsd, formatLabels, outcomeLabelKey, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
 import { SetCostQuotaForm } from '@/components/orgs/set-cost-quota-form';
+import { SpendProtectionConsole } from '@/components/guardrails/spend-protection-console';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -43,15 +53,50 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, quota, logEntries] = await Promise.all([
+  const [
+    projects,
+    quota,
+    logEntries,
+    killSwitchStatus,
+    guardrailPolicy,
+    interventions,
+    installs,
+  ] = await Promise.all([
     listOrgProjects(orgId),
     getProjectCostQuota(orgId, projectId),
     listQueryCostLogEntriesForProject(orgId, projectId),
+    getAutomationKillSwitchStatus(orgId).catch(() => ({ engaged: false })),
+    getActiveAutomationGuardrailPolicy(orgId, projectId).catch(() => null),
+    listAutomationActionsForProject(orgId, projectId, 20).catch(() => []),
+    listPluginInstallsForProject(orgId, projectId).catch(() => []),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/cost-guardrails`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
+
+  const activePluginIds = new Set(
+    installs
+      .filter((i) => i.status === 'installed')
+      .map((i) => i.plugin_id.toLowerCase()),
+  );
+
+  const hasAdOrAutomationConnector =
+    activePluginIds.has('google_ads') ||
+    activePluginIds.has('meta_ads') ||
+    activePluginIds.has('tiktok_ads') ||
+    activePluginIds.has('automation') ||
+    activePluginIds.has('guardrails');
+
+  const hasActiveGuardrailData =
+    Boolean(guardrailPolicy && (guardrailPolicy.setAt !== null || (guardrailPolicy.protectedTargetIds && guardrailPolicy.protectedTargetIds.length > 0))) ||
+    interventions.length > 0 ||
+    Boolean(killSwitchStatus && killSwitchStatus.engaged);
+
+  const isDataConnected = hasAdOrAutomationConnector || hasActiveGuardrailData;
 
   // Passes the quota already fetched above so this doesn't re-read the same ProjectCostQuotaModel doc a second time.
   const quotaStatus = await checkProjectQueryQuota(orgId, projectId, quota);
@@ -62,49 +107,60 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
   const t = await getTranslations('CostGuardrails');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="w-full space-y-8">
+      {/* Stitch Spend Protection & Emergency Console */}
+      <SpendProtectionConsole
+        orgId={orgId}
+        projectId={projectId}
+        isDataConnected={isDataConnected}
+        initialKillSwitchActive={Boolean(killSwitchStatus && killSwitchStatus.engaged)}
+      />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('usageHeading')}</h2>
-        <p className="text-sm text-muted-foreground">
-          {t('usageLine', { attempted: quotaStatus.attemptedToday, limit: quotaStatus.limit, remaining: quotaStatus.remaining })}
-        </p>
-        {quotaView.setAt ? (
-          <p className="text-xs text-muted-foreground">{t('labelsCurrent', { labels: formatLabels(quotaView.labels) || t('noLabels') })}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground">{t('defaultQuotaNote')}</p>
-        )}
-      </section>
+      {/* Internal BigQuery Admin Quota Settings (Collapsible) */}
+      <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-bold tracking-tight text-foreground">{t('title', { projectName: project.name })}</h2>
+        <p className="text-xs text-muted-foreground mt-1 mb-6">{t('usageHeading')}</p>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('setQuotaHeading')}</h2>
-        <SetCostQuotaForm orgId={orgId} projectId={projectId} dailyQueryLimit={quotaView.dailyQueryLimit} labels={quotaView.labels} />
-      </section>
+        <section className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            {t('usageLine', { attempted: quotaStatus.attemptedToday, limit: quotaStatus.limit, remaining: quotaStatus.remaining })}
+          </p>
+          {quotaView.setAt ? (
+            <p className="text-xs text-muted-foreground">{t('labelsCurrent', { labels: formatLabels(quotaView.labels) || t('noLabels') })}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t('defaultQuotaNote')}</p>
+          )}
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('logHeading')}</h2>
-        {logViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noLogEntries')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {logViews.map((entry) => (
-              <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <span className="font-medium">{t('logEntrySummary', { outcome: t(outcomeLabelKey(entry.outcome)), executedAt: entry.executedAt })}</span>
-                <span className="text-muted-foreground">
-                  {Object.keys(entry.definitionRefs).length > 0
-                    ? t('logEntryDefinitions', { definitions: Object.values(entry.definitionRefs).join(', ') })
-                    : t('logEntryNoDefinitions')}
-                </span>
-                <span className="text-muted-foreground">
-                  {entry.estimatedCostUsd !== null ? t('logEntryCost', { cost: formatEstimatedCostUsd(entry.estimatedCostUsd) }) : t('logEntryCostUnknown')}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="text-xs text-muted-foreground">{t('logCapNote', { count: logViews.length })}</p>
-      </section>
+        <section className="flex flex-col gap-3 mt-6">
+          <h3 className="text-sm font-semibold">{t('setQuotaHeading')}</h3>
+          <SetCostQuotaForm orgId={orgId} projectId={projectId} dailyQueryLimit={quotaView.dailyQueryLimit} labels={quotaView.labels} />
+        </section>
+
+        <section className="flex flex-col gap-3 mt-6">
+          <h3 className="text-sm font-semibold">{t('logHeading')}</h3>
+          {logViews.length === 0 ? (
+            <p className="text-muted-foreground text-xs">{t('noLogEntries')}</p>
+          ) : (
+            <ul className="flex flex-col gap-2 max-h-60 overflow-y-auto">
+              {logViews.map((entry) => (
+                <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
+                  <span className="font-medium">{t('logEntrySummary', { outcome: t(outcomeLabelKey(entry.outcome)), executedAt: entry.executedAt })}</span>
+                  <span className="text-muted-foreground">
+                    {Object.keys(entry.definitionRefs).length > 0
+                      ? t('logEntryDefinitions', { definitions: Object.values(entry.definitionRefs).join(', ') })
+                      : t('logEntryNoDefinitions')}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {entry.estimatedCostUsd !== null ? t('logEntryCost', { cost: formatEstimatedCostUsd(entry.estimatedCostUsd) }) : t('logEntryCostUnknown')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-muted-foreground">{t('logCapNote', { count: logViews.length })}</p>
+        </section>
+      </div>
     </main>
   );
 }

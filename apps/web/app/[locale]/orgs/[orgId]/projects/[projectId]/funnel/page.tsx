@@ -14,15 +14,18 @@ import {
   getPaybackOverviewForProject,
   getQualityCalibrationBreakdownForProject,
   queryGoalProgress,
+  listRawRecordEventsForProject,
 } from '@/lib/orgs/queries';
 import { buildFunnelGoalsCockpitData } from '@/lib/orgs/funnel-goals-synthesizer';
 import { FunnelGoalsDashboard } from '@/components/orgs/funnel-goals-dashboard';
+import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
 import type {
   FunnelStepsOutcome,
   CohortRetentionOutcome,
   PaybackOverviewOutcome,
   QualityCalibrationBreakdownOutcome,
   GoalProgressOutcome,
+  RawRecordModel,
 } from '@growthos/firebase-orm-models';
 
 type PageProps = Readonly<{
@@ -65,10 +68,14 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/funnel`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   let funnelOutcome: FunnelStepsOutcome | null = null;
+  let rawRecords: RawRecordModel[] = [];
   let cohortOutcome: CohortRetentionOutcome | null = null;
   let paybackOutcome: PaybackOverviewOutcome | null = null;
   let calibrationOutcome: QualityCalibrationBreakdownOutcome | null = null;
@@ -77,6 +84,15 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     funnelOutcome = await queryProjectFunnelSteps(orgId, projectId);
   } catch {
     funnelOutcome = null;
+  }
+
+  // When BigQuery is not configured or returns no steps, query landed event records from Firestore
+  if (!funnelOutcome || !funnelOutcome.ok || funnelOutcome.steps.length === 0) {
+    try {
+      rawRecords = await listRawRecordEventsForProject(orgId, projectId);
+    } catch {
+      rawRecords = [];
+    }
   }
 
   try {
@@ -119,8 +135,12 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     );
   }
 
+  const hasWarehouseSteps = Boolean(funnelOutcome && funnelOutcome.ok && funnelOutcome.steps.length > 0);
+  const hasEventData = hasWarehouseSteps || rawRecords.length > 0;
+
   const cockpitData = buildFunnelGoalsCockpitData({
     funnelOutcome,
+    rawRecords: !hasWarehouseSteps ? rawRecords : undefined,
     goals,
     goalOutcomes,
     personNameById,
@@ -132,6 +152,21 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
 
   return (
     <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      {!hasEventData && (
+        <MissingIntegrationAlert
+          orgId={orgId}
+          projectId={projectId}
+          metricKey="CONVERSION_FUNNEL"
+          connectorId="growthos_sdk"
+          customTitle="Tracking SDK & Funnel Telemetry"
+          customMissingPoints={[
+            'Step progression telemetry (Landing -> Signup -> Activation -> Paid)',
+            'Web SDK page view pings and persistent client anonymous IDs',
+          ]}
+          customImpactMetrics={['Multi-Step Conversion Funnel Velocity', 'Dropoff Bottleneck Diagnostics', 'True ROI Attribution']}
+        />
+      )}
+
       <FunnelGoalsDashboard
         orgId={orgId}
         projectId={projectId}

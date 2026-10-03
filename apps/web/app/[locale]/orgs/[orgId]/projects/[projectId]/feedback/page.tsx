@@ -70,7 +70,10 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
   const [projects, installs] = await Promise.all([listOrgProjects(orgId), listPluginInstallsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    notFound();
+    if (projects.length > 0) {
+      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/feedback`);
+    }
+    redirect(`/${locale}/orgs/${orgId}`);
   }
 
   const installViews = installs.map(toPluginInstallView);

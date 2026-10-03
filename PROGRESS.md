@@ -17,6 +17,24 @@ Template for each entry:
 
 ---
 
+## 2026-09-12 - Repository sprint lifecycle and completion cleanup
+
+- **Last completed:** added `SPRINTS.json`, `scripts/sprints.mjs`, 14 isolated regression tests,
+  `pnpm sprints`/`pnpm test:sprints`, and `docs/sprints.md`. Plan/start/complete lifecycle,
+  automatic `complete-ready` end-of-run hook, explicit unfinished-task carry-over, archive-first
+  recoverable writes, conflict checks and locking. Root tests now include the sprint suite.
+- **Validation:** 14/14 sprint tests pass; real repository list and dry-run commands pass; syntax
+  and whitespace checks pass. Root `pnpm test` passed the sprint stage but stopped at the
+  existing missing-Java Firestore emulator prerequisite. No website code changed.
+- **In progress (exact stopping point):** implementation complete locally; no sprint has been
+  started or closed merely to initialize the workflow. Sprints 1-7 remain planned.
+- **Blocked + why:** full monorepo test completion requires Java on PATH.
+- **Next step:** choose the working sprint with `pnpm sprints start ID`; run
+  `pnpm sprints complete-ready` after each task/status update.
+- **Jira:** KAN-85 tracks this new repository tooling. The old archived ergonomics row also used
+  KAN-85 as a historical local label; it must not be interpreted as this newly allocated Jira issue.
+- **Waiting on human:** none for the new CLI; existing external acceptance gaps remain unchanged.
+
 ## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
