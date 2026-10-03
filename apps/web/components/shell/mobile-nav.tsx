@@ -68,7 +68,7 @@ export function MobileDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation drawer"
-        className="flex max-h-[calc(100vh-4rem)] w-full flex-col gap-4 overflow-y-auto border-b border-[#ECE8F6] dark:border-white/10 bg-[#F5F3FB]/95 dark:bg-[#1E1E24]/95 backdrop-blur-xl p-4 shadow-soft-xl animate-slide-down"
+        className="flex max-h-[calc(100vh-4rem)] w-full animate-slide-down flex-col gap-pp-md overflow-y-auto rounded-b-pp-lg bg-pp-surface-container-lowest p-pp-md shadow-pp-candy-hover dark:bg-[#1E1E24]/95"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Workspace Switcher */}
@@ -127,7 +127,7 @@ export function MobileDrawer({
           {/* 6 Functional Clusters */}
           {sections.map((section, idx) => (
             <div key={section.clusterKey ?? section.heading ?? idx} className="flex flex-col gap-1">
-              <span className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">
                 {section.heading ?? (section.clusterKey ? tNavClusters(section.clusterKey) : '')}
               </span>
               {section.items.map((item) => {
@@ -138,26 +138,25 @@ export function MobileDrawer({
                     key={item.href}
                     href={item.href}
                     onClick={() => setMobileMenuOpen(false)}
-                    className={
-                      cn(
-                        'flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-                        active
-                          ? 'bg-[#EBE9FD] dark:bg-[#7064F4]/20 text-[#7064F4] text-primary font-semibold shadow-soft'
-                          : 'text-foreground hover:bg-[#ECE8F6]/70 dark:hover:bg-white/5',
-                      ) + (active ? ' bg-primary/10' : '')
-                    }
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'flex items-center justify-between rounded-pp-lg px-pp-md py-pp-sm text-pp-label-md transition-colors',
+                      active
+                        ? 'bg-pp-primary-fixed font-semibold text-pp-on-primary-fixed dark:bg-pp-periwinkle/20 dark:text-pp-primary-fixed'
+                        : 'text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface dark:text-foreground dark:hover:bg-white/5',
+                    )}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex min-w-0 items-center gap-pp-sm">
                       <Icon
                         className={cn(
-                          'h-4 w-4 shrink-0',
-                          active ? 'text-[#7064F4]' : 'text-muted-foreground',
+                          'h-5 w-5 shrink-0',
+                          active ? 'text-pp-primary dark:text-pp-primary-fixed' : 'text-pp-on-surface-variant dark:text-muted-foreground',
                         )}
                       />
                       <span className="truncate">{item.label}</span>
                     </div>
                     {item.badge ? (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                      <span className="rounded-full bg-pp-surface-container px-2 py-0.5 text-pp-label-sm text-pp-on-surface-variant">
                         {item.badge}
                       </span>
                     ) : null}

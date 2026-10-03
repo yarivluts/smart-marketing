@@ -2409,7 +2409,23 @@
     "nameRequiredError": "Organization name is required.",
     "save": "Save",
     "saved": "Saved.",
-    "saveError": "Could not save these settings. Please try again."
+    "saveError": "Could not save these settings. Please try again.",
+    "eyebrow": "Organization",
+    "kpiProjects": "Projects",
+    "kpiProjectsLink": "Open organization home",
+    "kpiMembers": "Members",
+    "kpiMembersHint": "People with access to this organization",
+    "kpiBilling": "Billing contact",
+    "kpiBillingSet": "Configured",
+    "kpiBillingMissing": "Missing",
+    "kpiBillingAction": "Action needed",
+    "identityTitle": "General identity",
+    "identitySubtitle": "Name, URL slug and billing contact for this organization.",
+    "projectsTitle": "Projects in this organization",
+    "projectsSubtitle": "Every project inherits this organization's members and billing.",
+    "projectsEmpty": "No projects yet.",
+    "membersFootnote": "{count, plural, one {# member} other {# members}} in this organization",
+    "billingFootnote": "Invoices and plan notices go to the billing contact."
   },
   "ProjectSettings": {
     "metaTitle": "Project settings",
@@ -2990,5 +3006,24 @@
     "colDuration": "Duration",
     "colStatus": "Status",
     "colActions": "Actions"
+  },
+  "ShellHeader": {
+    "notifications": "Notifications",
+    "notificationsPanel": "Notifications Panel",
+    "markAllRead": "Mark all read",
+    "caughtUp": "You're all caught up",
+    "caughtUpHint": "Alerts about tracking, budgets and wins will appear here.",
+    "profileMenu": "User Profile Menu",
+    "userMenu": "User menu",
+    "statusSignedIn": "Status: Signed in",
+    "signedInAs": "Signed in as",
+    "accountSettings": "Account & Organization Settings",
+    "plans": "Subscription & Plans",
+    "signOut": "Sign Out"
+  },
+  "OrgNav": {
+    "organizationHeading": "Organization",
+    "projectsHeading": "Projects",
+    "settings": "Organization settings"
   }
 }

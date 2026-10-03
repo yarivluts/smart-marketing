@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Heebo, Manrope, Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -16,6 +16,12 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   display: 'swap',
   weight: ['400', '500', '600', '700', '800'],
 });
+
+// Stitch "Pastel Pulse" typography: Outfit for headlines/metrics, Manrope for body/labels.
+// Neither ships Hebrew glyphs, so Heebo is chained after them in tailwind's `pp-*` families.
+const ppDisplay = Outfit({ subsets: ['latin'], variable: '--font-pp-display', display: 'swap' });
+const ppBody = Manrope({ subsets: ['latin'], variable: '--font-pp-body', display: 'swap' });
+const ppHebrew = Heebo({ subsets: ['hebrew', 'latin'], variable: '--font-pp-hebrew', display: 'swap' });
 
 export function generateStaticParams(): Array<{ locale: AppLocale }> {
   return routing.locales.map((locale) => ({ locale }));
@@ -42,8 +48,12 @@ export default async function LocaleLayout({ children, params }: LayoutProps): P
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} dir={getDirection(locale)} className={plusJakartaSans.variable}>
-      <body className="min-h-screen font-sans antialiased">
+    <html
+      lang={locale}
+      dir={getDirection(locale)}
+      className={`${plusJakartaSans.variable} ${ppDisplay.variable} ${ppBody.variable} ${ppHebrew.variable}`}
+    >
+      <body className="min-h-screen font-pp-body antialiased">
         <NextIntlClientProvider>
           <AppProviders>{children}</AppProviders>
         </NextIntlClientProvider>

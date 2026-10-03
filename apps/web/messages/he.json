@@ -2409,7 +2409,23 @@
     "nameRequiredError": "שם הארגון הוא שדה חובה.",
     "save": "שמירה",
     "saved": "נשמר.",
-    "saveError": "שמירת ההגדרות נכשלה. נסו שוב."
+    "saveError": "שמירת ההגדרות נכשלה. נסו שוב.",
+    "eyebrow": "ארגון",
+    "kpiProjects": "פרויקטים",
+    "kpiProjectsLink": "לדף הבית של הארגון",
+    "kpiMembers": "חברים",
+    "kpiMembersHint": "אנשים עם גישה לארגון הזה",
+    "kpiBilling": "איש קשר לחיוב",
+    "kpiBillingSet": "מוגדר",
+    "kpiBillingMissing": "חסר",
+    "kpiBillingAction": "נדרשת פעולה",
+    "identityTitle": "זהות כללית",
+    "identitySubtitle": "שם, מזהה URL ואיש קשר לחיוב עבור הארגון.",
+    "projectsTitle": "פרויקטים בארגון",
+    "projectsSubtitle": "כל פרויקט יורש את החברים והחיוב של הארגון.",
+    "projectsEmpty": "אין עדיין פרויקטים.",
+    "membersFootnote": "{count, plural, one {חבר אחד} other {# חברים}} בארגון",
+    "billingFootnote": "חשבוניות והודעות על התוכנית נשלחות לאיש הקשר לחיוב."
   },
   "ProjectSettings": {
     "metaTitle": "הגדרות פרויקט",
@@ -2990,5 +3006,24 @@
     "colDuration": "משך זמן",
     "colStatus": "סטטוס",
     "colActions": "פעולות"
+  },
+  "ShellHeader": {
+    "notifications": "התראות",
+    "notificationsPanel": "חלונית התראות",
+    "markAllRead": "סמן הכל כנקרא",
+    "caughtUp": "אין התראות חדשות",
+    "caughtUpHint": "התראות על מעקב, תקציבים והצלחות יופיעו כאן.",
+    "profileMenu": "תפריט פרופיל משתמש",
+    "userMenu": "תפריט משתמש",
+    "statusSignedIn": "סטטוס: מחובר",
+    "signedInAs": "מחובר בתור",
+    "accountSettings": "הגדרות חשבון וארגון",
+    "plans": "מנוי ותוכניות",
+    "signOut": "התנתקות"
+  },
+  "OrgNav": {
+    "organizationHeading": "ארגון",
+    "projectsHeading": "פרויקטים",
+    "settings": "הגדרות ארגון"
   }
 }

@@ -2,9 +2,9 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { Check } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
 
 export interface OrganizationSettingsFormProps {
   orgId: string;
@@ -63,46 +63,54 @@ export function OrganizationSettingsForm({
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="org-settings-name">
-          {t('nameLabel')}
-        </label>
-        <Input id="org-settings-name" value={name} onChange={(event) => setName(event.target.value)} />
+    <form className="flex flex-col gap-pp-md" onSubmit={handleSubmit} noValidate>
+      <div className="grid gap-pp-md md:grid-cols-2">
+        <PpField label={t('nameLabel')} htmlFor="org-settings-name">
+          <input
+            id="org-settings-name"
+            className={ppInputClass}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </PpField>
+
+        <PpField label={t('slugLabel')} htmlFor="org-settings-slug" hint={t('slugHelp')}>
+          <input
+            id="org-settings-slug"
+            className={ppInputClass}
+            dir="ltr"
+            value={slug}
+            onChange={(event) => setSlug(event.target.value)}
+          />
+        </PpField>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="org-settings-slug">
-          {t('slugLabel')}
-        </label>
-        <Input id="org-settings-slug" value={slug} onChange={(event) => setSlug(event.target.value)} />
-        <p className="text-xs text-muted-foreground">{t('slugHelp')}</p>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="org-settings-billing-email">
-          {t('billingEmailLabel')}
-        </label>
-        <Input
+      <PpField label={t('billingEmailLabel')} htmlFor="org-settings-billing-email" hint={t('billingEmailHelp')}>
+        <input
           id="org-settings-billing-email"
           type="email"
+          dir="ltr"
+          className={ppInputClass}
           value={billingEmail}
           onChange={(event) => setBillingEmail(event.target.value)}
         />
-        <p className="text-xs text-muted-foreground">{t('billingEmailHelp')}</p>
-      </div>
+      </PpField>
 
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="rounded-2xl bg-pp-error-container px-pp-md py-2 text-pp-body-md text-pp-on-error-container">
           {error}
         </p>
       ) : null}
-      {saved && !error ? <p className="text-sm text-muted-foreground">{t('saved')}</p> : null}
+      {saved && !error ? (
+        <p className="rounded-2xl bg-pp-secondary-container/40 px-pp-md py-2 text-pp-body-md text-pp-on-secondary-container">
+          {t('saved')}
+        </p>
+      ) : null}
 
-      <div>
-        <Button type="submit" disabled={submitting}>
+      <div className="flex justify-end">
+        <PpButton type="submit" icon={Check} disabled={submitting}>
           {t('save')}
-        </Button>
+        </PpButton>
       </div>
     </form>
   );

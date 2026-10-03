@@ -47,7 +47,7 @@ function NavShellContent({
   const activeHref = bestMatchingHref(pathname, allHrefs);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-pp-surface-container-low text-pp-on-surface dark:bg-background dark:text-foreground">
       {/* Floating Top Header */}
       <Header
         brandName={brandName}
@@ -83,7 +83,7 @@ function NavShellContent({
         />
 
         {/* Main Content Area */}
-        <main id="main-content" className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 pb-[88px] lg:pb-8">
+        <main id="main-content" className="min-w-0 flex-1 p-4 pb-[88px] sm:p-6 lg:p-8 lg:pb-8">
           {children}
         </main>
       </div>

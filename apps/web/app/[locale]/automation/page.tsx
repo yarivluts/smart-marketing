@@ -1,30 +1,18 @@
-import { Suspense } from 'react';
-import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { AutomationHub } from '@/components/automation/automation-hub';
+import { redirectToFirstProject } from '@/lib/orgs/redirect-project';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string }>;
 }>;
 
-export async function generateMetadata({ params }: PageProps) {
+/**
+ * Shortcut to the signed-in user's first project's Automation hub — same
+ * pattern as the other top-level shortcuts (`/funnel`, `/campaigns`, …).
+ *
+ * Previously this rendered `AutomationHub` directly with hardcoded
+ * `default-org` / `default-project` IDs and no session check, so every API
+ * call it made targeted an org/project that doesn't exist.
+ */
+export default async function AutomationShortcutPage({ params }: PageProps) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'Automation' });
-  return { title: t('metaTitle') || 'Automation Hub' };
-}
-
-export default async function TopLevelAutomationPage({ params }: PageProps): Promise<React.ReactElement> {
-  const { locale } = await params;
-  setRequestLocale(locale);
-
-  return (
-    <main className="container mx-auto max-w-6xl py-8 px-4 sm:px-6">
-      <Suspense>
-        <AutomationHub
-          orgId="default-org"
-          projectId="default-project"
-          projectName="GrowthOS Cockpit"
-        />
-      </Suspense>
-    </main>
-  );
+  return redirectToFirstProject(locale, 'automation');
 }

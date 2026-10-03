@@ -97,39 +97,51 @@ describe('Milestone 1: Canonical Pastel Pulse Shell Enhancements', () => {
       expect(screen.getByText('PROD')).toBeInTheDocument();
     });
 
-    it('renders NotificationBell with unread counter badge and opens interactive panel on click', async () => {
+    it('renders NotificationBell with an honest empty state when no notifications exist', async () => {
       const user = userEvent.setup();
       renderWithIntl(<NotificationBell />);
 
       const bellBtn = screen.getByRole('button', { name: /notifications/i });
-      expect(bellBtn).toBeInTheDocument();
-      expect(screen.getByText('3')).toBeInTheDocument();
-
       await user.click(bellBtn);
-      const panel = screen.getByRole('dialog', { name: /notifications panel/i });
-      expect(panel).toBeInTheDocument();
-      expect(screen.getByText('Webhook Stream Ingesting')).toBeInTheDocument();
-      expect(screen.getByText('Missing Integration Alert')).toBeInTheDocument();
-
-      const markReadBtn = screen.getByRole('button', { name: /mark all read/i });
-      await user.click(markReadBtn);
-      expect(screen.queryByText('3')).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /notifications panel/i })).toBeInTheDocument();
+      expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /mark all read/i })).not.toBeInTheDocument();
     });
 
-    it('renders UserProfileMenu with active online indicator and dropdown actions', async () => {
+    it('renders NotificationBell unread counter from real notifications and clears it', async () => {
+      const user = userEvent.setup();
+      renderWithIntl(
+        <NotificationBell
+          notifications={[
+            { id: 'a', title: 'Webhook Stream Ingesting', time: '12m ago', unread: true },
+            { id: 'b', title: 'Missing Integration Alert', time: '1h ago', unread: true },
+            { id: 'c', title: 'Old', time: '3d ago', unread: false },
+          ]}
+        />,
+      );
+
+      expect(screen.getByText('2')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /notifications/i }));
+      expect(screen.getByText('Webhook Stream Ingesting')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /mark all read/i }));
+      expect(screen.queryByText('2')).not.toBeInTheDocument();
+    });
+
+    it('renders UserProfileMenu with signed-in indicator and dropdown actions', async () => {
       const user = userEvent.setup();
       renderWithIntl(<UserProfileMenu userEmail="alex@acme.com" currentOrgId="org-1" />);
 
       const profileBtn = screen.getByRole('button', { name: /user profile menu/i });
       expect(profileBtn).toBeInTheDocument();
-      expect(screen.getByLabelText('Status: Active')).toBeInTheDocument();
+      expect(screen.getByLabelText('Status: Signed in')).toBeInTheDocument();
 
       await user.click(profileBtn);
       const menu = screen.getByRole('menu', { name: /user menu/i });
       expect(menu).toBeInTheDocument();
-      expect(screen.getByText('Online')).toBeInTheDocument();
+      expect(screen.getByText('Signed in as')).toBeInTheDocument();
+      expect(screen.queryByText('Admin')).not.toBeInTheDocument();
       expect(screen.getByText('Account & Organization Settings')).toBeInTheDocument();
-      expect(screen.getByText('Sign Out')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Sign Out' })).toBeInTheDocument();
     });
 
     it('Header integrates environment badge, notification bell, and user profile', () => {
@@ -167,12 +179,11 @@ describe('Milestone 1: Canonical Pastel Pulse Shell Enhancements', () => {
       );
 
       const aside = screen.getByLabelText('Sidebar Navigation');
-      expect(aside.className).toContain('bg-[#F5F3FB]/75');
-      expect(aside.className).toContain('border-[#ECE8F6]');
-      expect(aside.className).toContain('backdrop-blur-md');
+      expect(aside.className).toContain('bg-pp-surface-container-lowest');
+      expect(aside.className).toContain('w-72');
     });
 
-    it('styles active sidebar links with #7064F4 indicator and #EBE9FD soft violet pill background', () => {
+    it('styles active sidebar links with the Stitch primary-fixed pill', () => {
       renderWithIntl(
         <ShellProvider>
           <Sidebar
@@ -186,8 +197,8 @@ describe('Milestone 1: Canonical Pastel Pulse Shell Enhancements', () => {
 
       const activeLinks = screen.getAllByRole('link', { name: /Ad Campaigns & ROAS/i });
       expect(activeLinks.length).toBeGreaterThan(0);
-      expect(activeLinks[0].className).toContain('bg-[#EBE9FD]');
-      expect(activeLinks[0].className).toContain('text-[#7064F4]');
+      expect(activeLinks[0].className).toContain('bg-pp-primary-fixed');
+      expect(activeLinks[0].className).toContain('text-pp-on-primary-fixed');
     });
   });
 

@@ -78,25 +78,23 @@ function SidebarLinkItem({
     <div className="group relative flex items-center">
       <Link
         href={item.href}
-        className={
-          cn(
-            'flex flex-1 items-center rounded-xl transition-all duration-150 relative',
-            isCollapsed
-              ? 'h-10 w-10 justify-center mx-auto'
-              : 'justify-between px-3 py-2 text-sm font-medium gap-3',
-            active
-              ? 'bg-[#EBE9FD] dark:bg-[#7064F4]/20 text-[#7064F4] font-semibold shadow-soft'
-              : 'text-muted-foreground hover:bg-[#ECE8F6]/60 dark:hover:bg-white/5 hover:text-foreground',
-          ) + (active ? ' bg-primary/10' : '')
-        }
+        className={cn(
+          'relative flex flex-1 items-center rounded-pp-lg transition-all duration-150',
+          isCollapsed
+            ? 'mx-auto h-10 w-10 justify-center'
+            : 'justify-between gap-pp-sm px-pp-md py-pp-sm text-pp-label-md',
+          active
+            ? 'bg-pp-primary-fixed font-semibold text-pp-on-primary-fixed dark:bg-pp-periwinkle/20 dark:text-pp-primary-fixed'
+            : 'text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface dark:text-muted-foreground dark:hover:bg-white/5 dark:hover:text-foreground',
+        )}
         aria-label={item.label}
         aria-current={active ? 'page' : undefined}
       >
-        <div className={cn('flex items-center min-w-0', isCollapsed ? 'justify-center' : 'gap-3')}>
+        <div className={cn('flex min-w-0 items-center', isCollapsed ? 'justify-center' : 'gap-pp-sm')}>
           <Icon
             className={cn(
-              'h-4 w-4 shrink-0 transition-colors',
-              active ? 'text-[#7064F4] text-primary' : 'text-muted-foreground group-hover:text-foreground',
+              'h-5 w-5 shrink-0 transition-colors',
+              active ? 'text-pp-primary dark:text-pp-primary-fixed' : 'text-pp-on-surface-variant group-hover:text-pp-on-surface dark:text-muted-foreground',
             )}
             aria-hidden="true"
           />
@@ -104,6 +102,9 @@ function SidebarLinkItem({
             <span className="truncate">{item.label}</span>
           ) : null}
         </div>
+        {!isCollapsed && active && !(showBadge && item.badge) ? (
+          <span className="ms-auto h-2 w-2 shrink-0 rounded-full bg-pp-primary group-hover:hidden" aria-hidden="true" />
+        ) : null}
 
         {!isCollapsed && showBadge && item.badge ? (
           <div className="flex items-center gap-1.5 ms-auto pe-5 group-hover:pe-0 transition-all">
@@ -197,14 +198,14 @@ export function Sidebar({
     <aside
       aria-label="Sidebar Navigation"
       className={cn(
-        'hidden lg:flex shrink-0 flex-col border-e border-[#ECE8F6] dark:border-white/10 bg-[#F5F3FB]/75 dark:bg-[#181820]/80 backdrop-blur-md sticky top-16 h-[calc(100vh-4rem)] transition-all duration-200 ease-in-out select-none',
-        isCollapsed ? 'w-16 p-2' : 'w-64 p-3.5',
+        'sticky top-16 hidden h-[calc(100vh-4rem)] shrink-0 select-none flex-col border-e border-transparent bg-pp-surface-container-lowest shadow-sm transition-all duration-200 ease-in-out dark:border-white/10 dark:bg-[#181820]/90 lg:flex',
+        isCollapsed ? 'w-16 p-2' : 'w-72 p-pp-md',
         className,
       )}
     >
       {/* Workspace Switcher in Expanded Mode */}
       {!isCollapsed && (organizations.length > 0 || projects.length > 0) ? (
-        <div className="mb-4">
+        <div className="mb-pp-md">
           <WorkspaceSwitcher
             organizations={organizations}
             currentOrgId={currentOrgId}
@@ -216,11 +217,11 @@ export function Sidebar({
       ) : null}
 
       {/* Navigation Sections List */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden space-y-5 scrollbar-thin">
+      <div className="flex-1 space-y-pp-md overflow-y-auto overflow-x-hidden scrollbar-thin">
         {/* Pinned Favorites Section (only when expanded) */}
         {!isCollapsed && pinnedItems.length > 0 ? (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">
               <Pin className="h-3 w-3 text-amber-500" />
               <span>{tNavClusters('favorites')}</span>
             </div>
@@ -242,13 +243,13 @@ export function Sidebar({
 
         {/* 6 Functional Clusters */}
         {sections.map((section, idx) => (
-          <div key={section.clusterKey ?? section.heading ?? idx} className="flex flex-col gap-1">
+          <div key={section.clusterKey ?? section.heading ?? idx} className="flex flex-col gap-1.5">
             {!isCollapsed ? (
-              <span className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/70">
+              <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">
                 {section.heading ?? (section.clusterKey ? tNavClusters(section.clusterKey) : '')}
               </span>
             ) : (
-              <div className="my-1 border-b border-[#ECE8F6] dark:border-white/10" />
+              <div className="my-1 border-b border-pp-outline-variant/30 dark:border-white/10" />
             )}
 
             {section.items.map((item) => (
@@ -267,15 +268,15 @@ export function Sidebar({
       </div>
 
       {/* Sidebar Footer with Collapse Toggle */}
-      <div className="pt-3 mt-auto border-t border-[#ECE8F6] dark:border-white/10">
+      <div className="mt-auto border-t border-pp-outline-variant/30 pt-pp-sm dark:border-white/10">
         <button
           type="button"
           onClick={toggleCollapsed}
           aria-label={isCollapsed ? tNavShell('expandSidebar') : tNavShell('collapseSidebar')}
           title={isCollapsed ? tNavShell('expandSidebar') : tNavShell('collapseSidebar')}
           className={cn(
-            'flex items-center rounded-xl text-xs font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors',
-            isCollapsed ? 'h-10 w-10 justify-center mx-auto' : 'w-full px-3 py-2 justify-between',
+            'flex items-center rounded-pp-lg text-pp-body-sm text-pp-on-surface-variant transition-colors hover:bg-pp-surface-container-high hover:text-pp-on-surface dark:text-muted-foreground',
+            isCollapsed ? 'mx-auto h-10 w-10 justify-center' : 'w-full justify-between px-pp-sm py-2',
           )}
         >
           {!isCollapsed ? (

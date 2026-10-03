@@ -1,13 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, LogOut, Menu, Shield, Sparkles, User, X } from 'lucide-react';
-import { Link } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
+import { Bell, BellOff, LogOut, Menu, Network, Shield, User, X } from 'lucide-react';
+import { Link, useRouter } from '@/i18n/navigation';
 import { LanguageSwitcher } from './language-switcher';
 import { CommandPalette } from './command-palette';
 import { WorkspaceSwitcher, type WorkspaceOrg, type WorkspaceProject } from './workspace-switcher';
 import { useShell } from './shell-context';
 import { PageGuideButton } from '@/components/guides/page-guide-button';
+import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils';
 
 export interface HeaderProps {
@@ -18,10 +20,48 @@ export interface HeaderProps {
   currentProjectId?: string;
   currentEnv?: string;
   userEmail?: string;
+  /** Real notifications for the signed-in user. Omitted → honest empty state. */
+  notifications?: ShellNotification[];
   onMobileMenuToggle?: () => void;
   isMobileMenuOpen?: boolean;
   className?: string;
   children?: React.ReactNode;
+}
+
+export interface ShellNotification {
+  id: string;
+  title: string;
+  /** Pre-formatted relative time (e.g. "12m ago"). */
+  time: string;
+  unread: boolean;
+  href?: string;
+}
+
+/** Stitch top-bar round icon button (`w-9 h-9 rounded-full bg-surface-container`). */
+const iconButtonClass =
+  'relative flex h-9 w-9 items-center justify-center rounded-full bg-pp-surface-container text-pp-on-surface-variant transition-colors hover:bg-pp-surface-container-high hover:text-pp-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-pp-primary/40 dark:bg-white/5 dark:text-muted-foreground dark:hover:bg-white/10';
+
+const popoverClass =
+  'absolute end-0 top-full z-50 mt-2 animate-slide-down rounded-pp-lg bg-pp-surface-container-lowest p-pp-sm text-pp-on-surface shadow-pp-candy-hover ring-1 ring-pp-outline-variant/30 dark:bg-popover dark:text-popover-foreground';
+
+function useDismissable(isOpen: boolean, close: () => void): React.RefObject<HTMLDivElement | null> {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!isOpen) return undefined;
+    function handleClickOutside(event: MouseEvent): void {
+      if (ref.current && !ref.current.contains(event.target as Node)) close();
+    }
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key === 'Escape') close();
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, close]);
+  return ref;
 }
 
 export function EnvironmentBadge({ env = 'dev' }: { env?: string }): React.ReactElement {
@@ -30,19 +70,19 @@ export function EnvironmentBadge({ env = 'dev' }: { env?: string }): React.React
   const envConfigs: Record<string, { label: string; badgeClass: string; dotClass: string; pingClass: string }> = {
     prod: {
       label: 'PROD',
-      badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
-      dotClass: 'bg-emerald-500',
-      pingClass: 'bg-emerald-400',
+      badgeClass: 'bg-pp-secondary-container/40 text-pp-on-secondary-container',
+      dotClass: 'bg-pp-secondary',
+      pingClass: 'bg-pp-secondary-fixed-dim',
     },
     staging: {
       label: 'STAGING',
-      badgeClass: 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20',
+      badgeClass: 'bg-sky-100 text-sky-800 dark:bg-sky-500/10 dark:text-sky-300',
       dotClass: 'bg-sky-500',
       pingClass: 'bg-sky-400',
     },
     dev: {
       label: 'DEV',
-      badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+      badgeClass: 'bg-amber-100 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300',
       dotClass: 'bg-amber-500',
       pingClass: 'bg-amber-400',
     },
@@ -54,122 +94,118 @@ export function EnvironmentBadge({ env = 'dev' }: { env?: string }): React.React
     <div
       aria-label={`Environment: ${current.label}`}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold tracking-wider transition-colors shadow-soft',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-pp-label-sm tracking-wider transition-colors',
         current.badgeClass,
       )}
     >
       <span className="relative flex h-1.5 w-1.5">
-        <span className={cn('animate-ping absolute inline-flex h-full w-full rounded-full opacity-75', current.pingClass)} />
-        <span className={cn('relative inline-flex rounded-full h-1.5 w-1.5', current.dotClass)} />
+        <span className={cn('absolute inline-flex h-full w-full animate-ping rounded-full opacity-75', current.pingClass)} />
+        <span className={cn('relative inline-flex h-1.5 w-1.5 rounded-full', current.dotClass)} />
       </span>
       <span>{current.label}</span>
     </div>
   );
 }
 
-export function NotificationBell(): React.ReactElement {
+export function NotificationBell({
+  notifications = [],
+}: {
+  notifications?: ShellNotification[];
+}): React.ReactElement {
+  const t = useTranslations('ShellHeader');
   const [isOpen, setIsOpen] = React.useState(false);
-  const [unreadCount, setUnreadCount] = React.useState(3);
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [readIds, setReadIds] = React.useState<ReadonlySet<string>>(() => new Set());
+  const close = React.useCallback(() => setIsOpen(false), []);
+  const menuRef = useDismissable(isOpen, close);
 
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen]);
-
-  const notifications = [
-    {
-      id: '1',
-      title: 'Webhook Stream Ingesting',
-      time: '12m ago',
-      unread: true,
-    },
-    {
-      id: '2',
-      title: 'Missing Integration Alert',
-      time: '1h ago',
-      unread: true,
-    },
-    {
-      id: '3',
-      title: 'Monthly MRR Milestone Reached',
-      time: '3h ago',
-      unread: true,
-    },
-  ];
+  const unreadCount = notifications.filter((n) => n.unread && !readIds.has(n.id)).length;
 
   return (
     <div className="relative" ref={menuRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        aria-label="Notifications"
+        aria-label={t('notifications')}
         aria-expanded={isOpen}
-        className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-input bg-card text-foreground transition-colors hover:bg-muted shadow-soft"
+        className={iconButtonClass}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-5 w-5" />
         {unreadCount > 0 ? (
-          <span className="absolute -top-1 -end-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#7064F4] px-1 text-[10px] font-bold text-white shadow-soft animate-pulse">
+          <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-pp-primary px-1 text-[10px] font-bold text-pp-on-primary ring-2 ring-pp-surface-bright">
             {unreadCount}
           </span>
         ) : null}
       </button>
 
       {isOpen ? (
-        <div
-          role="dialog"
-          aria-label="Notifications Panel"
-          className="absolute end-0 top-full mt-2 w-80 rounded-2xl border border-border bg-popover/95 p-3 text-popover-foreground shadow-soft-xl backdrop-blur-xl z-50 animate-slide-down"
-        >
-          <div className="flex items-center justify-between pb-2 border-b border-border/60">
-            <span className="text-xs font-bold text-foreground">Notifications</span>
+        <div role="dialog" aria-label={t('notificationsPanel')} className={cn(popoverClass, 'w-80')}>
+          <div className="flex items-center justify-between px-pp-sm pb-pp-sm pt-1">
+            <span className="font-pp-display text-pp-label-md text-pp-on-surface">{t('notifications')}</span>
             {unreadCount > 0 ? (
               <button
                 type="button"
-                onClick={() => setUnreadCount(0)}
-                className="text-[11px] font-medium text-primary hover:underline"
+                onClick={() => setReadIds(new Set(notifications.map((n) => n.id)))}
+                className="text-pp-label-sm text-pp-primary hover:underline"
               >
-                Mark all read
+                {t('markAllRead')}
               </button>
             ) : null}
           </div>
-          <div className="mt-2 space-y-1.5 max-h-60 overflow-y-auto">
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                className={cn(
-                  'flex items-start gap-2.5 rounded-xl p-2 text-xs transition-colors hover:bg-muted/70',
-                  n.unread && unreadCount > 0 ? 'bg-primary/5' : '',
-                )}
-              >
-                <span className="mt-0.5 flex h-2 w-2 rounded-full bg-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-foreground truncate">{n.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{n.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center gap-pp-sm rounded-pp bg-pp-surface-container-low px-pp-md py-pp-lg text-center">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-pp-primary-fixed text-pp-primary">
+                <BellOff className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <p className="text-pp-label-md text-pp-on-surface">{t('caughtUp')}</p>
+              <p className="text-pp-body-sm text-pp-on-surface-variant">{t('caughtUpHint')}</p>
+            </div>
+          ) : (
+            <div className="max-h-72 space-y-1 overflow-y-auto">
+              {notifications.map((n) => {
+                const unread = n.unread && !readIds.has(n.id);
+                const body = (
+                  <>
+                    <span
+                      className={cn(
+                        'mt-1.5 flex h-2 w-2 shrink-0 rounded-full',
+                        unread ? 'bg-pp-primary' : 'bg-pp-outline-variant',
+                      )}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-pp-label-md text-pp-on-surface">{n.title}</p>
+                      <p className="text-pp-body-sm text-pp-outline">{n.time}</p>
+                    </div>
+                  </>
+                );
+                const rowClass = cn(
+                  'flex items-start gap-pp-sm rounded-pp p-pp-sm transition-colors hover:bg-pp-surface-container-high',
+                  unread ? 'bg-pp-primary-fixed/40' : '',
+                );
+                return n.href ? (
+                  <Link key={n.id} href={n.href} onClick={close} className={rowClass}>
+                    {body}
+                  </Link>
+                ) : (
+                  <div key={n.id} className={rowClass}>
+                    {body}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : null}
     </div>
   );
+}
+
+/** `useAuth` throws outside `<AuthProvider>`; the header must still render in isolation (tests, error pages). */
+function useOptionalSignOut(): (() => Promise<void>) | null {
+  try {
+    return useAuth().signOut;
+  } catch {
+    return null;
+  }
 }
 
 export function UserProfileMenu({
@@ -179,110 +215,88 @@ export function UserProfileMenu({
   userEmail: string;
   currentOrgId?: string;
 }): React.ReactElement {
+  const t = useTranslations('ShellHeader');
+  const router = useRouter();
+  const signOut = useOptionalSignOut();
   const [isOpen, setIsOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen]);
+  const [signingOut, setSigningOut] = React.useState(false);
+  const close = React.useCallback(() => setIsOpen(false), []);
+  const menuRef = useDismissable(isOpen, close);
 
   const initial = userEmail.charAt(0).toUpperCase();
+
+  async function handleSignOut(): Promise<void> {
+    setSigningOut(true);
+    try {
+      // Clears both the Firebase client session and the server session cookie.
+      if (signOut) await signOut();
+    } finally {
+      setSigningOut(false);
+      close();
+      router.push('/login');
+    }
+  }
+
+  const itemClass =
+    'flex w-full items-center gap-pp-sm rounded-pp px-pp-sm py-2 text-start text-pp-label-md text-pp-on-surface transition-colors hover:bg-pp-surface-container-high';
 
   return (
     <div className="relative" ref={menuRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        aria-label="User Profile Menu"
+        aria-label={t('profileMenu')}
         aria-expanded={isOpen}
-        className="group flex items-center gap-2 rounded-xl border border-border/80 bg-card/80 ps-1.5 pe-2.5 py-1 text-xs shadow-soft transition-all hover:bg-muted/80 focus:outline-none"
+        className="group flex items-center gap-2 rounded-full ps-0.5 pe-1 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-pp-primary/40 sm:pe-3"
       >
-        <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary font-bold transition-transform group-hover:scale-105">
+        <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-pp-primary-fixed font-pp-display text-pp-label-md text-pp-on-primary-fixed shadow-sm ring-2 ring-pp-primary/20 transition-transform group-hover:scale-105">
           {initial}
           <span
-            aria-label="Status: Active"
-            className="absolute bottom-0 end-0 h-2 w-2 rounded-full bg-[#55EFC4] ring-2 ring-background"
+            aria-label={t('statusSignedIn')}
+            className="absolute bottom-0 end-0 h-2.5 w-2.5 rounded-full bg-pp-secondary-fixed-dim ring-2 ring-pp-surface-bright"
           />
-        </div>
-        <span className="hidden sm:inline-block max-w-[130px] truncate text-foreground font-medium">
+        </span>
+        <span className="hidden max-w-[140px] truncate text-pp-label-md text-pp-on-surface sm:inline-block">
           {userEmail}
         </span>
       </button>
 
       {isOpen ? (
-        <div
-          role="menu"
-          aria-label="User menu"
-          className="absolute end-0 top-full mt-2 w-64 rounded-2xl border border-border bg-popover/95 p-2 text-popover-foreground shadow-soft-xl backdrop-blur-xl z-50 animate-slide-down space-y-1"
-        >
-          <div className="p-2 border-b border-border/60">
-            <div className="flex items-center gap-2">
-              <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary font-bold">
-                {initial}
-                <span className="absolute bottom-0 end-0 h-2 w-2 rounded-full bg-[#55EFC4] ring-2 ring-background" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-foreground">{userEmail}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="inline-flex items-center rounded-full bg-[#55EFC4]/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
-                    Online
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">Admin</span>
-                </div>
-              </div>
+        <div role="menu" aria-label={t('userMenu')} className={cn(popoverClass, 'w-64 space-y-1')}>
+          <div className="flex items-center gap-pp-sm rounded-pp bg-pp-surface-container-low p-pp-sm">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pp-primary-fixed font-pp-display text-pp-label-md text-pp-on-primary-fixed">
+              {initial}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-pp-label-sm uppercase tracking-wider text-pp-outline">{t('signedInAs')}</p>
+              <p className="truncate text-pp-label-md text-pp-on-surface">{userEmail}</p>
             </div>
           </div>
 
           <div className="py-1">
             {currentOrgId ? (
-              <Link
-                href={`/orgs/${currentOrgId}/settings`}
-                onClick={() => setIsOpen(false)}
-                role="menuitem"
-                className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs text-foreground hover:bg-muted transition-colors"
-              >
-                <User className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Account & Organization Settings</span>
+              <Link href={`/orgs/${currentOrgId}/settings`} onClick={close} role="menuitem" className={itemClass}>
+                <User className="h-4 w-4 text-pp-on-surface-variant" />
+                <span>{t('accountSettings')}</span>
               </Link>
             ) : null}
-            <Link
-              href="/pricing"
-              onClick={() => setIsOpen(false)}
-              role="menuitem"
-              className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs text-foreground hover:bg-muted transition-colors"
-            >
-              <Shield className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>Subscription & Plans</span>
+            <Link href="/pricing" onClick={close} role="menuitem" className={itemClass}>
+              <Shield className="h-4 w-4 text-pp-on-surface-variant" />
+              <span>{t('plans')}</span>
             </Link>
           </div>
 
-          <div className="pt-1 border-t border-border/60">
-            <Link
-              href="/login"
-              onClick={() => setIsOpen(false)}
+          <div className="border-t border-pp-outline-variant/30 pt-1">
+            <button
+              type="button"
               role="menuitem"
-              className="flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+              onClick={() => void handleSignOut()}
+              disabled={signingOut}
+              className={cn(itemClass, 'text-pp-error hover:bg-pp-error-container/60 disabled:opacity-60')}
             >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Sign Out</span>
-            </Link>
+              <LogOut className="h-4 w-4" />
+              <span>{t('signOut')}</span>
+            </button>
           </div>
         </div>
       ) : null}
@@ -298,6 +312,7 @@ export function Header({
   currentProjectId,
   currentEnv = 'dev',
   userEmail,
+  notifications,
   onMobileMenuToggle,
   isMobileMenuOpen,
   className,
@@ -317,35 +332,35 @@ export function Header({
     <header
       aria-label="Top Navigation"
       className={cn(
-        'sticky top-0 z-30 flex h-16 w-full items-center justify-between gap-4 border-b border-border/80 bg-glass px-4 sm:px-6 backdrop-blur-md shadow-soft transition-all select-none',
+        'sticky top-0 z-30 flex h-16 w-full select-none items-center justify-between gap-pp-md bg-pp-surface-bright/95 px-pp-md shadow-sm backdrop-blur-md transition-all dark:bg-[#121218]/90 sm:px-pp-lg',
         className,
       )}
     >
       {/* Brand & Left Navigation */}
-      <div className="flex items-center gap-3.5 min-w-0">
+      <div className="flex min-w-0 items-center gap-pp-md lg:gap-pp-lg">
         {toggleMobile ? (
           <button
             type="button"
             onClick={toggleMobile}
             aria-label={mobileOpen ? 'Close navigation' : 'Open navigation'}
             aria-expanded={mobileOpen}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-input bg-card text-foreground lg:hidden shadow-soft hover:bg-muted"
+            className={cn(iconButtonClass, 'lg:hidden')}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         ) : null}
 
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-soft transition-transform group-hover:scale-105">
-            <Sparkles className="h-5 w-5" />
-          </div>
-          <span className="hidden sm:inline-block font-bold text-lg tracking-tight bg-brand-gradient bg-clip-text text-transparent">
+        <Link href="/" className="group flex items-center gap-pp-sm">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pp-primary text-pp-on-primary shadow-sm shadow-pp-primary/30 transition-transform group-hover:scale-105">
+            <Network className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span className="hidden font-pp-display text-pp-headline-md font-bold tracking-tight text-pp-primary dark:text-pp-primary-fixed sm:inline-block">
             {brandName}
           </span>
         </Link>
 
         {organizations.length > 0 || projects.length > 0 ? (
-          <div className="hidden lg:flex items-center gap-2.5">
+          <div className="hidden items-center gap-pp-sm lg:flex">
             <div className="w-56">
               <WorkspaceSwitcher
                 organizations={organizations}
@@ -367,16 +382,17 @@ export function Header({
       </div>
 
       {/* Center Command Palette Search (Desktop & Tablet) */}
-      <div className="hidden sm:flex flex-1 max-w-md mx-2">
+      <div className="mx-2 hidden max-w-md flex-1 sm:flex">
         <CommandPalette orgId={currentOrgId} projectId={currentProjectId} />
       </div>
 
       {/* Right Controls & Profile */}
-      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+      <div className="flex shrink-0 items-center gap-pp-sm sm:gap-pp-md">
         <PageGuideButton variant="pill" className="hidden sm:inline-flex" />
         <PageGuideButton variant="inline" className="sm:hidden" />
-        <NotificationBell />
+        <NotificationBell notifications={notifications} />
         <LanguageSwitcher compact />
+        <span className="mx-1 hidden h-6 w-px bg-pp-outline-variant/50 sm:block" aria-hidden="true" />
 
         {userEmail ? (
           <UserProfileMenu userEmail={userEmail} currentOrgId={currentOrgId} />

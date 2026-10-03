@@ -177,9 +177,9 @@ describe('Modern Unified Navigation Shell: Adversarial Stress Test Suite', () =>
       );
 
       const aside = screen.getByLabelText('Sidebar Navigation');
-      expect(aside).toHaveClass('w-64');
+      expect(aside).toHaveClass('w-72');
 
-      // Rapidly toggle 50 times (even -> back to w-64)
+      // Rapidly toggle 50 times (even -> back to w-72)
       for (let i = 0; i < 50; i++) {
         const btn = screen.getByRole('button', {
           name: /collapse sidebar|expand sidebar/i,
@@ -187,7 +187,7 @@ describe('Modern Unified Navigation Shell: Adversarial Stress Test Suite', () =>
         await user.click(btn);
       }
 
-      expect(aside).toHaveClass('w-64');
+      expect(aside).toHaveClass('w-72');
       expect(localStorage.getItem('growthos_sidebar_collapsed')).toBe('false');
 
       // Toggle once more -> odd -> w-16
@@ -214,8 +214,8 @@ describe('Modern Unified Navigation Shell: Adversarial Stress Test Suite', () =>
       );
 
       const aside = screen.getByLabelText('Sidebar Navigation');
-      // Must not crash and should fallback cleanly to expanded w-64
-      expect(aside).toHaveClass('w-64');
+      // Must not crash and should fallback cleanly to expanded w-72
+      expect(aside).toHaveClass('w-72');
       expect(screen.getAllByText('Overview Pulse').length).toBeGreaterThan(0);
     });
 

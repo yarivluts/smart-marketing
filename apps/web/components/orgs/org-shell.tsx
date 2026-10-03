@@ -1,12 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { Building2 } from 'lucide-react';
 import { can } from '@growthos/shared';
-import { AppShell, type AppShellNavItem } from '@/components/orgs/app-shell';
-import { OrgSwitcher } from '@/components/orgs/org-switcher';
+import { NavShell } from '@/components/shell/nav-shell';
+import type { NavShellItem, NavShellSection } from '@/components/shell/nav-types';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
+import { listOrgProjects } from '@/lib/orgs/queries';
 
 export interface OrgShellProps {
   locale: string;
@@ -15,18 +15,18 @@ export interface OrgShellProps {
 }
 
 /**
- * The persistent shell (sidebar / mobile top bar + tab bar) for the four
- * org-only pages (`/orgs/:orgId`, `/resources`, `/audit-log`, `/plugins`) —
- * see `AppShell`'s own doc comment for why this exists.
+ * The persistent shell for the org-only pages (`/orgs/:orgId`, `/resources`,
+ * `/audit-log`, `/plugins`, `/settings`, `/projects/new`).
+ *
+ * Renders the same Stitch "Pastel Pulse" `NavShell` (top bar, sidebar, mobile
+ * drawer + obsidian dock) as `ProjectLayout`, so moving between org and
+ * project pages no longer swaps between two different chromes.
  *
  * Deliberately a plain component each page calls directly, **not** a Next.js
  * `layout.tsx`: `layout.tsx` files nest with every descendant route,
- * including `projects/[projectId]/*` — an org-level `layout.tsx` rendering
- * `AppShell` here would wrap the *project*-level layout's own `AppShell` too,
- * stacking two full shells on every project page (found live: a doubled
- * mobile header, and the bottom tab bar showing org-level items instead of
- * the project's). `ProjectLayout` (the one real `layout.tsx` in this tree)
- * builds its own merged org+project nav instead of relying on this one.
+ * including `projects/[projectId]/*` — an org-level `layout.tsx` here would
+ * wrap the project layout's own shell too, stacking two full shells on every
+ * project page (found live: a doubled mobile header).
  *
  * Duplicates the same auth/membership check every page under it already
  * makes — `getServerSession`/`resolveOrgSessionContext` are both `cache()`d,
@@ -51,50 +51,56 @@ export async function OrgShell({
   const principal = { type: 'user' as const, id: user.id };
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
+  const canManageOrg = can(bindings, principal, 'billing.manage', { orgId });
 
-  const [t, tShell] = await Promise.all([
+  const [t, tShell, tNav, projects] = await Promise.all([
     getTranslations('OrgDetailPage'),
     getTranslations('AppShell'),
+    getTranslations('OrgNav'),
+    listOrgProjects(orgId),
   ]);
 
-  const items: AppShellNavItem[] = [
-    { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
-    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
+  const items: NavShellItem[] = [
+    { id: 'org-home', href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
+    { id: 'org-resources', href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
     ...(canViewAuditLog
-      ? [
-          {
-            href: `/orgs/${orgId}/audit-log`,
-            label: t('auditLogLink'),
-            icon: 'ShieldCheck' as const,
-          },
-        ]
+      ? [{ id: 'org-audit', href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: 'ShieldCheck' as const }]
       : []),
     ...(canManagePlugins
-      ? [
-          {
-            href: `/orgs/${orgId}/plugins`,
-            label: t('pluginRegistryLink'),
-            icon: 'Puzzle' as const,
-          },
-        ]
+      ? [{ id: 'org-plugins', href: `/orgs/${orgId}/plugins`, label: t('pluginRegistryLink'), icon: 'Puzzle' as const }]
+      : []),
+    ...(canManageOrg
+      ? [{ id: 'org-settings', href: `/orgs/${orgId}/settings`, label: tNav('settings'), icon: 'Settings' as const }]
       : []),
   ];
 
+  const projectItems: NavShellItem[] = projects.map((p) => ({
+    id: `org-project-${p.id}`,
+    href: `/orgs/${orgId}/projects/${p.id}`,
+    label: p.name,
+    icon: 'LayoutGrid' as const,
+  }));
+
+  const sections: NavShellSection[] = [
+    { heading: tNav('organizationHeading'), items },
+    ...(projectItems.length > 0 ? [{ heading: tNav('projectsHeading'), items: projectItems }] : []),
+  ];
+
+  const organizations = memberships
+    .filter((m) => m.status === 'active')
+    .map((m) => ({ id: m.organizationId, name: m.organizationName }));
+
   return (
-    <AppShell
-      switchers={
-        <>
-          <span className="flex items-center gap-2 px-3 text-sm font-semibold">
-            <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
-            {tShell('brandName')}
-          </span>
-          <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
-        </>
-      }
-      sections={[{ items }]}
+    <NavShell
+      brandName={tShell('brandName')}
+      organizations={organizations}
+      currentOrgId={orgId}
+      projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+      userEmail={session.email ?? undefined}
+      sections={sections}
       mobileTabItems={items.slice(0, 4)}
     >
       {children}
-    </AppShell>
+    </NavShell>
   );
 }

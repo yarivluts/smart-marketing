@@ -37,7 +37,7 @@ describe('F02: Responsive Desktop Sidebar', () => {
   const sections = buildProjectNavSections('org-1', 'p-1', t);
 
   describe('Tier 1: Primary Happy Path Scenarios', () => {
-    it('F02-T1-01: renders sidebar expanded by default (w-64 mode)', () => {
+    it('F02-T1-01: renders sidebar expanded by default (w-72 mode)', () => {
       renderWithIntl(
         <ShellProvider>
           <Sidebar
@@ -49,7 +49,7 @@ describe('F02: Responsive Desktop Sidebar', () => {
       );
 
       const aside = screen.getByLabelText('Sidebar Navigation');
-      expect(aside).toHaveClass('w-64');
+      expect(aside).toHaveClass('w-72');
       expect(screen.getAllByText('Overview Pulse').length).toBeGreaterThan(0);
       expect(screen.getByText('Collapse sidebar')).toBeInTheDocument();
     });
@@ -74,7 +74,7 @@ describe('F02: Responsive Desktop Sidebar', () => {
       expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
     });
 
-    it('F02-T1-03: expands back to full width (w-64) when expand button is clicked in rail mode', async () => {
+    it('F02-T1-03: expands back to full width (w-72) when expand button is clicked in rail mode', async () => {
       const user = userEvent.setup();
       renderWithIntl(
         <ShellProvider defaultCollapsed={true}>
@@ -90,7 +90,7 @@ describe('F02: Responsive Desktop Sidebar', () => {
       await user.click(expandBtn);
 
       const aside = screen.getByLabelText('Sidebar Navigation');
-      expect(aside).toHaveClass('w-64');
+      expect(aside).toHaveClass('w-72');
     });
 
     it('F02-T1-04: persists collapsed state in localStorage across page reloads', async () => {
@@ -157,7 +157,7 @@ describe('F02: Responsive Desktop Sidebar', () => {
       );
 
       const aside = screen.getByLabelText('Sidebar Navigation');
-      expect(aside).toHaveClass('w-64');
+      expect(aside).toHaveClass('w-72');
     });
 
     it('F02-T2-02: hides workspace switcher combobox in collapsed rail mode to save horizontal space', () => {
