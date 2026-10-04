@@ -21,11 +21,11 @@ export interface AdsKpiScorecardsProps {
 export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps): React.ReactElement {
   const t = useTranslations('Campaigns');
 
-  const spendChange = summary.spendChangePct ?? 14.2;
-  const roasChange = summary.roasChangePct ?? 22.1;
-  const cpaChange = summary.cpaChangePct ?? -12.4;
-  const ctrVal = summary.blendedCtrPct ?? summary.avgCtrPct ?? 2.85;
-  const ctrDiff = ctrVal >= 2.0 ? '+0.8%' : '-0.2%';
+  const spendChange = summary.spendChangePct;
+  const roasChange = summary.roasChangePct;
+  const cpaChange = summary.cpaChangePct;
+  const ctrVal = summary.blendedCtrPct ?? summary.avgCtrPct ?? 0;
+  const ctrDiff = ctrVal > 0 ? (ctrVal >= 2.0 ? '+0.8%' : '-0.2%') : undefined;
 
   const activeProgress =
     summary.totalCampaignsCount > 0
@@ -41,23 +41,27 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
       <StatCard
         title={t('metricTotalSpend')}
         value={`$${summary.totalSpendUsd.toLocaleString()}`}
-        change={`+${spendChange}%`}
+        change={spendChange !== undefined ? `+${spendChange}%` : undefined}
         changeType="increase"
-        period="vs prev 30d"
+        period={spendChange !== undefined ? 'vs prev 30d' : undefined}
         icon={DollarSign}
-        subtext={`Meta: $${summary.metaSpendUsd.toLocaleString()} · Google: $${summary.googleSpendUsd.toLocaleString()}`}
+        subtext={
+          summary.totalSpendUsd > 0
+            ? `Meta: $${summary.metaSpendUsd.toLocaleString()} · Google: $${summary.googleSpendUsd.toLocaleString()}`
+            : 'No live spend recorded'
+        }
       />
 
       {/* 2. Blended ROAS */}
       <StatCard
         title={t('metricBlendedRoas')}
         value={`${summary.blendedRoas.toFixed(1)}x`}
-        change={`+${roasChange}%`}
+        change={roasChange !== undefined ? `+${roasChange}%` : undefined}
         changeType="increase"
-        period="vs prev 30d"
+        period={roasChange !== undefined ? 'vs prev 30d' : undefined}
         icon={TrendingUp}
-        targetHint={t('roasTargetHint', { target: '3.5x' })}
-        progress={Math.min(Math.round((summary.blendedRoas / 3.5) * 100), 100)}
+        targetHint={summary.blendedRoas > 0 ? t('roasTargetHint', { target: '3.5x' }) : undefined}
+        progress={summary.blendedRoas > 0 ? Math.min(Math.round((summary.blendedRoas / 3.5) * 100), 100) : 0}
       />
 
       {/* 3. Impressions & Clicks */}
@@ -69,30 +73,34 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
             : String(summary.totalImpressions)
         }
         icon={MousePointerClick}
-        subtext={`${t('clicksCount', { count: summary.totalClicks.toLocaleString() })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`}
+        subtext={
+          summary.totalImpressions > 0 || summary.totalClicks > 0
+            ? `${t('clicksCount', { count: summary.totalClicks.toLocaleString() })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`
+            : 'No ad network telemetry recorded'
+        }
       />
 
       {/* 4. Average CTR */}
       <StatCard
         title={t('metricAvgCtr')}
-        value={`${ctrVal}%`}
+        value={`${ctrVal.toFixed(2)}%`}
         change={ctrDiff}
         changeType={ctrVal >= 2.0 ? 'increase' : 'decrease'}
-        period="vs benchmark"
+        period={ctrDiff ? 'vs benchmark' : undefined}
         icon={Percent}
-        subtext={t('ctrBenchmarkComparison', { diff: ctrDiff })}
+        subtext={ctrDiff ? t('ctrBenchmarkComparison', { diff: ctrDiff }) : 'No click telemetry recorded'}
       />
 
       {/* 5. Blended CPA */}
       <StatCard
         title={t('metricBlendedCpa')}
         value={`$${summary.blendedCpaUsd.toFixed(2)}`}
-        change={`${cpaChange}%`}
+        change={cpaChange !== undefined ? `${cpaChange}%` : undefined}
         // A decrease in CPA is positive for performance
-        changeType={cpaChange <= 0 ? 'increase' : 'decrease'}
-        period="vs prev 30d"
+        changeType={cpaChange !== undefined && cpaChange <= 0 ? 'increase' : 'decrease'}
+        period={cpaChange !== undefined ? 'vs prev 30d' : undefined}
         icon={Target}
-        subtext={`${summary.totalConversions} total conv.`}
+        subtext={summary.totalConversions > 0 ? `${summary.totalConversions} total conv.` : '0 total conv.'}
       />
 
       {/* 6. Active Campaigns */}

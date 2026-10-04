@@ -45,24 +45,9 @@ export interface AdsPerformanceSummary {
 }
 
 /**
- * Deterministically derives a pseudo-random floating ratio between 0.8 and 1.2
- * based on a string seed (e.g. target ID) so synthesized performance figures
- * are stable and repeatable across page reloads without hardcoding.
- */
-function getDeterministicFactor(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  const normalized = Math.abs(hash % 1000) / 1000; // 0..1
-  return 0.85 + normalized * 0.3; // 0.85 .. 1.15
-}
-
-/**
  * Transforms raw Firestore target rows and warehouse spend breakdown into unified
- * campaign items. If warehouse data is unconfigured or empty, computes realistic
- * simulated performance metrics deterministically based on target daily budget.
+ * campaign items. Returns genuine, telemetry-backed ad figures without fabricating
+ * synthetic hash-derived impressions, clicks, CTR, or ROAS (KAN-300).
  */
 export function buildUnifiedAdsCockpitData(
   targets: AutomationTargetView[],
@@ -92,10 +77,7 @@ export function buildUnifiedAdsCockpitData(
       spendByCampaignId.get(target.campaignResourceName ?? target.id) ??
       spendByCampaignId.get(target.label);
     const hasLiveSpend = typeof rawSpend === 'number' && rawSpend > 0;
-
-    const factor = getDeterministicFactor(target.id || target.label);
-    const budget30d = (target.dailyBudgetUsd || 50) * 30;
-    const spend30dUsd = hasLiveSpend ? rawSpend : Math.round(budget30d * 0.88 * factor);
+    const spend30dUsd = hasLiveSpend ? rawSpend : 0;
 
     const draft = draftsByTargetId?.get(target.id);
     let platform: UnifiedCampaignItem['platform'] = 'simulated';
@@ -109,17 +91,14 @@ export function buildUnifiedAdsCockpitData(
       platform = 'google_ads';
     }
 
-    // Realistic marketing ratios
-    const cpc = 1.25 * (platform === 'google_ads' ? 1.4 : 0.9) * factor;
-    const clicks = Math.max(10, Math.round(spend30dUsd / Math.max(0.2, cpc)));
-    const impressionsPerClick = platform === 'google_ads' ? 24 : 45;
-    const impressions = Math.round(clicks * impressionsPerClick * factor);
-    const ctrPct = impressions > 0 ? (clicks / impressions) * 100 : 2.85;
-    const cvr = platform === 'google_ads' ? 0.082 : 0.054;
-    const conversions = Math.max(1, Math.round(clicks * cvr * factor));
-    const cpaUsd = conversions > 0 ? spend30dUsd / conversions : 24.5;
-    const roas = Number((3.2 * (platform === 'meta_ads' ? 1.15 : 0.95) * factor).toFixed(2));
-    const attributedRevenue = spend30dUsd * roas;
+    // Honest empty metrics when telemetry has not been collected/connected (KAN-300)
+    const clicks = 0;
+    const impressions = 0;
+    const ctrPct = 0;
+    const conversions = 0;
+    const cpaUsd = 0;
+    const roas = 0;
+    const attributedRevenue = 0;
 
     totalSpend += spend30dUsd;
     if (platform === 'meta_ads') {
@@ -146,8 +125,8 @@ export function buildUnifiedAdsCockpitData(
       roas,
       impressions,
       clicks,
-      ctrPct: Number(ctrPct.toFixed(2)),
-      cpaUsd: Number(cpaUsd.toFixed(2)),
+      ctrPct,
+      cpaUsd,
       conversions,
       objective: target.importedObjective,
       campaignResourceName: target.campaignResourceName,
@@ -159,7 +138,7 @@ export function buildUnifiedAdsCockpitData(
     };
   });
 
-  const blendedRoas = totalSpend > 0 ? Number((totalAttributedRevenue / totalSpend).toFixed(2)) : 0;
+  const blendedRoas = totalSpend > 0 && totalAttributedRevenue > 0 ? Number((totalAttributedRevenue / totalSpend).toFixed(2)) : 0;
   const blendedCtrPct = totalImpressions > 0 ? Number(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0;
   const blendedCpaUsd = totalConversions > 0 ? Number((totalSpend / totalConversions).toFixed(2)) : 0;
 
@@ -167,7 +146,7 @@ export function buildUnifiedAdsCockpitData(
     totalSpendUsd: totalSpend,
     metaSpendUsd: metaSpend,
     googleSpendUsd: googleSpend,
-    simulatedSpendUsd: simulatedSpend,
+    simulatedSpendUsd: 0,
     blendedRoas,
     totalImpressions,
     totalClicks,
@@ -176,9 +155,9 @@ export function buildUnifiedAdsCockpitData(
     totalConversions,
     activeCampaignsCount: items.filter((i) => i.status === 'enabled').length,
     totalCampaignsCount: items.length,
-    spendChangePct: totalSpend > 0 ? 14.2 : 0,
-    roasChangePct: totalSpend > 0 ? 22.1 : 0,
-    cpaChangePct: totalSpend > 0 ? -12.4 : 0,
+    spendChangePct: undefined,
+    roasChangePct: undefined,
+    cpaChangePct: undefined,
     avgCtrPct: blendedCtrPct,
   };
 

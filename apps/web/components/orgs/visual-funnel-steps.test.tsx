@@ -78,4 +78,16 @@ describe('VisualFunnelSteps Component', () => {
     expect(screen.getByTestId('count-checkout')).toHaveTextContent('1500 users');
     expect(screen.getByTestId('dropoff-checkout')).toHaveTextContent('-70% drop-off');
   });
+
+  it('renders honest empty state when steps array is empty (KAN-300)', () => {
+    renderWithIntl(<VisualFunnelSteps steps={[]} funnelName="GrowthOS Funnel" />);
+
+    expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
+    expect(screen.getByText('Conversion Funnel: GrowthOS Funnel')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No funnel confirmed yet for this project. Confirm a funnel mapping during onboarding to see conversion here.',
+      ),
+    ).toBeInTheDocument();
+  });
 });

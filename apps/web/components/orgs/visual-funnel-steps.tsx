@@ -27,7 +27,28 @@ export function VisualFunnelSteps({
   className = '',
 }: VisualFunnelStepsProps): React.ReactElement {
   const t = useTranslations('Funnel');
-  const steps = passedSteps && passedSteps.length > 0 ? passedSteps : createMockEasySignFunnel();
+  const steps = passedSteps !== undefined ? passedSteps : createMockEasySignFunnel();
+
+  if (steps.length === 0) {
+    return (
+      <div
+        data-testid="visual-funnel-container"
+        className={`flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card p-12 text-center shadow-xs ${className}`}
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground">
+          <Users className="h-6 w-6" aria-hidden="true" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold text-foreground">
+            {t('visualFunnelHeading', { funnelName })}
+          </h3>
+          <p className="max-w-md text-xs text-muted-foreground">
+            {t('noFunnel')}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const totalStarted = steps[0]?.customerCount ?? 0;
   const totalCompleted = steps[steps.length - 1]?.customerCount ?? 0;

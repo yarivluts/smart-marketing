@@ -141,33 +141,43 @@ export function CampaignListTable({
                       {`$${item.spend30dUsd.toLocaleString()}`}
                     </span>
                     <span className="text-[10px] text-pp-on-surface-variant">
-                      {t('conversionsCountShort', { count: item.conversions })}
+                      {item.conversions > 0
+                        ? t('conversionsCountShort', { count: item.conversions })
+                        : '0 conv'}
                     </span>
                   </div>
                 </td>
 
                 {/* ROAS Badge */}
                 <td className="px-5 py-4">
-                  <Badge
-                    variant={item.roas >= 3.0 ? 'success' : item.roas >= 2.0 ? 'warning' : 'secondary'}
-                    size="sm"
-                    className="font-bold"
-                  >
-                    <TrendingUp className="h-3 w-3 me-1 shrink-0" aria-hidden="true" />
-                    <span dir="ltr">{`${item.roas}x`}</span>
-                  </Badge>
+                  {item.roas > 0 ? (
+                    <Badge
+                      variant={item.roas >= 3.0 ? 'success' : item.roas >= 2.0 ? 'warning' : 'secondary'}
+                      size="sm"
+                      className="font-bold"
+                    >
+                      <TrendingUp className="h-3 w-3 me-1 shrink-0" aria-hidden="true" />
+                      <span dir="ltr">{`${item.roas}x`}</span>
+                    </Badge>
+                  ) : (
+                    <span className="text-xs text-pp-outline">—</span>
+                  )}
                 </td>
 
                 {/* Performance (CTR / CPA) */}
                 <td className="px-5 py-4">
-                  <div className="flex flex-col text-[11px] gap-0.5">
-                    <span className="font-semibold text-pp-on-surface">
-                      <span dir="ltr">{`${item.ctrPct}%`}</span> {t('ctrLabel')}
-                    </span>
-                    <span className="text-pp-on-surface-variant">
-                      <span dir="ltr">{`$${item.cpaUsd}`}</span> {t('cpaLabel')}
-                    </span>
-                  </div>
+                  {item.ctrPct > 0 || item.cpaUsd > 0 ? (
+                    <div className="flex flex-col text-[11px] gap-0.5">
+                      <span className="font-semibold text-pp-on-surface">
+                        <span dir="ltr">{`${item.ctrPct}%`}</span> {t('ctrLabel')}
+                      </span>
+                      <span className="text-pp-on-surface-variant">
+                        <span dir="ltr">{`$${item.cpaUsd}`}</span> {t('cpaLabel')}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-pp-outline">—</span>
+                  )}
                 </td>
 
                 {/* Actions */}

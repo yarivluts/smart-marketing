@@ -3,7 +3,7 @@ import { buildUnifiedAdsCockpitData } from './ads-performance-synthesizer';
 import type { AutomationTargetView } from './automation-view';
 
 describe('ads-performance-synthesizer', () => {
-  it('synthesizes realistic deterministic performance metrics for targets without warehouse data', () => {
+  it('returns honest empty metrics for targets without warehouse data (KAN-300)', () => {
     const targets: AutomationTargetView[] = [
       {
         id: 'campaign-1',
@@ -30,21 +30,26 @@ describe('ads-performance-synthesizer', () => {
     expect(items).toHaveLength(2);
     expect(items[0].platform).toBe('meta_ads');
     expect(items[0].status).toBe('enabled');
-    expect(items[0].spend30dUsd).toBeGreaterThan(0);
-    expect(items[0].roas).toBeGreaterThan(0);
-    expect(items[0].impressions).toBeGreaterThan(items[0].clicks);
-    expect(items[0].clicks).toBeGreaterThan(items[0].conversions);
+    // Genuine zero fallbacks, no fabricated numbers
+    expect(items[0].spend30dUsd).toBe(0);
+    expect(items[0].roas).toBe(0);
+    expect(items[0].impressions).toBe(0);
+    expect(items[0].clicks).toBe(0);
+    expect(items[0].conversions).toBe(0);
+    expect(items[0].ctrPct).toBe(0);
+    expect(items[0].cpaUsd).toBe(0);
 
     expect(items[1].platform).toBe('google_ads');
     expect(items[1].status).toBe('paused');
-    expect(items[1].spend30dUsd).toBeGreaterThan(0);
+    expect(items[1].spend30dUsd).toBe(0);
 
-    expect(summary.totalSpendUsd).toBe(items[0].spend30dUsd + items[1].spend30dUsd);
-    expect(summary.metaSpendUsd).toBe(items[0].spend30dUsd);
-    expect(summary.googleSpendUsd).toBe(items[1].spend30dUsd);
+    expect(summary.totalSpendUsd).toBe(0);
+    expect(summary.metaSpendUsd).toBe(0);
+    expect(summary.googleSpendUsd).toBe(0);
     expect(summary.activeCampaignsCount).toBe(1);
     expect(summary.totalCampaignsCount).toBe(2);
-    expect(summary.blendedRoas).toBeGreaterThan(0);
+    expect(summary.blendedRoas).toBe(0);
+    expect(summary.spendChangePct).toBeUndefined();
   });
 
   it('uses live warehouse spend breakdown when available', () => {
@@ -80,5 +85,7 @@ describe('ads-performance-synthesizer', () => {
 
     expect(items[0].spend30dUsd).toBe(1450);
     expect(summary.totalSpendUsd).toBe(1450);
+    expect(items[0].impressions).toBe(0); // No hash-derived impressions
+    expect(items[0].roas).toBe(0);        // No hash-derived ROAS
   });
 });
