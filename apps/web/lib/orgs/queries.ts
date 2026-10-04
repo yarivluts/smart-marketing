@@ -127,6 +127,11 @@ import {
   type BillingRecoveryItem,
   type ActiveDunningSummaryItem,
   type BillingRecoveryOptions,
+  getCreativeFatigueTelemetryForProject as getCreativeFatigueTelemetryForProjectInOrganization,
+  type CreativeFatigueTelemetryResult,
+  type CreativeFatigueItem,
+  type CreativeFatigueLevel,
+  type CreativeSwapAction,
   type RepCollectionEntryModel,
   type RepCollectionLeaderboardPeriod,
   type RepCollectionLeaderboardResult,
@@ -406,6 +411,22 @@ export type {
   BillingRecoveryItem,
   ActiveDunningSummaryItem,
   BillingRecoveryOptions,
+};
+
+export async function getCreativeFatigueTelemetryForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number },
+): Promise<CreativeFatigueTelemetryResult> {
+  await ensureFirestoreOrm();
+  return getCreativeFatigueTelemetryForProjectInOrganization(organizationId, projectId, options);
+}
+
+export type {
+  CreativeFatigueTelemetryResult,
+  CreativeFatigueItem,
+  CreativeFatigueLevel,
+  CreativeSwapAction,
 };
 
 export async function listFailedPipelineMessagesForProject(

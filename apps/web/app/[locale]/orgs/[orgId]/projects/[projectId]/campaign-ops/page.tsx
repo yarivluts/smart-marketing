@@ -11,11 +11,18 @@ import {
   getCampaignSpendBreakdownForProject,
   getPaybackOverviewForProject,
   getQualityCalibrationBreakdownForProject,
+  getCreativeFatigueTelemetryForProject,
   listOrgProjects,
   listPluginInstallsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { campaignSpendStatusLabelKey } from '@/lib/orgs/campaign-ops-view';
+import {
+  campaignSpendStatusLabelKey,
+  creativeFatigueLevelLabelKey,
+  creativeFatiguePillAccent,
+  creativeSwapActionLabelKey,
+  creativeSwapActionPillAccent,
+} from '@/lib/orgs/campaign-ops-view';
 import { signupQualityScoreTierLabelKey } from '@/lib/orgs/quality-score-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { CampaignTargetInput } from '@/components/orgs/campaign-target-input';
@@ -75,15 +82,16 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
   const installViews = installs.map(toPluginInstallView);
   const paybackPackInstalled = hasActiveInstall(installViews, CAMPAIGN_OPS_PACK_PLUGIN_ID);
 
-  const [paybackOutcome, campaignPaybackOutcome, spendOutcome, calibrationOutcome] = await Promise.all([
+  const [paybackOutcome, campaignPaybackOutcome, spendOutcome, calibrationOutcome, creativeFatigue] = await Promise.all([
     paybackPackInstalled ? getPaybackOverviewForProject(orgId, projectId) : Promise.resolve(null),
     paybackPackInstalled ? getCampaignPaybackBreakdownForProject(orgId, projectId) : Promise.resolve(null),
     getCampaignSpendBreakdownForProject(orgId, projectId),
     paybackPackInstalled ? getQualityCalibrationBreakdownForProject(orgId, projectId) : Promise.resolve(null),
+    getCreativeFatigueTelemetryForProject(orgId, projectId),
   ]);
 
   const hasSpendData = Boolean(spendOutcome.ok && spendOutcome.rows && spendOutcome.rows.length > 0);
-  const isDataConnected = paybackPackInstalled || hasSpendData;
+  const isDataConnected = paybackPackInstalled || hasSpendData || creativeFatigue.hasData;
 
   const t = await getTranslations('CampaignOps');
 
@@ -301,6 +309,118 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           )}
         </PpCard>
       )}
+
+      {/* 5.5. Creative Wear-Out & Fatigue Radar Section (KAN-305, Stitch 6bf1b35b) */}
+      <PpCard
+        title={t('fatigueRadarHeading')}
+        subtitle={t('fatigueRadarDescription')}
+        icon={Radar}
+        iconAccent="error"
+        flush={creativeFatigue.hasData && creativeFatigue.creatives.length > 0}
+      >
+        {!creativeFatigue.hasData || creativeFatigue.creatives.length === 0 ? (
+          <PpEmptyState
+            icon={Radar}
+            title={t('fatigueRadarEmptyTitle')}
+            description={t('fatigueRadarEmptyDescription')}
+          />
+        ) : (
+          <div className="flex flex-col">
+            {/* Fatigue KPI Strip */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 sm:p-5 bg-pp-surface-container-low border-b border-pp-outline-variant/30">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-pp-outline">{t('kpiSaturatedCreatives')}</span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl font-bold font-mono text-pp-error">
+                    {creativeFatigue.fatiguedCount}
+                  </span>
+                  <span className="text-xs text-pp-outline font-mono">
+                    / {creativeFatigue.totalCreatives}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-pp-outline">{t('kpiWearingOutCreatives')}</span>
+                <span className="text-xl font-bold font-mono text-pp-amber">
+                  {creativeFatigue.wearingOutCount}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-pp-outline">{t('kpiAvgDecayRate')}</span>
+                <span className="text-xl font-bold font-mono text-pp-error">
+                  {creativeFatigue.avgDecayRatePct > 0 ? `-${creativeFatigue.avgDecayRatePct}%` : '0.0%'}
+                </span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-pp-outline">{t('kpiBudgetAtRisk')}</span>
+                <span className="text-xl font-bold font-mono text-pp-on-surface">
+                  ${creativeFatigue.budgetAtRisk.toLocaleString(locale, { maximumFractionDigits: 0 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Creatives Fatigue Table */}
+            <PpTable>
+              <thead>
+                <tr>
+                  <th>{t('columnCreative')}</th>
+                  <th>{t('columnChannel')}</th>
+                  <th>{t('columnFrequency')}</th>
+                  <th>{t('columnCtrComparison')}</th>
+                  <th>{t('columnDecayRate')}</th>
+                  <th>{t('columnFatigueLevel')}</th>
+                  <th>{t('columnRecommendation')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {creativeFatigue.creatives.map((c) => (
+                  <tr key={c.id}>
+                    <td className="font-semibold text-pp-on-surface">
+                      <div className="flex flex-col">
+                        <span>{c.creativeName}</span>
+                        <span className="text-xs font-mono text-pp-outline">{c.creativeId}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="uppercase text-xs font-mono font-semibold text-pp-secondary">
+                        {c.channel}
+                      </span>
+                    </td>
+                    <td className="tabular-nums font-mono font-medium">
+                      {c.frequency.toFixed(2)}x
+                    </td>
+                    <td className="tabular-nums font-mono text-xs">
+                      <span className="font-semibold text-pp-on-surface">{c.currentCtrPct.toFixed(2)}%</span>
+                      <span className="text-pp-outline"> / {c.baselineCtrPct.toFixed(2)}%</span>
+                    </td>
+                    <td className="tabular-nums font-mono">
+                      <span
+                        className={
+                          c.decayPct > 0
+                            ? 'text-pp-error font-semibold'
+                            : 'text-pp-mint font-semibold'
+                        }
+                      >
+                        {c.decayPct > 0 ? `-${c.decayPct.toFixed(1)}%` : `+${Math.abs(c.decayPct).toFixed(1)}%`}
+                      </span>
+                    </td>
+                    <td>
+                      <PpPill accent={creativeFatiguePillAccent(c.fatigueLevel)} dot>
+                        {t(creativeFatigueLevelLabelKey(c.fatigueLevel))}
+                      </PpPill>
+                    </td>
+                    <td>
+                      <PpPill accent={creativeSwapActionPillAccent(c.recommendedAction)}>
+                        {t(creativeSwapActionLabelKey(c.recommendedAction))}
+                      </PpPill>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PpTable>
+          </div>
+        )}
+      </PpCard>
 
       {/* 6. Spend Targets & Inline Target Governance Section */}
       <PpCard
