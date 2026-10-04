@@ -105,22 +105,31 @@ export function SetupChecklistHub({
     setStatusMessage(null);
 
     try {
-      const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/setup-checklist/verify`, {
+      const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/setup-checklist/verify-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requirementId: requirement.id,
           action: nextAction,
+          lookbackHours: 24,
+          simulateTestEvent: true,
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
         setVerifiedList(data.verifiedRequirements);
-        const detail = data.testResult?.batchId ? ` (${data.testResult.batchId})` : '';
-        setStatusMessage(
-          nextAction === 'verify' ? `${t('verifiedSuccess')}${detail}` : 'Status updated.',
-        );
+        let msg = 'Status updated.';
+        if (nextAction === 'verify') {
+          if (data.liveDetected) {
+            msg = `Live stream verified! ${data.recordCount ?? 1} events received in the last 24h.`;
+          } else if (data.testResult?.batchId) {
+            msg = `${t('verifiedSuccess')} (${data.testResult.batchId})`;
+          } else {
+            msg = t('verifiedSuccess');
+          }
+        }
+        setStatusMessage(msg);
       }
     } finally {
       setVerifyingId(null);

@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { SetupChecklistHub } from './setup-checklist-hub';
@@ -48,13 +48,16 @@ describe('SetupChecklistHub', () => {
     expect(screen.getByTestId('req-card-req_web_sdk')).toBeInTheDocument();
   });
 
-  it('allows 1-click testing & verifying a requirement', async () => {
+  it('allows 1-click testing & verifying a requirement with live stream telemetry', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
         success: true,
         requirementId: 'req_checkout_stream',
         verified: true,
+        liveDetected: true,
+        recordCount: 8,
+        latestRecordAt: new Date().toISOString(),
         verifiedRequirements: ['req_web_sdk', 'req_checkout_stream'],
       }),
     } as Response);
@@ -67,12 +70,14 @@ describe('SetupChecklistHub', () => {
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
-        '/api/orgs/org-test/projects/proj-test/setup-checklist/verify',
+        '/api/orgs/org-test/projects/proj-test/setup-checklist/verify-stream',
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({
             requirementId: 'req_checkout_stream',
             action: 'verify',
+            lookbackHours: 24,
+            simulateTestEvent: true,
           }),
         }),
       );
