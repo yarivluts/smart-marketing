@@ -122,6 +122,11 @@ import {
   listRepCollectionEntriesForProject as listRepCollectionEntriesForProjectInOrganization,
   getRepCollectionLeaderboardForProject as getRepCollectionLeaderboardForProjectInOrganization,
   listBillingCollectionSignalsForProject as listBillingCollectionSignalsForProjectInOrganization,
+  getBillingRecoveryAnalyticsForProject as getBillingRecoveryAnalyticsForProjectInOrganization,
+  type BillingRecoveryAnalyticsResult,
+  type BillingRecoveryItem,
+  type ActiveDunningSummaryItem,
+  type BillingRecoveryOptions,
   type RepCollectionEntryModel,
   type RepCollectionLeaderboardPeriod,
   type RepCollectionLeaderboardResult,
@@ -386,6 +391,22 @@ export async function listRecentDunningSubscriptionsForProject(
   await ensureFirestoreOrm();
   return listRecentDunningSubscriptionsForProjectInOrganization(organizationId, projectId, limit);
 }
+
+export async function getBillingRecoveryAnalyticsForProject(
+  organizationId: string,
+  projectId: string,
+  options?: BillingRecoveryOptions,
+): Promise<BillingRecoveryAnalyticsResult> {
+  await ensureFirestoreOrm();
+  return getBillingRecoveryAnalyticsForProjectInOrganization(organizationId, projectId, options);
+}
+
+export type {
+  BillingRecoveryAnalyticsResult,
+  BillingRecoveryItem,
+  ActiveDunningSummaryItem,
+  BillingRecoveryOptions,
+};
 
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,

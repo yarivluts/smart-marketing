@@ -10,6 +10,7 @@ import {
   listRecentBillingEventsForProject,
   listRecentChurnedSubscriptionsForProject,
   listRecentDunningSubscriptionsForProject,
+  getBillingRecoveryAnalyticsForProject,
 } from '@/lib/orgs/queries';
 import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from '@/lib/orgs/billing-ops-view';
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
@@ -24,7 +25,7 @@ import {
   PpTable,
   PpPill,
 } from '@/components/pastel/primitives';
-import { Receipt, TrendingDown, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Receipt, TrendingDown, AlertTriangle, ShieldCheck, RotateCw } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -60,12 +61,26 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, rawRecords, churnRecords, dunningRecords, environments] = await Promise.all([
+  const [projects, rawRecords, churnRecords, dunningRecords, environments, recoveryAnalytics] = await Promise.all([
     listOrgProjects(orgId),
     listRecentBillingEventsForProject(orgId, projectId),
     listRecentChurnedSubscriptionsForProject(orgId, projectId),
     listRecentDunningSubscriptionsForProject(orgId, projectId),
     listEnvironmentsForProject(orgId, projectId),
+    getBillingRecoveryAnalyticsForProject(orgId, projectId).catch(() => ({
+      hasData: false,
+      recoveredRevenueTotal: 0,
+      rolling30dRecovered: 0,
+      rolling90dRecovered: 0,
+      atRiskMrrTotal: 0,
+      activeDunningCount: 0,
+      recoveryRatePct: 0,
+      failedPaymentsCount: 0,
+      recoveredPaymentsCount: 0,
+      avgRecoveryHours: 0,
+      recentRecoveries: [],
+      activeDunning: [],
+    })),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -78,7 +93,8 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   const entries = rawRecords.map(toBillingOpsFeedEntryView);
   const churnEntries = churnRecords.map(toChurnFeedEntryView);
   const dunningEntries = dunningRecords.map(toDunningFeedEntryView);
-  const hasBillingData = entries.length > 0 || churnEntries.length > 0 || dunningEntries.length > 0;
+  const hasBillingData =
+    entries.length > 0 || churnEntries.length > 0 || dunningEntries.length > 0 || recoveryAnalytics.hasData;
 
   const t = await getTranslations('BillingOpsFeed');
   const tEnv = await getTranslations('EnvBadge');
@@ -140,7 +156,135 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
         />
       </PpKpiGrid>
 
-      {/* 3. Section 1: Operational Billing Feed */}
+      {/* 3. Section 1: Recovery Revenue & Dunning Performance (KAN-304, Stitch e9857ed6) */}
+      <PpCard
+        title={t('recoveryHeroTitle')}
+        subtitle={t('recoveryHeroSubtitle')}
+        icon={RotateCw}
+        iconAccent="mint"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
+            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
+              {t('recoveredRevenue30d')}
+            </p>
+            <div className="mt-2 text-2xl font-bold tracking-tight text-pp-secondary">
+              {recoveryAnalytics.rolling30dRecovered > 0 ? (
+                `$${recoveryAnalytics.rolling30dRecovered.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              ) : (
+                <span className="text-pp-outline font-normal">—</span>
+              )}
+            </div>
+            <p className="mt-1 text-pp-label-xs text-pp-outline">
+              {t('recoveredRevenue90d')}: ${recoveryAnalytics.rolling90dRecovered.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
+            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
+              {t('recoveryRate')}
+            </p>
+            <div className="mt-2 text-2xl font-bold tracking-tight text-pp-on-surface">
+              {recoveryAnalytics.failedPaymentsCount > 0 ? (
+                `${recoveryAnalytics.recoveryRatePct}%`
+              ) : (
+                <span className="text-pp-outline font-normal">—</span>
+              )}
+            </div>
+            <p className="mt-1 text-pp-label-xs text-pp-outline">
+              {recoveryAnalytics.recoveredPaymentsCount} of {recoveryAnalytics.failedPaymentsCount} payments recovered
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
+            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
+              {t('avgPaybackRate')}
+            </p>
+            <div className="mt-2 text-2xl font-bold tracking-tight text-pp-on-surface">
+              {recoveryAnalytics.recoveredPaymentsCount > 0 ? (
+                t('hoursDuration', { hours: recoveryAnalytics.avgRecoveryHours })
+              ) : (
+                <span className="text-pp-outline font-normal">—</span>
+              )}
+            </div>
+            <p className="mt-1 text-pp-label-xs text-pp-outline">
+              {t('avgRecoveryDuration')}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
+            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
+              {t('atRiskDunningMrr')}
+            </p>
+            <div className="mt-2 text-2xl font-bold tracking-tight text-amber-700 dark:text-amber-400">
+              {recoveryAnalytics.atRiskMrrTotal > 0 ? (
+                `$${recoveryAnalytics.atRiskMrrTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              ) : (
+                <span className="text-pp-outline font-normal">—</span>
+              )}
+            </div>
+            <p className="mt-1 text-pp-label-xs text-pp-outline">
+              {t('activeDunningFlows', { count: recoveryAnalytics.activeDunningCount })}
+            </p>
+          </div>
+        </div>
+      </PpCard>
+
+      {/* 4. Section 2: Recent Payment Recoveries */}
+      <PpCard
+        title={t('recentRecoveriesHeading')}
+        subtitle={t('recentRecoveriesSubtitle')}
+        icon={RotateCw}
+        iconAccent="mint"
+        flush={recoveryAnalytics.recentRecoveries.length > 0}
+      >
+        {recoveryAnalytics.recentRecoveries.length === 0 ? (
+          <p className="text-pp-body-md text-pp-on-surface-variant">{t('recentRecoveriesEmpty')}</p>
+        ) : (
+          <div className="space-y-4">
+            <PpTable>
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Recovered Amount</th>
+                  <th>Payback Latency</th>
+                  <th>Failed Date</th>
+                  <th>Recovered Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recoveryAnalytics.recentRecoveries.map((item) => (
+                  <tr key={item.id}>
+                    <td className="font-mono text-xs text-pp-on-surface font-medium">
+                      {item.customerId ? t('customerLine', { customerId: item.customerId }) : '—'}
+                    </td>
+                    <td className="font-semibold text-pp-secondary">
+                      {t('recoveredAmountLine', { amount: item.recoveredAmount, currency: item.currency.toUpperCase() })}
+                    </td>
+                    <td className="text-pp-body-sm font-medium text-pp-on-surface">
+                      {t('recoveredInHours', { hours: item.latencyHours })}
+                    </td>
+                    <td className="text-pp-label-sm text-pp-outline font-mono">
+                      {item.failedAt}
+                    </td>
+                    <td className="text-pp-label-sm text-pp-outline font-mono">
+                      {item.recoveredAt}
+                    </td>
+                    <td>
+                      <PpPill accent="mint" dot>
+                        {t('statusRecovered')}
+                      </PpPill>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </PpTable>
+          </div>
+        )}
+      </PpCard>
+
+      {/* 5. Section 3: Operational Billing Feed */}
       <PpCard
         title={t('title', { projectName: project.name })}
         subtitle={t('description')}

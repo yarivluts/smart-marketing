@@ -187,5 +187,6 @@ export * from './services/schema-mart.service';
 export * from './warehouse/schema-mart';
 export * from './services/segment.service';
 export * from './services/rep-collection.service';
+export * from './services/billing-recovery.service';
 export * from './plugin-runtime/easysign';
 
