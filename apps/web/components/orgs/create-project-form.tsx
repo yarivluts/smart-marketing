@@ -100,7 +100,6 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
         <PpField label={t('nameLabel')} htmlFor="project-name">
           <input
             id="project-name"
-            aria-label="Project name"
             data-testid="project-name-input"
             required
             placeholder="e.g. Acme SaaS, Storefront, Mobile App"

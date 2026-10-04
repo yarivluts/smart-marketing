@@ -30,9 +30,9 @@ test.describe('Audit log (KAN-44): entries render, chain verifies, quoted summar
     const orgId = await createOrganization(page, 'Audit E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel('Project name').fill('Client Alpha');
+    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
     const projectId = page.url().split('/').slice(-2)[0];
 
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/boards`);

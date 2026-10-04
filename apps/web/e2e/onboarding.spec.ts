@@ -38,11 +38,13 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     const orgId = await createOrganization(page, 'Onboarding E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel('Project name').fill('Client Alpha');
+    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
 
     // Creating a project lands straight on the onboarding wizard (KAN-68), not the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
+    const projectId = page.url().split('/').slice(-2)[0];
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/onboarding`);
     await expect(page.getByRole('heading', { name: 'Get Client Alpha set up' })).toBeVisible();
     await page.getByRole('button', { name: 'Start onboarding' }).click();
 

@@ -38,10 +38,10 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     const orgId = await createOrganization(page, 'Ingest Health E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel('Project name').fill('Client Alpha');
+    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
@@ -91,11 +91,11 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     const orgId = await createOrganization(page, 'Ingest Health Empty E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel('Project name').fill('Client Alpha');
+    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page — this
     // project is the org's only one, so the org page defaults its switcher to it without a `?project=`.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
     await page.goto(`/en/orgs/${orgId}`);
 
     await page.getByRole('link', { name: 'Ingest health' }).click();

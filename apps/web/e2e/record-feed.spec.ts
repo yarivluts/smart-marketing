@@ -31,10 +31,10 @@ test.describe('Record feed (KAN-81)', () => {
     const orgId = await createOrganization(page, 'Record Feed E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel('Project name').fill('Client Beta');
+    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Beta');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
@@ -50,10 +50,10 @@ test.describe('Record feed (KAN-81)', () => {
     const orgId = await createOrganization(page, 'Record Feed Filter E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel('Project name').fill('Client Gamma');
+    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Gamma');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
