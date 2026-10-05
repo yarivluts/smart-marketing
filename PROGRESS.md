@@ -20,26 +20,29 @@ Template for each entry:
 ## 2026-10-05 - Generic external-site integration: browser keys, SDKs, Installation page (KAN-315, KAN-316)
 
 - **Last completed:** Yariv asked for a generic way for external sites (EasySign and any other) to connect, with Node and browser libraries and an easy way to verify the installation.
-  - **PR #584 (KAN-315, deployed d40e103 to api-prod/preprod and web-preprod):**
+  - **PR #584 (KAN-315, deployed d40e103 everywhere, Done):**
     - Publishable `gos_pk_live_` / `gos_pk_test_` browser keys. They are limited to listed origins and can only send events.
     - `text/plain` and `?key=` are accepted, so `sendBeacon` works, with CORS on events and verify only.
     - A secret key used from a web page is refused.
     - `GET /v1/ingest/verify?expect=` returns the installation report.
     - Keys page: key kind and an allowed-origins editor.
-  - **PR #585 (KAN-316, in CI):**
+  - **PR #585 + fix #586 (KAN-316, deployed 5197981, Done):**
     - `@growthos/node`: batching, retries, relay, backfill helpers and the `growthos verify` CLI.
     - `@growthos/browser`: a touchpoint per visit, track/identify/consent, beacon and `verify()`.
     - Both are served by the app at `/sdk/v1/` (script bundle and npm tarballs).
     - Project **Installation** page with a live check, and the MCP tool `check_installation`.
     - Guide: `docs/integrations/quick-start.md`.
   - Every check reports from real records only. Nothing synthetic is ever sent.
-- **In progress (exact stopping point):**
-  - Getting d40e103 onto web-prod: its prod image build had failed to submit, and was resubmitted.
-  - Then merge and deploy #585.
+  - **#586:** the prod check found `/sdk/v1/growthos-node.tgz` had no code. The web image builds only `@growthos/web`'s dependencies, so `@growthos/node` is now one, and `copy-sdk` refuses to pack an unbuilt SDK.
+  - **Verified on prod:** the tarball was installed from prod into a clean project, and CJS, ESM and the `growthos verify` CLI all run (an invalid key exits 2). Also checked: `growthos.js` (9 KB), the browser tarball, and the login page.
+- **In progress (exact stopping point):** none.
 - **Blocked + why:**
-  - An out-of-band tool keeps deploying `feat/stitch-conversion` to web-prod with no env vars, which breaks login.
-  - web-prod traffic is pinned to a known-good revision. Its env is copied by the scratchpad `deploy-web-prod.ps1` on every deploy.
-- **Next step:** after #585 is live, check `/sdk/v1/growthos.js` and the Installation page on prod, then move KAN-316 to Done.
+  - An out-of-band tool deployed `feat/stitch-conversion` to web-prod with no env vars, leaving the service template env-less.
+  - A plain `gcloud run deploy --image` therefore yields a broken revision. Deploy web-prod by copying env and secret refs from a known-good revision (web-prod-00103-d5b), with `--no-traffic`, and route traffic only after `/api/health` shows the expected sha.
+- **Next step:**
+  - Google Ads performance reports.
+  - Gemini 503 retry.
+  - Any answer from the human list below.
 - **Waiting on human:**
   - Whether to publish the SDKs to npm. This needs an npm account or scope; until then installs use the `/sdk/v1/` tarballs.
   - Whether to prepare an EasySign migration PR to the SDKs. The EasySign repo is Adir's.
