@@ -17,6 +17,35 @@ Template for each entry:
 
 ---
 
+## 2026-10-05 - Generic external-site integration: browser keys, SDKs, Installation page (KAN-315, KAN-316)
+
+- **Last completed:** Yariv asked for a generic way for external sites (EasySign and any other) to connect, with Node and browser libraries and an easy way to verify the installation.
+  - **PR #584 (KAN-315, deployed d40e103 to api-prod/preprod and web-preprod):**
+    - Publishable `gos_pk_live_` / `gos_pk_test_` browser keys. They are limited to listed origins and can only send events.
+    - `text/plain` and `?key=` are accepted, so `sendBeacon` works, with CORS on events and verify only.
+    - A secret key used from a web page is refused.
+    - `GET /v1/ingest/verify?expect=` returns the installation report.
+    - Keys page: key kind and an allowed-origins editor.
+  - **PR #585 (KAN-316, in CI):**
+    - `@growthos/node`: batching, retries, relay, backfill helpers and the `growthos verify` CLI.
+    - `@growthos/browser`: a touchpoint per visit, track/identify/consent, beacon and `verify()`.
+    - Both are served by the app at `/sdk/v1/` (script bundle and npm tarballs).
+    - Project **Installation** page with a live check, and the MCP tool `check_installation`.
+    - Guide: `docs/integrations/quick-start.md`.
+  - Every check reports from real records only. Nothing synthetic is ever sent.
+- **In progress (exact stopping point):**
+  - Getting d40e103 onto web-prod: its prod image build had failed to submit, and was resubmitted.
+  - Then merge and deploy #585.
+- **Blocked + why:**
+  - An out-of-band tool keeps deploying `feat/stitch-conversion` to web-prod with no env vars, which breaks login.
+  - web-prod traffic is pinned to a known-good revision. Its env is copied by the scratchpad `deploy-web-prod.ps1` on every deploy.
+- **Next step:** after #585 is live, check `/sdk/v1/growthos.js` and the Installation page on prod, then move KAN-316 to Done.
+- **Waiting on human:**
+  - Whether to publish the SDKs to npm. This needs an npm account or scope; until then installs use the `/sdk/v1/` tarballs.
+  - Whether to prepare an EasySign migration PR to the SDKs. The EasySign repo is Adir's.
+  - The EasySign plugin's four `easysign.*` schemas and their metrics are never registered by any code path (only tests use `ensureEasySignSchemasRegistered`), and EasySign's real integration does not send them. The choice is to remove the plugin or rewire it to what EasySign sends.
+  - Stop the tool that deploys `feat/stitch-conversion` to web-prod.
+
 ## 2026-10-02 - Who speaks + narrator voice, advanced video settings, search ads, Meta audiences (KAN-279..282)
 
 - **Last completed:** all requested by Yariv after his review; every PR deployed to prod and preprod.
