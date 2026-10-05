@@ -5,7 +5,15 @@
 // Runs before next build/dev; the packages are built first (turbo builds dependencies first). The
 // tarballs are what `pnpm pack` publishes, so installing from here equals installing from npm.
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,11 +40,21 @@ copyFileSync(bundle, join(target, 'growthos.js'));
 
 /** Packs one SDK package into public/sdk/v1/<name>.tgz (a stable name, whatever the version). */
 function pack(directory, name) {
+  // pnpm pack happily packs a package that was never built (package.json + README only), which
+  // would serve an SDK with no code - so its entry point must exist first.
+  const packageDir = join(packages, directory);
+  const { main } = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8'));
+  if (!main || !existsSync(join(packageDir, main))) {
+    console.error(
+      `copy-sdk: ${directory} is not built (${main ?? 'no main'} is missing) - add it as a dependency of @growthos/web so it builds first.`,
+    );
+    process.exit(1);
+  }
   const work = join(target, `.pack-${name}`);
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
   execFileSync('pnpm', ['pack', '--pack-destination', work], {
-    cwd: join(packages, directory),
+    cwd: packageDir,
     stdio: 'ignore',
     shell: process.platform === 'win32',
   });
