@@ -46,7 +46,9 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
 
     await page.getByLabel('Name').fill('CI key');
     await page.getByLabel('Environment').selectOption({ label: 'Prod' });
-    await page.getByRole('checkbox', { name: 'ingest.write' }).check();
+    // A browser (publishable) key: the kind that goes into a website, so the snippet comes with it.
+    await page.getByRole('radio', { name: /Browser key/ }).check();
+    await page.getByLabel('Allowed domains (one per line)').fill('https://www.example.com');
     await page.getByRole('button', { name: 'Create key' }).click();
 
     await expect(page.getByText("Copy this key now — it won't be shown again.")).toBeVisible();
@@ -55,10 +57,10 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     // scoped to `MintedApiKeyDisplay`'s own element, not any `<code>` block.
     const rawKeyLocator = page.getByTestId('minted-api-key-value');
     const rawKey = await rawKeyLocator.innerText();
-    expect(rawKey).toMatch(/^gos_live_/);
+    expect(rawKey).toMatch(/^gos_pk_live_/);
 
-    // KAN-57: minting a key with `ingest.write` also surfaces the touchpoint-capture
-    // embed snippet, since the raw key it needs is only ever available right here.
+    // KAN-57: minting a browser key also surfaces the touchpoint-capture embed snippet, since the
+    // raw key it needs is only ever available right here (a server key never gets one).
     await expect(page.getByText('Website tracking snippet')).toBeVisible();
     await expect(page.locator('pre code')).toContainText(rawKey);
     await page.getByRole('button', { name: 'Copy snippet' }).click();
