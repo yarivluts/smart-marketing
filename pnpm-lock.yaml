@@ -177,6 +177,9 @@ importers:
       '@growthos/eslint-config':
         specifier: workspace:*
         version: link:../../packages/eslint-config
+      '@growthos/node':
+        specifier: workspace:*
+        version: link:../../packages/sdk-node
       '@playwright/test':
         specifier: ^1.49.1
         version: 1.61.1
