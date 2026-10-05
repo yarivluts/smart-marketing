@@ -2,12 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { renderEmbedSnippet } from '@growthos/tracking-sdk';
+import { installSnippet } from '@growthos/browser';
 import { Button } from '@/components/ui/button';
 
 export interface TouchpointSnippetDisplayProps {
   writeKey: string;
   ingestBaseUrl: string;
+}
+
+/** The GrowthOS API base (without /v1/ingest) from the ingest URL the app is configured with. */
+export function apiBaseFromIngestUrl(ingestBaseUrl: string): string {
+  return ingestBaseUrl.replace(/\/+$/, '').replace(/\/v1\/ingest$/, '');
 }
 
 /**
@@ -20,7 +25,16 @@ export interface TouchpointSnippetDisplayProps {
 export function TouchpointSnippetDisplay({ writeKey, ingestBaseUrl }: TouchpointSnippetDisplayProps): React.ReactElement {
   const t = useTranslations('ApiKeys');
   const [copied, setCopied] = useState(false);
-  const snippet = useMemo(() => renderEmbedSnippet({ writeKey, ingestBaseUrl }), [writeKey, ingestBaseUrl]);
+  // The SDK script is served by this app itself (apps/web/scripts/copy-sdk.mjs), so its origin is ours.
+  const snippet = useMemo(
+    () =>
+      installSnippet({
+        key: writeKey,
+        api: apiBaseFromIngestUrl(ingestBaseUrl),
+        scriptUrl: `${typeof window === 'undefined' ? '' : window.location.origin}/sdk/v1/growthos.js`,
+      }),
+    [writeKey, ingestBaseUrl],
+  );
 
   async function handleCopy(): Promise<void> {
     try {
@@ -38,6 +52,7 @@ export function TouchpointSnippetDisplay({ writeKey, ingestBaseUrl }: Touchpoint
       <pre className="max-h-64 overflow-auto rounded-md bg-background p-3 text-xs">
         <code>{snippet}</code>
       </pre>
+      <p className="text-xs text-muted-foreground">{t('touchpointSnippetVerify')}</p>
       <Button type="button" variant="outline" size="sm" onClick={handleCopy} className="self-start">
         {copied ? t('copied') : t('copySnippet')}
       </Button>

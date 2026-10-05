@@ -57,3 +57,6 @@ infra/terraform/*_override.tf.json
 
 # Local validation screenshots — evidence for a run, never part of the repo
 apps/web/*.png
+
+# The browser SDK bundle, copied from @growthos/browser at build time (apps/web/scripts/copy-sdk.mjs).
+apps/web/public/sdk/

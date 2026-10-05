@@ -107,6 +107,9 @@ importers:
       '@growthos/ad-studio':
         specifier: workspace:*
         version: link:../../packages/ad-studio
+      '@growthos/browser':
+        specifier: workspace:*
+        version: link:../../packages/sdk-browser
       '@growthos/firebase-orm-models':
         specifier: workspace:*
         version: link:../../packages/firebase-orm-models
@@ -338,6 +341,27 @@ importers:
       eslint:
         specifier: ^9.17.0
         version: 9.39.4(jiti@1.21.7)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)(terser@5.49.2)
+
+  packages/sdk-browser:
+    devDependencies:
+      '@growthos/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      esbuild:
+        specifier: ^0.21.5
+        version: 0.21.5
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.4(jiti@1.21.7)
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

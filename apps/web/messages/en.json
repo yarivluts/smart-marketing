@@ -587,7 +587,7 @@
     "cancelRename": "Cancel",
     "renameError": "Couldn't rename this key. Please try again.",
     "touchpointSnippetHeading": "Website tracking snippet",
-    "touchpointSnippetIntro": "Paste this once, right before the closing body tag, on any page you want to track. It captures UTM parameters and ad-click ids at entry and attaches them to every event this key's project registers.",
+    "touchpointSnippetIntro": "Paste this once in the head section of every page. It loads without slowing the page, sends a touchpoint (campaign, ad click id, landing page) at the start of each visit, and gives you GrowthOS.track(name, properties) and GrowthOS.identify(userId) after login.",
     "copySnippet": "Copy snippet",
     "mcpConnectionsHeading": "MCP connections",
     "mcpEndpointIntro": "Connect an MCP client (Claude Desktop, claude.ai, or a headless agent) to this project.",
@@ -650,7 +650,8 @@
     "originsShort": "Domains:",
     "editOrigins": "Edit domains",
     "saveOrigins": "Save domains",
-    "originsSaveError": "Couldn't save the domains. Please try again."
+    "originsSaveError": "Couldn't save the domains. Please try again.",
+    "touchpointSnippetVerify": "To check the install, open the browser console on your site and run GrowthOS.verify() - or see the Installation check on Ingest health."
   },
   "McpConsent": {
     "metaTitle": "Connect an MCP client",

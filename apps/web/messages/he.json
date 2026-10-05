@@ -587,7 +587,7 @@
     "cancelRename": "ביטול",
     "renameError": "לא ניתן היה לשנות את שם המפתח. נסה שוב.",
     "touchpointSnippetHeading": "קטע מעקב לאתר",
-    "touchpointSnippetIntro": "הדביקו קטע זה פעם אחת, ממש לפני תגית הסגירה של ה-body, בכל עמוד שברצונכם לעקוב אחריו. הקטע לוכד פרמטרי UTM ומזהי קליק ממודעות בעת הכניסה ומצרף אותם לכל אירוע שהפרויקט של מפתח זה רושם.",
+    "touchpointSnippetIntro": "הדביקו את זה פעם אחת באזור ה-head של כל עמוד. הוא נטען בלי להאט את העמוד, שולח touchpoint (קמפיין, מזהה קליק, דף נחיתה) בתחילת כל ביקור, ומאפשר GrowthOS.track(name, properties) ו-GrowthOS.identify(userId) אחרי התחברות.",
     "copySnippet": "העתקת הקטע",
     "mcpConnectionsHeading": "חיבורי MCP",
     "mcpEndpointIntro": "חברו לקוח MCP (Claude Desktop,‏ claude.ai, או סוכן ללא ממשק) לפרויקט זה.",
@@ -650,7 +650,8 @@
     "originsShort": "דומיינים:",
     "editOrigins": "עריכת דומיינים",
     "saveOrigins": "שמירת הדומיינים",
-    "originsSaveError": "לא הצלחנו לשמור את הדומיינים. נסו שוב."
+    "originsSaveError": "לא הצלחנו לשמור את הדומיינים. נסו שוב.",
+    "touchpointSnippetVerify": "כדי לבדוק את ההתקנה, פתחו את הקונסול של הדפדפן באתר והריצו GrowthOS.verify() - או ראו את בדיקת ההתקנה ב-Ingest health."
   },
   "McpConsent": {
     "metaTitle": "חיבור לקוח MCP",

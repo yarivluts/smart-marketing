@@ -3,8 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev -p 3000",
+    "build": "node scripts/copy-sdk.mjs && next build",
+    "dev": "node scripts/copy-sdk.mjs && next dev -p 3000",
     "start": "next start -p 3000",
     "test": "pnpm run test:unit:emulator && pnpm run test:e2e:sharded",
     "test:unit": "vitest run",
@@ -18,6 +18,7 @@
     "@anthropic-ai/sdk": "^0.128.0",
     "@google-cloud/storage": "^8.2.0",
     "@growthos/ad-studio": "workspace:*",
+    "@growthos/browser": "workspace:*",
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
     "@growthos/tracking-sdk": "workspace:*",
