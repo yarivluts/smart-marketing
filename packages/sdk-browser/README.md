@@ -16,7 +16,8 @@ your site. The page then shows the snippet to paste once in the `<head>` of ever
 </script>
 ```
 
-Or with a bundler: `npm install @growthos/browser`, then
+Or with a bundler: `npm install https://<growthos-app>/sdk/v1/growthos-browser.tgz` (until it
+is on npm as `@growthos/browser`), then
 
 ```ts
 import { init, track, identify, getAnonId } from '@growthos/browser';

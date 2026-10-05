@@ -6,6 +6,10 @@ deliberately documents *what the code does*, not the full aspirational contract 
 [`docs/plan/12-api-reference.md`](../plan/12-api-reference.md); the divergences from that
 plan sketch are called out explicitly in [§9](#9-differences-from-the-plan-sketch).
 
+Connecting a whole site (keys, the browser snippet, the Node SDK, verifying it works)? Start with
+[`docs/integrations/quick-start.md`](../integrations/quick-start.md). This page is the wire contract
+underneath.
+
 If you are pushing real data and something is silently missing from your boards, read
 [§5 (validation & quarantine)](#5-validation--quarantine) and
 [§9](#9-differences-from-the-plan-sketch) first — the three record kinds do **not** share a

@@ -5,8 +5,10 @@ dependencies. Batching, retries, a clear result for every record, a relay for br
 backfill helpers and an installation check.
 
 ```bash
-npm install @growthos/node
+npm install https://<growthos-app>/sdk/v1/growthos-node.tgz   # until it is on npm as @growthos/node
 ```
+
+Whole-site walkthrough (keys, browser + server, verifying): [`docs/integrations/quick-start.md`](../../docs/integrations/quick-start.md).
 
 ## Quick start
 
