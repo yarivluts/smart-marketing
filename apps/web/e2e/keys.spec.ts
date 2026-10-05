@@ -66,7 +66,9 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     await page.getByRole('button', { name: 'Copy snippet' }).click();
     const snippetClipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(snippetClipboardText).toContain(rawKey);
-    expect(snippetClipboardText).toContain('window.growthos');
+    // The @growthos/browser loader: queues calls, loads the SDK served by this app, then inits.
+    expect(snippetClipboardText).toContain('/sdk/v1/growthos.js');
+    expect(snippetClipboardText).toContain(`GrowthOS.init({"key":"${rawKey}"`);
 
     // Scoped to `MintedApiKeyDisplay`'s own container: the touchpoint snippet's
     // copy button above was just clicked too, so an unscoped 'Copied' lookup

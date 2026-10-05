@@ -252,6 +252,7 @@ describe('McpController (e2e)', () => {
           'audit_installation_gaps',
           'create_hook_endpoint',
           'get_setup_health',
+          'check_installation',
           'get_ingest_health',
           'evolve_metric',
           'list_hook_endpoints',
@@ -1366,6 +1367,41 @@ describe('McpController (e2e)', () => {
         expect(crossEnvironment.isError).toBe(true);
       } finally {
         await prodClient.close();
+      }
+    });
+  });
+
+  describe('check_installation', () => {
+    it("checks each expected schema in the key's own environment, from real records only", async () => {
+      const a = await setupProjectWithKey('Installation Check Org');
+      await registerSchemaDefinition({ organizationId: a.organization.id, projectId: a.project.id, kind: 'event', name: 'signup', fields: [{ name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }], createdByUserId: a.owner.id });
+      await registerSchemaDefinition({ organizationId: a.organization.id, projectId: a.project.id, kind: 'event', name: 'document_signed', fields: [{ name: 'document_id', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }], createdByUserId: a.owner.id });
+      const now = new Date().toISOString();
+      await ingestBatch({
+        organizationId: a.organization.id,
+        projectId: a.project.id,
+        environmentId: a.devEnvironmentId,
+        input: { kind: 'event', records: [{ event_id: 'ci-1', event: 'signup', ts: now, properties: { plan: 'free' } }, { event_id: 'ci-2', event: 'signup', ts: now, properties: {} }] },
+      });
+      const { rawKey: devKey } = await mintApiKey({ organizationId: a.organization.id, projectId: a.project.id, environmentId: a.devEnvironmentId, name: 'e2e installation dev key', scopes: ['mcp.read'], createdByUserId: a.owner.id });
+      const client = await connectedClient(devKey);
+      try {
+        const result = await client.callTool({ name: 'check_installation', arguments: { expect: ['signup', 'document_signed', 'touchpoint'] } });
+        expect(result.isError ?? false).toBe(false);
+        const body = JSON.parse((result.content as Array<{ text: string }>)[0].text) as { environment: string; status: string; schemas: { name: string; status: string; openQuarantined: number; fix: string | null }[]; installation_page: string };
+        expect(body.environment).toBe('dev');
+        expect(body.status).toBe('attention');
+        expect(body.schemas.map((schema) => [schema.name, schema.status])).toEqual([
+          ['signup', 'receiving'],
+          ['document_signed', 'registered_no_data'],
+          ['touchpoint', 'not_registered'],
+        ]);
+        // Arriving, with one rejected record still waiting: the fix says so.
+        expect(body.schemas[0].openQuarantined).toBe(1);
+        expect(body.schemas[0].fix).toContain('missing_required_field');
+        expect(body.installation_page).toContain(`/projects/${a.project.id}/install`);
+      } finally {
+        await client.close();
       }
     });
   });

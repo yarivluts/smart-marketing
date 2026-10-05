@@ -243,7 +243,8 @@
     "recentActivityAll": "Open the full log",
     "recentActivityEmpty": "Nothing has been changed here yet",
     "recentActivityLatest": "Latest changes",
-    "projectAdStudioLink": "AI Ad Studio"
+    "projectAdStudioLink": "AI Ad Studio",
+    "projectInstallLink": "Installation"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -587,7 +588,7 @@
     "cancelRename": "Cancel",
     "renameError": "Couldn't rename this key. Please try again.",
     "touchpointSnippetHeading": "Website tracking snippet",
-    "touchpointSnippetIntro": "Paste this once, right before the closing body tag, on any page you want to track. It captures UTM parameters and ad-click ids at entry and attaches them to every event this key's project registers.",
+    "touchpointSnippetIntro": "Paste this once in the head section of every page. It loads without slowing the page, sends a touchpoint (campaign, ad click id, landing page) at the start of each visit, and gives you GrowthOS.track(name, properties) and GrowthOS.identify(userId) after login.",
     "copySnippet": "Copy snippet",
     "mcpConnectionsHeading": "MCP connections",
     "mcpEndpointIntro": "Connect an MCP client (Claude Desktop, claude.ai, or a headless agent) to this project.",
@@ -650,7 +651,8 @@
     "originsShort": "Domains:",
     "editOrigins": "Edit domains",
     "saveOrigins": "Save domains",
-    "originsSaveError": "Couldn't save the domains. Please try again."
+    "originsSaveError": "Couldn't save the domains. Please try again.",
+    "touchpointSnippetVerify": "To check the install, open the browser console on your site and run GrowthOS.verify() - or see the Installation check on Ingest health."
   },
   "McpConsent": {
     "metaTitle": "Connect an MCP client",
@@ -4870,5 +4872,65 @@
       "title": "Changes",
       "body": "When this policy changes, the date at the top of this page changes with it."
     }
+  },
+  "Installation": {
+    "metaTitle": "Installation",
+    "title": "Connect your site",
+    "description": "Everything an integration needs in one place: the keys, ready-to-paste code for the website and the server, and a live check of what really arrives.",
+    "keysTitle": "Keys for {environment}",
+    "keysDescription": "A browser key goes in the website (it can only send events, from its domains). A server key stays on your server. Each key writes to one environment.",
+    "keyKinds": {
+      "publishable": "Browser key",
+      "secret": "Server key"
+    },
+    "noKey": {
+      "publishable": "No browser key for this environment yet - mint one on the Keys page with your site domains.",
+      "secret": "No server key with ingest.write for this environment yet - mint one on the Keys page."
+    },
+    "manageKeys": "Manage keys",
+    "codeTitle": "Code",
+    "codeDescription": "With this environment and these addresses filled in. The libraries are served by GrowthOS itself.",
+    "tabs": {
+      "website": "Website snippet",
+      "browser_npm": "Browser package",
+      "node": "Node.js server",
+      "relay": "Relay (strict CSP)",
+      "check": "Check from code"
+    },
+    "tabHints": {
+      "website": "Paste once in the head section of every page. It loads without slowing the page and sends the campaign of each visit.",
+      "browser_npm": "For sites built with a bundler (React, Next.js, Vue...): install the package and call init once.",
+      "node": "For your server: signups, product events and the customer row. Use a server key from an environment variable - never in the page.",
+      "relay": "If your Content-Security-Policy only allows your own origin, pages send to your server and it forwards with the server key.",
+      "check": "Check the installation from a terminal or CI (exit code 0 when everything arrives), or from the browser console on your site."
+    },
+    "fullKeyNote": "Replace the shortened key with the full one you copied when it was created (or mint a new one).",
+    "copy": "Copy",
+    "copied": "Copied",
+    "checkTitle": "Installation check",
+    "checkDescription": "For each schema your site should send: what really arrived in this environment, and what to fix. Nothing is sent by checking.",
+    "noEnvironment": "This project has no environments yet.",
+    "statusOk": "Everything expected is arriving in {environment}.",
+    "statusAttention": "Something needs attention in {environment}.",
+    "checkedAt": "Checked {time}",
+    "listen": "Listen live",
+    "stopListening": "Stop listening",
+    "checkNow": "Check now",
+    "listeningHint": "Re-checking every few seconds - send from your site now and watch each line turn green.",
+    "checkError": "Couldn't run the check. Please try again.",
+    "nothingYet": "Nothing registered or received yet. Add the schema names your site sends.",
+    "status": {
+      "receiving": "Receiving",
+      "stale": "Nothing in 24 hours",
+      "quarantined": "Rejected",
+      "registered_no_data": "Waiting for the first record",
+      "not_registered": "Not registered"
+    },
+    "lastAccepted": "last received {time}",
+    "neverAccepted": "never received",
+    "inQuarantine": "{count} rejected, waiting in quarantine",
+    "removeSchema": "Stop checking {name}",
+    "addSchemaPlaceholder": "Schema name, e.g. signup",
+    "addSchema": "Check it too"
   }
 }

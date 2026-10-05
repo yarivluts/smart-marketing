@@ -243,7 +243,8 @@
     "recentActivityAll": "לפתיחת היומן המלא",
     "recentActivityEmpty": "עדיין לא בוצעו כאן שינויים",
     "recentActivityLatest": "השינויים האחרונים",
-    "projectAdStudioLink": "סטודיו מודעות AI"
+    "projectAdStudioLink": "סטודיו מודעות AI",
+    "projectInstallLink": "התקנה"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -587,7 +588,7 @@
     "cancelRename": "ביטול",
     "renameError": "לא ניתן היה לשנות את שם המפתח. נסה שוב.",
     "touchpointSnippetHeading": "קטע מעקב לאתר",
-    "touchpointSnippetIntro": "הדביקו קטע זה פעם אחת, ממש לפני תגית הסגירה של ה-body, בכל עמוד שברצונכם לעקוב אחריו. הקטע לוכד פרמטרי UTM ומזהי קליק ממודעות בעת הכניסה ומצרף אותם לכל אירוע שהפרויקט של מפתח זה רושם.",
+    "touchpointSnippetIntro": "הדביקו את זה פעם אחת באזור ה-head של כל עמוד. הוא נטען בלי להאט את העמוד, שולח touchpoint (קמפיין, מזהה קליק, דף נחיתה) בתחילת כל ביקור, ומאפשר GrowthOS.track(name, properties) ו-GrowthOS.identify(userId) אחרי התחברות.",
     "copySnippet": "העתקת הקטע",
     "mcpConnectionsHeading": "חיבורי MCP",
     "mcpEndpointIntro": "חברו לקוח MCP (Claude Desktop,‏ claude.ai, או סוכן ללא ממשק) לפרויקט זה.",
@@ -650,7 +651,8 @@
     "originsShort": "דומיינים:",
     "editOrigins": "עריכת דומיינים",
     "saveOrigins": "שמירת הדומיינים",
-    "originsSaveError": "לא הצלחנו לשמור את הדומיינים. נסו שוב."
+    "originsSaveError": "לא הצלחנו לשמור את הדומיינים. נסו שוב.",
+    "touchpointSnippetVerify": "כדי לבדוק את ההתקנה, פתחו את הקונסול של הדפדפן באתר והריצו GrowthOS.verify() - או ראו את בדיקת ההתקנה ב-Ingest health."
   },
   "McpConsent": {
     "metaTitle": "חיבור לקוח MCP",
@@ -4870,5 +4872,65 @@
       "title": "שינויים",
       "body": "כשהמדיניות משתנה, התאריך בראש העמוד משתנה איתה."
     }
+  },
+  "Installation": {
+    "metaTitle": "התקנה",
+    "title": "חיבור האתר שלכם",
+    "description": "כל מה שהתממשקות צריכה במקום אחד: המפתחות, קוד מוכן להדבקה לאתר ולשרת, ובדיקה חיה של מה שבאמת מגיע.",
+    "keysTitle": "מפתחות ל-{environment}",
+    "keysDescription": "מפתח לדפדפן נכנס לאתר (הוא יכול רק לשלוח אירועים, מהדומיינים שלו). מפתח שרת נשאר בשרת שלכם. כל מפתח כותב לסביבה אחת.",
+    "keyKinds": {
+      "publishable": "מפתח לדפדפן",
+      "secret": "מפתח שרת"
+    },
+    "noKey": {
+      "publishable": "עדיין אין מפתח לדפדפן לסביבה הזו - צרו אחד בעמוד המפתחות עם הדומיינים של האתר.",
+      "secret": "עדיין אין מפתח שרת עם ingest.write לסביבה הזו - צרו אחד בעמוד המפתחות."
+    },
+    "manageKeys": "ניהול מפתחות",
+    "codeTitle": "קוד",
+    "codeDescription": "עם הסביבה והכתובות האלה כבר בפנים. הספריות מוגשות על ידי GrowthOS עצמה.",
+    "tabs": {
+      "website": "קטע קוד לאתר",
+      "browser_npm": "חבילה לדפדפן",
+      "node": "שרת Node.js",
+      "relay": "Relay (CSP מחמיר)",
+      "check": "בדיקה מהקוד"
+    },
+    "tabHints": {
+      "website": "הדביקו פעם אחת באזור ה-head של כל עמוד. הוא נטען בלי להאט את העמוד ושולח את הקמפיין של כל ביקור.",
+      "browser_npm": "לאתרים שנבנים עם bundler (React, Next.js, Vue...): התקינו את החבילה וקראו ל-init פעם אחת.",
+      "node": "לשרת שלכם: הרשמות, אירועי מוצר ורשומת הלקוח. השתמשו במפתח שרת ממשתנה סביבה - אף פעם לא בעמוד.",
+      "relay": "אם ה-Content-Security-Policy שלכם מתיר רק את הדומיין שלכם, העמודים שולחים לשרת שלכם והוא מעביר עם מפתח השרת.",
+      "check": "בדקו את ההתקנה מהטרמינל או מה-CI (קוד יציאה 0 כשהכול מגיע), או מהקונסול של הדפדפן באתר."
+    },
+    "fullKeyNote": "החליפו את המפתח המקוצר במפתח המלא שהעתקתם כשנוצר (או צרו מפתח חדש).",
+    "copy": "העתקה",
+    "copied": "הועתק",
+    "checkTitle": "בדיקת התקנה",
+    "checkDescription": "לכל סכמה שהאתר שלכם אמור לשלוח: מה באמת הגיע לסביבה הזו, ומה לתקן. הבדיקה לא שולחת כלום.",
+    "noEnvironment": "לפרויקט הזה עדיין אין סביבות.",
+    "statusOk": "כל מה שמצופה מגיע ל-{environment}.",
+    "statusAttention": "משהו דורש תשומת לב ב-{environment}.",
+    "checkedAt": "נבדק {time}",
+    "listen": "האזנה חיה",
+    "stopListening": "הפסקת האזנה",
+    "checkNow": "בדיקה עכשיו",
+    "listeningHint": "בודק מחדש כל כמה שניות - שלחו עכשיו מהאתר וראו כל שורה הופכת לירוקה.",
+    "checkError": "לא הצלחנו להריץ את הבדיקה. נסו שוב.",
+    "nothingYet": "עדיין לא נרשם ולא התקבל כלום. הוסיפו את שמות הסכמות שהאתר שולח.",
+    "status": {
+      "receiving": "מתקבל",
+      "stale": "כלום ב-24 שעות",
+      "quarantined": "נדחה",
+      "registered_no_data": "ממתין לרשומה הראשונה",
+      "not_registered": "לא רשום"
+    },
+    "lastAccepted": "התקבל לאחרונה {time}",
+    "neverAccepted": "מעולם לא התקבל",
+    "inQuarantine": "{count} נדחו, ממתינים בהסגר",
+    "removeSchema": "הפסקת בדיקה של {name}",
+    "addSchemaPlaceholder": "שם סכמה, למשל signup",
+    "addSchema": "לבדוק גם אותה"
   }
 }

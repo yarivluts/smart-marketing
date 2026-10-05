@@ -11,6 +11,7 @@ import {
   listTrackingAlertsForProject,
   MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA,
   ProjectNotFoundError,
+  verifyInstallationForEnvironment,
 } from '@growthos/firebase-orm-models';
 import {
   buildInstallationGapsOutput,
@@ -207,7 +208,35 @@ async function buildIngestHealth(auth: McpAuthContext, environmentId: string, en
   };
 }
 
+const installationInputShape = {
+  ...environmentInputShape,
+  expect: z
+    .array(z.string())
+    .max(50)
+    .optional()
+    .describe('The schema names the integration should send (events, entities or measures). Omit to check every schema registered or sent in the environment.'),
+};
+
 export function registerMcpSetupTools(server: McpServer, auth: McpAuthContext): void {
+  server.registerTool(
+    'check_installation',
+    {
+      title: 'Check an installation',
+      description:
+        'For each expected schema in one environment, what really arrived: receiving (accepted in the last 24h), stale, quarantined (with reasons), registered_no_data or not_registered - with the fix, and an overall ok/attention. Derived from real records only; nothing is sent or stored. The same check as GET /v1/ingest/verify, the SDKs verify() and the Installation page. An API key checks its own environment.',
+      inputSchema: toolInputSchema(installationInputShape),
+    },
+    auditedToolHandler(auth, 'check_installation', async (args: any) => {
+      const resolved = await resolveFocusEnvironment(auth, args);
+      if ('error' in resolved) {
+        return resolved.error;
+      }
+      const expected = ((args as { expect?: string[] } | undefined)?.expect ?? []).map((name) => name.trim()).filter(Boolean);
+      const check = await verifyInstallationForEnvironment({ organizationId: auth.organizationId, projectId: auth.projectId, environmentId: resolved.focus.environmentId, expected });
+      return textResult({ environment: resolved.focus.environmentName, status: check.report.status, schemas: check.report.schemas, installation_page: `${webAppUrl()}/en/orgs/${auth.organizationId}/projects/${auth.projectId}/install` });
+    }),
+  );
+
   server.registerTool(
     'get_ingest_health',
     {
