@@ -1,24 +1,53 @@
-// Serves the browser SDK from GrowthOS itself: copies @growthos/browser's script-tag bundle to
-// public/sdk/v1/growthos.js, the address the install snippet loads. Runs before next build/dev;
-// the bundle comes from the package's own build (turbo builds dependencies first).
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+// Serves the SDKs from GrowthOS itself, under /sdk/v1/:
+//   growthos.js            - @growthos/browser's script-tag bundle (what the install snippet loads)
+//   growthos-browser.tgz   - npm install https://<app>/sdk/v1/growthos-browser.tgz
+//   growthos-node.tgz      - npm install https://<app>/sdk/v1/growthos-node.tgz
+// Runs before next build/dev; the packages are built first (turbo builds dependencies first). The
+// tarballs are what `pnpm pack` publishes, so installing from here equals installing from npm.
+import { execFileSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-let source = '';
+const here = dirname(fileURLToPath(import.meta.url));
+const target = join(here, '..', 'public', 'sdk', 'v1');
+const packages = join(here, '..', '..', '..', 'packages');
+
+let bundle = '';
 try {
-  source = require.resolve('@growthos/browser/growthos.js');
+  bundle = require.resolve('@growthos/browser/growthos.js');
 } catch {
   // Not built yet: reported below.
 }
-const target = join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'sdk', 'v1', 'growthos.js');
-
-if (!source || !existsSync(source)) {
-  console.error(`copy-sdk: the @growthos/browser bundle is missing - build @growthos/browser first (pnpm --filter @growthos/browser build).`);
+if (!bundle || !existsSync(bundle)) {
+  console.error(
+    'copy-sdk: the @growthos/browser bundle is missing - build @growthos/browser first (pnpm --filter @growthos/browser build).',
+  );
   process.exit(1);
 }
-mkdirSync(dirname(target), { recursive: true });
-copyFileSync(source, target);
-console.log(`copy-sdk: served the browser SDK at /sdk/v1/growthos.js`);
+mkdirSync(target, { recursive: true });
+copyFileSync(bundle, join(target, 'growthos.js'));
+
+/** Packs one SDK package into public/sdk/v1/<name>.tgz (a stable name, whatever the version). */
+function pack(directory, name) {
+  const work = join(target, `.pack-${name}`);
+  rmSync(work, { recursive: true, force: true });
+  mkdirSync(work, { recursive: true });
+  execFileSync('pnpm', ['pack', '--pack-destination', work], {
+    cwd: join(packages, directory),
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
+  });
+  const tarball = readdirSync(work).find((file) => file.endsWith('.tgz'));
+  if (!tarball) throw new Error(`copy-sdk: pnpm pack produced nothing for ${directory}`);
+  renameSync(join(work, tarball), join(target, `${name}.tgz`));
+  rmSync(work, { recursive: true, force: true });
+}
+
+pack('sdk-browser', 'growthos-browser');
+pack('sdk-node', 'growthos-node');
+console.log(
+  'copy-sdk: served the SDKs at /sdk/v1/ (growthos.js, growthos-browser.tgz, growthos-node.tgz)',
+);

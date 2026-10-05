@@ -147,6 +147,7 @@ export default async function ProjectLayout({
       : []),
     ...(canViewIngestHealth
       ? [
+          { href: `${base}/install`, label: t('projectInstallLink'), icon: 'ShieldCheck' as const },
           { href: `${base}/ingest-health`, label: t('projectIngestHealthLink'), icon: 'Activity' as const },
           { href: `${base}/hooks`, label: t('projectHooksLink'), icon: 'Webhook' as const },
           { href: `${base}/field-mappings`, label: t('projectFieldMappingsLink'), icon: 'GitBranch' as const },

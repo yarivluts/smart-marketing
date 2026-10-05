@@ -22,7 +22,10 @@ export function apiBaseFromIngestUrl(ingestBaseUrl: string): string {
  * returns it again). Pasting this `<script>` tag into a site captures
  * UTM/click-ids at entry and attaches them to every event the tracker sends.
  */
-export function TouchpointSnippetDisplay({ writeKey, ingestBaseUrl }: TouchpointSnippetDisplayProps): React.ReactElement {
+export function TouchpointSnippetDisplay({
+  writeKey,
+  ingestBaseUrl,
+}: TouchpointSnippetDisplayProps): React.ReactElement {
   const t = useTranslations('ApiKeys');
   const [copied, setCopied] = useState(false);
   // The SDK script is served by this app itself (apps/web/scripts/copy-sdk.mjs), so its origin is ours.

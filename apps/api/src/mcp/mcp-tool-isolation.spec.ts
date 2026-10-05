@@ -83,6 +83,7 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   get_setup_health: { kind: 'connection-scope', permission: 'mcp.read' },
   audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
   // KAN-202 I4: read-only, the caller's own project, and only the key's own environment.
+  check_installation: { kind: 'connection-scope', permission: 'mcp.read' },
   get_ingest_health: { kind: 'connection-scope', permission: 'mcp.read' },
   // The AI Ad Studio (`mcp-ad-studio-tools.ts`): the studio on `ai.use` like the web routes, its daily
   // limits on `project.configure`, and anything sent to an ad platform on `automation.execute`.
