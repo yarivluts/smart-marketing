@@ -22,7 +22,7 @@ describe('ingest contract (KAN-202 I1)', () => {
   it('is an OpenAPI 3.1 document served under the deployment-configured /v1 base', () => {
     expect(contract.openapi).toBe('3.1.0');
     expect(contract.servers).toEqual([{ url: 'https://api.example.test/v1' }]);
-    expect(Object.keys(contract.paths).sort()).toEqual(['/ingest/batches/{batch_id}', '/ingest/entities', '/ingest/events', '/ingest/measures']);
+    expect(Object.keys(contract.paths).sort()).toEqual(['/ingest/batches/{batch_id}', '/ingest/entities', '/ingest/events', '/ingest/measures', '/ingest/verify']);
   });
 
   it.each([

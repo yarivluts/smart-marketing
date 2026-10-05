@@ -628,7 +628,29 @@
     "noKeysDetail": "הנפיקו מפתח למטה כדי להתחיל לשלוח נתונים או לחבר סוכן.",
     "deactivatedHeading": "מפתחות שהושבתו ({count})",
     "createKeyDescription": "בחרו את השלב ואת מינימום ההרשאות שהאינטגרציה צריכה. הסוד מוצג פעם אחת בלבד.",
-    "lastUsedRelative": "בשימוש {relative}"
+    "lastUsedRelative": "בשימוש {relative}",
+    "kindLabel": "איפה המפתח ישמש",
+    "kind": {
+      "secret": {
+        "label": "מפתח שרת",
+        "hint": "נשמר בסוד בשרת שלכם (Node.js, פונקציות, מערכת ניהול). בחרו את ההרשאות שלו למטה."
+      },
+      "publishable": {
+        "label": "מפתח לדפדפן",
+        "hint": "בטוח לשים באתר. הוא יכול רק לשלוח אירועים, ורק מהדומיינים שתפרטו."
+      }
+    },
+    "originsLabel": "דומיינים מורשים (אחד בכל שורה)",
+    "originsHint": "כתובת מלאה כמו https://www.example.com. השתמשו ב-https://*.example.com לכל תתי-הדומיינים, וב-http://localhost:3000 לפיתוח מקומי.",
+    "originsIssue": {
+      "no_origins": "הוסיפו לפחות דומיין אחד.",
+      "invalid_origin": "כל שורה צריכה להיות כתובת כמו https://www.example.com - בלי נתיב, ו-http רגיל רק ל-localhost.",
+      "too_many_origins": "עד 20 דומיינים."
+    },
+    "originsShort": "דומיינים:",
+    "editOrigins": "עריכת דומיינים",
+    "saveOrigins": "שמירת הדומיינים",
+    "originsSaveError": "לא הצלחנו לשמור את הדומיינים. נסו שוב."
   },
   "McpConsent": {
     "metaTitle": "חיבור לקוח MCP",

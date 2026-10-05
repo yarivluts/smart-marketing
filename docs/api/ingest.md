@@ -41,6 +41,19 @@ Authorization: Bearer gos_live_xxxxxxxx        # or gos_test_… for a test envi
   `Retry-After` header (seconds). Rate limiting is checked only *after* auth + scope pass,
   so an unknown key can never exhaust a real key's budget.
 
+### 1.1 Publishable (browser) keys
+
+A web page never holds a secret key. Mint a **browser key** instead (Keys page, `kind: publishable`):
+
+- Prefix `gos_pk_live_` / `gos_pk_test_`; it always carries exactly `ingest.write`.
+- It works only on `POST /v1/ingest/events` and `GET /v1/ingest/verify` (403 anywhere else), and
+  only from its **allowed origins**, checked against the browser's `Origin` header:
+  `https://www.example.com`, `https://*.example.com` (subdomains only), `http://localhost:3000`.
+  Edit them on the key's card; a change takes effect on the next request.
+- CORS is answered for those two routes. The key may also come as `?key=gos_pk_...` with a
+  `text/plain` JSON body - exactly what `navigator.sendBeacon` sends on page unload, with no preflight.
+- A secret key is refused in a URL (401), and on the browser routes when it arrives from a web page (403).
+
 ## 2. Endpoints
 
 | Method | Path | Body kind |
@@ -49,6 +62,7 @@ Authorization: Bearer gos_live_xxxxxxxx        # or gos_test_… for a test envi
 | `POST` | `/v1/ingest/entities` | entity upserts of one `type` |
 | `POST` | `/v1/ingest/measures` | pre-aggregated measures |
 | `GET`  | `/v1/ingest/batches/{batch_id}` | per-record validation results for a prior batch |
+| `GET`  | `/v1/ingest/verify?expect=a,b` | installation check (section 11) |
 
 All three `POST` endpoints return **`202 Accepted`** with a batch summary even when some (or
 all) records were quarantined — a bad record quarantines only itself; it does not fail the
@@ -250,7 +264,7 @@ participate on the DuckDB leg only.)
 **Never declare either one `is_required` on an event schema.** `customer_id` is absent until
 `identify()` has run, so a required declaration quarantines every event from a not-yet-identified
 visitor — all anonymous traffic — and a schema cannot be deleted or archived, with `evolve_schema`
-additive-only, so the mistake is permanent. Registration now rejects this (KAN-120). Declaring
+additive-only, so the mistake is permanent. Registration warns about this (KAN-120). Declaring
 either field *optional* is fine and has always been.
 
 ## 7. Idempotency & dedup
@@ -299,7 +313,7 @@ reason per record — you do not need a second call to find out what went wrong:
     {
       "client_id": "evt_1",
       "status": "quarantined",           // "quarantined" | "duplicate"
-      "reasons": ["unknown_schema:signup"]
+      "reasons": ["schema_not_registered:signup"]
     }
   ]
 }
@@ -388,3 +402,26 @@ curl -X POST "$INGEST_URL/v1/ingest/measures" \
 # Per-record results
 curl "$INGEST_URL/v1/ingest/batches/b_789" -H "Authorization: Bearer $GOS_KEY"
 ```
+
+## 11. Checking an installation - `GET /v1/ingest/verify`
+
+```bash
+curl -H "Authorization: Bearer $GROWTHOS_KEY" \
+  "https://<api>/v1/ingest/verify?expect=touchpoint,signup,document_signed,customer"
+```
+
+Answers which project and environment the key writes to and - from real records only, never from
+a manual flag or test data - the status of each expected schema (any kind):
+
+| status | meaning |
+| ------ | ------- |
+| `receiving` | accepted in the last 24 hours |
+| `stale` | accepted before, nothing in the last 24 hours |
+| `quarantined` | records arrived but every one was rejected (see `quarantineReasons`) |
+| `registered_no_data` | the schema is registered; nothing arrived in this environment |
+| `not_registered` | not registered - every record of it would be rejected |
+
+Each schema carries a plain-words `fix`; `report.status` is `ok` only when every checked schema is
+receiving with nothing waiting in quarantine. Without `expect`, a secret key gets every schema in
+the environment; a publishable key only checks what it names (default: `touchpoint`). Nothing is
+sent or stored by checking.

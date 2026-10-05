@@ -46,6 +46,14 @@ export const INGEST_CONTRACT_RULES: readonly { id: string; rule: string }[] = [
     id: 'environment_from_key',
     rule: 'The environment (dev, staging, prod) is the one the API key was minted for. It is never a field in the payload; send test traffic with a dev key.',
   },
+  {
+    id: 'publishable_keys_send_events_only',
+    rule: 'A web page uses a publishable key (gos_pk_live_... / gos_pk_test_...), never a secret one: it can only POST /ingest/events and GET /ingest/verify, only from the origins the key allows (checked against the browser Origin header). It may come as ?key= with a text/plain JSON body - the form navigator.sendBeacon sends. A secret key is refused in a URL and from a web page.',
+  },
+  {
+    id: 'verify_installation',
+    rule: 'GET /ingest/verify?expect=a,b tells the key which project and environment it writes to and, from real records only, the status of each expected schema: receiving, stale, quarantined, registered_no_data or not_registered - with the fix. Nothing is sent or stored by checking.',
+  },
 ];
 
 /**
@@ -183,7 +191,8 @@ export function buildIngestContract(apiBaseUrl: string) {
     'x-growthos-backfill': INGEST_BACKFILL_CONTRACT,
     components: {
       securitySchemes: {
-        apiKey: { type: 'http', scheme: 'bearer', description: 'A project API key (gos_live_... / gos_test_...) with the ingest.write scope, bound to one environment.' },
+        apiKey: { type: 'http', scheme: 'bearer', description: 'A project API key with the ingest.write scope, bound to one environment: a secret key (gos_live_... / gos_test_...) on a server, or a publishable key (gos_pk_live_... / gos_pk_test_...) in a web page on one of its allowed origins.' },
+        publishableKeyQuery: { type: 'apiKey', in: 'query', name: 'key', description: 'A publishable key only, for navigator.sendBeacon (which cannot set headers).' },
       },
       schemas: {
         EventRecord: EVENT_RECORD_SCHEMA,
@@ -206,6 +215,54 @@ export function buildIngestContract(apiBaseUrl: string) {
       },
       '/ingest/measures': {
         post: ingestOperation('Send a batch of pre-aggregated measures', batchSchema('records', MEASURE_RECORD_SCHEMA), { records: [MEASURE_EXAMPLE] }),
+      },
+      '/ingest/verify': {
+        get: {
+          summary: 'Check an installation: where this key writes, and what really arrived for each expected schema',
+          security: [{ apiKey: [] }, { publishableKeyQuery: [] }],
+          parameters: [{ name: 'expect', in: 'query', required: false, schema: { type: 'string' }, description: 'Comma-separated schema names, at most 50. Without it a secret key gets every schema; a publishable key only touchpoint.' }],
+          responses: {
+            '200': {
+              description: 'The key, its project and environment, and the check.',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      key: { type: 'object', properties: { kind: { type: 'string', enum: ['secret', 'publishable'] }, prefix: { type: 'string' }, scopes: { type: 'array', items: { type: 'string' } }, allowedOrigins: { type: 'array', items: { type: 'string' } } } },
+                      project: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' } } },
+                      environment: { type: 'object', properties: { id: { type: 'string' }, name: { type: 'string' } } },
+                      report: {
+                        type: 'object',
+                        properties: {
+                          status: { type: 'string', enum: ['ok', 'attention'] },
+                          schemas: {
+                            type: 'array',
+                            items: {
+                              type: 'object',
+                              properties: {
+                                name: { type: 'string' },
+                                kind: { type: ['string', 'null'] },
+                                status: { type: 'string', enum: ['receiving', 'stale', 'quarantined', 'registered_no_data', 'not_registered'] },
+                                registered: { type: 'boolean' },
+                                lastAcceptedAt: { type: ['string', 'null'] },
+                                openQuarantined: { type: 'integer' },
+                                quarantineReasons: { type: 'array', items: { type: 'string' } },
+                                fix: { type: ['string', 'null'] },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            '401': { description: 'Missing, unknown or revoked API key, or a secret key in the URL.' },
+            '403': { description: 'A publishable key from an origin it does not allow, or a secret key from a web page.' },
+          },
+        },
       },
       '/ingest/batches/{batch_id}': {
         get: {

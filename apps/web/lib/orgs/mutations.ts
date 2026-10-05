@@ -140,6 +140,7 @@ import {
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
   renameApiKey as renameApiKeyInOrganization,
+  setApiKeyAllowedOrigins as setApiKeyAllowedOriginsInOrganization,
   type OrchestrationRunModel,
   type PluginInstallModel,
   type PluginManifestModel,
@@ -608,6 +609,8 @@ interface MintApiKeyInput {
   name: string;
   scopes: readonly ApiKeyScope[];
   createdByUserId: string;
+  kind?: 'secret' | 'publishable';
+  allowedOrigins?: readonly string[];
 }
 
 export async function mintApiKey(input: MintApiKeyInput): Promise<MintApiKeyResult> {
@@ -638,6 +641,19 @@ interface RenameApiKeyInput {
 export async function renameApiKey(input: RenameApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return renameApiKeyInOrganization(input);
+}
+
+interface SetApiKeyAllowedOriginsInput {
+  organizationId: string;
+  projectId: string;
+  apiKeyId: string;
+  allowedOrigins: readonly string[];
+  actorUserId: string;
+}
+
+export async function setApiKeyAllowedOrigins(input: SetApiKeyAllowedOriginsInput): Promise<ApiKeyModel> {
+  await ensureFirestoreOrm();
+  return setApiKeyAllowedOriginsInOrganization(input);
 }
 
 interface IssueMcpAuthorizationCodeInput {

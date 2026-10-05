@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
   API_KEY_PREFIXES,
+  PUBLISHABLE_API_KEY_PREFIXES,
+  allowedOriginsIssue,
+  normalizeAllowedOrigins,
+  type AllowedOriginIssue,
+  type ApiKeyKind,
   type ApiKeyScope,
   apiKeyModeForEnvironment,
   err,
@@ -32,6 +37,20 @@ export class ApiKeyNotFoundError extends Error {
   constructor() {
     super('API key not found in this project.');
     this.name = 'ApiKeyNotFoundError';
+  }
+}
+
+export class InvalidAllowedOriginsError extends Error {
+  constructor(public readonly issue: AllowedOriginIssue) {
+    super(`The allowed origins of a publishable key are not valid: ${issue}`);
+    this.name = 'InvalidAllowedOriginsError';
+  }
+}
+
+export class NotAPublishableKeyError extends Error {
+  constructor() {
+    super('Only a publishable key has allowed origins.');
+    this.name = 'NotAPublishableKeyError';
   }
 }
 
@@ -93,6 +112,9 @@ export interface MintApiKeyParams {
   name: string;
   scopes: readonly ApiKeyScope[];
   createdByUserId: string;
+  /** Defaults to `secret`. A publishable key always carries exactly `ingest.write` and needs `allowedOrigins`. */
+  kind?: ApiKeyKind;
+  allowedOrigins?: readonly string[];
 }
 
 export interface MintApiKeyResult {
@@ -116,11 +138,21 @@ export async function mintApiKey(params: MintApiKeyParams): Promise<MintApiKeyRe
     params.environmentId,
   );
 
-  if (params.scopes.length === 0 || !params.scopes.every(isApiKeyScope)) {
+  const kind: ApiKeyKind = params.kind ?? 'secret';
+  // A publishable key is public: it can only ever send events, whatever scopes were asked for.
+  const scopes: readonly ApiKeyScope[] = kind === 'publishable' ? ['ingest.write'] : params.scopes;
+  if (scopes.length === 0 || !scopes.every(isApiKeyScope)) {
     throw new InvalidApiKeyScopeError();
   }
+  let allowedOrigins: string[] = [];
+  if (kind === 'publishable') {
+    const issue = allowedOriginsIssue(params.allowedOrigins ?? []);
+    if (issue) throw new InvalidAllowedOriginsError(issue);
+    allowedOrigins = normalizeAllowedOrigins(params.allowedOrigins ?? []);
+  }
 
-  const prefix = API_KEY_PREFIXES[apiKeyModeForEnvironment(environment.name)];
+  const mode = apiKeyModeForEnvironment(environment.name);
+  const prefix = kind === 'publishable' ? PUBLISHABLE_API_KEY_PREFIXES[mode] : API_KEY_PREFIXES[mode];
   const rawKey = `${prefix}${randomBytes(SECRET_BYTES).toString('base64url')}`;
 
   const apiKey = new ApiKeyModel();
@@ -130,7 +162,9 @@ export async function mintApiKey(params: MintApiKeyParams): Promise<MintApiKeyRe
   apiKey.environment_id = params.environmentId;
   apiKey.key_prefix = rawKey.slice(0, prefix.length + DISPLAY_SECRET_CHARS);
   apiKey.hashed_secret = hashSecret(rawKey);
-  apiKey.scopes = [...params.scopes];
+  apiKey.scopes = [...scopes];
+  apiKey.kind = kind;
+  if (kind === 'publishable') apiKey.allowed_origins = allowedOrigins;
   apiKey.created_by = params.createdByUserId;
   apiKey.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await apiKey.save();
@@ -146,7 +180,7 @@ export async function mintApiKey(params: MintApiKeyParams): Promise<MintApiKeyRe
       targetType: 'api_key',
       targetId: apiKey.id,
       summary: `Minted API key "${apiKey.name}" (${apiKey.key_prefix}…)`,
-      after: { name: apiKey.name, environmentId: apiKey.environment_id, scopes: apiKey.scopes },
+      after: { name: apiKey.name, environmentId: apiKey.environment_id, scopes: apiKey.scopes, kind, ...(kind === 'publishable' ? { allowedOrigins } : {}) },
     });
   } catch {
     // Best-effort — audit logging must never turn a successful mint into a failure for the caller.
@@ -161,6 +195,9 @@ export interface ApiKeyAuthContext {
   projectId: string;
   environmentId: string;
   scopes: readonly ApiKeyScope[];
+  kind: ApiKeyKind;
+  /** Empty for a secret key. */
+  allowedOrigins: readonly string[];
 }
 
 export interface VerifyApiKeyParams {
@@ -193,7 +230,24 @@ function toApiKeyAuthContext(apiKey: ApiKeyModel): ApiKeyAuthContext {
     projectId: apiKey.project_id,
     environmentId: apiKey.environment_id,
     scopes: apiKey.scopes,
+    kind: apiKey.kind ?? 'secret',
+    allowedOrigins: apiKey.allowed_origins ?? [],
   };
+}
+
+/** How stale `last_used_at` may get: writing it on every request would make a busy key one hot document. */
+const LAST_USED_WRITE_INTERVAL_MS = 60_000;
+
+/** Records that the key was used, at most once a minute (best-effort: a failed write never fails the request). */
+async function touchLastUsed(apiKey: ApiKeyModel, now: Date = new Date()): Promise<void> {
+  const previous = apiKey.last_used_at ? Date.parse(apiKey.last_used_at) : Number.NaN;
+  if (Number.isFinite(previous) && now.getTime() - previous < LAST_USED_WRITE_INTERVAL_MS) return;
+  apiKey.last_used_at = now.toISOString();
+  try {
+    await apiKey.save();
+  } catch {
+    // Best-effort.
+  }
 }
 
 /**
@@ -233,8 +287,7 @@ export async function verifyApiKeyForRequest(params: VerifyApiKeyParams): Promis
     return err('This API key does not carry the required scope.');
   }
 
-  apiKey.last_used_at = new Date().toISOString();
-  await apiKey.save();
+  await touchLastUsed(apiKey);
 
   return ok(toApiKeyAuthContext(apiKey));
 }
@@ -276,8 +329,7 @@ export async function authenticateApiKey(
     return err({ reason: 'insufficient_scope', message: 'This API key does not carry the required scope.' });
   }
 
-  apiKey.last_used_at = new Date().toISOString();
-  await apiKey.save();
+  await touchLastUsed(apiKey);
 
   return ok(toApiKeyAuthContext(apiKey));
 }
@@ -372,6 +424,43 @@ export async function renameApiKey(params: RenameApiKeyParams): Promise<ApiKeyMo
   return apiKey;
 }
 
+export interface SetApiKeyAllowedOriginsParams {
+  organizationId: string;
+  projectId: string;
+  apiKeyId: string;
+  allowedOrigins: readonly string[];
+  actorUserId: string;
+}
+
+/** Replaces the web origins a publishable key accepts events from (takes effect on the next request). Audited. */
+export async function setApiKeyAllowedOrigins(params: SetApiKeyAllowedOriginsParams): Promise<ApiKeyModel> {
+  const apiKey = await loadApiKey(params.organizationId, params.projectId, params.apiKeyId);
+  if ((apiKey.kind ?? 'secret') !== 'publishable') throw new NotAPublishableKeyError();
+  const issue = allowedOriginsIssue(params.allowedOrigins);
+  if (issue) throw new InvalidAllowedOriginsError(issue);
+  const before = { allowedOrigins: apiKey.allowed_origins ?? [] };
+  apiKey.allowed_origins = normalizeAllowedOrigins(params.allowedOrigins);
+  await apiKey.save();
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: apiKey.environment_id,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'api_key.set_allowed_origins',
+      targetType: 'api_key',
+      targetId: apiKey.id,
+      summary: `Set the allowed origins of API key (${apiKey.key_prefix}…) to ${apiKey.allowed_origins.join(', ')}`,
+      before,
+      after: { allowedOrigins: apiKey.allowed_origins },
+    });
+  } catch {
+    // Best-effort - see the equivalent comment in mintApiKey above.
+  }
+  return apiKey;
+}
+
 /** Safe-to-display view of a key — never carries `hashed_secret` (KAN-30's admin list needs exactly this shape). */
 export interface ApiKeySummary {
   id: string;
@@ -388,6 +477,9 @@ export interface ApiKeySummary {
    * the first question asked when auditing a credential.
    */
   revokedBy?: string;
+  kind: ApiKeyKind;
+  /** Empty for a secret key. */
+  allowedOrigins: readonly string[];
 }
 
 function toSummary(apiKey: ApiKeyModel): ApiKeySummary {
@@ -401,6 +493,8 @@ function toSummary(apiKey: ApiKeyModel): ApiKeySummary {
     lastUsedAt: apiKey.last_used_at,
     revokedAt: apiKey.revoked_at,
     revokedBy: apiKey.revoked_by,
+    kind: apiKey.kind ?? 'secret',
+    allowedOrigins: apiKey.allowed_origins ?? [],
   };
 }
 

@@ -628,7 +628,29 @@
     "noKeysDetail": "Mint one below to start sending data or to connect an agent.",
     "deactivatedHeading": "Deactivated keys ({count})",
     "createKeyDescription": "Pick the stage and the fewest scopes the integration needs. The secret is shown once.",
-    "lastUsedRelative": "Used {relative}"
+    "lastUsedRelative": "Used {relative}",
+    "kindLabel": "Where the key is used",
+    "kind": {
+      "secret": {
+        "label": "Server key",
+        "hint": "Kept secret on your server (Node.js, functions, back office). Pick its scopes below."
+      },
+      "publishable": {
+        "label": "Browser key",
+        "hint": "Safe to put in your website. It can only send events, and only from the domains you list."
+      }
+    },
+    "originsLabel": "Allowed domains (one per line)",
+    "originsHint": "Full origins like https://www.example.com. Use https://*.example.com for every subdomain, and http://localhost:3000 for local development.",
+    "originsIssue": {
+      "no_origins": "Add at least one domain.",
+      "invalid_origin": "Each line must be an origin like https://www.example.com - no paths, and plain http only for localhost.",
+      "too_many_origins": "At most 20 domains."
+    },
+    "originsShort": "Domains:",
+    "editOrigins": "Edit domains",
+    "saveOrigins": "Save domains",
+    "originsSaveError": "Couldn't save the domains. Please try again."
   },
   "McpConsent": {
     "metaTitle": "Connect an MCP client",

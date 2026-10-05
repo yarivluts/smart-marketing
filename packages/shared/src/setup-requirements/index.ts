@@ -24,3 +24,4 @@ export {
   type SetupHealthLabel,
   type SetupOutputContext,
 } from './describe';
+export * from './installation-check';
