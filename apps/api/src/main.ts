@@ -5,7 +5,9 @@ import './instrument';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { configureBrowserIngest } from './browser-ingest.setup';
 import { connectFirestoreOrmForApi } from './firestore-orm.bootstrap';
 import { assertPublicUrlsConfigured } from './mcp-oauth/mcp-oauth-urls';
 
@@ -20,7 +22,9 @@ async function bootstrap(): Promise<void> {
   // `rawBody: true` preserves the exact request bytes on `request.rawBody` alongside the parsed
   // `request.body` — KAN-53's hook receiver needs the untouched bytes for HMAC signature
   // verification, since a re-serialized JSON body would compute a different (and wrong) digest.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  // Publishable (browser) keys: text/plain bodies and CORS on the two browser routes.
+  configureBrowserIngest(app);
   // KAN-75's MCP OAuth 2.1 protocol endpoints live outside the `/v1` prefix: `.well-known/*`
   // discovery paths are fixed by RFC 8615 (not app-namespaced), and `/oauth/*` matches what a
   // generic OAuth client (dynamic client registration, `/authorize` redirects) expects to find

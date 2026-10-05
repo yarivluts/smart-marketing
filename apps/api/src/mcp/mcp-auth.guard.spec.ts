@@ -55,7 +55,7 @@ describe('McpAuthGuard', () => {
   it('authenticates a live API key with the mcp.read scope, attaching principalKind "api_key"', async () => {
     mockAuthenticateApiKey.mockResolvedValue({
       ok: true,
-      value: { apiKey: { id: 'key-1' } as never, organizationId: 'org-1', projectId: 'proj-1', environmentId: 'env-1', scopes: ['mcp.read'] },
+      value: { apiKey: { id: 'key-1' } as never, organizationId: 'org-1', projectId: 'proj-1', environmentId: 'env-1', scopes: ['mcp.read'], kind: 'secret', allowedOrigins: [] },
     });
     const { context, request } = makeContext({ headers: { authorization: 'Bearer gos_live_ok' } });
 
@@ -130,7 +130,7 @@ describe('McpAuthGuard', () => {
       const limitedGuard = new McpAuthGuard(limiter);
       mockAuthenticateApiKey.mockResolvedValue({
         ok: true,
-        value: { apiKey: { id: 'key-1' } as never, organizationId: 'org-1', projectId: 'proj-1', environmentId: 'env-1', scopes: ['mcp.read'] },
+        value: { apiKey: { id: 'key-1' } as never, organizationId: 'org-1', projectId: 'proj-1', environmentId: 'env-1', scopes: ['mcp.read'], kind: 'secret', allowedOrigins: [] },
       });
       const { context, setHeader } = makeContext({ headers: { authorization: 'Bearer gos_live_ok' } });
 

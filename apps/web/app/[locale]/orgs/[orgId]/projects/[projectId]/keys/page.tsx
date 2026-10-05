@@ -17,6 +17,7 @@ import { apiKeyUsageStatus, sortApiKeys, summarizeApiKeys, type ApiKeyUsageStatu
 import { formatRelativeTime } from '@/lib/orgs/recency';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
 import { EditApiKeyNameForm } from '@/components/orgs/edit-api-key-name-form';
+import { EditAllowedOriginsForm } from '@/components/orgs/edit-allowed-origins-form';
 import { RevokeApiKeyButton } from '@/components/orgs/revoke-api-key-button';
 import { RevokeMcpConnectionButton } from '@/components/orgs/revoke-mcp-connection-button';
 import { EnvironmentPill } from '@/components/orgs/environment-pill';
@@ -142,6 +143,7 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
                   {apiKey.keyPrefix}
                 </code>
                 {environmentName ? <EnvironmentPill name={environmentName} label={tEnv(environmentName)} /> : null}
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t(`kind.${apiKey.kind}.label`)}</span>
               </span>
             </div>
           </div>
@@ -150,6 +152,10 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
             {!apiKey.revokedAt ? <RevokeApiKeyButton orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} /> : null}
           </div>
         </div>
+
+        {apiKey.kind === 'publishable' && !apiKey.revokedAt ? (
+          <EditAllowedOriginsForm orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} initialOrigins={apiKey.allowedOrigins} />
+        ) : null}
 
         {apiKey.scopes.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">

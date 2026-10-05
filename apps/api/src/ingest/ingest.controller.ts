@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
   attributeIngestBatchToBackfill,
   EmptyIngestBatchError,
@@ -6,12 +6,15 @@ import {
   IngestBatchTooLargeError,
   ingestBatch,
   validateIngestBatch,
+  verifyInstallationForKey,
+  type InstallationVerification,
   type IngestBatchInput,
   type IngestValidationSummary,
 } from '@growthos/firebase-orm-models';
 import { Public } from '../authz/public.decorator';
 import { ApiKeyAuthGuard, type ApiKeyAuthenticatedRequest } from '../authz/api-key-auth.guard';
 import { RequireApiKeyScope } from '../authz/api-key-scope.decorator';
+import { AllowPublishableKey } from '../authz/allow-publishable-key.decorator';
 import { parseEntitiesRequestBody, parseEventsRequestBody, parseMeasuresRequestBody } from './ingest-request';
 
 interface IngestBatchResponse {
@@ -43,6 +46,22 @@ function backfillIdFromHeaders(headers: ApiKeyAuthenticatedRequest['headers']): 
   return value && value.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value) ? value : undefined;
 }
 
+/**
+ * A browser sending with `sendBeacon` (or as `text/plain` to skip the CORS preflight) delivers the
+ * JSON as a string; anything else is the parsed body already.
+ */
+function jsonBody(body: unknown): unknown {
+  if (typeof body !== 'string') return body;
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new BadRequestException('The request body is not valid JSON.');
+  }
+}
+
+/** At most this many schema names per check - enough for any site, small enough to stay one cheap read each. */
+const MAX_EXPECTED_SCHEMAS = 50;
+
 /** `ApiKeyAuthGuard` always populates this before a route handler runs (it throws first if authentication fails), so a missing context here would mean the guard was bypassed, not a caller error. */
 function requireApiKeyContext(request: ApiKeyAuthenticatedRequest) {
   if (!request.apiKeyContext) {
@@ -59,8 +78,27 @@ function requireApiKeyContext(request: ApiKeyAuthenticatedRequest) {
 export class IngestController {
   @Post('events')
   @HttpCode(202)
+  @AllowPublishableKey()
   ingestEvents(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestBatchResponse> {
-    return this.handleBatch(request, parseEventsRequestBody(body));
+    return this.handleBatch(request, parseEventsRequestBody(jsonBody(body)));
+  }
+
+  /**
+   * The installation check: which project and environment this key writes to and, from real
+   * records only, how each schema in `?expect=a,b` is doing there (receiving, stale, quarantined,
+   * registered with no data, not registered) with the next step. A secret key without `expect`
+   * gets every schema; a publishable key only the ones it names (default: touchpoint).
+   */
+  @Get('verify')
+  @AllowPublishableKey()
+  verify(@Req() request: ApiKeyAuthenticatedRequest, @Query('expect') expect?: string | string[]): Promise<InstallationVerification> {
+    const context = requireApiKeyContext(request);
+    const names = (Array.isArray(expect) ? expect : [expect ?? ''])
+      .flatMap((value) => value.split(','))
+      .map((name) => name.trim())
+      .filter(Boolean);
+    if (names.length > MAX_EXPECTED_SCHEMAS) throw new BadRequestException(`Name at most ${MAX_EXPECTED_SCHEMAS} schemas in expect.`);
+    return verifyInstallationForKey(context, names);
   }
 
   @Post('entities')

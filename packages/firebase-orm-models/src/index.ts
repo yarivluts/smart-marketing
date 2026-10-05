@@ -174,6 +174,7 @@ export * from './services/product-analytics.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './services/setup-health.service';
+export * from './services/installation-verification.service';
 export * from './vault';
 export * from './rate-limit';
 export * from './warehouse';

@@ -7,14 +7,17 @@ import {
   createProject,
   EnvironmentNotFoundError,
   ensureUserForFirebaseSession,
+  InvalidAllowedOriginsError,
   InvalidApiKeyNameError,
   InvalidApiKeyScopeError,
   listApiKeysForProject,
   listAuditLogEntriesForOrg,
   mintApiKey,
+  NotAPublishableKeyError,
   ProjectNotFoundError,
   renameApiKey,
   revokeApiKey,
+  setApiKeyAllowedOrigins,
   verifyApiKeyForRequest,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -603,5 +606,56 @@ describe('listApiKeysForProject summary', () => {
     expect(afterRevoke?.revokedBy).toBe(owner.id);
     expect(afterRevoke?.revokedAt).toBeTruthy();
     expect(afterRevoke?.createdBy).toBe(owner.id);
+  });
+});
+
+describe('publishable (browser) keys', () => {
+  it('mints a gos_pk_ key that only carries ingest.write, with its origins normalized', async () => {
+    const { owner, organization, project, devEnvironment } = await setupProject('Publishable Key Org');
+    const { apiKey, rawKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      name: 'Website',
+      scopes: ['ingest.write', 'schema.write'],
+      kind: 'publishable',
+      allowedOrigins: ['https://WWW.example.com/', 'http://localhost:3000'],
+      createdByUserId: owner.id,
+    });
+    expect(rawKey.startsWith('gos_pk_test_')).toBe(true);
+    expect(apiKey).toMatchObject({ kind: 'publishable', scopes: ['ingest.write'], allowed_origins: ['https://www.example.com', 'http://localhost:3000'] });
+    const auth = await authenticateApiKey(rawKey, 'ingest.write');
+    expect(auth.ok && auth.value).toMatchObject({ kind: 'publishable', allowedOrigins: ['https://www.example.com', 'http://localhost:3000'] });
+    const listed = await listApiKeysForProject(organization.id, project.id);
+    expect(listed[0]).toMatchObject({ kind: 'publishable', allowedOrigins: ['https://www.example.com', 'http://localhost:3000'] });
+  });
+
+  it('refuses a publishable key without valid origins, and origins on a secret key', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Publishable Refusals Org');
+    const base = { organizationId: organization.id, projectId: project.id, environmentId: prodEnvironment.id, name: 'Site', scopes: ['ingest.write'] as const, createdByUserId: owner.id };
+    await expect(mintApiKey({ ...base, kind: 'publishable', allowedOrigins: [] })).rejects.toBeInstanceOf(InvalidAllowedOriginsError);
+    await expect(mintApiKey({ ...base, kind: 'publishable', allowedOrigins: ['https://example.com/path'] })).rejects.toMatchObject({ issue: 'invalid_origin' });
+    const secret = await mintApiKey({ ...base });
+    expect(secret.apiKey.kind).toBe('secret');
+    await expect(setApiKeyAllowedOrigins({ organizationId: organization.id, projectId: project.id, apiKeyId: secret.apiKey.id, allowedOrigins: ['https://example.com'], actorUserId: owner.id })).rejects.toBeInstanceOf(NotAPublishableKeyError);
+  });
+
+  it('replaces the origins of a publishable key, audited', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Publishable Origins Org');
+    const { apiKey } = await mintApiKey({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironment.id, name: 'Site', scopes: ['ingest.write'], kind: 'publishable', allowedOrigins: ['https://a.example.com'], createdByUserId: owner.id });
+    const updated = await setApiKeyAllowedOrigins({ organizationId: organization.id, projectId: project.id, apiKeyId: apiKey.id, allowedOrigins: ['https://*.example.com', 'https://example.com'], actorUserId: owner.id });
+    expect(updated.allowed_origins).toEqual(['https://*.example.com', 'https://example.com']);
+    const audit = await listAuditLogEntriesForOrg(organization.id);
+    expect(audit.some((entry) => entry.action === 'api_key.set_allowed_origins')).toBe(true);
+  });
+
+  it('records last use at most once a minute, so a busy browser key is not one hot document', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Last Used Org');
+    const { rawKey } = await mintApiKey({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironment.id, name: 'Server', scopes: ['ingest.write'], createdByUserId: owner.id });
+    const first = await authenticateApiKey(rawKey, 'ingest.write');
+    const firstUse = first.ok ? first.value.apiKey.last_used_at : undefined;
+    expect(firstUse).toEqual(expect.any(String));
+    const second = await authenticateApiKey(rawKey, 'ingest.write');
+    expect(second.ok && second.value.apiKey.last_used_at).toBe(firstUse);
   });
 });

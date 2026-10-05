@@ -10,6 +10,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { GET, POST } from './route';
+import { PATCH as PATCH_KEY } from './[apiKeyId]/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -217,6 +218,42 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/keys', () => {
     expect(listed.apiKeys[0]).toMatchObject({ id: body.apiKeyId, name: 'CI key', keyPrefix: body.keyPrefix });
     expect(listed.apiKeys[0]).not.toHaveProperty('hashedSecret');
     expect(listed.apiKeys[0]).not.toHaveProperty('rawKey');
+  });
+
+  it('mints a browser (publishable) key with only ingest.write and its domains, edits the domains, and refuses bad ones', async () => {
+    const { ownerSession, organization, project, prodEnvironment } = await setupOrgProject('Keys Browser Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const params = Promise.resolve({ orgId: organization.id, projectId: project.id });
+
+    const noOrigins = await POST(keysRequest(organization.id, project.id, { name: 'Site', environmentId: prodEnvironment.id, kind: 'publishable', allowedOrigins: [] }).request, { params });
+    expect(noOrigins.status).toBe(400);
+    expect(await noOrigins.json()).toEqual({ error: 'invalid_origins', issue: 'no_origins' });
+    const badOrigin = await POST(keysRequest(organization.id, project.id, { name: 'Site', environmentId: prodEnvironment.id, kind: 'publishable', allowedOrigins: ['http://example.com'] }).request, { params });
+    expect(await badOrigin.json()).toEqual({ error: 'invalid_origins', issue: 'invalid_origin' });
+    expect((await POST(keysRequest(organization.id, project.id, { name: 'X', environmentId: prodEnvironment.id, kind: 'weird', scopes: ['ingest.write'] }).request, { params })).status).toBe(400);
+
+    const response = await POST(
+      keysRequest(organization.id, project.id, { name: 'Site', environmentId: prodEnvironment.id, kind: 'publishable', scopes: ['schema.write'], allowedOrigins: ['https://WWW.example.com/'] }).request,
+      { params },
+    );
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { apiKeyId: string; rawKey: string; kind: string; allowedOrigins: string[] };
+    expect(body.rawKey).toMatch(/^gos_pk_live_/);
+    expect(body).toMatchObject({ kind: 'publishable', allowedOrigins: ['https://www.example.com'] });
+    const listed = (await (await GET(keysRequest(organization.id, project.id).request, { params })).json()) as { apiKeys: Array<Record<string, unknown>> };
+    expect(listed.apiKeys[0]).toMatchObject({ kind: 'publishable', scopes: ['ingest.write'], allowedOrigins: ['https://www.example.com'] });
+
+    const patch = (allowedOrigins: unknown, apiKeyId = body.apiKeyId) =>
+      PATCH_KEY(
+        new NextRequest(`https://growthos.test/api/orgs/${organization.id}/projects/${project.id}/keys/${apiKeyId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowedOrigins }) }),
+        { params: Promise.resolve({ orgId: organization.id, projectId: project.id, apiKeyId }) },
+      );
+    const updated = await patch(['https://www.example.com', 'https://*.example.com']);
+    expect(await updated.json()).toEqual({ apiKeyId: body.apiKeyId, allowedOrigins: ['https://www.example.com', 'https://*.example.com'] });
+    expect(await (await patch(['ftp://example.com'])).json()).toEqual({ error: 'invalid_origins', issue: 'invalid_origin' });
+
+    const server = (await (await POST(keysRequest(organization.id, project.id, { name: 'Server', environmentId: prodEnvironment.id, scopes: ['ingest.write'] }).request, { params })).json()) as { apiKeyId: string };
+    expect(await (await patch(['https://www.example.com'], server.apiKeyId)).json()).toEqual({ error: 'not_publishable' });
   });
 
   it('KAN-142: lets a project-scoped project_admin mint a key in THEIR OWN project', async () => {

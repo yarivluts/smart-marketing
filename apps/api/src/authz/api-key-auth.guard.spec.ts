@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { authenticateApiKey, InMemoryTokenBucketRateLimiter, type RateLimiter } from '@growthos/firebase-orm-models';
 import { ApiKeyAuthGuard, type ApiKeyAuthenticatedRequest, type HeaderSettableResponse } from './api-key-auth.guard';
 import { API_KEY_SCOPE_KEY } from './api-key-scope.decorator';
+import { ALLOW_PUBLISHABLE_KEY } from './allow-publishable-key.decorator';
 
 jest.mock('@growthos/firebase-orm-models', () => {
   const actual = jest.requireActual('@growthos/firebase-orm-models');
@@ -57,6 +58,54 @@ describe('ApiKeyAuthGuard', () => {
     mockAuthenticateApiKey.mockReset();
   });
 
+  describe('publishable (browser) keys', () => {
+    const publishable = {
+      apiKey: { id: 'k-pub' } as never,
+      organizationId: 'org-1',
+      projectId: 'proj-1',
+      environmentId: 'env-1',
+      scopes: ['ingest.write'] as const,
+      kind: 'publishable' as const,
+      allowedOrigins: ['https://easysign.example', 'https://*.easysign.example'],
+    };
+    const browserRoute = { [API_KEY_SCOPE_KEY]: 'ingest.write', [ALLOW_PUBLISHABLE_KEY]: true };
+
+    it('lets a publishable key send from an allowed origin, by header or by ?key= (sendBeacon)', async () => {
+      mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: publishable });
+      const { guard, context } = makeGuard(browserRoute);
+      await expect(guard.canActivate(context({ headers: { authorization: 'Bearer gos_pk_live_x', origin: 'https://easysign.example' } }))).resolves.toBe(true);
+      await expect(guard.canActivate(context({ headers: { origin: 'https://www.easysign.example' }, query: { key: 'gos_pk_live_x' } }))).resolves.toBe(true);
+      expect(mockAuthenticateApiKey).toHaveBeenLastCalledWith('gos_pk_live_x', 'ingest.write');
+    });
+
+    it('refuses (403) another origin or no origin, naming what to fix', async () => {
+      mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: publishable });
+      const { guard, context } = makeGuard(browserRoute);
+      await expect(guard.canActivate(context({ headers: { authorization: 'Bearer gos_pk_live_x', origin: 'https://evil.example' } }))).rejects.toThrow('does not allow requests from https://evil.example');
+      await expect(guard.canActivate(context({ headers: { authorization: 'Bearer gos_pk_live_x' } }))).rejects.toThrow(ForbiddenException);
+    });
+
+    it('refuses (403) a publishable key on any route not marked for it - deny by default', async () => {
+      mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: publishable });
+      const { guard, context } = makeGuard({ [API_KEY_SCOPE_KEY]: 'ingest.write' });
+      await expect(guard.canActivate(context({ headers: { authorization: 'Bearer gos_pk_live_x', origin: 'https://easysign.example' } }))).rejects.toThrow(/can only send events/);
+    });
+
+    it('refuses (403) a secret key sent from a web page on a browser route, but not from a server', async () => {
+      const secret = { ...publishable, kind: 'secret' as const, allowedOrigins: [] as string[] };
+      mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: secret });
+      const { guard, context } = makeGuard(browserRoute);
+      await expect(guard.canActivate(context({ headers: { authorization: 'Bearer gos_live_x', origin: 'https://easysign.example' } }))).rejects.toThrow('must never be used in a web page');
+      await expect(guard.canActivate(context({ headers: { authorization: 'Bearer gos_live_x' } }))).resolves.toBe(true);
+    });
+
+    it('never accepts a secret key in the URL (401), before even looking it up', async () => {
+      const { guard, context } = makeGuard(browserRoute);
+      await expect(guard.canActivate(context({ headers: {}, query: { key: 'gos_live_secret' } }))).rejects.toThrow(UnauthorizedException);
+      expect(mockAuthenticateApiKey).not.toHaveBeenCalled();
+    });
+  });
+
   it('fails closed (403) when the route carries no @RequireApiKeyScope(...) annotation', async () => {
     const { guard, context } = makeGuard({});
     await expect(guard.canActivate(context({}))).rejects.toThrow(ForbiddenException);
@@ -106,6 +155,8 @@ describe('ApiKeyAuthGuard', () => {
       projectId: 'proj-1',
       environmentId: 'env-1',
       scopes: ['ingest.write'] as const,
+      kind: 'secret' as const,
+      allowedOrigins: [] as string[],
     };
     mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: authContext });
     const { guard, context } = makeGuard({ [API_KEY_SCOPE_KEY]: 'ingest.write' });
@@ -136,6 +187,8 @@ describe('ApiKeyAuthGuard', () => {
         projectId: 'proj-1',
         environmentId: 'env-1',
         scopes: ['ingest.write'] as const,
+        kind: 'secret' as const,
+        allowedOrigins: [] as string[],
       };
     }
 
