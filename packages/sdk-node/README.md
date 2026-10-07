@@ -8,6 +8,10 @@ backfill helpers and an installation check.
 npm install https://<growthos-app>/sdk/v1/growthos-node.tgz   # until it is on npm as @growthos/node
 ```
 
+`growthos-node.tgz` is always the latest build. To pin, vendor `growthos-node-<version>.tgz` into
+your repo and depend on `file:vendor/growthos-node-<version>.tgz`: a lockfile then never sees its
+content change.
+
 Whole-site walkthrough (keys, browser + server, verifying): [`docs/integrations/quick-start.md`](../../docs/integrations/quick-start.md).
 
 ## Quick start
@@ -91,8 +95,9 @@ The browser SDK can send straight to GrowthOS with a publishable key. If your Co
 only allows your own origin, relay through your server instead - the secret key never reaches the page:
 
 ```ts
-// Next.js: app/api/growth/route.ts (any Fetch API runtime: Cloudflare Workers, Deno, Bun)
-import { createRelayHandler } from '@growthos/node';
+// Next.js: app/api/growth/route.ts (any Fetch API runtime: Cloudflare Workers / Pages, Vercel Edge,
+// Deno, Bun). The `/relay` entry loads no Node built-in, so it bundles for edge runtimes too.
+import { createRelayHandler } from '@growthos/node/relay';
 export const POST = createRelayHandler({
   apiKey: process.env.GROWTHOS_API_KEY!,
   allowedEvents: ['touchpoint', 'page_view', 'cta_click'],

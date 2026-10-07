@@ -1,6 +1,6 @@
 {
   "name": "@growthos/browser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "GrowthOS for websites: campaign attribution, events and identity from the browser, with batching, sendBeacon on page exit and an installation check.",
   "license": "MIT",
   "type": "module",

@@ -219,4 +219,21 @@ describe('GrowthOS browser', () => {
       .map((event) => event.properties.path);
     expect(paths).toEqual(['/pricing', '/features']);
   });
+
+  it('page() sends path and only the properties given, so an undeclared field never quarantines it', async () => {
+    const growthos = client({ touchpoint: false });
+    document.title = 'Pricing - Example';
+    growthos.page();
+    growthos.page({ locale: 'he' });
+    await growthos.flush();
+    const views = sent
+      .flatMap((call) => call.batch)
+      .filter((event) => event.event === 'page_view')
+      .map((event) => {
+        const { anon_id: _anon, customer_id: _customer, ...rest } = event.properties;
+        return rest;
+      });
+    const path = location.pathname;
+    expect(views).toEqual([{ path }, { path, locale: 'he' }]);
+  });
 });

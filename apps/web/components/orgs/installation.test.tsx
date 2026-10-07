@@ -165,7 +165,7 @@ describe('InstallationCode', () => {
     expect(code()).toContain(`npm install ${window.location.origin}/sdk/v1/growthos-node.tgz`);
     expect(code()).toContain("baseUrl: 'https://api.test'");
     fireEvent.click(screen.getByRole('tab', { name: 'Relay (strict CSP)' }));
-    expect(code()).toContain('createRelayHandler');
+    expect(code()).toContain("import { createRelayHandler } from '@growthos/node/relay';");
     fireEvent.click(screen.getByRole('tab', { name: 'Check from code' }));
     expect(code()).toContain(
       'GROWTHOS_API_KEY=gos_live_ef56... npx growthos verify --base-url https://api.test',

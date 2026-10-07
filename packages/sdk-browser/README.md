@@ -35,6 +35,8 @@ A browser key is public by design: it can only send events, and only from the do
 - **Your events** - `GrowthOS.track('cta_click', { cta: 'hero_signup' })`. The name must be a
   registered event schema, and every property declared on it.
 - **page_view** - only with `init({ pageViews: true })`: on load and on every in-app navigation.
+  It carries `path` and nothing else (`GrowthOS.page({ locale: 'he' })` adds your own fields), so
+  register a `page_view` schema with a `path` string plus whatever you add.
 
 Every event carries `anon_id` (and `customer_id` after `identify`) inside its properties.
 

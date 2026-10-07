@@ -1,6 +1,6 @@
 {
   "name": "@growthos/node",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Send events, entities and measures to GrowthOS from Node.js - batching, retries, per-record results, a browser relay and an installation check.",
   "license": "MIT",
   "main": "./dist/cjs/index.js",
@@ -16,6 +16,23 @@
         "types": "./dist/cjs/index.d.ts",
         "default": "./dist/cjs/index.js"
       }
+    },
+    "./relay": {
+      "import": {
+        "types": "./dist/esm/relay.d.ts",
+        "default": "./dist/esm/relay.js"
+      },
+      "require": {
+        "types": "./dist/cjs/relay.d.ts",
+        "default": "./dist/cjs/relay.js"
+      }
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "relay": [
+        "./dist/cjs/relay.d.ts"
+      ]
     }
   },
   "bin": {

@@ -72,14 +72,17 @@ directly ([`docs/api/ingest.md`](../api/ingest.md), OpenAPI at `GET /v1/ingest/c
 
 The `/sdk/v1/` addresses are served by GrowthOS itself and are exactly what `npm publish` would
 ship. Once the packages are on npm, `npm install @growthos/node` / `@growthos/browser` is the same
-code.
+code. `growthos-node.tgz` / `growthos-browser.tgz` are always the latest build; to pin one, vendor
+`growthos-node-<version>.tgz` into the repo and depend on it with `file:`, so the lockfile never
+sees its content change.
 
 ### Strict Content-Security-Policy: a relay
 
 If the site's CSP cannot allow the GrowthOS API, send browser events to your own server and
-forward them with `createRelayHandler` from `@growthos/node`. It only forwards the event names you
+forward them with `createRelayHandler` from `@growthos/node/relay` (it loads no Node built-in, so
+it also runs on edge runtimes such as Cloudflare Pages). It only forwards the event names you
 allow (by default `touchpoint` and `page_view`), with size caps. Point the browser SDK at it with
-`init({ endpoint: '/growthos' })`.
+`init({ endpoint: '/api/growth' })`.
 
 ### History: backfill
 
