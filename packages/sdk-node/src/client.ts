@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { DEFAULT_BASE_URL, SDK_VERSION, envBaseUrl } from './constants.js';
 import { defaultSleep, request, type HttpOptions } from './http.js';
 import {
   GrowthOSError,
@@ -15,8 +16,7 @@ import {
   type ValidationResult,
 } from './types.js';
 
-export const DEFAULT_BASE_URL = 'https://api-prod-1098891924957.me-west1.run.app';
-export const SDK_VERSION = '0.1.0';
+export { DEFAULT_BASE_URL, SDK_VERSION } from './constants.js';
 /** The API's own limit per batch. */
 export const MAX_BATCH_SIZE = 1000;
 
@@ -138,7 +138,7 @@ export class GrowthOS {
         'GrowthOS: no fetch available - use Node.js 18 or later, or pass options.fetch.',
       );
     this.http = {
-      baseUrl: options.baseUrl ?? process.env.GROWTHOS_BASE_URL ?? DEFAULT_BASE_URL,
+      baseUrl: options.baseUrl ?? envBaseUrl() ?? DEFAULT_BASE_URL,
       apiKey: options.apiKey,
       timeoutMs: options.timeoutMs ?? 10_000,
       maxRetries: options.maxRetries ?? 5,

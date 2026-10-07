@@ -1,7 +1,7 @@
 import { parseAcquisitionParams, type AcquisitionParams } from '@growthos/touchpoint-capture';
 
 export const DEFAULT_API = 'https://api-prod-1098891924957.me-west1.run.app';
-export const SDK_VERSION = '0.1.0';
+export const SDK_VERSION = '0.1.1';
 
 /** A new visit starts after this much inactivity (the usual web-analytics session length). */
 export const VISIT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -168,11 +168,15 @@ export class GrowthOSBrowser {
     });
   }
 
-  /** Sends `page_view` (path, title and any extra properties). */
+  /**
+   * Sends `page_view` with `path` plus only the properties you pass. Nothing else is added: a
+   * property the project's page_view schema does not declare would quarantine every page view
+   * (`page({ title: document.title })` when the schema has `title`).
+   */
   page(properties: Properties = {}): void {
     if (typeof location === 'undefined') return;
     this.lastPage = location.pathname + location.search;
-    this.track('page_view', { path: location.pathname, title: document.title, ...properties });
+    this.track('page_view', { path: location.pathname, ...properties });
   }
 
   /** Who the visitor is (after login/signup): every later event carries this customer id, which ties the visit's attribution to the customer. */

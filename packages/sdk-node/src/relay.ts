@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { DEFAULT_BASE_URL, SDK_VERSION } from './client.js';
+import { DEFAULT_BASE_URL, SDK_VERSION, envBaseUrl } from './constants.js';
 import { request, defaultSleep, type HttpOptions } from './http.js';
 import { GrowthOSError } from './types.js';
 
@@ -9,7 +9,9 @@ import { GrowthOSError } from './types.js';
  * and this forwards the events with your secret key, which never reaches the page.
  *
  * ```ts
- * // Next.js app/api/growth/route.ts (also Cloudflare Workers, Deno, Bun - any Fetch API runtime)
+ * // Next.js app/api/growth/route.ts (also Cloudflare Workers, Deno, Bun - any Fetch API runtime).
+ * // On edge runtimes import from '@growthos/node/relay': the package root also loads node:crypto.
+ * import { createRelayHandler } from '@growthos/node/relay';
  * export const POST = createRelayHandler({ apiKey: process.env.GROWTHOS_API_KEY!, allowedEvents: ['touchpoint', 'page_view', 'cta_click'] });
  * ```
  */
@@ -76,7 +78,7 @@ export function createRelayHandler(options: RelayOptions): (request: Request) =>
   const maxBodyBytes = options.maxBodyBytes ?? 64 * 1024;
   const maxEvents = options.maxEvents ?? 100;
   const http: HttpOptions = {
-    baseUrl: options.baseUrl ?? process.env.GROWTHOS_BASE_URL ?? DEFAULT_BASE_URL,
+    baseUrl: options.baseUrl ?? envBaseUrl() ?? DEFAULT_BASE_URL,
     apiKey: options.apiKey,
     timeoutMs: options.timeoutMs ?? 5000,
     maxRetries: options.maxRetries ?? 2,

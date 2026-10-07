@@ -70,7 +70,7 @@ export function InstallationCode({
       ].join('\n'),
       relay: [
         '// Next.js app/api/growth/route.ts - for a Content-Security-Policy that only allows your own origin',
-        "import { createRelayHandler } from '@growthos/node';",
+        "import { createRelayHandler } from '@growthos/node/relay'; // edge-safe (Cloudflare, Vercel Edge)",
         '',
         'export const POST = createRelayHandler({',
         '  apiKey: process.env.GROWTHOS_API_KEY,',
