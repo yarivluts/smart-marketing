@@ -17,6 +17,30 @@ Template for each entry:
 
 ---
 
+## 2026-10-07 - SDK 0.1.1 and the EasySign migration, prepared locally (KAN-317)
+
+- **Last completed:**
+  - **PR #591 (KAN-317, deployed d8713ce):** fixes found while moving EasySign onto the SDKs.
+    EasySign is Next.js on Cloudflare Pages, with every route on the edge runtime.
+    - The new `@growthos/node/relay` entry loads no Node built-in. The package root loads `node:crypto`, so the relay could not bundle on edge runtimes. `edge-safe.test.ts` walks its import graph.
+    - `@growthos/browser` `page()` now sends only `path`. The extra `title` used to quarantine every page_view on a schema without it.
+    - `/sdk/v1/` now also serves `growthos-{node,browser}-<version>.tgz`, which a site can vendor and pin.
+  - **EasySign, local only:** Yariv asked for this to stay local for now. It is on branch `growthos-sdk` in the worktree `C:\claude-projects\marketing\easy-sign-sdk`, with 4 commits, not pushed.
+    - The 0.1.1 tarballs are vendored with exactly the bytes prod serves.
+    - Functions send through `@growthos/node`.
+    - The landing pages use `@growthos/browser` as transport only. EasySign keeps its own touchpoint and channel rules, and returning visitors keep their pre-SDK anon id.
+    - `/api/growth` is still on the edge runtime with EasySign's allowlists, and forwards through `@growthos/node/relay`.
+    - Verified: unit tests (89) and function tests (56) pass, plus lint, i18n parity, `growth:check` and `next build` (the SDK does not load on `/sign` or `/p`). An end-to-end run of the built app against a mock GrowthOS also passed.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** nothing.
+- **Next step:** push the EasySign branch and open its PR when Yariv says so.
+- **Waiting on human:**
+  - When to send the EasySign branch to Adir.
+  - npm publishing.
+  - The `easysign.*` plugin (remove it or rewire it; see KAN-93).
+  - Stopping the out-of-band web-prod deploys.
+  - Whether GrowthOS's touchpoint channel rules should adopt EasySign's richer ones. Today `cpc` stays `cpc`, and search-engine referrers count as `referral`. Changing this affects every customer's data.
+
 ## 2026-10-05 - Generic external-site integration: browser keys, SDKs, Installation page (KAN-315, KAN-316)
 
 - **Last completed:** Yariv asked for a generic way for external sites (EasySign and any other) to connect, with Node and browser libraries and an easy way to verify the installation.
