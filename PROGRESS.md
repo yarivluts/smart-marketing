@@ -17,6 +17,32 @@ Template for each entry:
 
 ---
 
+## 2026-10-10 - Pastel Pulse redesign on main, every feature kept (KAN-318)
+
+- **Last completed:** Yariv asked to keep the new design but have everything work as before.
+  - **Problem:** prod was serving the out-of-band `feat/stitch-conversion` build. That branch was cut from main on 2026-08-31 and is 641 commits behind, so search ads, audiences, video settings, publishing, the SDKs and the Installation page were gone. Its Ad Studio and project home were mockups with invented data, and the environment badge was hard-coded to DEV.
+  - **PR #593 (deployed fbd5842):** the design layer of that branch applied to main.
+    - `pp-*` tokens and the fonts.
+    - The shadcn variables moved to the pastel palette.
+    - `AppShell` restyled (top bar, sidebar, mobile dock) with a new account menu: email, my account, sign out.
+    - `PageHero`, `ChartCard`, `StatCard`, `Card` and `Button` restyled.
+    - Every page keeps main's data, permissions and features.
+  - **Phone fixes, broken on main too:**
+    - `sr-only` data tables now sit inside an `sr-only` div. A table box ignores width:1px, so the hidden table laid out at full width.
+    - Long values wrap, and grid children may shrink (#594, bc0a78d).
+    - All 44 org and project pages now load on an iPhone 13 with no sideways scroll and no console errors.
+  - **Verified with a QA org-admin user on prod** (`yariv.luts+growthos-qa@gmail.com`, org_admin in EasySign).
+    - Each capture run sets a fresh random password, held only in memory, and signs in through the login form. Nothing is stored.
+    - A no-traffic tagged revision was used for the preview; the tags were removed afterwards.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** the tool that deploys `feat/stitch-conversion` to web-prod will overwrite this the next time it runs. It must stop, or work on top of main.
+- **Next step:**
+  - The landing page from the branch, with its hard-coded English moved to en/he translations.
+  - The full PM / engineer / UX review of every page with Jira bugs and screenshots, which Yariv asked for.
+- **Waiting on human:**
+  - Stop the out-of-band deploys, or point that tool at main.
+  - Earlier open items: npm publishing, the EasySign branch, the `easysign.*` plugin and the channel rules.
+
 ## 2026-10-07 - SDK 0.1.1 and the EasySign migration, prepared locally (KAN-317)
 
 - **Last completed:**
