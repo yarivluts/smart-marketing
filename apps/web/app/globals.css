@@ -3,26 +3,26 @@
 @tailwind utilities;
 
 /*
- * Modern SaaS Design System Tokens:
- * Slate neutral foundation, Indigo primary CTA & accents, Emerald growth/success,
- * Amber warning/caution, Rose alert/destructive, soft diffused shadows,
- * glassmorphic backdrops, and accessible focus rings.
+ * "Pastel Pulse" design tokens (the Stitch redesign), as the shadcn variables every
+ * component reads: lavender-white surface, violet primary (#5243d5), soft lavender neutrals,
+ * 1rem corners. Emerald success, amber warning and rose alert are kept for status colour.
+ * The `pp-*` palette in tailwind.config.ts carries the same values for the pastel primitives.
  */
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
+    --background: 266 100% 99%;
+    --foreground: 240 10% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 240 10% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 243 75% 59%;
+    --popover-foreground: 240 10% 12%;
+    --primary: 246 63% 55%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 243 75% 59%;
+    --secondary: 260 32% 95%;
+    --secondary-foreground: 240 10% 12%;
+    --muted: 260 32% 95%;
+    --muted-foreground: 248 10% 30%;
+    --accent: 246 63% 55%;
     --accent-foreground: 0 0% 100%;
     --destructive: 350 89% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -34,14 +34,14 @@
     --alert-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 243 75% 59%;
-    --radius: 0.75rem;
+    --border: 260 18% 90%;
+    --input: 260 18% 90%;
+    --ring: 246 63% 55%;
+    --radius: 1rem;
 
-    /* Brand gradient endpoints */
-    --gradient-from: 243 75% 59%;
-    --gradient-to: 268 75% 62%;
+    /* Brand gradient endpoints: primary -> periwinkle */
+    --gradient-from: 246 63% 55%;
+    --gradient-to: 245 87% 67%;
   }
 
   .dark {
@@ -89,6 +89,7 @@
   h1,
   h2,
   h3 {
+    @apply font-pp-display;
     letter-spacing: -0.02em;
   }
   a,
