@@ -190,5 +190,8 @@ export * from './services/rep-collection.service';
 export * from './services/billing-recovery.service';
 export * from './services/creative-fatigue.service';
 export * from './services/peer-benchmarks.service';
+export * from './models/autopilot-config.model';
+export * from './models/autopilot-action.model';
+export * from './services/ad-autopilot.service';
 export * from './plugin-runtime/easysign';
 
