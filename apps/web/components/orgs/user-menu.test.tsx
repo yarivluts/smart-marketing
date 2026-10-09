@@ -7,6 +7,7 @@ import { UserMenu } from './user-menu';
 const replace = vi.fn();
 const signOut = vi.fn(async () => undefined);
 let user: { email: string; displayName: string | null } | null = null;
+let loading = false;
 
 vi.mock('@/i18n/navigation', () => ({
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
@@ -16,7 +17,7 @@ vi.mock('@/i18n/navigation', () => ({
   ),
   useRouter: () => ({ replace }),
 }));
-vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ user, signOut }) }));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ user, loading, signOut }) }));
 
 function renderMenu() {
   return render(
@@ -29,6 +30,7 @@ function renderMenu() {
 beforeEach(() => {
   replace.mockReset();
   signOut.mockClear();
+  loading = false;
 });
 
 describe('UserMenu', () => {
@@ -36,6 +38,14 @@ describe('UserMenu', () => {
     user = null;
     const { container } = renderMenu();
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('keeps its slot with a placeholder while the session is still loading', () => {
+    user = null;
+    loading = true;
+    renderMenu();
+    expect(screen.getByTestId('user-menu-loading')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
   });
 
   it('shows the initial and email, opens the menu, and closes it on Escape', () => {

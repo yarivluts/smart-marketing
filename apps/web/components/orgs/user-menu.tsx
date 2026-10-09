@@ -13,7 +13,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 export function UserMenu(): React.ReactElement | null {
   const t = useTranslations('AppShell');
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -33,6 +33,11 @@ export function UserMenu(): React.ReactElement | null {
     };
   }, [open]);
 
+  // While Firebase restores the session the slot keeps its place, so the header never jumps or
+  // looks like it has no account menu.
+  if (loading) {
+    return <span data-testid="user-menu-loading" aria-hidden="true" className="h-9 w-9 animate-pulse rounded-full bg-pp-surface-container" />;
+  }
   if (!user) return null;
   const email = user.email ?? '';
   const initial = (user.displayName || email || '?').trim().charAt(0).toUpperCase();
