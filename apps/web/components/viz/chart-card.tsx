@@ -18,10 +18,13 @@ export interface ChartCardProps {
 export function ChartCard({ title, description, icon: Icon, actions, footer, children, className, fill }: ChartCardProps): React.ReactElement {
   return (
     <section
-      className={cn('flex flex-col rounded-2xl bg-pp-surface-container-lowest text-pp-on-surface shadow-pp-candy', className)}
+      className={cn(
+        'flex min-w-0 flex-col rounded-2xl bg-pp-surface-container-lowest text-pp-on-surface shadow-pp-candy',
+        className,
+      )}
       aria-label={title}
     >
-      <header className="flex items-start justify-between gap-3 px-pp-lg pt-pp-lg">
+      <header className="flex flex-wrap items-start justify-between gap-3 px-pp-lg pt-pp-lg">
         <div className="flex min-w-0 items-start gap-3">
           {Icon ? (
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">

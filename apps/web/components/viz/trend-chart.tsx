@@ -2,7 +2,20 @@
 
 import * as React from 'react';
 import { useLocale } from 'next-intl';
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { seriesColor } from './palette';
 import { formatVizValue, type VizValueFormat } from './format';
 
@@ -81,7 +94,12 @@ export function TrendChart({
       key="tooltip"
       formatter={(value: unknown) => valueFormatter(Number(value))}
       labelFormatter={(value: unknown) => xFormatter(String(value))}
-      contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
+      contentStyle={{
+        background: 'hsl(var(--popover))',
+        border: '1px solid hsl(var(--border))',
+        borderRadius: 12,
+        fontSize: 12,
+      }}
       cursor={{ fill: 'hsl(var(--muted) / 0.5)' }}
     />,
     ...(showLegend ? [<Legend key="legend" wrapperStyle={{ fontSize: 12 }} />] : []),
@@ -96,7 +114,16 @@ export function TrendChart({
       <BarChart data={rows}>
         {axes}
         {series.map((entry, index) => (
-          <Bar key={entry.key} dataKey={entry.key} name={entry.label} fill={seriesColor(index, entry.color)} radius={[6, 6, 0, 0]} maxBarSize={56} isAnimationActive={false} stackId={stacked ? 'stack' : undefined} />
+          <Bar
+            key={entry.key}
+            dataKey={entry.key}
+            name={entry.label}
+            fill={seriesColor(index, entry.color)}
+            radius={[6, 6, 0, 0]}
+            maxBarSize={56}
+            isAnimationActive={false}
+            stackId={stacked ? 'stack' : undefined}
+          />
         ))}
       </BarChart>
     );
@@ -105,7 +132,18 @@ export function TrendChart({
       <LineChart data={rows}>
         {axes}
         {series.map((entry, index) => (
-          <Line key={entry.key} type="monotone" dataKey={entry.key} name={entry.label} stroke={seriesColor(index, entry.color)} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={false} />
+          <Line
+            key={entry.key}
+            type="monotone"
+            dataKey={entry.key}
+            name={entry.label}
+            stroke={seriesColor(index, entry.color)}
+            strokeWidth={2.5}
+            dot={{ r: 3 }}
+            activeDot={{ r: 5 }}
+            connectNulls={false}
+            isAnimationActive={false}
+          />
         ))}
       </LineChart>
     );
@@ -114,7 +152,14 @@ export function TrendChart({
       <AreaChart data={rows}>
         <defs>
           {series.map((entry, index) => (
-            <linearGradient key={entry.key} id={`${gradientId}-${index}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient
+              key={entry.key}
+              id={`${gradientId}-${index}`}
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
               <stop offset="0%" stopColor={seriesColor(index, entry.color)} stopOpacity={0.35} />
               <stop offset="100%" stopColor={seriesColor(index, entry.color)} stopOpacity={0.02} />
             </linearGradient>
@@ -146,30 +191,38 @@ export function TrendChart({
           {chart}
         </ResponsiveContainer>
       </div>
-      <table className="sr-only">
-        <caption>{label}</caption>
-        <thead>
-          <tr>
-            <th scope="col">{xKey}</th>
-            {series.map((entry) => (
-              <th key={entry.key} scope="col">
-                {entry.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={`${String(row[xKey])}-${index}`}>
-              <th scope="row">{xFormatter(String(row[xKey]))}</th>
-              {series.map((entry) => {
-                const value = row[entry.key];
-                return <td key={entry.key}>{typeof value === 'number' ? valueFormatter(value) : '-'}</td>;
-              })}
+      {/* sr-only on the wrapper, not the table: a table box ignores width:1px/overflow:hidden and
+          would lay out at full width, pushing a phone (RTL) page sideways. */}
+      <div className="sr-only">
+        <table>
+          <caption>{label}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{xKey}</th>
+              {series.map((entry) => (
+                <th key={entry.key} scope="col">
+                  {entry.label}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${String(row[xKey])}-${index}`}>
+                <th scope="row">{xFormatter(String(row[xKey]))}</th>
+                {series.map((entry) => {
+                  const value = row[entry.key];
+                  return (
+                    <td key={entry.key}>
+                      {typeof value === 'number' ? valueFormatter(value) : '-'}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }

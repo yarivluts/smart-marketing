@@ -544,7 +544,7 @@ describe('BoardTileView', () => {
       // planned height, so it needs no scrolling to be seen.
       const more = screen.getByTestId('small-multiples-more');
       expect(within(more).getByText('+2 more')).toBeInTheDocument();
-      expect(more.parentElement?.lastElementChild === more || more.nextElementSibling?.tagName === 'TABLE').toBe(true);
+      expect(more.parentElement?.lastElementChild === more || more.nextElementSibling?.querySelector(':scope > table') != null).toBe(true);
     });
 
     it('prints the last x-axis date in full, anchored to the plot\'s right edge instead of centred past it ("9/26", never "9/2")', () => {
