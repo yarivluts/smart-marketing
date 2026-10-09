@@ -134,6 +134,9 @@ import {
   type CreativeFatigueItem,
   type CreativeFatigueLevel,
   type CreativeSwapAction,
+  getPeerBenchmarksForProject as getPeerBenchmarksForProjectInOrganization,
+  type PeerBenchmarksTelemetryResult,
+  type PeerBenchmarkQueryOptions,
   type RepCollectionEntryModel,
   type RepCollectionLeaderboardPeriod,
   type RepCollectionLeaderboardResult,
@@ -429,6 +432,22 @@ export type {
   CreativeFatigueItem,
   CreativeFatigueLevel,
   CreativeSwapAction,
+};
+
+export const getPeerBenchmarksForProject = cache(
+  async function getPeerBenchmarksForProject(
+    organizationId: string,
+    projectId: string,
+    options?: PeerBenchmarkQueryOptions,
+  ): Promise<PeerBenchmarksTelemetryResult> {
+    await ensureFirestoreOrm();
+    return getPeerBenchmarksForProjectInOrganization(organizationId, projectId, options);
+  },
+);
+
+export type {
+  PeerBenchmarksTelemetryResult,
+  PeerBenchmarkQueryOptions,
 };
 
 export async function listFailedPipelineMessagesForProject(

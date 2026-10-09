@@ -189,5 +189,6 @@ export * from './services/segment.service';
 export * from './services/rep-collection.service';
 export * from './services/billing-recovery.service';
 export * from './services/creative-fatigue.service';
+export * from './services/peer-benchmarks.service';
 export * from './plugin-runtime/easysign';
 

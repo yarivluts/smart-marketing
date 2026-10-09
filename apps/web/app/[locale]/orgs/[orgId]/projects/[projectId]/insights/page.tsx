@@ -4,7 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, listProjectInsights } from '@/lib/orgs/queries';
+import { listOrgProjects, listProjectInsights, getPeerBenchmarksForProject } from '@/lib/orgs/queries';
 import { buildInsightsView } from '@/lib/orgs/insights-view';
 import { PeerBenchmarksHub } from '@/components/insights/peer-benchmarks-hub';
 import { PpPage, PpCard } from '@/components/pastel/primitives';
@@ -56,7 +56,10 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
     redirect(`/${locale}/orgs/${orgId}`);
   }
 
-  const insights = await listProjectInsights(orgId, projectId);
+  const [insights, peerBenchmarks] = await Promise.all([
+    listProjectInsights(orgId, projectId),
+    getPeerBenchmarksForProject(orgId, projectId).catch(() => undefined),
+  ]);
   const view = buildInsightsView(insights);
 
   const t = await getTranslations({ locale, namespace: 'Insights' });
@@ -64,7 +67,12 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
   return (
     <PpPage className="space-y-10">
       {/* Stitch Dynamic Peer Benchmarks Cockpit */}
-      <PeerBenchmarksHub orgId={orgId} projectId={projectId} isDataConnected={true} />
+      <PeerBenchmarksHub
+        orgId={orgId}
+        projectId={projectId}
+        isDataConnected={true}
+        initialTelemetry={peerBenchmarks}
+      />
 
       {/* Real-Time Project Insights & Anomaly Feed */}
       <PpCard

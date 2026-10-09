@@ -33,4 +33,5 @@ export * from './support';
 export * from './sales';
 export * from './schemas';
 export * from './setup-requirements';
+export * from './peer-benchmarks';
 
