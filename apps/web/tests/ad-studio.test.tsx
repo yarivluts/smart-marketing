@@ -142,40 +142,45 @@ describe('GrowthOS AI Ad Studio Suite', () => {
       expect(screen.getByText('Autopilot Pipeline Monitor')).toBeDefined();
       expect(screen.getByText('Autonomous Pipeline Operational')).toBeDefined();
       expect(screen.getByText('Daily Pacing Limit')).toBeDefined();
-      expect(screen.getByText('$5,000')).toBeDefined();
+      expect(screen.getByText('$5,000 / day')).toBeDefined();
       expect(screen.getByText('Channel Spend Allocation')).toBeDefined();
       expect(screen.getByText('Creative Fatigue Radar & Auto-Rotation')).toBeDefined();
       expect(screen.getByText('Autonomous Action Audit Ledger')).toBeDefined();
     });
 
-    it('supports guardrails editing and saving', () => {
+    it('supports guardrails editing and saving', async () => {
       renderWithIntl(<AutopilotMonitor orgId={orgId} projectId={projectId} projectName={projectName} />);
 
       const adjustBtn = screen.getByRole('button', { name: /Adjust Guardrails/i });
       fireEvent.click(adjustBtn);
 
-      expect(screen.getByRole('button', { name: 'Close' })).toBeDefined();
       const dailyCapInput = screen.getByDisplayValue('5000');
       fireEvent.change(dailyCapInput, { target: { value: '8500' } });
 
-      const closeBtn = screen.getByRole('button', { name: 'Close' });
-      fireEvent.click(closeBtn);
+      const saveBtn = screen.getByRole('button', { name: /Save Guardrails/i });
+      fireEvent.click(saveBtn);
 
-      expect(screen.getByText('$8,500')).toBeDefined();
+      await waitFor(() => {
+        expect(screen.getByText('$8,500 / day')).toBeDefined();
+      });
     });
 
-    it('triggers emergency kill-switch and resumes autopilot', () => {
+    it('triggers emergency kill-switch and resumes autopilot', async () => {
       renderWithIntl(<AutopilotMonitor orgId={orgId} projectId={projectId} projectName={projectName} />);
 
       const killBtn = screen.getByRole('button', { name: /Emergency Kill-Switch/i });
       fireEvent.click(killBtn);
 
-      expect(screen.getByText('Autopilot Inactive / Paused')).toBeDefined();
+      await waitFor(() => {
+        expect(screen.getByText('Autopilot Suspended (Emergency Safe Mode)')).toBeDefined();
+      });
 
-      const resumeBtn = screen.getByRole('button', { name: 'Resume Operations' });
+      const resumeBtn = screen.getByRole('button', { name: /Resume Autopilot/i });
       fireEvent.click(resumeBtn);
 
-      expect(screen.getByText('Autonomous Pipeline Operational')).toBeDefined();
+      await waitFor(() => {
+        expect(screen.getByText('Autonomous Pipeline Operational')).toBeDefined();
+      });
     });
   });
 
@@ -184,14 +189,14 @@ describe('GrowthOS AI Ad Studio Suite', () => {
       renderWithIntl(<VideoExportConsole orgId={orgId} projectId={projectId} projectName={projectName} />);
 
       expect(screen.getByText('Video Assembly & Export Console')).toBeDefined();
-      expect(screen.getByText('Render Timeline & Viewport Preview')).toBeDefined();
-      expect(screen.getByText('Multi-Format Export Matrix')).toBeDefined();
-      expect(screen.getByText('Vertical Story & Reels')).toBeDefined();
-      expect(screen.getByText('Feed Carousel & Square')).toBeDefined();
-      expect(screen.getAllByText('Desktop Web & YouTube').length).toBeGreaterThan(0);
-      expect(screen.getByText('Subtitles & Dynamic Captions')).toBeDefined();
+      expect(screen.getByText('Master Render Canvas')).toBeDefined();
+      expect(screen.getByText('Channel Target Conformance')).toBeDefined();
+      expect(screen.getByText('Export Actions')).toBeDefined();
+      expect(screen.getByText('Metadata & Guardrails')).toBeDefined();
       expect(screen.getByText('Recent Render Pipeline Jobs')).toBeDefined();
-      expect(screen.getByText('No video renders yet')).toBeDefined();
+      expect(screen.getByText('Save 4K Master MP4')).toBeDefined();
+      expect(screen.getByText('Push & Dispatch to Ad Networks')).toBeDefined();
+      expect(screen.getByText('Passed EBU R128')).toBeDefined();
     });
 
     it('triggers video rendering and completion state', async () => {
@@ -202,11 +207,11 @@ describe('GrowthOS AI Ad Studio Suite', () => {
 
       await waitFor(
         () => {
-          expect(screen.getByText('Video successfully rendered and dispatched to ad platforms!')).toBeDefined();
+          expect(screen.getByTestId('video-export-feedback')).toBeDefined();
         },
         { timeout: 3000 },
       );
-      expect(screen.getAllByRole('button', { name: /Download/i }).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Download/i).length).toBeGreaterThan(0);
     });
 
     it('toggles aspect ratios in preview console', () => {

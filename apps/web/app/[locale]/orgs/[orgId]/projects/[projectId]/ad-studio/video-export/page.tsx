@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import { listOrgProjects, getVideoExportTelemetryForProject } from '@/lib/orgs/queries';
 import { PpPage } from '@/components/pastel/primitives';
 import { AdStudioNavHeader } from '../components/ad-studio-nav-header';
 import { VideoExportConsole } from '../components/video-export-console';
@@ -47,10 +47,17 @@ export default async function VideoExportPage({ params }: PageProps): Promise<Re
     redirect(`/${locale}/orgs/${orgId}`);
   }
 
+  const initialTelemetry = await getVideoExportTelemetryForProject(orgId, projectId, project.name);
+
   return (
     <PpPage className="space-y-8">
       <AdStudioNavHeader orgId={orgId} projectId={projectId} />
-      <VideoExportConsole orgId={orgId} projectId={projectId} projectName={project.name} />
+      <VideoExportConsole
+        orgId={orgId}
+        projectId={projectId}
+        projectName={project.name}
+        initialTelemetry={initialTelemetry}
+      />
     </PpPage>
   );
 }

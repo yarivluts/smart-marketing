@@ -194,5 +194,7 @@ export * from './models/autopilot-config.model';
 export * from './models/autopilot-action.model';
 export * from './services/ad-autopilot.service';
 export * from './services/attribution.service';
+export * from './models/video-render-job.model';
+export * from './services/video-assembly.service';
 export * from './plugin-runtime/easysign';
 

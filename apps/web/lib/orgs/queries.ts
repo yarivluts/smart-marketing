@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import type { AutopilotTelemetryResult, AttributionTelemetryResult } from '@growthos/shared';
+import type { AutopilotTelemetryResult, AttributionTelemetryResult, VideoExportTelemetryResult } from '@growthos/shared';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   countSegmentMembers as countSegmentMembersInOrganization,
@@ -139,6 +139,7 @@ import {
   getAutopilotTelemetry as getAutopilotTelemetryInOrganization,
   getAttributionTelemetry as getAttributionTelemetryInOrganization,
   type GetAttributionTelemetryOptions,
+  VideoAssemblyService,
   type PeerBenchmarksTelemetryResult,
   type PeerBenchmarkQueryOptions,
   type RepCollectionEntryModel,
@@ -478,6 +479,19 @@ export const getAttributionTelemetryForProject = cache(
 );
 
 export type { AttributionTelemetryResult, GetAttributionTelemetryOptions };
+
+export const getVideoExportTelemetryForProject = cache(
+  async function getVideoExportTelemetryForProject(
+    organizationId: string,
+    projectId: string,
+    projectName?: string,
+  ): Promise<VideoExportTelemetryResult> {
+    await ensureFirestoreOrm();
+    return VideoAssemblyService.getVideoExportTelemetry(organizationId, projectId, projectName);
+  },
+);
+
+export type { VideoExportTelemetryResult };
 
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,
