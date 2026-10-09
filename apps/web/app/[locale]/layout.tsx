@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Heebo, Manrope, Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -7,10 +7,21 @@ import '../globals.css';
 import { routing, getDirection, type AppLocale } from '@/i18n/routing';
 import { AppProviders } from '@/lib/providers/app-providers';
 
-// Intercom-style clean, geometric sans — self-hosted via next/font (no runtime request to
+// Plus Jakarta Sans geometric sans — self-hosted via next/font (no runtime request to
 // fonts.googleapis.com, so it works the same in every environment including offline CI/emulator
 // runs), exposed as a CSS variable so tailwind.config.ts's `fontFamily.sans` can pick it up.
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+  weight: ['400', '500', '600', '700', '800'],
+});
+
+// Stitch "Pastel Pulse" typography: Outfit for headlines/metrics, Manrope for body/labels.
+// Neither ships Hebrew glyphs, so Heebo is chained after them in tailwind's `pp-*` families.
+const ppDisplay = Outfit({ subsets: ['latin'], variable: '--font-pp-display', display: 'swap' });
+const ppBody = Manrope({ subsets: ['latin'], variable: '--font-pp-body', display: 'swap' });
+const ppHebrew = Heebo({ subsets: ['hebrew', 'latin'], variable: '--font-pp-hebrew', display: 'swap' });
 
 export function generateStaticParams(): Array<{ locale: AppLocale }> {
   return routing.locales.map((locale) => ({ locale }));
@@ -37,8 +48,12 @@ export default async function LocaleLayout({ children, params }: LayoutProps): P
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} dir={getDirection(locale)} className={inter.variable}>
-      <body className="min-h-screen font-sans antialiased">
+    <html
+      lang={locale}
+      dir={getDirection(locale)}
+      className={`${plusJakartaSans.variable} ${ppDisplay.variable} ${ppBody.variable} ${ppHebrew.variable}`}
+    >
+      <body className="min-h-screen font-pp-body antialiased">
         <NextIntlClientProvider>
           <AppProviders>{children}</AppProviders>
         </NextIntlClientProvider>

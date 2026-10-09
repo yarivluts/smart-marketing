@@ -25,7 +25,11 @@
     "automationSection": "אוטומציה",
     "settingsSection": "הגדרות",
     "openMenu": "פתיחת תפריט",
-    "closeMenu": "סגירת תפריט"
+    "closeMenu": "סגירת תפריט",
+    "userMenu": "תפריט חשבון",
+    "signedInAs": "מחובר כ־",
+    "myAccount": "החשבון שלי",
+    "signOut": "התנתקות"
   },
   "OmniSearch": {
     "trigger": "חיפוש...",

@@ -14,8 +14,8 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       <Comp
         ref={ref}
         className={cn(
-          'rounded-2xl border border-border/80 bg-card text-card-foreground shadow-soft transition-all duration-200',
-          hoverable && 'hover:shadow-soft-md hover:-translate-y-0.5 hover:border-border',
+          'rounded-2xl border border-transparent bg-card text-card-foreground shadow-pp-candy transition-all duration-200',
+          hoverable && 'hover:shadow-pp-candy-hover hover:-translate-y-0.5',
           className,
         )}
         {...props}

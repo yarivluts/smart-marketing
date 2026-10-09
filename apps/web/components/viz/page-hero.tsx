@@ -16,36 +16,35 @@ export interface PageHeroProps {
 }
 
 /**
- * The top of every page: a tinted panel with the page's icon, title, one-line purpose and its key
- * numbers, so a page opens on what matters instead of a bare heading. Logical properties (`ms`,
- * `text-start`) keep it correct in RTL.
+ * The top of every page, in the Pastel Pulse look: the eyebrow as a lavender pill, a large display
+ * title, the one-line purpose, then the page's key numbers. It sits on the page surface (no card),
+ * like the Stitch page header. Logical properties (`ms`, `text-start`) keep it correct in RTL.
  */
 export function PageHero({ icon: Icon, eyebrow, title, description, actions, children, className }: PageHeroProps): React.ReactElement {
   return (
-    <section
-      data-testid="page-hero"
-      className={cn(
-        'relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8',
-        'bg-[radial-gradient(ellipse_at_top_right,hsl(var(--primary)/0.10),transparent_55%),radial-gradient(ellipse_at_bottom_left,hsl(var(--info)/0.08),transparent_50%)]',
-        className,
-      )}
-    >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-4">
+    <section data-testid="page-hero" className={cn('flex flex-col gap-pp-lg', className)}>
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div className="flex min-w-0 items-start gap-pp-md">
           {Icon ? (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-[hsl(var(--gradient-to))] text-primary-foreground shadow-md">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-pp-primary-fixed text-pp-primary shadow-sm">
               <Icon className="h-6 w-6" />
             </div>
           ) : null}
           <div className="min-w-0 text-start">
-            {eyebrow ? <p className="text-xs font-semibold uppercase tracking-wider text-primary">{eyebrow}</p> : null}
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{title}</h1>
-            {description ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p> : null}
+            {eyebrow ? (
+              <span className="mb-1 inline-flex rounded-full bg-pp-primary-fixed px-2.5 py-0.5 text-pp-label-sm uppercase tracking-wider text-pp-on-primary-fixed">
+                {eyebrow}
+              </span>
+            ) : null}
+            <h1 className="font-pp-display text-pp-headline-xl-mobile tracking-tight text-pp-on-surface md:text-pp-headline-xl">
+              {title}
+            </h1>
+            {description ? <p className="mt-1 max-w-3xl text-pp-body-md text-pp-on-surface-variant">{description}</p> : null}
           </div>
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-3">{actions}</div> : null}
       </div>
-      {children ? <div className="mt-6">{children}</div> : null}
+      {children ? <div>{children}</div> : null}
     </section>
   );
 }

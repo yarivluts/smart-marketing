@@ -134,24 +134,27 @@ function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_nu
 function SeriesDataTable({ caption, points }: { caption: string; points: readonly TimeSeriesPoint[]; locale?: string }): React.ReactElement {
   const t = useTranslations('Boards');
   const formatValue = useFormatValue();
+  // sr-only on a wrapper: a table box ignores width:1px/overflow:hidden and would push the page wide.
   return (
-    <table className="sr-only">
-      <caption>{caption}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{t('chartBucketColumn')}</th>
-          <th scope="col">{t('chartValueColumn')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {points.map((point) => (
-          <tr key={point.bucket}>
-            <th scope="row">{point.bucket}</th>
-            <td>{point.value === null ? t('chartNoValue') : formatValue(point.value)}</td>
+    <div className="sr-only">
+      <table>
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{t('chartBucketColumn')}</th>
+            <th scope="col">{t('chartValueColumn')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {points.map((point) => (
+            <tr key={point.bucket}>
+              <th scope="row">{point.bucket}</th>
+              <td>{point.value === null ? t('chartNoValue') : formatValue(point.value)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

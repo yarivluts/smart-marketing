@@ -25,7 +25,11 @@
     "automationSection": "Automation",
     "settingsSection": "Settings",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "userMenu": "Account menu",
+    "signedInAs": "Signed in as",
+    "myAccount": "My account",
+    "signOut": "Sign out"
   },
   "OmniSearch": {
     "trigger": "Search...",

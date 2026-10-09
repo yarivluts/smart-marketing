@@ -62,16 +62,19 @@ export function StatCard({
   return (
     <Card
       hoverable
-      className={cn('flex flex-col justify-between p-6 transition-all duration-200', className)}
+      className={cn(
+        'flex flex-col justify-between border-s-4 border-s-pp-primary p-pp-lg transition-all duration-200',
+        className,
+      )}
       {...props}
     >
       <div>
         <div className="flex items-center justify-between gap-2">
-          <span className="line-clamp-2 text-sm font-medium text-muted-foreground">{title}</span>
+          <span className="line-clamp-2 text-pp-label-sm uppercase tracking-wider text-pp-outline">{title}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {badge}
             {Icon ? (
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
                 <Icon className="h-5 w-5" />
               </div>
             ) : null}
@@ -79,7 +82,7 @@ export function StatCard({
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
-          <span dir="ltr" className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground inline-block">
+          <span dir="ltr" className="inline-block font-pp-display text-pp-metric text-pp-on-surface">
             {value}
           </span>
         </div>
