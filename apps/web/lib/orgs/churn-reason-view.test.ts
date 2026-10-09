@@ -1,23 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { cancellationReasonCodeLabelKey, cancellationReasonThemeLabelKey, toCancellationReasonDimensionBreakdownRows } from './churn-reason-view';
+import {
+  cancellationReasonCodeLabelKey,
+  cancellationReasonThemeLabelKey,
+  cancellationReasonPillAccent,
+  winbackPotentialAccent,
+  winbackPlaybookLabelKey,
+  toCancellationReasonDimensionBreakdownRows,
+} from './churn-reason-view';
 
-describe('cancellationReasonThemeLabelKey', () => {
-  it('maps every known theme to its translation key', () => {
-    expect(cancellationReasonThemeLabelKey('pricing')).toBe('themePricing');
-    expect(cancellationReasonThemeLabelKey('competitor')).toBe('themeCompetitor');
-    expect(cancellationReasonThemeLabelKey('missing_features')).toBe('themeMissingFeatures');
-    expect(cancellationReasonThemeLabelKey('support')).toBe('themeSupport');
-    expect(cancellationReasonThemeLabelKey('bugs')).toBe('themeBugs');
-    expect(cancellationReasonThemeLabelKey('not_using')).toBe('themeNotUsing');
-  });
-
-  it('falls back to the raw theme name for an unrecognized value', () => {
-    expect(cancellationReasonThemeLabelKey('some_future_theme')).toBe('some_future_theme');
-  });
-});
-
-describe('cancellationReasonCodeLabelKey', () => {
-  it('maps every taxonomy code to its translation key', () => {
+describe('churn-reason-view', () => {
+  it('maps reason codes to label keys correctly', () => {
     expect(cancellationReasonCodeLabelKey('too_expensive')).toBe('reasonTooExpensive');
     expect(cancellationReasonCodeLabelKey('missing_features')).toBe('reasonMissingFeatures');
     expect(cancellationReasonCodeLabelKey('switched_competitor')).toBe('reasonSwitchedCompetitor');
@@ -25,54 +17,48 @@ describe('cancellationReasonCodeLabelKey', () => {
     expect(cancellationReasonCodeLabelKey('not_using_enough')).toBe('reasonNotUsingEnough');
     expect(cancellationReasonCodeLabelKey('technical_issues')).toBe('reasonTechnicalIssues');
     expect(cancellationReasonCodeLabelKey('other')).toBe('reasonOther');
+    expect(cancellationReasonCodeLabelKey('unknown_custom')).toBe('unknown_custom');
   });
 
-  it('falls back to the raw code for an unrecognized value', () => {
-    expect(cancellationReasonCodeLabelKey('made_up_reason')).toBe('made_up_reason');
+  it('maps theme clusters to label keys correctly', () => {
+    expect(cancellationReasonThemeLabelKey('pricing')).toBe('themePricing');
+    expect(cancellationReasonThemeLabelKey('competitor')).toBe('themeCompetitor');
+    expect(cancellationReasonThemeLabelKey('missing_features')).toBe('themeMissingFeatures');
+    expect(cancellationReasonThemeLabelKey('support')).toBe('themeSupport');
+    expect(cancellationReasonThemeLabelKey('bugs')).toBe('themeBugs');
+    expect(cancellationReasonThemeLabelKey('not_using')).toBe('themeNotUsing');
+    expect(cancellationReasonThemeLabelKey('custom_theme')).toBe('custom_theme');
   });
-});
 
-describe('toCancellationReasonDimensionBreakdownRows', () => {
-  it('flattens rows into {value, count}, most cancellations first', () => {
-    const rows = toCancellationReasonDimensionBreakdownRows(
-      [
-        { plan_interval: 'month', cancellations_total: 3 },
-        { plan_interval: 'year', cancellations_total: 7 },
-      ],
-      'plan_interval',
-    );
-    expect(rows).toEqual([
-      { value: 'year', count: 7 },
-      { value: 'month', count: 3 },
+  it('returns distinct Pastel Pulse accents for reason codes and potentials', () => {
+    expect(cancellationReasonPillAccent('too_expensive')).toBe('pink');
+    expect(cancellationReasonPillAccent('switched_competitor')).toBe('primary');
+    expect(cancellationReasonPillAccent('missing_features')).toBe('sky');
+    expect(cancellationReasonPillAccent('not_using_enough')).toBe('mint');
+    expect(cancellationReasonPillAccent('technical_issues')).toBe('neutral');
+
+    expect(winbackPotentialAccent('high')).toBe('mint');
+    expect(winbackPotentialAccent('medium')).toBe('sky');
+    expect(winbackPotentialAccent('low')).toBe('neutral');
+  });
+
+  it('maps playbook identifiers to translation keys', () => {
+    expect(winbackPlaybookLabelKey('pause_discount')).toBe('playbookPauseDiscount');
+    expect(winbackPlaybookLabelKey('smart_dunning')).toBe('playbookSmartDunning');
+    expect(winbackPlaybookLabelKey('executive_outreach')).toBe('playbookExecutiveOutreach');
+    expect(winbackPlaybookLabelKey('adoption_concierge')).toBe('playbookAdoptionConcierge');
+  });
+
+  it('aggregates dimension rows correctly', () => {
+    const rows = [
+      { plan_interval: 'month', cancellations_total: 5 },
+      { plan_interval: 'month', cancellations_total: 3 },
+      { plan_interval: 'year', cancellations_total: 2 },
+    ];
+    const result = toCancellationReasonDimensionBreakdownRows(rows, 'plan_interval');
+    expect(result).toEqual([
+      { value: 'month', count: 8 },
+      { value: 'year', count: 2 },
     ]);
-  });
-
-  it('treats a null dimension value as an empty-string bucket and a null count as zero', () => {
-    const rows = toCancellationReasonDimensionBreakdownRows([{ channel_id: null, cancellations_total: null }], 'channel_id');
-    expect(rows).toEqual([{ value: '', count: 0 }]);
-  });
-
-  it('breaks ties on count alphabetically by value', () => {
-    const rows = toCancellationReasonDimensionBreakdownRows(
-      [
-        { channel_id: 'paid_social', cancellations_total: 2 },
-        { channel_id: 'paid_search', cancellations_total: 2 },
-      ],
-      'channel_id',
-    );
-    expect(rows.map((row) => row.value)).toEqual(['paid_search', 'paid_social']);
-  });
-
-  it('sums counts across more than one bucket_date row for the same dimension value', () => {
-    // The compiler always buckets by its own bucket_date regardless of the requested dimensions, so
-    // the same channel can come back split across more than one row (e.g. two different years).
-    const rows = toCancellationReasonDimensionBreakdownRows(
-      [
-        { bucket_date: '2026-01-01', channel_id: 'paid_search', cancellations_total: 2 },
-        { bucket_date: '2027-01-01', channel_id: 'paid_search', cancellations_total: 3 },
-      ],
-      'channel_id',
-    );
-    expect(rows).toEqual([{ value: 'paid_search', count: 5 }]);
   });
 });

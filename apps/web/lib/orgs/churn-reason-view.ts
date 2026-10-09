@@ -86,3 +86,63 @@ export function cancellationReasonCodeLabelKey(reasonCode: string): string {
       return reasonCode;
   }
 }
+
+/**
+ * Returns the Pastel Pulse pill accent for a given cancellation reason code.
+ */
+export function cancellationReasonPillAccent(reasonCode: string): 'primary' | 'pink' | 'mint' | 'sky' | 'neutral' {
+  switch (reasonCode) {
+    case 'too_expensive':
+    case 'poor_support':
+      return 'pink';
+    case 'switched_competitor':
+      return 'primary';
+    case 'missing_features':
+      return 'sky';
+    case 'not_using_enough':
+      return 'mint';
+    case 'technical_issues':
+    case 'other':
+    default:
+      return 'neutral';
+  }
+}
+
+/**
+ * Returns the Pastel Pulse pill accent for a given winback potential tier.
+ */
+export function winbackPotentialAccent(potential: 'high' | 'medium' | 'low'): 'mint' | 'sky' | 'neutral' {
+  switch (potential) {
+    case 'high':
+      return 'mint';
+    case 'medium':
+      return 'sky';
+    case 'low':
+    default:
+      return 'neutral';
+  }
+}
+
+/**
+ * Translation key for one winback playbook strategy (KAN-306).
+ */
+export function winbackPlaybookLabelKey(playbook: string): string {
+  switch (playbook) {
+    case 'pause_discount':
+      return 'playbookPauseDiscount';
+    case 'smart_dunning':
+      return 'playbookSmartDunning';
+    case 'executive_outreach':
+      return 'playbookExecutiveOutreach';
+    case 'adoption_concierge':
+      return 'playbookAdoptionConcierge';
+    case 'feature_preview':
+      return 'playbookFeaturePreview';
+    case 'support_escalation':
+      return 'playbookSupportEscalation';
+    case 'standard_followup':
+      return 'playbookStandardFollowup';
+    default:
+      return playbook;
+  }
+}

@@ -2,11 +2,13 @@ import {
   CANCELLATION_REASON_SCHEMA_FIELDS,
   CANCELLATION_REASON_SCHEMA_KIND,
   CANCELLATION_REASON_SCHEMA_NAME,
+  calculateWinbackScore,
   clusterCancellationReasonComments,
   computeCancellationReasonCodeBreakdown,
   MetricCompilerError,
   type CancellationReasonCodeCount,
   type CancellationReasonThemeCluster,
+  type WinbackAssessment,
 } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import type { RawRecordModel } from '../models/raw-record.model';
@@ -14,6 +16,7 @@ import type { SchemaDefModel } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { DuplicateSchemaDefinitionError, getActiveSchemaDefinition, registerSchemaDefinition } from './schema-registry.service';
 import { listRecentRecordsForSchemas } from './pipeline.service';
+import { ingestBatch } from './ingest.service';
 import { MetricNotRegisteredError, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { queryMetrics } from './metrics-query.service';
@@ -257,4 +260,141 @@ export async function getCancellationReasonDimensionBreakdownForProject(
     }
     throw error;
   }
+}
+
+export interface IngestCancellationReasonFeedbackItem {
+  reasonCode: string;
+  comment?: string | null;
+  customerId?: string | null;
+  timestamp?: string | null;
+}
+
+export interface IngestCancellationReasonFeedbackParams {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  feedback: IngestCancellationReasonFeedbackItem[];
+  createdByUserId?: string;
+}
+
+export interface IngestCancellationReasonFeedbackResult {
+  accepted: number;
+  quarantined: number;
+  batchId: string;
+}
+
+/**
+ * Ingests customer exit survey feedback and cancellation reason codes into the project's
+ * event stream (KAN-306). Idempotently guarantees schema registration and formats each
+ * survey response into an accepted `cancellation_reason` event record.
+ */
+export async function ingestCancellationReasonFeedback(
+  params: IngestCancellationReasonFeedbackParams,
+): Promise<IngestCancellationReasonFeedbackResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+
+  if (params.feedback.length === 0) {
+    return { accepted: 0, quarantined: 0, batchId: '' };
+  }
+
+  // Idempotently ensure the cancellation_reason event schema is registered
+  await ensureCancellationReasonSchemaRegistered({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    createdByUserId: params.createdByUserId ?? 'system:cancellation-ingest',
+  });
+
+  const nowIso = new Date().toISOString();
+  const records = params.feedback.map((item, idx) => {
+    const ts = item.timestamp ?? nowIso;
+    const clientId = `cancel_feedback_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 7)}`;
+    const reasonCode = item.reasonCode.trim();
+    const comment = typeof item.comment === 'string' && item.comment.trim().length > 0 ? item.comment.trim() : null;
+    const customerId = typeof item.customerId === 'string' && item.customerId.trim().length > 0 ? item.customerId.trim() : null;
+
+    const properties: Record<string, unknown> = {
+      reason_code: reasonCode,
+    };
+    if (comment !== null) {
+      properties.comment = comment;
+    }
+    if (customerId !== null) {
+      properties.customer_id = customerId;
+    }
+
+    return {
+      client_id: clientId,
+      schema_name: CANCELLATION_REASON_SCHEMA_NAME,
+      payload: {
+        event: CANCELLATION_REASON_SCHEMA_NAME,
+        event_id: `evt_${clientId}`,
+        ts,
+        properties,
+      },
+    };
+  });
+
+  const summary = await ingestBatch({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: params.environmentId,
+    input: {
+      kind: 'event',
+      records,
+    },
+  });
+
+  return {
+    accepted: summary.accepted,
+    quarantined: summary.quarantined,
+    batchId: summary.batchId,
+  };
+}
+
+export interface CancellationReasonFeedItem {
+  id: string;
+  reasonCode: string;
+  comment: string | null;
+  customerId: string | null;
+  landedAt: string;
+  winback: WinbackAssessment;
+}
+
+/**
+ * Returns structured cancellation reason feed items with computed winback assessments (KAN-306),
+ * sorted newest first, for display on the Retention & Exit Intelligence Hub ledger table.
+ */
+export async function getCancellationReasonFeedForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<CancellationReasonFeedItem[]> {
+  await requireProjectInOrg(organizationId, projectId);
+  const limit = options?.limit ?? DEFAULT_CANCELLATION_REASON_RECORD_LIMIT;
+  const records = options?.precomputedRecords ?? (await listCancellationReasonRecordsForProject(organizationId, projectId, limit));
+
+  const items: CancellationReasonFeedItem[] = [];
+
+  for (const record of records) {
+    const parsed = parseCancellationReason(record);
+    if (!parsed) continue;
+
+    const props = (record.payload?.properties ?? {}) as Record<string, unknown>;
+    const customerId = typeof props.customer_id === 'string' ? props.customer_id : null;
+
+    const winback = calculateWinbackScore(parsed.reasonCode, {
+      hasComment: Boolean(parsed.comment),
+    });
+
+    items.push({
+      id: record.id || record.client_id || `rec_${Date.now()}`,
+      reasonCode: parsed.reasonCode,
+      comment: parsed.comment,
+      customerId,
+      landedAt: parsed.landedAt,
+      winback,
+    });
+  }
+
+  return items;
 }

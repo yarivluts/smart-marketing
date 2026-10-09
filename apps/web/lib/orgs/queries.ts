@@ -9,10 +9,12 @@ import {
   getBoard as getBoardInOrganization,
   getCancellationReasonCodeBreakdownForProject as getCancellationReasonCodeBreakdownForProjectInOrganization,
   getCancellationReasonDimensionBreakdownForProject as getCancellationReasonDimensionBreakdownForProjectInOrganization,
+  getCancellationReasonFeedForProject as getCancellationReasonFeedForProjectInOrganization,
   getCancellationReasonThemeDigestForProject as getCancellationReasonThemeDigestForProjectInOrganization,
   listCancellationReasonRecordsForProject as listCancellationReasonRecordsForProjectInOrganization,
   type CancellationReasonBreakdownDimension,
   type CancellationReasonDimensionBreakdownOutcome,
+  type CancellationReasonFeedItem,
   getSignupQualityScoreOverviewForProject as getSignupQualityScoreOverviewForProjectInOrganization,
   getSignupQualityScoreDimensionBreakdownForProject as getSignupQualityScoreDimensionBreakdownForProjectInOrganization,
   getSignupQualityScoreAdjustedMetricsForProject as getSignupQualityScoreAdjustedMetricsForProjectInOrganization,
@@ -590,6 +592,15 @@ export async function getCancellationReasonDimensionBreakdownForProject(
 ): Promise<CancellationReasonDimensionBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getCancellationReasonDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
+}
+
+export async function getCancellationReasonFeedForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<CancellationReasonFeedItem[]> {
+  await ensureFirestoreOrm();
+  return getCancellationReasonFeedForProjectInOrganization(organizationId, projectId, options);
 }
 
 /** The bounded, landed `onboarding_survey` raw records `getSignupQualityScoreOverviewForProject` reads — fetch once via this and pass the result via `precomputedRecords` for a page needing more than one read, same posture `listCancellationReasonRecordsForProject` establishes. */

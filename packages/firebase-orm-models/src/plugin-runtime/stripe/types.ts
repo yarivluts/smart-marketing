@@ -88,6 +88,12 @@ export const STRIPE_SUBSCRIPTION_STATUSES = [
 ] as const;
 export type StripeSubscriptionStatus = (typeof STRIPE_SUBSCRIPTION_STATUSES)[number];
 
+export interface StripeCancellationDetails {
+  comment?: string | null;
+  feedback?: string | null;
+  reason?: string | null;
+}
+
 export interface StripeSubscription {
   id: string;
   object: 'subscription';
@@ -99,6 +105,7 @@ export interface StripeSubscription {
   canceled_at: number | null;
   created: number;
   items: { data: StripeSubscriptionItem[] };
+  cancellation_details?: StripeCancellationDetails | null;
 }
 
 /** A verified Stripe webhook event envelope (`Stripe-Signature` already checked by the time this is read). */

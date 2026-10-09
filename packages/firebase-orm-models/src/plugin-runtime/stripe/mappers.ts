@@ -124,3 +124,70 @@ export function mapSubscriptionToEntityRecord(subscription: StripeSubscription):
     },
   };
 }
+
+/**
+ * Maps Stripe's customer exit survey cancellation feedback to our standardized
+ * `CancellationReasonCode` taxonomy (KAN-306).
+ */
+export function mapStripeCancellationFeedbackToReasonCode(feedback?: string | null): string {
+  if (!feedback) return 'other';
+  switch (feedback) {
+    case 'too_expensive':
+      return 'too_expensive';
+    case 'missing_features':
+      return 'missing_features';
+    case 'switched_service':
+      return 'switched_competitor';
+    case 'unused':
+      return 'not_using_enough';
+    case 'customer_service':
+      return 'poor_support';
+    case 'too_complex':
+    case 'low_quality':
+      return 'technical_issues';
+    case 'other':
+    default:
+      return 'other';
+  }
+}
+
+/**
+ * Extracts a `cancellation_reason` event record when a Stripe subscription carries exit survey feedback
+ * or reason details (KAN-306).
+ */
+export function mapStripeSubscriptionToCancellationReasonRecord(
+  subscription: StripeSubscription,
+): Record<string, unknown> | null {
+  const details = subscription.cancellation_details;
+  if (!details || (!details.feedback && !details.comment && !details.reason)) {
+    return null;
+  }
+
+  const reasonCode = details.feedback
+    ? mapStripeCancellationFeedbackToReasonCode(details.feedback)
+    : details.reason === 'payment_failed'
+      ? 'technical_issues'
+      : 'other';
+
+  const comment = typeof details.comment === 'string' && details.comment.trim().length > 0 ? details.comment.trim() : null;
+  const landedTs = toIso(subscription.canceled_at ?? Math.floor(Date.now() / 1000));
+
+  const properties: Record<string, unknown> = {
+    reason_code: reasonCode,
+    customer_id: subscription.customer,
+  };
+  if (comment !== null) {
+    properties.comment = comment;
+  }
+
+  return {
+    client_id: `stripe_cancel_${subscription.id}`,
+    schema_name: 'cancellation_reason',
+    payload: {
+      event: 'cancellation_reason',
+      event_id: `evt_cancel_${subscription.id}`,
+      ts: landedTs,
+      properties,
+    },
+  };
+}

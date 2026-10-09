@@ -6,7 +6,7 @@ import type { KmsProvider } from '../vault';
 import {
   STRIPE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   STRIPE_PLUGIN_ID,
-  mapStripeWebhookEventToIngestInput,
+  mapStripeWebhookEventToIngestInputs,
   parseStripeCredentialSecret,
   verifyStripeWebhookSignature,
   StripeWebhookSignatureError,
@@ -18,6 +18,7 @@ import { EnvironmentNotFoundError } from './key.service';
 import { PluginInstallNotFoundError } from './plugin-registry.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
 import { ingestBatch, type IngestBatchSummary } from './ingest.service';
+import { ensureCancellationReasonSchemaRegistered } from './churn-reason.service';
 
 /** An install claims to be (or was resolved as) the built-in Stripe plugin, but isn't configured with a usable Stripe credential yet — surfaced identically whether the caller is a webhook delivery or a "Run now" click. */
 export class StripeCredentialConfigError extends Error {
@@ -162,17 +163,33 @@ export async function processStripeWebhookEvent(params: ProcessStripeWebhookEven
   } catch {
     throw new StripeWebhookSignatureError('payload is not valid JSON');
   }
-  const input = mapStripeWebhookEventToIngestInput(event);
-  if (!input) {
+  const inputs = mapStripeWebhookEventToIngestInputs(event);
+  if (inputs.length === 0) {
     return { eventId: event.id, eventType: event.type, handled: false };
   }
 
-  const summary = await ingestBatch({
-    organizationId: params.organizationId,
-    projectId: params.projectId,
-    environmentId: params.environmentId,
-    input,
-  });
+  let lastSummary: IngestBatchSummary | undefined;
+  for (const input of inputs) {
+    if (input.kind === 'event') {
+      const hasCancellation = (input.records as Array<{ schema_name?: string }>).some(
+        (r) => r.schema_name === 'cancellation_reason',
+      );
+      if (hasCancellation) {
+        await ensureCancellationReasonSchemaRegistered({
+          organizationId: params.organizationId,
+          projectId: params.projectId,
+          createdByUserId: 'system:stripe-webhook',
+        }).catch(() => null);
+      }
+    }
 
-  return { eventId: event.id, eventType: event.type, handled: true, summary };
+    lastSummary = await ingestBatch({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: params.environmentId,
+      input,
+    });
+  }
+
+  return { eventId: event.id, eventType: event.type, handled: true, summary: lastSummary! };
 }

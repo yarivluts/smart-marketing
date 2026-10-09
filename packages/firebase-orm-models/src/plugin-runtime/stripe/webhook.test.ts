@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapStripeWebhookEventToIngestInput } from './webhook';
+import { mapStripeWebhookEventToIngestInput, mapStripeWebhookEventToIngestInputs } from './webhook';
 import type { StripeWebhookEvent } from './types';
 
 function event(type: string, object: Record<string, unknown>): StripeWebhookEvent {
@@ -90,5 +90,41 @@ describe('mapStripeWebhookEventToIngestInput', () => {
 
   it('returns null for an event type this connector does not handle', () => {
     expect(mapStripeWebhookEventToIngestInput(event('payment_intent.created', {}))).toBeNull();
+  });
+
+  it('maps a subscription cancellation with exit survey feedback to both entity and cancellation_reason batches', () => {
+    const inputs = mapStripeWebhookEventToIngestInputs(
+      event('customer.subscription.deleted', {
+        id: 'sub_cancel_1',
+        object: 'subscription',
+        customer: 'cus_123',
+        status: 'canceled',
+        currency: 'usd',
+        current_period_end: 1_700_100_000,
+        cancel_at_period_end: false,
+        canceled_at: 1_700_050_000,
+        created: 1_700_000_000,
+        items: { data: [{ price: { unit_amount: 5000, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }, quantity: 1 }] },
+        cancellation_details: {
+          feedback: 'too_expensive',
+          comment: 'Pricing is too high for our team',
+          reason: 'cancellation_requested',
+        },
+      }),
+    );
+
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].kind).toBe('entity');
+    expect(inputs[0]).toMatchObject({ type: 'stripe_subscription' });
+
+    expect(inputs[1].kind).toBe('event');
+    const cancelRecords = (inputs[1] as any).records;
+    expect(cancelRecords).toHaveLength(1);
+    expect(cancelRecords[0].schema_name).toBe('cancellation_reason');
+    expect(cancelRecords[0].payload.properties).toMatchObject({
+      reason_code: 'too_expensive',
+      comment: 'Pricing is too high for our team',
+      customer_id: 'cus_123',
+    });
   });
 });
