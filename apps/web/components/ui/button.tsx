@@ -5,15 +5,16 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-xl text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-soft hover:bg-primary/90 hover:shadow-soft-md hover:-translate-y-0.5',
-        brand: 'bg-brand-gradient text-primary-foreground shadow-soft hover:shadow-glow hover:-translate-y-0.5',
+        default: 'bg-primary text-primary-foreground shadow-pp-candy hover:bg-pp-primary-container hover:shadow-pp-candy-hover',
+        brand: 'bg-brand-gradient text-primary-foreground shadow-pp-candy hover:shadow-glow hover:-translate-y-0.5',
         destructive: 'bg-destructive text-destructive-foreground shadow-soft hover:bg-destructive/90 hover:shadow-soft-md',
-        outline: 'border border-input bg-background shadow-soft hover:bg-muted/80 hover:border-accent hover:text-accent-foreground',
-        secondary: 'bg-secondary text-secondary-foreground shadow-soft hover:bg-secondary/80',
+        outline:
+          'border border-pp-outline-variant/60 bg-pp-surface-container-lowest text-foreground shadow-pp-candy hover:border-pp-primary/40 hover:bg-pp-surface-container-low',
+        secondary: 'bg-pp-primary-fixed text-pp-on-primary-fixed hover:bg-pp-primary-fixed-dim/60',
         ghost: 'hover:bg-muted hover:text-foreground',
         link: 'text-primary underline-offset-4 hover:underline p-0 h-auto',
         success: 'bg-success text-success-foreground shadow-soft hover:bg-success/90 hover:shadow-glow-emerald',
@@ -22,10 +23,10 @@ const buttonVariants = cva(
       },
       size: {
         default: 'h-10 px-4 py-2',
-        sm: 'h-8 rounded-lg px-3 text-xs',
-        lg: 'h-12 rounded-xl px-8 text-base',
+        sm: 'h-8 px-3 text-xs',
+        lg: 'h-12 px-8 text-base',
         icon: 'h-10 w-10 p-0',
-        'icon-sm': 'h-8 w-8 p-0 rounded-lg',
+        'icon-sm': 'h-8 w-8 p-0',
       },
     },
     defaultVariants: {

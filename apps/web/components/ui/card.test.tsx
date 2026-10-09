@@ -22,12 +22,12 @@ describe('Card', () => {
 
   it('applies the rounded, soft-shadow card styling by default', () => {
     render(<Card data-testid="card">content</Card>);
-    expect(screen.getByTestId('card')).toHaveClass('rounded-2xl', 'shadow-soft');
+    expect(screen.getByTestId('card')).toHaveClass('rounded-2xl', 'shadow-pp-candy');
   });
 
   it('supports hoverable card styling', () => {
     render(<Card data-testid="card" hoverable>content</Card>);
-    expect(screen.getByTestId('card')).toHaveClass('hover:shadow-soft-md');
+    expect(screen.getByTestId('card')).toHaveClass('hover:shadow-pp-candy-hover');
   });
 
   it('merges a custom className rather than replacing the base styling', () => {
@@ -46,7 +46,7 @@ describe('Card', () => {
       </Card>,
     );
     const link = screen.getByRole('link', { name: 'link card' });
-    expect(link).toHaveClass('rounded-2xl', 'shadow-soft');
+    expect(link).toHaveClass('rounded-2xl', 'shadow-pp-candy');
     expect(link.tagName).toBe('A');
   });
 });
