@@ -196,5 +196,7 @@ export * from './services/ad-autopilot.service';
 export * from './services/attribution.service';
 export * from './models/video-render-job.model';
 export * from './services/video-assembly.service';
+export * from './models/customer-expansion-event.model';
+export * from './services/expansion-radar.service';
 export * from './plugin-runtime/easysign';
 

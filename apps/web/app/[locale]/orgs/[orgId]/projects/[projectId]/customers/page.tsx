@@ -5,7 +5,13 @@ import { activeSchemaNamesForKind, buildActiveSchemaDefsByKindAndName } from '@g
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, listPluginInstallsForProject, listSchemaDefinitionsForProject, searchProjectCustomers } from '@/lib/orgs/queries';
+import {
+  listOrgProjects,
+  listPluginInstallsForProject,
+  listSchemaDefinitionsForProject,
+  searchProjectCustomers,
+  getCustomerExpansionTelemetryForProject,
+} from '@/lib/orgs/queries';
 import { buildCustomerSearchView } from '@/lib/orgs/customer-search-view';
 import { ExpansionRadar } from '@/components/customers/expansion-radar';
 import { PpPage, PpCard, ppInputClass } from '@/components/pastel/primitives';
@@ -53,10 +59,11 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
     notFound();
   }
 
-  const [projects, schemaDefs, installs] = await Promise.all([
+  const [projects, schemaDefs, installs, initialTelemetry] = await Promise.all([
     listOrgProjects(orgId),
     listSchemaDefinitionsForProject(orgId, projectId),
     listPluginInstallsForProject(orgId, projectId).catch(() => []),
+    getCustomerExpansionTelemetryForProject(orgId, projectId).catch(() => undefined),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -89,7 +96,12 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
   return (
     <PpPage className="space-y-10">
       {/* Stitch Expansion & Upgrade Radar */}
-      <ExpansionRadar orgId={orgId} projectId={projectId} isDataConnected={isDataConnected} />
+      <ExpansionRadar
+        orgId={orgId}
+        projectId={projectId}
+        isDataConnected={isDataConnected}
+        initialTelemetry={initialTelemetry}
+      />
 
       {/* Customer 360 Warehouse Search */}
       <PpCard

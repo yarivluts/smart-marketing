@@ -37,4 +37,5 @@ export * from './peer-benchmarks';
 export * from './ad-autopilot';
 export * from './attribution';
 export * from './video-assembly';
+export * from './expansion-radar';
 

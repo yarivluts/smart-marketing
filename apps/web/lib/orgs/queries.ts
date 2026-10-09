@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import type { AutopilotTelemetryResult, AttributionTelemetryResult, VideoExportTelemetryResult } from '@growthos/shared';
+import type { AutopilotTelemetryResult, AttributionTelemetryResult, VideoExportTelemetryResult, CustomerExpansionSummary, AccountSegment } from '@growthos/shared';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   countSegmentMembers as countSegmentMembersInOrganization,
@@ -140,6 +140,7 @@ import {
   getAttributionTelemetry as getAttributionTelemetryInOrganization,
   type GetAttributionTelemetryOptions,
   VideoAssemblyService,
+  ExpansionRadarService,
   type PeerBenchmarksTelemetryResult,
   type PeerBenchmarkQueryOptions,
   type RepCollectionEntryModel,
@@ -492,6 +493,19 @@ export const getVideoExportTelemetryForProject = cache(
 );
 
 export type { VideoExportTelemetryResult };
+
+export const getCustomerExpansionTelemetryForProject = cache(
+  async function getCustomerExpansionTelemetryForProject(
+    organizationId: string,
+    projectId: string,
+    segment: AccountSegment = 'all',
+  ): Promise<CustomerExpansionSummary> {
+    await ensureFirestoreOrm();
+    return ExpansionRadarService.getCustomerExpansionRadarTelemetry(organizationId, projectId, segment);
+  },
+);
+
+export type { CustomerExpansionSummary, AccountSegment };
 
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,
