@@ -88,7 +88,7 @@ export function MetricFamilyCard({ orgId, projectId, name, versions, lineageHref
   return (
     <li
       id={`metric-${name}`}
-      className={cn('flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm', isArchived && 'opacity-70')}
+      className={cn('flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm', isArchived && 'opacity-70')}
       data-testid={`metric-family-${name}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">

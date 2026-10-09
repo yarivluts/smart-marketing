@@ -93,6 +93,13 @@
   main {
     overflow-wrap: anywhere;
   }
+  /*
+   * Grid items default to min-width:auto, so one nowrap line (a key prefix, a schema's field list)
+   * widens the whole track past a phone screen. Let them shrink; their own content wraps or scrolls.
+   */
+  main .grid > * {
+    min-width: 0;
+  }
   h1,
   h2,
   h3 {

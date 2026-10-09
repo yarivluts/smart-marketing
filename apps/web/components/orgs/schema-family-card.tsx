@@ -96,7 +96,7 @@ export function SchemaFamilyCard({ orgId, projectId, kind, name, versions }: Sch
   }
 
   return (
-    <li className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" data-testid={`schema-family-${kind}-${name}`}>
+    <li className="flex min-w-0 flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" data-testid={`schema-family-${kind}-${name}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
           <SchemaKindIcon kind={kind} />
