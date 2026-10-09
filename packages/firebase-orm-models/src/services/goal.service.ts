@@ -1,10 +1,13 @@
 import {
+  calculateGoalForecast,
   calculateGoalProgress,
   computeElapsedFraction,
   isGoalDirection,
   isGoalRhythm,
   MetricCompilerError,
+  type DailyObservation,
   type GoalDirection,
+  type GoalForecastResult,
   type GoalProgressHistoryPoint,
   type GoalProgressResult,
   type GoalRhythm,
@@ -473,7 +476,7 @@ export async function deleteGoal(organizationId: string, projectId: string, goal
 }
 
 export type GoalProgressOutcome =
-  | { ok: true; actualValue: number; progress: GoalProgressResult }
+  | { ok: true; actualValue: number; progress: GoalProgressResult; forecast?: GoalForecastResult }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
 export interface QueryGoalProgressParams {
@@ -541,14 +544,38 @@ function buildHistoryPoints(
   return points;
 }
 
+function buildDailyObservations(rows: readonly WarehouseRow[], metricName: string): DailyObservation[] {
+  const observations: DailyObservation[] = [];
+  for (const row of rows) {
+    const rawDate = row.bucket_date;
+    if (typeof rawDate !== 'string' || rawDate.length < 10) {
+      continue;
+    }
+    const rawValue = row[metricName] ?? null;
+    if (rawValue === null) {
+      continue;
+    }
+    const value = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+    observations.push({
+      date: rawDate.slice(0, 10),
+      value,
+    });
+  }
+  return observations;
+}
+
 /**
  * Computes a goal's current progress (KAN-64, E12.1): queries the goal's own
  * metric over `[start_date, min(asOfDate, deadline)]`, sums it into a single
  * `actualValue`, also turns the same day-grain rows into `history` points
  * (`buildHistoryPoints`) so `calculateGoalProgress` can fit a trend for a
  * minimize/range goal's `projectedFinalValue` instead of a flat projection,
- * and runs it all through `calculateGoalProgress`. Mirrors `queryBoardTile`'s
- * exact error-handling shape (`board.service.ts`) — a goal's own progress
+ * calculates predictive Monte Carlo pacing regression (KAN-308), and runs
+ * it all through `calculateGoalProgress`. Mirrors `queryBoardTile`'s exact
+ * error-handling shape (`board.service.ts`) — a goal's own progress
  * thermometer degrades gracefully the same way a board tile does, rather
  * than failing the whole goal detail page.
  */
@@ -573,7 +600,19 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       actualValue: 0,
       elapsedFraction: 0,
     });
-    return { ok: true, actualValue: 0, progress };
+    const forecast = calculateGoalForecast({
+      direction: goal.direction,
+      targetValue: goal.target_value ?? undefined,
+      rangeMin: goal.range_min ?? undefined,
+      rangeMax: goal.range_max ?? undefined,
+      actualValue: 0,
+      startDate: goal.start_date,
+      deadline: goal.deadline,
+      asOfDate,
+      rhythm: goal.rhythm,
+      observations: [],
+    });
+    return { ok: true, actualValue: 0, progress, forecast };
   }
 
   const queryEnd = asOfDate < goal.deadline ? asOfDate : goal.deadline;
@@ -600,6 +639,7 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       goal.deadline,
       goal.rhythm,
     );
+    const observations = buildDailyObservations(result.series, goal.metric_name);
     const progress = calculateGoalProgress({
       direction: goal.direction,
       targetValue: goal.target_value ?? undefined,
@@ -609,7 +649,19 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       elapsedFraction,
       history,
     });
-    return { ok: true, actualValue, progress };
+    const forecast = calculateGoalForecast({
+      direction: goal.direction,
+      targetValue: goal.target_value ?? undefined,
+      rangeMin: goal.range_min ?? undefined,
+      rangeMax: goal.range_max ?? undefined,
+      actualValue,
+      startDate: goal.start_date,
+      deadline: goal.deadline,
+      asOfDate,
+      rhythm: goal.rhythm,
+      observations,
+    });
+    return { ok: true, actualValue, progress, forecast };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };

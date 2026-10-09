@@ -13,7 +13,7 @@ import {
   listOrgProjects,
   queryGoalProgress,
 } from '@/lib/orgs/queries';
-import { buildGoalThermometerView } from '@/lib/orgs/goal-view';
+import { buildGoalThermometerView, buildGoalForecastView } from '@/lib/orgs/goal-view';
 import {
   PpButton,
   PpCard,
@@ -25,6 +25,7 @@ import {
   PpPill,
 } from '@/components/pastel/primitives';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
+import { GoalMonteCarloCard } from '@/components/orgs/goal-monte-carlo-card';
 import { DeleteGoalButton } from '@/components/orgs/delete-goal-button';
 import { EditGoalForm } from '@/components/orgs/edit-goal-form';
 
@@ -78,6 +79,8 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
 
   const outcome = await queryGoalProgress(orgId, projectId, goal);
   const thermometerView = buildGoalThermometerView(outcome);
+  const forecastView =
+    thermometerView.kind === 'ok' ? buildGoalForecastView(thermometerView.forecast) : null;
   const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
   const ownerName = peopleRows.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;
 
@@ -200,6 +203,17 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
           <GoalThermometer view={thermometerView} />
         </div>
       </PpCard>
+
+      {/* AI Monte Carlo Predictive Pace & Trajectory Card (KAN-308 / Stitch 7ccbd2e5) */}
+      {forecastView ? (
+        <GoalMonteCarloCard
+          forecast={forecastView}
+          targetValue={goal.direction === 'range' ? (goal.range_max ?? 0) : (goal.target_value ?? 0)}
+          direction={goal.direction}
+          metricName={goal.metric_name}
+          deadline={goal.deadline}
+        />
+      ) : null}
 
       {/* Main 2-Column Section: Governance Details & Edit Form */}
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">

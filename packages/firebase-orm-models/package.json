@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "firebase emulators:exec --project demo-growthos-test --only firestore \"vitest run\"",
+    "test:unit": "vitest run",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

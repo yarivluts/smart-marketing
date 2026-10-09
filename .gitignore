@@ -46,6 +46,8 @@ Thumbs.db
 
 # Claude Code tooling scratch space (agent worktrees, etc.) — not project content
 .claude/
+.agents/
+ORIGINAL_REQUEST.md
 
 # Terraform
 infra/terraform/.terraform/
