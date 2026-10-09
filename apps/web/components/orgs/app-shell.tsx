@@ -46,6 +46,7 @@ import {
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { LanguageSwitcher } from '@/components/shell/language-switcher';
+import { UserMenu } from './user-menu';
 import { cn } from '@/lib/utils';
 
 /**
@@ -228,6 +229,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
         {omniSearch ? <div className="mx-2 hidden max-w-md flex-1 md:block">{omniSearch}</div> : null}
         <div className="flex shrink-0 items-center gap-pp-sm">
           <LanguageSwitcher compact className="hidden sm:flex" />
+          <UserMenu />
           <button
             type="button"
             onClick={() => setMobileMenuOpen((open) => !open)}
