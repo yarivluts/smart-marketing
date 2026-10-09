@@ -6,6 +6,7 @@ import { GET as pairingStatus } from '@/app/api/tv-pairing/status/route';
 import { GET as pairingRotation } from '@/app/api/tv-pairing/rotation/route';
 import { GET as pairingBoard } from '@/app/api/tv-pairing/board/route';
 import { GET as pairingWinFeed } from '@/app/api/tv-pairing/win-feed/route';
+import { POST as pairingCommandAck } from '@/app/api/tv-pairing/command/ack/route';
 
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8090';
@@ -59,4 +60,28 @@ describe('tv-pairing viewer routes: unminted token vs. a real-but-unauthorized t
       () => pairingWinFeed(new NextRequest(`https://growthos.test/api/tv-pairing/win-feed?token=${deviceToken}`)),
     );
   });
+
+  it('POST /api/tv-pairing/command/ack rejects identically for an unminted token vs. an unclaimed real one (KAN-307)', async () => {
+    const { deviceToken } = await requestTvPairing();
+    const ackPayload = JSON.stringify({ commandId: 'c1', status: 'acknowledged' });
+    await expectIndistinguishable(
+      () =>
+        pairingCommandAck(
+          new NextRequest('https://growthos.test/api/tv-pairing/command/ack', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer never-minted', 'Content-Type': 'application/json' },
+            body: ackPayload,
+          }),
+        ),
+      () =>
+        pairingCommandAck(
+          new NextRequest('https://growthos.test/api/tv-pairing/command/ack', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${deviceToken}`, 'Content-Type': 'application/json' },
+            body: ackPayload,
+          }),
+        ),
+    );
+  });
 });
+

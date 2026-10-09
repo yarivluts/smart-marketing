@@ -1,4 +1,10 @@
-import type { TvPairingModel } from '@growthos/firebase-orm-models';
+import type {
+  TvPairingModel,
+  TvPairingPowerState,
+  TvPairingPendingCommand,
+  TvPairingCommandResult,
+  TvPairingCecSchedule,
+} from '@growthos/firebase-orm-models';
 
 /** A paired TV's own admin-list row — never sends the full `@arbel/firebase-orm` model instance (or its hashed secret fields) to a client component. */
 export interface TvPairingSummaryView {
@@ -11,6 +17,10 @@ export interface TvPairingSummaryView {
   lastSeenAt?: string;
   sessionExpiresAt?: string;
   revokedAt?: string;
+  powerState?: TvPairingPowerState;
+  pendingCommand?: TvPairingPendingCommand;
+  lastCommandResult?: TvPairingCommandResult;
+  cecSchedule?: TvPairingCecSchedule;
 }
 
 /** Only ever called for a *claimed* pairing (the admin list only ever shows those — see `listTvPairingsForProject`'s own doc comment), so every field this view needs is guaranteed set. */
@@ -25,5 +35,10 @@ export function toTvPairingSummaryView(pairing: TvPairingModel): TvPairingSummar
     ...(pairing.last_seen_at ? { lastSeenAt: pairing.last_seen_at } : {}),
     ...(pairing.session_expires_at ? { sessionExpiresAt: pairing.session_expires_at } : {}),
     ...(pairing.revoked_at ? { revokedAt: pairing.revoked_at } : {}),
+    powerState: pairing.power_state ?? 'on',
+    ...(pairing.pending_command ? { pendingCommand: pairing.pending_command } : {}),
+    ...(pairing.last_command_result ? { lastCommandResult: pairing.last_command_result } : {}),
+    ...(pairing.cec_standby_schedule ? { cecSchedule: pairing.cec_standby_schedule } : {}),
   };
 }
+

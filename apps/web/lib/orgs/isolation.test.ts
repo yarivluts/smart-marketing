@@ -31,6 +31,7 @@ import { DELETE as deleteBoard, PATCH as patchBoard } from '@/app/api/orgs/[orgI
 import { PUT as saveBoardTiles } from '@/app/api/orgs/[orgId]/projects/[projectId]/boards/[boardId]/tiles/route';
 import { GET as listTvPairings, POST as claimTvPairingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/tv-pairing/route';
 import { DELETE as revokeTvPairingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/tv-pairing/[pairingId]/route';
+import { POST as sendTvPairingCommandRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/tv-pairing/[pairingId]/command/route';
 import { GET as listAutomationActions, POST as proposeAutomationActionRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/route';
 import { POST as proposeCampaignDraftRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/campaign-drafts/route';
 import { POST as proposeCampaignActivationRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/campaign-activations/route';
@@ -881,6 +882,35 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         }),
       () =>
         revokeTvPairingRoute(deleteRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, pairingId: FAKE_PAIRING_ID }),
+        }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/projects/[projectId]/tv-pairing/[pairingId]/command: org caller cannot see vs. fake org id (KAN-307)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-tv-pairing-cmd-caller'));
+    const caller = await ensureUserForFirebaseSession({ firebaseUid: callerSession.uid, email: callerSession.email as string });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (tv-pairing cmd)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-tv-pairing-cmd-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (tv-pairing cmd)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+    const FAKE_PAIRING_ID = 'does-not-exist-pairing';
+
+    const cmdRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/tv-pairing/${FAKE_PAIRING_ID}/command`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'reboot' }),
+      });
+    await expectIndistinguishable(
+      () =>
+        sendTvPairingCommandRoute(cmdRequestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID, pairingId: FAKE_PAIRING_ID }),
+        }),
+      () =>
+        sendTvPairingCommandRoute(cmdRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, pairingId: FAKE_PAIRING_ID }),
         }),
     );

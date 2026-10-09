@@ -200,10 +200,18 @@ import {
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
   updateTvPairingSettings as updateTvPairingSettingsInOrganization,
+  sendTvPairingCommand as sendTvPairingCommandInOrganization,
+  updateTvPairingCecSchedule as updateTvPairingCecScheduleInOrganization,
+  acknowledgeTvPairingCommand as acknowledgeTvPairingCommandInOrganization,
   type RequestTvPairingResult,
   type TvPairingModel,
+  type TvPairingCommandType,
+  type TvPairingPowerState,
+  type TvPairingPendingCommand,
+  type TvPairingCommandResult,
+  type TvPairingCecSchedule,
 } from '@growthos/firebase-orm-models';
-import type { SegmentWorkListStatus, PluginScope } from '@growthos/shared';
+import type { SegmentWorkListStatus, PluginScope, Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 interface CreateOrganizationInput {
@@ -1639,12 +1647,54 @@ export interface UpdateTvPairingSettingsInput {
   rotationSeconds: number;
   reducedMotion: boolean;
   actorUserId: string;
+  cecSchedule?: TvPairingCecSchedule;
 }
 
 export async function updateTvPairingSettings(input: UpdateTvPairingSettingsInput): Promise<TvPairingModel> {
   await ensureFirestoreOrm();
   return updateTvPairingSettingsInOrganization(input);
 }
+
+export interface SendTvPairingCommandInput {
+  organizationId: string;
+  projectId: string;
+  pairingId: string;
+  type: TvPairingCommandType;
+  actorUserId: string;
+  parameters?: Record<string, unknown>;
+}
+
+export async function sendTvPairingCommand(input: SendTvPairingCommandInput): Promise<TvPairingModel> {
+  await ensureFirestoreOrm();
+  return sendTvPairingCommandInOrganization(input);
+}
+
+export interface UpdateTvPairingCecScheduleInput {
+  organizationId: string;
+  projectId: string;
+  pairingId: string;
+  cecSchedule: TvPairingCecSchedule;
+  actorUserId: string;
+}
+
+export async function updateTvPairingCecSchedule(input: UpdateTvPairingCecScheduleInput): Promise<TvPairingModel> {
+  await ensureFirestoreOrm();
+  return updateTvPairingCecScheduleInOrganization(input);
+}
+
+export interface AcknowledgeTvPairingCommandInput {
+  deviceToken: string;
+  commandId: string;
+  status: 'acknowledged' | 'failed';
+  error?: string;
+  powerState?: TvPairingPowerState;
+}
+
+export async function acknowledgeTvPairingCommand(input: AcknowledgeTvPairingCommandInput): Promise<Result<TvPairingModel, string>> {
+  await ensureFirestoreOrm();
+  return acknowledgeTvPairingCommandInOrganization(input);
+}
+
 
 /** Starts (or resumes) a project's onboarding wizard (KAN-68) — creates the singleton state doc on first visit. */
 export async function startOnboarding(

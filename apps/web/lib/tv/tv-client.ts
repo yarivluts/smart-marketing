@@ -15,6 +15,23 @@ export interface RequestPairingResponse {
   codeExpiresAt: string;
 }
 
+export type TvPowerState = 'on' | 'standby' | 'sleep';
+
+export interface TvPendingCommand {
+  commandId: string;
+  type: 'reboot' | 'display_sleep' | 'display_wake' | 'force_reload';
+  issuedAt: string;
+  issuedBy: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface TvCecSchedule {
+  enabled: boolean;
+  sleepTime?: string;
+  wakeTime?: string;
+  timezone?: string;
+}
+
 export type TvPairingStatusResponse =
   | { status: 'pending'; codeExpiresAt: string }
   | { status: 'expired' }
@@ -28,6 +45,9 @@ export type TvPairingStatusResponse =
       rotationSeconds: number;
       reducedMotion: boolean;
       label: string;
+      powerState?: TvPowerState;
+      pendingCommand?: TvPendingCommand;
+      cecSchedule?: TvCecSchedule;
     };
 
 export interface TvRotationBoardSummary {
@@ -99,3 +119,23 @@ export async function fetchTvBoardFrame(deviceToken: string, boardId: string): P
 export function tvWinFeedUrl(deviceToken: string): string {
   return `/api/tv-pairing/win-feed?token=${encodeURIComponent(deviceToken)}`;
 }
+
+export interface TvCommandAckPayload {
+  commandId: string;
+  status: 'acknowledged' | 'failed';
+  error?: string;
+  powerState?: TvPowerState;
+}
+
+export async function ackTvPairingCommand(deviceToken: string, payload: TvCommandAckPayload): Promise<{ ok: boolean; commandId: string; powerState: string }> {
+  const response = await fetch('/api/tv-pairing/command/ack', {
+    method: 'POST',
+    headers: {
+      ...bearerAuthHeaders(deviceToken),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  return parseJsonOrThrow(response);
+}
+

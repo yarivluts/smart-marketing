@@ -2410,7 +2410,23 @@
     "pairSubtitle": "הזנת הקוד המוצג על גבי הטלוויזיה לשיוך לפרויקט זה",
     "liveStatus": "פעיל",
     "kpiActiveDisplaysFooter": "{count, plural, one {מסך פעיל אחד} other {# מסכים פעילים}}",
-    "tvsPairedCount": "{count, plural, one {טלוויזיה אחת משויכת} other {# טלוויזיות משויכות}}"
+    "tvsPairedCount": "{count, plural, one {טלוויזיה אחת משויכת} other {# טלוויזיות משויכות}}",
+    "powerActive": "פעיל",
+    "powerStandby": "בהמתנה",
+    "powerSleep": "שינה",
+    "pendingCommandLabel": "ממתין לביצוע: {command}",
+    "cmdSleep": "העבר למצב שינה",
+    "cmdWake": "הער מסך",
+    "cmdReload": "טען מחדש",
+    "cmdReboot": "אתחל מסך",
+    "cmdSending": "שולח…",
+    "cmdSuccess": "הפקודה נשלחה בהצלחה",
+    "cmdError": "שליחת הפקודה נכשלה. נסה שוב.",
+    "cecScheduleLabel": "לוח זמנים להמתנה HDMI-CEC",
+    "cecScheduleEnabled": "המתנה אוטומטית לפי CEC",
+    "cecSleepTime": "שעת כניסה להמתנה",
+    "cecWakeTime": "שעת יקיצה",
+    "cecStandbyActive": "לוח זמני CEC פעיל: {sleepTime} – {wakeTime}"
   },
   "TvMode": {
     "metaTitle": "חדר מלחמה",
@@ -2423,7 +2439,10 @@
     "loadingBoard": "טוען לוח…",
     "goalsFrameHeading": "יעדים",
     "leaderboardFrameHeading": "לוח מובילי הגבייה",
-    "winOverlayHeading": "ניצחון חדש!"
+    "winOverlayHeading": "ניצחון חדש!",
+    "displaySleep": "מצב המתנה לתצוגה (מצב שינה מרוחק פעיל)",
+    "cecStandby": "מצב המתנה לתצוגה (לוח זמנים CEC פעיל)",
+    "pressAnyKeyToWake": "גע במסך או לחץ על מקש כלשהו להפעלת התצוגה"
   },
   "Automation": {
     "metaTitle": "אוטומציה",

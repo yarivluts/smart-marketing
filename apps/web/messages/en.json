@@ -2410,7 +2410,23 @@
     "pairSubtitle": "Redeem code displayed on TV to link it to this project",
     "liveStatus": "Live",
     "kpiActiveDisplaysFooter": "{count, plural, one {# active display} other {# active displays}}",
-    "tvsPairedCount": "{count, plural, one {# TV paired} other {# TVs paired}}"
+    "tvsPairedCount": "{count, plural, one {# TV paired} other {# TVs paired}}",
+    "powerActive": "Active",
+    "powerStandby": "Standby",
+    "powerSleep": "Sleep",
+    "pendingCommandLabel": "Pending: {command}",
+    "cmdSleep": "Sleep",
+    "cmdWake": "Wake",
+    "cmdReload": "Reload",
+    "cmdReboot": "Reboot",
+    "cmdSending": "Sending…",
+    "cmdSuccess": "Command sent successfully",
+    "cmdError": "Failed to send command. Please try again.",
+    "cecScheduleLabel": "HDMI-CEC Standby Schedule",
+    "cecScheduleEnabled": "Automated CEC Standby",
+    "cecSleepTime": "Standby Time",
+    "cecWakeTime": "Wake Time",
+    "cecStandbyActive": "CEC Schedule Active: {sleepTime} – {wakeTime}"
   },
   "TvMode": {
     "metaTitle": "War room",
@@ -2423,7 +2439,10 @@
     "loadingBoard": "Loading board…",
     "goalsFrameHeading": "Goals",
     "leaderboardFrameHeading": "Collections leaderboard",
-    "winOverlayHeading": "New win!"
+    "winOverlayHeading": "New win!",
+    "displaySleep": "Display Standby (Remote Sleep Active)",
+    "cecStandby": "Display Standby (CEC Standby Active)",
+    "pressAnyKeyToWake": "Touch screen or press any key to wake display"
   },
   "Automation": {
     "metaTitle": "Automation",

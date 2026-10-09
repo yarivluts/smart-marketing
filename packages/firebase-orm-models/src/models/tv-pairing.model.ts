@@ -94,4 +94,47 @@ export class TvPairingModel extends BaseModel {
 
   @Field()
   public revoked_by?: string;
+
+  /** Current hardware power state ('on' | 'standby' | 'sleep') synced via remote command channel (KAN-307). */
+  @Field()
+  public power_state?: TvPairingPowerState;
+
+  /** Unacknowledged remote command queued for execution by the TV kiosk client (KAN-307). */
+  @Field()
+  public pending_command?: TvPairingPendingCommand | null;
+
+  /** Result of the most recently executed command by the TV display runtime (KAN-307). */
+  @Field()
+  public last_command_result?: TvPairingCommandResult | null;
+
+  /** Automated HDMI-CEC standby schedule configuration for conference & lobby displays (KAN-307). */
+  @Field()
+  public cec_standby_schedule?: TvPairingCecSchedule | null;
+}
+
+export type TvPairingPowerState = 'on' | 'standby' | 'sleep';
+
+export type TvPairingCommandType = 'reboot' | 'display_sleep' | 'display_wake' | 'force_reload';
+
+export interface TvPairingPendingCommand {
+  commandId: string;
+  type: TvPairingCommandType;
+  issuedAt: string;
+  issuedBy: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface TvPairingCommandResult {
+  commandId: string;
+  type: string;
+  executedAt: string;
+  status: 'acknowledged' | 'failed';
+  error?: string;
+}
+
+export interface TvPairingCecSchedule {
+  enabled: boolean;
+  sleepTime?: string;
+  wakeTime?: string;
+  timezone?: string;
 }
