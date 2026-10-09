@@ -17,6 +17,29 @@ Template for each entry:
 
 ---
 
+## 2026-10-10 - Page-by-page QA review of prod: 59 bugs in Jira (KAN-319..KAN-377)
+
+- **Last completed:** Yariv asked for a review of every page on desktop and mobile, as PM, engineer and UX, with bugs filed in Jira with screenshots.
+  - **Captured:** all 44 org and project pages (desktop 1440px and iPhone 13), signed in as the QA org admin. Six parallel reviewers each covered one lens set per batch.
+  - **Filed:** 59 deduplicated Bugs (6 high, 33 medium, 20 low), KAN-319 to KAN-377. Each sits under epic KAN-14, is labelled `qa-review` plus `severity-*`, `lens-*` and `viewport-*`, and has its screenshot attached.
+  - **Excluded:** chart findings that were the entry animation caught mid-way (verified by recapturing with a 3s settle), plus intended behavior (owner-only org settings, the win-rules live feed).
+  - **Fixed instead of filed:** the redesign's own issues, in PR #596 (deployed f97dea9).
+    - The KPI accent is now an inner bar.
+    - Word and date KPI values use a smaller style with dir=auto.
+    - The account menu placeholder appears while the session loads.
+    - Only one active nav item for a duplicated href.
+    - No duplicate project name in the sidebar.
+- **High-severity open bugs:**
+  - Campaigns table on mobile (KAN-319).
+  - Schema field tables on mobile (KAN-320).
+  - Members list on mobile (KAN-321).
+  - Cost log table on mobile (KAN-322).
+  - TV setup shows no TV URL or QR code (KAN-323).
+  - Audit log integrity check reports "corrupted" (KAN-324).
+- **In progress (exact stopping point):** none.
+- **Next step:** work the high-severity QA bugs, then the untranslated enum and English-sentence group (KAN-325..KAN-332).
+- **Waiting on human:** stop the out-of-band `feat/stitch-conversion` deploys (see the entry below).
+
 ## 2026-10-10 - Pastel Pulse redesign on main, every feature kept (KAN-318)
 
 - **Last completed:** Yariv asked to keep the new design but have everything work as before.
