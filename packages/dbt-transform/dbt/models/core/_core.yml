@@ -115,6 +115,42 @@ models:
         tests:
           - not_null
 
+  - name: fact_attribution_paths
+    description: >
+      Omnichannel multi-touch conversion journey pathways (KAN-312): aggregates customer
+      touchpoint sequences before conversion, total touches, first and last touch channels,
+      and conversion cycle duration.
+    columns:
+      - name: path_key
+        tests:
+          - not_null
+          - unique
+      - name: conversion_event_id
+        tests:
+          - not_null
+      - name: total_touches
+        tests:
+          - not_null
+
+  - name: fact_attribution_markov
+    description: >
+      Markov chain transition probability matrix (KAN-312): state-to-state channel
+      transitions and empirical transition probabilities across customer journeys.
+    columns:
+      - name: transition_key
+        tests:
+          - not_null
+          - unique
+      - name: from_channel
+        tests:
+          - not_null
+      - name: to_channel
+        tests:
+          - not_null
+      - name: transition_probability
+        tests:
+          - not_null
+
   - name: fact_cohort_retention
     description: >
       Generic cohort engine v1 + KAN-118's conversion-event parameter (plan

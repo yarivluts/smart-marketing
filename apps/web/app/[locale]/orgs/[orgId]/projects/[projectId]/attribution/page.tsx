@@ -4,7 +4,11 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getCampaignSpendBreakdownForProject, listOrgProjects, listPluginInstallsForProject } from '@/lib/orgs/queries';
+import {
+  getAttributionTelemetryForProject,
+  listOrgProjects,
+  listPluginInstallsForProject,
+} from '@/lib/orgs/queries';
 import { PpPage } from '@/components/pastel/primitives';
 import { MultiTouchAttributionMatrix } from '@/components/attribution/multi-touch-attribution-matrix';
 
@@ -17,9 +21,9 @@ export async function generateMetadata({ params: _params }: PageProps) {
 }
 
 /**
- * Multi-Touch Attribution Matrix (Stitch 6e3358b76a2e476299656d3a18f84a4d):
- * Cross-channel Shapley value game-theoretic revenue attribution, multi-touch lookback
- * windows (30/60/90d), and top-converting omnichannel sequence pathways.
+ * Multi-Touch Attribution Matrix (Stitch 2bc944e2e3c1498fb5add4a1aaebcac5):
+ * Cross-channel Shapley value game-theoretic revenue attribution, Markov chain removal effects,
+ * multi-touch lookback windows (30/60/90d), and top-converting omnichannel sequence pathways.
  */
 export default async function AttributionPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -41,10 +45,10 @@ export default async function AttributionPage({ params }: PageProps): Promise<Re
     notFound();
   }
 
-  const [projects, installs, campaignSpendOutcome] = await Promise.all([
+  const [projects, installs, initialTelemetry] = await Promise.all([
     listOrgProjects(orgId),
     listPluginInstallsForProject(orgId, projectId).catch(() => []),
-    getCampaignSpendBreakdownForProject(orgId, projectId).catch(() => ({ ok: false as const, reason: 'query_error' as const })),
+    getAttributionTelemetryForProject(orgId, projectId, { lookbackDays: 60 }).catch(() => null),
   ]);
 
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -77,45 +81,21 @@ export default async function AttributionPage({ params }: PageProps): Promise<Re
     activePluginIds.has('segment');
 
   const hasAttributionData = Boolean(
-    campaignSpendOutcome.ok && campaignSpendOutcome.rows && campaignSpendOutcome.rows.length > 0,
+    initialTelemetry && initialTelemetry.channels && initialTelemetry.channels.length > 0,
   );
 
   const isDataConnected = (hasAdConnector && hasTouchpointConnector) || hasAttributionData || hasAdConnector;
-
-  const totalSpend = campaignSpendOutcome.ok && campaignSpendOutcome.rows
-    ? campaignSpendOutcome.rows.reduce((sum, r) => sum + (r.actualSpend || 0), 0)
-    : 0;
-
-  const initialAttributionRows =
-    campaignSpendOutcome.ok && campaignSpendOutcome.rows && campaignSpendOutcome.rows.length > 0
-      ? campaignSpendOutcome.rows.map((row, idx) => {
-          const spend = row.actualSpend || 0;
-          const share = totalSpend > 0 ? Math.round((spend / totalSpend) * 100) : 0;
-          return {
-            id: row.campaignId,
-            channel: row.campaignId.replace(/[-_]/g, ' '),
-            role: idx % 2 === 0 ? 'Top of Funnel & Acquisition' : 'High-Intent Decision & Conversion',
-            firstTouchShare: `${share}%`,
-            firstTouchRevenue: `$${spend.toLocaleString()}`,
-            lastTouchShare: `${share}%`,
-            lastTouchRevenue: `$${spend.toLocaleString()}`,
-            shapleyShare: `${share}%`,
-            shapleyRevenue: `$${spend.toLocaleString()}`,
-            roas: '—',
-            roasStatus: 'emerald' as const,
-            color: ['bg-pp-primary', 'bg-sky-400', 'bg-emerald-400', 'bg-amber-400', 'bg-purple-400'][idx % 5],
-          };
-        })
-      : [];
 
   return (
     <PpPage className="space-y-8">
       <MultiTouchAttributionMatrix
         orgId={orgId}
         projectId={projectId}
+        projectName={project.name}
         isDataConnected={isDataConnected}
-        initialRows={initialAttributionRows}
+        initialTelemetry={initialTelemetry ?? undefined}
       />
     </PpPage>
   );
 }
+

@@ -1,6 +1,6 @@
 import 'server-only';
 import { cache } from 'react';
-import type { AutopilotTelemetryResult } from '@growthos/shared';
+import type { AutopilotTelemetryResult, AttributionTelemetryResult } from '@growthos/shared';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   countSegmentMembers as countSegmentMembersInOrganization,
@@ -137,6 +137,8 @@ import {
   type CreativeSwapAction,
   getPeerBenchmarksForProject as getPeerBenchmarksForProjectInOrganization,
   getAutopilotTelemetry as getAutopilotTelemetryInOrganization,
+  getAttributionTelemetry as getAttributionTelemetryInOrganization,
+  type GetAttributionTelemetryOptions,
   type PeerBenchmarksTelemetryResult,
   type PeerBenchmarkQueryOptions,
   type RepCollectionEntryModel,
@@ -463,6 +465,19 @@ export const getAutopilotTelemetryForProject = cache(
 );
 
 export type { AutopilotTelemetryResult };
+
+export const getAttributionTelemetryForProject = cache(
+  async function getAttributionTelemetryForProject(
+    organizationId: string,
+    projectId: string,
+    options?: GetAttributionTelemetryOptions,
+  ): Promise<AttributionTelemetryResult> {
+    await ensureFirestoreOrm();
+    return getAttributionTelemetryInOrganization(organizationId, projectId, options);
+  },
+);
+
+export type { AttributionTelemetryResult, GetAttributionTelemetryOptions };
 
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,
