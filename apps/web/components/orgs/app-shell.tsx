@@ -41,9 +41,11 @@ import {
   X,
   type LucideIcon,
   Clapperboard,
+  Network,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
+import { LanguageSwitcher } from '@/components/shell/language-switcher';
 import { cn } from '@/lib/utils';
 
 /**
@@ -147,14 +149,29 @@ function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boo
     <Link
       href={item.href}
       onClick={onClick}
+      aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors',
-        active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground',
+        'flex items-center gap-pp-sm rounded-pp-lg px-pp-md py-pp-sm text-pp-label-md transition-colors',
+        active
+          ? 'bg-pp-primary-fixed font-semibold text-primary'
+          : 'text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface',
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <Icon className={cn('h-5 w-5 shrink-0', active ? 'text-pp-primary' : 'text-pp-on-surface-variant')} aria-hidden="true" />
       <span className="truncate">{item.label}</span>
     </Link>
+  );
+}
+
+/** The GrowthOS mark: the violet tile and wordmark of the Pastel Pulse header. */
+function Brand({ name }: { name: string }): React.ReactElement {
+  return (
+    <span className="flex items-center gap-pp-sm">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pp-primary text-pp-on-primary shadow-sm shadow-pp-primary/30">
+        <Network className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <span className="font-pp-display text-pp-headline-md font-bold tracking-tight text-pp-primary">{name}</span>
+    </span>
   );
 }
 
@@ -168,11 +185,13 @@ function NavSections({
   onNavigate?: () => void;
 }): React.ReactElement {
   return (
-    <nav className="flex flex-col gap-5">
+    <nav className="flex flex-col gap-pp-md">
       {sections.map((section, index) => (
         <div key={section.heading ?? index} className="flex flex-col gap-1">
           {section.heading ? (
-            <span className="px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground/70">{section.heading}</span>
+            <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">{section.heading}</span>
+          ) : index > 0 ? (
+            <div className="mx-pp-md mb-1 border-b border-pp-outline-variant/30" aria-hidden="true" />
           ) : null}
           {section.items.map((item) => (
             <NavLink key={item.href} item={item} active={item.href === activeHref} onClick={onNavigate} />
@@ -200,45 +219,57 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
   const activeHref = bestMatchingHref(pathname, allHrefs);
 
   return (
-    <div className="flex min-h-screen flex-col md:flex-row">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-e border-border bg-background/80 p-4 backdrop-blur md:flex">
-        {switchers ? <div className="flex flex-col gap-3">{switchers}</div> : null}
-        {omniSearch}
-        <NavSections sections={sections} activeHref={activeHref} />
-      </aside>
-
-      {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur md:hidden">
-        <span className="bg-brand-gradient bg-clip-text text-lg font-bold text-transparent">{t('brandName')}</span>
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen((open) => !open)}
-          aria-expanded={mobileMenuOpen}
-          aria-label={mobileMenuOpen ? t('closeMenu') : t('openMenu')}
-          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent/10"
-        >
-          {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
-        </button>
+    <div className="flex min-h-screen flex-col bg-pp-surface-container-low text-pp-on-surface">
+      {/* Top bar: brand, omnisearch and language on desktop; brand and the menu button on mobile */}
+      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-pp-md border-b border-pp-outline-variant/30 bg-pp-surface-container-lowest/95 px-pp-md backdrop-blur lg:px-pp-lg">
+        <Link href="/" className="shrink-0">
+          <Brand name={t('brandName')} />
+        </Link>
+        {omniSearch ? <div className="mx-2 hidden max-w-md flex-1 md:block">{omniSearch}</div> : null}
+        <div className="flex shrink-0 items-center gap-pp-sm">
+          <LanguageSwitcher compact className="hidden sm:flex" />
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            aria-expanded={mobileMenuOpen}
+            aria-label={mobileMenuOpen ? t('closeMenu') : t('openMenu')}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-pp-on-surface-variant hover:bg-pp-surface-container-high md:hidden"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+          </button>
+        </div>
       </header>
 
-      {/* Mobile slide-down menu */}
+      <div className="flex min-h-0 flex-1">
+        {/* Desktop sidebar */}
+        <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-72 shrink-0 flex-col gap-pp-md overflow-y-auto bg-pp-surface-container-lowest p-pp-md shadow-sm md:flex">
+          {switchers ? (
+            <div className="flex flex-col gap-3 rounded-pp border border-pp-outline-variant/40 bg-pp-surface-container-lowest p-pp-sm shadow-pp-candy">
+              {switchers}
+            </div>
+          ) : null}
+          <NavSections sections={sections} activeHref={activeHref} />
+        </aside>
+
+        {/* Main content */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="flex-1 pb-pp-dock md:pb-0">{children}</main>
+        </div>
+      </div>
+
+      {/* Mobile slide-down menu (fixed under the top bar; after the sidebar in document order) */}
       {mobileMenuOpen ? (
-        <div className="fixed inset-x-0 top-[57px] z-10 flex max-h-[calc(100vh-57px)] flex-col gap-4 overflow-y-auto border-b border-border bg-background p-4 shadow-soft-lg md:hidden">
-          {switchers ? <div className="flex flex-col gap-3">{switchers}</div> : null}
+        <div className="fixed inset-x-0 top-16 z-20 flex max-h-[calc(100vh-4rem)] flex-col gap-pp-md overflow-y-auto border-b border-pp-outline-variant/30 bg-pp-surface-container-lowest p-pp-md shadow-pp-candy md:hidden">
+          {switchers ? <div className="flex flex-col gap-3 rounded-pp bg-pp-surface-container-low p-pp-sm">{switchers}</div> : null}
           {omniSearch}
+          <LanguageSwitcher compact className="sm:hidden" />
           <NavSections sections={sections} activeHref={activeHref} onNavigate={() => setMobileMenuOpen(false)} />
         </div>
       ) : null}
 
-      {/* Main content */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <main className="flex-1 pb-20 md:pb-0">{children}</main>
-      </div>
-
       {/* Mobile bottom tab bar */}
       {mobileTabItems.length > 0 ? (
-        <nav className="fixed inset-x-0 bottom-0 z-20 flex items-stretch justify-around border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        <nav className="fixed inset-x-3 bottom-3 z-20 flex items-stretch justify-around rounded-pp-lg bg-pp-surface-container-lowest/95 pb-[env(safe-area-inset-bottom)] shadow-pp-dock backdrop-blur md:hidden">
           {mobileTabItems.map((item) => {
             const Icon = ICONS[item.icon];
             const active = item.href === activeHref;
@@ -247,8 +278,8 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition-colors',
-                  active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  'flex flex-1 flex-col items-center gap-0.5 rounded-pp-lg py-2 text-[11px] font-semibold transition-colors',
+                  active ? 'text-primary' : 'text-pp-on-surface-variant hover:text-pp-on-surface',
                 )}
               >
                 <Icon className="h-5 w-5" aria-hidden="true" />

@@ -63,9 +63,8 @@ export function ppAccentPill(accent: PpAccent): string {
 /* ------------------------------------------------------------------------------------------ */
 
 /**
- * Page content column: Stitch vertical rhythm (`space-y-space-lg`). Padding and the
- * mobile-dock clearance come from `NavShell`'s `<main>` (Stitch `p-space-md md:p-space-lg
- * lg:p-space-xl`), so pages rendered inside the shell must not add their own.
+ * Page content column: Stitch vertical rhythm (`space-y-pp-lg`), centred and width-capped.
+ * The shell owns the page's single main landmark; this is a plain container inside it.
  */
 export function PpPage({
   children,

@@ -12,6 +12,8 @@ vi.mock('@/i18n/navigation', () => ({
     </a>
   ),
   usePathname: () => mockUsePathname(),
+  // The header's LanguageSwitcher navigates with it.
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 
 const homeItem: AppShellNavItem = { href: '/orgs/org-1', label: 'Home', icon: 'Home' };
