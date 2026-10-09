@@ -222,7 +222,7 @@ export default async function ProjectLayout({
     <AppShell
       switchers={
         <>
-          <span className="truncate px-3 text-sm font-semibold">{project.name}</span>
+          {/* The switcher's selected pill already names the current project. */}
           <ProjectSwitcher
             orgId={orgId}
             projects={projects}

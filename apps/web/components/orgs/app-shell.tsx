@@ -185,6 +185,9 @@ function NavSections({
   activeHref: string | undefined;
   onNavigate?: () => void;
 }): React.ReactElement {
+  // The same href can appear twice (a primary module and its restored per-feature link, e.g. the
+  // funnel): only the first occurrence is marked current, so the sidebar never shows two active pills.
+  const activeItem = sections.flatMap((section) => section.items).find((item) => item.href === activeHref);
   return (
     <nav className="flex flex-col gap-pp-md">
       {sections.map((section, index) => (
@@ -195,7 +198,7 @@ function NavSections({
             <div className="mx-pp-md mb-1 border-b border-pp-outline-variant/30" aria-hidden="true" />
           ) : null}
           {section.items.map((item) => (
-            <NavLink key={item.href} item={item} active={item.href === activeHref} onClick={onNavigate} />
+            <NavLink key={item.href} item={item} active={item === activeItem} onClick={onNavigate} />
           ))}
         </div>
       ))}

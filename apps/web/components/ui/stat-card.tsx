@@ -59,18 +59,21 @@ export function StatCard({
       ? 'down'
       : 'neutral';
 
+  // A value made of words or a date ("no data yet", a time zone, "26 Sep 2026") is not a metric:
+  // the display-number size would wrap it over two huge lines, and forcing LTR would scramble Hebrew.
+  const isTextValue = typeof value === 'string' && /[A-Za-z\u0590-\u05ff]{2,}/.test(value);
+
   return (
     <Card
       hoverable
-      className={cn(
-        'flex flex-col justify-between border-s-4 border-s-pp-primary p-pp-lg transition-all duration-200',
-        className,
-      )}
+      className={cn('relative flex flex-col justify-between overflow-hidden p-pp-lg transition-all duration-200', className)}
       {...props}
     >
+      {/* Accent bar on the inline-start edge, clipped by the card's radius (a border would curve past the corners). */}
+      <span aria-hidden="true" className="absolute inset-y-0 start-0 w-1 bg-pp-primary" />
       <div>
         <div className="flex items-center justify-between gap-2">
-          <span className="line-clamp-2 text-pp-label-sm uppercase tracking-wider text-pp-outline">{title}</span>
+          <span className="text-pp-label-sm uppercase tracking-wider text-pp-outline">{title}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {badge}
             {Icon ? (
@@ -82,9 +85,15 @@ export function StatCard({
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
-          <span dir="ltr" className="inline-block font-pp-display text-pp-metric text-pp-on-surface">
-            {value}
-          </span>
+          {isTextValue ? (
+            <span dir="auto" className="inline-block text-pp-headline-md font-semibold text-pp-on-surface-variant">
+              {value}
+            </span>
+          ) : (
+            <span dir="ltr" className="inline-block font-pp-display text-pp-metric text-pp-on-surface">
+              {value}
+            </span>
+          )}
         </div>
       </div>
 
