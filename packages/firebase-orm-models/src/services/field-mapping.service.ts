@@ -1,8 +1,11 @@
 import {
-  applyFieldMapping,
+  benchmarkFieldMappingLatency,
+  calculateFieldMappingConfidence,
   mappingTargetFields,
   suggestFieldMappingRules as suggestMappingRulesFromSample,
   validateMappingRules,
+  type FieldMappingConfidenceScore,
+  type FieldMappingLatencyMetrics,
   type MappingApplyResult,
   type MappingRecordKind,
   type MappingRule,
@@ -405,6 +408,10 @@ export interface TestRunFieldMappingResult extends MappingApplyResult {
   schemaRegistered: boolean;
   /** Field-level violations against the target schema's registered fields, once the record passed its envelope check. */
   schemaValidationErrors: readonly string[];
+  /** Benchmarked latency percentiles (avg, p50, p90, p95, p99) across sample execution runs. */
+  latencyProfile: FieldMappingLatencyMetrics;
+  /** Semantic and syntactic transformation confidence score and recommendation. */
+  confidenceScore: FieldMappingConfidenceScore;
 }
 
 /**
@@ -429,23 +436,42 @@ async function runFieldMapping(
     throw new InvalidSamplePayloadError();
   }
 
-  const applied = applyFieldMapping(rules, payload);
-  if (applied.errors.length > 0) {
-    return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
+  const { applied, latency } = benchmarkFieldMappingLatency(rules, payload);
+
+  let envelopeErrors: readonly string[] = [];
+  let schemaRegistered = false;
+  let schemaValidationErrors: readonly string[] = [];
+
+  if (applied.errors.length === 0) {
+    const { fieldsToValidate, envelopeReasons } = checkRecordEnvelope(kind, applied.record);
+    envelopeErrors = envelopeReasons;
+
+    if (envelopeReasons.length === 0) {
+      const activeSchema = await getActiveSchemaDefinition(organizationId, projectId, kind, schemaName);
+      if (activeSchema) {
+        schemaRegistered = true;
+        schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs, kind);
+      }
+    }
   }
 
-  const { fieldsToValidate, envelopeReasons } = checkRecordEnvelope(kind, applied.record);
-  if (envelopeReasons.length > 0) {
-    return { ...applied, envelopeErrors: envelopeReasons, schemaRegistered: false, schemaValidationErrors: [] };
-  }
+  const confidenceScore = calculateFieldMappingConfidence({
+    rules,
+    mappingErrors: applied.errors,
+    envelopeErrors,
+    schemaRegistered,
+    schemaValidationErrors,
+    samplePayload: payload,
+  });
 
-  const activeSchema = await getActiveSchemaDefinition(organizationId, projectId, kind, schemaName);
-  if (!activeSchema) {
-    return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
-  }
-
-  const schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs, kind);
-  return { ...applied, envelopeErrors: [], schemaRegistered: true, schemaValidationErrors };
+  return {
+    ...applied,
+    envelopeErrors,
+    schemaRegistered,
+    schemaValidationErrors,
+    latencyProfile: latency,
+    confidenceScore,
+  };
 }
 
 /**

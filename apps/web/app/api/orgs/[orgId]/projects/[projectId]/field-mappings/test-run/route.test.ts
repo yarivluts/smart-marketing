@@ -110,6 +110,14 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/field-mappings/test-run', 
     expect(body.errors).toEqual([]);
     expect(body.schemaValidationErrors).toEqual([]);
     expect(body.record).toEqual({ event_id: 'ord_1', event: 'order_completed', ts: '2024-01-01T00:00:00Z', properties: { order_id: 'ord_1' } });
+    expect(body.latencyProfile).toBeDefined();
+    expect(body.latencyProfile.avgLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(body.latencyProfile.p90Ms).toBeGreaterThanOrEqual(0);
+    expect(body.latencyProfile.p95Ms).toBeGreaterThanOrEqual(0);
+    expect(body.confidenceScore).toBeDefined();
+    expect(body.confidenceScore.score).toBeGreaterThanOrEqual(90);
+    expect(body.confidenceScore.level).toBe('high');
+    expect(body.confidenceScore.recommendation).toContain('High match certainty');
   });
 
   it('test-runs a saved mapping by id, prefilling the sample from a queued hook delivery', async () => {
@@ -146,6 +154,10 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/field-mappings/test-run', 
     const body = await response.json();
     expect(body.errors).toEqual([]);
     expect(body.record.event_id).toBe('ord_1');
+    expect(body.latencyProfile).toBeDefined();
+    expect(body.latencyProfile.avgLatencyMs).toBeGreaterThanOrEqual(0);
+    expect(body.confidenceScore).toBeDefined();
+    expect(body.confidenceScore.score).toBeGreaterThanOrEqual(90);
   });
 
   it('returns invalid_sample_payload for malformed JSON', async () => {

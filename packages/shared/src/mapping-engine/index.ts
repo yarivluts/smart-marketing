@@ -8,3 +8,4 @@ export {
   type MappingTargetFieldDescriptor,
   type ValidatedMappingRules,
 } from './engine';
+export * from './profiler';

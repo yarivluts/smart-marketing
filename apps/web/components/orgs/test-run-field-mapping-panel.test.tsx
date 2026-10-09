@@ -202,4 +202,48 @@ describe('TestRunFieldMappingPanel', () => {
     expect(screen.getByText('Schema validation errors: unregistered_field:x')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('renders latency percentiles benchmark and confidence badge with AI recommendation', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        record: { 'account.metrics.lifetimeValue': 1450.75 },
+        errors: [],
+        envelopeErrors: [],
+        schemaRegistered: true,
+        schemaValidationErrors: [],
+        latencyProfile: {
+          avgLatencyMs: 0.42,
+          p50Ms: 0.38,
+          p90Ms: 0.51,
+          p95Ms: 0.58,
+          p99Ms: 0.65,
+          iterations: 25,
+          totalTimeMs: 10.5,
+        },
+        confidenceScore: {
+          score: 98,
+          level: 'high',
+          factors: [
+            { name: 'rule_evaluation', weight: 0.4, score: 100, passed: true },
+            { name: 'envelope_conformance', weight: 0.3, score: 100, passed: true },
+            { name: 'schema_alignment', weight: 0.3, score: 100, passed: true },
+          ],
+          recommendation: 'High match certainty for financial telemetry data types.',
+        },
+      }),
+    } as Response);
+    renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
+    fireEvent.change(screen.getByLabelText('Sample payload (JSON)'), { target: { value: '{"amount": 1450.75}' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    expect(await screen.findByTestId('confidence-badge')).toHaveTextContent('98% CONFIDENCE');
+    expect(screen.getByTestId('latency-benchmark')).toHaveTextContent('Execution latency: 0.42ms (p90: 0.51ms, p95: 0.58ms)');
+    expect(screen.getByTestId('ai-recommendation')).toHaveTextContent(
+      'AI Recommendation: High match certainty for financial telemetry data types.',
+    );
+    expect(screen.getByText('Schema Matched')).toBeInTheDocument();
+  });
 });

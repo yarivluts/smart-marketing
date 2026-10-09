@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { PpButton, ppInputClass } from '@/components/pastel/primitives';
-import { Play, Check, X, FlaskConical } from 'lucide-react';
+import { Play, Check, X, FlaskConical, CheckCircle2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { FieldMappingConfidenceScore, FieldMappingLatencyMetrics } from '@growthos/shared';
 
 export interface TestRunHookDeliveryOption {
   id: string;
@@ -25,6 +26,8 @@ interface TestRunResponseBody {
   envelopeErrors: string[];
   schemaRegistered: boolean;
   schemaValidationErrors: string[];
+  latencyProfile?: FieldMappingLatencyMetrics;
+  confidenceScore?: FieldMappingConfidenceScore;
 }
 
 interface ApplyResponseBody extends TestRunResponseBody {
@@ -174,10 +177,67 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
         </p>
       ) : null}
       {result ? (
-        <div className="flex flex-col gap-2 text-xs">
-          <pre className="max-h-48 overflow-auto rounded-xl bg-[#1e1e24] text-[#f2eff8] p-3 font-mono text-xs">
-            {JSON.stringify(result.record, null, 2)}
-          </pre>
+        <div className="flex flex-col gap-2.5 text-xs">
+          {result.confidenceScore ? (
+            <div className="flex items-center justify-between">
+              <div
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold',
+                  result.confidenceScore.level === 'high'
+                    ? 'bg-[#E6FAF5] text-[#0E624C] dark:bg-[#00513f]/40 dark:text-[#3fdeb4]'
+                    : result.confidenceScore.level === 'medium'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                    : 'bg-pp-error/15 text-pp-error',
+                )}
+                data-testid="confidence-badge"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span className="font-bold">{t('confidenceBadge', { confidence: result.confidenceScore.score })}</span>
+              </div>
+              <span className="text-[11px] text-pp-outline font-medium">
+                {t('confidenceTier', { level: result.confidenceScore.level })}
+              </span>
+            </div>
+          ) : null}
+
+          <div className="rounded-xl bg-[#1e1e24] text-[#f2eff8] p-3 font-mono text-xs flex flex-col gap-2">
+            <pre className="max-h-48 overflow-auto">
+              {JSON.stringify(result.record, null, 2)}
+            </pre>
+            <div className="pt-2 border-t border-[#303036] flex items-center justify-between text-[11px] text-[#787586]">
+              {result.latencyProfile ? (
+                <span data-testid="latency-benchmark">
+                  {t('executionLatency', {
+                    avgLatencyMs: result.latencyProfile.avgLatencyMs,
+                    p90Ms: result.latencyProfile.p90Ms,
+                    p95Ms: result.latencyProfile.p95Ms,
+                  })}
+                </span>
+              ) : (
+                <span>{t('executionLatencyFallback')}</span>
+              )}
+              <span className={cn('flex items-center gap-1 font-sans font-semibold', isSuccess ? 'text-[#55EFC4]' : 'text-pp-error')}>
+                <Check className="w-3 h-3" />
+                {isSuccess ? t('schemaMatched') : t('schemaValidationFailed')}
+              </span>
+            </div>
+          </div>
+
+          {result.confidenceScore?.recommendation ? (
+            <div
+              className="bg-pp-primary-fixed/20 dark:bg-pp-primary-container/20 p-3 rounded-xl flex items-center justify-between border border-pp-primary/20"
+              data-testid="ai-recommendation"
+            >
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-pp-primary shrink-0" />
+                <div className="text-xs text-pp-on-surface">
+                  <span className="font-bold text-pp-primary">{t('aiRecommendationLabel')}: </span>
+                  <span>{result.confidenceScore.recommendation}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           {result.errors.length > 0 ? (
             <p className="text-pp-error font-medium">{t('mappingErrors', { errors: result.errors.join(', ') })}</p>
           ) : null}
