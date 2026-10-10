@@ -111,6 +111,9 @@ import {
   listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
   listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
   listRecentDunningSubscriptionsForProject as listRecentDunningSubscriptionsForProjectInOrganization,
+  getBillingRecoveryForProject as getBillingRecoveryForProjectInOrganization,
+  type BillingRecoverySummary,
+  type GetBillingRecoveryForProjectOptions,
   listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
   type RawRecordModel,
   type RecordFieldFilter,
@@ -425,6 +428,16 @@ export async function listRecentDunningSubscriptionsForProject(
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
   return listRecentDunningSubscriptionsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+/** Failed Stripe payments paired with the charge that recovered them (KAN-304). */
+export async function getBillingRecoveryForProject(
+  organizationId: string,
+  projectId: string,
+  options?: GetBillingRecoveryForProjectOptions,
+): Promise<BillingRecoverySummary> {
+  await ensureFirestoreOrm();
+  return getBillingRecoveryForProjectInOrganization(organizationId, projectId, options);
 }
 
 /** Same `environmentId` semantics as {@link listRecentIngestBatchesForProject}. */
