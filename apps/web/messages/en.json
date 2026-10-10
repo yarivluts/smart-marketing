@@ -1250,7 +1250,9 @@
     "timelineTitle": "Billing events",
     "amountShort": "{amount} {currency}",
     "mrrShort": "{amount} {currency} MRR",
-    "mrrAtRiskLine": "MRR at risk (smallest unit): {amounts}"
+    "mrrAtRiskLine": "MRR at risk (smallest unit): {amounts}",
+    "kpiNoValue": "No data yet",
+    "kpiNoEventsSub": "No billing events received - connect Stripe to start tracking"
   },
   "RecordFeed": {
     "metaTitle": "Record feed",
@@ -1896,7 +1898,7 @@
   "CostGuardrails": {
     "loggedCostTotal": "Estimated cost across these entries: {total}",
     "loggedCostPartial": "{withCost} of {total} entries carry an estimate; the rest ran on an executor that does not report bytes processed, so the real total is higher.",
-    "loggedCostNone": "None of these entries carry a cost estimate, so no total can be shown.",
+    "loggedCostNone": "Cost tracking is not configured for these queries: none of these entries carry a cost estimate, so no total can be shown.",
     "metaTitle": "Cost guardrails",
     "title": "Cost guardrails for {projectName}",
     "usageHeading": "Today's usage",
@@ -1954,7 +1956,10 @@
     "columnOutcome": "Outcome",
     "columnMetrics": "Metrics",
     "columnCost": "Est. cost",
-    "costUnknownShort": "Not available"
+    "costUnknownShort": "Not tracked",
+    "kpiCostNotTracked": "Not tracked",
+    "kpiCostNotTrackedSub": "Cost tracking is not configured for any of the {count} most recent entries",
+    "kpiCostCoverageSub": "Estimated for {withCost} of {total} recent entries"
   },
   "AuditLog": {
     "metaTitle": "Audit log",

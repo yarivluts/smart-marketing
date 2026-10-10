@@ -1250,7 +1250,9 @@
     "timelineTitle": "אירועי חיוב",
     "amountShort": "{amount} {currency}",
     "mrrShort": "{amount} {currency} MRR",
-    "mrrAtRiskLine": "MRR בסיכון (ביחידה הקטנה ביותר): {amounts}"
+    "mrrAtRiskLine": "MRR בסיכון (ביחידה הקטנה ביותר): {amounts}",
+    "kpiNoValue": "אין נתונים עדיין",
+    "kpiNoEventsSub": "לא התקבלו אירועי חיוב - חברו את Stripe כדי להתחיל במעקב"
   },
   "RecordFeed": {
     "metaTitle": "פיד רשומות",
@@ -1896,7 +1898,7 @@
   "CostGuardrails": {
     "loggedCostTotal": "עלות משוערת עבור הרשומות האלה: {total}",
     "loggedCostPartial": "{withCost} מתוך {total} רשומות נושאות אומדן; השאר רצו על מנוע שאינו מדווח בתים שעובדו, ולכן הסך האמיתי גבוה יותר.",
-    "loggedCostNone": "אף אחת מהרשומות האלה אינה נושאת אומדן עלות, ולכן לא ניתן להציג סך.",
+    "loggedCostNone": "מעקב עלויות אינו מוגדר עבור שאילתות אלה: אף אחת מהרשומות אינה נושאת אומדן עלות, ולכן לא ניתן להציג סך.",
     "metaTitle": "בקרות עלות",
     "title": "בקרות עלות עבור {projectName}",
     "usageHeading": "השימוש היום",
@@ -1954,7 +1956,10 @@
     "columnOutcome": "תוצאה",
     "columnMetrics": "מדדים",
     "columnCost": "עלות משוערת",
-    "costUnknownShort": "לא זמין"
+    "costUnknownShort": "לא במעקב",
+    "kpiCostNotTracked": "לא במעקב",
+    "kpiCostNotTrackedSub": "מעקב עלויות אינו מוגדר עבור אף אחת מ-{count} הרשומות האחרונות",
+    "kpiCostCoverageSub": "הערכה קיימת עבור {withCost} מתוך {total} הרשומות האחרונות"
   },
   "AuditLog": {
     "metaTitle": "יומן ביקורת",

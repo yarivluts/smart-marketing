@@ -19,7 +19,7 @@ import {
   DEFAULT_DUNNING_FEED_LIMIT,
 } from '@growthos/firebase-orm-models';
 import { billingOpsFeedEntryTypeLabelKey, splitOverFetchedFeed, toBillingOpsFeedEntryView, type BillingOpsFeedEntryType } from '@/lib/orgs/billing-ops-view';
-import { BILLING_OPS_TYPES, groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from '@/lib/orgs/billing-ops-summary';
+import { BILLING_OPS_TYPES, billingOpsKpis, groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from '@/lib/orgs/billing-ops-summary';
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 import { dunningFeedEntryStatusLabelKey, toDunningFeedEntryView } from '@/lib/orgs/dunning-feed-view';
 import { StatCard } from '@/components/ui/stat-card';
@@ -130,6 +130,11 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     `${t('landedAtLine', { landedAt: formatTime(landedAt) })} · ${t('clientIdLine', { clientId })} · ${environmentName(environmentId)}`;
 
   const summary = summariseBillingFeed(entries);
+  // With no billing events at all the counts are unknown, not zero - render the no-value state
+  // so the KPIs never contradict the "connect Stripe" empty state below them.
+  const kpis = billingOpsKpis(summary, { eventCount: entries.length, churnCount: churnEntries.length, dunningCount: dunningEntries.length });
+  const kpiValue = (value: number | null): string => (value === null ? t('kpiNoValue') : integer.format(value));
+  const eventKpiSub = kpis.hasBillingEvents ? t('kpiWindowSub', { count: entries.length }) : t('kpiNoEventsSub');
   const churnMrr = sumMrrByCurrency(churnEntries);
   const dunningMrr = sumMrrByCurrency(dunningEntries);
   const mrrLine = (totals: { currency: string; mrr: number }[]): string | undefined =>
@@ -194,14 +199,14 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Receipt} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard title={t('kpiCharges')} value={integer.format(summary.counts.charge)} icon={CreditCard} subtext={t('kpiWindowSub', { count: entries.length })} />
-          <StatCard title={t('kpiFailed')} value={integer.format(summary.counts.failed_payment)} icon={XCircle} subtext={t('kpiWindowSub', { count: entries.length })} />
-          <StatCard title={t('kpiRefunds')} value={integer.format(summary.counts.refund)} icon={RotateCcw} subtext={t('kpiWindowSub', { count: entries.length })} />
+          <StatCard title={t('kpiCharges')} value={kpiValue(kpis.charge)} icon={CreditCard} subtext={eventKpiSub} />
+          <StatCard title={t('kpiFailed')} value={kpiValue(kpis.failed_payment)} icon={XCircle} subtext={eventKpiSub} />
+          <StatCard title={t('kpiRefunds')} value={kpiValue(kpis.refund)} icon={RotateCcw} subtext={eventKpiSub} />
           <StatCard
             title={t('kpiAtRisk')}
-            value={integer.format(churnEntries.length + dunningEntries.length)}
+            value={kpiValue(kpis.atRisk)}
             icon={AlertTriangle}
-            subtext={t('kpiAtRiskSub', { churn: churnEntries.length, dunning: dunningEntries.length })}
+            subtext={kpis.atRisk === null ? t('kpiNoEventsSub') : t('kpiAtRiskSub', { churn: churnEntries.length, dunning: dunningEntries.length })}
           />
         </div>
       </PageHero>

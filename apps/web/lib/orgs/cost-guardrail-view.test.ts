@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatEstimatedCostUsd, formatLabels, labelsToLines, outcomeLabelKey, parseLabelsInput, toProjectCostQuotaView, toQueryCostLogEntryView, summariseLoggedCost, type QueryCostLogEntryView } from './cost-guardrail-view';
+import { formatEstimatedCostUsd, formatLabels, labelsToLines, loggedCostKpi,outcomeLabelKey, parseLabelsInput, toProjectCostQuotaView, toQueryCostLogEntryView, summariseLoggedCost, type QueryCostLogEntryView } from './cost-guardrail-view';
 
 describe('formatLabels / parseLabelsInput', () => {
   it('formats an empty label set as an empty string', () => {
@@ -88,16 +88,59 @@ describe('toQueryCostLogEntryView', () => {
 });
 
 describe('formatEstimatedCostUsd', () => {
-  it('formats to 4 decimal places with a leading dollar sign', () => {
-    expect(formatEstimatedCostUsd(6.25)).toBe('$6.2500');
+  it('formats amounts of a cent or more with two decimals', () => {
+    expect(formatEstimatedCostUsd(6.25)).toBe('$6.25');
+    expect(formatEstimatedCostUsd(0.01)).toBe('$0.01');
+    expect(formatEstimatedCostUsd(1234.5)).toBe('$1,234.50');
+  });
+
+  it('formats a measured zero with two decimals, not a four-decimal zero', () => {
+    expect(formatEstimatedCostUsd(0)).toBe('$0.00');
   });
 
   it('keeps small fractional-cent costs visible instead of rounding to $0.00', () => {
     expect(formatEstimatedCostUsd(0.0003)).toBe('$0.0003');
+    expect(formatEstimatedCostUsd(0.0042)).toBe('$0.0042');
   });
 
-  it('formats zero cost explicitly', () => {
-    expect(formatEstimatedCostUsd(0)).toBe('$0.0000');
+  it('renders a positive cost below the smallest shown fraction as a bound, never as zero', () => {
+    expect(formatEstimatedCostUsd(0.00001)).toBe('< $0.0001');
+  });
+
+  it('localizes through Intl.NumberFormat', () => {
+    expect(formatEstimatedCostUsd(6.25, 'he')).toBe(new Intl.NumberFormat('he', { style: 'currency', currency: 'USD' }).format(6.25));
+  });
+});
+
+describe('loggedCostKpi', () => {
+  const view = (estimatedCostUsd: number | null): QueryCostLogEntryView => ({
+    id: Math.random().toString(36).slice(2),
+    outcome: 'executed',
+    definitionRefs: {},
+    executedAt: '2026-09-16T00:00:00.000Z',
+    estimatedCostUsd,
+  });
+
+  it('has nothing to report when nothing was logged', () => {
+    expect(loggedCostKpi(summariseLoggedCost([]))).toEqual({ kind: 'no_entries' });
+  });
+
+  it('is "not tracked" - not $0 - when no logged entry carries a cost estimate', () => {
+    expect(loggedCostKpi(summariseLoggedCost([view(null), view(null), view(null)]))).toEqual({ kind: 'not_tracked', totalEntries: 3 });
+  });
+
+  it('reports the measured total with its coverage when some entries carry an estimate', () => {
+    expect(loggedCostKpi(summariseLoggedCost([view(0.5), view(null), view(0.25), view(null)]))).toEqual({
+      kind: 'measured',
+      totalUsd: 0.75,
+      withCost: 2,
+      totalEntries: 4,
+      isPartial: true,
+    });
+  });
+
+  it('treats a measured zero estimate as a measurement', () => {
+    expect(loggedCostKpi(summariseLoggedCost([view(0)]))).toMatchObject({ kind: 'measured', totalUsd: 0, withCost: 1, totalEntries: 1, isPartial: false });
   });
 });
 

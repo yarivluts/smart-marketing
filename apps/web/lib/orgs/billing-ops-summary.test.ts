@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BillingOpsFeedEntryView } from './billing-ops-view';
-import { groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from './billing-ops-summary';
+import { billingOpsKpis, groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from './billing-ops-summary';
 
 function entry(overrides: Partial<BillingOpsFeedEntryView> & Pick<BillingOpsFeedEntryView, 'id' | 'type' | 'landedAt'>): BillingOpsFeedEntryView {
   return {
@@ -46,6 +46,41 @@ describe('summariseBillingFeed', () => {
 
   it('is all zeros for an empty feed', () => {
     expect(summariseBillingFeed([])).toEqual({ counts: { charge: 0, failed_payment: 0, refund: 0 }, totalsByCurrency: [], byDay: [] });
+  });
+});
+
+describe('billingOpsKpis', () => {
+  it('has no value for any KPI when no billing data landed at all - 0 would read as a measurement', () => {
+    expect(billingOpsKpis(summariseBillingFeed([]), { eventCount: 0, churnCount: 0, dunningCount: 0 })).toEqual({
+      hasBillingEvents: false,
+      charge: null,
+      failed_payment: null,
+      refund: null,
+      atRisk: null,
+    });
+  });
+
+  it('reports real counts, including real zeros, once billing events exist', () => {
+    const feed = [
+      entry({ id: '1', type: 'charge', landedAt: '2026-08-02T10:00:00Z' }),
+      entry({ id: '2', type: 'charge', landedAt: '2026-08-02T11:00:00Z' }),
+      entry({ id: '3', type: 'failed_payment', landedAt: '2026-08-02T12:00:00Z' }),
+    ];
+    expect(billingOpsKpis(summariseBillingFeed(feed), { eventCount: feed.length, churnCount: 0, dunningCount: 0 })).toEqual({
+      hasBillingEvents: true,
+      charge: 2,
+      failed_payment: 1,
+      refund: 0,
+      atRisk: 0,
+    });
+  });
+
+  it('keeps the at-risk count when subscriptions landed even without billing events', () => {
+    const kpis = billingOpsKpis(summariseBillingFeed([]), { eventCount: 0, churnCount: 2, dunningCount: 1 });
+    expect(kpis.charge).toBeNull();
+    expect(kpis.failed_payment).toBeNull();
+    expect(kpis.refund).toBeNull();
+    expect(kpis.atRisk).toBe(3);
   });
 });
 
