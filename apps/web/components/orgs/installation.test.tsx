@@ -6,6 +6,19 @@ import messages from '../../messages/en.json';
 import { InstallationCheck } from './installation-check';
 import { InstallationCode } from './installation-code';
 
+vi.mock('@/i18n/navigation', () => ({
+  Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+const CREATE_KEY_HREF = {
+  publishable: '/orgs/o/projects/p/keys?kind=publishable&environmentId=env-prod#create-key',
+  secret: '/orgs/o/projects/p/keys?kind=secret&environmentId=env-prod&scopes=ingest.write#create-key',
+};
+
 const REPORT: InstallationReport = {
   status: 'attention',
   schemas: [
@@ -123,6 +136,44 @@ describe('InstallationCheck', () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
+  it('shows one status per row, and a remove button that says what it does', () => {
+    renderWith(
+      <InstallationCheck
+        orgId="o"
+        projectId="p"
+        environmentId="env-prod"
+        environmentName="prod"
+        defaultExpected={['touchpoint', 'customer']}
+        initialReport={{
+          status: 'attention',
+          schemas: [
+            REPORT.schemas[0],
+            {
+              name: 'customer',
+              kind: 'entity',
+              status: 'registered_no_data',
+              registered: true,
+              lastAcceptedAt: null,
+              openQuarantined: 0,
+              quarantineReasons: [],
+              fix: null,
+            },
+          ],
+        }}
+      />,
+    );
+    const customer = screen.getByTestId('installation-schema-customer');
+    expect(within(customer).getByText('Waiting for the first record')).toBeInTheDocument();
+    // The status already says nothing arrived - no second "never received" label.
+    expect(customer.textContent).not.toMatch(/never received/i);
+
+    const remove = within(customer).getByRole('button', { name: 'Stop checking customer' });
+    expect(remove).toHaveAttribute('title', expect.stringContaining('Nothing is deleted'));
+    fireEvent.click(remove);
+    expect(screen.queryByTestId('installation-schema-customer')).not.toBeInTheDocument();
+    expect(screen.getByTestId('installation-schema-touchpoint')).toBeInTheDocument();
+  });
+
   it('says so when the check cannot run', async () => {
     vi.stubGlobal(
       'fetch',
@@ -152,8 +203,11 @@ describe('InstallationCode', () => {
         apiBase="https://api.test"
         browserKeyPrefix="gos_pk_live_ab12cd34"
         serverKeyPrefix="gos_live_ef56"
+        environmentName="prod"
+        createKeyHref={CREATE_KEY_HREF}
       />,
     );
+    expect(screen.queryByTestId('installation-code-missing-key')).not.toBeInTheDocument();
     const code = () =>
       screen.getByTestId('installation-code').querySelector('pre code')?.textContent ?? '';
     expect(code()).toContain(
@@ -172,16 +226,93 @@ describe('InstallationCode', () => {
     );
   });
 
-  it('shows placeholders when the environment has no keys yet', () => {
+  it('copies the code when the environment has the key it needs', async () => {
+    const writeText = vi.fn(async () => undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    renderWith(
+      <InstallationCode
+        apiBase="https://api.test"
+        browserKeyPrefix="gos_pk_live_ab12cd34"
+        serverKeyPrefix="gos_live_ef56"
+        environmentName="prod"
+        createKeyHref={CREATE_KEY_HREF}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument());
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('gos_pk_live_ab12cd34...'));
+  });
+
+  it('offers no copy of a snippet without a key - only the way to create one', () => {
     renderWith(
       <InstallationCode
         apiBase="https://api.test"
         browserKeyPrefix={null}
         serverKeyPrefix={null}
+        environmentName="prod"
+        createKeyHref={CREATE_KEY_HREF}
       />,
     );
-    expect(screen.getByTestId('installation-code').textContent).toContain(
+    // The code is still shown for its shape, greyed and marked unusable.
+    expect(screen.getByTestId('installation-code-block')).toHaveTextContent(
       '"key":"gos_pk_live_..."',
     );
+    expect(screen.getByTestId('installation-code-block')).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Replace the shortened key/)).not.toBeInTheDocument();
+    const notice = screen.getByTestId('installation-code-missing-key');
+    expect(notice).toHaveAttribute('data-kind', 'publishable');
+    expect(notice).toHaveTextContent('prod has no browser key yet');
+    expect(within(notice).getByRole('link', { name: 'Create a browser key' })).toHaveAttribute(
+      'href',
+      CREATE_KEY_HREF.publishable,
+    );
+
+    // The server-side tabs need a server key instead.
+    for (const tab of ['Node.js server', 'Relay (strict CSP)', 'Check from code']) {
+      fireEvent.click(screen.getByRole('tab', { name: tab }));
+      expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument();
+      expect(
+        within(screen.getByTestId('installation-code-missing-key')).getByRole('link', {
+          name: 'Create a server key',
+        }),
+      ).toHaveAttribute('href', CREATE_KEY_HREF.secret);
+    }
+  });
+
+  it('judges each tab by the key it needs', () => {
+    renderWith(
+      <InstallationCode
+        apiBase="https://api.test"
+        browserKeyPrefix="gos_pk_live_ab12cd34"
+        serverKeyPrefix={null}
+        environmentName="prod"
+        createKeyHref={CREATE_KEY_HREF}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    expect(screen.queryByTestId('installation-code-missing-key')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: 'Node.js server' }));
+    expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('installation-code-missing-key')).toHaveAttribute(
+      'data-kind',
+      'secret',
+    );
+  });
+
+  it('tells someone who cannot manage keys who can, instead of a dead link', () => {
+    renderWith(
+      <InstallationCode
+        apiBase="https://api.test"
+        browserKeyPrefix={null}
+        serverKeyPrefix={null}
+        environmentName="prod"
+        createKeyHref={null}
+      />,
+    );
+    const notice = screen.getByTestId('installation-code-missing-key');
+    expect(within(notice).queryByRole('link')).not.toBeInTheDocument();
+    expect(notice).toHaveTextContent('Ask someone who manages keys');
+    expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument();
   });
 });

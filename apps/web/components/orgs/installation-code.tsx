@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { KeyRound } from 'lucide-react';
 import { installSnippet } from '@growthos/browser';
+import type { ApiKeyKind } from '@growthos/shared';
+import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -12,19 +15,41 @@ export interface InstallationCodeProps {
   /** Display prefixes of the environment's active browser keys (the full key is only shown at mint). */
   browserKeyPrefix: string | null;
   serverKeyPrefix: string | null;
+  /** The selected environment's name, for the "this environment has no key" notice. */
+  environmentName?: string | null;
+  /**
+   * Where to create each kind of key for this environment (the Keys page, preset). Null when the
+   * viewer cannot manage keys - the notice then says who can.
+   */
+  createKeyHref?: Record<ApiKeyKind, string> | null;
 }
 
 type Tab = 'website' | 'browser_npm' | 'node' | 'relay' | 'check';
+
+/** The key each tab's code runs with: a browser key in the page, a server key everywhere else. */
+const KEY_KIND_BY_TAB: Record<Tab, ApiKeyKind> = {
+  website: 'publishable',
+  browser_npm: 'publishable',
+  node: 'secret',
+  relay: 'secret',
+  check: 'secret',
+};
 
 /**
  * Copy-ready code for every way a site connects: the website snippet, the browser package, the
  * Node server SDK, a same-origin relay for strict CSPs, and the command-line installation check -
  * with this deployment's addresses filled in. The SDKs are served by this app itself.
+ *
+ * Code that needs a key the environment does not have is shown greyed, for its shape only, with
+ * no copy action: a snippet with a placeholder key can never send anything. In its place is the
+ * way forward - create that kind of key for this environment.
  */
 export function InstallationCode({
   apiBase,
   browserKeyPrefix,
   serverKeyPrefix,
+  environmentName = null,
+  createKeyHref = null,
 }: InstallationCodeProps): React.ReactElement {
   const t = useTranslations('Installation');
   const [tab, setTab] = useState<Tab>('website');
@@ -100,6 +125,9 @@ export function InstallationCode({
   }
 
   const tabs: Tab[] = ['website', 'browser_npm', 'node', 'relay', 'check'];
+  const neededKind = KEY_KIND_BY_TAB[tab];
+  const hasKey = neededKind === 'publishable' ? Boolean(browserKeyPrefix) : Boolean(serverKeyPrefix);
+  const environment = environmentName || t('thisEnvironment');
   return (
     <section className="flex flex-col gap-3" data-testid="installation-code">
       <div className="flex flex-wrap gap-1.5" role="tablist" aria-label={t('codeTitle')}>
@@ -122,17 +150,50 @@ export function InstallationCode({
         ))}
       </div>
       <p className="text-sm text-muted-foreground">{t(`tabHints.${tab}`)}</p>
-      <pre className="max-h-96 overflow-auto rounded-xl bg-muted/60 p-4 text-xs" dir="ltr">
+      {hasKey ? null : (
+        <div
+          role="note"
+          className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm"
+          data-testid="installation-code-missing-key"
+          data-kind={neededKind}
+        >
+          <p className="flex items-center gap-2 font-semibold">
+            <KeyRound className="h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+            {t(`missingKey.${neededKind}.title`)}
+          </p>
+          <p className="text-muted-foreground">
+            {t(`missingKey.${neededKind}.body`, { environment })}
+          </p>
+          {createKeyHref ? (
+            <Button asChild size="sm" className="self-start">
+              <Link href={createKeyHref[neededKind]}>{t(`createKey.${neededKind}`)}</Link>
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t('askForKey')}</p>
+          )}
+        </div>
+      )}
+      <pre
+        className={cn(
+          'max-h-96 overflow-auto rounded-xl bg-muted/60 p-4 text-xs',
+          !hasKey && 'select-none opacity-50',
+        )}
+        dir="ltr"
+        aria-disabled={hasKey ? undefined : true}
+        data-testid="installation-code-block"
+      >
         <code>{code[tab]}</code>
       </pre>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" size="sm" variant="outline" onClick={() => void copy()}>
-          {copied === tab ? t('copied') : t('copy')}
-        </Button>
-        {(tab === 'website' || tab === 'browser_npm') && browserKeyPrefix ? (
-          <span className="text-xs text-muted-foreground">{t('fullKeyNote')}</span>
-        ) : null}
-      </div>
+      {hasKey ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" size="sm" variant="outline" onClick={() => void copy()}>
+            {copied === tab ? t('copied') : t('copy')}
+          </Button>
+          {neededKind === 'publishable' ? (
+            <span className="text-xs text-muted-foreground">{t('fullKeyNote')}</span>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

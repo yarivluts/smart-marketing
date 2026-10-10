@@ -4897,6 +4897,10 @@
       "secret": "No server key with ingest.write for this environment yet - mint one on the Keys page."
     },
     "manageKeys": "Manage keys",
+    "createKey": {
+      "publishable": "Create a browser key",
+      "secret": "Create a server key"
+    },
     "codeTitle": "Code",
     "codeDescription": "With this environment and these addresses filled in. The libraries are served by GrowthOS itself.",
     "tabs": {
@@ -4914,6 +4918,18 @@
       "check": "Check the installation from a terminal or CI (exit code 0 when everything arrives), or from the browser console on your site."
     },
     "fullKeyNote": "Replace the shortened key with the full one you copied when it was created (or mint a new one).",
+    "missingKey": {
+      "publishable": {
+        "title": "This code needs a browser key first",
+        "body": "{environment} has no browser key yet, so this code cannot send anything - the key in it is only a placeholder. Create a browser key with your site domains, then come back: the code fills in with it and can be copied."
+      },
+      "secret": {
+        "title": "This code needs a server key first",
+        "body": "{environment} has no server key that can write events (ingest.write) yet, so this code cannot send anything. Create one, keep it in an environment variable on your server, then come back to copy the code."
+      }
+    },
+    "askForKey": "Ask someone who manages keys in this project to create it.",
+    "thisEnvironment": "This environment",
     "copy": "Copy",
     "copied": "Copied",
     "checkTitle": "Installation check",
@@ -4936,9 +4952,9 @@
       "not_registered": "Not registered"
     },
     "lastAccepted": "last received {time}",
-    "neverAccepted": "never received",
     "inQuarantine": "{count} rejected, waiting in quarantine",
     "removeSchema": "Stop checking {name}",
+    "removeSchemaHint": "Stop checking {name} here. Nothing is deleted - it only leaves this checklist (add it back below).",
     "addSchemaPlaceholder": "Schema name, e.g. signup",
     "addSchema": "Check it too"
   }

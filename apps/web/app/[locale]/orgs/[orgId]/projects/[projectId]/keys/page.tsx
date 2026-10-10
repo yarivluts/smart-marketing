@@ -12,6 +12,7 @@ import {
   listOrgProjects,
 } from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
+import { CREATE_API_KEY_ANCHOR, parseCreateApiKeyPreset } from '@/lib/orgs/create-api-key-link';
 import { mcpApiUrl } from '@/lib/orgs/mcp-api-url';
 import { apiKeyUsageStatus, sortApiKeys, summarizeApiKeys, type ApiKeyUsageStatus } from '@/lib/orgs/api-key-viz';
 import { formatRelativeTime } from '@/lib/orgs/recency';
@@ -28,6 +29,7 @@ import { Activity, Ban, Bot, Clock, KeyRound, Layers3, Plug, ShieldCheck, Sparkl
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
@@ -56,8 +58,10 @@ const STATUS_STYLE: Record<ApiKeyUsageStatus, { tile: string; dot: string }> = {
  * Keys render as cards (environment, scopes, how recently used) with active keys first, above a
  * usage breakdown, scope usage and per-environment coverage - all counted from the same key list.
  */
-export default async function ProjectApiKeysPage({ params }: PageProps): Promise<React.ReactElement> {
+export default async function ProjectApiKeysPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
+  // `?kind=publishable&environmentId=...` (e.g. from the Installation page) presets the create form.
+  const preset = parseCreateApiKeyPreset((await searchParams) ?? {});
   setRequestLocale(locale);
 
   const session = await getServerSession();
@@ -262,13 +266,23 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
         )}
       </ChartCard>
 
-      <ChartCard title={t('createKeyHeading')} description={t('createKeyDescription')} icon={KeyRound}>
-        {environmentOptions.length === 0 ? (
-          <EmptyState compact icon={KeyRound} title={t('noEnvironments')} />
-        ) : (
-          <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
-        )}
-      </ChartCard>
+      <div id={CREATE_API_KEY_ANCHOR} className="scroll-mt-20">
+        <ChartCard title={t('createKeyHeading')} description={t('createKeyDescription')} icon={KeyRound}>
+          {environmentOptions.length === 0 ? (
+            <EmptyState compact icon={KeyRound} title={t('noEnvironments')} />
+          ) : (
+            <CreateApiKeyForm
+              orgId={orgId}
+              projectId={projectId}
+              environments={environmentOptions}
+              ingestBaseUrl={ingestApiUrl()}
+              initialKind={preset.kind}
+              initialEnvironmentId={preset.environmentId}
+              initialScopes={preset.scopes}
+            />
+          )}
+        </ChartCard>
+      </div>
 
       <ChartCard title={t('mcpConnectionsHeading')} description={t('mcpEndpointIntro')} icon={Plug}>
         <div className="flex flex-col gap-3">

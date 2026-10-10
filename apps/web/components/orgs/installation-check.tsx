@@ -99,6 +99,12 @@ export function InstallationCheck({
     setNewName('');
   }
 
+  // Removing a name takes its row away at once, not only on the next check. With nothing left
+  // to expect, a check lists everything received, so the report is shown as it is.
+  const rows = expected.length
+    ? report.schemas.filter((schema) => expected.includes(schema.name))
+    : report.schemas;
+
   const ok = report.status === 'ok';
   return (
     <section className="flex flex-col gap-4" data-testid="installation-check">
@@ -156,11 +162,11 @@ export function InstallationCheck({
         </p>
       ) : null}
 
-      {report.schemas.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('nothingYet')}</p>
       ) : null}
       <ul className="flex flex-col gap-2">
-        {report.schemas.map((schema) => {
+        {rows.map((schema) => {
           const style = STATUS_STYLE[schema.status];
           const Icon = style.icon;
           return (
@@ -178,19 +184,27 @@ export function InstallationCheck({
                 <span className={cn('text-xs font-medium', style.className)}>
                   {t(`status.${schema.status}`)}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {schema.lastAcceptedAt
-                    ? t('lastAccepted', { time: time.format(new Date(schema.lastAcceptedAt)) })
-                    : t('neverAccepted')}
-                  {schema.openQuarantined
-                    ? ` · ${t('inQuarantine', { count: schema.openQuarantined })}`
-                    : ''}
-                </span>
+                {/* One status per row: the label above already says when nothing arrived yet. */}
+                {schema.lastAcceptedAt || schema.openQuarantined ? (
+                  <span className="text-xs text-muted-foreground">
+                    {[
+                      schema.lastAcceptedAt
+                        ? t('lastAccepted', { time: time.format(new Date(schema.lastAcceptedAt)) })
+                        : null,
+                      schema.openQuarantined
+                        ? t('inQuarantine', { count: schema.openQuarantined })
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setExpected(expected.filter((name) => name !== schema.name))}
                   className="ms-auto rounded p-0.5 text-muted-foreground hover:bg-muted"
                   aria-label={t('removeSchema', { name: schema.name })}
+                  title={t('removeSchemaHint', { name: schema.name })}
                 >
                   <X className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
