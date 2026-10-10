@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { CreateApiKeyForm } from './create-api-key-form';
+import { CreateApiKeyForm, type CreateApiKeyFormProps } from './create-api-key-form';
 import messages from '../../messages/en.json';
 
 const refresh = vi.fn();
@@ -15,7 +15,9 @@ const ENVIRONMENTS = [
   { id: 'env-prod', name: 'prod' as const },
 ];
 
-function renderForm(): void {
+function renderForm(
+  preset: Pick<CreateApiKeyFormProps, 'initialKind' | 'initialEnvironmentId' | 'initialScopes'> = {},
+): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <CreateApiKeyForm
@@ -23,6 +25,7 @@ function renderForm(): void {
         projectId="project-1"
         environments={ENVIRONMENTS}
         ingestBaseUrl="https://api.example.com/v1/ingest"
+        {...preset}
       />
     </NextIntlClientProvider>,
   );
@@ -153,6 +156,26 @@ describe('CreateApiKeyForm', () => {
     expect(screen.getByRole('button', { name: 'Create key' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
     expect(screen.getByRole('button', { name: 'Create key' })).not.toBeDisabled();
+  });
+
+  it('starts on a browser key for the linked environment (from the Installation page)', () => {
+    renderForm({ initialKind: 'publishable', initialEnvironmentId: 'env-prod' });
+    expect(screen.getByRole('radio', { name: /Browser key/ })).toBeChecked();
+    expect(screen.getByLabelText('Environment')).toHaveValue('env-prod');
+    expect(screen.getByLabelText('Allowed domains (one per line)')).toBeInTheDocument();
+  });
+
+  it('starts on a server key with the linked scopes already checked', () => {
+    renderForm({ initialKind: 'secret', initialScopes: ['ingest.write'] });
+    expect(screen.getByRole('radio', { name: /Server key/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'ingest.write' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'metrics.write' })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Create key' })).not.toBeDisabled();
+  });
+
+  it('ignores a linked environment that is not one of the project environments', () => {
+    renderForm({ initialEnvironmentId: 'env-other' });
+    expect(screen.getByLabelText('Environment')).toHaveValue('env-dev');
   });
 
   it('shows an inline error when minting fails', async () => {

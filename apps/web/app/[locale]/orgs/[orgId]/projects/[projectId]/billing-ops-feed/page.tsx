@@ -7,6 +7,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
+  getBillingRecoveryForProject,
   listEnvironmentsForProject,
   listOrgProjects,
   listRecentBillingEventsForProject,
@@ -19,10 +20,11 @@ import {
   DEFAULT_DUNNING_FEED_LIMIT,
 } from '@growthos/firebase-orm-models';
 import { billingOpsFeedEntryTypeLabelKey, splitOverFetchedFeed, toBillingOpsFeedEntryView, type BillingOpsFeedEntryType } from '@/lib/orgs/billing-ops-view';
-import { BILLING_OPS_TYPES, groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from '@/lib/orgs/billing-ops-summary';
+import { BILLING_OPS_TYPES, billingOpsKpis, groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from '@/lib/orgs/billing-ops-summary';
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 import { dunningFeedEntryStatusLabelKey, toDunningFeedEntryView } from '@/lib/orgs/dunning-feed-view';
 import { StatCard } from '@/components/ui/stat-card';
+import { RecoveredPaymentsSection } from '@/components/orgs/recovered-payments-section';
 import { FeedTimeline, type FeedTimelineGroup } from '@/components/orgs/feed-timeline';
 import { ChartCard, DonutChart, EmptyState, PageHero, TrendChart, type VizStatus } from '@/components/viz';
 
@@ -62,6 +64,10 @@ const TYPE_COLOR: Record<BillingOpsFeedEntryType, string> = {
  * already a landed field on every `stripe_subscription` entity (KAN-49), so a dunning feed needed only
  * a new predicate over the same snapshots the churn feed already reads, not a new model.
  *
+ * A fourth section (KAN-304) pairs each failed payment with the successful charge that recovered it
+ * inside the dunning window (`getBillingRecoveryForProject`) - recovered amounts per currency, the
+ * recovery rate over attempts whose window has closed, and the time it took.
+ *
  * The KPIs, per-day chart and currency totals are computed over exactly the entries listed, so they
  * inherit each feed's cap note: a truncated feed is a window, and its totals are a window's totals.
  */
@@ -85,12 +91,13 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   // landed" from "thousands landed", and on a billing page those read very
   // differently: the second means the operator is looking at a window, not a
   // ledger. The extra row is never rendered - it is evidence, not an entry.
-  const [projects, rawRecords, churnRecords, dunningRecords, environments] = await Promise.all([
+  const [projects, rawRecords, churnRecords, dunningRecords, environments, recovery] = await Promise.all([
     listOrgProjects(orgId),
     listRecentBillingEventsForProject(orgId, projectId, DEFAULT_BILLING_OPS_FEED_LIMIT + 1),
     listRecentChurnedSubscriptionsForProject(orgId, projectId, DEFAULT_CHURN_FEED_LIMIT + 1),
     listRecentDunningSubscriptionsForProject(orgId, projectId, DEFAULT_DUNNING_FEED_LIMIT + 1),
     listEnvironmentsForProject(orgId, projectId),
+    getBillingRecoveryForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -130,6 +137,11 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     `${t('landedAtLine', { landedAt: formatTime(landedAt) })} · ${t('clientIdLine', { clientId })} · ${environmentName(environmentId)}`;
 
   const summary = summariseBillingFeed(entries);
+  // With no billing events at all the counts are unknown, not zero - render the no-value state
+  // so the KPIs never contradict the "connect Stripe" empty state below them.
+  const kpis = billingOpsKpis(summary, { eventCount: entries.length, churnCount: churnEntries.length, dunningCount: dunningEntries.length });
+  const kpiValue = (value: number | null): string => (value === null ? t('kpiNoValue') : integer.format(value));
+  const eventKpiSub = kpis.hasBillingEvents ? t('kpiWindowSub', { count: entries.length }) : t('kpiNoEventsSub');
   const churnMrr = sumMrrByCurrency(churnEntries);
   const dunningMrr = sumMrrByCurrency(dunningEntries);
   const mrrLine = (totals: { currency: string; mrr: number }[]): string | undefined =>
@@ -194,14 +206,14 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Receipt} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard title={t('kpiCharges')} value={integer.format(summary.counts.charge)} icon={CreditCard} subtext={t('kpiWindowSub', { count: entries.length })} />
-          <StatCard title={t('kpiFailed')} value={integer.format(summary.counts.failed_payment)} icon={XCircle} subtext={t('kpiWindowSub', { count: entries.length })} />
-          <StatCard title={t('kpiRefunds')} value={integer.format(summary.counts.refund)} icon={RotateCcw} subtext={t('kpiWindowSub', { count: entries.length })} />
+          <StatCard title={t('kpiCharges')} value={kpiValue(kpis.charge)} icon={CreditCard} subtext={eventKpiSub} />
+          <StatCard title={t('kpiFailed')} value={kpiValue(kpis.failed_payment)} icon={XCircle} subtext={eventKpiSub} />
+          <StatCard title={t('kpiRefunds')} value={kpiValue(kpis.refund)} icon={RotateCcw} subtext={eventKpiSub} />
           <StatCard
             title={t('kpiAtRisk')}
-            value={integer.format(churnEntries.length + dunningEntries.length)}
+            value={kpiValue(kpis.atRisk)}
             icon={AlertTriangle}
-            subtext={t('kpiAtRiskSub', { churn: churnEntries.length, dunning: dunningEntries.length })}
+            subtext={kpis.atRisk === null ? t('kpiNoEventsSub') : t('kpiAtRiskSub', { churn: churnEntries.length, dunning: dunningEntries.length })}
           />
         </div>
       </PageHero>
@@ -297,6 +309,8 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
           {dunningEntries.length === 0 ? <EmptyState compact icon={AlertTriangle} title={t('dunningEmpty')} /> : <FeedTimeline label={t('dunningHeading')} groups={dunningGroups} />}
         </ChartCard>
       </div>
+
+      <RecoveredPaymentsSection summary={recovery} />
     </div>
   );
 }

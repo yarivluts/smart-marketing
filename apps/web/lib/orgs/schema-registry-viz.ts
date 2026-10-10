@@ -40,6 +40,24 @@ export function totalEvents(entry: EventVolumeEntryRef): number {
   return entry.dailyCounts.reduce((sum, bucket) => sum + bucket.count, 0);
 }
 
+/**
+ * Where one event schema stands on receiving records, matching how tracking alerts actually work:
+ * an alert only fires for a schema that HAS landed records and then went silent, so a schema that
+ * never landed one is `not_connected` (no alert, by design) - or `only_rejected` when records are
+ * arriving but every one is quarantined. Never call either "silent": that word promises an alert.
+ */
+export type EventReceiptState = 'receiving' | 'not_connected' | 'only_rejected';
+
+export function eventReceiptState(entry: Pick<EventVolumeEntryRef, 'lastSeenAt'>, rejectedCount: number): EventReceiptState {
+  if (entry.lastSeenAt !== null) return 'receiving';
+  return rejectedCount > 0 ? 'only_rejected' : 'not_connected';
+}
+
+/** Event schemas that never landed a record - the ones tracking alerts deliberately do not cover. */
+export function countNeverReceived(entries: readonly Pick<EventVolumeEntryRef, 'lastSeenAt'>[]): number {
+  return entries.filter((entry) => entry.lastSeenAt === null).length;
+}
+
 /** The per-day sum across every event schema - the window's overall volume line. */
 export function dailyVolumeTotals(entries: readonly EventVolumeEntryRef[]): { date: string; count: number }[] {
   const byDate = new Map<string, number>();

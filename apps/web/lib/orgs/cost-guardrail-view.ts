@@ -34,15 +34,28 @@ export function toQueryCostLogEntryView(entry: QueryCostLogEntryModel): QueryCos
   };
 }
 
+/** The smallest sub-cent amount shown as-is; anything positive below it renders as "< $0.0001". */
+const MIN_DISPLAYED_SUB_CENT_USD = 0.0001;
+
 /**
- * A single query's estimated dollar cost is typically a small fraction of a
- * cent (BigQuery's on-demand price is $6.25 per TiB scanned, and most
- * GrowthOS metric queries scan far less than a TiB), so this keeps four
- * decimal places rather than the usual two — two would round almost every
- * real entry down to "$0.00", which reads as "free" rather than "small".
+ * Formats an estimated USD cost with sensible precision, localized via `Intl.NumberFormat`.
+ *
+ * Whole amounts and anything of a cent or more get the usual two decimals ("$6.25", "$0.00").
+ * A single query's estimate is often a small fraction of a cent (BigQuery's on-demand price is
+ * $6.25 per TiB scanned), and two decimals would round that down to "$0.00", which reads as
+ * "free" rather than "small" - so a positive sub-cent amount keeps up to four decimals, and one
+ * smaller still renders as "< $0.0001" instead of a misleading zero.
  */
-export function formatEstimatedCostUsd(estimatedCostUsd: number): string {
-  return `$${estimatedCostUsd.toFixed(4)}`;
+export function formatEstimatedCostUsd(estimatedCostUsd: number, locale = 'en'): string {
+  const currency = (maximumFractionDigits: number): Intl.NumberFormat =>
+    new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits });
+  if (estimatedCostUsd <= 0 || estimatedCostUsd >= 0.01) {
+    return currency(2).format(estimatedCostUsd);
+  }
+  if (estimatedCostUsd < MIN_DISPLAYED_SUB_CENT_USD) {
+    return `< ${currency(4).format(MIN_DISPLAYED_SUB_CENT_USD)}`;
+  }
+  return currency(4).format(estimatedCostUsd);
 }
 
 /** The `CostGuardrails` translation key for one cost-log entry's outcome label. */
@@ -135,6 +148,24 @@ export function summariseLoggedCost(entries: readonly QueryCostLogEntryView[]): 
     totalEntries: entries.length,
     isPartial: withCost.length > 0 && withCost.length < entries.length,
   };
+}
+
+/**
+ * What the "logged cost" KPI can honestly say about a {@link LoggedCostSummary}:
+ * - `no_entries`: nothing was logged, so there is nothing to total.
+ * - `not_tracked`: entries exist but none carries a cost estimate - cost tracking is not
+ *   configured for these queries, and "$0" would misreport that as a measured spend.
+ * - `measured`: at least one estimate exists; `withCost` of `totalEntries` states the coverage.
+ */
+export type LoggedCostKpi =
+  | { kind: 'no_entries' }
+  | { kind: 'not_tracked'; totalEntries: number }
+  | { kind: 'measured'; totalUsd: number; withCost: number; totalEntries: number; isPartial: boolean };
+
+export function loggedCostKpi(summary: LoggedCostSummary): LoggedCostKpi {
+  if (summary.totalEntries === 0) return { kind: 'no_entries' };
+  if (summary.entriesWithCost === 0) return { kind: 'not_tracked', totalEntries: summary.totalEntries };
+  return { kind: 'measured', totalUsd: summary.totalUsd, withCost: summary.entriesWithCost, totalEntries: summary.totalEntries, isPartial: summary.isPartial };
 }
 
 export interface CostLogDay {

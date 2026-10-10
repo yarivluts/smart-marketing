@@ -13,7 +13,7 @@ import { TrendChart, type TrendDatum } from '@/components/viz/trend-chart';
 import { InitialsAvatar } from '@/components/viz/initials-avatar';
 import { ProjectHealthCard } from '@/components/orgs/project-health-card';
 import { DashboardSignOutButton } from '@/components/auth/dashboard-sign-out-button';
-import { dailyTotals, shortDayLabel } from '@/lib/orgs/workspace-view';
+import { averageProductionScore, dailyTotals, shortDayLabel } from '@/lib/orgs/workspace-view';
 import type { DashboardOverview } from '@/lib/orgs/dashboard-overview';
 
 export interface DashboardContentProps {
@@ -43,8 +43,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
 
   const projects = overview.orgs.flatMap((org) => org.projects);
   const withHealth = projects.filter((project) => project.health !== null);
-  const scored = withHealth.filter((project) => project.health?.score !== null && project.health?.score !== undefined);
-  const averageScore = scored.length > 0 ? Math.round(scored.reduce((sum, project) => sum + (project.health?.score ?? 0), 0) / scored.length) : null;
+  const { average: averageScore, count: scoredCount } = averageProductionScore(withHealth.map((project) => project.health));
   const totalAccepted = withHealth.reduce((sum, project) => sum + (project.health?.acceptedCount ?? 0), 0);
   const totalRejected = withHealth.reduce((sum, project) => sum + (project.health?.quarantinedCount ?? 0), 0);
   const days = trendDays(now);
@@ -84,7 +83,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
             value={averageScore === null ? '-' : `${averageScore}%`}
             icon={Gauge}
             progress={averageScore ?? undefined}
-            subtext={averageScore === null ? t('kpiAverageHealthEmpty') : t('kpiAverageHealthSubtext', { count: scored.length })}
+            subtext={averageScore === null ? t('kpiAverageHealthEmpty') : t('kpiAverageHealthSubtext', { count: scoredCount })}
           />
           <StatCard title={t('kpiAccepted')} value={numberFormat.format(totalAccepted)} icon={TrendingUp} trendData={dailySum.some((value) => value > 0) ? dailySum : undefined} subtext={t('kpiAcceptedSubtext', { days: TREND_DAYS })} />
           <StatCard

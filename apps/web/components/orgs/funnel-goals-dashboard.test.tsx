@@ -294,6 +294,41 @@ describe('FunnelGoalsDashboard Component', () => {
       expect(losses[1]).toHaveTextContent('50 people');
     });
 
+    it('shows a no-data state pointing to data setup - not "no one was lost" or empty axes - when the first step has 0 people', () => {
+      const emptyFunnel = {
+        ok: true as const,
+        steps: REAL_FUNNEL.steps.map((step) => ({ ...step, customerCount: 0, conversionRateFromFirst: 0 })),
+      };
+      renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: emptyFunnel, goals: [] }));
+
+      // Where people drop off: no success check claiming nobody dropped off.
+      expect(screen.queryByText(enMessages.FunnelGoals.lossesNone)).not.toBeInTheDocument();
+      const losses = screen.getByTestId('funnel-losses-no-data');
+      expect(losses).toHaveTextContent(enMessages.FunnelGoals.funnelNoPeopleTitle);
+      expect(losses).toHaveTextContent(enMessages.FunnelGoals.funnelNoPeopleBody);
+      expect(within(losses).getByTestId('funnel-losses-no-data-setup-link')).toHaveAttribute('href', '/orgs/org-1/projects/test-proj/install');
+
+      // Conversion by step: no bare 0-4% axes, the same empty state instead.
+      expect(screen.queryByRole('table', { name: enMessages.FunnelGoals.conversionChartTitle })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('trend-chart')).not.toBeInTheDocument();
+      const conversion = screen.getByTestId('funnel-conversion-no-data');
+      expect(conversion).toHaveTextContent(enMessages.FunnelGoals.funnelNoPeopleTitle);
+      expect(within(conversion).getByTestId('funnel-conversion-no-data-setup-link')).toHaveAttribute('href', '/orgs/org-1/projects/test-proj/install');
+    });
+
+    it('still says no one was lost when people entered and none dropped off', () => {
+      const noLossFunnel = {
+        ok: true as const,
+        steps: REAL_FUNNEL.steps.map((step) => ({ ...step, customerCount: 40, conversionRateFromFirst: 1 })),
+      };
+      renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: noLossFunnel, goals: [] }));
+
+      expect(screen.getByText(enMessages.FunnelGoals.lossesNone)).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: enMessages.FunnelGoals.conversionChartTitle })).toBeInTheDocument();
+      expect(screen.queryByTestId('funnel-losses-no-data')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('funnel-conversion-no-data')).not.toBeInTheDocument();
+    });
+
     it('draws no chart at all without a measured funnel', () => {
       renderDashboard();
       expect(screen.queryByTestId('flow-diagram')).not.toBeInTheDocument();
