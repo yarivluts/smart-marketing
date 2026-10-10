@@ -212,6 +212,7 @@ export interface SegmentSummaryStats {
   /** Sum of the member counts that were measured; null when none was. */
   totalMembers: number | null;
   measuredCount: number;
+  /** The measured segment with the most members; null when none was measured or every measured one is empty. */
   largest: { id: string; name: string; count: number } | null;
   byStatus: Record<SegmentSummaryView['status'], number>;
 }
@@ -227,7 +228,8 @@ export function summarizeSegments(
     if (view?.kind !== 'ok') continue;
     stats.measuredCount += 1;
     stats.totalMembers = (stats.totalMembers ?? 0) + view.count;
-    if (!stats.largest || view.count > stats.largest.count) stats.largest = { id: segment.id, name: segment.name, count: view.count };
+    // A segment with no members is not "the largest" of anything: with every segment empty, there is none.
+    if (view.count > 0 && (!stats.largest || view.count > stats.largest.count)) stats.largest = { id: segment.id, name: segment.name, count: view.count };
   }
   return stats;
 }

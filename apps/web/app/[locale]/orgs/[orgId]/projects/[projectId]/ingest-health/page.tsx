@@ -20,6 +20,7 @@ import {
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   computeIngestHealthSummary,
+  formatErrorRate,
   formatMinutesAgo,
   formatThroughput,
   toIngestBatchView,
@@ -134,6 +135,8 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
 
   const numberFormat = new Intl.NumberFormat(locale);
   const overall = summary.overall;
+  // A rate over zero received records has no value: shown as the empty value, never "0.0%".
+  const overallRate = formatErrorRate(overall.errorRatePercent);
   const base = `/orgs/${orgId}/projects/${projectId}/ingest-health`;
   const warehouseCount = warehouseFreshness.status === 'ok' ? warehouseFreshness.landedRecordCount : null;
   // The pipeline as a graph: every count is one this page already shows below, so the diagram and
@@ -170,6 +173,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   ];
 
   function renderRollup(rollup: IngestHealthRollup, key: string) {
+    const rollupRate = formatErrorRate(rollup.errorRatePercent);
     return (
       <li key={key} className="flex flex-col gap-1 rounded-xl border border-border bg-background/60 px-4 py-3 text-sm">
         <span className="font-medium">{rollup.kind === 'overall' ? t('overallHeading') : t(rollup.kind)}</span>
@@ -182,7 +186,9 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
           })}
         </span>
         <span className="text-muted-foreground">
-          {t('rateLine', { percent: rollup.errorRatePercent.toFixed(1), perMinute: formatThroughput(rollup.throughputPerMinute) })}
+          {rollupRate === null
+            ? t('rateLineNoRecords', { perMinute: formatThroughput(rollup.throughputPerMinute) })
+            : t('rateLine', { percent: rollupRate, perMinute: formatThroughput(rollup.throughputPerMinute) })}
         </span>
         {/* The counts above are what happened ON ARRIVAL and never change. Without this line, 47
             probes dismissed long ago kept the page reading as 47 open problems (KAN-201, EasySign). */}
@@ -209,7 +215,12 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
             icon={CheckCircle2}
             progress={overall.totalRecords > 0 ? Math.round((overall.acceptedCount / overall.totalRecords) * 100) : undefined}
           />
-          <StatCard title={t('kpiRejectedRate')} value={`${overall.errorRatePercent.toFixed(1)}%`} icon={XCircle} />
+          <StatCard
+            title={t('kpiRejectedRate')}
+            value={overallRate === null ? t('kpiNoRate') : t('kpiRateValue', { percent: overallRate })}
+            subtext={overallRate === null ? t('kpiNoRateSubtext') : undefined}
+            icon={XCircle}
+          />
           <StatCard
             title={t('kpiLastBatch')}
             value={overall.freshnessMinutes === null ? t('kpiNever') : t('kpiLastBatchValue', { minutes: formatMinutesAgo(overall.freshnessMinutes) })}

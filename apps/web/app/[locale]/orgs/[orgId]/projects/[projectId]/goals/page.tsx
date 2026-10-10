@@ -11,6 +11,7 @@ import { listGoalsForProject, listMetricsCatalogForProject, listOrgPeople, listO
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildUnifiedGoalsData, type UnifiedGoalItem } from '@/lib/orgs/funnel-goals-synthesizer';
 import { summarizeGoalStatusMix, type GoalStatusMix } from '@/lib/orgs/growth-viz';
+import { buildGoalsKpiValues } from '@/lib/orgs/goals-kpis';
 import { cn } from '@/lib/utils';
 import { CreateGoalForm } from '@/components/orgs/create-goal-form';
 import { GoalTargetInput } from '@/components/orgs/goal-target-input';
@@ -112,7 +113,13 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
   const tMix = await getTranslations('FunnelGoals');
   const numberFormat = new Intl.NumberFormat(locale);
   const mix = summarizeGoalStatusMix(items);
-  const needsAttention = summary.atRiskCount + summary.offTrackCount;
+  const kpis = buildGoalsKpiValues(summary, {
+    formatNumber: (value) => numberFormat.format(value),
+    ofMeasured: (count, total) => t('kpiOfMeasured', { count, total }),
+    percent: (percent) => t('percentValue', { percent }),
+    emptyValue: t('kpiEmptyValue'),
+    avgProgressNone: t('kpiAvgProgressNone'),
+  });
   const measured = items.filter((item) => item.progressKind === 'ok' && item.percentFilled !== null && !item.isPaused);
   const show = (goal: UnifiedGoalItem, value: number): string => formatMetricValue(value, goal.unit, locale);
   const targetText = (goal: UnifiedGoalItem): string =>
@@ -125,18 +132,9 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
       <PageHero icon={Target} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('pageDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiGoals')} value={numberFormat.format(items.length)} icon={ListChecks} subtext={summary.pausedGoalsCount > 0 ? t('kpiPausedSubtext', { count: summary.pausedGoalsCount }) : undefined} />
-          <StatCard
-            title={t('kpiOnTrack')}
-            value={summary.measuredGoalsCount > 0 ? t('kpiOfMeasured', { count: summary.onTrackCount, total: summary.measuredGoalsCount }) : t('kpiNoValue')}
-            icon={CheckCircle2}
-          />
-          <StatCard title={t('kpiNeedsAttention')} value={summary.measuredGoalsCount > 0 ? numberFormat.format(needsAttention) : t('kpiNoValue')} icon={AlertTriangle} />
-          <StatCard
-            title={t('kpiAvgProgress')}
-            value={summary.averageProgressPct !== null ? t('percentValue', { percent: summary.averageProgressPct }) : t('kpiNoValue')}
-            icon={Gauge}
-            progress={summary.averageProgressPct ?? undefined}
-          />
+          <StatCard title={t('kpiOnTrack')} value={kpis.onTrack} icon={CheckCircle2} />
+          <StatCard title={t('kpiNeedsAttention')} value={kpis.needsAttention} icon={AlertTriangle} />
+          <StatCard title={t('kpiAvgProgress')} value={kpis.avgProgress} subtext={kpis.avgProgressSubtext} icon={Gauge} progress={kpis.avgProgressBar} />
         </div>
       </PageHero>
 

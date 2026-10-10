@@ -187,7 +187,7 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
           />
           <StatCard
             title={t('kpiLargest')}
-            value={stats.largest ? numberFormat.format(stats.largest.count) : t('kpiNoValue')}
+            value={stats.largest ? numberFormat.format(stats.largest.count) : stats.measuredCount > 0 ? t('kpiLargestAllEmpty') : t('kpiNoValue')}
             subtext={stats.largest ? stats.largest.name : undefined}
             icon={Trophy}
           />
