@@ -13,6 +13,7 @@ import { PageHero } from '@/components/viz/page-hero';
 import { Timeline } from '@/components/viz/timeline';
 import { TrendChart } from '@/components/viz/trend-chart';
 import { AUDIT_CATEGORY_ICONS, AUDIT_CATEGORY_TONES } from '@/components/orgs/audit-action-style';
+import { AuditChainStatus, auditEntryAnchorId } from '@/components/orgs/audit-chain-status';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -99,7 +100,11 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
               title={t('kpiIntegrity')}
               value={chain.valid ? t('kpiIntegrityOk') : t('kpiIntegrityBroken')}
               icon={chain.valid ? ShieldCheck : ShieldAlert}
-              subtext={t('kpiIntegritySubtext', { count: chain.entryCount })}
+              subtext={
+                chain.valid && chain.forks.length > 0
+                  ? t('kpiIntegrityBranchedSubtext', { count: chain.entryCount, forks: chain.forks.length })
+                  : t('kpiIntegritySubtext', { count: chain.entryCount })
+              }
             />
             <StatCard title={t('kpiEntries')} value={numberFormat.format(views.length)} icon={History} subtext={auditPage.truncated ? t('kpiEntriesTruncated') : undefined} />
             <StatCard title={t('kpiActors')} value={numberFormat.format(actorCounts.length)} icon={Users} />
@@ -112,16 +117,7 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
           </div>
         </PageHero>
 
-        <p
-          className={
-            chain.valid
-              ? 'flex items-center gap-2 rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-muted-foreground'
-              : 'flex items-center gap-2 rounded-xl border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive'
-          }
-        >
-          {chain.valid ? <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-hidden="true" /> : <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden="true" />}
-          {chain.valid ? t('chainValid', { count: chain.entryCount }) : t('chainInvalid', { entryId: chain.brokenAtEntryId ?? '' })}
-        </p>
+        <AuditChainStatus chain={chain} visibleEntryIds={new Set(views.map((entry) => entry.id))} actorName={actorName} />
 
         {views.length === 0 ? (
           <EmptyState icon={History} title={t('noEntries')} description={t('noEntriesHint')} />
@@ -167,6 +163,7 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
                       const name = actorName(entry.actorType, entry.actorId);
                       return {
                         key: entry.id,
+                        anchorId: auditEntryAnchorId(entry.id),
                         icon: AUDIT_CATEGORY_ICONS[category],
                         tone: AUDIT_CATEGORY_TONES[category],
                         leading: <InitialsAvatar name={name} seed={entry.actorId} size="sm" className="mt-0.5" />,

@@ -6,6 +6,8 @@ export type TimelineTone = 'primary' | 'success' | 'warning' | 'destructive' | '
 
 export interface TimelineItem {
   key: string;
+  /** DOM id for the item, so other parts of the page can link to it (`#id`); the linked item is highlighted. */
+  anchorId?: string;
   /** The event's kind, drawn as a bubble on the timeline's rail. */
   icon?: LucideIcon | React.ComponentType<{ className?: string }>;
   tone?: TimelineTone;
@@ -60,7 +62,7 @@ export function Timeline({ groups, label, className }: TimelineProps): React.Rea
             {group.items.map((item) => {
               const Icon = item.icon;
               return (
-                <li key={item.key} className="relative ps-7">
+                <li key={item.key} id={item.anchorId} className="relative scroll-mt-24 rounded-xl ps-7 target:bg-warning/10 target:ring-2 target:ring-warning/40">
                   <span
                     className={cn('absolute -start-[15px] top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-card ring-2', TONES[item.tone ?? 'primary'])}
                     aria-hidden="true"

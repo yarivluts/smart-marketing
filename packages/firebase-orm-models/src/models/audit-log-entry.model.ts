@@ -91,6 +91,17 @@ export class AuditLogEntryModel extends BaseModel {
   @Field({ is_required: true })
   public created_at!: string;
 
+  /**
+   * This entry's position in its org's chain: its parent's `seq` + 1 (1 for the first entry that
+   * carries one). The writer picks the entry to link onto by this field, never by `created_at` -
+   * `created_at` comes from the clock of whichever host wrote the entry (apps/web, apps/api,
+   * workers), and those clocks disagree by up to tens of seconds, so "newest by `created_at`" is
+   * not "most recently appended". Absent on entries written before the field existed; when present
+   * it is part of the hashed content.
+   */
+  @Field({ is_required: false })
+  public seq?: number;
+
   /** The chain-preceding entry's own `entry_hash` for this org, or `''` for that org's very first entry. */
   @Field({ is_required: true })
   public prev_entry_hash!: string;

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   acceptInvite,
   AuditLogEntryModel,
@@ -109,7 +109,7 @@ describe('recordAuditLogEntry: hash chain', () => {
     // entryCount is 2, not 1: `setupProject` itself records one
     // `organization.create` entry (KAN-44 follow-up) ahead of this one.
     const result = await verifyAuditLogChainForOrg(organization.id);
-    expect(result).toEqual({ valid: true, entryCount: 2 });
+    expect(result).toEqual({ valid: true, entryCount: 2, forks: [] });
   });
 
   it('round-trips client_type/client_id (KAN-77) and keeps the chain valid alongside entries that omit them', async () => {
@@ -143,7 +143,7 @@ describe('recordAuditLogEntry: hash chain', () => {
     // entryCount is 3, not 2: `setupProject` itself records one
     // `organization.create` entry (KAN-44 follow-up) ahead of the two above.
     const result = await verifyAuditLogChainForOrg(organization.id);
-    expect(result).toEqual({ valid: true, entryCount: 3 });
+    expect(result).toEqual({ valid: true, entryCount: 3, forks: [] });
 
     const entries = await listAuditLogEntriesForOrg(organization.id);
     const mcpEntry = entries.find((entry) => entry.action === 'mcp.tool_call');
@@ -217,12 +217,12 @@ describe('verifyAuditLogChainForOrg', () => {
     // Chain length is 3, not 2: `setupProject` itself records one
     // `organization.create` entry (KAN-44 follow-up) ahead of the two below.
     const result = await verifyAuditLogChainForOrg(organization.id);
-    expect(result).toEqual({ valid: true, entryCount: 3 });
+    expect(result).toEqual({ valid: true, entryCount: 3, forks: [] });
   });
 
   it('reports valid for an org with no entries beyond its own organization.create', async () => {
     const { organization } = await setupProject('Empty Chain Org');
-    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 1 });
+    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 1, forks: [] });
   });
 
   it('detects a hash_mismatch when an entry is edited directly after being written', async () => {
@@ -291,6 +291,7 @@ describe('verifyAuditLogChainForOrg', () => {
       before: reloaded!.before,
       after: reloaded!.after,
       created_at: reloaded!.created_at,
+      seq: reloaded!.seq,
       prev_entry_hash: forgedPrevHash,
     });
     reloaded!.prev_entry_hash = forgedPrevHash;
@@ -301,6 +302,172 @@ describe('verifyAuditLogChainForOrg', () => {
     expect(result.valid).toBe(false);
     expect(result.reason).toBe('chain_break');
     expect(result.brokenAtEntryId).toBe(second.id);
+    expect(result.brokenEntry).toMatchObject({ id: second.id, action: 'test.two', actorType: 'user', actorId: owner.id });
+  });
+
+  it('reports a chain_break when an entry other entries link onto is deleted', async () => {
+    const { owner, organization } = await setupProject('Deleted Entry Org');
+    const middle = await recordAuditLogEntry({
+      organizationId: organization.id,
+      actorType: 'user',
+      actorId: owner.id,
+      action: 'test.middle',
+      targetType: 'test',
+      targetId: '1',
+      summary: 'middle',
+    });
+    const after = await recordAuditLogEntry({
+      organizationId: organization.id,
+      actorType: 'user',
+      actorId: owner.id,
+      action: 'test.after',
+      targetType: 'test',
+      targetId: '2',
+      summary: 'after',
+    });
+
+    const reloaded = await AuditLogEntryModel.init(middle.id, { organization_id: organization.id });
+    await reloaded!.remove();
+
+    const result = await verifyAuditLogChainForOrg(organization.id);
+    expect(result).toMatchObject({ valid: false, reason: 'chain_break', brokenAtEntryId: after.id });
+  });
+});
+
+/**
+ * Writer regressions behind prod org JGTxet9aGXV6xUPWYidR's "tampered" banner (2026-10-10): 46 of
+ * its 717 entries linked onto an entry that was not the one appended just before them - 13
+ * `metric_def.register` entries written by one `Promise.all` all linking onto one parent, and
+ * entries from hosts with disagreeing clocks linking onto a "newest by created_at" entry that was
+ * not the most recent append. No entry's own hash was wrong and no parent was missing.
+ */
+describe('recordAuditLogEntry: concurrent and clock-skewed appends stay linear', () => {
+  it('chains concurrent appends for one org one after another instead of forking them', async () => {
+    const { owner, organization } = await setupProject('Concurrent Append Org');
+
+    await Promise.all(
+      Array.from({ length: 12 }, (_, index) =>
+        recordAuditLogEntry({
+          organizationId: organization.id,
+          actorType: 'user',
+          actorId: owner.id,
+          action: 'metric_def.register',
+          targetType: 'metric_def',
+          targetId: `metric-${index}`,
+          summary: `Registered metric ${index}`,
+        }),
+      ),
+    );
+
+    const entries = (await listAuditLogEntriesForOrg(organization.id)).sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0));
+    expect(entries).toHaveLength(13);
+    expect(entries.map((entry) => entry.seq)).toEqual(Array.from({ length: 13 }, (_, index) => index + 1));
+    entries.slice(1).forEach((entry, index) => expect(entry.prev_entry_hash).toBe(entries[index].entry_hash));
+    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 13, forks: [] });
+  });
+
+  it('keeps appending after a failed append without blocking the org queue', async () => {
+    const { owner, organization } = await setupProject('Failed Append Org');
+    // The first queued append's write fails; the one queued behind it must still run.
+    const saveSpy = vi.spyOn(AuditLogEntryModel.prototype, 'save').mockRejectedValueOnce(new Error('simulated write failure'));
+    try {
+      const failing = recordAuditLogEntry({
+        organizationId: organization.id,
+        actorType: 'user',
+        actorId: owner.id,
+        action: 'test.fail',
+        targetType: 'test',
+        targetId: 'x',
+        summary: 'fails',
+      });
+      const next = recordAuditLogEntry({
+        organizationId: organization.id,
+        actorType: 'user',
+        actorId: owner.id,
+        action: 'test.next',
+        targetType: 'test',
+        targetId: 'y',
+        summary: 'next',
+      });
+      await expect(failing).rejects.toThrow('simulated write failure');
+      // seq 2: the org's `organization.create` entry is 1 and the failed append wrote nothing.
+      await expect(next).resolves.toMatchObject({ action: 'test.next', seq: 2 });
+    } finally {
+      saveSpy.mockRestore();
+    }
+    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 2, forks: [] });
+  });
+
+  it('links onto the most recent append even when an earlier writer stamped a time ahead of this clock', async () => {
+    const { owner, organization } = await setupProject('Clock Skew Org');
+    const base = { organizationId: organization.id, actorType: 'user' as const, actorId: owner.id, targetType: 'test', summary: 's' };
+
+    // A host whose clock runs a minute ahead (prod showed apps/api up to 44s ahead of apps/web).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 60_000);
+    let ahead: AuditLogEntryModel;
+    try {
+      ahead = await recordAuditLogEntry({ ...base, action: 'mcp.tool_call', targetId: 'a' });
+    } finally {
+      vi.useRealTimers();
+    }
+    const revokeA = await recordAuditLogEntry({ ...base, action: 'api_key.revoke', targetId: 'b' });
+    const revokeB = await recordAuditLogEntry({ ...base, action: 'api_key.revoke', targetId: 'c' });
+
+    expect(revokeA.created_at < ahead.created_at).toBe(true);
+    expect(revokeA.prev_entry_hash).toBe(ahead.entry_hash);
+    // Ordering by created_at would pick `ahead` again here and fork the chain.
+    expect(revokeB.prev_entry_hash).toBe(revokeA.entry_hash);
+    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 4, forks: [] });
+  });
+
+  it('continues an org whose entries predate seq from its newest entry, and reports the old fork as benign', async () => {
+    // A bare org id: entries written the pre-seq way (no `seq`, two siblings forked off one parent).
+    const organizationId = unique('legacy-org');
+    async function writeLegacy(action: string, createdAt: string, prevEntryHash: string): Promise<AuditLogEntryModel> {
+      const content = buildHashableContent({
+        organization_id: organizationId,
+        actor_type: 'user',
+        actor_id: 'user-1',
+        action,
+        target_type: 'test',
+        target_id: action,
+        summary: action,
+        created_at: createdAt,
+        prev_entry_hash: prevEntryHash,
+      });
+      const entry = new AuditLogEntryModel();
+      Object.assign(entry, content);
+      entry.entry_hash = computeEntryHash(content);
+      entry.setPathParams({ organization_id: organizationId });
+      await entry.save();
+      return entry;
+    }
+    const genesis = await writeLegacy('plugin.install', '2026-08-16T19:50:09.408Z', '');
+    const siblingA = await writeLegacy('metric_def.register', '2026-08-16T19:50:09.512Z', genesis.entry_hash);
+    const siblingB = await writeLegacy('metric_def.register', '2026-08-16T19:50:09.516Z', genesis.entry_hash);
+
+    const next = await recordAuditLogEntry({
+      organizationId,
+      actorType: 'user',
+      actorId: 'user-1',
+      action: 'board.create',
+      targetType: 'board',
+      targetId: 'b',
+      summary: 'Created board',
+    });
+    expect(next.seq).toBe(1);
+    expect(next.prev_entry_hash).toBe(siblingB.entry_hash);
+
+    const result = await verifyAuditLogChainForOrg(organizationId);
+    expect(result.valid).toBe(true);
+    expect(result.entryCount).toBe(4);
+    expect(result.forks).toEqual([
+      {
+        parent: expect.objectContaining({ id: genesis.id, action: 'plugin.install' }),
+        branches: [expect.objectContaining({ id: siblingA.id }), expect.objectContaining({ id: siblingB.id })],
+      },
+    ]);
   });
 });
 
