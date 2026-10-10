@@ -60,6 +60,40 @@ export function summariseBillingFeed(entries: readonly BillingOpsFeedEntryView[]
   };
 }
 
+/**
+ * The four headline KPIs of the billing-ops page, or `null` for a KPI the data cannot support.
+ *
+ * A count of 0 is only a measurement when billing data is actually flowing. With no billing
+ * events at all (Stripe not connected, or connected but nothing received yet) "0 charges" and
+ * "0 failed payments" read as a clean bill of health when they are really "unknown" - so those
+ * KPIs are `null` and the page renders its no-value state instead. The at-risk count is backed
+ * by subscription snapshots rather than billing events, so it stays a real number whenever any
+ * churning or dunning subscription has landed, and is `null` only when nothing billing-related
+ * landed at all.
+ */
+export interface BillingOpsKpis {
+  hasBillingEvents: boolean;
+  charge: number | null;
+  failed_payment: number | null;
+  refund: number | null;
+  atRisk: number | null;
+}
+
+export function billingOpsKpis(
+  summary: Pick<BillingOpsSummary, 'counts'>,
+  sizes: { eventCount: number; churnCount: number; dunningCount: number },
+): BillingOpsKpis {
+  const hasBillingEvents = sizes.eventCount > 0;
+  const hasAnyBillingData = hasBillingEvents || sizes.churnCount > 0 || sizes.dunningCount > 0;
+  return {
+    hasBillingEvents,
+    charge: hasBillingEvents ? summary.counts.charge : null,
+    failed_payment: hasBillingEvents ? summary.counts.failed_payment : null,
+    refund: hasBillingEvents ? summary.counts.refund : null,
+    atRisk: hasAnyBillingData ? sizes.churnCount + sizes.dunningCount : null,
+  };
+}
+
 /** Feed entries grouped by the UTC day they landed, newest day first, keeping each day's own order. */
 export function groupFeedByDay<T extends { landedAt: string }>(entries: readonly T[]): { day: string; entries: T[] }[] {
   const groups = new Map<string, T[]>();

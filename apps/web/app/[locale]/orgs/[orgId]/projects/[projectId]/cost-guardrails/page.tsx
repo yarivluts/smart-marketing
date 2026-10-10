@@ -12,6 +12,7 @@ import {
   breakdownCostLog,
   formatEstimatedCostUsd,
   formatLabels,
+  loggedCostKpi,
   outcomeLabelKey,
   quotaUsagePct,
   summariseLoggedCost,
@@ -113,6 +114,10 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
 
   const t = await getTranslations('CostGuardrails');
   const integer = new Intl.NumberFormat(locale);
+  const formatCost = (usd: number): string => formatEstimatedCostUsd(usd, locale);
+  // Most queries carry no cost estimate (cost tracking is only wired for the BigQuery executor),
+  // so the KPI states "not tracked" or its coverage rather than a zero that reads as measured spend.
+  const costKpi = loggedCostKpi(loggedCost);
   const shortDay = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' });
   const dateTime = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'UTC' });
   const formatDay = (day: string): string => {
@@ -137,9 +142,17 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
           <StatCard title={t('kpiRemaining')} value={integer.format(quotaStatus.remaining)} icon={Database} subtext={quotaStatus.allowed ? t('kpiRemainingOpen') : t('kpiRemainingBlocked')} />
           <StatCard
             title={t('kpiLoggedCost')}
-            value={loggedCost.entriesWithCost > 0 ? formatEstimatedCostUsd(loggedCost.totalUsd) : t('kpiNoValue')}
+            value={
+              costKpi.kind === 'measured' ? formatCost(costKpi.totalUsd) : costKpi.kind === 'not_tracked' ? t('kpiCostNotTracked') : t('kpiNoValue')
+            }
             icon={CircleDollarSign}
-            subtext={t('kpiLoggedCostSub', { count: logViews.length })}
+            subtext={
+              costKpi.kind === 'measured'
+                ? t('kpiCostCoverageSub', { withCost: costKpi.withCost, total: costKpi.totalEntries })
+                : costKpi.kind === 'not_tracked'
+                  ? t('kpiCostNotTrackedSub', { count: costKpi.totalEntries })
+                  : t('kpiLoggedCostSub', { count: logViews.length })
+            }
           />
           <StatCard title={t('kpiBlocked')} value={integer.format(breakdown.byOutcome.blocked_quota_exceeded)} icon={Ban} subtext={t('kpiLoggedCostSub', { count: logViews.length })} />
         </div>
@@ -231,7 +244,7 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
           logViews.length > 0 ? (
             <div className="flex flex-col gap-1">
               {loggedCost.entriesWithCost > 0 ? (
-                <p className="text-sm font-medium text-foreground">{t('loggedCostTotal', { total: formatEstimatedCostUsd(loggedCost.totalUsd) })}</p>
+                <p className="text-sm font-medium text-foreground">{t('loggedCostTotal', { total: formatCost(loggedCost.totalUsd) })}</p>
               ) : (
                 <p className="text-sm">{t('loggedCostNone')}</p>
               )}
@@ -282,7 +295,7 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
                         )}
                       </td>
                       <td className="whitespace-nowrap py-2 text-end tabular-nums" dir="ltr">
-                        {entry.estimatedCostUsd !== null ? formatEstimatedCostUsd(entry.estimatedCostUsd) : <span className="text-muted-foreground">{t('costUnknownShort')}</span>}
+                        {entry.estimatedCostUsd !== null ? formatCost(entry.estimatedCostUsd) :<span className="text-muted-foreground">{t('costUnknownShort')}</span>}
                       </td>
                     </tr>
                   );
