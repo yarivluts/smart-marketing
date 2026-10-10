@@ -14,6 +14,7 @@ import {
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
+import { createApiKeyHref } from '@/lib/orgs/create-api-key-link';
 import { Link } from '@/i18n/navigation';
 import { ChartCard, PageHero } from '@/components/viz';
 import { InstallationCheck } from '@/components/orgs/installation-check';
@@ -89,6 +90,17 @@ export default async function InstallationPage({ params }: PageProps): Promise<R
     .replace(/\/+$/, '')
     .replace(/\/v1\/ingest$/, '');
   const base = `/orgs/${orgId}/projects/${projectId}`;
+  // The Keys page is gated on `keys.manage`; someone who can only write events is told who can.
+  const canManageKeys = can(bindings, { type: 'user', id: user.id }, 'keys.manage', {
+    orgId,
+    projectId,
+  });
+  const createKeyHref = canManageKeys
+    ? {
+        publishable: createApiKeyHref(`${base}/keys`, 'publishable', environment?.id),
+        secret: createApiKeyHref(`${base}/keys`, 'secret', environment?.id),
+      }
+    : null;
 
   return (
     <div className="container mx-auto flex max-w-5xl flex-col gap-6 py-8">
@@ -114,7 +126,17 @@ export default async function InstallationPage({ params }: PageProps): Promise<R
               >
                 <span className="font-semibold">{t(`keyKinds.${kind}`)}</span>
                 {list.length === 0 ? (
-                  <span className="text-xs text-warning">{t(`noKey.${kind}`)}</span>
+                  <>
+                    <span className="text-xs text-warning">{t(`noKey.${kind}`)}</span>
+                    {createKeyHref ? (
+                      <Link
+                        href={createKeyHref[kind]}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        {t(`createKey.${kind}`)}
+                      </Link>
+                    ) : null}
+                  </>
                 ) : (
                   list.map((key) => (
                     <span key={key.id} className="flex flex-col text-xs">
@@ -133,12 +155,14 @@ export default async function InstallationPage({ params }: PageProps): Promise<R
             );
           })}
         </div>
-        <Link
-          href={`${base}/keys`}
-          className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
-        >
-          {t('manageKeys')}
-        </Link>
+        {canManageKeys ? (
+          <Link
+            href={`${base}/keys`}
+            className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
+          >
+            {t('manageKeys')}
+          </Link>
+        ) : null}
       </ChartCard>
 
       <ChartCard title={t('codeTitle')} description={t('codeDescription')} icon={Code2}>
@@ -146,6 +170,8 @@ export default async function InstallationPage({ params }: PageProps): Promise<R
           apiBase={apiBase}
           browserKeyPrefix={browserKeys[0]?.keyPrefix ?? null}
           serverKeyPrefix={serverKeys[0]?.keyPrefix ?? null}
+          environmentName={environment?.name ?? null}
+          createKeyHref={createKeyHref}
         />
       </ChartCard>
 

@@ -25,6 +25,13 @@ export interface CreateApiKeyFormProps {
   projectId: string;
   environments: readonly ProjectEnvironmentOption[];
   ingestBaseUrl: string;
+  /**
+   * Preselections, e.g. from a "create a browser key for prod" link on the Installation page
+   * (`?kind=publishable&environmentId=...`). Each is ignored when it does not match a real option.
+   */
+  initialKind?: ApiKeyKind;
+  initialEnvironmentId?: string;
+  initialScopes?: readonly ApiKeyScope[];
 }
 
 interface MintedKey {
@@ -46,15 +53,24 @@ export function CreateApiKeyForm({
   projectId,
   environments,
   ingestBaseUrl,
+  initialKind,
+  initialEnvironmentId,
+  initialScopes,
 }: CreateApiKeyFormProps): React.ReactElement {
   const t = useTranslations('ApiKeys');
   const tEnv = useTranslations('EnvBadge');
   const router = useRouter();
   const [name, setName] = useState('');
-  const [environmentId, setEnvironmentId] = useState(environments[0]?.id ?? '');
-  const [kind, setKind] = useState<ApiKeyKind>('secret');
+  const [environmentId, setEnvironmentId] = useState(
+    environments.some((environment) => environment.id === initialEnvironmentId)
+      ? (initialEnvironmentId as string)
+      : (environments[0]?.id ?? ''),
+  );
+  const [kind, setKind] = useState<ApiKeyKind>(initialKind ?? 'secret');
   const [originsText, setOriginsText] = useState('');
-  const [selectedScopes, setSelectedScopes] = useState<ApiKeyScope[]>([]);
+  const [selectedScopes, setSelectedScopes] = useState<ApiKeyScope[]>(() =>
+    API_KEY_SCOPES.filter((scope) => initialScopes?.includes(scope)),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
   const [mintedKey, setMintedKey] = useState<MintedKey | null>(null);
