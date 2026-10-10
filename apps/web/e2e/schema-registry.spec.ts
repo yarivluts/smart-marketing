@@ -78,16 +78,19 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await expect(page.getByText('v3 — Active')).toHaveCount(0);
 
     // KAN-36: the registered event schema shows up in the volume/tracking-alerts
-    // section, honestly reporting "never received a record" since this test never
+    // section, honestly reporting "not connected yet" since this test never
     // ingests any real data — and a manual "Check now" leaves it that way (nothing
     // to have "broken" yet). Tracking is scoped per environment, and the page shows
     // the environment picked in the project shell (KAN-196) — prod by default — so
     // the sparkline list has one "<schemaName> (<environment>)" row, the prod one.
+    // The tracking-alerts card says why there is no alert for it, instead of a bare
+    // "no alerts" beside a schema the page itself lists as never received.
     const prodEventVolumeRow = page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod\)/ });
     await expect(prodEventVolumeRow).toBeVisible();
-    await expect(prodEventVolumeRow.getByText('Never received a record.')).toBeVisible();
+    await expect(prodEventVolumeRow.getByText('Not connected yet: no record received.')).toBeVisible();
     await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ })).toHaveCount(0);
     await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
+    await expect(page.getByTestId('tracking-alerts-not-connected-note')).toContainText('do not raise tracking alerts');
 
     await page.getByRole('button', { name: 'Check now' }).click();
     await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();

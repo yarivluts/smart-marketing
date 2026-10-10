@@ -1,6 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { deriveSetupHealth, type SetupSchemaObservation } from '@growthos/shared';
-import { buildRequirementLanes, countFamiliesByKind, dailyVolumeTotals, stackedVolumeChart, totalEvents } from './schema-registry-viz';
+import {
+  buildRequirementLanes,
+  countFamiliesByKind,
+  countNeverReceived,
+  dailyVolumeTotals,
+  eventReceiptState,
+  stackedVolumeChart,
+  totalEvents,
+} from './schema-registry-viz';
+
+describe('event receipt state (never-received schemas are not connected, not alerted-silent)', () => {
+  it('classifies a schema that landed records as receiving, even with no traffic this week', () => {
+    expect(eventReceiptState({ lastSeenAt: '2026-09-01T00:00:00.000Z' }, 0)).toBe('receiving');
+    expect(eventReceiptState({ lastSeenAt: '2026-09-01T00:00:00.000Z' }, 3)).toBe('receiving');
+  });
+
+  it('calls a never-landed schema not connected, or only-rejected when records bounce', () => {
+    expect(eventReceiptState({ lastSeenAt: null }, 0)).toBe('not_connected');
+    expect(eventReceiptState({ lastSeenAt: null }, 12)).toBe('only_rejected');
+  });
+
+  it('counts never-received schemas for the KPI and the tracking-alerts note', () => {
+    expect(countNeverReceived([{ lastSeenAt: null }, { lastSeenAt: '2026-09-01T00:00:00.000Z' }, { lastSeenAt: null }])).toBe(2);
+    expect(countNeverReceived([])).toBe(0);
+  });
+});
 
 const volume = (schemaName: string, counts: number[], lastSeenAt: string | null = null) => ({
   schemaName,

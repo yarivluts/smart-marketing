@@ -18,6 +18,7 @@ import {
   hasActiveInstall,
   pluginInstallHealth,
   pluginTypeForInstall,
+  readyToAddCounts,
   sourceRunStatusLabelKey,
   toPluginInstallView,
   toPluginManifestView,
@@ -92,7 +93,9 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   // uninstalled first (installPlugin's own PluginAlreadyInstalledError) — filtered out here rather
   // than left for the form to discover via a failed submit.
   const installableManifests = manifestViews.filter((manifest) => !hasActiveInstall(installViews, manifest.pluginId));
-  const installableBuiltinPacks = builtinMetricPacks().filter((pack) => !hasActiveInstall(installViews, pack.pluginId));
+  const allBuiltinPacks = builtinMetricPacks();
+  const installableBuiltinPacks = allBuiltinPacks.filter((pack) => !hasActiveInstall(installViews, pack.pluginId));
+  const readyToAdd = readyToAddCounts(installViews, manifestViews, allBuiltinPacks);
 
   // Only an active install of a `source`-type manifest has a runnable sync (KAN-47) — a disabled/
   // uninstalled install, or one of any other plugin type, has nothing to trigger here.
@@ -140,7 +143,12 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
             icon={RefreshCw}
             subtext={activeSourceInstalls.length > 0 ? t('kpiSourcesSubtext') : t('kpiSourcesNone')}
           />
-          <StatCard title={t('kpiAvailable')} value={numberFormat.format(installableBuiltinPacks.length + installableManifests.length)} icon={DownloadCloud} />
+          <StatCard
+            title={t('kpiAvailable')}
+            value={numberFormat.format(readyToAdd.plugins)}
+            icon={DownloadCloud}
+            subtext={t('kpiAvailablePacks', { count: readyToAdd.packs })}
+          />
         </div>
       </PageHero>
 
