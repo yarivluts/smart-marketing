@@ -3,6 +3,7 @@ import type { SetupEnvironmentHealth, SetupHealthReport } from '@growthos/shared
 import {
   auditActionCategory,
   auditActionDomain,
+  averageProductionScore,
   dailyTotals,
   groupByDay,
   initialsFor,
@@ -91,11 +92,30 @@ describe('project health', () => {
     expect(pickHeadlineEnvironment(null)).toBeNull();
   });
 
-  it('falls back to the furthest-along environment while production has nothing connected', () => {
+  it('keeps production as the headline even while nothing is connected there (never switches to dev)', () => {
     const emptyProd = environment('prod', 0, { connectedCount: 0 });
-    expect(pickHeadlineEnvironment({ environments: [environment('dev', 83), emptyProd, environment('staging', 0, { connectedCount: 0 })] })?.environmentName).toBe('dev');
-    // All tied at zero: production wins the tie.
-    expect(pickHeadlineEnvironment({ environments: [environment('dev', 0, { connectedCount: 0 }), emptyProd] })?.environmentName).toBe('prod');
+    const report: SetupHealthReport = { environments: [environment('dev', 83), emptyProd, environment('staging', 0, { connectedCount: 0 })] };
+    expect(pickHeadlineEnvironment(report)?.environmentName).toBe('prod');
+    const snapshot = summarizeProjectHealth(report, [], NOW);
+    // The big number agrees with the "prod 0%" in the per-environment breakdown.
+    expect(snapshot.score).toBe(0);
+    expect(snapshot.headlineEnvironment).toBe('prod');
+    expect(snapshot.environments.find((entry) => entry.name === 'prod')?.score).toBe(snapshot.score);
+    expect(snapshot.environments.map((entry) => `${entry.name} ${entry.score}`)).toEqual(['prod 0', 'staging 0', 'dev 83']);
+  });
+
+  it('falls back to prod/staging/dev order only when the project has no production environment', () => {
+    expect(pickHeadlineEnvironment({ environments: [environment('dev', 90), environment('staging', 10)] })?.environmentName).toBe('staging');
+  });
+
+  it('averages only production headline scores for the dashboard KPI', () => {
+    const prodReport = (score: number): SetupHealthReport => ({ environments: [environment('prod', score), environment('dev', 100)] });
+    const a = summarizeProjectHealth(prodReport(0), [], NOW);
+    const b = summarizeProjectHealth(prodReport(50), [], NOW);
+    const noProd = summarizeProjectHealth({ environments: [environment('dev', 83)] }, [], NOW);
+    const unreadable = summarizeProjectHealth(null, [], NOW);
+    expect(averageProductionScore([a, b, noProd, unreadable, null])).toEqual({ average: 25, count: 2 });
+    expect(averageProductionScore([noProd, unreadable])).toEqual({ average: null, count: 0 });
   });
 
   it('summarises the setup report and recent batches without inventing anything', () => {

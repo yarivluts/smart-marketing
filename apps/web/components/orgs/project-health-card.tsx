@@ -88,7 +88,7 @@ export function ProjectHealthCard({ project, wide = false }: { project: Dashboar
               ) : null}
               {health.environments.length > 1 ? (
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  {health.environments.map((environment) => `${tEnv(environment.name)} ${environment.score}%`).join(' · ')}
+                  {t('cardEnvironments', { list: health.environments.map((environment) => `${tEnv(environment.name)} ${environment.score}%`).join(' · ') })}
                 </p>
               ) : null}
             </div>

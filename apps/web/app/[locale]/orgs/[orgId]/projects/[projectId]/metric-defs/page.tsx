@@ -6,7 +6,16 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listMetricDefinitionsForProject, listOrgProjects, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
 import { toMetricDefView, type MetricDefView } from '@/lib/orgs/metric-def-view';
-import { buildMetricLineage, catalogStats, pickLineageFocus, tallestLineageColumn, toCatalogMetrics, type LineageNode } from '@/lib/orgs/metric-lineage';
+import {
+  buildMetricLineage,
+  catalogStats,
+  formulaSharePercent,
+  metricTypeSlices,
+  pickLineageFocus,
+  tallestLineageColumn,
+  toCatalogMetrics,
+  type LineageNode,
+} from '@/lib/orgs/metric-lineage';
 import { RegisterMetricDefForm } from '@/components/orgs/register-metric-def-form';
 import { MetricFamilyCard } from '@/components/orgs/metric-family-card';
 import type { MetricVersionView } from '@/components/orgs/metric-definition-editor';
@@ -104,6 +113,8 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
 
   const metrics = toCatalogMetrics(families);
   const stats = catalogStats(metrics);
+  const typeBreakdown = metricTypeSlices(stats);
+  const formulaShare = formulaSharePercent(stats);
   const usedBy = new Map(stats.reuse.map((entry) => [entry.name, entry.count]));
   const schemaNames = new Set(schemaDefs.filter((schemaDef) => schemaDef.status === 'active').map((schemaDef) => schemaDef.name));
   const focusName = pickLineageFocus(metrics, metricParam);
@@ -143,7 +154,8 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
           <StatCard
             title={t('kpiFormulaShare')}
             value={numberFormat.format(stats.formula)}
-            progress={stats.active > 0 ? Math.round((stats.formula / stats.active) * 100) : undefined}
+            progress={formulaShare ?? undefined}
+            targetHint={formulaShare === null ? undefined : t('kpiFormulaShareHint')}
             icon={FunctionSquare}
           />
           <StatCard title={t('kpiSources')} value={numberFormat.format(stats.tables.length)} icon={Database} />
@@ -157,13 +169,13 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
             <ChartCard title={t('typesTitle')} description={t('typesDescription')} icon={Sigma} fill>
               <DonutChart
                 label={t('typesTitle')}
-                centerValue={numberFormat.format(metrics.length)}
+                centerValue={numberFormat.format(typeBreakdown.total)}
                 centerLabel={t('typesCenter')}
-                data={[
-                  { label: t('kindAggregation'), value: stats.aggregation, color: 'hsl(var(--primary))' },
-                  { label: t('kindFormula'), value: stats.formula, color: 'hsl(var(--info))' },
-                  { label: t('archivedLabel'), value: stats.archived, color: 'hsl(var(--muted-foreground))' },
-                ]}
+                data={typeBreakdown.slices.map((slice) =>
+                  slice.kind === 'aggregation'
+                    ? { label: t('kindAggregation'), value: slice.value, color: 'hsl(var(--primary))' }
+                    : { label: t('kindFormula'), value: slice.value, color: 'hsl(var(--info))' },
+                )}
                 size={150}
                 layout="stacked"
               />

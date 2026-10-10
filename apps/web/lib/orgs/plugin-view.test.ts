@@ -6,6 +6,7 @@ import {
   pluginInstallHealth,
   pluginInstallHealthLabelKey,
   pluginTypeForInstall,
+  readyToAddCounts,
   sourceRunStatusLabelKey,
   toPluginInstallView,
   toPluginManifestView,
@@ -124,6 +125,33 @@ describe('hasActiveInstall', () => {
 
   it('is false for a plugin id with no install at all', () => {
     expect(hasActiveInstall(installs, 'com.example.does-not-exist')).toBe(false);
+  });
+});
+
+describe('readyToAddCounts', () => {
+  const builtinPacks = Array.from({ length: 8 }, (_, index) => ({ pluginId: `growthos.builtin.pack-${index}` }));
+
+  it('reports zero plugins (not the built-in packs) when every registered plugin is already installed', () => {
+    const installs = [toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.shopify-pack', status: 'installed' }))];
+    const manifests = [
+      toPluginManifestView(manifest({ id: 'm1', plugin_id: 'com.example.shopify-pack', version: '1.0.0' })),
+      toPluginManifestView(manifest({ id: 'm2', plugin_id: 'com.example.shopify-pack', version: '2.0.0' })),
+    ];
+    // The install card shows "every registered plugin is already installed"; the KPI must agree.
+    expect(readyToAddCounts(installs, manifests, builtinPacks)).toEqual({ plugins: 0, packs: 8 });
+  });
+
+  it('counts distinct plugin ids, not manifest versions, and drops packs that are already installed', () => {
+    const installs = [
+      toPluginInstallView(install({ id: 'i1', plugin_id: 'growthos.builtin.pack-0', status: 'disabled' })),
+      toPluginInstallView(install({ id: 'i2', plugin_id: 'com.example.ads-pack', status: 'uninstalled', uninstalled_at: '2026-01-02T00:00:00.000Z' })),
+    ];
+    const manifests = [
+      toPluginManifestView(manifest({ id: 'm1', plugin_id: 'com.example.stripe-pack', version: '1.0.0' })),
+      toPluginManifestView(manifest({ id: 'm2', plugin_id: 'com.example.stripe-pack', version: '2.0.0' })),
+      toPluginManifestView(manifest({ id: 'm3', plugin_id: 'com.example.ads-pack', version: '1.0.0' })),
+    ];
+    expect(readyToAddCounts(installs, manifests, builtinPacks)).toEqual({ plugins: 2, packs: 7 });
   });
 });
 

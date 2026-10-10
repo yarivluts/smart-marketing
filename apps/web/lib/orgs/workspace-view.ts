@@ -112,18 +112,34 @@ export interface ProjectHealthSnapshot {
 
 const ENVIRONMENT_ORDER = ['prod', 'staging', 'dev'];
 
+/** The environment project pages default to, and so the one a project's headline score reflects. */
+export const HEADLINE_ENVIRONMENT = ENVIRONMENT_ORDER[0];
+
 /**
- * The environment a project's headline score is read from: production once anything is connected
- * there (what the project's reports default to); before that, the environment that is furthest
- * along (a project still integrating against dev reads as its dev progress, not a flat 0%), ties
- * broken in prod/staging/dev order. Every environment's own score is still listed beside it.
+ * The environment a project's headline score is read from: always production when the project has
+ * one (what the project's reports default to), even while nothing is connected there yet - a
+ * headline that quietly switched to dev would read "83%" beside "prod 0%". Only a project with no
+ * production environment falls back to the first in prod/staging/dev order. Every environment's own
+ * score is still listed beside it.
  */
 export function pickHeadlineEnvironment(report: SetupHealthReport | null): SetupEnvironmentHealth | null {
   if (!report || report.environments.length === 0) return null;
   const ranked = [...report.environments].sort((a, b) => rankEnvironment(a.environmentName) - rankEnvironment(b.environmentName));
-  const prod = ranked.find((environment) => environment.environmentName === 'prod');
-  if (prod && prod.connectedCount > 0) return prod;
-  return ranked.reduce((best, environment) => (environment.score > best.score ? environment : best), ranked[0]);
+  return ranked[0];
+}
+
+/**
+ * The dashboard's "average setup health" KPI: the mean production score across the projects whose
+ * headline is production, so the KPI and every card's big number describe the same environment.
+ * Projects without a readable production score are left out of both the mean and the count.
+ */
+export function averageProductionScore(snapshots: readonly (ProjectHealthSnapshot | null)[]): { average: number | null; count: number } {
+  const scores: number[] = [];
+  for (const snapshot of snapshots) {
+    if (snapshot && snapshot.headlineEnvironment === HEADLINE_ENVIRONMENT && snapshot.score !== null) scores.push(snapshot.score);
+  }
+  if (scores.length === 0) return { average: null, count: 0 };
+  return { average: Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length), count: scores.length };
 }
 
 function rankEnvironment(name: string): number {

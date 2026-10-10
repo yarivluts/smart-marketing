@@ -102,6 +102,26 @@ export function catalogStats(metrics: readonly CatalogMetric[]): CatalogStats {
   };
 }
 
+/**
+ * The "metric types" breakdown: aggregation vs formula over active metrics only. Archived is a
+ * status, not a type, so it never appears as a slice - the slices always sum to the "active
+ * metrics" KPI.
+ */
+export function metricTypeSlices(stats: CatalogStats): { total: number; slices: { kind: 'aggregation' | 'formula'; value: number }[] } {
+  return {
+    total: stats.aggregation + stats.formula,
+    slices: [
+      { kind: 'aggregation', value: stats.aggregation },
+      { kind: 'formula', value: stats.formula },
+    ],
+  };
+}
+
+/** Formula (computed) metrics as a whole-number share of active metrics, or null when there are none. */
+export function formulaSharePercent(stats: CatalogStats): number | null {
+  return stats.active > 0 ? Math.round((stats.formula / stats.active) * 100) : null;
+}
+
 /** The upstream size of a metric: how many metrics and tables it is built from, transitively. */
 function upstreamSize(name: string, byName: ReadonlyMap<string, CatalogMetric>, seen = new Set<string>()): number {
   if (seen.has(name)) return 0;

@@ -16,7 +16,16 @@ import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { Link } from '@/i18n/navigation';
 import { toSchemaDefView, type SchemaDefView } from '@/lib/orgs/schema-def-view';
 import { toTrackingAlertView, trackingAlertStatusLabelKey } from '@/lib/orgs/tracking-alert-view';
-import { buildRequirementLanes, countFamiliesByKind, dailyVolumeTotals, stackedVolumeChart, totalEvents, type SchemaChipStatus } from '@/lib/orgs/schema-registry-viz';
+import {
+  buildRequirementLanes,
+  countFamiliesByKind,
+  countNeverReceived,
+  dailyVolumeTotals,
+  eventReceiptState,
+  stackedVolumeChart,
+  totalEvents,
+  type SchemaChipStatus,
+} from '@/lib/orgs/schema-registry-viz';
 import { formatRelativeTime } from '@/lib/orgs/recency';
 import { RegisterSchemaDefForm } from '@/components/orgs/register-schema-def-form';
 import { SchemaFamilyCard, type SchemaVersionView } from '@/components/orgs/schema-family-card';
@@ -188,7 +197,10 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   const dailyTotals = dailyVolumeTotals(eventVolumeOverview);
   const weekTotal = dailyTotals.reduce((sum, bucket) => sum + bucket.count, 0);
   const liveSchemaCount = eventVolumeOverview.filter((entry) => totalEvents(entry) > 0).length;
-  const silentEntries = eventVolumeOverview.filter((entry) => entry.lastSeenAt === null);
+  // Never-received schemas are "not connected yet", not silent: tracking alerts only cover a schema
+  // that landed records and then stopped, so these never raise one.
+  const neverReceivedCount = countNeverReceived(eventVolumeOverview);
+  const activeAlertCount = trackingAlertViews.filter((alert) => alert.status === 'active').length;
   const volumeChart = stackedVolumeChart(eventVolumeOverview, 5, t('volumeOtherSeries'), shortDate);
   const healthForEnvironment = setupHealth?.environments.find((environment) => environment.environmentId === environmentId) ?? null;
   const { lanes, unmapped } = buildRequirementLanes(families, healthForEnvironment);
@@ -229,8 +241,8 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
           />
           <StatCard
             title={t('kpiSilentSchemas')}
-            value={numberFormat.format(silentEntries.length)}
-            subtext={trackingAlertViews.some((alert) => alert.status === 'active') ? t('kpiActiveAlerts', { count: trackingAlertViews.filter((alert) => alert.status === 'active').length }) : undefined}
+            value={numberFormat.format(neverReceivedCount)}
+            subtext={activeAlertCount > 0 ? t('kpiActiveAlerts', { count: activeAlertCount }) : neverReceivedCount > 0 ? t('kpiNotConnectedSub') : undefined}
             icon={VolumeX}
           />
         </div>
@@ -361,6 +373,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
               {volumeRows.map((entry) => {
                 const rejectedCount = rejectedCountByKey.get(`${entry.schemaName}:${entry.environmentId}`) ?? 0;
                 const total = totalEvents(entry);
+                const receipt = eventReceiptState(entry, rejectedCount);
                 return (
                   <li
                     key={`${entry.schemaName}:${entry.environmentId}`}
@@ -374,7 +387,11 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
                         {t('eventVolumeSchemaEnvironmentLabel', { schemaName: entry.schemaName, environmentName: tEnv(entry.environmentName) })}
                       </span>
                       <span className="text-xs text-muted-foreground" title={entry.lastSeenAt ?? undefined}>
-                        {entry.lastSeenAt === null ? t('eventNeverSeen') : t('eventLastSeenRelative', { relative: formatRelativeTime(entry.lastSeenAt, now, locale) })}
+                        {entry.lastSeenAt !== null
+                          ? t('eventLastSeenRelative', { relative: formatRelativeTime(entry.lastSeenAt, now, locale) })
+                          : receipt === 'only_rejected'
+                            ? t('eventNoneAccepted')
+                            : t('eventNeverSeen')}
                       </span>
                       {rejectedCount > 0 ? (
                         <span className="text-xs text-amber-600 dark:text-amber-400">
@@ -402,6 +419,11 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
 
           <div className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-muted-foreground">{t('trackingAlertsHeading')}</h3>
+            {neverReceivedCount > 0 ? (
+              <p className="text-xs text-muted-foreground" data-testid="tracking-alerts-not-connected-note">
+                {t('trackingAlertsNotConnectedNote', { count: neverReceivedCount })}
+              </p>
+            ) : null}
             {trackingAlertViews.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('noTrackingAlerts')}</p>
             ) : (

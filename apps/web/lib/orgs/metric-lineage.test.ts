@@ -3,6 +3,8 @@ import {
   buildMetricLineage,
   catalogStats,
   formulaInputs,
+  formulaSharePercent,
+  metricTypeSlices,
   pickLineageFocus,
   schemaForTable,
   tallestLineageColumn,
@@ -57,6 +59,25 @@ describe('catalog stats', () => {
     ]);
     // The archived old_ratio's reference to ad_spend is not counted.
     expect(stats.reuse[0]).toEqual({ name: 'ad_spend', count: 2 });
+  });
+
+  it('breaks metric types down over active metrics only, so the slices total the active KPI', () => {
+    const stats = catalogStats(metrics);
+    const breakdown = metricTypeSlices(stats);
+    // 7 metrics in total, 1 archived: the donut shows 6, never 7, and has no "archived" slice.
+    expect(breakdown.total).toBe(stats.active);
+    expect(breakdown.total).toBe(6);
+    expect(breakdown.slices).toEqual([
+      { kind: 'aggregation', value: 3 },
+      { kind: 'formula', value: 2 + 1 },
+    ]);
+    expect(breakdown.slices.reduce((sum, slice) => sum + slice.value, 0)).toBe(stats.active);
+    expect(breakdown.slices.map((slice) => slice.kind)).not.toContain('archived');
+  });
+
+  it('expresses derived metrics as a share of active metrics, or null with none active', () => {
+    expect(formulaSharePercent(catalogStats(metrics))).toBe(50);
+    expect(formulaSharePercent(catalogStats([]))).toBeNull();
   });
 });
 
