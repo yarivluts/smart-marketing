@@ -1645,6 +1645,7 @@
     "reasonPoorSupport": "Poor support",
     "reasonNotUsingEnough": "Not using it enough",
     "reasonTechnicalIssues": "Technical issues",
+    "reasonPaymentFailed": "Payment failed (involuntary)",
     "reasonOther": "Other",
     "themePricing": "Pricing",
     "themeCompetitor": "Competitor",

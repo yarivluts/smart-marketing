@@ -1645,6 +1645,7 @@
     "reasonPoorSupport": "תמיכה לקויה",
     "reasonNotUsingEnough": "לא נעשה בו שימוש מספיק",
     "reasonTechnicalIssues": "בעיות טכניות",
+    "reasonPaymentFailed": "התשלום נכשל (נטישה לא רצונית)",
     "reasonOther": "אחר",
     "themePricing": "תמחור",
     "themeCompetitor": "מתחרה",

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { CANCELLATION_REASON_CODES } from '@growthos/shared';
 import { cancellationReasonCodeLabelKey, cancellationReasonThemeLabelKey, toCancellationReasonDimensionBreakdownRows } from './churn-reason-view';
+import en from '../../messages/en.json';
+import he from '../../messages/he.json';
 
 describe('cancellationReasonThemeLabelKey', () => {
   it('maps every known theme to its translation key', () => {
@@ -24,11 +27,20 @@ describe('cancellationReasonCodeLabelKey', () => {
     expect(cancellationReasonCodeLabelKey('poor_support')).toBe('reasonPoorSupport');
     expect(cancellationReasonCodeLabelKey('not_using_enough')).toBe('reasonNotUsingEnough');
     expect(cancellationReasonCodeLabelKey('technical_issues')).toBe('reasonTechnicalIssues');
+    expect(cancellationReasonCodeLabelKey('payment_failed')).toBe('reasonPaymentFailed');
     expect(cancellationReasonCodeLabelKey('other')).toBe('reasonOther');
   });
 
   it('falls back to the raw code for an unrecognized value', () => {
     expect(cancellationReasonCodeLabelKey('made_up_reason')).toBe('made_up_reason');
+  });
+
+  it('has an English and a Hebrew label for every taxonomy code, including involuntary payment_failed', () => {
+    for (const code of CANCELLATION_REASON_CODES) {
+      const key = cancellationReasonCodeLabelKey(code) as keyof typeof en.ChurnReasons;
+      expect(en.ChurnReasons[key], code).toBeTruthy();
+      expect(he.ChurnReasons[key], code).toBeTruthy();
+    }
   });
 });
 
