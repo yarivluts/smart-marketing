@@ -298,4 +298,35 @@ describe('summarizeSegments', () => {
   it('reports no total when nothing was measured', () => {
     expect(summarizeSegments([{ id: 's1', name: 'A', status: 'open' }], new Map([['s1', { kind: 'query_error' }]] as const)).totalMembers).toBeNull();
   });
+
+  it('names no largest segment when every measured segment is empty - an empty segment is not "the largest"', () => {
+    const stats = summarizeSegments(
+      [
+        { id: 's1', name: 'Lawyers', status: 'open' },
+        { id: 's2', name: 'Paying', status: 'open' },
+      ],
+      new Map([
+        ['s1', { kind: 'ok', count: 0 }],
+        ['s2', { kind: 'ok', count: 0 }],
+      ] as const),
+    );
+    expect(stats.largest).toBeNull();
+    // The counts were measured: the total is a real 0, not "no data".
+    expect(stats.totalMembers).toBe(0);
+    expect(stats.measuredCount).toBe(2);
+  });
+
+  it('names the only non-empty segment as the largest even when it comes after empty ones', () => {
+    const stats = summarizeSegments(
+      [
+        { id: 's1', name: 'Empty', status: 'open' },
+        { id: 's2', name: 'One member', status: 'open' },
+      ],
+      new Map([
+        ['s1', { kind: 'ok', count: 0 }],
+        ['s2', { kind: 'ok', count: 1 }],
+      ] as const),
+    );
+    expect(stats.largest).toEqual({ id: 's2', name: 'One member', count: 1 });
+  });
 });

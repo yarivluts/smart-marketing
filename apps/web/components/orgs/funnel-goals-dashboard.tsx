@@ -177,6 +177,34 @@ export function FunnelGoalsDashboard({
 
   const projectBase = `/orgs/${orgId}/projects/${projectId}`;
   const funnelMeasured = funnelViewKind === 'ok' && funnelSteps.length > 0;
+  /*
+    A defined funnel whose first step has nobody in it has measured nothing yet. Its loss list
+    would be empty and read as "no one was lost", and its conversion chart would draw bare axes -
+    both look like a result. Say there is no data and point at data setup instead.
+  */
+  const funnelHasEntrants = useMemo(() => {
+    const first = [...funnelSteps].sort((a, b) => a.stepOrder - b.stepOrder)[0];
+    return first !== undefined && first.customerCount > 0;
+  }, [funnelSteps]);
+  const funnelNoPeopleState = (testId: string): React.ReactElement => (
+    <div data-testid={testId}>
+      <EmptyState
+        compact
+        icon={Layers}
+        title={t('funnelNoPeopleTitle')}
+        description={t('funnelNoPeopleBody')}
+        action={
+          <Link
+            href={`${projectBase}/install`}
+            data-testid={`${testId}-setup-link`}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+          >
+            {t('funnelNoPeopleCta')}
+          </Link>
+        }
+      />
+    </div>
+  );
 
   const filteredGoals = useMemo(() => {
     return goals.filter((g) => {
@@ -412,17 +440,23 @@ export function FunnelGoalsDashboard({
 
               <div className="grid gap-6 lg:grid-cols-5">
                 <ChartCard title={t('conversionChartTitle')} description={t('conversionChartDescription')} icon={BarChart3} className="lg:col-span-3" fill>
-                  <TrendChart
-                    label={t('conversionChartTitle')}
-                    xKey="step"
-                    data={conversionRows}
-                    series={[{ key: 'conversion', label: t('conversionSeries') }]}
-                    kind="bar"
-                    valueFormat="percent"
-                  />
+                  {funnelHasEntrants ? (
+                    <TrendChart
+                      label={t('conversionChartTitle')}
+                      xKey="step"
+                      data={conversionRows}
+                      series={[{ key: 'conversion', label: t('conversionSeries') }]}
+                      kind="bar"
+                      valueFormat="percent"
+                    />
+                  ) : (
+                    funnelNoPeopleState('funnel-conversion-no-data')
+                  )}
                 </ChartCard>
                 <ChartCard title={t('lossesTitle')} description={t('lossesDescription')} icon={TrendingDown} className="lg:col-span-2" fill>
-                  {funnelLosses.length > 0 ? (
+                  {!funnelHasEntrants ? (
+                    funnelNoPeopleState('funnel-losses-no-data')
+                  ) : funnelLosses.length > 0 ? (
                     <BarList
                       color="hsl(var(--destructive))"
                       items={funnelLosses.map((loss) => ({
