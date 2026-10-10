@@ -56,7 +56,7 @@ const MOUNTED = ['ad-studio', 'auth', 'campaigns', 'integrations', 'orgs', 'tv',
  * "filters" that multiplied counts by a constant - so mounting either would have put invented
  * numbers on a real project. The live equivalents are in `components/orgs`.
  */
-const NOT_MOUNTED = ['ai', 'automation', 'billing', 'members', 'reporting', 'settings', 'shell'];
+const NOT_MOUNTED = ['ai', 'automation', 'reporting', 'shell'];
 
 function componentDirectories(): string[] {
   return readdirSync(COMPONENTS_ROOT)
