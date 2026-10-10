@@ -155,6 +155,7 @@ export * from './services/feedback.service';
 export * from './services/plugin-registry.service';
 export * from './services/plugin-runtime.service';
 export * from './services/stripe-plugin.service';
+export * from './services/billing-recovery.service';
 export * from './services/ga4-plugin.service';
 export * from './services/source-plugin-dispatch.service';
 export * from './services/crm-sync.service';

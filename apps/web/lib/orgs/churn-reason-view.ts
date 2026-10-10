@@ -81,6 +81,8 @@ export function cancellationReasonCodeLabelKey(reasonCode: string): string {
       return 'reasonNotUsingEnough';
     case 'technical_issues':
       return 'reasonTechnicalIssues';
+    case 'payment_failed':
+      return 'reasonPaymentFailed';
     case 'other':
       return 'reasonOther';
     default:

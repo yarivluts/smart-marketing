@@ -2,7 +2,13 @@ import { SourcePluginExecutionError, type SourcePluginExecutor, type SourcePlugi
 import type { StripeApiClient, StripeListParams } from './api-client';
 import { StripeApiError } from './api-client';
 import { type StripeSyncCursor, type StripeResourceCursor, initialStripeSyncCursor, parseStripeSyncCursor, serializeStripeSyncCursor } from './cursor';
-import { mapChargeToEventRecords, mapInvoiceToEventRecord, mapRefundToEventRecord, mapSubscriptionToEntityRecord } from './mappers';
+import {
+  mapChargeToEventRecords,
+  mapInvoiceToEventRecord,
+  mapRefundToEventRecord,
+  mapStripeSubscriptionToCancellationReasonRecord,
+  mapSubscriptionToEntityRecord,
+} from './mappers';
 import { STRIPE_SUBSCRIPTION_ENTITY_NAME } from './schemas';
 import type { StripeListPage } from './types';
 
@@ -56,23 +62,28 @@ async function runEventsPhase(
   cursor: StripeSyncCursor,
   pageSize: number,
 ): Promise<{ records: Record<string, unknown>[]; nextCursor: StripeSyncCursor }> {
-  const [charges, invoices, refunds] = await Promise.all([
+  const [charges, invoices, refunds, cancellations] = await Promise.all([
     syncOneResource(cursor.events.charge, (params) => client.listCharges(params), pageSize),
     syncOneResource(cursor.events.invoice, (params) => client.listInvoices(params), pageSize),
     syncOneResource(cursor.events.refund, (params) => client.listRefunds(params), pageSize),
+    // Backfills cancellation reasons for subscriptions canceled before the webhook was connected.
+    // Polling by `created` only sees newly created subscriptions, so a later cancellation of an old
+    // one reaches GrowthOS through the `customer.subscription.*` webhook, not this poll.
+    syncOneResource(cursor.events.cancellation, (params) => client.listSubscriptions(params), pageSize),
   ]);
 
   const records = [
     ...charges.items.flatMap(mapChargeToEventRecords),
     ...invoices.items.map(mapInvoiceToEventRecord),
     ...refunds.items.map(mapRefundToEventRecord),
+    ...cancellations.items.map(mapStripeSubscriptionToCancellationReasonRecord).filter((record): record is Record<string, unknown> => record !== null),
   ];
 
   return {
     records,
     nextCursor: {
       phase: 'entities',
-      events: { charge: charges.cursor, invoice: invoices.cursor, refund: refunds.cursor },
+      events: { charge: charges.cursor, invoice: invoices.cursor, refund: refunds.cursor, cancellation: cancellations.cursor },
       entities: cursor.entities,
     },
   };
