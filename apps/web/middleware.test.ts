@@ -77,6 +77,14 @@ describe('middleware', () => {
     }
   });
 
+  it('lets anyone read the developer guides without signing in, but not a look-alike path', () => {
+    intlMiddlewareMock.mockReturnValue(NextResponse.next());
+    for (const path of ['/en/developers', '/he/developers', '/en/developers/quick-start', '/he/developers/mcp']) {
+      expect(middleware(requestFor(path)).headers.get('location')).toBeNull();
+    }
+    expect(middleware(requestFor('/en/developers-admin')).headers.get('location')).toContain('/en/login');
+  });
+
   it('lets an unauthenticated visitor reach the public home page', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en'));
