@@ -17,6 +17,27 @@ Template for each entry:
 
 ---
 
+## 2026-10-11 - Only true data on every page; Stitch branch merged (KAN-324, KAN-350..356)
+
+- **Last completed:** Yariv asked to make sure no page shows invented data, to fix what was needed, and to merge what was needed.
+  - **Code sweep:** no mock, sample or random data is rendered on main. Earlier passes had already removed invented benchmarks, canned copilot replies and fixed "projected" impacts.
+  - **Dead demo code removed:** `components/billing`, `components/members` and `components/settings`. No route rendered them, but they still held fabricated data.
+  - **Misleading numbers fixed (PR #602, deployed eb75944):**
+    - Empty data now reads as empty: the funnel, goal counts, the largest segment and rates over zero records.
+    - Sources that aren't connected show "not connected" or "not tracked" instead of zeros (billing, cost).
+    - Contradictory counts now agree: the dashboard headline is production's score, plus the plugins, metric types and silent schemas.
+    - The install snippet can't be copied with a placeholder key.
+  - **Audit log "tampered" was a bug:** 12 forks from concurrent writes and clock skew. Every one of the 717 entries verifies. The writer now serializes per org with `seq`, and the verifier follows links. Prod now reads "valid".
+  - **`feat/stitch-conversion` reviewed commit by commit:**
+    - Ported only the real parts: billing recovery (KAN-304) and Stripe cancellation reasons (KAN-306).
+    - Skipped everything that invents data or simulates work (KAN-303, KAN-305, KAN-307 to KAN-314).
+    - The branch was then synced as a fast-forward merge whose tree equals main (e9e19af3). The other tool's next pull or deploy carries every feature.
+  - **Verified on prod with the QA user:** all 12 changed pages return 200 with no console errors. The audit log, dashboard and billing pages were checked visually.
+  - **Jira:** KAN-324 and KAN-350 to KAN-356 are Done, with comments.
+- **In progress (exact stopping point):** none.
+- **Next step:** the remaining QA bugs, starting with the high-severity phone tables (KAN-319..322) and TV setup (KAN-323), then the untranslated-enum group (KAN-325..332).
+- **Waiting on human:** whoever runs the `feat/stitch-conversion` tool should pull the synced branch, or work on main, before its next deploy.
+
 ## 2026-10-10 - Page-by-page QA review of prod: 59 bugs in Jira (KAN-319..KAN-377)
 
 - **Last completed:** Yariv asked for a review of every page on desktop and mobile, as PM, engineer and UX, with bugs filed in Jira with screenshots.
