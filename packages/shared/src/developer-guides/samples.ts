@@ -30,12 +30,13 @@ export const GUIDE_SCHEMA_MANIFEST = {
     {
       kind: 'event',
       name: TOUCHPOINT_SCHEMA_NAME,
+      // Flags default to false, so only the true ones are spelled out.
       fields: TOUCHPOINT_SCHEMA_FIELDS.map((field) => ({
         name: field.name,
         type: field.type,
-        is_required: field.isRequired,
-        is_pii: field.isPii,
-        is_identity_key: field.isIdentityKey,
+        ...(field.isRequired ? { is_required: true } : {}),
+        ...(field.isPii ? { is_pii: true } : {}),
+        ...(field.isIdentityKey ? { is_identity_key: true } : {}),
       })),
     },
     {
@@ -87,6 +88,19 @@ export function sampleEntitiesBody(now: Date = new Date()) {
 /** `POST /v1/ingest/measures` body: the number is a top-level `value`, dimensions are separate. */
 export function sampleMeasuresBody(now: Date = new Date()) {
   return { records: [{ measure: 'mrr', ts: now.toISOString().slice(0, 10), value: 49, dimensions: { plan: 'pro' } }] };
+}
+
+/** A 202 batch summary as the ingest endpoints return it: one record accepted, one quarantined. */
+export function sampleIngestResponse(): string {
+  return json({
+    batch_id: 'Hf3kQ9xTbL2mR8vN1pZc',
+    kind: 'event',
+    accepted: 1,
+    quarantined: 1,
+    duplicates: 0,
+    total: 2,
+    rejected: [{ client_id: 'signup-user_124', status: 'quarantined', reasons: ['missing_required_field:plan'] }],
+  });
 }
 
 /** `POST /v1/metrics/query` body. */
@@ -147,13 +161,43 @@ export function curlMcp(ctx: DeveloperGuideContext, method: 'tools/list' | 'tool
   ].join('\n');
 }
 
+/** The metric the API guide queries: daily signups, counted from the events core table. */
+export const GUIDE_METRIC = {
+  name: 'signups',
+  kind: 'aggregation',
+  function: 'count',
+  table: 'events',
+  column: 'event_id',
+  time_column: 'occurred_at',
+  filters: [{ field: 'event_type', op: '=', value: 'signup' }],
+  unit: 'count',
+} as const;
+
+/** Registers GUIDE_METRIC through MCP's register_metric (needs metrics.write). */
+export function curlRegisterMetric(ctx: DeveloperGuideContext): string {
+  return curlMcp(ctx, 'tools/call', { name: 'register_metric', arguments: GUIDE_METRIC });
+}
+
 /** Registers the guide's schemas through MCP's apply_schema_manifest (needs schema.write). */
 export function curlApplySchemaManifest(ctx: DeveloperGuideContext): string {
   return curlMcp(ctx, 'tools/call', { name: 'apply_schema_manifest', arguments: GUIDE_SCHEMA_MANIFEST });
 }
 
+/** The manifest as readable JSON: one line per field, so a schema reads as a short list. */
 export function schemaManifestJson(): string {
-  return json(GUIDE_SCHEMA_MANIFEST);
+  const schemas = GUIDE_SCHEMA_MANIFEST.schemas.map((schema) => {
+    const fields = schema.fields.map((field) => `        ${JSON.stringify(field).replace(/,"/g, ', "').replace(/":/g, '": ')}`);
+    return [
+      '    {',
+      `      "kind": ${JSON.stringify(schema.kind)},`,
+      `      "name": ${JSON.stringify(schema.name)},`,
+      '      "fields": [',
+      fields.join(',\n'),
+      '      ]',
+      '    }',
+    ].join('\n');
+  });
+  return ['{', '  "schemas": [', schemas.join(',\n'), '  ]', '}'].join('\n');
 }
 
 export function nodeInstall(ctx: DeveloperGuideContext): string {

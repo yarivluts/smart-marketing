@@ -106,3 +106,14 @@ describe('developer guide samples', () => {
     expect(body.params.arguments.schemas).toHaveLength(GUIDE_SCHEMA_MANIFEST.schemas.length);
   });
 });
+
+describe('schemaManifestJson', () => {
+  it('is valid JSON equal to the manifest, with one line per field', async () => {
+    const { schemaManifestJson } = await import('./samples');
+    const text = schemaManifestJson();
+    expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(GUIDE_SCHEMA_MANIFEST)));
+    expect(text).toContain('{"name": "click_id", "type": "string", "is_identity_key": true}');
+    // One line per field plus a few per schema: about 50, against about 150 for plain JSON.
+    expect(text.split('\n').length).toBeLessThan(60);
+  });
+});
