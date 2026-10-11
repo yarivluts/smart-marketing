@@ -29,7 +29,8 @@
     "userMenu": "Account menu",
     "signedInAs": "Signed in as",
     "myAccount": "My account",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "developersLink": "Developers"
   },
   "OmniSearch": {
     "trigger": "Search...",
@@ -5020,6 +5021,227 @@
     "removeSchema": "Stop checking {name}",
     "removeSchemaHint": "Stop checking {name} here. Nothing is deleted - it only leaves this checklist (add it back below).",
     "addSchemaPlaceholder": "Schema name, e.g. signup",
-    "addSchema": "Check it too"
+    "addSchema": "Check it too",
+    "developerGuides": "Developer guides: API, SDKs and MCP"
+  },
+  "Developers": {
+    "brand": "GrowthOS",
+    "nav": {
+      "label": "Developer guides",
+      "area": "Developers",
+      "openApp": "Open the app",
+      "signIn": "Sign in",
+      "overview": "Overview",
+      "quickStart": "Quick start",
+      "clientSide": "Client side (browser)",
+      "serverSide": "Server side (Node.js)",
+      "api": "HTTP API",
+      "mcp": "MCP for AI agents",
+      "testing": "Test environment"
+    },
+    "common": {
+      "copy": "Copy",
+      "copied": "Copied",
+      "previous": "Previous",
+      "next": "Next",
+      "read": "Read the guide"
+    },
+    "code": {
+      "terminal": "Terminal",
+      "json": "JSON",
+      "html": "HTML",
+      "typescript": "TypeScript",
+      "javascript": "JavaScript (Node.js)",
+      "console": "Browser console"
+    },
+    "overview": {
+      "title": "Build on GrowthOS",
+      "intro": "Send your product's events, customers and revenue to GrowthOS, read metrics back, and connect AI agents over MCP - from the browser, from your server, or from any language over HTTP.",
+      "testedNote": "Every sample on these pages runs against a GrowthOS <strong>test environment</strong> before it ships. Start with test keys (<code>gos_test_</code>, <code>gos_pk_test_</code>): nothing touches production data until you switch to live keys.",
+      "pathsTitle": "Pick your path",
+      "cards": {
+        "quickStart": "From zero to a verified event in five steps, in a test environment.",
+        "clientSide": "The script snippet or the npm package: visit attribution, events, identity and consent.",
+        "serverSide": "The Node.js SDK: events, customers and measures with batching, retries and a result for every record.",
+        "api": "Every endpoint, request shape and response - for any language.",
+        "mcp": "Connect Claude or your own agent to read metrics and manage the project.",
+        "testing": "Test keys, dev and staging data, and checking an installation before going live."
+      },
+      "conceptsTitle": "Core concepts",
+      "concepts": {
+        "environments": {
+          "title": "Projects and environments",
+          "body": "Every project has three environments: <code>dev</code>, <code>staging</code> and <code>prod</code>. A key belongs to one environment, and the records it sends land only there."
+        },
+        "keys": {
+          "title": "Keys",
+          "body": "A <strong>browser key</strong> (<code>gos_pk_...</code>) is public: it can only send events, and only from the domains you list. A <strong>server key</strong> (<code>gos_test_...</code> for dev and staging, <code>gos_live_...</code> for prod) stays on your server. The key decides the project and the environment - there is no project id in your code."
+        },
+        "schemas": {
+          "title": "Schemas",
+          "body": "Every event, entity and measure name is registered first, with the fields it carries. A record with an unregistered name or an undeclared field is quarantined with the reason, and the rest of its batch still lands."
+        },
+        "identity": {
+          "title": "Identity",
+          "body": "<code>anon_id</code> (the visitor) and <code>customer_id</code> (the signed-in customer) ride inside <code>properties</code>. Sending the browser's <code>anon_id</code> with the server's signup ties the signup to the campaign of the visit."
+        },
+        "idempotency": {
+          "title": "Safe retries",
+          "body": "Every event carries your own <code>event_id</code>. Sending the same id again is reported as a duplicate, not stored twice, so retrying a failed request is always safe."
+        }
+      }
+    },
+    "quickStart": {
+      "title": "Quick start",
+      "intro": "Five steps from nothing to a verified event, all in a test environment. You need a GrowthOS project; the samples use curl and read the server key from the GROWTHOS_API_KEY environment variable.",
+      "step1Title": "1. Create test keys",
+      "step1Body": "Open your project in GrowthOS, switch the environment to <strong>dev</strong>, and on the <strong>Keys</strong> page create a server key with <code>ingest.write</code>, <code>schema.write</code> and <code>mcp.read</code>, and a browser key for your site's domains (<code>http://localhost</code> is allowed for testing). Test keys start with <code>gos_test_</code> and <code>gos_pk_test_</code>.",
+      "step1Env": "Keep the server key in an environment variable - never in code or in a page:",
+      "step1Cta": "Open GrowthOS",
+      "step2Title": "2. Register your schemas",
+      "step2Body": "Declare every event, entity and measure you will send, with its fields. This manifest registers the ones the guides use - <code>touchpoint</code> (GrowthOS's own visit schema), <code>signup</code>, <code>cta_click</code>, a <code>customer</code> entity and an <code>mrr</code> measure; replace them with your own. It goes through MCP's <code>apply_schema_manifest</code>, or use the <strong>Schemas</strong> page in the app. Schemas are project-wide, so they are ready for prod too.",
+      "step3Title": "3. Send your first event",
+      "step3Body": "One <code>signup</code> event in the exact wire shape. The response says how many records were <strong>accepted</strong>, <strong>quarantined</strong> (with the reason) or <strong>duplicates</strong>.",
+      "step4Title": "4. Add the browser and server SDKs",
+      "step4Body": "On your site, the browser SDK sends a <code>touchpoint</code> at the start of each visit and the events you track. On your server, the Node.js SDK sends signups, customers and revenue. Any other language calls the HTTP API.",
+      "step5Title": "5. Verify the installation",
+      "step5Body": "Ask GrowthOS what really arrived for each schema: <strong>receiving</strong>, <strong>quarantined</strong> (with the reason), <strong>registered but no data</strong> or <strong>not registered</strong>. The <strong>Installation</strong> page in the app shows the same, and can listen live while you click through your site.",
+      "liveTitle": "Going live",
+      "liveBody": "Create live keys in the <strong>prod</strong> environment (<code>gos_live_...</code>, <code>gos_pk_live_...</code>), swap them into your configuration and run the same check against prod. Nothing else needs to be registered again."
+    },
+    "clientSide": {
+      "title": "Client side: the browser SDK",
+      "intro": "About 9 KB, no dependencies, never blocks the page. It sends a touchpoint at the start of each visit - campaign, ad click id, landing page and referrer - and the events you track.",
+      "keyTitle": "Browser keys",
+      "keyBody": "Create a <strong>browser key</strong> for the environment and list your site's domains. It can only send events, and only from those domains - a page anywhere else gets 403. <code>http://localhost</code> is allowed, so a test key works on your own machine.",
+      "secretWarning": "Never put a server key (<code>gos_test_...</code> or <code>gos_live_...</code>) in a page. GrowthOS refuses a server key sent from a browser.",
+      "snippetTitle": "Option 1: the script snippet",
+      "snippetBody": "Paste it once into the head of every page. It loads the SDK asynchronously and queues calls until it arrives, so early <code>track</code> calls are never lost. Replace the key with your browser key.",
+      "npmTitle": "Option 2: the npm package",
+      "npmBody": "For single-page apps and bundlers. The package is served by GrowthOS; pin the versioned file.",
+      "apiTitle": "What you can call",
+      "apiTrack": "<code>track(event, properties)</code> - send an event. The name must be a registered event schema, and every property must be declared on it.",
+      "apiIdentify": "<code>identify(customerId)</code> - after signup or login: later events carry the customer id.",
+      "apiReset": "<code>reset()</code> - on logout: forgets the customer and starts a new anonymous visitor.",
+      "apiAnon": "<code>getAnonId()</code> - the visitor id. Send it to your server at signup so the signup is credited to this visit.",
+      "apiPage": "<code>pageViews: true</code> - sends <code>page_view</code> with the <code>path</code> on load and on every in-app navigation. Register a <code>page_view</code> schema with a <code>path</code> field first.",
+      "apiFlush": "Events are sent in batches (10 events or 1 second), and whatever is left when the page is hidden goes out with <code>sendBeacon</code>. <code>flush()</code> sends now.",
+      "consentTitle": "Consent",
+      "consentBody": "Start in <code>pending</code> and nothing is stored or sent until consent is <code>granted</code>; <code>denied</code> drops what waited and clears the stored ids.",
+      "relayTitle": "Strict Content-Security-Policy: a relay",
+      "relayBody": "If your page may only call its own origin, let the browser SDK post to your own route and forward from there with the server key. The relay forwards only the event names you allow, with size limits.",
+      "verifyTitle": "Check it in the browser",
+      "verifyBody": "With a browser key, run this in the browser console on your site. It prints whether each schema is receiving, quarantined (with the reason) or not registered - from what really arrived. A rejected record is also logged to the console with its reason."
+    },
+    "serverSide": {
+      "title": "Server side: the Node.js SDK",
+      "intro": "Node.js 18 or newer, no dependencies. Batching, retries on 429 / 5xx / network errors, a result for every record, a relay for browser events, backfill helpers and an installation check.",
+      "installTitle": "Install",
+      "installBody": "The SDK is served by GrowthOS. Install the versioned file, so your lockfile never sees its content change:",
+      "exampleTitle": "Send events, customers and measures",
+      "exampleBody": "A complete script: it reads the key from <code>GROWTHOS_API_KEY</code>, sends one event, one customer and one measure, prints what happened to each record and runs the installation check. Run it as an ES module (for example <code>node send.mjs</code>).",
+      "resultsTitle": "What happened to each record",
+      "resultsBody": "<code>flush()</code>, <code>shutdown()</code> and the immediate <code>sendEvents()</code> / <code>sendEntities()</code> / <code>sendMeasures()</code> return the accepted, quarantined and duplicate counts and every record that was not accepted, with its reasons. In a serverless function, call <code>flush()</code> before returning; before a process exits, call <code>shutdown()</code>.",
+      "idTitle": "Stable ids",
+      "idBody": "<code>eventId(...parts)</code> turns your own data into a stable id, so a retried job is reported as a <strong>duplicate</strong> instead of being counted twice. Send <strong>every</strong> attribute of a customer each time: an entity upsert replaces the whole row.",
+      "cliTitle": "Check from the terminal or CI",
+      "cliBody": "The SDK ships a <code>growthos</code> command. Exit code 0 means everything expected is arriving, 1 means something needs attention, 2 means the check itself failed - so it fits a deploy pipeline.",
+      "otherTitle": "Other languages",
+      "otherBody": "Every SDK call is one HTTPS request with a JSON body - Python, PHP, Go or anything else uses the HTTP API directly."
+    },
+    "api": {
+      "title": "HTTP API",
+      "intro": "Every call is HTTPS with a bearer key and a JSON body. These are the same endpoints the SDKs use.",
+      "authTitle": "Base URL and authentication",
+      "authBody": "Send the key as <code>Authorization: Bearer ...</code>. The key decides the organization, project and environment - there is no project id in the URL. All paths start with the base URL:",
+      "baseUrl": "Base URL",
+      "endpointsTitle": "Endpoints",
+      "colEndpoint": "Endpoint",
+      "colScope": "Key scope",
+      "colWhat": "What it does",
+      "noKey": "No key",
+      "endpoints": {
+        "events": "Send events (up to 1,000 per request).",
+        "entities": "Upsert entities of one type - always the whole row.",
+        "measures": "Send pre-aggregated numbers.",
+        "validate": "Check records against your schemas exactly as ingest would, without storing anything.",
+        "batch": "The result of every record in a batch.",
+        "verify": "The installation check: what really arrived for each expected schema.",
+        "contract": "The ingest contract as OpenAPI 3.1.",
+        "metrics": "The project's registered metrics.",
+        "metricsQuery": "Query a metric as a time series.",
+        "mcp": "The MCP server (JSON-RPC) for AI agents."
+      },
+      "eventsTitle": "Send events",
+      "eventsBody": "Records go in a top-level <code>batch</code> array. <code>event_id</code>, <code>event</code> and <code>ts</code> are required; the schema's fields go in <code>properties</code>, together with <code>anon_id</code> and <code>customer_id</code>.",
+      "entitiesTitle": "Upsert entities",
+      "entitiesBody": "One request carries one entity <code>type</code>. Send the whole row every time - an upsert replaces it, so an attribute you leave out is erased.",
+      "measuresTitle": "Send measures",
+      "measuresBody": "Pre-aggregated numbers, such as a day's revenue: the number is a top-level <code>value</code> and the breakdown goes in <code>dimensions</code>. Re-sending the same aggregate is idempotent.",
+      "responseTitle": "Responses",
+      "responseBody": "<code>202</code> with the counts of accepted, quarantined and duplicate records; every record that was not accepted is listed with its status and reasons (for example <code>missing_required_field:plan</code>, <code>unregistered_field:...</code>, <code>field_type_mismatch:...</code> or <code>schema_not_registered</code>). The batch endpoint returns the result of every record.",
+      "metricsTitle": "Read metrics",
+      "metricsBody": "Register a metric (here through MCP's <code>register_metric</code>, which needs <code>metrics.write</code>), list the catalog and query a time series. New records reach the warehouse in its hourly refresh, so a fresh project returns an empty series at first.",
+      "contractTitle": "Machine-readable contract",
+      "contractBody": "The ingest contract as an OpenAPI 3.1 document - request envelopes, the batch response and the rules a JSON schema cannot express. No key needed.",
+      "errorsTitle": "Errors and limits",
+      "errorsBody": "<code>400</code> malformed request - <code>401</code> missing or unknown key - <code>403</code> a scope the key lacks, or a browser key used outside its domains - <code>413</code> too large - <code>429</code> rate limited: wait for <code>Retry-After</code> - <code>5xx</code> retry with backoff. Records are never half-stored: retrying with the same ids is always safe."
+    },
+    "mcp": {
+      "title": "MCP for AI agents",
+      "intro": "GrowthOS is a Model Context Protocol server. An agent can read schemas, metrics and funnels, check the installation, register schemas and metrics, manage goals and segments, run the Ad Studio and propose automation changes - with the same permissions, limits and audit log as the app.",
+      "endpointTitle": "Endpoint",
+      "endpointBody": "One URL for every project: the credential decides the organization, project and environment. The server is stateless - every request authenticates on its own.",
+      "endpointLabel": "MCP endpoint",
+      "authTitle": "Credentials",
+      "authBody": "Interactive clients such as Claude Desktop and claude.ai sign in with <strong>OAuth</strong> - there is no secret to copy. Agents and scripts use a <strong>server key</strong> with <code>mcp.read</code>, plus <code>schema.write</code>, <code>metrics.write</code> or <code>dashboards.write</code> for the tools that change things. Approving automation always needs a person and is never available to a key.",
+      "claudeTitle": "Claude Desktop and claude.ai",
+      "claudeBody": "Add a custom connector with the endpoint URL above. You are sent to GrowthOS to sign in and choose the project, and the GrowthOS tools appear in your next conversation.",
+      "claudeCodeTitle": "Claude Code",
+      "claudeCodeBody": "Add GrowthOS as a remote server, reading the key from the environment:",
+      "curlTitle": "Plain HTTP (JSON-RPC)",
+      "curlBody": "Every POST is one JSON-RPC call. List the tools, or call one - here the installation check:",
+      "headlessTitle": "A headless agent",
+      "headlessBody": "With the official MCP SDK for TypeScript - connect, list the tools and call one:",
+      "toolsTitle": "What agents can do",
+      "toolsRead": "<strong>Read</strong> - <code>list_schemas</code>, <code>query_funnel</code>, <code>get_ingest_health</code>, <code>check_installation</code>, <code>validate_records</code>, metrics and boards.",
+      "toolsSetup": "<strong>Set up</strong> - <code>register_schema</code>, <code>apply_schema_manifest</code>, <code>register_metric</code>, <code>set_funnel</code> (each needs its write scope; some offer a <code>dry_run</code> preview).",
+      "toolsGrowth": "<strong>Goals and segments</strong> - <code>create_goal</code>, <code>create_segment</code> (needs <code>dashboards.write</code>).",
+      "toolsAds": "<strong>Ad Studio</strong> - write briefs and scripts, research keywords, plan audiences and publish paused ads, with the studio's own limits.",
+      "toolsAutomation": "<strong>Automation</strong> - <code>propose_action</code> and <code>approve_action</code> need a person's OAuth sign-in with automation rights; a key can never execute them.",
+      "testTitle": "Use a test environment",
+      "testBody": "Give the agent a <code>gos_test_</code> key: everything it sends or creates in data lands in <strong>dev</strong>. Schemas and metrics it registers are project-wide, ready for prod."
+    },
+    "testing": {
+      "title": "Test environment",
+      "intro": "Build and check your integration without touching production data. Every project comes with two test environments.",
+      "envTitle": "dev, staging and prod",
+      "envBody": "Test keys belong to <strong>dev</strong> or <strong>staging</strong>; live keys to <strong>prod</strong>. Records land only in the key's environment, so test data never mixes with production numbers. Schemas and metrics are shared across all three.",
+      "colEnvironment": "Environment",
+      "colServerKey": "Server key",
+      "colBrowserKey": "Browser key",
+      "colUse": "Use it for",
+      "env": {
+        "dev": "dev",
+        "staging": "staging",
+        "prod": "prod"
+      },
+      "use": {
+        "dev": "Building the integration on your own machine.",
+        "staging": "Your staging site, before a release.",
+        "prod": "The live site and real customers."
+      },
+      "pickerTitle": "See test data in the app",
+      "pickerBody": "Switch the environment picker (dev / staging / prod) in the project sidebar - every page then shows that environment's data, and the Keys page creates keys for it.",
+      "loopTitle": "The test loop",
+      "loop1": "Send with test keys - from the site, the server or curl.",
+      "loop2": "Open the <strong>Installation</strong> page and press <strong>Listen live</strong>, or run the verify call below.",
+      "loop3": "Fix anything quarantined: the reason names the schema and the field.",
+      "loop4": "Repeat until every expected schema reads <strong>receiving</strong>, then move to prod keys.",
+      "quarantineTitle": "When a record is rejected",
+      "quarantineBody": "A quarantined record keeps its reason, for example <code>missing_required_field:plan</code> or <code>unregistered_field:coupon</code>. Fix the sender or add the field to the schema, then send again. The <strong>Ingest health</strong> page lists what is waiting, and a record can be replayed once the schema accepts it.",
+      "liveTitle": "Going live",
+      "liveBody": "Create live keys in <strong>prod</strong>, swap them into your configuration (and your site's domains on the browser key), and run the same verify call against prod. Keep the test keys for your staging site and your CI."
+    }
   }
 }

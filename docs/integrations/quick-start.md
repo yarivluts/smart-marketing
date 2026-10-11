@@ -7,6 +7,11 @@ them is specific to one customer.
 Everything below is also shown, already filled in for the chosen environment, on the project's
 **Installation** page (`/orgs/<org>/projects/<project>/install`).
 
+The public developer area at **`/developers`** (no sign-in) has the full guides: quick start,
+client side, server side, the REST API, MCP, and testing against a test environment. Every sample
+there is rendered with the deployment's real API and app URLs, and is checked end to end against a
+sandbox test environment.
+
 ## 1. Decide what you send
 
 | What | Sent from | Schema kind | Example |
