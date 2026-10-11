@@ -41,6 +41,7 @@ import {
   X,
   type LucideIcon,
   Clapperboard,
+  Code2,
   Network,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -231,6 +232,13 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
         </Link>
         {omniSearch ? <div className="mx-2 hidden max-w-md flex-1 md:block">{omniSearch}</div> : null}
         <div className="flex shrink-0 items-center gap-pp-sm">
+          <Link
+            href="/developers"
+            className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-pp-label-md text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface lg:flex"
+          >
+            <Code2 className="h-4 w-4" aria-hidden="true" />
+            {t('developersLink')}
+          </Link>
           <LanguageSwitcher compact className="hidden sm:flex" />
           <UserMenu />
           <button
@@ -269,6 +277,14 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
           {omniSearch}
           <LanguageSwitcher compact className="sm:hidden" />
           <NavSections sections={sections} activeHref={activeHref} onNavigate={() => setMobileMenuOpen(false)} />
+          <Link
+            href="/developers"
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-pp-sm rounded-pp-lg px-pp-md py-pp-sm text-pp-label-md text-pp-on-surface-variant hover:bg-pp-surface-container-high"
+          >
+            <Code2 className="h-5 w-5" aria-hidden="true" />
+            {t('developersLink')}
+          </Link>
         </div>
       ) : null}
 

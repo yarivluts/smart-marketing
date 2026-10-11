@@ -173,6 +173,9 @@ export default async function InstallationPage({ params }: PageProps): Promise<R
           environmentName={environment?.name ?? null}
           createKeyHref={createKeyHref}
         />
+        <Link href="/developers" className="mt-3 inline-block text-sm font-medium text-primary hover:underline">
+          {t('developerGuides')}
+        </Link>
       </ChartCard>
 
       <ChartCard title={t('checkTitle')} description={t('checkDescription')} icon={Radio}>
