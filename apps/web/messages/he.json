@@ -29,7 +29,8 @@
     "userMenu": "תפריט חשבון",
     "signedInAs": "מחובר כ־",
     "myAccount": "החשבון שלי",
-    "signOut": "התנתקות"
+    "signOut": "התנתקות",
+    "developersLink": "מפתחים"
   },
   "OmniSearch": {
     "trigger": "חיפוש...",
@@ -5020,6 +5021,227 @@
     "removeSchema": "הפסקת בדיקה של {name}",
     "removeSchemaHint": "הפסקת הבדיקה של {name} כאן. שום דבר לא נמחק - הוא רק יוצא מרשימת הבדיקה (אפשר להוסיף אותו שוב למטה).",
     "addSchemaPlaceholder": "שם סכמה, למשל signup",
-    "addSchema": "לבדוק גם אותה"
+    "addSchema": "לבדוק גם אותה",
+    "developerGuides": "מדריכים למפתחים: API, SDK ו-MCP"
+  },
+  "Developers": {
+    "brand": "GrowthOS",
+    "nav": {
+      "label": "מדריכים למפתחים",
+      "area": "מפתחים",
+      "openApp": "כניסה למערכת",
+      "signIn": "התחברות",
+      "overview": "סקירה",
+      "quickStart": "התחלה מהירה",
+      "clientSide": "צד לקוח (דפדפן)",
+      "serverSide": "צד שרת (Node.js)",
+      "api": "HTTP API",
+      "mcp": "MCP לסוכני AI",
+      "testing": "סביבת בדיקות"
+    },
+    "common": {
+      "copy": "העתקה",
+      "copied": "הועתק",
+      "previous": "הקודם",
+      "next": "הבא",
+      "read": "למדריך"
+    },
+    "code": {
+      "terminal": "טרמינל",
+      "json": "JSON",
+      "html": "HTML",
+      "typescript": "TypeScript",
+      "javascript": "JavaScript (Node.js)",
+      "console": "קונסולת הדפדפן"
+    },
+    "overview": {
+      "title": "לבנות על GrowthOS",
+      "intro": "שלחו ל-GrowthOS את האירועים, הלקוחות וההכנסות של המוצר שלכם, קראו מדדים בחזרה, וחברו סוכני AI דרך MCP - מהדפדפן, מהשרת, או מכל שפה דרך HTTP.",
+      "testedNote": "כל דוגמת קוד בעמודים האלה רצה מול <strong>סביבת בדיקות</strong> של GrowthOS לפני שהיא עולה. התחילו עם מפתחות בדיקה (<code>gos_test_</code>, <code>gos_pk_test_</code>): שום דבר לא נוגע בנתוני הייצור עד שתעברו למפתחות חיים.",
+      "pathsTitle": "בחרו את הדרך שלכם",
+      "cards": {
+        "quickStart": "מאפס לאירוע מאומת בחמישה צעדים, בסביבת בדיקות.",
+        "clientSide": "קוד ההטמעה או חבילת ה-npm: ייחוס ביקורים, אירועים, זיהוי משתמש והסכמה.",
+        "serverSide": "ה-SDK ל-Node.js: אירועים, לקוחות ומדדים עם אצוות, ניסיונות חוזרים ותוצאה לכל רשומה.",
+        "api": "כל נקודת קצה, מבנה בקשה ותשובה - לכל שפה.",
+        "mcp": "חברו את Claude או סוכן משלכם כדי לקרוא מדדים ולנהל את הפרויקט.",
+        "testing": "מפתחות בדיקה, נתוני dev ו-staging, ובדיקת ההטמעה לפני העלייה לאוויר."
+      },
+      "conceptsTitle": "מושגי יסוד",
+      "concepts": {
+        "environments": {
+          "title": "פרויקטים וסביבות",
+          "body": "לכל פרויקט שלוש סביבות: <code>dev</code>, <code>staging</code> ו-<code>prod</code>. כל מפתח שייך לסביבה אחת, והרשומות שהוא שולח נשמרות רק בה."
+        },
+        "keys": {
+          "title": "מפתחות",
+          "body": "<strong>מפתח דפדפן</strong> (<code>gos_pk_...</code>) הוא ציבורי: הוא יכול רק לשלוח אירועים, ורק מהדומיינים שהגדרתם. <strong>מפתח שרת</strong> (<code>gos_test_...</code> ל-dev ול-staging, <code>gos_live_...</code> ל-prod) נשאר בשרת שלכם. המפתח קובע את הפרויקט והסביבה - אין מזהה פרויקט בקוד."
+        },
+        "schemas": {
+          "title": "סכמות",
+          "body": "כל שם של אירוע, ישות או מדד נרשם קודם, עם השדות שהוא נושא. רשומה עם שם שלא נרשם או עם שדה שלא הוגדר עוברת להסגר עם הסיבה, ושאר הרשומות באצווה עדיין נקלטות."
+        },
+        "identity": {
+          "title": "זהות",
+          "body": "<code>anon_id</code> (המבקר) ו-<code>customer_id</code> (הלקוח המחובר) נשלחים בתוך <code>properties</code>. שליחת ה-<code>anon_id</code> מהדפדפן יחד עם ההרשמה מהשרת קושרת את ההרשמה לקמפיין של הביקור."
+        },
+        "idempotency": {
+          "title": "ניסיונות חוזרים בטוחים",
+          "body": "כל אירוע נושא <code>event_id</code> משלכם. שליחה חוזרת של אותו מזהה מדווחת ככפילות ולא נשמרת פעמיים, כך שתמיד בטוח לשלוח שוב בקשה שנכשלה."
+        }
+      }
+    },
+    "quickStart": {
+      "title": "התחלה מהירה",
+      "intro": "חמישה צעדים מכלום לאירוע מאומת, כולם בסביבת בדיקות. צריך פרויקט ב-GrowthOS; הדוגמאות משתמשות ב-curl וקוראות את מפתח השרת ממשתנה הסביבה GROWTHOS_API_KEY.",
+      "step1Title": "1. יצירת מפתחות בדיקה",
+      "step1Body": "פתחו את הפרויקט ב-GrowthOS, העבירו את הסביבה ל-<strong>dev</strong>, ובעמוד <strong>מפתחות</strong> צרו מפתח שרת עם <code>ingest.write</code>, <code>schema.write</code> ו-<code>mcp.read</code>, ומפתח דפדפן לדומיינים של האתר (<code>http://localhost</code> מותר לבדיקות). מפתחות בדיקה מתחילים ב-<code>gos_test_</code> וב-<code>gos_pk_test_</code>.",
+      "step1Env": "שמרו את מפתח השרת במשתנה סביבה - לעולם לא בקוד או בעמוד:",
+      "step1Cta": "פתיחת GrowthOS",
+      "step2Title": "2. רישום הסכמות",
+      "step2Body": "הגדירו כל אירוע, ישות ומדד שתשלחו, עם השדות שלו. המניפסט הזה רושם את אלה שהמדריכים משתמשים בהם - <code>touchpoint</code> (סכמת הביקור של GrowthOS), <code>signup</code>, <code>cta_click</code>, ישות <code>customer</code> ומדד <code>mrr</code>; החליפו אותם בשמות שלכם. הרישום עובר דרך <code>apply_schema_manifest</code> של MCP, או דרך עמוד <strong>הסכמות</strong> במערכת. סכמות משותפות לכל הפרויקט, כך שהן מוכנות גם ל-prod.",
+      "step3Title": "3. שליחת האירוע הראשון",
+      "step3Body": "אירוע <code>signup</code> אחד, במבנה המדויק. התשובה אומרת כמה רשומות <strong>נקלטו</strong>, כמה <strong>עברו להסגר</strong> (עם הסיבה) וכמה היו <strong>כפילויות</strong>.",
+      "step4Title": "4. הוספת ה-SDK לדפדפן ולשרת",
+      "step4Body": "באתר, ה-SDK לדפדפן שולח <code>touchpoint</code> בתחילת כל ביקור ואת האירועים שאתם עוקבים אחריהם. בשרת, ה-SDK ל-Node.js שולח הרשמות, לקוחות והכנסות. כל שפה אחרת קוראת ל-HTTP API.",
+      "step5Title": "5. אימות ההטמעה",
+      "step5Body": "שאלו את GrowthOS מה באמת הגיע לכל סכמה: <strong>מתקבל</strong>, <strong>בהסגר</strong> (עם הסיבה), <strong>רשום אבל בלי נתונים</strong> או <strong>לא רשום</strong>. עמוד <strong>ההתקנה</strong> במערכת מציג את אותו הדבר, ויכול להאזין בזמן אמת בזמן שאתם עוברים באתר.",
+      "liveTitle": "עלייה לאוויר",
+      "liveBody": "צרו מפתחות חיים בסביבת <strong>prod</strong> (<code>gos_live_...</code>, <code>gos_pk_live_...</code>), החליפו אותם בהגדרות שלכם והריצו את אותה בדיקה מול prod. אין צורך לרשום שום דבר מחדש."
+    },
+    "clientSide": {
+      "title": "צד לקוח: ה-SDK לדפדפן",
+      "intro": "בערך 9KB, בלי תלויות, ולעולם לא חוסם את העמוד. הוא שולח touchpoint בתחילת כל ביקור - קמפיין, מזהה קליק על מודעה, דף נחיתה ומפנה - ואת האירועים שאתם עוקבים אחריהם.",
+      "keyTitle": "מפתחות דפדפן",
+      "keyBody": "צרו <strong>מפתח דפדפן</strong> לסביבה והגדירו את הדומיינים של האתר. הוא יכול רק לשלוח אירועים, ורק מהדומיינים האלה - עמוד מכל מקום אחר מקבל 403. <code>http://localhost</code> מותר, כך שמפתח בדיקה עובד גם על המחשב שלכם.",
+      "secretWarning": "לעולם אל תשימו מפתח שרת (<code>gos_test_...</code> או <code>gos_live_...</code>) בעמוד. GrowthOS דוחה מפתח שרת שנשלח מדפדפן.",
+      "snippetTitle": "אפשרות 1: קוד ההטמעה",
+      "snippetBody": "הדביקו אותו פעם אחת בחלק העליון (head) של כל עמוד. הוא טוען את ה-SDK בצורה אסינכרונית ושומר קריאות עד שהוא מגיע, כך שקריאות <code>track</code> מוקדמות לא הולכות לאיבוד. החליפו את המפתח במפתח הדפדפן שלכם.",
+      "npmTitle": "אפשרות 2: חבילת npm",
+      "npmBody": "לאפליקציות עמוד-יחיד ולבנדלרים. החבילה מוגשת על ידי GrowthOS; קבעו את הקובץ עם מספר הגרסה.",
+      "apiTitle": "מה אפשר לקרוא",
+      "apiTrack": "<code>track(event, properties)</code> - שליחת אירוע. השם חייב להיות סכמת אירוע רשומה, וכל מאפיין חייב להיות מוגדר בה.",
+      "apiIdentify": "<code>identify(customerId)</code> - אחרי הרשמה או התחברות: האירועים הבאים יישאו את מזהה הלקוח.",
+      "apiReset": "<code>reset()</code> - ביציאה: שוכח את הלקוח ומתחיל מבקר אנונימי חדש.",
+      "apiAnon": "<code>getAnonId()</code> - מזהה המבקר. שלחו אותו לשרת בזמן ההרשמה, כדי שההרשמה תיוחס לביקור הזה.",
+      "apiPage": "<code>pageViews: true</code> - שולח <code>page_view</code> עם ה-<code>path</code> בטעינה ובכל ניווט בתוך האפליקציה. רשמו קודם סכמת <code>page_view</code> עם שדה <code>path</code>.",
+      "apiFlush": "האירועים נשלחים באצוות (10 אירועים או שנייה אחת), ומה שנשאר כשהעמוד מוסתר נשלח עם <code>sendBeacon</code>. <code>flush()</code> שולח מיד.",
+      "consentTitle": "הסכמה",
+      "consentBody": "התחילו במצב <code>pending</code> ושום דבר לא נשמר או נשלח עד שההסכמה <code>granted</code>; <code>denied</code> מוחק את מה שחיכה ומנקה את המזהים השמורים.",
+      "relayTitle": "מדיניות CSP מחמירה: ממסר",
+      "relayBody": "אם העמוד רשאי לפנות רק לדומיין שלו, תנו ל-SDK לשלוח לנתיב משלכם ולהעביר משם עם מפתח השרת. הממסר מעביר רק את שמות האירועים שאישרתם, עם מגבלות גודל.",
+      "verifyTitle": "בדיקה בדפדפן",
+      "verifyBody": "עם מפתח דפדפן, הריצו את זה בקונסולת הדפדפן באתר שלכם. הפקודה מציגה לכל סכמה אם היא מתקבלת, בהסגר (עם הסיבה) או לא רשומה - לפי מה שבאמת הגיע. רשומה שנדחתה נרשמת גם בקונסולה עם הסיבה."
+    },
+    "serverSide": {
+      "title": "צד שרת: ה-SDK ל-Node.js",
+      "intro": "Node.js 18 ומעלה, בלי תלויות. אצוות, ניסיונות חוזרים על 429 / 5xx / שגיאות רשת, תוצאה לכל רשומה, ממסר לאירועי דפדפן, כלים למילוי היסטוריה ובדיקת התקנה.",
+      "installTitle": "התקנה",
+      "installBody": "ה-SDK מוגש על ידי GrowthOS. התקינו את הקובץ עם מספר הגרסה, כדי שקובץ הנעילה לעולם לא יראה את התוכן שלו משתנה:",
+      "exampleTitle": "שליחת אירועים, לקוחות ומדדים",
+      "exampleBody": "סקריפט שלם: הוא קורא את המפתח מ-<code>GROWTHOS_API_KEY</code>, שולח אירוע אחד, לקוח אחד ומדד אחד, מדפיס מה קרה לכל רשומה ומריץ את בדיקת ההתקנה. הריצו אותו כמודול ES (למשל <code>node send.mjs</code>).",
+      "resultsTitle": "מה קרה לכל רשומה",
+      "resultsBody": "<code>flush()</code>, <code>shutdown()</code> והשליחות המיידיות <code>sendEvents()</code> / <code>sendEntities()</code> / <code>sendMeasures()</code> מחזירים את מספר הרשומות שנקלטו, שעברו להסגר ושהיו כפולות, ואת כל רשומה שלא נקלטה עם הסיבות. בפונקציית serverless קראו ל-<code>flush()</code> לפני החזרה; לפני שתהליך מסתיים קראו ל-<code>shutdown()</code>.",
+      "idTitle": "מזהים יציבים",
+      "idBody": "<code>eventId(...parts)</code> הופך נתונים שלכם למזהה יציב, כך שמשימה שרצה שוב מדווחת <strong>ככפילות</strong> במקום להיספר פעמיים. שלחו בכל פעם את <strong>כל</strong> המאפיינים של לקוח: עדכון ישות מחליף את כל השורה.",
+      "cliTitle": "בדיקה מהטרמינל או מה-CI",
+      "cliBody": "ה-SDK כולל פקודת <code>growthos</code>. קוד יציאה 0 אומר שכל מה שציפיתם לו מגיע, 1 אומר שמשהו דורש תשומת לב, ו-2 אומר שהבדיקה עצמה נכשלה - כך שהיא משתלבת בתהליך הפריסה.",
+      "otherTitle": "שפות אחרות",
+      "otherBody": "כל קריאה של ה-SDK היא בקשת HTTPS אחת עם גוף JSON - Python, PHP, Go או כל שפה אחרת משתמשות ב-HTTP API ישירות."
+    },
+    "api": {
+      "title": "HTTP API",
+      "intro": "כל קריאה היא HTTPS עם מפתח Bearer וגוף JSON. אלה אותן נקודות קצה שה-SDK משתמש בהן.",
+      "authTitle": "כתובת בסיס והזדהות",
+      "authBody": "שלחו את המפתח בכותרת <code>Authorization: Bearer ...</code>. המפתח קובע את הארגון, הפרויקט והסביבה - אין מזהה פרויקט בכתובת. כל הנתיבים מתחילים בכתובת הבסיס:",
+      "baseUrl": "כתובת בסיס",
+      "endpointsTitle": "נקודות קצה",
+      "colEndpoint": "נקודת קצה",
+      "colScope": "הרשאת מפתח",
+      "colWhat": "מה היא עושה",
+      "noKey": "ללא מפתח",
+      "endpoints": {
+        "events": "שליחת אירועים (עד 1,000 בבקשה).",
+        "entities": "עדכון ישויות מסוג אחד - תמיד השורה כולה.",
+        "measures": "שליחת מספרים מצטברים.",
+        "validate": "בדיקת רשומות מול הסכמות בדיוק כמו בקליטה, בלי לשמור דבר.",
+        "batch": "התוצאה של כל רשומה באצווה.",
+        "verify": "בדיקת ההתקנה: מה באמת הגיע לכל סכמה צפויה.",
+        "contract": "חוזה הקליטה כמסמך OpenAPI 3.1.",
+        "metrics": "המדדים הרשומים בפרויקט.",
+        "metricsQuery": "שאילתת מדד כסדרה לאורך זמן.",
+        "mcp": "שרת ה-MCP (JSON-RPC) לסוכני AI."
+      },
+      "eventsTitle": "שליחת אירועים",
+      "eventsBody": "הרשומות נשלחות במערך <code>batch</code> ברמה העליונה. <code>event_id</code>, <code>event</code> ו-<code>ts</code> הם חובה; שדות הסכמה נכנסים ל-<code>properties</code>, יחד עם <code>anon_id</code> ו-<code>customer_id</code>.",
+      "entitiesTitle": "עדכון ישויות",
+      "entitiesBody": "כל בקשה נושאת <code>type</code> אחד של ישות. שלחו בכל פעם את השורה כולה - העדכון מחליף אותה, כך שמאפיין שהשמטתם נמחק.",
+      "measuresTitle": "שליחת מדדים",
+      "measuresBody": "מספרים מצטברים, כמו ההכנסה של יום: המספר הוא <code>value</code> ברמה העליונה והפילוח נכנס ל-<code>dimensions</code>. שליחה חוזרת של אותו סיכום לא יוצרת כפילות.",
+      "responseTitle": "תשובות",
+      "responseBody": "<code>202</code> עם מספר הרשומות שנקלטו, שעברו להסגר ושהיו כפולות; כל רשומה שלא נקלטה מופיעה עם הסטטוס והסיבות (למשל <code>missing_required_field:plan</code>, <code>unregistered_field:...</code>, <code>field_type_mismatch:...</code> או <code>schema_not_registered</code>). נקודת הקצה של האצווה מחזירה את התוצאה של כל רשומה.",
+      "metricsTitle": "קריאת מדדים",
+      "metricsBody": "רשמו מדד (כאן דרך <code>register_metric</code> של MCP, שדורש <code>metrics.write</code>), הציגו את הקטלוג והריצו שאילתה לסדרת זמן. רשומות חדשות מגיעות למחסן הנתונים ברענון השעתי שלו, כך שבפרויקט חדש הסדרה ריקה בהתחלה.",
+      "contractTitle": "חוזה קריא למכונה",
+      "contractBody": "חוזה הקליטה כמסמך OpenAPI 3.1 - מבני הבקשות, תשובת האצווה והכללים שסכמת JSON לא יכולה לבטא. לא צריך מפתח.",
+      "errorsTitle": "שגיאות ומגבלות",
+      "errorsBody": "<code>400</code> בקשה פגומה - <code>401</code> מפתח חסר או לא מוכר - <code>403</code> הרשאה שאין למפתח, או מפתח דפדפן מחוץ לדומיינים שלו - <code>413</code> גדול מדי - <code>429</code> הגבלת קצב: חכו ל-<code>Retry-After</code> - <code>5xx</code> נסו שוב בהשהיה הולכת וגדלה. רשומות אף פעם לא נשמרות חלקית: ניסיון חוזר עם אותם מזהים תמיד בטוח."
+    },
+    "mcp": {
+      "title": "MCP לסוכני AI",
+      "intro": "GrowthOS הוא שרת Model Context Protocol. סוכן יכול לקרוא סכמות, מדדים ומשפכים, לבדוק את ההתקנה, לרשום סכמות ומדדים, לנהל יעדים ופלחים, להפעיל את סטודיו המודעות ולהציע שינויי אוטומציה - עם אותן הרשאות, מגבלות ויומן ביקורת כמו במערכת.",
+      "endpointTitle": "נקודת קצה",
+      "endpointBody": "כתובת אחת לכל הפרויקטים: ההזדהות קובעת את הארגון, הפרויקט והסביבה. השרת חסר מצב - כל בקשה מזדהה בעצמה.",
+      "endpointLabel": "נקודת הקצה של MCP",
+      "authTitle": "הזדהות",
+      "authBody": "לקוחות אינטראקטיביים כמו Claude Desktop ו-claude.ai מתחברים עם <strong>OAuth</strong> - אין סוד להעתיק. סוכנים וסקריפטים משתמשים ב<strong>מפתח שרת</strong> עם <code>mcp.read</code>, ועוד <code>schema.write</code>, <code>metrics.write</code> או <code>dashboards.write</code> לכלים שמשנים דברים. אישור אוטומציה תמיד דורש אדם ולעולם לא זמין למפתח.",
+      "claudeTitle": "Claude Desktop ו-claude.ai",
+      "claudeBody": "הוסיפו מחבר מותאם עם כתובת נקודת הקצה שלמעלה. תועברו ל-GrowthOS כדי להתחבר ולבחור את הפרויקט, וכלי GrowthOS יופיעו בשיחה הבאה.",
+      "claudeCodeTitle": "Claude Code",
+      "claudeCodeBody": "הוסיפו את GrowthOS כשרת מרוחק, עם המפתח ממשתנה הסביבה:",
+      "curlTitle": "HTTP רגיל (JSON-RPC)",
+      "curlBody": "כל POST הוא קריאת JSON-RPC אחת. הציגו את הכלים, או קראו לאחד מהם - כאן בדיקת ההתקנה:",
+      "headlessTitle": "סוכן בלי ממשק",
+      "headlessBody": "עם ה-SDK הרשמי של MCP ל-TypeScript - התחברות, רשימת הכלים וקריאה לאחד מהם:",
+      "toolsTitle": "מה סוכנים יכולים לעשות",
+      "toolsRead": "<strong>קריאה</strong> - <code>list_schemas</code>, <code>query_funnel</code>, <code>get_ingest_health</code>, <code>check_installation</code>, <code>validate_records</code>, מדדים ולוחות.",
+      "toolsSetup": "<strong>הגדרה</strong> - <code>register_schema</code>, <code>apply_schema_manifest</code>, <code>register_metric</code>, <code>set_funnel</code> (כל אחד דורש את הרשאת הכתיבה שלו; חלקם מציעים תצוגה מקדימה עם <code>dry_run</code>).",
+      "toolsGrowth": "<strong>יעדים ופלחים</strong> - <code>create_goal</code>, <code>create_segment</code> (דורש <code>dashboards.write</code>).",
+      "toolsAds": "<strong>סטודיו מודעות</strong> - כתיבת בריפים ותסריטים, מחקר מילות מפתח, תכנון קהלים ופרסום מודעות מושהות, במגבלות של הסטודיו.",
+      "toolsAutomation": "<strong>אוטומציה</strong> - <code>propose_action</code> ו-<code>approve_action</code> דורשים התחברות OAuth של אדם עם הרשאות אוטומציה; מפתח לעולם לא יכול להפעיל אותם.",
+      "testTitle": "שימוש בסביבת בדיקות",
+      "testBody": "תנו לסוכן מפתח <code>gos_test_</code>: כל הנתונים שהוא שולח או יוצר נשמרים ב-<strong>dev</strong>. סכמות ומדדים שהוא רושם משותפים לכל הפרויקט ומוכנים ל-prod."
+    },
+    "testing": {
+      "title": "סביבת בדיקות",
+      "intro": "בנו ובדקו את ההטמעה בלי לגעת בנתוני הייצור. כל פרויקט מגיע עם שתי סביבות בדיקה.",
+      "envTitle": "dev, staging ו-prod",
+      "envBody": "מפתחות בדיקה שייכים ל-<strong>dev</strong> או ל-<strong>staging</strong>; מפתחות חיים ל-<strong>prod</strong>. רשומות נשמרות רק בסביבה של המפתח, כך שנתוני בדיקה לעולם לא מתערבבים במספרי הייצור. סכמות ומדדים משותפים לשלוש הסביבות.",
+      "colEnvironment": "סביבה",
+      "colServerKey": "מפתח שרת",
+      "colBrowserKey": "מפתח דפדפן",
+      "colUse": "מתי להשתמש",
+      "env": {
+        "dev": "dev",
+        "staging": "staging",
+        "prod": "prod"
+      },
+      "use": {
+        "dev": "בניית ההטמעה על המחשב שלכם.",
+        "staging": "אתר ה-staging שלכם, לפני שחרור.",
+        "prod": "האתר החי ולקוחות אמיתיים."
+      },
+      "pickerTitle": "צפייה בנתוני בדיקה במערכת",
+      "pickerBody": "החליפו את בורר הסביבה (dev / staging / prod) בסרגל הצד של הפרויקט - כל עמוד יציג את הנתונים של הסביבה הזו, ועמוד המפתחות ייצור מפתחות עבורה.",
+      "loopTitle": "מחזור הבדיקה",
+      "loop1": "שלחו עם מפתחות בדיקה - מהאתר, מהשרת או עם curl.",
+      "loop2": "פתחו את עמוד <strong>ההתקנה</strong> ולחצו <strong>האזנה חיה</strong>, או הריצו את קריאת האימות שלמטה.",
+      "loop3": "תקנו כל מה שעבר להסגר: הסיבה מציינת את הסכמה ואת השדה.",
+      "loop4": "חזרו על זה עד שכל סכמה צפויה מסומנת <strong>מתקבל</strong>, ואז עברו למפתחות prod.",
+      "quarantineTitle": "כשרשומה נדחית",
+      "quarantineBody": "רשומה שעברה להסגר שומרת את הסיבה, למשל <code>missing_required_field:plan</code> או <code>unregistered_field:coupon</code>. תקנו את השולח או הוסיפו את השדה לסכמה, ושלחו שוב. עמוד <strong>בריאות הקליטה</strong> מציג את מה שממתין, ואפשר להריץ שוב רשומה ברגע שהסכמה מקבלת אותה.",
+      "liveTitle": "עלייה לאוויר",
+      "liveBody": "צרו מפתחות חיים ב-<strong>prod</strong>, החליפו אותם בהגדרות שלכם (ואת הדומיינים של האתר במפתח הדפדפן), והריצו את אותה קריאת אימות מול prod. שמרו את מפתחות הבדיקה לאתר ה-staging ול-CI."
+    }
   }
 }
