@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { MetricCompilerError, SIGNUP_QUALITY_SCORE_TIERS, type SignupQualityScoreTier } from '@growthos/shared';
+import { MetricCompilerError, SIGNUP_QUALITY_SCORE_TIERS, TOTAL_GRAIN, type SignupQualityScoreTier } from '@growthos/shared';
 import { CampaignTargetModel } from '../models/campaign-target.model';
 import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -106,11 +106,12 @@ export async function listCampaignTargetsForProject(organizationId: string, proj
     .get();
 }
 
-export type CampaignSpendStatus = 'no_target' | 'on_target' | 'over_target';
+export type CampaignSpendStatus = 'no_target' | 'on_target' | 'over_target' | 'no_spend_data';
 
 export interface CampaignSpendRow {
   campaignId: string;
-  actualSpend: number;
+  /** `null` when the project has no spend data at all for the window, which is NOT the same as spending nothing — see the status doc below. */
+  actualSpend: number | null;
   monthlyBudget: number | null;
   status: CampaignSpendStatus;
 }
@@ -146,7 +147,18 @@ function toDateOnly(ms: number): string {
  * over the trailing {@link CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS} days, merged
  * with every saved {@link CampaignTargetModel} in the project. A campaign
  * with a saved target but zero spend in the window still gets a row
- * (`actualSpend: 0`); a campaign with spend but no saved target gets
+ * (`actualSpend: 0`) — but only when the project HAS spend data and this
+ * campaign is simply absent from it. If the whole series came back empty, no
+ * campaign has spend data and every targeted one reports
+ * `actualSpend: null, status: 'no_spend_data'` instead of a measured zero.
+ *
+ * That distinction matters because the alternative is green reassurance derived
+ * from absence: a project whose ad connector has never synced would otherwise
+ * show every campaign as "0 spent against a $5,000 target — On target", which
+ * reads as being comfortably under budget rather than as having no idea. The two
+ * are distinguishable here (an empty series means nobody has data, a missing
+ * campaign within a populated series really did spend nothing), so they are
+ * distinguished. A campaign with spend but no saved target gets
  * `monthlyBudget: null, status: 'no_target'` rather than being dropped —
  * a human needs to *see* an untargeted campaign to decide whether to target
  * it. Never throws for an expected, per-query-recoverable outcome — mirrors
@@ -156,7 +168,7 @@ function toDateOnly(ms: number): string {
 export async function getCampaignSpendBreakdownForProject(
   organizationId: string,
   projectId: string,
-  options?: { now?: number; executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { now?: number; executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<CampaignSpendBreakdownOutcome> {
   const now = options?.now ?? Date.now();
   const windowStartMs = now - CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -173,6 +185,7 @@ export async function getCampaignSpendBreakdownForProject(
         },
         ...(options?.executor ? { executor: options.executor } : {}),
         ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
       }),
       listCampaignTargetsForProject(organizationId, projectId),
     ]);
@@ -181,13 +194,27 @@ export async function getCampaignSpendBreakdownForProject(
     const targetByCampaign = new Map(targets.map((target) => [target.campaign_id, target.monthly_budget]));
     const everyCampaignId = new Set([...actualByCampaign.keys(), ...targetByCampaign.keys()]);
 
+    // An empty series means the project has no spend data at all, not that every
+    // campaign spent nothing.
+    const hasAnySpendData = actualByCampaign.size > 0;
+
     const rows: CampaignSpendRow[] = [...everyCampaignId].map((campaignId) => {
-      const actualSpend = actualByCampaign.get(campaignId) ?? 0;
+      const measured = actualByCampaign.get(campaignId);
       const monthlyBudget = targetByCampaign.get(campaignId) ?? null;
-      const status: CampaignSpendStatus = monthlyBudget === null ? 'no_target' : actualSpend > monthlyBudget ? 'over_target' : 'on_target';
+      const actualSpend = measured ?? (hasAnySpendData ? 0 : null);
+      const status: CampaignSpendStatus =
+        monthlyBudget === null
+          ? 'no_target'
+          : actualSpend === null
+            ? 'no_spend_data'
+            : actualSpend > monthlyBudget
+              ? 'over_target'
+              : 'on_target';
       return { campaignId, actualSpend, monthlyBudget, status };
     });
-    rows.sort((a, b) => b.actualSpend - a.actualSpend);
+    // Unmeasured campaigns sort last: they are not "the smallest spend", they are
+    // the ones nothing is known about.
+    rows.sort((a, b) => (b.actualSpend ?? -1) - (a.actualSpend ?? -1));
 
     return { ok: true, rows };
   } catch (error) {
@@ -224,7 +251,7 @@ export type PaybackOverviewOutcome =
   | { ok: true; windows: PaybackWindowValue[] }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
-/** Local mirror of `sumMetricRows` (`goal.service.ts`) — same reasoning that file's own copy gives for not sharing one across services. */
+/** Sums an additive metric's column across rows (its `collection_Nd` sums only - never a ratio; see `TOTAL_GRAIN` for how a non-additive metric's period value is read instead). */
 function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): number {
   return rows.reduce((total, row) => {
     const raw = row[metricName] ?? null;
@@ -246,7 +273,7 @@ function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): numbe
 export async function getPaybackOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<PaybackOverviewOutcome> {
   try {
     const result = await queryMetrics({
@@ -259,6 +286,7 @@ export async function getPaybackOverviewForProject(
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
     });
 
     const windows = COLLECTION_WINDOW_DAYS.map((windowDays) => ({
@@ -320,8 +348,7 @@ function toCampaignPaybackRow(row: WarehouseRow): CampaignPaybackRow | null {
  * (2026-08-25 follow-up — see `fact_customer_payback.sql`'s own doc comment
  * for how the mart now carries `campaign_id`): lifetime `collection_40d`/
  * `roi_40d`, broken down by `campaign_id`, one query for both metrics at
- * once (same "one wide `1970..2999` bucket" posture
- * {@link getPaybackOverviewForProject} already establishes, so each
+ * once (one `total`-grain `1970..2999` bucket, so each
  * campaign_id contributes at most one row — no cross-bucket fold needed for
  * `roi_40d`, which (being a ratio) couldn't be summed correctly anyway, see
  * `quality-score-pack/metrics.ts`'s own doc comment on the identical
@@ -335,7 +362,7 @@ function toCampaignPaybackRow(row: WarehouseRow): CampaignPaybackRow | null {
 export async function getCampaignPaybackBreakdownForProject(
   organizationId: string,
   projectId: string,
-  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<CampaignPaybackBreakdownOutcome> {
   try {
     const result = await queryMetrics({
@@ -344,10 +371,15 @@ export async function getCampaignPaybackBreakdownForProject(
       request: {
         metrics: ['collection_40d', 'roi_40d'],
         dimensions: ['campaign_id'],
-        time: { start: '1970-01-01', end: '2999-12-31', grain: 'year' },
+        // `total`, not `year`: a `year` grain over 1970..2999 is one bucket per calendar YEAR, so a
+        // campaign with data in two years came back as two rows, each a partial "lifetime" ROI (and
+        // a duplicate campaign key). One whole-range bucket makes `roi_40d` the ratio of the
+        // campaign's lifetime totals - see `TOTAL_GRAIN`.
+        time: { start: '1970-01-01', end: '2999-12-31', grain: TOTAL_GRAIN },
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
     });
 
     const rows = result.series.map(toCampaignPaybackRow).filter((row): row is CampaignPaybackRow => row !== null);
@@ -435,7 +467,7 @@ function foldCalibrationTierTotals(rows: readonly WarehouseRow[]): Map<string, Q
 export async function getQualityCalibrationBreakdownForProject(
   organizationId: string,
   projectId: string,
-  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<QualityCalibrationBreakdownOutcome> {
   try {
     const result = await queryMetrics({
@@ -448,6 +480,7 @@ export async function getQualityCalibrationBreakdownForProject(
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
     });
 
     const totalsByTier = foldCalibrationTierTotals(result.series);

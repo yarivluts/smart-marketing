@@ -1,13 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   EnvironmentNotFoundError,
+  InvalidAllowedOriginsError,
   InvalidApiKeyScopeError,
   isApiKeyScope,
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
+import type { ApiKeyScope } from '@growthos/shared';
 import { mintApiKey } from '@/lib/orgs/mutations';
 import { listApiKeysForProject, listOrgProjects } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -25,7 +27,7 @@ interface RouteParams {
  */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'keys.manage');
+  const { error } = await requireProjectPermission(orgId, projectId, 'keys.manage');
   if (error) {
     return error;
   }
@@ -46,16 +48,25 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'keys.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'keys.manage');
   if (error) {
     return error;
   }
 
-  const parsed = await parseJsonBody<{ name?: unknown; environmentId?: unknown; scopes?: unknown }>(request);
+  const parsed = await parseJsonBody<{ name?: unknown; environmentId?: unknown; scopes?: unknown; kind?: unknown; allowedOrigins?: unknown }>(request);
   if (parsed.error) {
     return parsed.error;
   }
-  const { name, environmentId, scopes } = parsed.body;
+  const { name, environmentId, kind, allowedOrigins } = parsed.body;
+  // A publishable (browser) key always carries exactly ingest.write; scopes sent with it are ignored.
+  const publishable = kind === 'publishable';
+  if (kind !== undefined && kind !== 'secret' && !publishable) {
+    return NextResponse.json({ error: 'invalid_kind' }, { status: 400 });
+  }
+  const scopes = publishable ? ['ingest.write'] : parsed.body.scopes;
+  if (publishable && (!Array.isArray(allowedOrigins) || !allowedOrigins.every((origin) => typeof origin === 'string'))) {
+    return NextResponse.json({ error: 'invalid_origins', issue: 'no_origins' }, { status: 400 });
+  }
   if (typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }
@@ -72,13 +83,17 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       projectId,
       environmentId,
       name: name.trim(),
-      scopes,
+      scopes: scopes as ApiKeyScope[],
       createdByUserId: user.id,
+      ...(publishable ? { kind: 'publishable' as const, allowedOrigins: allowedOrigins as string[] } : {}),
     });
-    return NextResponse.json({ apiKeyId: apiKey.id, keyPrefix: apiKey.key_prefix, rawKey }, { status: 201 });
+    return NextResponse.json({ apiKeyId: apiKey.id, keyPrefix: apiKey.key_prefix, rawKey, kind: apiKey.kind ?? 'secret', allowedOrigins: apiKey.allowed_origins ?? [] }, { status: 201 });
   } catch (err) {
     if (err instanceof ProjectNotFoundError || err instanceof EnvironmentNotFoundError) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    if (err instanceof InvalidAllowedOriginsError) {
+      return NextResponse.json({ error: 'invalid_origins', issue: err.issue }, { status: 400 });
     }
     if (err instanceof InvalidApiKeyScopeError) {
       return NextResponse.json({ error: 'invalid_scopes' }, { status: 400 });

@@ -101,6 +101,21 @@ export function hasActiveInstall(installs: readonly PluginInstallView[], pluginI
 }
 
 /**
+ * What the plugins page can still add, split the way the page offers it: `plugins` is the number of
+ * distinct registered plugins (not manifest versions) the "Install a plugin" card offers, `packs` the
+ * built-in packs its own card offers. Kept apart so the "ready to add" KPI never reports built-in
+ * packs as plugins while the install card says every registered plugin is already installed.
+ */
+export function readyToAddCounts(
+  installs: readonly PluginInstallView[],
+  manifests: readonly { pluginId: string }[],
+  packs: readonly { pluginId: string }[],
+): { plugins: number; packs: number } {
+  const plugins = new Set(manifests.filter((manifest) => !hasActiveInstall(installs, manifest.pluginId)).map((manifest) => manifest.pluginId));
+  return { plugins: plugins.size, packs: packs.filter((pack) => !hasActiveInstall(installs, pack.pluginId)).length };
+}
+
+/**
  * The manifest `type` for one install, resolved by matching its own
  * `pluginId`+`version` against the org's registered manifests (KAN-47's
  * "only a source-type install has a runnable sync" section needs this —

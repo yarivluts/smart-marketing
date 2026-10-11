@@ -25,10 +25,22 @@ export interface SetProjectSessionReplayUrlTemplateParams {
  *
  * Validation goes through the *same* `buildSessionReplayLink` the renderer
  * uses, with a throwaway sample page, rather than a second hand-rolled URL
- * check: a template that this rejects is exactly a template that would have
- * rendered no link, so an admin can never save something that silently does
- * nothing (or, worse, a `javascript:` href — see that function's own note on
- * why the scheme check is the security boundary here).
+ * check: a template this rejects is exactly a template that would have
+ * rendered no link (or, worse, a `javascript:` href — see that function's own
+ * note on why the scheme check is the security boundary here).
+ *
+ * That covers templates which render NO link. It does not cover the other way
+ * a template disappoints: one with no `{landing_page}` placeholder renders a
+ * link on every row that opens the *same* unfiltered page. This comment used
+ * to claim "an admin can never save something that silently does nothing",
+ * which was false for exactly that case — and that case is reachable by a
+ * typo (`{landingpage}`), because a typo'd template is still a valid https URL
+ * and so passes every check there is.
+ *
+ * Refusing it would be wrong: a plain "open my replay tool" link is a
+ * legitimate thing to configure, and the renderer deliberately supports it. So
+ * the caller is told which kind it saved, and the admin form says so
+ * (KAN-160). Warning, not refusal — the same call KAN-120 settled on.
  */
 export async function setProjectSessionReplayUrlTemplate(
   params: SetProjectSessionReplayUrlTemplateParams,
@@ -76,18 +88,42 @@ export class InvalidProjectNameError extends Error {
   }
 }
 
+export class InvalidProjectCurrencyError extends Error {
+  constructor() {
+    super('Currency must be a three-letter ISO-4217 code, e.g. ILS or USD.');
+    this.name = 'InvalidProjectCurrencyError';
+  }
+}
+
+export class InvalidProjectTimezoneError extends Error {
+  constructor() {
+    super('Timezone must be a valid IANA time zone name, e.g. Asia/Jerusalem.');
+    this.name = 'InvalidProjectTimezoneError';
+  }
+}
+
+const ISO_4217_PATTERN = /^[A-Z]{3}$/;
+
+/** `Intl` is the one IANA zone catalog Node ships with — no dependency, and it's exactly what the runtime would use to format in that zone. */
+function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface UpdateProjectDetailsParams {
   organizationId: string;
   projectId: string;
   name: string;
   /** Omit (or pass an empty string) to clear the vertical. */
   vertical?: string;
-  platformType?: string;
-  businessModel?: string;
-  transactionType?: string;
-  primaryStack?: string;
-  verifiedRequirements?: string[];
-  customHiddenModules?: string[];
+  /** ISO-4217 code; omit to leave unchanged, pass an empty string to clear. */
+  currency?: string;
+  /** IANA time zone; omit to leave unchanged, pass an empty string to clear. */
+  timezone?: string;
   actorUserId: string;
 }
 
@@ -117,36 +153,31 @@ export async function updateProjectDetails(params: UpdateProjectDetailsParams): 
     throw new InvalidProjectNameError();
   }
 
-  const before = {
+  const currency = params.currency?.trim().toUpperCase();
+  if (currency !== undefined && currency !== '' && !ISO_4217_PATTERN.test(currency)) {
+    throw new InvalidProjectCurrencyError();
+  }
+  const timezone = params.timezone?.trim();
+  if (timezone !== undefined && timezone !== '' && !isValidTimezone(timezone)) {
+    throw new InvalidProjectTimezoneError();
+  }
+
+  const snapshot = (): Record<string, string> => ({
     name: project.name,
     vertical: project.vertical ?? '',
-    platform_type: project.platform_type ?? '',
-    business_model: project.business_model ?? '',
-    transaction_type: project.transaction_type ?? '',
-    primary_stack: project.primary_stack ?? '',
-  };
+    currency: project.currency ?? '',
+    timezone: project.timezone ?? '',
+  });
+  const before = snapshot();
 
   project.name = trimmedName;
   project.vertical = params.vertical?.trim() ?? '';
-  if (params.platformType !== undefined) {
-    project.platform_type = params.platformType.trim();
+  if (currency !== undefined) {
+    project.currency = currency;
   }
-  if (params.businessModel !== undefined) {
-    project.business_model = params.businessModel.trim();
+  if (timezone !== undefined) {
+    project.timezone = timezone;
   }
-  if (params.transactionType !== undefined) {
-    project.transaction_type = params.transactionType.trim();
-  }
-  if (params.primaryStack !== undefined) {
-    project.primary_stack = params.primaryStack.trim();
-  }
-  if (params.verifiedRequirements !== undefined) {
-    project.verified_requirements = params.verifiedRequirements;
-  }
-  if (params.customHiddenModules !== undefined) {
-    project.custom_hidden_modules = params.customHiddenModules;
-  }
-
   project.setPathParams({ organization_id: params.organizationId });
   await project.save();
 
@@ -161,10 +192,62 @@ export async function updateProjectDetails(params: UpdateProjectDetailsParams): 
       targetId: params.projectId,
       summary: `Updated project "${project.name}"`,
       before,
-      after: { name: project.name, vertical: project.vertical ?? '' },
+      after: snapshot(),
     });
   } catch {
     // Best-effort — audit logging must never turn a successful save into a failure for the caller.
+  }
+
+  return project;
+}
+
+/**
+ * Retires a project (EasySign audit J-06: a duplicate project had no way
+ * out of the org except a full delete) — stamps `archived_at`, which hides
+ * it from `listOrgProjects` and everything built on it; nothing under the
+ * project is touched. Idempotent. See `ProjectModel.archived_at`.
+ */
+export async function archiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  return setProjectArchived(organizationId, projectId, actorUserId, true);
+}
+
+/** Reverses {@link archiveProject}. */
+export async function unarchiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  return setProjectArchived(organizationId, projectId, actorUserId, false);
+}
+
+async function setProjectArchived(organizationId: string, projectId: string, actorUserId: string, archived: boolean): Promise<ProjectModel> {
+  const project = await ProjectModel.init(projectId, { organization_id: organizationId });
+  if (!project || project.organization_id !== organizationId) {
+    throw new ProjectNotFoundError();
+  }
+  const wasArchived = project.archived_at !== undefined;
+  if (wasArchived === archived) {
+    return project;
+  }
+
+  // `@arbel/firebase-orm` drops `undefined` fields from the update it sends
+  // (see `GoalModel.target_value`'s doc comment), so clearing the stamp has
+  // to go through an explicit `null`; readers treat both as "not archived".
+  project.archived_at = (archived ? new Date().toISOString() : null) as string | undefined;
+  project.setPathParams({ organization_id: organizationId });
+  await project.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      actorType: 'user',
+      actorId: actorUserId,
+      action: archived ? 'project.archive' : 'project.unarchive',
+      targetType: 'project',
+      targetId: projectId,
+      summary: `${archived ? 'Archived' : 'Unarchived'} project "${project.name}"`,
+      before: { archived: wasArchived },
+      after: { archived },
+    });
+  } catch {
+    // Best-effort — see updateProjectDetails.
   }
 
   return project;

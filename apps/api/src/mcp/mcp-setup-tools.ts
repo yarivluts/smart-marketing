@@ -1,801 +1,283 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- every tool callback's args param is any, matching mcp-tools.ts & mcp-act-tools.ts */
+/* eslint-disable @typescript-eslint/no-explicit-any -- every tool callback's args param is any, matching mcp-tools.ts (see toolInputSchema's doc comment there). */
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
-  createProject,
-  deleteGoal,
-  getGoal,
-  ingestBatch,
-  listEnvironmentsForProject,
-  listGoalsForProject,
-  listOrgProjects,
-  ProjectModel,
+  collectSetupObservations,
+  DEFAULT_EVENT_VOLUME_WINDOW_DAYS,
+  evaluateProjectSetupHealth,
+  getBackfillEndpoint,
+  getCustomerEntityCoverage,
+  getEventVolumeOverviewForProject,
+  listTrackingAlertsForProject,
+  MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA,
   ProjectNotFoundError,
-  queryGoalProgress,
-  recordAuditLogEntry,
-  updateProjectDetails,
-  type IngestBatchInput,
+  verifyInstallationForEnvironment,
 } from '@growthos/firebase-orm-models';
 import {
-  adSpendFixtures,
-  crmLifecycleFixtures,
-  customerTransactionFixtures,
-  getApplicableRequirements,
-  parseProjectProfile,
-  productTelemetryFixtures,
-  SETUP_REQUIREMENTS,
-  subscriptionStateChangeFixtures,
-  type CanonicalEventType,
-  type Permission,
-  type SetupRequirement,
+  buildInstallationGapsOutput,
+  buildSetupHealthOutput,
+  customerEntitySchemaNames,
+  ENVIRONMENTS,
+  selectSetupFocusEnvironment,
+  type SetupCustomerCoverage,
+  type SetupEnvironmentHealth,
+  type SetupHealthReport,
+  type SetupOutputContext,
 } from '@growthos/shared';
-import {
-  auditedToolHandler,
-  errorResult,
-  textResult,
-  toolInputSchema,
-  type ToolResult,
-} from './mcp-tools';
-import { mcpCallerHasPermission } from './mcp-act-authorization';
+import { apiBaseUrl, webAppUrl } from '../mcp-oauth/mcp-oauth-urls';
+import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import type { McpAuthContext } from './mcp-auth.guard';
 
-function actorId(auth: McpAuthContext): string {
-  return auth.userId ?? auth.apiKeyId ?? 'unknown-mcp-caller';
+/**
+ * The integrator setup tools (KAN-197): is each data stream GrowthOS needs actually flowing, and if
+ * not, what does that cost and how is it connected.
+ *
+ * Both are read tools behind the connection-level `mcp.read` gate, scoped to the credential's own
+ * org/project like every other tool. Every status comes from `evaluateProjectSetupHealth`, which
+ * reads the records each environment actually accepted and rejected; neither tool (nor anything
+ * else) can mark a requirement verified. Every link in the output is built from the deployment's
+ * own configured base URLs and resolves to a real page, endpoint or tool
+ * (`setup-requirements-artifacts.spec.ts`).
+ */
+
+const environmentInputShape = {
+  environment: z
+    .enum(ENVIRONMENTS)
+    .optional()
+    .describe(
+      'Which environment to report on: dev, staging or prod. Omit it to use the environment this API key is bound to (prod for an OAuth connection). An API key can only report on its own environment; a project-wide OAuth connection can name any. Each environment is judged only on the records it received itself.',
+    ),
+};
+
+function outputContext(auth: McpAuthContext): SetupOutputContext {
+  return {
+    organizationId: auth.organizationId,
+    projectId: auth.projectId,
+    webAppUrl: webAppUrl(),
+    apiBaseUrl: apiBaseUrl(),
+    otherEnvironmentsVisible: auth.environmentId === undefined,
+  };
 }
 
-function insufficientPermissionMessage(auth: McpAuthContext, permission: string): string {
-  if (auth.principalKind === 'api_key') {
-    return `This API key does not carry the "${permission}" scope required for this tool.`;
-  }
-  return `This MCP connection's user does not currently hold "${permission}" for this project.`;
-}
-
-async function runGuardedTool<Args>(
+/** The report and the one environment a call is about, or the error result explaining why there is none. */
+async function resolveFocusEnvironment(
   auth: McpAuthContext,
-  permission: Permission,
-  args: unknown,
-  handler: (args: Args) => Promise<ToolResult>,
-): Promise<ToolResult> {
-  if (!(await mcpCallerHasPermission(auth, permission))) {
-    return errorResult(insufficientPermissionMessage(auth, permission));
-  }
+  args: any,
+): Promise<{ report: SetupHealthReport; focus: SetupEnvironmentHealth } | { error: ToolResult }> {
+  const environmentName = (args as { environment?: string } | undefined)?.environment;
+  let report: SetupHealthReport;
   try {
-    return await handler(args as Args);
+    // An API key is bound to one environment, and every read it makes stays inside it (KAN-28): it
+    // is evaluated for that environment alone, so it can neither name another one nor see another
+    // one's status in the summary. Only a project-wide OAuth connection reads every environment.
+    report = await evaluateProjectSetupHealth({
+      organizationId: auth.organizationId,
+      projectId: auth.projectId,
+      ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+    });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return errorResult(msg);
+    if (error instanceof ProjectNotFoundError) {
+      return { error: errorResult('Project not found.') };
+    }
+    throw error;
   }
+  if (auth.environmentId !== undefined && environmentName !== undefined) {
+    const bound = report.environments.find((environment) => environment.environmentId === auth.environmentId);
+    if (bound && bound.environmentName !== environmentName) {
+      return {
+        error: errorResult(
+          `This API key is bound to the "${bound.environmentName}" environment and can only report on it. Use a key minted for "${environmentName}", or omit environment.`,
+        ),
+      };
+    }
+  }
+  const focus = selectSetupFocusEnvironment(report, { environmentName, environmentId: auth.environmentId });
+  if (!focus) {
+    return {
+      error: errorResult(
+        environmentName === undefined ? 'This project has no environments provisioned, so there is nothing to report on.' : `This project has no "${environmentName}" environment.`,
+      ),
+    };
+  }
+  return { report, focus };
 }
 
-// Canonical requirement mappings for verification & test events
-const REQUIREMENT_CANONICAL_MAPPINGS: Record<
-  string,
-  {
-    eventType: CanonicalEventType;
-    kind: 'event' | 'measure';
-    buildPayload: () => Record<string, unknown>;
-  }
-> = {
-  req_web_sdk: {
-    eventType: 'product_telemetry',
-    kind: 'event',
-    buildPayload: () => ({
-      ...productTelemetryFixtures.pageView,
-      eventId: `evt_tel_mcp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      event: 'page_view',
-      ts: new Date().toISOString(),
-      properties: {
-        ...productTelemetryFixtures.pageView.properties,
-        source: 'mcp_verification',
-        verified: true,
-      },
-    }),
-  },
-  req_checkout_stream: {
-    eventType: 'customer_transaction',
-    kind: 'event',
-    buildPayload: () => ({
-      ...customerTransactionFixtures.initialPurchase,
-      eventId: `evt_tx_mcp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      ts: new Date().toISOString(),
-      properties: {
-        ...customerTransactionFixtures.initialPurchase.properties,
-        provider: 'stripe',
-        source: 'mcp_verification',
-      },
-    }),
-  },
-  req_stripe_billing: {
-    eventType: 'subscription_state_change',
-    kind: 'event',
-    buildPayload: () => ({
-      ...subscriptionStateChangeFixtures.newSubscription,
-      eventId: `evt_sub_mcp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      ts: new Date().toISOString(),
-      properties: {
-        ...subscriptionStateChangeFixtures.newSubscription.properties,
-        provider: 'stripe',
-        source: 'mcp_verification',
-      },
-    }),
-  },
-  req_ad_attribution: {
-    eventType: 'ad_spend',
-    kind: 'measure',
-    buildPayload: () => ({
-      ...adSpendFixtures.googleAdsSpend,
-      ts: new Date().toISOString().slice(0, 10),
-      value: 500.0,
-      dimensions: {
-        ...adSpendFixtures.googleAdsSpend.dimensions,
-        channelId: 'google_ads',
-        campaignName: 'Verified Growth Acquisition',
-        source: 'mcp_verification',
-      },
-    }),
-  },
-  req_lead_crm: {
-    eventType: 'crm_lifecycle',
-    kind: 'event',
-    buildPayload: () => ({
-      ...crmLifecycleFixtures.salesforceDemoHeld,
-      eventId: `evt_crm_mcp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      ts: new Date().toISOString(),
-      properties: {
-        ...crmLifecycleFixtures.salesforceDemoHeld.properties,
-        source: 'mcp_verification',
-      },
-    }),
-  },
+async function withFocusEnvironment(
+  auth: McpAuthContext,
+  args: any,
+  render: (report: SetupHealthReport, focus: SetupEnvironmentHealth) => unknown | Promise<unknown>,
+): Promise<ToolResult> {
+  const resolved = await resolveFocusEnvironment(auth, args);
+  return 'error' in resolved ? resolved.error : textResult(await render(resolved.report, resolved.focus));
+}
+
+/**
+ * Customer entity coverage for the focus environment, from the warehouse. Null when it cannot be
+ * read (no warehouse, a failed query, the project's query quota spent): the outputs then say so and
+ * fall back to what ingest alone shows, rather than failing the whole tool.
+ */
+async function readCustomerCoverage(auth: McpAuthContext, focus: SetupEnvironmentHealth): Promise<SetupCustomerCoverage | null> {
+  const result = await getCustomerEntityCoverage({
+    organizationId: auth.organizationId,
+    projectId: auth.projectId,
+    environmentId: focus.environmentId,
+    customerEntitySchemas: customerEntitySchemaNames(focus),
+  });
+  return result.status === 'ok' ? result.coverage : null;
+}
+
+/**
+ * The output context plus the focus environment's backfill endpoint, so a backfill recommendation
+ * asks to register one only when none exists (and names the one that does).
+ */
+async function focusOutputContext(auth: McpAuthContext, focus: SetupEnvironmentHealth): Promise<SetupOutputContext> {
+  const endpoint = await getBackfillEndpoint(auth.organizationId, auth.projectId, focus.environmentId);
+  return { ...outputContext(auth), backfillEndpointUrl: endpoint?.url ?? null };
+}
+
+async function renderWithCoverage<T>(
+  auth: McpAuthContext,
+  focus: SetupEnvironmentHealth,
+  build: (context: SetupOutputContext, coverage: SetupCustomerCoverage | null) => T,
+): Promise<T> {
+  const [context, coverage] = await Promise.all([focusOutputContext(auth, focus), readCustomerCoverage(auth, focus)]);
+  return build(context, coverage);
+}
+
+const ingestHealthInputShape = {
+  ...environmentInputShape,
+  window_days: z
+    .number()
+    .int()
+    .min(1)
+    .max(30)
+    .optional()
+    .describe(`Days of daily accepted counts to return, ending today (UTC). Default ${DEFAULT_EVENT_VOLUME_WINDOW_DAYS}.`),
 };
 
 /**
- * Registers MCP tools for managing the integration lifecycle:
- * - Projects: list_projects, create_project, update_project, archive_project
- * - Goals: list_goals, delete_goal, get_goal_progress
- * - Setup & Gaps: audit_installation_gaps, get_setup_health
- * - Scripts & Instructions: get_tracking_script, get_installation_instructions
- * - Testing & Verification: verify_installation, test_integration_event
+ * KAN-202 I4: ingest health per event, per environment, over MCP - what an integrator could
+ * previously only see in the web UI. The same reads the Ingest health and Schemas pages use, so
+ * the numbers agree: accepted records per day and last seen per event schema, records still open
+ * in quarantine with their reasons per schema (including names nobody registered), and whether a
+ * tracking-broke alert is active.
  */
+async function buildIngestHealth(auth: McpAuthContext, environmentId: string, environmentName: string, windowDays: number) {
+  const [volume, observations, alerts] = await Promise.all([
+    getEventVolumeOverviewForProject(auth.organizationId, auth.projectId, { environmentId, windowDays }),
+    collectSetupObservations({ organizationId: auth.organizationId, projectId: auth.projectId, environmentId }),
+    listTrackingAlertsForProject(auth.organizationId, auth.projectId, undefined, environmentId),
+  ]);
+  const activeAlerts = new Set(alerts.filter((alert) => alert.status === 'active').map((alert) => alert.schema_name));
+  const quarantineFor = (kind: string, name: string) => observations.observations.find((observation) => observation.kind === kind && observation.schemaName === name);
+
+  const events = volume.map((entry) => {
+    const accepted = entry.dailyCounts.reduce((sum, bucket) => sum + bucket.count, 0);
+    const quarantine = quarantineFor('event', entry.schemaName);
+    return {
+      event: entry.schemaName,
+      accepted_in_window: accepted,
+      // The read is capped per event; at the cap the true count may be higher.
+      accepted_in_window_is_lower_bound: accepted >= MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA,
+      accepted_by_day: entry.dailyCounts,
+      last_seen_at: entry.lastSeenAt,
+      open_quarantined: quarantine?.openQuarantinedCount ?? 0,
+      quarantine_reasons: quarantine?.quarantineReasons ?? [],
+      tracking_alert_active: activeAlerts.has(entry.schemaName),
+    };
+  });
+  const eventNames = new Set(events.map((event) => event.event));
+  const otherSchemas = observations.observations
+    .filter((observation) => !(observation.kind === 'event' && eventNames.has(observation.schemaName)))
+    .map((observation) => ({
+      kind: observation.kind,
+      name: observation.schemaName,
+      registered: observation.registered,
+      last_accepted_at: observation.lastAcceptedAt,
+      open_quarantined: observation.openQuarantinedCount,
+      quarantine_reasons: observation.quarantineReasons,
+    }))
+    .sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
+
+  return {
+    environment: environmentName,
+    window_days: windowDays,
+    events,
+    other_schemas: otherSchemas,
+    note: 'Counts are records that landed (accepted) in this environment, by UTC day; open_quarantined counts rejected records still awaiting action, from the newest ones. other_schemas lists entity and measure schemas, and names that were sent but never registered.',
+  };
+}
+
+const installationInputShape = {
+  ...environmentInputShape,
+  expect: z
+    .array(z.string())
+    .max(50)
+    .optional()
+    .describe('The schema names the integration should send (events, entities or measures). Omit to check every schema registered or sent in the environment.'),
+};
+
 export function registerMcpSetupTools(server: McpServer, auth: McpAuthContext): void {
-  // 1. list_projects
   server.registerTool(
-    'list_projects',
+    'check_installation',
     {
-      title: 'List projects in organization',
-      description: 'List all projects registered in the caller organization, with their tech stack, business model, and environments.',
-      inputSchema: toolInputSchema({}),
+      title: 'Check an installation',
+      description:
+        'For each expected schema in one environment, what really arrived: receiving (accepted in the last 24h), stale, quarantined (with reasons), registered_no_data or not_registered - with the fix, and an overall ok/attention. Derived from real records only; nothing is sent or stored. The same check as GET /v1/ingest/verify, the SDKs verify() and the Installation page. An API key checks its own environment.',
+      inputSchema: toolInputSchema(installationInputShape),
     },
-    auditedToolHandler(auth, 'list_projects', async () => {
-      const projects = await listOrgProjects(auth.organizationId);
-      const enriched = await Promise.all(
-        projects.map(async (p) => {
-          let envs: Array<{ id: string; name: string }> = [];
-          try {
-            const rawEnvs = await listEnvironmentsForProject(auth.organizationId, p.id);
-            envs = rawEnvs.map((e) => ({ id: e.id, name: e.name }));
-          } catch {
-            // best-effort
-          }
-          const profile = parseProjectProfile(p);
-          const reqs = getApplicableRequirements(profile.businessModel, profile.platformType);
-          const verified = profile.verifiedRequirements.length;
-          const total = reqs.length;
-          const score = total > 0 ? Math.round((verified / total) * 100) : 100;
-
-          return {
-            id: p.id,
-            name: p.name,
-            vertical: p.vertical,
-            platform_type: profile.platformType,
-            business_model: profile.businessModel,
-            transaction_type: profile.transactionType,
-            primary_stack: profile.primaryStack,
-            environments: envs,
-            setup_readiness: {
-              verified_count: verified,
-              total_applicable: total,
-              score_percentage: score,
-              verified_requirements: profile.verifiedRequirements,
-            },
-            is_current: p.id === auth.projectId,
-          };
-        }),
-      );
-
-      return textResult({
-        organization_id: auth.organizationId,
-        current_project_id: auth.projectId,
-        total_projects: enriched.length,
-        projects: enriched,
-      });
-    }),
-  );
-
-  // 2. create_project
-  server.registerTool(
-    'create_project',
-    {
-      title: 'Create and provision project',
-      description: 'Create and provision a new project in the organization with dev, staging, and prod environments. Requires "project.manage".',
-      inputSchema: toolInputSchema({
-        name: z.string().min(1).describe('The project display name.'),
-        vertical: z.string().optional().describe('Industry vertical (e.g. "b2b_saas", "ecommerce", "fintech").'),
-        platform_type: z.enum(['web', 'mobile', 'hybrid']).optional().describe('Platform type: web, mobile, or hybrid.'),
-        business_model: z
-          .enum(['saas_subscription', 'ecommerce_physical', 'digital_products', 'leadgen_b2b', 'marketplace_hybrid'])
-          .optional()
-          .describe('Business model for metric tailoring.'),
-        transaction_type: z
-          .enum(['monthly_recurring', 'annual_recurring', 'one_time', 'hybrid_mixed'])
-          .optional()
-          .describe('Transaction payment structure.'),
-        primary_stack: z
-          .enum(['shopify', 'woocommerce', 'stripe', 'custom_web', 'mobile_native', 'hubspot_salesforce'])
-          .optional()
-          .describe('Primary technical stack.'),
-      }),
-    },
-    auditedToolHandler(auth, 'create_project', async (args: any) =>
-      runGuardedTool(auth, 'project.manage', args, async (input: any) => {
-        const { project, environments } = await createProject({
-          organizationId: auth.organizationId,
-          name: input.name,
-          vertical: input.vertical,
-          platformType: input.platform_type,
-          businessModel: input.business_model,
-          transactionType: input.transaction_type,
-          primaryStack: input.primary_stack,
-          createdByUserId: actorId(auth),
-        });
-
-        return textResult({
-          message: `Project "${project.name}" created successfully.`,
-          project: {
-            id: project.id,
-            name: project.name,
-            organization_id: project.organization_id,
-            vertical: project.vertical,
-            platform_type: project.platform_type,
-            business_model: project.business_model,
-            environments: environments.map((e) => ({ id: e.id, name: e.name })),
-          },
-        });
-      }),
-    ),
-  );
-
-  // 3. update_project
-  server.registerTool(
-    'update_project',
-    {
-      title: 'Update project configuration',
-      description: 'Update an existing project details and configuration. Requires "project.manage".',
-      inputSchema: toolInputSchema({
-        project_id: z.string().optional().describe('Target project id. Defaults to current project.'),
-        name: z.string().min(1).describe('Project display name.'),
-        vertical: z.string().optional().describe('Industry vertical.'),
-        platform_type: z.enum(['web', 'mobile', 'hybrid']).optional(),
-        business_model: z
-          .enum(['saas_subscription', 'ecommerce_physical', 'digital_products', 'leadgen_b2b', 'marketplace_hybrid'])
-          .optional(),
-        transaction_type: z
-          .enum(['monthly_recurring', 'annual_recurring', 'one_time', 'hybrid_mixed'])
-          .optional(),
-        primary_stack: z
-          .enum(['shopify', 'woocommerce', 'stripe', 'custom_web', 'mobile_native', 'hubspot_salesforce'])
-          .optional(),
-      }),
-    },
-    auditedToolHandler(auth, 'update_project', async (args: any) =>
-      runGuardedTool(auth, 'project.manage', args, async (input: any) => {
-        const targetProjectId = input.project_id || auth.projectId;
-        const updated = await updateProjectDetails({
-          organizationId: auth.organizationId,
-          projectId: targetProjectId,
-          name: input.name,
-          vertical: input.vertical,
-          platformType: input.platform_type,
-          businessModel: input.business_model,
-          transactionType: input.transaction_type,
-          primaryStack: input.primary_stack,
-          actorUserId: actorId(auth),
-        });
-
-        return textResult({
-          message: `Project "${updated.name}" updated successfully.`,
-          project: {
-            id: updated.id,
-            name: updated.name,
-            vertical: updated.vertical,
-            platform_type: updated.platform_type,
-            business_model: updated.business_model,
-            primary_stack: updated.primary_stack,
-          },
-        });
-      }),
-    ),
-  );
-
-  // 4. archive_project
-  server.registerTool(
-    'archive_project',
-    {
-      title: 'Archive project',
-      description: 'Safely archive a project in the organization. Requires "project.manage".',
-      inputSchema: toolInputSchema({
-        project_id: z.string().min(1).describe('The project id to archive.'),
-      }),
-    },
-    auditedToolHandler(auth, 'archive_project', async (args: any) =>
-      runGuardedTool(auth, 'project.manage', args, async ({ project_id }: any) => {
-        const project = await ProjectModel.init(project_id, { organization_id: auth.organizationId });
-        if (!project || project.organization_id !== auth.organizationId) {
-          throw new ProjectNotFoundError();
-        }
-
-        project.archived_at = new Date().toISOString();
-        project.setPathParams({ organization_id: auth.organizationId });
-        await project.save();
-
-        try {
-          await recordAuditLogEntry({
-            organizationId: auth.organizationId,
-            projectId: project_id,
-            actorType: auth.principalKind === 'api_key' ? 'api_key' : 'user',
-            actorId: actorId(auth),
-            action: 'project.archive',
-            targetType: 'project',
-            targetId: project_id,
-            summary: `Archived project "${project.name}"`,
-          });
-        } catch {
-          // best-effort
-        }
-
-        return textResult({
-          message: `Project "${project.name}" (${project_id}) has been successfully archived.`,
-          archived_at: project.archived_at,
-        });
-      }),
-    ),
-  );
-
-  // 5. list_goals
-  server.registerTool(
-    'list_goals',
-    {
-      title: 'List project goals',
-      description: 'List all active conversion and growth goals for the project.',
-      inputSchema: toolInputSchema({}),
-    },
-    auditedToolHandler(auth, 'list_goals', async () => {
-      const goals = await listGoalsForProject(auth.organizationId, auth.projectId);
-      return textResult({
-        project_id: auth.projectId,
-        total_goals: goals.length,
-        goals: goals.map((g) => ({
-          id: g.id,
-          name: g.name,
-          metric_name: g.metric_name,
-          direction: g.direction,
-          target_value: g.target_value,
-          range_min: g.range_min,
-          range_max: g.range_max,
-          start_date: g.start_date,
-          deadline: g.deadline,
-          rhythm: g.rhythm,
-          owner_person_id: g.owner_person_id,
-        })),
-      });
-    }),
-  );
-
-  // 6. delete_goal
-  server.registerTool(
-    'delete_goal',
-    {
-      title: 'Delete project goal',
-      description: 'Delete a goal from the project. Requires "dashboards.write".',
-      inputSchema: toolInputSchema({
-        goal_id: z.string().min(1).describe('The goal id to delete.'),
-      }),
-    },
-    auditedToolHandler(auth, 'delete_goal', async (args: any) =>
-      runGuardedTool(auth, 'dashboards.write', args, async ({ goal_id }: any) => {
-        await deleteGoal(auth.organizationId, auth.projectId, goal_id, actorId(auth));
-        return textResult({
-          message: `Goal ${goal_id} deleted successfully.`,
-          deleted_goal_id: goal_id,
-        });
-      }),
-    ),
-  );
-
-  // 7. get_goal_progress
-  server.registerTool(
-    'get_goal_progress',
-    {
-      title: 'Get goal progress and pacing',
-      description: 'Retrieve real-time progress calculations, pacing, and historical points for a goal.',
-      inputSchema: toolInputSchema({
-        goal_id: z.string().min(1).describe('The goal id to evaluate.'),
-      }),
-    },
-    auditedToolHandler(auth, 'get_goal_progress', async ({ goal_id }: any) => {
-      const goal = await getGoal(auth.organizationId, auth.projectId, goal_id);
-      if (!goal) {
-        return errorResult(`Goal ${goal_id} not found in this project.`);
+    auditedToolHandler(auth, 'check_installation', async (args: any) => {
+      const resolved = await resolveFocusEnvironment(auth, args);
+      if ('error' in resolved) {
+        return resolved.error;
       }
-
-      try {
-        const progress = await queryGoalProgress({
-          organizationId: auth.organizationId,
-          projectId: auth.projectId,
-          goal,
-        });
-
-        return textResult({
-          goal: {
-            id: goal.id,
-            name: goal.name,
-            metric_name: goal.metric_name,
-            target_value: goal.target_value,
-            deadline: goal.deadline,
-          },
-          progress,
-        });
-      } catch (err: any) {
-        return textResult({
-          goal: {
-            id: goal.id,
-            name: goal.name,
-            metric_name: goal.metric_name,
-            target_value: goal.target_value,
-            deadline: goal.deadline,
-          },
-          status: 'pending_warehouse_data',
-          message: err?.message || 'Goal progress data is compiling in BigQuery.',
-        });
-      }
+      const expected = ((args as { expect?: string[] } | undefined)?.expect ?? []).map((name) => name.trim()).filter(Boolean);
+      const check = await verifyInstallationForEnvironment({ organizationId: auth.organizationId, projectId: auth.projectId, environmentId: resolved.focus.environmentId, expected });
+      return textResult({ environment: resolved.focus.environmentName, status: check.report.status, schemas: check.report.schemas, installation_page: `${webAppUrl()}/en/orgs/${auth.organizationId}/projects/${auth.projectId}/install` });
     }),
   );
 
-  // 8. audit_installation_gaps
+  server.registerTool(
+    'get_ingest_health',
+    {
+      title: 'Get ingest health',
+      description:
+        "Ingest health per event in one environment: accepted records per UTC day over window_days and in total, last_seen_at, records still open in quarantine with their reasons, and whether a tracking-broke alert is active - plus entity/measure schemas and unregistered names in other_schemas. The same data as the Ingest health page. An API key reports only on its own environment; a project-wide OAuth connection can name one with environment (default prod).",
+      inputSchema: toolInputSchema(ingestHealthInputShape),
+    },
+    auditedToolHandler(auth, 'get_ingest_health', async (args: any) => {
+      const resolved = await resolveFocusEnvironment(auth, args);
+      if ('error' in resolved) {
+        return resolved.error;
+      }
+      const windowDays = (args as { window_days?: number } | undefined)?.window_days ?? DEFAULT_EVENT_VOLUME_WINDOW_DAYS;
+      return textResult(await buildIngestHealth(auth, resolved.focus.environmentId, resolved.focus.environmentName, windowDays));
+    }),
+  );
+
+  server.registerTool(
+    'get_setup_health',
+    {
+      title: 'Get setup health',
+      description:
+        "How far this project's integration is connected: for each setup requirement (landing-page attribution, signups, product usage events, customer entity, billing, ad spend) whether it is connected (accepted records seen), an error (only rejected records, still in quarantine) or a gap (nothing received), in one environment in detail and every environment in summary. Statuses are derived from the ingest records each environment actually accepted or rejected; nothing can be marked connected by hand. Billing counts records from any billing system (a subscription_state_change event, or the Stripe connector). Also returns customer_coverage (how many customers seen in events have a customer record, from the warehouse) and customer_backfill when fewer than 90% do. Use audit_installation_gaps for what each gap costs and how to connect it.",
+      inputSchema: toolInputSchema(environmentInputShape),
+    },
+    auditedToolHandler(auth, 'get_setup_health', async (args: any) =>
+      withFocusEnvironment(auth, args, async (report, focus) => renderWithCoverage(auth, focus, (context, coverage) => buildSetupHealthOutput(report, focus, context, coverage))),
+    ),
+  );
+
   server.registerTool(
     'audit_installation_gaps',
     {
       title: 'Audit installation gaps',
-      description: 'Analyze the project technical setup and detect missing data streams, telemetry gaps, and their impact on reporting.',
-      inputSchema: toolInputSchema({}),
+      description:
+        "Every setup requirement not yet connected in one environment of this project, each with: why (what was or was not received there, including quarantine reasons for rejected records), impact_summary (which reports stay empty or wrong without it), satisfied_by (which records would connect it), connected_in_other_environments, and how_to_fix - concrete steps naming a real web page URL, ingest API endpoint or MCP tool. Also lists the requirements that are connected and the schemas that connected them, customer_coverage, and customer_backfill with steps when fewer than 90% of the customers seen in events have a customer record (typically customers from before the integration went live). Read-only: it changes nothing.",
+      inputSchema: toolInputSchema(environmentInputShape),
     },
-    auditedToolHandler(auth, 'audit_installation_gaps', async () => {
-      const project = await ProjectModel.init(auth.projectId, { organization_id: auth.organizationId });
-      if (!project || project.organization_id !== auth.organizationId) {
-        throw new ProjectNotFoundError();
-      }
-
-      const profile = parseProjectProfile(project);
-      const applicableReqs = getApplicableRequirements(profile.businessModel, profile.platformType);
-      const verifiedSet = new Set(project.verified_requirements ?? []);
-
-      const verified = applicableReqs.filter((r: SetupRequirement) => verifiedSet.has(r.id));
-      const gaps = applicableReqs
-        .filter((r: SetupRequirement) => !verifiedSet.has(r.id))
-        .map((r: SetupRequirement) => {
-          const mapping = REQUIREMENT_CANONICAL_MAPPINGS[r.id];
-          return {
-            requirement_id: r.id,
-            category: r.category,
-            is_core: r.isCore,
-            missing_event_stream: mapping ? mapping.eventType : 'custom_telemetry',
-            impact_summary: r.impactKey,
-            recommended_stack: profile.primaryStack,
-            quick_code_snippet: r.quickSnippet(auth.organizationId, auth.projectId, profile.primaryStack),
-            guide_steps: r.guideSteps,
-          };
-        });
-
-      const completionPercentage =
-        applicableReqs.length > 0 ? Math.round((verified.length / applicableReqs.length) * 100) : 100;
-
-      return textResult({
-        project_id: auth.projectId,
-        project_name: project.name,
-        profile: {
-          platform_type: profile.platformType,
-          business_model: profile.businessModel,
-          primary_stack: profile.primaryStack,
-        },
-        readiness_score: `${completionPercentage}%`,
-        status: completionPercentage === 100 ? 'fully_integrated' : completionPercentage >= 60 ? 'needs_attention' : 'critical_gaps',
-        total_applicable_requirements: applicableReqs.length,
-        verified_count: verified.length,
-        unresolved_gaps_count: gaps.length,
-        unresolved_gaps: gaps,
-        verified_requirements: verified.map((r) => ({ id: r.id, category: r.category })),
-      });
-    }),
-  );
-
-  // 9. get_setup_health
-  server.registerTool(
-    'get_setup_health',
-    {
-      title: 'Get setup readiness health',
-      description: 'Get a quick high-level summary of the setup health and telemetry readiness score.',
-      inputSchema: toolInputSchema({}),
-    },
-    auditedToolHandler(auth, 'get_setup_health', async () => {
-      const project = await ProjectModel.init(auth.projectId, { organization_id: auth.organizationId });
-      if (!project || project.organization_id !== auth.organizationId) {
-        throw new ProjectNotFoundError();
-      }
-
-      const profile = parseProjectProfile(project);
-      const applicableReqs = getApplicableRequirements(profile.businessModel, profile.platformType);
-      const verifiedSet = new Set(project.verified_requirements ?? []);
-      const verifiedCount = applicableReqs.filter((r: SetupRequirement) => verifiedSet.has(r.id)).length;
-      const total = applicableReqs.length;
-      const score = total > 0 ? Math.round((verifiedCount / total) * 100) : 100;
-
-      return textResult({
-        project_id: auth.projectId,
-        project_name: project.name,
-        score,
-        health: score >= 80 ? 'healthy' : score >= 50 ? 'degraded' : 'unhealthy',
-        verified_count: verifiedCount,
-        total_requirements: total,
-        summary: `${verifiedCount} of ${total} core requirements connected (${score}%).`,
-      });
-    }),
-  );
-
-  // 10. get_tracking_script
-  server.registerTool(
-    'get_tracking_script',
-    {
-      title: 'Get tracking script and webhooks',
-      description: 'Generate customized, ready-to-copy tracking scripts and webhook endpoints for the project stack.',
-      inputSchema: toolInputSchema({
-        format: z.enum(['html_script', 'npm_import', 'webhook', 'all']).optional().describe('Snippet format to retrieve.'),
-      }),
-    },
-    auditedToolHandler(auth, 'get_tracking_script', async (args: any) => {
-      const format = args?.format || 'all';
-      const project = await ProjectModel.init(auth.projectId, { organization_id: auth.organizationId });
-      const stack = (project?.primary_stack as any) || 'custom_web';
-
-      const htmlScript = `<!-- GrowthOS Edge Tracking Tag -->
-<script
-  src="https://cdn.growthos.io/sdk/v2/sdk.min.js"
-  data-org="${auth.organizationId}"
-  data-project="${auth.projectId}"
-  async
-></script>`;
-
-      const npmImport = `// Install: npm install @growthos/tracking-sdk
-import { initGrowthOS } from '@growthos/tracking-sdk';
-
-initGrowthOS({
-  organizationId: "${auth.organizationId}",
-  projectId: "${auth.projectId}",
-  edgeTracking: true,
-});`;
-
-      const stripeWebhook = `https://growthos.io/api/orgs/${auth.organizationId}/projects/${auth.projectId}/plugins/stripe-webhook`;
-      const genericWebhook = `https://growthos.io/api/orgs/${auth.organizationId}/projects/${auth.projectId}/hooks`;
-
-      const result: Record<string, string> = {};
-      if (format === 'html_script' || format === 'all') result.html_script = htmlScript;
-      if (format === 'npm_import' || format === 'all') result.npm_import = npmImport;
-      if (format === 'webhook' || format === 'all') {
-        result.stripe_webhook_url = stripeWebhook;
-        result.generic_webhook_url = genericWebhook;
-      }
-
-      return textResult({
-        project_id: auth.projectId,
-        primary_stack: stack,
-        snippets: result,
-        quick_test_curl: `curl -X POST https://api-preprod-1098891924957.me-west1.run.app/v1/ingest/event \\
-  -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer <API_KEY>" \\
-  -d '{"event":"page_view","properties":{"url":"https://example.com"}}'`,
-      });
-    }),
-  );
-
-  // 11. get_installation_instructions
-  server.registerTool(
-    'get_installation_instructions',
-    {
-      title: 'Get step-by-step installation instructions',
-      description: 'Get step-by-step setup guides and sample payloads for a specific connector or requirement.',
-      inputSchema: toolInputSchema({
-        requirement_id: z.string().min(1).describe('The requirement id (e.g. "req_web_sdk", "req_stripe_billing", "req_checkout_stream", "req_ad_attribution", "req_lead_crm").'),
-      }),
-    },
-    auditedToolHandler(auth, 'get_installation_instructions', async ({ requirement_id }: any) => {
-      const req = SETUP_REQUIREMENTS.find((r: SetupRequirement) => r.id === requirement_id);
-      if (!req) {
-        return errorResult(`Unknown requirement id "${requirement_id}". Available: ${SETUP_REQUIREMENTS.map((r: SetupRequirement) => r.id).join(', ')}`);
-      }
-
-      const project = await ProjectModel.init(auth.projectId, { organization_id: auth.organizationId });
-      const stack = (project?.primary_stack as any) || 'custom_web';
-
-      return textResult({
-        id: req.id,
-        category: req.category,
-        is_core: req.isCore,
-        steps: req.guideSteps,
-        code_snippet: req.quickSnippet(auth.organizationId, auth.projectId, stack),
-        sample_payload: req.samplePayload || null,
-        verification_method: `Call tool "verify_installation" with requirement_id: "${req.id}"`,
-      });
-    }),
-  );
-
-  // 12. verify_installation
-  server.registerTool(
-    'verify_installation',
-    {
-      title: 'Verify installation and ingest test event',
-      description: 'Mark a requirement as verified and inject a synthetic event into the ingestion pipeline to confirm end-to-end receipt. Requires "project.manage".',
-      inputSchema: toolInputSchema({
-        requirement_id: z.string().min(1).describe('The requirement id to verify.'),
-        inject_test_event: z.boolean().optional().describe('Whether to inject a canonical test record into the ingestion pipeline (default: true).'),
-      }),
-    },
-    auditedToolHandler(auth, 'verify_installation', async (args: any) =>
-      runGuardedTool(auth, 'project.manage', args, async ({ requirement_id, inject_test_event = true }: any) => {
-        const project = await ProjectModel.init(auth.projectId, { organization_id: auth.organizationId });
-        if (!project || project.organization_id !== auth.organizationId) {
-          throw new ProjectNotFoundError();
-        }
-
-        const currentVerified = new Set(project.verified_requirements ?? []);
-        currentVerified.add(requirement_id);
-        const updatedList = Array.from(currentVerified);
-
-        let batchId = `batch_verify_mcp_${Date.now()}`;
-        let accepted = 1;
-
-        const mapping = REQUIREMENT_CANONICAL_MAPPINGS[requirement_id];
-        if (inject_test_event && mapping) {
-          try {
-            let environmentId = 'default';
-            try {
-              const envs = await listEnvironmentsForProject(auth.organizationId, auth.projectId);
-              if (envs.length > 0) environmentId = envs[0].id;
-            } catch {
-              environmentId = 'default';
-            }
-
-            const payload = mapping.buildPayload();
-            const ingestInput: IngestBatchInput =
-              mapping.kind === 'measure'
-                ? { kind: 'measure', records: [payload] }
-                : { kind: 'event', records: [payload] };
-
-            const summary = await ingestBatch({
-              organizationId: auth.organizationId,
-              projectId: auth.projectId,
-              environmentId,
-              input: ingestInput,
-            });
-            batchId = summary.batchId;
-            accepted = summary.accepted;
-          } catch {
-            // best-effort
-          }
-        }
-
-        project.verified_requirements = updatedList;
-        project.setPathParams({ organization_id: auth.organizationId });
-        await project.save();
-
-        return textResult({
-          message: `Requirement "${requirement_id}" verified successfully.`,
-          requirement_id,
-          verified: true,
-          batch_id: batchId,
-          records_ingested: accepted,
-          verified_requirements: updatedList,
-        });
-      }),
-    ),
-  );
-
-  // 13. test_integration_event
-  server.registerTool(
-    'test_integration_event',
-    {
-      title: 'Test raw integration event pipeline',
-      description: 'Ingest a test event to verify that the raw ingestion and telemetry pipeline is functioning properly. Requires "project.manage".',
-      inputSchema: toolInputSchema({
-        event_type: z
-          .enum(['product_telemetry', 'customer_transaction', 'subscription_state_change', 'ad_spend', 'crm_lifecycle'])
-          .describe('Canonical event stream type.'),
-        payload: z.record(z.unknown()).optional().describe('Custom test payload (optional).'),
-      }),
-    },
-    auditedToolHandler(auth, 'test_integration_event', async (args: any) =>
-      runGuardedTool(auth, 'project.manage', args, async ({ event_type, payload }: any) => {
-        let environmentId = 'default';
-        try {
-          const envs = await listEnvironmentsForProject(auth.organizationId, auth.projectId);
-          if (envs.length > 0) environmentId = envs[0].id;
-        } catch {
-          environmentId = 'default';
-        }
-
-        let recordPayload = payload;
-        let kind: 'event' | 'measure' = 'event';
-
-        if (!recordPayload) {
-          switch (event_type) {
-            case 'product_telemetry':
-              recordPayload = {
-                ...productTelemetryFixtures.pageView,
-                eventId: `evt_test_${Date.now()}`,
-                ts: new Date().toISOString(),
-              };
-              break;
-            case 'customer_transaction':
-              recordPayload = {
-                ...customerTransactionFixtures.initialPurchase,
-                eventId: `evt_test_${Date.now()}`,
-                ts: new Date().toISOString(),
-              };
-              break;
-            case 'subscription_state_change':
-              recordPayload = {
-                ...subscriptionStateChangeFixtures.newSubscription,
-                eventId: `evt_test_${Date.now()}`,
-                ts: new Date().toISOString(),
-              };
-              break;
-            case 'ad_spend':
-              kind = 'measure';
-              recordPayload = {
-                ...adSpendFixtures.googleAdsSpend,
-                ts: new Date().toISOString().slice(0, 10),
-              };
-              break;
-            case 'crm_lifecycle':
-              recordPayload = {
-                ...crmLifecycleFixtures.salesforceDemoHeld,
-                eventId: `evt_test_${Date.now()}`,
-                ts: new Date().toISOString(),
-              };
-              break;
-          }
-        }
-
-        const ingestInput: IngestBatchInput =
-          kind === 'measure'
-            ? { kind: 'measure', records: [recordPayload] }
-            : { kind: 'event', records: [recordPayload] };
-
-        const summary = await ingestBatch({
-          organizationId: auth.organizationId,
-          projectId: auth.projectId,
-          environmentId,
-          input: ingestInput,
-        });
-
-        return textResult({
-          status: 'success',
-          event_type,
-          batch_id: summary.batchId,
-          records_accepted: summary.accepted,
-          latency_ms: 12,
-          environment_id: environmentId,
-          message: `Synthetic test event (${event_type}) ingested and confirmed in pipeline.`,
-        });
-      }),
+    auditedToolHandler(auth, 'audit_installation_gaps', async (args: any) =>
+      withFocusEnvironment(auth, args, async (report, focus) => renderWithCoverage(auth, focus, (context, coverage) => buildInstallationGapsOutput(report, focus, context, coverage))),
     ),
   );
 }

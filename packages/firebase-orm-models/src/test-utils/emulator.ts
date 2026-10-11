@@ -1,53 +1,61 @@
-import { initializeApp } from 'firebase/app';
-import { collection, connectFirestoreEmulator, getDocs, initializeFirestore } from 'firebase/firestore';
-import { FirestoreOrmRepository } from '@arbel/firebase-orm';
+import { connectFirestoreOrmAdmin } from '../firestore-connection';
 
 /**
- * Connects the ORM's global Firestore connection to the local emulator
- * started by `firebase emulators:exec` (see this package's `test` script and
+ * Connects the ORM's global Firestore connection to the local emulator started
+ * by `firebase emulators:exec` (see this package's `test` script and
  * `firebase.json`). Must match the `--project` flag passed to that command.
+ *
+ * ## Why this uses the Admin SDK rather than the client SDK (KAN-103)
+ *
+ * This suite's long-running flake was the client SDK's gRPC `Listen` stream
+ * getting its framing desynchronized against the emulator, after which every
+ * subsequent read of that stream is garbage. The symptoms look unrelated but are
+ * one failure: `RESOURCE_EXHAUSTED: Received message larger than max
+ * (4036202791 vs 4194304)` is a garbage *length prefix* being read as a message
+ * size — nothing here is 4GB — and alongside it come
+ * `INTERNAL: Response message parsing error: invalid wire type 6 at offset 500`
+ * and `index out of range: 28 + 10 > 28`, which are the same corrupted bytes
+ * failing to parse a different way. Upstream: firebase-tools#8654.
+ *
+ * The previous mitigation was `experimentalForceLongPolling: true`, on the
+ * theory that it swaps gRPC for HTTP long-polling so nothing accumulates on a
+ * shared stream. **That option does nothing in Node.** The client SDK ships
+ * separate builds, and in `index.node.cjs.js` the transport is chosen by
+ * `function newConnection(databaseInfo) { return new GrpcConnection(protos,
+ * databaseInfo); }` — unconditional, with `forceLongPolling` stored on the
+ * database info and never consulted. It is honoured only by the browser build's
+ * WebChannel transport.
+ *
+ * That is why the flake only ever failed `@growthos/firebase-orm-models#test`
+ * and never apps/web's emulator suites: apps/web runs vitest with
+ * `environment: 'jsdom'` and so resolves the browser build, where the setting is
+ * real. This package runs `environment: 'node'`, where it was a no-op — so this
+ * path has been unprotected the whole time it was believed fixed.
+ *
+ * The Admin SDK avoids the problem structurally rather than papering over it: it
+ * serves `get()` with `runQuery`/`batchGetDocuments` RPCs and opens a `Listen`
+ * stream only for `onSnapshot`, which nothing here uses. No long-lived stream
+ * means no framing to lose. It is also the connection real deployments use, so
+ * the tests now exercise the production path.
+ *
+ * Safe for this suite specifically because the emulator rules are open
+ * (`allow read, write: if true` — see `firestore.rules`), so nothing here
+ * depended on the client SDK being subject to rules.
+ *
+ * `appName` is accepted and ignored, kept so the ~75 calling test files did not
+ * all have to change: the Admin SDK holds one process-wide connection rather
+ * than a named app per file, and `connectFirestoreOrmAdmin` is idempotent.
  */
 const EMULATOR_PROJECT_ID = 'demo-growthos-test';
-const EMULATOR_HOST = '127.0.0.1';
-const EMULATOR_PORT = 8080;
-const WARMUP_ATTEMPTS = 20;
-const WARMUP_RETRY_DELAY_MS = 500;
+const EMULATOR_HOST = '127.0.0.1:8080';
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+export async function connectToFirestoreEmulator(_appName: string): Promise<void> {
+  // `firebase emulators:exec` sets this for us; defaulted so a direct `vitest
+  // run` against an already-running emulator still reaches it rather than
+  // silently trying to talk to production Firestore.
+  process.env.FIRESTORE_EMULATOR_HOST ??= EMULATOR_HOST;
 
-export async function connectToFirestoreEmulator(appName: string): Promise<void> {
-  const app = initializeApp({ apiKey: 'fake-api-key', projectId: EMULATOR_PROJECT_ID }, appName);
-  // The client SDK's default gRPC transport multiplexes every read (even a
-  // one-shot `getDocs()`) as a "target" on one shared `Listen` stream per
-  // Firestore instance. With 40+ of these emulator test files — each
-  // issuing many reads across many concurrently-running files against one
-  // shared emulator — accumulated/replayed target state on that stream grew
-  // without bound over a run (observed climbing from hundreds of MB to
-  // multiple GB), eventually tripping gRPC's 4MB `RESOURCE_EXHAUSTED` limit
-  // and failing whichever test happened to be watching at the time.
-  // `experimentalForceLongPolling` switches the transport to plain HTTP
-  // long-polling (one request per read, nothing multiplexed/accumulated) —
-  // the SDK's own `FirestoreSettings` docs point network-reliability
-  // workarounds like this one at
-  // https://github.com/firebase/firebase-js-sdk/issues/1674.
-  const firestore = initializeFirestore(app, { experimentalForceLongPolling: true });
-  connectFirestoreEmulator(firestore, EMULATOR_HOST, EMULATOR_PORT);
-  await FirestoreOrmRepository.initGlobalConnection(firestore);
-
-  // The emulator's gRPC listener can still be settling for a moment right
-  // after `firebase emulators:exec` reports it started, which intermittently
-  // surfaces as a bogus RESOURCE_EXHAUSTED error on the client SDK's first
-  // request. Retry a trivial read here so that transient failure lands
-  // during setup instead of randomly failing whichever test runs first.
-  for (let attempt = 1; attempt <= WARMUP_ATTEMPTS; attempt++) {
-    try {
-      await getDocs(collection(firestore, 'connection_warmup_probe'));
-      return;
-    } catch (error) {
-      if (attempt === WARMUP_ATTEMPTS) throw error;
-      await delay(WARMUP_RETRY_DELAY_MS);
-    }
-  }
+  await connectFirestoreOrmAdmin({
+    projectId: process.env.FIREBASE_PROJECT_ID ?? EMULATOR_PROJECT_ID,
+  });
 }

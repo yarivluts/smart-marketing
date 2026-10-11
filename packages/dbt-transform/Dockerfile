@@ -27,6 +27,15 @@ COPY packages/dbt-transform/dbt ./dbt
 WORKDIR /app/dbt
 ENV DBT_PROFILES_DIR=/app/dbt
 
+# The commit this image was built from (KAN-204). Every run writes it into the
+# `dbt_build_info` table (models/ops), which api-prod reports publicly on
+# /v1/health/dbt-refresh so .github/workflows/prod-drift.yml can notice this job
+# running an old image - with no credentials of its own. Last, so a new commit
+# only rebuilds this one layer. Empty when unset: the job then records NULL,
+# meaning "not stamped", rather than inventing a value.
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
+
 # GOOGLE_CLOUD_PROJECT / GROWTHOS_BIGQUERY_CORE_DATASET /
 # GROWTHOS_BIGQUERY_LOCATION are supplied by the Cloud Run Job's env config —
 # the same three vars the app's own BigQuery seams read.

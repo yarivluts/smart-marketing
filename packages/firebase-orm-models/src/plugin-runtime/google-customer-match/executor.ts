@@ -1,5 +1,5 @@
 import { SinkPluginExecutionError, type SinkPluginExecutor, type SinkPluginPushParams, type SinkPluginPushResult } from '../executor';
-import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsContactMatchKey } from '../google-ads';
+import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsContactMatchKey, type GoogleAdsCustomerMatchConsent } from '../google-ads';
 import {
   hashEmailForGoogleCustomerMatch,
   hashNameForGoogleCustomerMatch,
@@ -30,6 +30,8 @@ export interface GoogleCustomerMatchSinkPluginExecutorOptions {
    * `audienceId`.
    */
   existingUserListResourceName: string | null;
+  /** The advertiser's consent for the uploaded users, from the install's config (KAN-236); omitted parts are not sent. */
+  consent?: GoogleAdsCustomerMatchConsent;
 }
 
 function extractProperty(record: Record<string, unknown>, key: string): string | undefined {
@@ -179,12 +181,14 @@ export class GoogleCustomerMatchSinkPluginExecutor implements SinkPluginExecutor
   private readonly customerId: string;
   private readonly userListName: string;
   private userListResourceName: string | null;
+  private readonly consent: GoogleAdsCustomerMatchConsent | undefined;
 
   constructor(options: GoogleCustomerMatchSinkPluginExecutorOptions) {
     this.apiClient = options.apiClient;
     this.customerId = options.customerId;
     this.userListName = options.userListName;
     this.userListResourceName = options.existingUserListResourceName;
+    this.consent = options.consent;
   }
 
   async push(params: SinkPluginPushParams): Promise<SinkPluginPushResult> {
@@ -200,7 +204,10 @@ export class GoogleCustomerMatchSinkPluginExecutor implements SinkPluginExecutor
         return { pushed: 0, externalRef: userListResourceName };
       }
 
-      const result = await this.apiClient.addContactsToCustomerMatchUserList(this.customerId, userListResourceName, contacts);
+      // Consent is passed only when the install answered it, so an unanswered install uploads exactly as before.
+      const result = this.consent
+        ? await this.apiClient.addContactsToCustomerMatchUserList(this.customerId, userListResourceName, contacts, this.consent)
+        : await this.apiClient.addContactsToCustomerMatchUserList(this.customerId, userListResourceName, contacts);
       return { pushed: result.numReceived, externalRef: userListResourceName };
     } catch (error) {
       if (error instanceof GoogleAdsApiError) {

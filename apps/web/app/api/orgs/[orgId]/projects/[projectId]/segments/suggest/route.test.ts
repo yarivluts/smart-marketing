@@ -39,6 +39,21 @@ async function setupOrgProject(orgName: string) {
   return { ownerSession, owner, organization, project };
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 async function registerCustomerSchema(organizationId: string, projectId: string, createdByUserId: string) {
   return registerSchemaDefinition({
     organizationId,
@@ -121,5 +136,30 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/segments/suggest', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { suggestions: Array<{ name: string; filters: unknown[]; confidence: number }> };
     expect(body.suggestions).toEqual([{ name: 'High-value customers', filters: [{ field: 'mrr_usd', op: '>=', value: 100 }], confidence: 0.85 }]);
+  });
+
+  it('KAN-136: lets a project-scoped project_admin request suggestions for THEIR OWN project', async () => {
+    const { owner, ownerSession, organization, project } = await setupOrgProject('Suggest Segments Project-Scoped Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const ownerUser = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', ownerUser.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = suggestRequest(organization.id, project.id, { schemaName: 'customer' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(200);
+  });
+
+  it("KAN-136 isolation: a project-scoped project_admin for one project can't request suggestions for a SIBLING project", async () => {
+    const { owner, ownerSession, organization, project } = await setupOrgProject('Suggest Segments Sibling Project Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const ownerUser = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', ownerUser.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = suggestRequest(organization.id, project.id, { schemaName: 'customer' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(403);
   });
 });

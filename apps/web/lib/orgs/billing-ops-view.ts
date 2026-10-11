@@ -1,5 +1,6 @@
 import { BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, checkRecordEnvelope, type RawRecordModel } from '@growthos/firebase-orm-models';
 import { numberField, stringField } from './raw-record-field-view';
+export { splitOverFetchedFeed } from './capped-list-view';
 
 const [CHARGE_SCHEMA_NAME, FAILED_PAYMENT_SCHEMA_NAME, REFUND_SCHEMA_NAME] = BILLING_OPS_FEED_EVENT_SCHEMA_NAMES;
 

@@ -34,6 +34,7 @@ async function setupProject(orgName: string) {
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
   const prodEnvironment = environments.find((e) => e.name === 'prod')!;
+  const devEnvironment = environments.find((e) => e.name === 'dev')!;
   await registerSchemaDefinition({
     organizationId: organization.id,
     projectId: project.id,
@@ -42,7 +43,7 @@ async function setupProject(orgName: string) {
     fields: [{ name: 'path', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
     createdByUserId: owner.id,
   });
-  return { owner, organization, project, prodEnvironment };
+  return { owner, organization, project, prodEnvironment, devEnvironment };
 }
 
 describe('listRecentIngestBatchesForProject', () => {
@@ -110,5 +111,34 @@ describe('listRecentIngestBatchesForProject', () => {
     const batches = await listRecentIngestBatchesForProject(organization.id, project.id);
     expect(batches).toHaveLength(1);
     expect(batches[0].project_id).toBe(project.id);
+  });
+});
+
+describe('listRecentIngestBatchesForProject environment scoping (KAN-196)', () => {
+  it('returns only the named environment\'s batches when environmentId is passed, and every environment\'s when omitted', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Ingest Health Env Scope Org');
+
+    const prodBatch = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e-prod', event: 'page_view', ts: '2026-07-03T10:15:00Z' }] },
+    });
+    await delay(5);
+    const devBatch = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e-dev', event: 'page_view', ts: '2026-07-03T10:16:00Z' }] },
+    });
+
+    const devOnly = await listRecentIngestBatchesForProject(organization.id, project.id, undefined, devEnvironment.id);
+    expect(devOnly.map((batch) => batch.id)).toEqual([devBatch.batchId]);
+
+    const prodOnly = await listRecentIngestBatchesForProject(organization.id, project.id, undefined, prodEnvironment.id);
+    expect(prodOnly.map((batch) => batch.id)).toEqual([prodBatch.batchId]);
+
+    const everyEnvironment = await listRecentIngestBatchesForProject(organization.id, project.id);
+    expect(everyEnvironment.map((batch) => batch.id)).toEqual([devBatch.batchId, prodBatch.batchId]);
   });
 });

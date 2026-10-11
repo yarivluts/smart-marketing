@@ -61,5 +61,19 @@ describe('CampaignCreativesPanel', () => {
     expect(screen.getByText('Sign PDF Online Fast')).toBeInTheDocument();
     expect(screen.getByText('Close deals faster with automated signing workflows.')).toBeInTheDocument();
     expect(screen.getByText('https://growthos.io/signup')).toBeInTheDocument();
+    // A draft made before the declaration existed shows none rather than a guessed answer.
+    expect(screen.queryByTestId('campaign-eu-political-declaration')).toBeNull();
+  });
+
+  it("shows the advertiser's EU political advertising declaration that will be sent to Google", () => {
+    const draft = {
+      platform: 'google_ads' as const,
+      campaignName: 'Search',
+      dailyBudgetUsd: 20,
+      containsEuPoliticalAdvertising: false,
+      adGroups: [{ name: 'Group', keywords: [], responsiveSearchAd: { headlines: ['A'], descriptions: ['B'], finalUrl: 'https://example.com' } }],
+    };
+    renderWithIntl(<CampaignCreativesPanel draft={draft} />);
+    expect(screen.getByTestId('campaign-eu-political-declaration')).toHaveTextContent(en.Campaigns.euPoliticalDeclaredNo);
   });
 });

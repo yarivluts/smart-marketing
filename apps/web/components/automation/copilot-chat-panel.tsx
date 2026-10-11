@@ -13,6 +13,32 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProposalDiffCard, type ActionProposalData } from './proposal-diff-card';
+import { buildCopilotEngineMessages, processCopilotQuery, type CopilotContext } from '@/lib/ai/copilot-engine';
+import type { CopilotActionProposal } from '@/lib/ai/copilot-types';
+
+/**
+ * Bridges the engine's proposal shape to the card's.
+ *
+ * `ActionProposalData` carries four fields the engine has no opinion on - a display `id`, the
+ * `platform` badge, a `status`, and the `diffEntries` the card renders as a before/after
+ * table. The before/after pair is the one diff entry the engine does know about, so it is
+ * derived rather than invented.
+ */
+function toActionProposalData(proposal: CopilotActionProposal): ActionProposalData {
+  return {
+    id: `prop-${proposal.targetId}-${Date.now()}`,
+    targetId: proposal.targetId,
+    targetLabel: proposal.targetLabel,
+    actionType: proposal.actionType,
+    impactBadge: proposal.impactBadge,
+    beforeValue: proposal.beforeValue,
+    afterValue: proposal.afterValue,
+    diffEntries: [{ key: proposal.actionType, before: String(proposal.beforeValue), after: String(proposal.afterValue) }],
+    ...(proposal.estimatedImpact ? { estimatedImpact: proposal.estimatedImpact } : {}),
+    status: 'awaiting_approval',
+    ...(proposal.payload ? { payload: proposal.payload } : {}),
+  };
+}
 
 export interface CopilotMessage {
   id: string;
@@ -32,6 +58,10 @@ export interface CopilotChatPanelProps {
   className?: string;
   embedded?: boolean;
   onClose?: () => void;
+  /** The project's real campaigns, so a proposal names one that exists. Without them the engine asks which campaign rather than guessing. */
+  targets?: CopilotContext['targets'];
+  /** The project's real funnel, so a drop-off answer is measured rather than assumed. */
+  funnelSteps?: CopilotContext['funnelSteps'];
 }
 
 /** Markdown parsing helper for safe rich text rendering in message bubbles */
@@ -97,18 +127,28 @@ export function CopilotChatPanel({
   className,
   embedded = false,
   onClose,
+  targets,
+  funnelSteps,
 }: CopilotChatPanelProps): React.ReactElement {
   const t = useTranslations('Copilot');
+  const tPanel = useTranslations('CopilotChatPanel');
+  const tEngine = useTranslations('CopilotEngine');
   const locale = useLocale();
   const isRtl = locale === 'he';
+
+  const engineMessages = React.useMemo(
+    () =>
+      buildCopilotEngineMessages({
+        format: (key, values) => tEngine(key, values),
+        raw: (key) => tEngine.raw(key),
+      }),
+    [tEngine],
+  );
 
   const defaultWelcomeMessage: CopilotMessage = {
     id: 'welcome-1',
     role: 'assistant',
-    content:
-      locale === 'he'
-        ? 'שלום! אני ה-AI Growth Copilot שלך. כיצד אוכל לעזור לך לייעל קמפיינים, לבדוק מדדים או לבצע שינויי תקציב היום?'
-        : "Hello! I'm your AI Growth Copilot. How can I assist you with optimizing campaigns, checking metrics, or reallocating budgets today?",
+    content: tPanel('welcomeMessage'),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
 
@@ -133,31 +173,10 @@ export function CopilotChatPanel({
   }, [messages, isTyping, scrollToBottom]);
 
   const quickPromptChips = [
-    {
-      label: locale === 'he' ? 'מודעות מובילות' : 'Top Ads',
-      query: locale === 'he' ? 'אילו מודעות הכי רווחיות השבוע?' : 'What are top ads this week?',
-    },
-    {
-      label: locale === 'he' ? 'הגדל תקציב' : 'Scale Budget',
-      query:
-        locale === 'he'
-          ? 'הגדל תקציב לקמפיין הריטרגטינג ל-$250'
-          : 'Increase budget for retargeting campaign to $250',
-    },
-    {
-      label: locale === 'he' ? 'קמפיין חדש' : 'New Campaign',
-      query:
-        locale === 'he'
-          ? 'צור קמפיין חדש לעורכי דין'
-          : 'Create a new campaign for lawyers',
-    },
-    {
-      label: locale === 'he' ? 'איזון תקציבי' : 'Budget Rebalance',
-      query:
-        locale === 'he'
-          ? 'העבר תקציב מגוגל למטא'
-          : 'Reallocate Google to Meta budget',
-    },
+    { label: tPanel('chipTopAdsLabel'), query: tPanel('chipTopAdsQuery') },
+    { label: tPanel('chipScaleBudgetLabel'), query: tPanel('chipScaleBudgetQuery') },
+    { label: tPanel('chipNewCampaignLabel'), query: tPanel('chipNewCampaignQuery') },
+    { label: tPanel('chipRebalanceLabel'), query: tPanel('chipRebalanceQuery') },
   ];
 
   async function handleSend(customQuery?: string) {
@@ -179,114 +198,60 @@ export function CopilotChatPanel({
 
     setIsTyping(true);
 
-    // Natural Language Intent Engine Simulation
+    /*
+      Delegates to lib/ai/copilot-engine, which resolves a campaign that actually exists and
+      declines the questions it has no measurement for.
+
+      This used to be a private copy of that engine: a chain of queryLower.includes() checks
+      returning canned replies - "I identified an optimization opportunity to scale the Meta
+      Retargeting campaign", "I've analyzed your query" - asserting analysis that never
+      happened, attached to proposals against hardcoded ids like tgt-meta-retargeting at
+      "$150/day" with "+32% projected conversions". handleApprove POSTs an approved proposal
+      to the real automation endpoint, so those ids had a path to a live ad account.
+
+      The 200ms delay is kept deliberately: it drives the typing indicator, and removing it
+      would make the reply appear before the indicator ever rendered.
+    */
     setTimeout(() => {
       setIsTyping(false);
-      const queryLower = textToSend.toLowerCase();
-      let assistantMsg: CopilotMessage;
 
-      const isHebrew = /[\u0590-\u05FF]/.test(textToSend);
+      const result = processCopilotQuery(textToSend, { orgId, projectId, targets, funnelSteps }, engineMessages);
 
-      if (queryLower.includes('budget') || queryLower.includes('תקציב') || queryLower.includes('increase') || queryLower.includes('scale') || queryLower.includes('הגדל')) {
-        assistantMsg = {
-          id: `asst-${Date.now()}`,
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: result.message.id,
           role: 'assistant',
-          content: isHebrew
-            ? 'זיהיתי הזדמנות להגדלת תקציב בקמפיין ריטרגטינג. הנה הצעת השינוי המותאמת עבורך:'
-            : 'I identified an optimization opportunity to scale the Meta Retargeting campaign. Here is the proposed budget update:',
+          content: result.message.content,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actionProposal: {
-            id: `prop-${Date.now()}`,
-            targetId: 'tgt-meta-retargeting',
-            targetLabel: 'Meta Retargeting Leads',
-            actionType: 'budget_change',
-            platform: 'meta_ads',
-            impactBadge: 'high',
-            beforeValue: '$150/day',
-            afterValue: '$250/day',
-            diffEntries: [
-              { key: 'Daily Budget', before: '$150/day', after: '$250/day' },
-            ],
-            estimatedImpact: isHebrew ? '+32% המרות חזויות' : '+32% projected conversions',
-            status: 'awaiting_approval',
-            payload: { dailyBudgetUsd: 250 },
-          },
-        };
-      } else if (queryLower.includes('new campaign') || queryLower.includes('קמפיין חדש') || queryLower.includes('lawyers') || queryLower.includes('עורכי דין') || queryLower.includes('draft') || queryLower.includes('טיוטה')) {
-        assistantMsg = {
-          id: `asst-${Date.now()}`,
-          role: 'assistant',
-          content: isHebrew
-            ? 'יצרתי הצעת טיוטה לקמפיין חיפוש ייעודי לעורכי דין עם מילות מפתח בעלות כוונת רכישה גבוהה.'
-            : 'I generated a campaign draft proposal targeting legal professionals with high intent search keywords.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actionProposal: {
-            id: `prop-draft-${Date.now()}`,
-            targetId: 'tgt-google-legal',
-            targetLabel: 'Google Search - Legal Leads',
-            actionType: 'campaign_draft',
-            platform: 'google_ads',
-            impactBadge: 'medium',
-            beforeValue: 'Draft',
-            afterValue: 'Ready to Launch ($100/day)',
-            diffEntries: [
-              { key: 'Status', before: 'Unpublished', after: 'Active' },
-              { key: 'Target ROAS', before: '—', after: '3.5x' },
-            ],
-            estimatedImpact: isHebrew ? '+45 לידים איכותיים בחודש' : '+45 qualified leads / month',
-            status: 'awaiting_approval',
-            payload: { platform: 'google_ads', budget: 100 },
-          },
-        };
-      } else if (queryLower.includes('top ads') || queryLower.includes('מודעות') || queryLower.includes('רווחיות') || queryLower.includes('best')) {
-        assistantMsg = {
-          id: `asst-${Date.now()}`,
-          role: 'assistant',
-          content: isHebrew
-            ? 'המודעות הכי רווחיות השבוע הן במודעות Meta עם ROAS של 4.2x (וידאו הדגמה 30 שניות) וקמפיין Google Brand Search עם ROAS של 5.1x.'
-            : 'The top performing ads this week are **Meta Video Creative (30s)** with **4.2x ROAS** ($4,200 rev on $1,000 spend) and **Google Brand Search** with **5.1x ROAS**.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-      } else if (queryLower.includes('reallocate') || queryLower.includes('העבר') || queryLower.includes('איזון')) {
-        assistantMsg = {
-          id: `asst-${Date.now()}`,
-          role: 'assistant',
-          content: isHebrew
-            ? 'ניתוח המדדים מציג שקמפיינים ב-Meta משיגים ROAS של 4.2x לעומת 1.5x ב-Google. הנה הצעה להעברת $300 מתקציב Google ל-Meta:'
-            : 'Performance analysis indicates Meta ROAS is 4.2x vs Google ROAS 1.5x. Here is a proposal to reallocate $300/day from Google to Meta:',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          actionProposal: {
-            id: `prop-rebal-${Date.now()}`,
-            targetId: 'tgt-rebalance',
-            targetLabel: 'Budget Rebalancing (Google → Meta)',
-            actionType: 'budget_change',
-            platform: 'meta_ads',
-            impactBadge: 'high',
-            beforeValue: 'Google $500 / Meta $500',
-            afterValue: 'Google $200 / Meta $800',
-            diffEntries: [
-              { key: 'Meta Daily Budget', before: '$500/day', after: '$800/day' },
-              { key: 'Google Daily Budget', before: '$500/day', after: '$200/day' },
-            ],
-            estimatedImpact: isHebrew ? '+38% רווחיות מצרפית' : '+38% blended net return',
-            status: 'awaiting_approval',
-          },
-        };
-      } else {
-        assistantMsg = {
-          id: `asst-${Date.now()}`,
-          role: 'assistant',
-          content: isHebrew
-            ? `ניתחתי את השאילתה שלך לגבי "${textToSend}". כל המערכות פועלות בתקינות. באפשרותך לבקש הצעת ייעול תקציב, ניתוח משפך או יצירת קמפיין חדש.`
-            : `I've analyzed your query for "${textToSend}". Current metrics are within healthy thresholds. You can ask me to scale budgets, inspect funnel drop-offs, or launch campaign drafts anytime.`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-      }
-
-      setMessages((prev) => [...prev, assistantMsg]);
+          ...(result.actionProposal ? { actionProposal: toActionProposalData(result.actionProposal) } : {}),
+        },
+      ]);
     }, 200);
   }
 
+  function appendSystemMessage(content: string) {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `sys-${Date.now()}`,
+        role: 'assistant',
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+  }
+
+  /**
+   * Reports what actually happened.
+   *
+   * Two separate ways this used to claim success on a failure: the `catch` branch appended
+   * the very same "Action executed successfully! Rollback is available in audit log."
+   * message as the happy path, and the happy path itself never inspected the response —
+   * `fetch` only rejects on a network error, so a 400 or a 403 from the propose endpoint
+   * resolved normally and was reported as executed. Either way the user was sent looking
+   * for a rollback entry that was never written.
+   */
   async function handleApprove(proposal: ActionProposalData) {
     setIsExecuting(true);
     setExecutingProposalId(proposal.targetId);
@@ -294,7 +259,7 @@ export function CopilotChatPanel({
       if (onExecuteProposal) {
         await onExecuteProposal(proposal);
       } else if (orgId && projectId) {
-        await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/propose`, {
+        const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/propose`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -303,33 +268,14 @@ export function CopilotChatPanel({
             afterDailyBudgetUsd: proposal.payload?.dailyBudgetUsd,
           }),
         });
+        if (!res.ok) {
+          throw new Error(`propose failed with ${res.status}`);
+        }
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-${Date.now()}`,
-          role: 'assistant',
-          content:
-            locale === 'he'
-              ? 'הפעולה בוצעה בהצלחה! ניתן לבטל בכל עת.'
-              : 'Action executed successfully! Rollback is available in audit log.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      appendSystemMessage(t('actionExecuted'));
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-${Date.now()}`,
-          role: 'assistant',
-          content:
-            locale === 'he'
-              ? 'הפעולה בוצעה בהצלחה! ניתן לבטל בכל עת.'
-              : 'Action executed successfully! Rollback is available in audit log.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      appendSystemMessage(t('actionFailed'));
     } finally {
       setIsExecuting(false);
       setExecutingProposalId(null);
@@ -376,7 +322,7 @@ export function CopilotChatPanel({
           <button
             type="button"
             onClick={handleClearChat}
-            title={locale === 'he' ? 'נקה שיחה' : 'Clear Chat'}
+            title={tPanel('clearChat')}
             className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
           >
             <Trash2 className="h-4 w-4" />
@@ -513,7 +459,7 @@ export function CopilotChatPanel({
           value={input}
           dir="auto"
           onChange={(e) => setInput(e.target.value)}
-          placeholder={t('inputPlaceholder') || (locale === 'he' ? 'שאל שאלה או תן פקודה...' : 'Ask a question or issue a command...')}
+          placeholder={t('inputPlaceholder')}
           className="flex-1 rounded-xl border border-input bg-card px-3.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary shadow-inner"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -530,7 +476,7 @@ export function CopilotChatPanel({
           disabled={!input.trim()}
           className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-soft hover:bg-primary/90 transition-all disabled:opacity-50 cursor-pointer active:scale-95"
         >
-          <span>{t('sendButton') || (locale === 'he' ? 'שלח' : 'Send')}</span>
+          <span>{t('sendButton')}</span>
           <Send className="ms-1.5 h-3.5 w-3.5" />
         </button>
       </div>

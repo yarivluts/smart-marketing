@@ -5,9 +5,17 @@
 # so `dbt build` is real and green in CI without a live BigQuery project. `dev` (DuckDB)
 # stays the default target CI actually builds against; `prod` (below) is the real
 # BigQuery leg (KAN-18 phase 4) — every model/macro compiles unchanged against either
-# adapter (see macros/cross_database.sql), but `prod` itself is inert until a human
-# provisions the real project (still `needs-human`) and points these env vars at it; it
-# has not been run against a live BigQuery project.
+# adapter (see macros/cross_database.sql).
+#
+# `prod` HAS been provisioned and run: the `growthos_core` dataset in growthos-g2w84
+# holds the built models (entities, events, measures, bridge_identity, stg_* and the
+# fact_* tables), and `api-prod` sets the warehouse env vars so the runtime query
+# executor targets it. This comment previously said prod was inert, needed a human, and
+# had never run against a live BigQuery project; that was true when written and is not
+# now. It matters because the two targets are not equivalent — see
+# `stg_identity_key_observations`, whose DuckDB leg joins the registered-identity-key
+# seed while its BigQuery leg uses fixed envelope paths — so believing dev is the only
+# live leg leads to reasoning about behaviour production does not have.
 growthos_transform:
   target: dev
   outputs:

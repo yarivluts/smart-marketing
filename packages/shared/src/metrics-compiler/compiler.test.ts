@@ -140,6 +140,39 @@ describe('compileMetricQuery — golden-file SQL tests', () => {
   });
 });
 
+describe('compileMetricQuery — total grain (a period value, not a series)', () => {
+  it('15: a ratio over the whole range compiles to ONE bucket per period, so the formula divides the period totals: sum(conversions) / sum(visitors)', () => {
+    expectGolden('15-total-grain-ratio-compare', {
+      metrics: ['lp_conversion_rate'],
+      time: { start: '2026-09-01', end: '2026-09-02', grain: 'total', compare: 'previous_period' },
+    });
+  });
+
+  it('16: a total-grain breakdown groups by the dimension only - one period value per campaign', () => {
+    expectGolden('16-total-grain-ratio-by-dimension', {
+      metrics: ['lp_conversion_rate'],
+      dimensions: ['campaign'],
+      time: { start: '2026-09-01', end: '2026-09-30', grain: 'total' },
+    });
+  });
+
+  it('never buckets by date at total grain: no DATE_TRUNC and no GROUP BY bucket_date, so no per-day ratio exists to be averaged', () => {
+    const compiled = compileMetricQuery(buildTestCatalog(), {
+      metrics: ['lp_conversion_rate'],
+      time: { start: '2026-09-01', end: '2026-09-02', grain: 'total' },
+    });
+    expect(compiled.sql).not.toContain('DATE_TRUNC');
+    expect(compiled.sql).not.toContain('GROUP BY bucket_date');
+    // The division happens once, in the outer SELECT, over each leaf's whole-range aggregate.
+    expect(compiled.sql.match(/SAFE_DIVIDE/g)).toHaveLength(1);
+  });
+
+  it('rejects a grain outside the query grains', () => {
+    const request = { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-01', grain: 'fortnight' } } as unknown as MetricQueryRequest;
+    expect(() => compileMetricQuery(buildTestCatalog(), request)).toThrow(MetricCompilerError);
+  });
+});
+
 describe('compileMetricQuery — formula max()/min() functions', () => {
   // Golden-file case 14 above covers max() end to end; this covers min()
   // compiling to LEAST() without needing a second full fixture pair.

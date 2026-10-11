@@ -61,10 +61,10 @@ function manifestWith(overrides: Partial<TvRotationManifest>): TvRotationManifes
   };
 }
 
-function renderScreen(manifest: TvRotationManifest): void {
+function renderScreen(manifest: TvRotationManifest, lastManifestAt: number | null = Date.now()): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <TvRotationScreen deviceToken="device-token-1" manifest={manifest} />
+      <TvRotationScreen deviceToken="device-token-1" manifest={manifest} lastManifestAt={lastManifestAt} pollIntervalMs={90_000} />
     </NextIntlClientProvider>,
   );
 }
@@ -198,5 +198,40 @@ describe('TvRotationScreen (KAN-67)', () => {
   it('omits the leaderboard frame entirely when it has no rows and no unattributed total', () => {
     renderScreen(manifestWith({ boards: [], goals: [], repCollectionLeaderboard: EMPTY_LEADERBOARD }));
     expect(screen.getByText('This TV has no boards or goals to show yet.')).toBeInTheDocument();
+  });
+
+  /**
+   * A wallboard that has stopped updating looks exactly like one that is
+   * working: both fetch paths swallow their errors on purpose and leave the
+   * last good data on screen, which is right for a blip and indistinguishable
+   * from an outage (KAN-172). Nobody is sitting at a TV to notice a missing
+   * spinner.
+   */
+  it('says nothing about staleness while the manifest is refreshing normally', () => {
+    vi.mocked(fetchTvBoardFrame).mockResolvedValue(BOARD_FRAME_A);
+    renderScreen(manifestWith({}), Date.now());
+    expect(screen.queryByText(/Not updating/)).toBeNull();
+  });
+
+  it('warns, with an age, once the manifest has not refreshed for several polls', () => {
+    vi.mocked(fetchTvBoardFrame).mockResolvedValue(BOARD_FRAME_A);
+    // Seven minutes against a 90s poll. Six would sit exactly ON the tolerance
+    // (4 x 90s), which `tv-staleness.test.ts` pins as not-yet-stale — the
+    // boundary belongs in that test, not smuggled into this one.
+    renderScreen(manifestWith({}), Date.now() - 7 * 60_000);
+    expect(screen.getByText(/Not updating/)).toBeInTheDocument();
+    expect(screen.getByText(/7 minutes ago/)).toBeInTheDocument();
+  });
+
+  /**
+   * First paint has nothing loaded yet and already shows its own loading state.
+   * Warning on top of that would fire on every TV for its first few seconds,
+   * and a banner that appears during normal operation is one the room learns to
+   * ignore.
+   */
+  it('says nothing about staleness before the first manifest has ever landed', () => {
+    vi.mocked(fetchTvBoardFrame).mockResolvedValue(BOARD_FRAME_A);
+    renderScreen(manifestWith({}), null);
+    expect(screen.queryByText(/Not updating/)).toBeNull();
   });
 });

@@ -55,7 +55,8 @@ with landings as (
         coalesce({{ json_text_field('properties', "'landing_page'") }}, '(unknown)') as landing_page,
         coalesce({{ json_text_field('properties', "'utm_campaign'") }}, '(none)') as campaign_id,
         coalesce({{ json_text_field('properties', "'channel'") }}, 'unknown') as channel_id,
-        entity_id as anon_id
+        -- The visitor, not the event (B12): see fact_attribution's touchpoints.
+        coalesce({{ json_text_field('properties', "'anon_id'") }}, entity_id) as anon_id
     from {{ ref('events') }}
     where event_type = 'touchpoint'
 ),
@@ -74,23 +75,54 @@ visitors as (
     group by 1, 2, 3, 4, 5, 6, 7
 ),
 
--- `channel_id = 'unattributed'` rows are conversions with no touchpoint at
--- all; they have no landing page to report on and are excluded rather than
--- piled into `(unknown)`, which is reserved for touchpoints that DID
+-- A conversion is a VISITOR WHO BECAME A KNOWN CUSTOMER, counted once, on
+-- the landing page that earned the last-touch credit for that customer's
+-- first such conversion, dated by when it happened.
+--
+-- Until B12 (2026-09-25) this counted every attributed event, and every
+-- non-touchpoint event is a "conversion" to fact_attribution - a page_view, a
+-- CTA click. Identity resolution never matched under the documented ingest
+-- contract, so the number was always 0 and nobody saw the definition; fixing
+-- the join alone would have turned one EasySign visitor (4 page views, 4
+-- clicks, a lead, a signup) into 10 conversions and a rate above 100%.
+-- Requiring `via_identity` keeps anonymous engagement out, and counting each
+-- customer once keeps the rate a rate: converted visitors / visitors.
+--
+-- `channel_id = 'unattributed'` rows have no touchpoint at all and so no
+-- landing page to report on; `(unknown)` is reserved for touchpoints that DID
 -- happen but carried no `landing_page` value.
+identified_conversions as (
+    select
+        organization_id,
+        project_id,
+        environment_id,
+        customer_id,
+        occurred_at,
+        coalesce(landing_page, '(unknown)') as landing_page,
+        coalesce(campaign_id, '(none)') as campaign_id,
+        channel_id,
+        row_number() over (
+            partition by organization_id, project_id, environment_id, customer_id
+            order by occurred_at asc, conversion_event_id asc
+        ) as rn
+    from {{ ref('fact_attribution') }}
+    where model = 'last_touch'
+      and channel_id != 'unattributed'
+      and via_identity
+),
+
 conversions as (
     select
         organization_id,
         project_id,
         environment_id,
         cast(occurred_at as date) as activity_date,
-        coalesce(landing_page, '(unknown)') as landing_page,
-        coalesce(campaign_id, '(none)') as campaign_id,
+        landing_page,
+        campaign_id,
         channel_id,
         count(*) as conversions
-    from {{ ref('fact_attribution') }}
-    where model = 'last_touch'
-      and channel_id != 'unattributed'
+    from identified_conversions
+    where rn = 1
     group by 1, 2, 3, 4, 5, 6, 7
 )
 

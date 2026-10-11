@@ -62,3 +62,56 @@ describe('synthesizeProactiveRecommendations', () => {
     expect(recs.some((r) => r.category === 'funnel_dropoff')).toBe(true);
   });
 });
+
+/**
+ * The guard these cases protect only works if callers pass honest input. The automation page
+ * used to hand this function a literal `roas: 3.8` for every campaign, which is never null, so
+ * the high-ROAS branch fired for every campaign on every project - with an Apply button wired
+ * to a real ad account. The same constant sat permanently above 3.5 and below nothing, so the
+ * pause branch could never fire either.
+ */
+describe('synthesizeProactiveRecommendations - unmeasured campaigns', () => {
+  const unmeasured = {
+    id: 'c1',
+    targetId: 'tgt-1',
+    label: 'EasySign Brand',
+    platform: 'meta_ads' as const,
+    status: 'enabled' as const,
+    dailyBudgetUsd: 120,
+    spend30dUsd: null,
+    impressions: null,
+    clicks: null,
+    ctrPct: null,
+    cpaUsd: null,
+    conversions: null,
+    roas: null,
+  };
+
+  it('raises no campaign recommendation when nothing has been measured', () => {
+    expect(synthesizeProactiveRecommendations([unmeasured], [])).toEqual([]);
+  });
+
+  it('raises a funnel recommendation from a real drop-off, with no invented forecast', () => {
+    const recs = synthesizeProactiveRecommendations(
+      [unmeasured],
+      [
+        { stageKey: 'view', stageLabel: 'Product View', stepOrder: 0, customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
+        { stageKey: 'checkout', stageLabel: 'Checkout', stepOrder: 1, customerCount: 300, conversionPercent: 30, dropOffPercent: 70 },
+      ],
+    );
+
+    expect(recs).toHaveLength(1);
+    expect(recs[0].category).toBe('funnel_dropoff');
+    // The 70% is measured; the old "+35 rescued conversions / month" was not.
+    expect(recs[0].description).toContain('70%');
+    expect(recs[0].projectedImpact).toBe('');
+    expect(recs[0].actionProposal.estimatedImpact).toBe('');
+  });
+
+  it('still acts on a campaign once its ROAS is genuinely measured', () => {
+    const recs = synthesizeProactiveRecommendations([{ ...unmeasured, roas: 4.2 }], []);
+    expect(recs).toHaveLength(1);
+    expect(recs[0].category).toBe('budget');
+    expect(recs[0].actionProposal.targetId).toBe('tgt-1');
+  });
+});

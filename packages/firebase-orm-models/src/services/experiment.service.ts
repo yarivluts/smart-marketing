@@ -6,6 +6,7 @@ import {
   EXPERIMENT_EXPOSURE_SCHEMA_NAME,
   EXPERIMENT_SCHEMA_FIELDS,
   MetricCompilerError,
+  TOTAL_GRAIN,
   type ExperimentResult,
   type ExperimentVariantCounts,
 } from '@growthos/shared';
@@ -15,7 +16,8 @@ import { DuplicateSchemaDefinitionError, getActiveSchemaDefinition, registerSche
 import { MetricNotRegisteredError, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { queryMetrics } from './metrics-query.service';
-import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseRow } from '../warehouse/query-executor';
+import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import type { MetricQueryResultCache } from '../warehouse/result-cache';
 
 export interface EnsureExperimentSchemasRegisteredParams {
   organizationId: string;
@@ -156,18 +158,27 @@ function groupRowsIntoExperimentResults(rows: readonly WarehouseRow[]): Experime
  * expected, per-query-recoverable outcome — mirrors that function's own
  * catch-and-classify posture.
  */
-export async function getExperimentResultsForProject(organizationId: string, projectId: string): Promise<ExperimentResultsOutcome> {
+export async function getExperimentResultsForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+): Promise<ExperimentResultsOutcome> {
   try {
     const result = await queryMetrics({
       organizationId,
       projectId,
+      ...(options?.executor ? { executor: options.executor } : {}),
+      ...(options?.cache ? { cache: options.cache } : {}),
       request: {
         metrics: ['experiment_exposures', 'experiment_conversions'],
         dimensions: ['experiment_key', 'variant_key'],
         // A lifetime view, not a windowed one — same reasoning `getNpsDimensionBreakdownForProject`
         // (KAN-82) documents: an experiment's result should reflect all its data, not just a recent
         // window, and this pack has no separate "experiment start/end date" concept to window by yet.
-        time: { start: '1970-01-01', end: '2999-12-31', grain: 'year' },
+        // `total`, not `year`: both metrics are count_distinct customers, and a customer exposed in
+        // December and again in January was one exposure per calendar-year bucket - summed below
+        // into two, skewing the significance test. One whole-range bucket counts them once.
+        time: { start: '1970-01-01', end: '2999-12-31', grain: TOTAL_GRAIN },
       },
     });
     return { ok: true, results: groupRowsIntoExperimentResults(result.series) };

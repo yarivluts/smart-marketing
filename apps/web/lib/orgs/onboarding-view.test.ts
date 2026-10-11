@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OnboardingStateModel } from '@growthos/firebase-orm-models';
-import { toOnboardingStateView } from './onboarding-view';
+import { buildFunnelEditorRows, toOnboardingStateView } from './onboarding-view';
 
 function state(overrides: Partial<OnboardingStateModel> & Pick<OnboardingStateModel, 'id'>): OnboardingStateModel {
   return {
@@ -53,5 +53,46 @@ describe('toOnboardingStateView', () => {
       startedAt: '2026-07-12T00:00:00.000Z',
       completedAt: '2026-07-12T00:10:00.000Z',
     });
+  });
+});
+
+describe('buildFunnelEditorRows (KAN-199)', () => {
+  const PROPOSAL = [
+    { eventSchemaName: 'page_viewed', stageKey: 'awareness' as const },
+    { eventSchemaName: 'signup', stageKey: 'signup' as const },
+    { eventSchemaName: 'document_signed', stageKey: 'other' as const },
+  ];
+
+  it('is the proposal, every step included, when no funnel is confirmed', () => {
+    expect(buildFunnelEditorRows([], PROPOSAL)).toEqual([
+      { eventSchemaName: 'page_viewed', stageKey: 'awareness', included: true },
+      { eventSchemaName: 'signup', stageKey: 'signup', included: true },
+      { eventSchemaName: 'document_signed', stageKey: 'other', included: true },
+    ]);
+  });
+
+  it('starts from a confirmed funnel (e.g. one set over MCP) in its own order and stages, then the rest of the proposal unticked', () => {
+    const confirmed = [
+      { eventSchemaName: 'document_signed', stageKey: 'conversion' as const, order: 1 },
+      { eventSchemaName: 'signup', stageKey: 'signup' as const, order: 0 },
+    ];
+    expect(buildFunnelEditorRows(confirmed, PROPOSAL)).toEqual([
+      { eventSchemaName: 'signup', stageKey: 'signup', included: true },
+      { eventSchemaName: 'document_signed', stageKey: 'conversion', included: true },
+      { eventSchemaName: 'page_viewed', stageKey: 'awareness', included: false },
+    ]);
+  });
+
+  it('keeps a confirmed step even if the proposal no longer lists it', () => {
+    const confirmed = [
+      { eventSchemaName: 'legacy_event', stageKey: 'other' as const, order: 0 },
+      { eventSchemaName: 'signup', stageKey: 'signup' as const, order: 1 },
+    ];
+    expect(buildFunnelEditorRows(confirmed, PROPOSAL).map((row) => [row.eventSchemaName, row.included])).toEqual([
+      ['legacy_event', true],
+      ['signup', true],
+      ['page_viewed', false],
+      ['document_signed', false],
+    ]);
   });
 });

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { InvalidProjectNameError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
+import { InvalidProjectCurrencyError, InvalidProjectNameError, InvalidProjectTimezoneError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { updateProjectDetails } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
@@ -11,17 +11,17 @@ interface RouteParams {
 interface UpdateProjectRequestBody {
   name?: unknown;
   vertical?: unknown;
-  platformType?: unknown;
-  businessModel?: unknown;
-  transactionType?: unknown;
-  primaryStack?: unknown;
-  verifiedRequirements?: unknown;
-  customHiddenModules?: unknown;
+  currency?: unknown;
+  timezone?: unknown;
 }
 
 /**
- * Edits a project's own `name`/`vertical` and full profile metadata.
- * Gated on `project.manage`.
+ * Edits a project's own `name`/`vertical` — the same "create + list only,
+ * no way to fix a typo'd definition" gap KAN-100/117/119/120/121 already
+ * closed for their own sibling registries. Gated on `project.manage`, the
+ * same per-project admin-config permission the session-replay and
+ * cost-guardrail routes use. `session_replay_url_template` has its own
+ * dedicated route (`.../session-replay`) and is untouched here.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
@@ -35,22 +35,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     return parsed.error;
   }
 
-  const {
-    name,
-    vertical,
-    platformType,
-    businessModel,
-    transactionType,
-    primaryStack,
-    verifiedRequirements,
-    customHiddenModules,
-  } = parsed.body;
-
+  const { name, vertical, currency, timezone } = parsed.body;
   if (typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }
   if (vertical !== undefined && typeof vertical !== 'string') {
     return NextResponse.json({ error: 'invalid_vertical' }, { status: 400 });
+  }
+  if (currency !== undefined && typeof currency !== 'string') {
+    return NextResponse.json({ error: 'invalid_currency' }, { status: 400 });
+  }
+  if (timezone !== undefined && typeof timezone !== 'string') {
+    return NextResponse.json({ error: 'invalid_timezone' }, { status: 400 });
   }
 
   try {
@@ -58,13 +54,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       organizationId: orgId,
       projectId,
       name,
-      vertical: typeof vertical === 'string' ? vertical : undefined,
-      platformType: typeof platformType === 'string' ? platformType : undefined,
-      businessModel: typeof businessModel === 'string' ? businessModel : undefined,
-      transactionType: typeof transactionType === 'string' ? transactionType : undefined,
-      primaryStack: typeof primaryStack === 'string' ? primaryStack : undefined,
-      verifiedRequirements: Array.isArray(verifiedRequirements) ? verifiedRequirements.filter((r): r is string => typeof r === 'string') : undefined,
-      customHiddenModules: Array.isArray(customHiddenModules) ? customHiddenModules.filter((m): m is string => typeof m === 'string') : undefined,
+      vertical,
+      currency,
+      timezone,
       actorUserId: user.id,
     });
     return NextResponse.json({
@@ -72,12 +64,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
         id: project.id,
         name: project.name,
         vertical: project.vertical ?? '',
-        platformType: project.platform_type ?? 'web',
-        businessModel: project.business_model ?? 'saas_subscription',
-        transactionType: project.transaction_type ?? 'monthly_recurring',
-        primaryStack: project.primary_stack ?? 'custom_web',
-        verifiedRequirements: project.verified_requirements ?? [],
-        customHiddenModules: project.custom_hidden_modules ?? [],
+        currency: project.currency ?? '',
+        timezone: project.timezone ?? '',
       },
     });
   } catch (err) {
@@ -86,6 +74,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     }
     if (err instanceof InvalidProjectNameError) {
       return NextResponse.json({ error: 'name_required' }, { status: 400 });
+    }
+    if (err instanceof InvalidProjectCurrencyError) {
+      return NextResponse.json({ error: 'invalid_currency' }, { status: 400 });
+    }
+    if (err instanceof InvalidProjectTimezoneError) {
+      return NextResponse.json({ error: 'invalid_timezone' }, { status: 400 });
     }
     throw err;
   }

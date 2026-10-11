@@ -12,18 +12,24 @@ export const DEFAULT_INGEST_HEALTH_BATCH_LIMIT = 200;
 
 /**
  * The most recent ingest batches for a project, newest first (KAN-35: ingest
- * health throughput/error-rate/freshness rollup + quarantine browser). Not
- * scoped to one environment — a project's dev/staging/prod batches are all
- * folded into one view, same as KAN-30's keys page listing every
- * environment's keys together with an environment label per row.
+ * health throughput/error-rate/freshness rollup + quarantine browser). With
+ * no `environmentId`, a project's dev/staging/prod batches are all folded
+ * into one view, same as KAN-30's keys page listing every environment's keys
+ * together with an environment label per row. Given one (KAN-196's project
+ * environment picker), only that environment's batches are returned; that
+ * query needs the (`environment_id`, `created_at` desc) composite index.
  */
 export async function listRecentIngestBatchesForProject(
   organizationId: string,
   projectId: string,
   limit: number = DEFAULT_INGEST_HEALTH_BATCH_LIMIT,
+  environmentId?: string,
 ): Promise<IngestBatchModel[]> {
-  return IngestBatchModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = IngestBatchModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .orderBy('created_at', 'desc')
     .limit(limit)
     .get();

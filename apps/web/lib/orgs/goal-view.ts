@@ -1,5 +1,5 @@
 import type { GoalModel, GoalProgressOutcome } from '@growthos/firebase-orm-models';
-import type { GoalForecastMilestone, GoalForecastResult, GoalPaceStatus, GoalTrajectoryPoint } from '@growthos/shared';
+import type { GoalPaceStatus, ParsedMetricUnit } from '@growthos/shared';
 
 /** A goal's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface GoalSummaryView {
@@ -40,22 +40,6 @@ const STATUS_COLOR: Record<GoalPaceStatus, 'green' | 'amber' | 'red'> = {
   off_track: 'red',
 };
 
-export interface GoalForecastView {
-  completionProbability: number;
-  probabilityFormatted: string; // e.g. "84.2%"
-  p10: number;
-  p50: number;
-  p90: number;
-  projectedCompletionDate: string | null;
-  projectedDaysAheadOrBehind: number;
-  meanDailyVelocity: number;
-  standardDeviation: number;
-  velocityUpliftPct: number;
-  simulatedRuns: number;
-  trajectorySpline: GoalTrajectoryPoint[];
-  milestones: GoalForecastMilestone[];
-}
-
 export type GoalThermometerView =
   | {
       kind: 'ok';
@@ -67,8 +51,18 @@ export type GoalThermometerView =
       expectedAtNow: number;
       projectedFinalValue: number;
       isGoalMet: boolean;
-      forecast?: GoalForecastResult;
+      /** The goal metric's declared unit (KAN-213), which the figures are shown in. Absent for a plain number. */
+      unit?: ParsedMetricUnit;
     }
+  /**
+   * The metric returned no rows over the goal's window, so there is no pace to report.
+   *
+   * Distinct from `ok` with a zero value: `actualValue` is a sum, so a metric that has never
+   * received a record sums to 0 exactly as one measured at zero does. Pace computed against
+   * that 0 renders "off track" in red at 0% - a project that has not started reporting shown
+   * exactly like one that is failing, when the two call for opposite responses.
+   */
+  | { kind: 'no_measurements' }
   | { kind: 'warehouse_not_configured' }
   | { kind: 'quota_exceeded'; message: string }
   | { kind: 'not_yet_backed'; message: string }
@@ -85,7 +79,7 @@ export type GoalThermometerView =
  * over-target maximize goal) or sits at 0 (a range goal missed on the low
  * side).
  */
-export function buildGoalThermometerView(outcome: GoalProgressOutcome): GoalThermometerView {
+export function buildGoalThermometerView(outcome: GoalProgressOutcome, unit?: ParsedMetricUnit): GoalThermometerView {
   if (!outcome.ok) {
     if (outcome.reason === 'warehouse_not_configured') {
       return { kind: 'warehouse_not_configured' };
@@ -93,7 +87,11 @@ export function buildGoalThermometerView(outcome: GoalProgressOutcome): GoalTher
     return { kind: outcome.reason, message: outcome.message };
   }
 
-  const { progress, actualValue, forecast } = outcome;
+  if (!outcome.hasMeasurements) {
+    return { kind: 'no_measurements' };
+  }
+
+  const { progress, actualValue } = outcome;
   const percentFilled = Math.min(100, Math.max(0, progress.progressRatio * 100));
 
   return {
@@ -105,25 +103,6 @@ export function buildGoalThermometerView(outcome: GoalProgressOutcome): GoalTher
     expectedAtNow: progress.expectedAtNow,
     projectedFinalValue: progress.projectedFinalValue,
     isGoalMet: progress.isGoalMet,
-    ...(forecast ? { forecast } : {}),
-  };
-}
-
-export function buildGoalForecastView(forecast?: GoalForecastResult): GoalForecastView | null {
-  if (!forecast) return null;
-  return {
-    completionProbability: forecast.completionProbability,
-    probabilityFormatted: `${(forecast.completionProbability * 100).toFixed(1)}%`,
-    p10: forecast.confidenceInterval.p10,
-    p50: forecast.confidenceInterval.p50,
-    p90: forecast.confidenceInterval.p90,
-    projectedCompletionDate: forecast.projectedCompletionDate,
-    projectedDaysAheadOrBehind: forecast.projectedDaysAheadOrBehind,
-    meanDailyVelocity: forecast.meanDailyVelocity,
-    standardDeviation: forecast.standardDeviation,
-    velocityUpliftPct: forecast.velocityUpliftPct,
-    simulatedRuns: forecast.simulatedRuns,
-    trajectorySpline: forecast.trajectorySpline,
-    milestones: forecast.milestones,
+    ...(unit && unit.kind !== 'number' ? { unit } : {}),
   };
 }

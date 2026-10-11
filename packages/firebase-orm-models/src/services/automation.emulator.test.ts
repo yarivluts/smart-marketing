@@ -120,6 +120,7 @@ function campaignDraft(overrides: Partial<CampaignDraft> = {}): CampaignDraft {
   return {
     campaignName: 'Winning Themes',
     advertisingChannelType: 'SEARCH',
+    containsEuPoliticalAdvertising: false,
     dailyBudgetUsd: 25,
     adGroups: [
       {

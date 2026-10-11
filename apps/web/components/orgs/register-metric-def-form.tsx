@@ -3,8 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
-import { PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   blankMetricDefinitionFormState,
   metricDefinitionFormStateToRequestBody,
@@ -17,7 +17,7 @@ export interface RegisterMetricDefFormProps {
   projectId: string;
 }
 
-/** Registers v1 of a new metric. */
+/** Registers v1 of a new metric (KAN-40 AC: "invalid definition rejected with a clear error"). */
 export function RegisterMetricDefForm({ orgId, projectId }: RegisterMetricDefFormProps): React.ReactElement {
   const t = useTranslations('MetricRegistry');
   const router = useRouter();
@@ -56,31 +56,24 @@ export function RegisterMetricDefForm({ orgId, projectId }: RegisterMetricDefFor
   }
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
-      <PpField label={t('nameLabel')} htmlFor="metric-def-name">
-        <input
-          id="metric-def-name"
-          required
-          placeholder={t('namePlaceholder')}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          className={ppInputClass}
-        />
-      </PpField>
+    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor="metric-def-name">
+          {t('nameLabel')}
+        </label>
+        <Input id="metric-def-name" required placeholder={t('namePlaceholder')} value={name} onChange={(event) => setName(event.target.value)} />
+      </div>
 
       <MetricDefinitionEditor state={definitionState} onChange={setDefinitionState} />
 
       {error ? (
-        <p role="alert" className="text-sm font-medium text-pp-error">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
-
-      <div>
-        <PpButton type="submit" variant="primary" icon={PlusCircle} disabled={submitting}>
-          {t('register')}
-        </PpButton>
-      </div>
+      <Button type="submit" disabled={submitting}>
+        {t('register')}
+      </Button>
     </form>
   );
 }

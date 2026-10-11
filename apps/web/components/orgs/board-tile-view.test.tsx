@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { BoardTileView } from './board-tile-view';
+import { BoardTileView, defaultTableSortColumn } from './board-tile-view';
 import type { BoardTileRow } from './board-types';
 import messages from '../../messages/en.json';
-import type { TileRenderView } from '@/lib/orgs/board-view';
+import heMessages from '../../messages/he.json';
+import { buildTileRenderView, type TileRenderView } from '@/lib/orgs/board-view';
+import { MAX_SMALL_MULTIPLES } from '@/lib/orgs/chart-labels';
+import { layoutHeightPx, planBarChartLayout, tileBodyHeightPx, VALUE_HEADROOM_PX } from '@/lib/orgs/small-multiples-layout';
+import { defaultTileSize } from './board-types';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -43,6 +47,86 @@ describe('BoardTileView', () => {
     expect(screen.getByText('50% vs. previous')).toBeInTheDocument();
   });
 
+  describe('values in their metric unit (KAN-213)', () => {
+    const ratio = { lp_conversion_rate: { kind: 'ratio' as const } };
+
+    it('shows a ratio big number as a percent: 0.5 is 50%', () => {
+      renderTile({ kind: 'big_number', value: 0.5, isEmpty: false, freshness: null, units: ratio }, { metricNames: ['lp_conversion_rate'], title: 'Conversion rate' });
+      expect(screen.getByText('50%')).toBeInTheDocument();
+      expect(screen.queryByText('0.5')).not.toBeInTheDocument();
+    });
+
+    it('renders a ratio big number over day 1 at 1/1 and day 2 at 1/100 as the period value 2/101 = 1.98% (shown to one decimal: "2%") - never as 50.5% (B24)', () => {
+      // What `queryBoardTile` returns for the tile: its range as ONE bucket, the rate over the
+      // period's totals (2 conversions / 101 visitors).
+      const view = buildTileRenderView(
+        { id: 't1', type: 'big_number', title: 'Conversion rate', layout: { x: 0, y: 0, w: 3, h: 2 }, metricNames: ['lp_conversion_rate'], dimensions: [] },
+        { ok: true, series: [{ bucket_date: '2026-09-01', lp_conversion_rate: 2 / 101 }] },
+        null,
+        ratio,
+      );
+      renderTile(view, { metricNames: ['lp_conversion_rate'], title: 'Conversion rate' });
+      expect(screen.getByText('2%')).toBeInTheDocument();
+      expect(screen.queryByText('50.5%')).not.toBeInTheDocument();
+      expect(screen.queryByText('51%')).not.toBeInTheDocument();
+    });
+
+    it('shows a currency big number with its symbol', () => {
+      renderTile({ kind: 'big_number', value: 1250, isEmpty: false, freshness: null, units: { ad_spend: { kind: 'currency', currency: 'USD' } } });
+      expect(screen.getByText('$1,250.00')).toBeInTheDocument();
+    });
+
+    it.each(['bar', 'line'] as const)('labels %s values, legend and screen-reader table in the unit', (chart) => {
+      renderTile(
+        {
+          kind: 'time_series',
+          chart,
+          series: [{ label: 'all', points: [{ bucket: '2026-09-24', value: 0.08 }, { bucket: '2026-09-25', value: 0.125 }] }],
+          isEmpty: false,
+          freshness: null,
+          units: ratio,
+        },
+        { type: chart, metricNames: ['lp_conversion_rate'], title: 'Conversion rate' },
+      );
+      expect(screen.getAllByText('8%').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('12.5%').length).toBeGreaterThan(0);
+      const table = screen.getByRole('table', { name: 'Conversion rate' });
+      expect(within(table).getByText('12.5%')).toBeInTheDocument();
+    });
+
+    it('formats a table metric column in its unit and leaves dimension columns alone', () => {
+      renderTile(
+        { kind: 'table', columns: ['campaign_id', 'lp_conversion_rate'], rows: [{ campaign_id: '42', lp_conversion_rate: 0.25 }], isEmpty: false, freshness: null, units: ratio },
+        { type: 'table', metricNames: ['lp_conversion_rate'] },
+      );
+      expect(screen.getByText('25%')).toBeInTheDocument();
+      expect(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    it('formats each funnel step total in its own unit', () => {
+      renderTile(
+        {
+          kind: 'funnel',
+          steps: [{ metricName: 'revenue', total: 1000, pctOfFirstStep: 100 }],
+          isEmpty: false,
+          freshness: null,
+          units: { revenue: { kind: 'currency', currency: 'EUR' } },
+        },
+        { type: 'funnel', metricNames: ['revenue'] },
+      );
+      expect(screen.getByText('€1,000.00 (100%)')).toBeInTheDocument();
+    });
+
+    it('in Hebrew, still shows the percent', () => {
+      render(
+        <NextIntlClientProvider locale="he" messages={heMessages}>
+          <BoardTileView tile={tile({ metricNames: ['lp_conversion_rate'] })} view={{ kind: 'big_number', value: 0.5, isEmpty: false, freshness: null, units: ratio }} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.getByText(/50/)).toHaveTextContent('%');
+    });
+  });
+
   it('renders an empty big_number state instead of a misleading zero', () => {
     renderTile({ kind: 'big_number', value: 0, isEmpty: true, freshness: null });
     expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
@@ -77,7 +161,7 @@ describe('BoardTileView', () => {
       { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }], isEmpty: false, freshness: null },
       { type: 'bar' },
     );
-    expect(screen.getByRole('img', { name: 'all' })).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Ad spend' })).toBeInTheDocument();
   });
 
   it('renders an empty bar-chart state', () => {
@@ -95,10 +179,30 @@ describe('BoardTileView', () => {
         // each array's own independent index, "meta" (current, index 1)
         // and "google" (previous, index 0) would wrongly share a color.
         series: [
-          { label: 'google', points: [{ bucket: '2026-01-01', value: 10 }] },
-          { label: 'meta', points: [{ bucket: '2026-01-01', value: 5 }] },
+          {
+            label: 'google',
+            points: [
+              { bucket: '2026-01-01', value: 10 },
+              { bucket: '2026-01-02', value: 12 },
+            ],
+          },
+          {
+            label: 'meta',
+            points: [
+              { bucket: '2026-01-01', value: 5 },
+              { bucket: '2026-01-02', value: 6 },
+            ],
+          },
         ],
-        previousSeries: [{ label: 'google', points: [{ bucket: '2025-12-01', value: 8 }] }],
+        previousSeries: [
+          {
+            label: 'google',
+            points: [
+              { bucket: '2025-12-30', value: 8 },
+              { bucket: '2025-12-31', value: 9 },
+            ],
+          },
+        ],
         isEmpty: false,
         freshness: null,
       },
@@ -128,6 +232,331 @@ describe('BoardTileView', () => {
     );
     expect(screen.getByText('Previous period')).toBeInTheDocument();
     expect(screen.getByTitle('2025-12-01: 8')).toBeInTheDocument();
+  });
+
+  describe('gaps - a bucket with no value (KAN-210 follow-up)', () => {
+    const withGap = [
+      { bucket: '2026-09-23', value: 1 },
+      { bucket: '2026-09-24', value: null },
+      { bucket: '2026-09-25', value: 3 },
+      { bucket: '2026-09-26', value: 4 },
+    ];
+
+    it('a line breaks at a gap instead of drawing straight across it', () => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'line', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
+        { type: 'line', title: 'CAC' },
+      );
+      const lines = container.querySelectorAll('polyline');
+      // Only the 9/25-9/26 run is a line; 9/23 stands alone (drawn as its labelled dot), and nothing
+      // connects 9/23 to 9/25.
+      expect(lines).toHaveLength(1);
+      expect(lines[0].getAttribute('points')?.split(' ')).toHaveLength(2);
+      const table = screen.getByRole('table', { name: 'CAC' });
+      expect(within(table).getByRole('row', { name: '2026-09-24 No value' })).toBeInTheDocument();
+    });
+
+    it('a lone value between two gaps is still drawn, as a dot, when it carries no label', () => {
+      const lone = [
+        { bucket: '2026-09-23', value: null },
+        { bucket: '2026-09-24', value: 2 },
+        { bucket: '2026-09-25', value: null },
+      ];
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'line',
+          series: [
+            { label: 'google', points: lone },
+            { label: 'meta', points: lone },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'line' },
+      );
+      expect(container.querySelectorAll('polyline')).toHaveLength(0);
+      expect(container.querySelectorAll('[data-testid="series-dot"]')).toHaveLength(2);
+    });
+
+    it('the plot is inset so the first and last points are not cut in half at the tile edge', () => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'line', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
+        { type: 'line', title: 'CAC' },
+      );
+      const plot = container.querySelector('[data-testid="line-plot"]');
+      // The plot and its axis share one inset wrapper, so labels stay aligned under their points.
+      expect(plot?.className).toMatch(/(^|\s)px-2(\s|$)/);
+      expect(plot?.querySelector('svg')).not.toBeNull();
+      expect(plot?.querySelector('.border-t')).not.toBeNull();
+    });
+
+    it('a bar tile leaves an empty, labelled slot for a gap rather than a zero-height bar', () => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
+        { type: 'bar', title: 'CAC' },
+      );
+      expect(container.querySelectorAll('[data-testid="series-bar"]')).toHaveLength(3);
+      expect(screen.getByTitle('2026-09-24: no value')).toHaveAttribute('data-testid', 'series-bar-gap');
+    });
+
+    it('a real zero is still a bar and a point, never a gap', () => {
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'bar',
+          series: [
+            {
+              label: 'all',
+              points: [
+                { bucket: '2026-09-24', value: 0 },
+                { bucket: '2026-09-25', value: 2 },
+              ],
+            },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'bar' },
+      );
+      expect(container.querySelectorAll('[data-testid="series-bar"]')).toHaveLength(2);
+      expect(container.querySelectorAll('[data-testid="series-bar-gap"]')).toHaveLength(0);
+    });
+  });
+
+  describe('readable time-series labels (KAN-210)', () => {
+    const signupsPerDay = [
+      { bucket: '2026-09-24', value: 1 },
+      { bucket: '2026-09-25', value: 3 },
+      { bucket: '2026-09-26', value: 0 },
+    ];
+
+    /** The drawn (aria-hidden) plot + axis - what a sighted reader or a screenshot sees. */
+    function visiblePlot(container: HTMLElement): HTMLElement {
+      const plot = container.querySelector<HTMLElement>('[dir="ltr"][aria-hidden="true"]');
+      expect(plot).not.toBeNull();
+      return plot!;
+    }
+
+    it.each(['bar', 'line'] as const)('prints each %s value and its bucket date as text on the chart', (chart) => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart, series: [{ label: 'all', points: signupsPerDay }], isEmpty: false, freshness: null },
+        { type: chart, title: 'Signups per day' },
+      );
+      const plot = within(visiblePlot(container));
+      for (const text of ['1', '3', '0', '9/24', '9/25', '9/26']) {
+        expect(plot.getByText(text)).toBeInTheDocument();
+      }
+    });
+
+    it.each(['bar', 'line'] as const)('exposes the %s series to assistive tech as a captioned table of date and value', (chart) => {
+      renderTile(
+        { kind: 'time_series', chart, series: [{ label: 'all', points: signupsPerDay }], isEmpty: false, freshness: null },
+        { type: chart, title: 'Signups per day' },
+      );
+      const table = screen.getByRole('table', { name: 'Signups per day' });
+      expect(within(table).getByRole('columnheader', { name: 'Date' })).toBeInTheDocument();
+      expect(within(table).getByRole('row', { name: '2026-09-25 3' })).toBeInTheDocument();
+    });
+
+    it('formats the axis dates for the Hebrew locale and keeps the plot left-to-right', () => {
+      const { container } = render(
+        <NextIntlClientProvider locale="he" messages={heMessages}>
+          <BoardTileView
+            tile={tile({ type: 'bar', title: 'Signups per day' })}
+            view={{ kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: signupsPerDay }], isEmpty: false, freshness: null }}
+          />
+        </NextIntlClientProvider>,
+      );
+      const plot = visiblePlot(container);
+      expect(within(plot).getByText('25.9')).toBeInTheDocument();
+      expect(within(plot).getByText('3')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: heMessages.Boards.chartBucketColumn })).toBeInTheDocument();
+    });
+
+    it('pairs a muted previous-period bar beside each current bar in the same plot, with its own captioned table', () => {
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'bar',
+          series: [{ label: 'all', points: [{ bucket: '2026-09-25', value: 3 }] }],
+          previousSeries: [{ label: 'all', points: [{ bucket: '2026-09-18', value: 7 }] }],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'bar', title: 'Signups per day' },
+      );
+      const plots = container.querySelectorAll<HTMLElement>('[dir="ltr"][aria-hidden="true"]');
+      expect(plots).toHaveLength(1);
+      const plot = within(plots[0]);
+      expect(plot.getByText('3')).toBeInTheDocument();
+      expect(plot.getByText('9/25')).toBeInTheDocument();
+      expect(plot.getByTitle('2026-09-18: 7')).toHaveClass('opacity-40');
+      expect(screen.getByText('Previous period')).toBeInTheDocument();
+      const previousTable = screen.getByRole('table', { name: 'Signups per day (previous period)' });
+      expect(within(previousTable).getByRole('row', { name: '2026-09-18 7' })).toBeInTheDocument();
+    });
+
+    it('puts each series\' latest value in the legend of a split line tile rather than on colliding points', () => {
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'line',
+          series: [
+            { label: 'google', points: [{ bucket: '2026-09-24', value: 4 }, { bucket: '2026-09-25', value: 10 }] },
+            { label: 'meta', points: [{ bucket: '2026-09-24', value: 2 }, { bucket: '2026-09-25', value: 5 }] },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'line' },
+      );
+      const legendItems = [...container.querySelectorAll('ul li')].map((item) => item.textContent);
+      expect(legendItems).toEqual(['google10', 'meta5']);
+      expect(within(visiblePlot(container)).getByText('9/25')).toBeInTheDocument();
+    });
+
+    it('thins labels on a long series so they do not collide, while the table keeps every value', () => {
+      const points = Array.from({ length: 30 }, (_, index) => ({
+        bucket: `2026-09-${String(index + 1).padStart(2, '0')}`,
+        value: index === 10 ? 50 : 2,
+      }));
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points }], isEmpty: false, freshness: null },
+        { type: 'bar', title: 'Signups per day' },
+      );
+      const plot = within(visiblePlot(container));
+      expect(plot.getByText('50')).toBeInTheDocument(); // the peak
+      expect(plot.getAllByText('2')).toHaveLength(1); // only the latest of the 29 other bars
+      expect(plot.getByText('9/30')).toBeInTheDocument(); // the latest bucket is always on the axis
+      expect(within(screen.getByRole('table', { name: 'Signups per day' })).getAllByRole('row')).toHaveLength(31);
+    });
+
+    it('captions each series table of a split line tile with the tile title and the series', () => {
+      renderTile(
+        {
+          kind: 'time_series',
+          chart: 'line',
+          series: [
+            { label: 'google', points: [{ bucket: '2026-09-25', value: 10 }] },
+            { label: 'meta', points: [{ bucket: '2026-09-25', value: 5 }] },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'line' },
+      );
+      expect(screen.getByRole('table', { name: 'Ad spend · google' })).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: 'Ad spend · meta' })).toBeInTheDocument();
+    });
+  });
+
+  describe('a split tile stays inside its grid cell (KAN-217)', () => {
+    const byCampaign = (values: Record<string, number>) => ({
+      kind: 'time_series' as const,
+      chart: 'bar' as const,
+      series: Object.entries(values).map(([label, value]) => ({ label, points: [{ bucket: '2026-09-25', value }] })),
+      isEmpty: false,
+      freshness: null,
+    });
+
+    it('clips the tile body and scrolls it, rather than letting content paint over the tile below', () => {
+      const { getByTestId } = renderTile(byCampaign({ a: 1, b: 2 }), { type: 'bar' });
+      const body = getByTestId('board-tile-body');
+      expect(body).toHaveClass('h-full', 'overflow-y-auto', 'overflow-x-hidden');
+    });
+
+    // Tall enough for the full cap of three plots - see `planBarChartLayout`.
+    const tallTile = { x: 0, y: 0, w: 6, h: 8 };
+
+    it('draws at most three per-campaign plots and summarises the rest behind "+N more"', () => {
+      const { container } = renderTile(byCampaign({ spring: 0.12, summer: 0.5, autumn: 0.08, winter: 0.3, brand: 0.02 }), {
+        type: 'bar',
+        title: 'Conversion rate',
+        layout: tallTile,
+      });
+      // One plot (a labelled <figure>) per drawn campaign: the three with the largest values.
+      const plots = container.querySelectorAll('figure');
+      expect([...plots].map((plot) => plot.getAttribute('aria-label'))).toEqual([
+        'Conversion rate · spring',
+        'Conversion rate · summer',
+        'Conversion rate · winter',
+      ]);
+      expect(container.querySelectorAll('[data-testid="series-bar"]')).toHaveLength(3);
+
+      const more = screen.getByTestId('small-multiples-more');
+      expect(within(more).getByText('+2 more')).toBeInTheDocument();
+      expect(within(more).getByText('autumn')).toBeInTheDocument();
+      expect(within(more).getByText('0.08')).toBeInTheDocument();
+      expect(within(more).getByText('brand')).toBeInTheDocument();
+      // The hidden campaigns' numbers still reach assistive tech.
+      expect(screen.getByRole('table', { name: 'Conversion rate · autumn' })).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: 'Conversion rate · brand' })).toBeInTheDocument();
+    });
+
+    it('shows no "+N more" when the split fits under the cap', () => {
+      renderTile(byCampaign({ a: 1, b: 2, c: 3 }), { type: 'bar', layout: tallTile });
+      expect(screen.queryByTestId('small-multiples-more')).not.toBeInTheDocument();
+    });
+
+    it('translates the "+N more" affordance', () => {
+      render(
+        <NextIntlClientProvider locale="he" messages={heMessages}>
+          <BoardTileView tile={tile({ type: 'bar', layout: tallTile })} view={byCampaign({ a: 1, b: 2, c: 3, d: 4 })} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.getByText(heMessages.Boards.moreSeriesLabel.replace('{count}', '1'))).toBeInTheDocument();
+    });
+  });
+
+  describe('a split tile fits its default-height cell, "+N more" included (B25)', () => {
+    const days = (values: number[]) => values.map((value, index) => ({ bucket: `2026-09-${String(24 + index).padStart(2, '0')}`, value }));
+    const fourCampaigns = {
+      kind: 'time_series' as const,
+      chart: 'bar' as const,
+      series: [
+        { label: 'spring', points: days([0.12, 0.1, 0.14]) },
+        { label: 'summer', points: days([0.5, 0.4, 0.45]) },
+        { label: 'autumn', points: days([0.08, 0.07, 0.09]) },
+        { label: 'winter', points: days([0.3, 0.2, 0.25]) },
+      ],
+      isEmpty: false,
+      freshness: null,
+    };
+    const defaultBarLayout = { x: 0, y: 0, ...defaultTileSize('bar') };
+
+    it('draws only the plots that fit a default 4-row tile, sized so they and "+N more" sum within the cell', () => {
+      const { container } = renderTile(fourCampaigns, { type: 'bar', title: 'Conversion rate by campaign', layout: defaultBarLayout });
+
+      const body = tileBodyHeightPx(defaultBarLayout.h);
+      const plan = planBarChartLayout({ seriesCount: 4, availableHeightPx: body, maxShown: MAX_SMALL_MULTIPLES, labelled: true, sharedAxis: true });
+      expect(layoutHeightPx(plan)).toBeLessThanOrEqual(body);
+
+      // The two largest campaigns are drawn, at the planned height ...
+      const figures = [...container.querySelectorAll('figure')];
+      expect(figures.map((figure) => figure.getAttribute('aria-label'))).toEqual(['Conversion rate by campaign · summer', 'Conversion rate by campaign · winter']);
+      for (const area of container.querySelectorAll<HTMLElement>('[data-testid="bar-plot-area"]')) {
+        expect(area.style.height).toBe(`${VALUE_HEADROOM_PX + plan.plotHeightPx}px`);
+      }
+      // ... sharing one date axis under the last plot ...
+      expect(container.querySelectorAll('[data-testid="bar-axis"]')).toHaveLength(1);
+      // ... and "+2 more" is rendered right after them, as the last thing in the chart - inside the
+      // planned height, so it needs no scrolling to be seen.
+      const more = screen.getByTestId('small-multiples-more');
+      expect(within(more).getByText('+2 more')).toBeInTheDocument();
+      expect(more.parentElement?.lastElementChild === more || more.nextElementSibling?.querySelector(':scope > table') != null).toBe(true);
+    });
+
+    it('prints the last x-axis date in full, anchored to the plot\'s right edge instead of centred past it ("9/26", never "9/2")', () => {
+      const { container } = renderTile(fourCampaigns, { type: 'bar', layout: defaultBarLayout });
+      const axis = container.querySelector<HTMLElement>('[data-testid="bar-axis"]')!;
+      const lastLabel = within(axis).getByText('9/26');
+      expect(lastLabel.textContent).toBe('9/26');
+      expect(lastLabel).toHaveAttribute('data-anchor', 'end');
+      expect(lastLabel).toHaveClass('right-0');
+      expect(lastLabel).not.toHaveClass('-translate-x-1/2');
+      expect(within(axis).getByText('9/24')).toHaveAttribute('data-anchor', 'start');
+    });
   });
 
   it('renders a table tile', () => {
@@ -235,6 +664,67 @@ describe('BoardTileView', () => {
       renderTile({ kind: 'unavailable', reason: 'query_error', message: 'boom' });
       expect(screen.queryByText(/Data as of/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('BoardTileView table tile: newest first and a row count (B28)', () => {
+  // EasySign's "Landing page x campaign" tile: rows arrive oldest first, so the newest day was
+  // below the fold of the tile's scroll box with nothing saying more rows existed.
+  const DATED_VIEW = {
+    kind: 'table',
+    isEmpty: false,
+    columns: ['bucket_date', 'campaign_id'],
+    rows: [
+      { bucket_date: '2026-09-24', campaign_id: 'b24-probe' },
+      { bucket_date: '2026-09-25', campaign_id: 'browser-e2e' },
+      { bucket_date: '2026-09-26', campaign_id: 'none' },
+      { bucket_date: '2026-09-27', campaign_id: 'sim-meta-09271313' },
+      { bucket_date: '2026-09-27', campaign_id: 'sim-google-09271313' },
+    ],
+    freshness: null,
+  } as unknown as TileRenderView;
+
+  const firstColumn = () =>
+    screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelectorAll('td')[0]?.textContent ?? '');
+
+  it('sorts by the date column newest first when the viewer has not chosen a sort, and says so with the row count', () => {
+    renderTile(DATED_VIEW, { id: 'b28-default', type: 'table' });
+    expect(firstColumn()).toEqual(['2026-09-27', '2026-09-27', '2026-09-26', '2026-09-25', '2026-09-24']);
+    expect(screen.getByRole('columnheader', { name: /bucket_date/ })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByTestId('table-row-count')).toHaveTextContent('5 rows · newest first');
+  });
+
+  it('the first click on the date column turns it oldest first, and the note goes away once the viewer chose', () => {
+    renderTile(DATED_VIEW, { id: 'b28-toggle', type: 'table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by bucket_date' }));
+    expect(firstColumn()).toEqual(['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-27']);
+    expect(screen.getByTestId('table-row-count')).toHaveTextContent(/^5 rows$/);
+  });
+
+  it("a viewer's saved sort still wins over the default", () => {
+    window.localStorage.setItem('growthos-board-tile-b28-saved-table-prefs', JSON.stringify({ sortColumn: 'campaign_id', sortDirection: 'asc', hiddenColumns: [] }));
+    renderTile(DATED_VIEW, { id: 'b28-saved', type: 'table' });
+    expect(screen.getByRole('columnheader', { name: /campaign_id/ })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: /bucket_date/ })).toHaveAttribute('aria-sort', 'none');
+  });
+
+  it('a table with no date-like column keeps its query order and still shows its row count', () => {
+    renderTile({ kind: 'table', isEmpty: false, columns: ['campaign_id'], rows: [{ campaign_id: 'b' }, { campaign_id: 'a' }], freshness: null } as unknown as TileRenderView, {
+      id: 'b28-undated',
+      type: 'table',
+    });
+    expect(firstColumn()).toEqual(['b', 'a']);
+    expect(screen.getByTestId('table-row-count')).toHaveTextContent(/^2 rows$/);
+  });
+
+  it('picks date-like columns only', () => {
+    expect(defaultTableSortColumn(['campaign_id', 'bucket_date'])).toBe('bucket_date');
+    expect(defaultTableSortColumn(['week', 'spend'])).toBe('week');
+    expect(defaultTableSortColumn(['created_at'])).toBe('created_at');
+    expect(defaultTableSortColumn(['campaign_id', 'update_count', 'landing_page'])).toBeNull();
   });
 });
 

@@ -42,7 +42,22 @@ async function setupOrgProject(orgName: string) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
-  return { ownerSession, organization, project };
+  return { ownerSession, owner, organization, project };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function schemaDefsRequest(
@@ -122,6 +137,36 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/schema-defs', () => {
     const response = await GET(request, { params });
     expect(response.status).toBe(404);
   });
+
+  it(
+    'KAN-140: lets a project-scoped project_admin list schema defs for THEIR OWN project — before this ' +
+      "fix a project-scoped binding never satisfied this route's permission check at all",
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Schema List Project-Scoped Org');
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = schemaDefsRequest(organization.id, project.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ schemaDefs: [] });
+    },
+  );
+
+  it(
+    "KAN-140 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org — a project-scope binding never grants access sideways',
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Schema List Sibling Project Org');
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = schemaDefsRequest(organization.id, otherProject.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/schema-defs', () => {
@@ -181,5 +226,19 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/schema-defs', () => {
     const second = schemaDefsRequest(organization.id, project.id, { kind: 'event', name: 'order_completed', fields: validFields });
     const response = await POST(second.request, { params: second.params });
     expect(response.status).toBe(409);
+  });
+
+  it('KAN-140: lets a project-scoped project_admin register a schema in THEIR OWN project', async () => {
+    const { organization, project, owner } = await setupOrgProject('Schema Register Project-Scoped Org');
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = schemaDefsRequest(organization.id, project.id, {
+      kind: 'event',
+      name: 'order_completed',
+      fields: validFields,
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
   });
 });

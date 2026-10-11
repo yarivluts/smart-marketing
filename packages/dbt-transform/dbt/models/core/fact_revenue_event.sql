@@ -3,7 +3,8 @@
 -- independently reliable sources this codebase already lands: Stripe's own
 -- `stripe_charge` events (`events` core table, per-charge outcome) for
 -- `type in ('charge', 'first_charge')`, and the subscription snapshot
--- history (`stg_stripe_subscription_history`) for `type in ('new',
+-- history (`stg_subscription_history`: Stripe snapshots and, since KAN-110,
+-- vendor-neutral `subscription_state_change` events) for `type in ('new',
 -- 'upgrade', 'downgrade')` MRR movements — Stripe's connector only lands a
 -- subscription's *current* state on each sync (no dedicated "plan changed"
 -- webhook/event is captured), so a movement is derived by diffing each
@@ -104,10 +105,10 @@ movement_rows as (
         customer_id,
         cast(null as {{ dbt.type_string() }}) as status,
         cast(null as {{ dbt.type_float() }}) as amount,
-        plan_interval as plan,
+        plan,
         mrr_delta,
-        landed_at as ts
-    from {{ ref('stg_stripe_subscription_history') }}
+        changed_at as ts
+    from {{ ref('stg_subscription_history') }}
     where movement_type is not null
 ),
 

@@ -7,6 +7,7 @@ import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { MetricCatalogEntryRow } from './board-types';
+import { GoalTargetUnitHint, storedGoalTarget, useGoalTargetEntryError } from './goal-target-entry';
 
 /** A plain, client-safe mirror of `OrgPersonModel` — the same "no `@growthos/firebase-orm-models` import in a client component" reasoning `MetricCatalogEntryRow`'s own doc comment (`board-types.ts`) gives. */
 export interface OrgPersonRow {
@@ -37,6 +38,8 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
   const [ownerPersonId, setOwnerPersonId] = useState(people[0]?.id ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const targetEntryError = useGoalTargetEntryError();
+  const metricUnit = metricCatalog.find((entry) => entry.name === metricName)?.unit;
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -49,6 +52,13 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
+    // A ratio metric's target is typed as a percent (8 for 8%) and stored as a fraction (KAN-213).
+    const typed = direction === 'range' ? [Number(rangeMin), Number(rangeMax)] : [Number(targetValue)];
+    const unitError = targetEntryError(typed, metricUnit);
+    if (unitError) {
+      setError(unitError);
+      return;
+    }
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals`, {
@@ -59,8 +69,8 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
           metricName,
           direction,
           ...(direction === 'range'
-            ? { rangeMin: Number(rangeMin), rangeMax: Number(rangeMax) }
-            : { targetValue: Number(targetValue) }),
+            ? { rangeMin: storedGoalTarget(Number(rangeMin), metricUnit), rangeMax: storedGoalTarget(Number(rangeMax), metricUnit) }
+            : { targetValue: storedGoalTarget(Number(targetValue), metricUnit) }),
           startDate,
           deadline,
           rhythm,
@@ -171,6 +181,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             />
           </div>
         )}
+        <GoalTargetUnitHint unit={metricUnit} />
       </div>
 
       <div className="flex flex-wrap items-end gap-3">

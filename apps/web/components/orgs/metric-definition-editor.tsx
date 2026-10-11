@@ -2,10 +2,15 @@
 
 import { useId } from 'react';
 import { useTranslations } from 'next-intl';
-import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
-import { Plus, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { METRIC_UNIT_KINDS, parseMetricUnit, type MetricUnitKind } from '@growthos/shared';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
+// Client components must never import from `@growthos/firebase-orm-models`
+// (its barrel drags in server-only code, e.g. `node:crypto` from
+// `key.service.ts`, which breaks the client webpack bundle) — this local
+// copy mirrors `schema-fields-editor.tsx`'s own `SCHEMA_FIELD_TYPES`
+// constant for the same reason.
 export const METRIC_AGG_FUNCTIONS = ['sum', 'count', 'count_distinct', 'avg', 'min', 'max'] as const;
 export type MetricAggFunctionRow = (typeof METRIC_AGG_FUNCTIONS)[number];
 
@@ -31,10 +36,29 @@ export interface MetricDefinitionFormState {
   formula: string;
   /** Raw comma-separated input — split into an array only at submit time. */
   dimensions: string;
+  /** The declared unit kind (KAN-213), or `''` for none (a plain number). */
+  unitKind: MetricUnitKind | '';
+  /** A `currency` unit's ISO 4217 code; blank means the project's own currency. */
+  currencyCode: string;
 }
 
 export function blankMetricDefinitionFormState(): MetricDefinitionFormState {
-  return { kind: 'aggregation', aggFunction: 'sum', table: '', column: '', timeColumn: '', filters: [], formula: '', dimensions: '' };
+  return { kind: 'aggregation', aggFunction: 'sum', table: '', column: '', timeColumn: '', filters: [], formula: '', dimensions: '', unitKind: '', currencyCode: '' };
+}
+
+/** The unit string the form submits: `null` for none, `currency:XXX` when a currency code is given. */
+export function metricUnitFromFormState(state: Pick<MetricDefinitionFormState, 'unitKind' | 'currencyCode'>): string | null {
+  if (state.unitKind === '') {
+    return null;
+  }
+  const code = state.currencyCode.trim().toUpperCase();
+  return state.unitKind === 'currency' && code.length > 0 ? `currency:${code}` : state.unitKind;
+}
+
+/** The form fields for a stored unit string; an unreadable one falls back to "none". */
+export function metricUnitToFormState(unit: string | null | undefined): Pick<MetricDefinitionFormState, 'unitKind' | 'currencyCode'> {
+  const parsed = unit ? parseMetricUnit(unit) : null;
+  return { unitKind: parsed?.kind ?? '', currencyCode: parsed?.currency ?? '' };
 }
 
 export interface MetricDefinitionRequestBody {
@@ -45,17 +69,20 @@ export interface MetricDefinitionRequestBody {
       }
     | { kind: 'formula'; formula: string };
   dimensions: string[];
+  /** Always sent, so an evolve made from the form states the unit explicitly (`null` clears it). */
+  unit: string | null;
 }
 
-/** The shared shape the register/evolve metric-def forms POST. */
+/** The shared shape the register/evolve metric-def forms POST — `parseMetricDefRequestBody` (the API-route side) accepts exactly this. */
 export function metricDefinitionFormStateToRequestBody(state: MetricDefinitionFormState): MetricDefinitionRequestBody {
   const dimensions = state.dimensions
     .split(',')
     .map((dimension) => dimension.trim())
     .filter((dimension) => dimension.length > 0);
 
+  const unit = metricUnitFromFormState(state);
   if (state.kind === 'formula') {
-    return { definition: { kind: 'formula', formula: state.formula }, dimensions };
+    return { definition: { kind: 'formula', formula: state.formula }, dimensions, unit };
   }
 
   return {
@@ -70,6 +97,7 @@ export function metricDefinitionFormStateToRequestBody(state: MetricDefinitionFo
       },
     },
     dimensions,
+    unit,
   };
 }
 
@@ -77,16 +105,20 @@ function blankFilterRow(): MetricFilterRow {
   return { field: '', operator: '=', value: '' };
 }
 
+/** One version of a metric, as rendered by `MetricFamilyCard` — a plain, client-safe shape (never a `@growthos/firebase-orm-models` type, per this file's own doc comment above). */
 export interface MetricVersionView {
   id: string;
   version: number;
-  status: 'active' | 'superseded';
+  status: 'active' | 'superseded' | 'archived';
   definitionKind: MetricDefinitionKindRow;
   aggregation: { function: MetricAggFunctionRow; table: string; column?: string; timeColumn: string; filters: MetricFilterRow[] } | null;
   formula: string | null;
   dimensions: string[];
+  /** The version's declared unit (KAN-213), or `null` when none is declared. */
+  unit: string | null;
 }
 
+/** Prefills the shared editor's form state from an existing version — used by `EvolveMetricDefForm` to open pre-populated with the latest version's definition. */
 export function metricVersionToFormState(version: MetricVersionView): MetricDefinitionFormState {
   return {
     kind: version.definitionKind,
@@ -97,6 +129,7 @@ export function metricVersionToFormState(version: MetricVersionView): MetricDefi
     filters: version.aggregation?.filters ?? [],
     formula: version.formula ?? '',
     dimensions: version.dimensions.join(', '),
+    ...metricUnitToFormState(version.unit),
   };
 }
 
@@ -105,9 +138,18 @@ export interface MetricDefinitionEditorProps {
   onChange: (state: MetricDefinitionFormState) => void;
 }
 
-/** The aggregation/formula/dimensions/filters builder (KAN-40) shared by register and evolve metric-def forms. */
+/** The aggregation/formula/dimensions/filters builder (KAN-40) shared by the register and evolve metric-def forms. */
 export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEditorProps): React.ReactElement {
   const t = useTranslations('MetricRegistry');
+  // Per-instance id prefix: this editor is mounted more than once on the
+  // metric registry page (the always-present register form + any open
+  // evolve form(s)), and the previous fixed ids ("metric-def-table", ...)
+  // were duplicated across instances — a <label htmlFor>/getElementById hit
+  // whichever instance came first in the DOM, so typing via a label (or any
+  // id-driven automation) could edit one form while submitting another
+  // (session-B QA, 2026-08-20: an evolve submit silently carried the
+  // previous version's aggregation because the typed values landed in a
+  // different instance's state).
   const idBase = useId();
 
   function updateFilter(index: number, patch: Partial<MetricFilterRow>): void {
@@ -119,13 +161,16 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
   }
 
   return (
-    <fieldset className="flex flex-col gap-4">
-      <PpField label={t('kindLabel')} htmlFor={`${idBase}-kind`}>
+    <fieldset className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor={`${idBase}-kind`}>
+          {t('kindLabel')}
+        </label>
         <select
           id={`${idBase}-kind`}
           value={state.kind}
           onChange={(event) => onChange({ ...state, kind: event.target.value as MetricDefinitionKindRow })}
-          className={ppInputClass}
+          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
         >
           {METRIC_DEFINITION_KINDS.map((kind) => (
             <option key={kind} value={kind}>
@@ -133,17 +178,18 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
             </option>
           ))}
         </select>
-      </PpField>
+      </div>
 
       {state.kind === 'aggregation' ? (
-        <div className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <PpField label={t('functionLabel')} htmlFor={`${idBase}-function`}>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-function`}>
+              {t('functionLabel')}
               <select
                 id={`${idBase}-function`}
                 value={state.aggFunction}
                 onChange={(event) => onChange({ ...state, aggFunction: event.target.value as MetricAggFunctionRow })}
-                className={ppInputClass}
+                className="h-10 rounded-md border border-input bg-background px-2 text-sm"
               >
                 {METRIC_AGG_FUNCTIONS.map((fn) => (
                   <option key={fn} value={fn}>
@@ -151,52 +197,46 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
                   </option>
                 ))}
               </select>
-            </PpField>
-            <PpField label={t('tableLabel')} htmlFor={`${idBase}-table`}>
-              <input
-                id={`${idBase}-table`}
-                placeholder={t('tablePlaceholder')}
-                value={state.table}
-                onChange={(event) => onChange({ ...state, table: event.target.value })}
-                className={ppInputClass}
-              />
-            </PpField>
-            <PpField label={t('columnLabel')} htmlFor={`${idBase}-column`}>
-              <input
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-table`}>
+              {t('tableLabel')}
+              <Input id={`${idBase}-table`} placeholder={t('tablePlaceholder')} value={state.table} onChange={(event) => onChange({ ...state, table: event.target.value })} />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-column`}>
+              {t('columnLabel')}
+              <Input
                 id={`${idBase}-column`}
                 placeholder={t('columnPlaceholder')}
                 value={state.column}
                 onChange={(event) => onChange({ ...state, column: event.target.value })}
-                className={ppInputClass}
               />
-            </PpField>
-            <PpField label={t('timeColumnLabel')} htmlFor={`${idBase}-time-column`}>
-              <input
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-time-column`}>
+              {t('timeColumnLabel')}
+              <Input
                 id={`${idBase}-time-column`}
                 placeholder={t('timeColumnPlaceholder')}
                 value={state.timeColumn}
                 onChange={(event) => onChange({ ...state, timeColumn: event.target.value })}
-                className={ppInputClass}
               />
-            </PpField>
+            </label>
           </div>
 
-          <fieldset className="flex flex-col gap-3 rounded-2xl bg-pp-surface-container-low/60 p-4 border border-pp-outline-variant/30">
-            <legend className="text-pp-label-sm uppercase tracking-wider text-pp-outline font-bold">{t('filtersLabel')}</legend>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium">{t('filtersLabel')}</legend>
             {state.filters.map((filter, index) => (
               <div key={index} className="flex flex-wrap items-center gap-2">
-                <input
+                <Input
                   aria-label={t('filterFieldPlaceholder')}
                   placeholder={t('filterFieldPlaceholder')}
                   value={filter.field}
                   onChange={(event) => updateFilter(index, { field: event.target.value })}
-                  className={cn(ppInputClass, 'w-auto min-w-[140px] flex-1 text-xs py-2')}
                 />
                 <select
                   aria-label={t('filterOperatorLabel')}
                   value={filter.operator}
                   onChange={(event) => updateFilter(index, { operator: event.target.value as MetricFilterOperatorRow })}
-                  className={cn(ppInputClass, 'w-[90px] text-xs py-2')}
+                  className="h-10 rounded-md border border-input bg-background px-2 text-sm"
                 >
                   {METRIC_FILTER_OPERATORS.map((operator) => (
                     <option key={operator} value={operator}>
@@ -204,59 +244,79 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
                     </option>
                   ))}
                 </select>
-                <input
+                <Input
                   aria-label={t('filterValuePlaceholder')}
                   placeholder={t('filterValuePlaceholder')}
                   value={filter.value}
                   onChange={(event) => updateFilter(index, { value: event.target.value })}
-                  className={cn(ppInputClass, 'w-auto min-w-[140px] flex-1 text-xs py-2')}
                 />
-                <PpButton
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  icon={Trash2}
-                  className="text-pp-error hover:bg-pp-error-container/40"
-                  onClick={() => removeFilter(index)}
-                >
+                <Button type="button" variant="destructive" size="sm" onClick={() => removeFilter(index)}>
                   {t('removeFilter')}
-                </PpButton>
+                </Button>
               </div>
             ))}
-            <div>
-              <PpButton
-                type="button"
-                variant="secondary"
-                size="sm"
-                icon={Plus}
-                onClick={() => onChange({ ...state, filters: [...state.filters, blankFilterRow()] })}
-              >
-                {t('addFilter')}
-              </PpButton>
-            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...state, filters: [...state.filters, blankFilterRow()] })}>
+              {t('addFilter')}
+            </Button>
           </fieldset>
         </div>
       ) : (
-        <PpField label={t('formulaLabel')} htmlFor={`${idBase}-formula`}>
-          <input
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium" htmlFor={`${idBase}-formula`}>
+            {t('formulaLabel')}
+          </label>
+          <Input
             id={`${idBase}-formula`}
             placeholder={t('formulaPlaceholder')}
             value={state.formula}
             onChange={(event) => onChange({ ...state, formula: event.target.value })}
-            className={cn(ppInputClass, 'font-mono text-sm')}
           />
-        </PpField>
+        </div>
       )}
 
-      <PpField label={t('dimensionsLabel')} htmlFor={`${idBase}-dimensions`}>
-        <input
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor={`${idBase}-dimensions`}>
+          {t('dimensionsLabel')}
+        </label>
+        <Input
           id={`${idBase}-dimensions`}
           placeholder={t('dimensionsPlaceholder')}
           value={state.dimensions}
           onChange={(event) => onChange({ ...state, dimensions: event.target.value })}
-          className={ppInputClass}
         />
-      </PpField>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-unit`}>
+          {t('unitLabel')}
+          <select
+            id={`${idBase}-unit`}
+            value={state.unitKind}
+            onChange={(event) => onChange({ ...state, unitKind: event.target.value as MetricUnitKind | '' })}
+            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="">{t('unitNone')}</option>
+            {METRIC_UNIT_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {t(`unitOption.${kind}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {state.unitKind === 'currency' ? (
+          <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-currency`}>
+            {t('currencyCodeLabel')}
+            <Input
+              id={`${idBase}-currency`}
+              placeholder={t('currencyCodePlaceholder')}
+              maxLength={3}
+              value={state.currencyCode}
+              onChange={(event) => onChange({ ...state, currencyCode: event.target.value })}
+            />
+          </label>
+        ) : null}
+      </div>
+      <p className="text-xs text-muted-foreground">{t('unitHelp')}</p>
     </fieldset>
   );
 }

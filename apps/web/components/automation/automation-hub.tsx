@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Sparkles,
   ShieldCheck,
@@ -9,7 +9,6 @@ import {
   History,
   Bot,
   CheckCircle2,
-  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -17,7 +16,6 @@ import { StatCard } from '@/components/ui/stat-card';
 import { CopilotChatPanel } from './copilot-chat-panel';
 import { ProposalDiffCard, type ActionProposalData } from './proposal-diff-card';
 import { ActionAuditTrail, type AuditActionItem } from './action-audit-trail';
-import { PageGuideButton } from '@/components/guides/page-guide-button';
 
 const EMPTY_ACTIONS: AuditActionItem[] = [];
 const EMPTY_PROPOSALS: ActionProposalData[] = [];
@@ -47,52 +45,24 @@ export function AutomationHub({
   onRollbackAction,
   className,
 }: AutomationHubProps): React.ReactElement {
+  const t = useTranslations('AutomationHub');
   const locale = useLocale();
   const isRtl = locale === 'he';
 
   const [activeTab, setActiveTab] = React.useState('copilot');
   const [localActions, setLocalActions] = React.useState<AuditActionItem[]>(actions);
-  const [localProposals, setLocalProposals] = React.useState<ActionProposalData[]>(
-    proposals.length > 0
-      ? proposals
-      : [
-          {
-            id: 'rec-1',
-            targetId: 'tgt-meta-scale',
-            targetLabel: 'Meta Retargeting Leads',
-            actionType: 'budget_change',
-            platform: 'meta_ads',
-            impactBadge: 'high',
-            beforeValue: '$150/day',
-            afterValue: '$250/day',
-            diffEntries: [{ key: 'Daily Budget', before: '$150/day', after: '$250/day' }],
-            estimatedImpact: '+32% projected conversions (ROAS 4.2x)',
-            status: 'awaiting_approval',
-          },
-          {
-            id: 'rec-2',
-            targetId: 'tgt-google-rebal',
-            targetLabel: 'Google Brand Search',
-            actionType: 'bid_strategy_change',
-            platform: 'google_ads',
-            impactBadge: 'medium',
-            beforeValue: 'Manual CPC',
-            afterValue: 'Target ROAS (450%)',
-            diffEntries: [{ key: 'Bid Strategy', before: 'Manual CPC', after: 'Target ROAS (450%)' }],
-            estimatedImpact: '+18% conversion value efficiency',
-            status: 'awaiting_approval',
-          },
-        ],
-  );
+  const [localProposals, setLocalProposals] = React.useState<ActionProposalData[]>(proposals);
 
   React.useEffect(() => {
     setLocalActions(actions);
   }, [actions]);
 
+  // Mirrors `proposals` unconditionally. An earlier version seeded this state with two
+  // invented proposals and only re-synced when the incoming array was non-empty, so a
+  // project with nothing pending rendered fabricated budget changes carrying real-looking
+  // figures — with a working Approve button next to them.
   React.useEffect(() => {
-    if (proposals.length > 0) {
-      setLocalProposals(proposals);
-    }
+    setLocalProposals(proposals);
   }, [proposals]);
 
   async function handleApproveProposal(proposal: ActionProposalData) {
@@ -147,58 +117,48 @@ export function AutomationHub({
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                {locale === 'he' ? `מרכז האוטומציה וה-AI Copilot` : `AI Automation Hub`}
+                {t('title')}
               </h1>
-              <PageGuideButton pageKey="cost-guardrails" />
               {killSwitchEngaged ? (
                 <span
                   data-testid="kill-switch-active-badge"
                   className="inline-flex items-center gap-1 rounded-full bg-destructive/10 border border-destructive/30 px-2.5 py-0.5 text-xs font-bold text-destructive"
                 >
                   <ShieldAlert className="h-3.5 w-3.5" />
-                  <span>{locale === 'he' ? 'מתג חירום פעיל' : 'KILL SWITCH ACTIVE'}</span>
+                  <span>{t('killSwitchActive')}</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>{locale === 'he' ? 'מערכת פעילה ומאובטחת' : 'Guardrails Active'}</span>
+                  <span>{t('guardrailsActive')}</span>
                 </span>
               )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              {locale === 'he'
-                ? `ניהול הצעות שינוי, בקרת תקציב אוטומטית ויומן פעולות עבור ${projectName}`
-                : `Autonomous marketing execution, smart proposals, and instant rollback for ${projectName}`}
+              {t('description', { projectName })}
             </p>
           </div>
         </div>
       </div>
 
-      {/* KPI Metric Summary Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/*
+        KPI Metric Summary Row. Both values are counted from the actions and proposals this
+        component was actually given. There is deliberately no third "AI-Optimized Spend"
+        card and no change-vs-last-week badge: the component receives no spend figure and no
+        prior-period baseline, and the previous versions of both were invented constants
+        ($14,850, +12.5%, +24.2%) that moved for no one and were indistinguishable from a
+        real reading. A number shown here has to come from the data.
+      */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
-          title={locale === 'he' ? 'פעולות שבוצעו' : 'Actions Executed'}
+          title={t('actionsExecuted')}
           value={executedCount}
-          change={12.5}
-          changeType="increase"
-          period="vs last week"
           icon={CheckCircle2}
         />
         <StatCard
-          title={locale === 'he' ? 'הצעות ממתינות' : 'Pending Proposals'}
+          title={t('pendingProposals')}
           value={pendingCount}
-          change={0}
-          changeType="neutral"
-          period="ready for approval"
           icon={Sparkles}
-        />
-        <StatCard
-          title={locale === 'he' ? 'תקציב מנוהל ב-AI' : 'AI-Optimized Spend'}
-          value="$14,850"
-          change={24.2}
-          changeType="increase"
-          period="monthly active"
-          icon={TrendingUp}
         />
       </div>
 
@@ -206,14 +166,14 @@ export function AutomationHub({
       <Tabs value={activeTab} onValueChange={setActiveTab} variant="pills" className="w-full">
         <TabsList className="grid grid-cols-2 max-w-md">
           <TabsTrigger value="copilot" icon={<Bot className="h-4 w-4" />}>
-            {locale === 'he' ? 'AI Copilot & הצעות' : 'AI Copilot & Proposals'}
+            {t('tabCopilot')}
           </TabsTrigger>
           <TabsTrigger
             value="audit"
             icon={<History className="h-4 w-4" />}
             count={localActions.length}
           >
-            {locale === 'he' ? 'יומן ביקורת (Audit)' : 'Audit Trail'}
+            {t('tabAudit')}
           </TabsTrigger>
         </TabsList>
 
@@ -236,12 +196,11 @@ export function AutomationHub({
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <h3 className="font-bold text-sm text-foreground">
-                    {locale === 'he' ? 'הצעות פרואקטיביות' : 'Proactive Proposals'}
+                    {t('proactiveProposals')}
                   </h3>
                 </div>
                 <span className="text-[11px] text-muted-foreground">
-                  {localProposals.filter((p) => p.status === 'awaiting_approval').length}{' '}
-                  {locale === 'he' ? 'ממתינות' : 'pending'}
+                  {t('pendingCount', { count: pendingCount })}
                 </span>
               </div>
 

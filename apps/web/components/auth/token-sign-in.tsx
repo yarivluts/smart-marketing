@@ -3,12 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { authErrorMessageKey, type AuthErrorMessageKey } from '@/lib/auth/auth-error';
 import { resolveRedirectTarget } from '@/lib/auth/redirect-target';
-import { PpButton, PpIconChip } from '@/components/pastel/primitives';
 
 /**
  * `/login/token?token=…` — exchanges a Firebase custom token for a real
@@ -51,29 +49,18 @@ export function TokenSignIn(): React.ReactElement {
   }, [searchParams, signInWithToken, router]);
 
   return (
-    <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-4 py-8 text-center">
+    <div className="mx-auto flex w-full max-w-sm flex-col gap-4 py-16 text-center">
       {errorKey ? (
         <>
-          <PpIconChip icon={AlertCircle} accent="error" size="lg" />
-          <p role="alert" className="text-pp-body-md text-pp-error font-medium">
+          <p role="alert" className="text-sm text-destructive">
             {t(errorKey)}
           </p>
-          <div className="mt-2">
-            <PpButton variant="secondary" asChild>
-              <Link href="/login" className="inline-flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
-                <span>{t('backToSignIn')}</span>
-              </Link>
-            </PpButton>
-          </div>
+          <Link href="/login" className="text-sm underline">
+            {t('backToSignIn')}
+          </Link>
         </>
       ) : (
-        <div className="flex flex-col items-center gap-4 py-6">
-          <Loader2 className="h-10 w-10 animate-spin text-pp-primary" />
-          <p className="font-pp-display text-pp-headline-md text-pp-on-surface">
-            {t('tokenSignInPending')}
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">{t('tokenSignInPending')}</p>
       )}
     </div>
   );

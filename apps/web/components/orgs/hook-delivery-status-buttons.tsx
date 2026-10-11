@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { PpButton } from '@/components/pastel/primitives';
-import { Check, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export interface HookDeliveryStatusButtonsProps {
   orgId: string;
@@ -12,7 +11,7 @@ export interface HookDeliveryStatusButtonsProps {
   hookDeliveryId: string;
 }
 
-/** Marks a review-queue delivery `reviewed` or `discarded` (KAN-53). */
+/** Marks a review-queue delivery `reviewed` or `discarded` (KAN-53) — bookkeeping only, since KAN-54's mapping engine doesn't exist yet to consume these deliveries automatically. */
 export function HookDeliveryStatusButtons({ orgId, projectId, hookDeliveryId }: HookDeliveryStatusButtonsProps): React.ReactElement {
   const t = useTranslations('Hooks');
   const router = useRouter();
@@ -41,15 +40,15 @@ export function HookDeliveryStatusButtons({ orgId, projectId, hookDeliveryId }: 
   return (
     <div className="flex flex-col items-end gap-1">
       <div className="flex gap-2">
-        <PpButton type="button" variant="secondary" size="sm" icon={Check} disabled={submitting} onClick={() => setStatus('reviewed')}>
+        <Button type="button" variant="outline" size="sm" disabled={submitting} onClick={() => setStatus('reviewed')}>
           {t('markReviewed')}
-        </PpButton>
-        <PpButton type="button" variant="ghost" size="sm" icon={Trash2} disabled={submitting} onClick={() => setStatus('discarded')}>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" disabled={submitting} onClick={() => setStatus('discarded')}>
           {t('discardDelivery')}
-        </PpButton>
+        </Button>
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-pp-error font-medium">
+        <p role="alert" className="text-xs text-destructive">
           {t('deliveryStatusError')}
         </p>
       ) : null}

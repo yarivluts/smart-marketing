@@ -3,9 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { MappingCastType, MappingRuleTransform } from '@growthos/shared';
-import { PpButton, ppInputClass } from '@/components/pastel/primitives';
-import { Sparkles, X, Check } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import type { FieldMappingRuleRow } from './field-mapping-rule-editor';
 
 interface FieldMappingSuggestion {
@@ -42,7 +40,10 @@ function suggestionToRuleRow(suggestion: FieldMappingSuggestion): FieldMappingRu
 
 /**
  * Proposes field-mapping rules from a pasted sample payload (KAN-55 AC: "LLM proposes field
- * mapping from sample payload; user confirms"). Collapsed by default.
+ * mapping from sample payload; user confirms"). Collapsed by default, the same posture
+ * `TestRunFieldMappingPanel` (KAN-54) establishes, and only usable once a kind + target schema are
+ * chosen on the create form, since the suggester needs the schema's registered fields to propose
+ * against.
  */
 export function SuggestFieldMappingsPanel({ orgId, projectId, kind, schemaName, onApplySuggestions }: SuggestFieldMappingsPanelProps): React.ReactElement {
   const t = useTranslations('FieldMappings');
@@ -81,81 +82,58 @@ export function SuggestFieldMappingsPanel({ orgId, projectId, kind, schemaName, 
 
   if (!open) {
     return (
-      <PpButton
-        type="button"
-        variant="secondary"
-        size="sm"
-        icon={Sparkles}
-        onClick={() => setOpen(true)}
-        disabled={!schemaName}
-      >
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)} disabled={!schemaName}>
         {t('suggestMappings')}
-      </PpButton>
+      </Button>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-3 rounded-2xl bg-pp-surface-container-low/80 p-4 border border-pp-outline-variant/30">
+    <div className="flex w-full flex-col gap-2 rounded-md border border-input p-2">
       <textarea
         aria-label={t('suggestSamplePayloadLabel')}
         placeholder={t('samplePayloadPlaceholder')}
         value={samplePayload}
         onChange={(event) => setSamplePayload(event.target.value)}
-        className={cn(ppInputClass, 'min-h-24 p-3 font-mono text-xs')}
+        className="min-h-24 rounded-md border border-input bg-background p-2 font-mono text-xs"
       />
       <div className="flex items-center gap-2">
-        <PpButton
-          type="button"
-          size="sm"
-          icon={Sparkles}
-          onClick={handleSuggest}
-          disabled={submitting || samplePayload.trim().length === 0}
-        >
+        <Button type="button" size="sm" onClick={handleSuggest} disabled={submitting || samplePayload.trim().length === 0}>
           {t('runSuggest')}
-        </PpButton>
-        <PpButton type="button" variant="ghost" size="sm" icon={X} onClick={() => setOpen(false)}>
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
           {t('close')}
-        </PpButton>
+        </Button>
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-pp-error font-medium">
+        <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       ) : null}
       {suggestions ? (
         suggestions.length === 0 ? (
-          <p className="text-xs text-pp-on-surface-variant">{t('noSuggestions')}</p>
+          <p className="text-xs text-muted-foreground">{t('noSuggestions')}</p>
         ) : (
-          <div className="flex flex-col gap-2 pt-2 text-xs">
+          <div className="flex flex-col gap-1 text-xs">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-pp-display text-pp-label-md font-bold text-pp-on-surface">
-                {t('suggestionsHeading', { count: suggestions.length })}
-              </span>
-              <PpButton type="button" variant="secondary" size="sm" icon={Check} onClick={applyAll}>
+              <span>{t('suggestionsHeading', { count: suggestions.length })}</span>
+              <Button type="button" variant="secondary" size="sm" onClick={applyAll}>
                 {t('applyAllSuggestions')}
-              </PpButton>
+              </Button>
             </div>
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-1">
               {suggestions.map((suggestion) => (
-                <li
-                  key={suggestion.targetField}
-                  className="flex items-center justify-between gap-2 rounded-xl bg-pp-surface-container-lowest px-3 py-2 shadow-sm border border-pp-outline-variant/20"
-                >
-                  <span className="font-mono text-xs text-pp-on-surface">
+                <li key={suggestion.targetField} className="flex items-center justify-between gap-2 rounded-md border border-input px-2 py-1">
+                  <span>
                     {t('suggestionSummary', {
                       targetField: suggestion.targetField,
                       sourcePath: suggestion.sourcePath,
                       confidence: Math.round(suggestion.confidence * 100),
                     })}
                   </span>
-                  <PpButton
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onApplySuggestions([suggestionToRuleRow(suggestion)])}
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={() => onApplySuggestions([suggestionToRuleRow(suggestion)])}>
                     {t('applySuggestion')}
-                  </PpButton>
+                  </Button>
                 </li>
               ))}
             </ul>

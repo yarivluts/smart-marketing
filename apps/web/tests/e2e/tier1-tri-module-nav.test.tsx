@@ -6,6 +6,8 @@ import { AppShell, type AppShellNavItem, type AppShellNavSection } from '../../c
 import messages from '../../messages/en.json';
 
 const mockUsePathname = vi.fn();
+// The shell header's UserMenu reads the session; signed out it renders nothing.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ user: null, signOut: vi.fn() }) }));
 vi.mock('@/i18n/navigation', () => ({
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>

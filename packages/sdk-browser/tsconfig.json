@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM"],
+    "rootDir": "..",
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+    "paths": {
+      "@growthos/touchpoint-capture": ["../shared/src/touchpoint-capture/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
+}

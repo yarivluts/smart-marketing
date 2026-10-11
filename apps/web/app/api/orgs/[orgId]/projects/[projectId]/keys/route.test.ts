@@ -10,6 +10,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { GET, POST } from './route';
+import { PATCH as PATCH_KEY } from './[apiKeyId]/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -43,7 +44,22 @@ async function setupOrgProject(orgName: string) {
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
   const prodEnvironment = environments.find((e) => e.name === 'prod')!;
-  return { ownerSession, organization, project, prodEnvironment };
+  return { ownerSession, owner, organization, project, prodEnvironment };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function keysRequest(
@@ -118,6 +134,36 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/keys', () => {
     const response = await GET(request, { params });
     expect(response.status).toBe(404);
   });
+
+  it(
+    'KAN-142: lets a project-scoped project_admin list keys for THEIR OWN project — before this ' +
+      "fix a project-scoped binding never satisfied this route's permission check at all",
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Keys List Project-Scoped Org');
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = keysRequest(organization.id, project.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ apiKeys: [] });
+    },
+  );
+
+  it(
+    "KAN-142 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org — a project-scope binding never grants access sideways',
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Keys List Sibling Project Org');
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = keysRequest(organization.id, otherProject.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/keys', () => {
@@ -172,5 +218,55 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/keys', () => {
     expect(listed.apiKeys[0]).toMatchObject({ id: body.apiKeyId, name: 'CI key', keyPrefix: body.keyPrefix });
     expect(listed.apiKeys[0]).not.toHaveProperty('hashedSecret');
     expect(listed.apiKeys[0]).not.toHaveProperty('rawKey');
+  });
+
+  it('mints a browser (publishable) key with only ingest.write and its domains, edits the domains, and refuses bad ones', async () => {
+    const { ownerSession, organization, project, prodEnvironment } = await setupOrgProject('Keys Browser Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const params = Promise.resolve({ orgId: organization.id, projectId: project.id });
+
+    const noOrigins = await POST(keysRequest(organization.id, project.id, { name: 'Site', environmentId: prodEnvironment.id, kind: 'publishable', allowedOrigins: [] }).request, { params });
+    expect(noOrigins.status).toBe(400);
+    expect(await noOrigins.json()).toEqual({ error: 'invalid_origins', issue: 'no_origins' });
+    const badOrigin = await POST(keysRequest(organization.id, project.id, { name: 'Site', environmentId: prodEnvironment.id, kind: 'publishable', allowedOrigins: ['http://example.com'] }).request, { params });
+    expect(await badOrigin.json()).toEqual({ error: 'invalid_origins', issue: 'invalid_origin' });
+    expect((await POST(keysRequest(organization.id, project.id, { name: 'X', environmentId: prodEnvironment.id, kind: 'weird', scopes: ['ingest.write'] }).request, { params })).status).toBe(400);
+
+    const response = await POST(
+      keysRequest(organization.id, project.id, { name: 'Site', environmentId: prodEnvironment.id, kind: 'publishable', scopes: ['schema.write'], allowedOrigins: ['https://WWW.example.com/'] }).request,
+      { params },
+    );
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { apiKeyId: string; rawKey: string; kind: string; allowedOrigins: string[] };
+    expect(body.rawKey).toMatch(/^gos_pk_live_/);
+    expect(body).toMatchObject({ kind: 'publishable', allowedOrigins: ['https://www.example.com'] });
+    const listed = (await (await GET(keysRequest(organization.id, project.id).request, { params })).json()) as { apiKeys: Array<Record<string, unknown>> };
+    expect(listed.apiKeys[0]).toMatchObject({ kind: 'publishable', scopes: ['ingest.write'], allowedOrigins: ['https://www.example.com'] });
+
+    const patch = (allowedOrigins: unknown, apiKeyId = body.apiKeyId) =>
+      PATCH_KEY(
+        new NextRequest(`https://growthos.test/api/orgs/${organization.id}/projects/${project.id}/keys/${apiKeyId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowedOrigins }) }),
+        { params: Promise.resolve({ orgId: organization.id, projectId: project.id, apiKeyId }) },
+      );
+    const updated = await patch(['https://www.example.com', 'https://*.example.com']);
+    expect(await updated.json()).toEqual({ apiKeyId: body.apiKeyId, allowedOrigins: ['https://www.example.com', 'https://*.example.com'] });
+    expect(await (await patch(['ftp://example.com'])).json()).toEqual({ error: 'invalid_origins', issue: 'invalid_origin' });
+
+    const server = (await (await POST(keysRequest(organization.id, project.id, { name: 'Server', environmentId: prodEnvironment.id, scopes: ['ingest.write'] }).request, { params })).json()) as { apiKeyId: string };
+    expect(await (await patch(['https://www.example.com'], server.apiKeyId)).json()).toEqual({ error: 'not_publishable' });
+  });
+
+  it('KAN-142: lets a project-scoped project_admin mint a key in THEIR OWN project', async () => {
+    const { organization, project, prodEnvironment, owner } = await setupOrgProject('Keys Mint Project-Scoped Org');
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = keysRequest(organization.id, project.id, {
+      name: 'CI key',
+      environmentId: prodEnvironment.id,
+      scopes: ['ingest.write'],
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
   });
 });

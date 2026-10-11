@@ -1,7 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Plus, Sliders, Sparkles, TrendingUp, Trophy } from 'lucide-react';
+import { ArrowUpRight, CalendarRange, Coins, Flame, GitBranch, ListChecks, PlusCircle, Trophy, Zap } from 'lucide-react';
 import { can } from '@growthos/shared';
+import { DEFAULT_WIN_EVENT_LIST_LIMIT } from '@growthos/firebase-orm-models';
+import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -14,25 +16,18 @@ import {
   listRecentWinEventsForProject,
   listWinRulesForProject,
 } from '@/lib/orgs/queries';
-import { toWinEventFeedItem, toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
+import { buildWinRuleFlow, countWinsByRule, toWinEventFeedItem, toWinRuleSummaryView, toWinTrend } from '@/lib/orgs/win-rule-view';
 import { toTrialPipelineWidgetView } from '@/lib/orgs/trial-pipeline-view';
 import { toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
-import {
-  PpButton,
-  PpCard,
-  PpKpiCard,
-  PpKpiGrid,
-  PpMobileActionBar,
-  PpPage,
-  PpPageHeader,
-  PpPill,
-} from '@/components/pastel/primitives';
 import { CreateWinRuleForm } from '@/components/orgs/create-win-rule-form';
 import { WinRuleList } from '@/components/orgs/win-rule-list';
 import { LiveWinFeed } from '@/components/orgs/live-win-feed';
 import { WinEventHistoryList } from '@/components/orgs/win-event-history-list';
 import { TrialPipelineWidget } from '@/components/orgs/trial-pipeline-widget';
-import { RepCollectionLeaderboardWidget } from '@/components/orgs/rep-collection-leaderboard-widget';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, EmptyState, FlowDiagram, PageHero, TrendChart } from '@/components/viz';
+import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -44,11 +39,19 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
+/** Days of history the wins-per-day chart covers. */
+const TREND_DAYS = 14;
+
 /**
- * Stitch "Pastel Pulse" win rules & celebration stream (desktop 4b2e8917 / a29b3e9b / 820d7e79, mobile 7a218cb8 / 97717328 / 51797a60).
+ * A project's win rules (KAN-65, E12.2, plan `04 §6`): every rule defined in
+ * this project, a form to create a new one, and a live feed of wins fired in
+ * real time — gated on `dashboards.write` for the whole page, the same
+ * "whole feature, not just mutation, is admin-only" posture `goals/page.tsx`
+ * (which this page mirrors) uses.
  *
- * Configures real-time event triggers for customer conversions, trial pipeline pacing,
- * sales sprint leaderboards, and live celebration broadcast feeds.
+ * Per-rule win counts, the trigger -> rule -> feed diagram and the wins-per-day
+ * chart are all computed from the same capped recent-wins read the history list
+ * renders, and say so: they describe the most recent wins, not all time.
  */
 export default async function WinRulesPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -61,200 +64,174 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })) {
     notFound();
   }
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/win-rules`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
-  const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] =
-    await Promise.all([
-      listWinRulesForProject(orgId, projectId),
-      listActiveEventSchemaNames(orgId, projectId),
-      getTrialPipelineSummary(orgId, projectId),
-      listRecentWinEventsForProject(orgId, projectId),
-      getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
-      listOrgPeople(orgId),
-    ]);
-
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+  const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] = await Promise.all([
+    listWinRulesForProject(orgId, projectId),
+    listActiveEventSchemaNames(orgId, projectId),
+    getTrialPipelineSummary(orgId, projectId, environmentScope),
+    listRecentWinEventsForProject(orgId, projectId, DEFAULT_WIN_EVENT_LIST_LIMIT + 1, environmentScope),
+    getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
+    listOrgPeople(orgId),
+  ]);
   const winRuleViews = winRules.map(toWinRuleSummaryView);
   const trialPipelineView = toTrialPipelineWidgetView(trialPipelineOutcome);
-  const winEventHistoryViews = recentWinEvents.map(toWinEventFeedItem);
+  const winEventPage = splitOverFetchedFeed(recentWinEvents, DEFAULT_WIN_EVENT_LIST_LIMIT);
+  const winEventHistoryViews = winEventPage.rows.map(toWinEventFeedItem);
   const repCollectionLeaderboardView = toRepCollectionLeaderboardView(
     repCollectionLeaderboard,
     new Map(people.map((person) => [person.id, person.name])),
   );
   const t = await getTranslations('WinRules');
+  const tCollections = await getTranslations('RepCollectionLeaderboard');
 
-  const activeRulesCount = winRuleViews.filter((r) => r.active).length;
-  const topCloser = repCollectionLeaderboardView.rows[0];
+  const numberFormat = new Intl.NumberFormat(locale);
+  const dayFormat = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const winCounts = countWinsByRule(winEventHistoryViews);
+  const activeRules = winRuleViews.filter((rule) => rule.active);
+  const firedRules = winRuleViews.filter((rule) => (winCounts.get(rule.id) ?? 0) > 0);
+  const topRule = [...winRuleViews].sort((a, b) => (winCounts.get(b.id) ?? 0) - (winCounts.get(a.id) ?? 0))[0];
+  const topRuleWins = topRule ? (winCounts.get(topRule.id) ?? 0) : 0;
+  const trend = toWinTrend(winEventHistoryViews, { now: new Date(), days: TREND_DAYS, truncated: winEventPage.truncated });
+  const flow = buildWinRuleFlow(winRuleViews, winCounts, {
+    action: t('flowActionLabel'),
+    actionSublabel: t('flowActionSublabel'),
+    schemaSublabel: t('flowSchemaSublabel'),
+    inactive: t('statusInactive'),
+    formatWins: (count) => t('ruleWinCount', { count }),
+    schemaHref: (schemaName) => `/orgs/${orgId}/projects/${projectId}/record-feed?schema=${encodeURIComponent(schemaName)}`,
+  });
+  const winsLabel = winEventPage.truncated ? t('kpiWinsTruncated', { count: winEventHistoryViews.length }) : numberFormat.format(winEventHistoryViews.length);
+  const formatCollectionAmount = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow={t('eyebrow')}
-        title={t('title', { projectName: project.name })}
-        description={t('description')}
-        actions={
-          <PpButton variant="primary" size="sm" icon={Plus} asChild>
-            <a href="#rule-builder">
-              <span>{t('createHeading')}</span>
-            </a>
-          </PpButton>
-        }
-      />
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Trophy} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            title={t('kpiActiveRules')}
+            value={numberFormat.format(activeRules.length)}
+            subtext={t('kpiOfTotalRules', { count: winRuleViews.length })}
+            progress={winRuleViews.length > 0 ? Math.round((activeRules.length / winRuleViews.length) * 100) : undefined}
+            icon={Zap}
+          />
+          <StatCard title={t('kpiRecentWins')} value={winsLabel} icon={Trophy} />
+          <StatCard title={t('kpiRulesFired')} value={numberFormat.format(firedRules.length)} subtext={t('kpiOfTotalRules', { count: winRuleViews.length })} icon={Flame} />
+          <StatCard
+            title={t('kpiTopRule')}
+            value={topRule && topRuleWins > 0 ? topRule.name : t('kpiNoValue')}
+            subtext={topRule && topRuleWins > 0 ? t('ruleWinCount', { count: topRuleWins }) : undefined}
+            icon={ListChecks}
+          />
+        </div>
+      </PageHero>
 
-      {/* KPI Overview Grid - 2x2 on mobile, 4-col on desktop */}
-      <PpKpiGrid className="grid-cols-2 lg:grid-cols-4">
-        <PpKpiCard
-          label={t('kpiActiveRules')}
-          value={
-            <span dir="ltr">
-              {activeRulesCount} <span className="text-pp-headline-md text-pp-outline">/ {winRules.length}</span>
-            </span>
-          }
-          accent="primary"
-          badge={t('kpiActiveBadge', { count: activeRulesCount })}
-          badgeAccent="primary"
-          footer={t('kpiDefinedFooter', { count: winRules.length })}
-        />
-        <PpKpiCard
-          label={t('kpiTrialPipeline')}
-          value={
-            <span dir="ltr">
-              {trialPipelineView.status === 'ok' && trialPipelineView.conversionRatePct !== null
-                ? `${trialPipelineView.conversionRatePct.toFixed(1)}%`
-                : '—'}
-            </span>
-          }
-          accent="mint"
-          badge={trialPipelineView.status === 'ok' ? `${trialPipelineView.activeTrials} in trial` : undefined}
-          badgeAccent="mint"
-          footer={trialPipelineView.status === 'ok' ? t('kpiConvertingFooter') : t('kpiWarehouseFooter')}
-        />
-        <PpKpiCard
-          label={t('kpiTopCloser')}
-          value={
-            <span dir="ltr">
-              {topCloser ? `$${topCloser.totalAmount.toLocaleString(locale)}` : '—'}
-            </span>
-          }
-          accent="amber"
-          badge={topCloser ? topCloser.name : undefined}
-          badgeAccent="amber"
-          footer={topCloser ? t('kpiDealsClosedFooter', { count: topCloser.entryCount }) : t('kpiNoDealsFooter')}
-        />
-        <PpKpiCard
-          label={t('kpiRecentWins')}
-          value={<span dir="ltr">{recentWinEvents.length}</span>}
-          valueSuffix={t('kpiWinsSuffix')}
-          accent={recentWinEvents.length > 0 ? 'sky' : 'neutral'}
-          badge={recentWinEvents.length > 0 ? t('kpiLoggedBadge') : undefined}
-          badgeAccent="sky"
-          footer={t('kpiPersistedFooter')}
-        />
-      </PpKpiGrid>
+      <ChartCard title={t('flowTitle')} description={t('flowDescription')} icon={GitBranch}>
+        {winRuleViews.length === 0 ? (
+          <EmptyState icon={GitBranch} title={t('noWinRules')} description={t('flowEmptyDetail')} compact />
+        ) : (
+          <FlowDiagram label={t('flowTitle')} nodes={flow.nodes} edges={flow.edges} height={Math.min(520, Math.max(260, winRuleViews.length * 104 + 60))} />
+        )}
+      </ChartCard>
 
-      {/* Main 2-Column Section */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        {/* Left Column: Live Win Feed & Configured Rules */}
-        <section className="flex flex-col gap-6 lg:col-span-7">
-          {/* Live Win Stream & Persisted History */}
-          <PpCard
-            title={t('feedHeading')}
-            subtitle={t('feedSubtitle')}
-            icon={Sparkles}
-            iconAccent="mint"
-            action={
-              <PpPill accent="mint" dot>
-                Live
-              </PpPill>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard
+          title={t('trendTitle')}
+          description={t('trendDescription', { days: TREND_DAYS })}
+          icon={CalendarRange}
+          className="lg:col-span-3"
+          fill
+          footer={trend.reliableFrom ? t('trendPartialNotice', { count: winEventHistoryViews.length }) : undefined}
+        >
+          {winEventHistoryViews.length === 0 ? (
+            <EmptyState icon={Trophy} title={t('historyEmpty')} compact />
+          ) : (
+            <TrendChart
+              label={t('trendTitle')}
+              xKey="day"
+              kind="bar"
+              data={trend.buckets.map((bucket) => ({ day: dayFormat.format(new Date(bucket.start)), wins: bucket.count }))}
+              series={[{ key: 'wins', label: t('trendSeries'), color: 'hsl(var(--success))' }]}
+              height={320}
+            />
+          )}
+        </ChartCard>
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <TrialPipelineWidget view={trialPipelineView} />
+          <ChartCard
+            title={tCollections('heading')}
+            icon={Coins}
+            fill
+            actions={
+              <Link
+                href={{ pathname: `/orgs/${orgId}/projects/${projectId}/rep-collections` }}
+                className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {t('openLedger')}
+                <ArrowUpRight className="h-3.5 w-3.5 rtl:-scale-x-100" aria-hidden="true" />
+              </Link>
+            }
+            footer={
+              repCollectionLeaderboardView.unattributedCount > 0
+                ? tCollections('unattributed', {
+                    amount: formatCollectionAmount(repCollectionLeaderboardView.unattributedTotal),
+                    count: repCollectionLeaderboardView.unattributedCount,
+                  })
+                : undefined
             }
           >
-            <div className="space-y-6">
-              <LiveWinFeed orgId={orgId} projectId={projectId} />
-              <div className="border-t border-pp-outline-variant/30 pt-4">
-                <WinEventHistoryList events={winEventHistoryViews} />
-              </div>
-            </div>
-          </PpCard>
-
-          {/* Active Rules List */}
-          <PpCard
-            title={t('rulesHeading')}
-            subtitle={t('rulesSubtitle')}
-            icon={Sliders}
-            iconAccent="primary"
-            action={<PpPill accent="primary">{winRuleViews.length} rules</PpPill>}
-          >
-            <WinRuleList orgId={orgId} projectId={projectId} winRules={winRuleViews} />
-          </PpCard>
-        </section>
-
-        {/* Right Column: Rule Builder & Associated Widgets */}
-        <section className="flex flex-col gap-6 lg:col-span-5">
-          {/* Rule Builder */}
-          <div id="rule-builder">
-            <PpCard
-              title={t('createHeading')}
-              subtitle={t('createSubtitle')}
-              icon={Plus}
-              iconAccent="primary"
-            >
-              {eventSchemaNames.length === 0 ? (
-                <p className="text-xs text-pp-outline">{t('noEventSchemas')}</p>
-              ) : (
-                <CreateWinRuleForm
-                  orgId={orgId}
-                  projectId={projectId}
-                  eventSchemaNames={eventSchemaNames}
-                />
-              )}
-            </PpCard>
-          </div>
-
-          {/* Trial Pipeline Widget */}
-          <PpCard
-            title={t('pipelineHeading')}
-            subtitle={t('pipelineSubtitle')}
-            icon={TrendingUp}
-            iconAccent="mint"
-          >
-            <TrialPipelineWidget view={trialPipelineView} />
-          </PpCard>
-
-          {/* Sprint Leaderboard Widget */}
-          <PpCard
-            title={t('leaderboardCardHeading')}
-            subtitle={t('leaderboardSubtitle')}
-            icon={Trophy}
-            iconAccent="amber"
-          >
-            <RepCollectionLeaderboardWidget view={repCollectionLeaderboardView} />
-          </PpCard>
-        </section>
+            {repCollectionLeaderboardView.rows.length === 0 ? (
+              <EmptyState icon={Coins} title={tCollections('empty')} compact />
+            ) : (
+              <BarList
+                items={repCollectionLeaderboardView.rows.map((row, index) => ({
+                  key: row.orgPersonId,
+                  label: tCollections('rank', { rank: index + 1, name: row.name }),
+                  value: row.totalAmount,
+                }))}
+                maxItems={5}
+                valueFormatter={formatCollectionAmount}
+                color="hsl(var(--success))"
+              />
+            )}
+          </ChartCard>
+        </div>
       </div>
 
-      {/* Mobile Sticky Action Bar */}
-      <PpMobileActionBar>
-        <div className="flex w-full items-center justify-between gap-2">
-          <span className="text-xs font-medium text-pp-on-surface-variant">
-            {t('activeRulesCount', { count: activeRulesCount })}
-          </span>
-          <PpButton variant="primary" size="sm" icon={Plus} asChild>
-            <a href="#rule-builder">
-              <span>{t('createHeading')}</span>
-            </a>
-          </PpButton>
+      <section className="flex flex-col gap-3" aria-labelledby="win-rules-heading">
+        <div className="flex items-center gap-2">
+          <Zap className="h-5 w-5 text-primary" aria-hidden="true" />
+          <h2 id="win-rules-heading" className="text-lg font-semibold">
+            {t('rulesHeading')}
+          </h2>
         </div>
-      </PpMobileActionBar>
-    </PpPage>
+        <WinRuleList orgId={orgId} projectId={projectId} winRules={winRuleViews} winCounts={Object.fromEntries(winCounts)} />
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Persisted history (KAN-65 follow-up, session-B dogfooding QA 2026-08-18): the live feed
+          beside it is a broadcast-only view that shows nothing once the tab wasn't open when a win fired
+          — this section is the page-load render of the same `win_events` collection so nothing is
+          missed. */}
+        <WinEventHistoryList events={winEventHistoryViews} truncated={winEventPage.truncated} />
+        <LiveWinFeed orgId={orgId} projectId={projectId} />
+      </div>
+
+      <ChartCard title={t('createHeading')} description={t('createDescription')} icon={PlusCircle}>
+        {eventSchemaNames.length === 0 ? <EmptyState icon={PlusCircle} title={t('noEventSchemas')} compact /> : null}
+        {eventSchemaNames.length > 0 ? <CreateWinRuleForm orgId={orgId} projectId={projectId} eventSchemaNames={eventSchemaNames} /> : null}
+      </ChartCard>
+    </div>
   );
 }

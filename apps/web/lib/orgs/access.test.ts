@@ -10,7 +10,7 @@ const { getServerSessionMock, resolveOrgSessionContextMock } = vi.hoisted(() => 
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
 vi.mock('@/lib/orgs/session-context', () => ({ resolveOrgSessionContext: resolveOrgSessionContextMock }));
 
-import { findActiveMembership, requireOrgMembership, requireOrgPermission } from './access';
+import { findActiveMembership, requireOrgMembership, requireOrgPermission, requireProjectPermission } from './access';
 
 function membership(overrides: Partial<UserOrgMembership> = {}): UserOrgMembership {
   return {
@@ -54,6 +54,10 @@ describe('findActiveMembership', () => {
 
 function ownerBinding(orgId: string, userId: string): PolicyBinding {
   return { principalType: 'user', principalId: userId, role: 'org_owner', scopeLevel: 'org', scopeId: orgId };
+}
+
+function projectAdminBinding(projectId: string, userId: string): PolicyBinding {
+  return { principalType: 'user', principalId: userId, role: 'project_admin', scopeLevel: 'project', scopeId: projectId };
 }
 
 describe('requireOrgPermission', () => {
@@ -110,6 +114,80 @@ describe('requireOrgPermission', () => {
     });
 
     const { error, user } = await requireOrgPermission('org-1', 'project.manage');
+    expect(error).toBeUndefined();
+    expect(user?.id).toBe('user-1');
+  });
+});
+
+describe('requireProjectPermission', () => {
+  beforeEach(() => {
+    getServerSessionMock.mockReset();
+    resolveOrgSessionContextMock.mockReset();
+  });
+
+  it('returns 401 when there is no session', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const { error, user } = await requireProjectPermission('org-1', 'project-1', 'dashboards.write');
+    expect(user).toBeUndefined();
+    expect(error?.status).toBe(401);
+  });
+
+  it('returns 404 when the caller has no active membership in the org at all', async () => {
+    getServerSessionMock.mockResolvedValue({ uid: 'firebase-uid-1' } as DecodedIdToken);
+    resolveOrgSessionContextMock.mockResolvedValue({
+      user: { id: 'user-1' } as UserModel,
+      memberships: [],
+      bindings: [],
+    });
+
+    const { error, user } = await requireProjectPermission('org-1', 'project-1', 'dashboards.write');
+    expect(user).toBeUndefined();
+    expect(error?.status).toBe(404);
+  });
+
+  it(
+    'returns 403 for a project-scoped binding on a DIFFERENT project — a binding never grants ' +
+      'access sideways to a sibling project (KAN-136 regression guard)',
+    async () => {
+      getServerSessionMock.mockResolvedValue({ uid: 'firebase-uid-1' } as DecodedIdToken);
+      resolveOrgSessionContextMock.mockResolvedValue({
+        user: { id: 'user-1' } as UserModel,
+        memberships: [membership({ organizationId: 'org-1', role: 'project_admin' })],
+        bindings: [projectAdminBinding('some-other-project', 'user-1')],
+      });
+
+      const { error, user } = await requireProjectPermission('org-1', 'project-1', 'dashboards.write');
+      expect(user).toBeUndefined();
+      expect(error?.status).toBe(403);
+    },
+  );
+
+  it(
+    'KAN-136: grants access to a project-scoped project_admin for THEIR OWN project — this is the ' +
+      'exact gap KAN-135 left open (a project-scoped binding satisfied nothing before this helper existed)',
+    async () => {
+      getServerSessionMock.mockResolvedValue({ uid: 'firebase-uid-1' } as DecodedIdToken);
+      resolveOrgSessionContextMock.mockResolvedValue({
+        user: { id: 'user-1' } as UserModel,
+        memberships: [membership({ organizationId: 'org-1', role: 'project_admin' })],
+        bindings: [projectAdminBinding('project-1', 'user-1')],
+      });
+
+      const { error, user } = await requireProjectPermission('org-1', 'project-1', 'dashboards.write');
+      expect(error).toBeUndefined();
+      expect(user?.id).toBe('user-1');
+    },
+  );
+
+  it('still grants access to an org-scope admin (regression: project scoping must not narrow existing org-scope access)', async () => {
+    getServerSessionMock.mockResolvedValue({ uid: 'firebase-uid-1' } as DecodedIdToken);
+    resolveOrgSessionContextMock.mockResolvedValue({
+      user: { id: 'user-1' } as UserModel,
+      memberships: [membership({ organizationId: 'org-1', role: 'org_owner' })],
+      bindings: [ownerBinding('org-1', 'user-1')],
+    });
+
+    const { error, user } = await requireProjectPermission('org-1', 'project-1', 'dashboards.write');
     expect(error).toBeUndefined();
     expect(user?.id).toBe('user-1');
   });

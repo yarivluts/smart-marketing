@@ -12,7 +12,7 @@ export interface ExperimentVariantResult extends ExperimentVariantCounts {
   isControl: boolean;
   /** Relative change vs. the control's conversion rate, as a percentage (e.g. `12.5` for a 12.5% relative lift). `null` for the control itself, or when either side's rate isn't computable. */
   upliftVsControlPct: number | null;
-  /** Two-tailed p-value from a two-proportion z-test against the control. `null` for the control itself, or when the test isn't computable (an empty variant or a pooled proportion of exactly 0 or 1, i.e. no variance to test against). */
+  /** Two-tailed p-value from a two-proportion z-test against the control. `null` for the control itself, or when the test isn't valid to run — see {@link twoProportionZTestPValue} for the three cases, of which "the sample is too small for the normal approximation" is by far the most common in practice. */
   pValue: number | null;
   /** `pValue !== null && pValue < SIGNIFICANCE_ALPHA` — conventional 95% confidence. `false` (not `null`) whenever `pValue` is `null`, so a caller can render this as a plain boolean badge without a third "unknown" state. */
   isSignificant: boolean;
@@ -56,17 +56,52 @@ function standardNormalCdf(z: number): number {
 }
 
 /**
- * A two-tailed two-proportion z-test's p-value, or `null` when it isn't
- * computable: either side has zero exposures (nothing to form a proportion
- * from), or the pooled proportion is exactly 0 or 1 (every exposure on
- * both sides landed the same way — no variance for the test's standard
- * error to divide by).
+ * The smallest expected count the two-proportion z-test needs in each of its
+ * four cells (successes and failures, on each arm) before the normal
+ * approximation it rests on is trustworthy — the conventional rule of thumb.
+ *
+ * This is a validity precondition, not a taste threshold. Below it the test
+ * still *computes* a p-value, and that p-value is wrong in a specific and
+ * dangerous direction: it is too small, so it manufactures winners. Measured
+ * against Fisher's exact test on the same counts: a control of 0/10 against a
+ * variant of 4/10 gives z-test p=0.025 ("significant") where the exact test
+ * gives p=0.087 (not significant); 1/20 against 6/20 gives 0.038 against 0.092.
+ * Both would have shipped a variant on the strength of ten users per arm.
+ */
+export const MIN_EXPECTED_CELL_COUNT = 5;
+
+/**
+ * A two-tailed two-proportion z-test's p-value, or `null` when the test isn't
+ * valid to run:
+ *
+ * 1. Either side has zero exposures — nothing to form a proportion from.
+ * 2. The pooled proportion is exactly 0 or 1 — every exposure on both sides
+ *    landed the same way, so there is no variance for the standard error to
+ *    divide by.
+ * 3. Any expected cell count falls below {@link MIN_EXPECTED_CELL_COUNT} — the
+ *    sample is too small for the normal approximation, so the number the test
+ *    would return does not mean what a reader takes it to mean.
+ *
+ * Callers render `null` as "insufficient data", which is the honest answer in
+ * all three cases. Returning a number here instead would be worse than a
+ * made-up constant: it carries the authority of having come out of a
+ * significance test.
  */
 function twoProportionZTestPValue(control: ExperimentVariantCounts, variant: ExperimentVariantCounts): number | null {
   if (control.exposures === 0 || variant.exposures === 0) return null;
 
   const pooled = (control.conversions + variant.conversions) / (control.exposures + variant.exposures);
   if (pooled === 0 || pooled === 1) return null;
+
+  // Checked on both arms, successes and failures alike: an experiment can carry
+  // plenty of exposures and still have far too few conversions to test on.
+  const expectedCells = [
+    control.exposures * pooled,
+    control.exposures * (1 - pooled),
+    variant.exposures * pooled,
+    variant.exposures * (1 - pooled),
+  ];
+  if (expectedCells.some((expected) => expected < MIN_EXPECTED_CELL_COUNT)) return null;
 
   const standardError = Math.sqrt(pooled * (1 - pooled) * (1 / control.exposures + 1 / variant.exposures));
   if (standardError === 0) return null;

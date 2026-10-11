@@ -72,3 +72,22 @@ describe('GoalThermometer', () => {
     expect(screen.getByText('boom')).toBeInTheDocument();
   });
 });
+
+describe('GoalThermometer figures in the metric unit (KAN-213)', () => {
+  it('shows a ratio goal\'s figures as percents', () => {
+    renderThermometer({
+      kind: 'ok',
+      percentFilled: 60,
+      status: 'at_risk',
+      statusColor: 'amber',
+      actualValue: 0.05,
+      expectedAtNow: 0.06,
+      projectedFinalValue: 0.075,
+      isGoalMet: false,
+      unit: { kind: 'ratio' },
+    });
+    expect(screen.getByText('5%')).toBeInTheDocument();
+    expect(screen.getByText('6%')).toBeInTheDocument();
+    expect(screen.getByText('7.5%')).toBeInTheDocument();
+  });
+});

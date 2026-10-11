@@ -10,8 +10,8 @@ export interface InsightView {
   id: string;
   severity: ProjectInsightSeverity;
   occurredAt: string;
-  titleKey: 'trackingAlertTitle' | 'winEventTitle';
-  detailKey: 'trackingAlertDetail' | 'winEventDetail';
+  titleKey: 'trackingAlertTitle' | 'winEventTitle' | 'metricHealthTitle';
+  detailKey: 'trackingAlertDetail' | 'winEventDetail' | 'metricHealthDetail';
   args: Record<string, string>;
 }
 
@@ -24,6 +24,19 @@ export function toInsightView(insight: ProjectInsight): InsightView {
       titleKey: 'trackingAlertTitle',
       detailKey: 'trackingAlertDetail',
       args: { schemaName: insight.schemaName, lastSeenAt: insight.lastSeenAt },
+    };
+  }
+  if (insight.kind === 'metric_health') {
+    // The reasons are the registry's own validation messages — technical, English, and exactly
+    // what the admin needs to fix the definition; they are rendered verbatim as an argument, the
+    // same way a tracking alert's schema name is.
+    return {
+      id: insight.id,
+      severity: insight.severity,
+      occurredAt: insight.occurredAt,
+      titleKey: 'metricHealthTitle',
+      detailKey: 'metricHealthDetail',
+      args: { metricName: insight.metricName, version: String(insight.version), reasons: insight.reasons.join(' ') },
     };
   }
   return {

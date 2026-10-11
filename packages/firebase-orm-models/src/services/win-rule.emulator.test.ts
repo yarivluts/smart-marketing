@@ -10,6 +10,7 @@ import {
   ingestBatch,
   InvalidWinRuleError,
   listAuditLogEntriesForOrg,
+  listEnvironmentsForProject,
   listRecentWinEventsForProject,
   listWinEventsSince,
   listWinRulesForProject,
@@ -658,6 +659,40 @@ describe('listWinEventsSince', () => {
 
     const atCursor = await listWinEventsSince(organization.id, project.id, wins[0].created_at);
     expect(atCursor.map((event) => event.id).sort()).toEqual(wins.map((event) => event.id).sort());
+  });
+
+  /**
+   * KAN-99. Rules fire at ingest for every environment, stamping the key's own on the win, so a
+   * `gos_test_` key's synthetic signup produced a real win. The feed read every environment, so
+   * that test win celebrated on the prod win feed and TV board beside real customers.
+   */
+  it('shows only prod wins by default on both feeds, and a named environment on request', async () => {
+    const { owner, organization, project, environmentId: prodEnvironmentId } = await setupOrgWithProject('Win Feed Env Org');
+    const devEnvironmentId = (await listEnvironmentsForProject(organization.id, project.id)).find((e) => e.name === 'dev')!.id;
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+    await createWinRule({ organizationId: organization.id, projectId: project.id, name: 'New signup', schemaName: 'signup', filters: [], createdByUserId: owner.id });
+
+    for (const [environmentId, suffix] of [[prodEnvironmentId, 'prod'], [devEnvironmentId, 'dev']] as const) {
+      await evaluateRecordAgainstWinRules({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId,
+        kind: 'event',
+        schemaName: 'signup',
+        clientId: `evt_${suffix}`,
+        payload: {},
+        rawRecordId: `raw_${suffix}`,
+        occurredAt: '2026-07-11T00:00:00.000Z',
+      });
+    }
+
+    const recent = await listRecentWinEventsForProject(organization.id, project.id);
+    expect(recent.map((event) => event.environment_id)).toEqual([prodEnvironmentId]);
+    const since = await listWinEventsSince(organization.id, project.id, '2000-01-01T00:00:00.000Z');
+    expect(since.map((event) => event.environment_id)).toEqual([prodEnvironmentId]);
+
+    const devRecent = await listRecentWinEventsForProject(organization.id, project.id, undefined, devEnvironmentId);
+    expect(devRecent.map((event) => event.environment_id)).toEqual([devEnvironmentId]);
   });
 });
 

@@ -10,7 +10,8 @@ const nextConfig = {
   // Standalone output for containerized (Cloud Run) deploys; skipped on Windows local builds
   output:
     process.env.NEXT_OUTPUT_STANDALONE === 'true' ||
-    (process.env.NODE_ENV === 'production' && process.platform !== 'win32')
+    // 'false': the e2e build, served by `next start`, which does not run standalone output.
+    (process.env.NEXT_OUTPUT_STANDALONE !== 'false' && process.env.NODE_ENV === 'production' && process.platform !== 'win32')
       ? 'standalone'
       : undefined,
   // Trace files from the monorepo root so workspace deps are included.
@@ -20,6 +21,9 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   transpilePackages: ['@growthos/shared'],
+  // The Ad Studio's media store (KAN-231): a Node-only client loaded at runtime rather than bundled,
+  // the same way Next already treats firebase-admin. Standalone tracing copies it into the image.
+  serverExternalPackages: ['@google-cloud/storage'],
   // @sentry/nextjs's server tracing pulls in OpenTelemetry instrumentation,
   // which uses require-in-the-middle's dynamic requires under the hood.
   // Webpack can't statically analyze those; this is a known, harmless warning.

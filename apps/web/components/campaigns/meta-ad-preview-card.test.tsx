@@ -39,6 +39,20 @@ describe('MetaAdPreviewCard', () => {
     expect(screen.getByText('Creative Preview Mockup')).toBeInTheDocument();
   });
 
+  /**
+   * The card used to fall back to the literal string 'growthos.io' when an ad had no link.
+   * This preview is a facsimile of the real Facebook ad unit, so that stand-in read as the
+   * ad's actual destination rather than as an absence.
+   */
+  it('shows no destination domain at all when the ad carries no link', () => {
+    const adWithoutLink = { ...mockAd, linkUrl: undefined };
+    renderWithIntl(<MetaAdPreviewCard campaignName="Meta Retargeting" ad={adWithoutLink} />);
+
+    expect(screen.queryByText('growthos.io')).not.toBeInTheDocument();
+    // The rest of the ad still renders — only the domain line is withheld.
+    expect(screen.getByText('Sign Documents 10x Faster')).toBeInTheDocument();
+  });
+
   it('renders in Hebrew RTL with correct translation', () => {
     renderWithIntl(<MetaAdPreviewCard campaignName="Meta Retargeting" ad={mockAd} />, {
       locale: 'he',

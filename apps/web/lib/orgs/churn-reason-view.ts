@@ -1,6 +1,7 @@
 import type { WarehouseRow } from '@growthos/firebase-orm-models';
 import type { CancellationReasonThemeCluster } from '@growthos/shared';
 import { toNumber } from './board-view';
+import { bucketByPeriod, earliestTimestamp, type PeriodBucket } from './period-buckets';
 
 /** One dimension value's cancellation count — the row shape the Churn Reasons page's plan/channel/cohort breakdown tables render from. */
 export interface CancellationReasonDimensionBreakdownRow {
@@ -80,6 +81,8 @@ export function cancellationReasonCodeLabelKey(reasonCode: string): string {
       return 'reasonNotUsingEnough';
     case 'technical_issues':
       return 'reasonTechnicalIssues';
+    case 'payment_failed':
+      return 'reasonPaymentFailed';
     case 'other':
       return 'reasonOther';
     default:
@@ -87,62 +90,38 @@ export function cancellationReasonCodeLabelKey(reasonCode: string): string {
   }
 }
 
-/**
- * Returns the Pastel Pulse pill accent for a given cancellation reason code.
- */
-export function cancellationReasonPillAccent(reasonCode: string): 'primary' | 'pink' | 'mint' | 'sky' | 'neutral' {
-  switch (reasonCode) {
-    case 'too_expensive':
-    case 'poor_support':
-      return 'pink';
-    case 'switched_competitor':
-      return 'primary';
-    case 'missing_features':
-      return 'sky';
-    case 'not_using_enough':
-      return 'mint';
-    case 'technical_issues':
-    case 'other':
-    default:
-      return 'neutral';
-  }
+/** The fields of a landed `cancellation_reason` raw record the trend reads. */
+export interface CancellationTrendRecord {
+  landed_at: string;
+  payload: Record<string, unknown>;
+}
+
+export interface CancellationTrend {
+  buckets: PeriodBucket[];
+  /** Set when the read hit its cap: weeks before this were never read and come back as `null`. */
+  reliableFrom: string | null;
 }
 
 /**
- * Returns the Pastel Pulse pill accent for a given winback potential tier.
+ * Cancellations landed per UTC week over the last `weeks` weeks, from the same bounded read the
+ * reason breakdown uses. Counts only records the breakdown counts (a non-empty `reason_code`), so
+ * the chart and the donut add up to the same total. When the read came back full (`records.length
+ * >= cap`) older history exists that was not fetched, so weeks before the oldest fetched record are
+ * reported as unknown rather than zero.
  */
-export function winbackPotentialAccent(potential: 'high' | 'medium' | 'low'): 'mint' | 'sky' | 'neutral' {
-  switch (potential) {
-    case 'high':
-      return 'mint';
-    case 'medium':
-      return 'sky';
-    case 'low':
-    default:
-      return 'neutral';
-  }
-}
-
-/**
- * Translation key for one winback playbook strategy (KAN-306).
- */
-export function winbackPlaybookLabelKey(playbook: string): string {
-  switch (playbook) {
-    case 'pause_discount':
-      return 'playbookPauseDiscount';
-    case 'smart_dunning':
-      return 'playbookSmartDunning';
-    case 'executive_outreach':
-      return 'playbookExecutiveOutreach';
-    case 'adoption_concierge':
-      return 'playbookAdoptionConcierge';
-    case 'feature_preview':
-      return 'playbookFeaturePreview';
-    case 'support_escalation':
-      return 'playbookSupportEscalation';
-    case 'standard_followup':
-      return 'playbookStandardFollowup';
-    default:
-      return playbook;
-  }
+export function toCancellationTrend(records: readonly CancellationTrendRecord[], options: { now: Date; weeks: number; cap: number }): CancellationTrend {
+  const counted = records.filter((record) => {
+    const properties = record.payload.properties;
+    if (typeof properties !== 'object' || properties === null) return false;
+    const reasonCode = (properties as Record<string, unknown>).reason_code;
+    return typeof reasonCode === 'string' && reasonCode.trim().length > 0;
+  });
+  const reliableFrom = records.length >= options.cap ? earliestTimestamp(records.map((record) => record.landed_at)) : null;
+  return {
+    buckets: bucketByPeriod(
+      counted.map((record) => ({ at: record.landed_at })),
+      { period: 'week', periods: options.weeks, now: options.now, reliableFrom },
+    ),
+    reliableFrom,
+  };
 }

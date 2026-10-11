@@ -131,6 +131,16 @@ export interface GoalProgressInput {
    * shares the same `elapsedFraction`).
    */
   history?: readonly GoalProgressHistoryPoint[];
+  /**
+   * Whether the goal's metric is a running total that grows with its window (signups, spend) -
+   * the default - or a level that holds whatever the window length (a conversion rate, an
+   * average; see `metricAccumulatesOverPeriod`). Only 'maximize' reads it: a running total is
+   * paced against `elapsed x target`, a level against the target itself, since a 5% conversion
+   * goal wants 5% on day 3 as much as on day 30 and a rate does not extrapolate by dividing by the
+   * elapsed fraction. `actualValue` for a level must be the period's own value (the formula over
+   * the period's totals), never a sum or mean of daily values.
+   */
+  accumulates?: boolean;
 }
 
 /**
@@ -198,7 +208,27 @@ function paceStatusFromRatio(ratio: number): GoalPaceStatus {
   return 'off_track';
 }
 
+/** A 'maximize' goal on a level metric (see {@link GoalProgressInput.accumulates}): a floor that applies all window long - the mirror image of a 'minimize' ceiling. */
+function calculateMaximizeLevelProgress(input: GoalProgressInput): GoalProgressResult {
+  const targetValue = input.targetValue ?? 0;
+  const { actualValue } = input;
+  const expectedAtNow = targetValue;
+  const ratio = targetValue === 0 ? 1 : actualValue / targetValue;
+  const progressRatio = targetValue === 0 && actualValue === 0 ? 0 : actualValue / targetValue;
+  const projectedFinalValue = fitLinearTrendProjection(input.history ?? [], 1) ?? actualValue;
+  return {
+    expectedAtNow,
+    progressRatio,
+    projectedFinalValue,
+    status: paceStatusFromRatio(ratio),
+    isGoalMet: actualValue >= targetValue,
+  };
+}
+
 function calculateMaximizeProgress(input: GoalProgressInput): GoalProgressResult {
+  if (input.accumulates === false) {
+    return calculateMaximizeLevelProgress(input);
+  }
   const targetValue = input.targetValue ?? 0;
   const { actualValue, elapsedFraction } = input;
   const expectedAtNow = targetValue * elapsedFraction;

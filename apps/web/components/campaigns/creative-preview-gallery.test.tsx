@@ -47,7 +47,7 @@ const mockItems: UnifiedCampaignItem[] = [
 ];
 
 describe('CreativePreviewGallery', () => {
-  it('renders gallery with platform filter buttons and creative cards', () => {
+  it('renders gallery with platform filter buttons and the real imported creative', () => {
     renderWithIntl(<CreativePreviewGallery items={mockItems} />);
 
     expect(screen.getByTestId('creative-preview-gallery')).toBeInTheDocument();
@@ -57,16 +57,29 @@ describe('CreativePreviewGallery', () => {
 
     expect(screen.getByText('Sign Documents Fast')).toBeInTheDocument();
     expect(screen.getByText('Automate contracts in seconds.')).toBeInTheDocument();
-    expect(screen.getByText('Google Search - Commercial Official')).toBeInTheDocument();
   });
 
-  it('filters by platform when clicking filter button', () => {
+  /**
+   * `c2` has neither imported ads nor a draft. The gallery used to synthesize a card for
+   * exactly this case — headline `${label} Official`, invented body copy and keywords, and
+   * a growthos.io destination — rendered in the same card component as a genuinely imported
+   * ad, in the one view whose job is showing what is really running on the platforms.
+   */
+  it('shows nothing for a campaign that has no imported ads and no draft', () => {
     renderWithIntl(<CreativePreviewGallery items={mockItems} />);
 
-    // Click Google Ads filter
+    expect(screen.queryByText(/Google Search - Commercial Official/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Smart Growth & ROI/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/growth marketing/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Accelerate your marketing performance/)).not.toBeInTheDocument();
+  });
+
+  it('falls through to the empty state when the filter leaves no real creatives', () => {
+    renderWithIntl(<CreativePreviewGallery items={mockItems} />);
+
     fireEvent.click(screen.getByText('Google Ads'));
 
-    expect(screen.getByText('Google Search - Commercial Official')).toBeInTheDocument();
     expect(screen.queryByText('Sign Documents Fast')).not.toBeInTheDocument();
+    expect(screen.getByText('No creatives found matching your filter.')).toBeInTheDocument();
   });
 });

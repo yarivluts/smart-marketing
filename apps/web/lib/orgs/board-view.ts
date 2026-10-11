@@ -5,7 +5,17 @@ import type {
   BoardTileType,
   WarehouseRow,
 } from '@growthos/firebase-orm-models';
-import type { ComparePeriod } from '@growthos/shared';
+import {
+  DEFAULT_RELATIVE_DATE_RANGE,
+  normalizeDateRangeSetting,
+  readPeriodValue,
+  resolveDateRangeSetting,
+  todayUtcDateOnly,
+  type ComparePeriod,
+  type DateRangeSetting,
+  type ParsedMetricUnit,
+  type ResolvedDateRange,
+} from '@growthos/shared';
 
 /** A board's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface BoardSummaryView {
@@ -23,18 +33,23 @@ export function toBoardSummaryView(board: BoardModel): BoardSummaryView {
 export interface BoardView {
   id: string;
   name: string;
-  dateRange: BoardModel['date_range'];
+  /** The stored setting (KAN-211), normalized: always carries its `kind`, so a legacy `{ start, end, grain }` board arrives as `kind: 'absolute'`. */
+  dateRange: DateRangeSetting;
+  /** The concrete window `dateRange` means today (UTC) — what the tiles on the page were queried over. */
+  resolvedDateRange: ResolvedDateRange;
   /** `undefined`, never `null` — this view's own conditional-spread construction (`toBoardView`) omits the key entirely rather than including an explicit `null` (unlike `BoardModel.compare` itself, whose stored `null` has its own storage-layer reason — see that field's own doc comment). */
   compare?: ComparePeriod;
   globalFilters: BoardModel['global_filters'];
   tiles: BoardTile[];
 }
 
-export function toBoardView(board: BoardModel): BoardView {
+export function toBoardView(board: BoardModel, today: string = todayUtcDateOnly()): BoardView {
+  const dateRange = normalizeDateRangeSetting(board.date_range) ?? { ...DEFAULT_RELATIVE_DATE_RANGE };
   return {
     id: board.id,
     name: board.name,
-    dateRange: board.date_range,
+    dateRange,
+    resolvedDateRange: resolveDateRangeSetting(dateRange, today),
     ...(board.compare ? { compare: board.compare } : {}),
     globalFilters: board.global_filters,
     tiles: board.tiles,
@@ -43,7 +58,12 @@ export function toBoardView(board: BoardModel): BoardView {
 
 export interface TimeSeriesPoint {
   bucket: string;
-  value: number;
+  /**
+   * `null` is "no value" for this bucket — an avg/ratio/formula metric over a bucket with no events
+   * (the query layer fills count/sum buckets with a real 0 instead, see `fillEmptyBuckets`). Charts
+   * draw it as a gap and never interpolate across it; it is not a 0.
+   */
+  value: number | null;
 }
 
 export interface TimeSeries {
@@ -107,7 +127,32 @@ export interface HistogramView {
 }
 
 /** Every data-bearing tile kind carries the same two KAN-69 fields: whether its query returned zero rows (an "empty state", distinct from a genuine zero) and its project-wide data-freshness badge (`null` when no orchestration run has ever succeeded). `unavailable` carries neither — it's already its own degraded state with no queried data to attach either to. */
-type WithFreshness<T> = T & { isEmpty: boolean; freshness: TileFreshness | null };
+type WithFreshness<T> = T & {
+  isEmpty: boolean;
+  freshness: TileFreshness | null;
+  /** The declared unit (KAN-213) of each of the tile's metrics that has one, by metric name. Absent when none of them declares a unit. */
+  units?: MetricDisplayUnits;
+};
+
+/** Metric name -> the unit its values are displayed in (see `resolveMetricDisplayUnits`). */
+export type MetricDisplayUnits = Record<string, ParsedMetricUnit>;
+
+/**
+ * The units a tile needs: only its own metrics, and only a declared unit - a plain `number` is left
+ * out, so a tile over unit-less metrics renders exactly as it did before units existed.
+ */
+function tileUnits(tile: BoardTile, units: MetricDisplayUnits | undefined): MetricDisplayUnits | undefined {
+  if (!units) {
+    return undefined;
+  }
+  const picked = Object.fromEntries(
+    tile.metricNames.flatMap((metricName) => {
+      const unit = units[metricName];
+      return unit && unit.kind !== 'number' ? [[metricName, unit] as const] : [];
+    }),
+  );
+  return Object.keys(picked).length > 0 ? picked : undefined;
+}
 
 export type TileRenderView =
   | { kind: 'unavailable'; reason: BoardTileUnavailableReason; message: string }
@@ -118,7 +163,7 @@ export type TileRenderView =
   | WithFreshness<{ kind: 'heatmap' } & HeatmapView>
   | WithFreshness<{ kind: 'histogram' } & HistogramView>;
 
-/** Exported for reuse by other view-mappers in this app (e.g. `trial-pipeline-view.ts`) that sum the same `WarehouseRow[]` shape — not shared with `packages/firebase-orm-models`, which keeps its own local mirror since that package must not depend on `apps/web` (see `goal.service.ts`'s `sumMetricRows`). */
+/** Coerces one warehouse cell to a finite number (`null`/unparseable reads 0). Exported for reuse by other view-mappers in this app that read the same `WarehouseRow[]` shape. */
 export function toNumber(value: string | number | null): number {
   if (value === null) {
     return 0;
@@ -140,19 +185,26 @@ function splitByPeriod(rows: readonly WarehouseRow[]): { current: WarehouseRow[]
   return { current, previous };
 }
 
-/** Exported — see `toNumber`'s own doc comment on why this is shared within `apps/web` but not with `packages/firebase-orm-models`. */
-export function sumMetric(rows: readonly WarehouseRow[], metricName: string): number {
-  return rows.reduce((total, row) => total + toNumber(row[metricName] ?? null), 0);
-}
-
+/**
+ * A big number is its metric's value for the whole period. `queryBoardTile` asks the warehouse for
+ * exactly that - the board's range as ONE bucket per period (`total` grain), with no breakdown - so
+ * `rows` holds one row for the current period and, when compared, one for the previous. It is read
+ * as-is, never re-derived from daily buckets: a conversion rate over the period is
+ * sum(conversions) / sum(visitors), which neither the sum of its daily rates (thirty days at 5% is
+ * not 150%) nor their mean (day 1 at 1/1 and day 2 at 1/100 average 50.5%, while the period's rate
+ * is 2/101 = 1.98%) can recover. The same holds for an average and for a count_distinct (a customer
+ * active on two days is one customer) - so a distinct-count big number can deliberately read LOWER
+ * than the sum of the same metric's daily bars on a line/bar tile: the bars count each day's
+ * distinct customers, the big number the period's. A count or a sum reads the same total it always
+ * did.
+ */
 function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
-  const { current, previous } = splitByPeriod(rows);
-  const value = sumMetric(current, metricName);
-  if (previous.length === 0) {
+  const value = readPeriodValue(rows, metricName, 'current') ?? 0;
+  if (!rows.some((row) => row.period === 'previous')) {
     return { kind: 'big_number' as const, value };
   }
-  const previousValue = sumMetric(previous, metricName);
+  const previousValue = readPeriodValue(rows, metricName, 'previous') ?? 0;
   const deltaPct = previousValue !== 0 ? ((value - previousValue) / previousValue) * 100 : undefined;
   return { kind: 'big_number' as const, value, previousValue, ...(deltaPct !== undefined ? { deltaPct } : {}) };
 }
@@ -182,7 +234,8 @@ function buildSeries(rows: readonly WarehouseRow[], tile: BoardTile): TimeSeries
   for (const row of rows) {
     const key = groupKey(row, tile.dimensions);
     const group = byGroup.get(key) ?? { label: groupLabel(row, tile.dimensions), points: [] };
-    group.points.push({ bucket: String(row.bucket_date ?? ''), value: toNumber(row[metricName] ?? null) });
+    const raw = row[metricName] ?? null;
+    group.points.push({ bucket: String(row.bucket_date ?? ''), value: raw === null ? null : toNumber(raw) });
     byGroup.set(key, group);
   }
   return [...byGroup.values()]
@@ -213,8 +266,9 @@ function buildTableView(rows: readonly WarehouseRow[]) {
   return { kind: 'table' as const, columns, rows: sorted };
 }
 
+/** Each step's value for the whole period - like a big number, a funnel tile queries one `total`-grain row (see `buildBigNumberView`). */
 function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]) {
-  const totals = tile.metricNames.map((metricName) => sumMetric(rows, metricName));
+  const totals = tile.metricNames.map((metricName) => readPeriodValue(rows, metricName) ?? 0);
   const firstTotal = totals[0] ?? 0;
   const steps: FunnelStep[] = tile.metricNames.map((metricName, index) => ({
     metricName,
@@ -265,9 +319,8 @@ function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]) {
  * single axis instead of a matrix: every row is summed into its own
  * dimension-value bucket (there should only ever be one row per bucket for
  * a real "as of latest date" snapshot metric, but summing rather than
- * overwriting tolerates a query that happens to return more than one, the
- * same defensive posture `sumMetric` already takes for `big_number`/
- * `funnel`).
+ * overwriting tolerates a query that happens to return more than one - right
+ * for the additive snapshot counts a histogram draws).
  */
 function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
@@ -300,11 +353,50 @@ function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]) {
  * genuine zero) is derived here once for every kind, rather than each
  * type-specific renderer re-deriving it from its own already-shaped data.
  */
-export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutcome, freshness: TileFreshness | null = null): TileRenderView {
+/** Distributive, so omitting the two wrapper fields keeps the union's members (and its `kind` discriminant) intact instead of collapsing them to their common keys. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+type TileContent = DistributiveOmit<
+  Extract<TileRenderView, { kind: Exclude<TileRenderView['kind'], 'unavailable'> }>,
+  'isEmpty' | 'freshness'
+>;
+
+/**
+ * Whether a shaped tile holds anything to draw — see `buildTileRenderView` for why this is
+ * derived from the content rather than the query's row count.
+ *
+ * `big_number` and `funnel` are the exceptions and take `currentRowCount` instead: their
+ * shape comes from the tile's own configuration, not from the data. A funnel always emits one
+ * step per configured metric and a big number always emits a value, so both look non-empty
+ * even when nothing was returned. For those two, "did the current period return any rows"
+ * is the only question that distinguishes an unmeasured tile from a genuine zero.
+ */
+function contentIsEmpty(content: TileContent, currentRowCount: number): boolean {
+  switch (content.kind) {
+    case 'big_number':
+    case 'funnel':
+      return currentRowCount === 0;
+    case 'time_series':
+      // A series of nothing but gaps (every bucket "no value") has nothing to draw either.
+      return content.series.length === 0 || content.series.every((series) => series.points.every((point) => point.value === null));
+    case 'table':
+      return content.rows.length === 0;
+    case 'heatmap':
+      return content.rowLabels.length === 0 || content.columnLabels.length === 0;
+    case 'histogram':
+      return content.labels.length === 0;
+  }
+}
+
+export function buildTileRenderView(
+  tile: BoardTile,
+  outcome: BoardTileQueryOutcome,
+  freshness: TileFreshness | null = null,
+  units?: MetricDisplayUnits,
+): TileRenderView {
   if (!outcome.ok) {
     return { kind: 'unavailable', reason: outcome.reason, message: outcome.message };
   }
-  const isEmpty = outcome.series.length === 0;
   const content = (() => {
     switch (tile.type) {
       case 'big_number':
@@ -324,5 +416,35 @@ export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutc
         return buildTableView(outcome.series);
     }
   })();
-  return { ...content, isEmpty, freshness };
+
+  /*
+    Emptiness is decided by what the tile can actually draw, not by the raw row count.
+
+    It used to be `outcome.series.length === 0`. But every chart kind renders from a *subset*
+    of those rows: `buildTimeSeriesView` splits by `period` and charts only the current one,
+    so a tile whose rows were all `period: 'previous'` produced `series: []` while the row
+    count said "not empty". `LineChartView` and `BarChartView` then skipped their empty branch
+    and rendered an `<svg>` with no polylines, or a flex container with no bars — a blank box
+    with no explanation, on a tile whose query had succeeded.
+
+    That is the reported symptom exactly: on the Landing-page board the big-number and
+    breakdown tiles came up blank while the table tile, which renders every row regardless of
+    period, showed the same underlying data correctly.
+
+    Big numbers and funnels are judged on the current period's row count instead, because
+    their shape is configuration-driven rather than data-driven — see `contentIsEmpty`.
+  */
+  const isEmpty = contentIsEmpty(content, splitByPeriod(outcome.series).current.length);
+
+  const displayUnits = tileUnits(tile, units);
+  return { ...content, isEmpty, freshness, ...(displayUnits ? { units: displayUnits } : {}) };
+}
+
+/** How many of a board's tiles are of each type, most common first (ties by type name) - for the gallery's per-board preview. */
+export function boardTileTypeMix(board: { tiles: readonly { type: string }[] }): { type: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const tile of board.tiles) {
+    counts.set(tile.type, (counts.get(tile.type) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
 }

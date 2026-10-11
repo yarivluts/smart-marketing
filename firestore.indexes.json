@@ -123,6 +123,130 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "raw_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "schema_name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "landed_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "raw_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "schema_name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "landed_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "win_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "win_events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "ingest_batches",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "quarantined_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "pipeline_messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "enqueued_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "tracking_alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "last_checked_at",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

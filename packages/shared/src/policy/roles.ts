@@ -71,6 +71,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   org_admin: ALL_PERMISSIONS.filter((p) => p !== 'billing.manage'),
   project_admin: [
     'project.manage',
+    'project.configure',
     'members.manage',
     'sources.manage',
     'keys.manage',
@@ -83,6 +84,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'automation.execute',
     'data.export',
     'plugin.install',
+    'ai.use',
     'mcp.read',
   ],
   editor: ['metrics.write', 'dashboards.write', 'dashboards.read', 'ai.use', 'mcp.read'],

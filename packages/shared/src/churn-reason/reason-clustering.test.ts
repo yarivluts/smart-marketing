@@ -3,11 +3,11 @@ import { clusterCancellationReasonComments, computeCancellationReasonCodeBreakdo
 
 describe('clusterCancellationReasonComments', () => {
   it('returns an empty list for no comments', () => {
-    expect(clusterCancellationReasonComments([])).toEqual([]);
+    expect(clusterCancellationReasonComments([])).toEqual({ clusters: [], totalComments: 0, matchedComments: 0, uncategorizedComments: 0 });
   });
 
   it('groups comments by theme, most common first', () => {
-    const clusters = clusterCancellationReasonComments([
+    const { clusters } = clusterCancellationReasonComments([
       'Way too expensive for what we get',
       'Pricing is too high for our team size',
       'We switched to a competitor with a better price',
@@ -20,19 +20,53 @@ describe('clusterCancellationReasonComments', () => {
     ]);
   });
 
-  it('drops comments that match no theme keyword from the digest', () => {
-    expect(clusterCancellationReasonComments(['Thanks for everything, it was fun while it lasted!'])).toEqual([]);
+  it('drops comments that match no theme keyword from the clusters but still counts them', () => {
+    // Dropping them silently is what let the page report a handful of themes as
+    // "what customers say" while most of the input matched nothing.
+    const digest = clusterCancellationReasonComments(['Thanks for everything, it was fun while it lasted!']);
+    expect(digest.clusters).toEqual([]);
+    expect(digest.totalComments).toBe(1);
+    expect(digest.matchedComments).toBe(0);
+    expect(digest.uncategorizedComments).toBe(1);
+  });
+
+  it('reports coverage when most comments match nothing, which is the case that misleads', () => {
+    const comments = ['Way too expensive', ...Array.from({ length: 9 }, (_unused, index) => `ne correspond pas a nos besoins ${index}`)];
+    const digest = clusterCancellationReasonComments(comments);
+    // One theme with one comment, out of ten. Without the counts this renders as
+    // "Pricing - 1 comment" and reads as the whole story.
+    expect(digest.clusters).toHaveLength(1);
+    expect(digest.totalComments).toBe(10);
+    expect(digest.matchedComments).toBe(1);
+    expect(digest.uncategorizedComments).toBe(9);
+  });
+
+  it('counts a non-English comment set as entirely uncategorized rather than absent', () => {
+    // The lexicon is fixed and English. A project whose customers write in
+    // another language gets zero clusters - which must not be reported as
+    // "no comments landed".
+    const digest = clusterCancellationReasonComments(['trop cher pour nous', 'nous avons change de fournisseur']);
+    expect(digest.clusters).toEqual([]);
+    expect(digest.totalComments).toBe(2);
+    expect(digest.uncategorizedComments).toBe(2);
+  });
+
+  it('matchedComments always equals the sum of cluster counts', () => {
+    const digest = clusterCancellationReasonComments(['too expensive', 'so many bugs', 'no keywords here at all', 'poor support']);
+    const summed = digest.clusters.reduce((total, cluster) => total + cluster.commentCount, 0);
+    expect(digest.matchedComments).toBe(summed);
+    expect(digest.matchedComments + digest.uncategorizedComments).toBe(digest.totalComments);
   });
 
   it('assigns a comment to the theme with the most keyword hits when it mentions more than one', () => {
     // "expensive" (pricing, 1 hit) vs "bug"/"crash" (bugs, 2 hits) -> bugs wins.
-    const clusters = clusterCancellationReasonComments(['Too expensive and also the app has bugs and crashes constantly']);
+    const { clusters } = clusterCancellationReasonComments(['Too expensive and also the app has bugs and crashes constantly']);
     expect(clusters).toHaveLength(1);
     expect(clusters[0].theme).toBe('bugs');
   });
 
   it('caps example comments at maxExamplesPerTheme', () => {
-    const clusters = clusterCancellationReasonComments(
+    const { clusters } = clusterCancellationReasonComments(
       ['too expensive', 'very costly', 'pricing is rough', 'over our budget'],
       { maxExamplesPerTheme: 2 },
     );

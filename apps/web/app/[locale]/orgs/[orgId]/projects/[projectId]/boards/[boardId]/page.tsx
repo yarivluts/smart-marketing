@@ -1,17 +1,18 @@
+import { CalendarRange, LayoutDashboard, Settings2 } from 'lucide-react';
+import { ChartCard, PageHero } from '@/components/viz';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { can } from '@growthos/shared';
+import { can, todayUtcDateOnly } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTiles } from '@/lib/orgs/queries';
+import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTiles, resolveMetricDisplayUnits } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildTileRenderView, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
 import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 import { BoardSettingsForm } from '@/components/orgs/board-settings-form';
 import { BoardGridEditor } from '@/components/orgs/board-grid-editor';
 import { DeleteBoardButton } from '@/components/orgs/delete-board-button';
-import { PpPage, PpPageHeader, PpCard, PpPill } from '@/components/pastel/primitives';
-import { SlidersHorizontal } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string; boardId: string }>;
@@ -20,6 +21,13 @@ type PageProps = Readonly<{
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Boards' });
+  // Deliberately static, not the real board name: generateMetadata runs
+  // independently of the page component's own session/permission check
+  // below, so fetching a caller-supplied board's name here (as an earlier
+  // version of this file did) would leak it into the page <title> for a
+  // caller who isn't even a member of the org that owns it — the same
+  // static-title posture every other per-resource admin page in this
+  // codebase (cost-guardrails, metric-defs, schema-defs, ...) already uses.
   return { title: t('metaTitle') };
 }
 
@@ -32,7 +40,8 @@ export async function generateMetadata({ params }: PageProps) {
  * add/move/resize/remove + "Save layout". Gated on `dashboards.read` to view
  * (`viewer` included — see the boards list page's own doc comment for why);
  * the settings form, delete button, and grid editor's edit affordances are
- * separately gated on `dashboards.write` below.
+ * separately gated on `dashboards.write` below. Checked at project scope,
+ * not just org scope (KAN-136) — see the boards list page's own doc comment.
  */
 export default async function BoardDetailPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId, boardId } = await params;
@@ -46,77 +55,83 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  const canViewBoard = can(bindings, principal, 'dashboards.read', { orgId }) || can(bindings, principal, 'dashboards.write', { orgId });
+  const canViewBoard =
+    can(bindings, principal, 'dashboards.read', { orgId, projectId }) ||
+    can(bindings, principal, 'dashboards.write', { orgId, projectId });
   if (!membership || !canViewBoard) {
     notFound();
   }
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
 
   // `freshness` (KAN-69): one project-wide badge shared by every tile on
   // this board — see `resolveBoardFreshness`'s own doc comment for why a
   // tile doesn't get its own per-metric freshness.
-  const [projects, board, metricCatalog, freshness] = await Promise.all([
+  const [projects, board, metricCatalog, freshness, metricUnits] = await Promise.all([
     listOrgProjects(orgId),
     getBoard(orgId, projectId, boardId),
     listMetricsCatalogForProject(orgId, projectId),
     resolveBoardFreshness(orgId, projectId),
+    resolveMetricDisplayUnits(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
-  if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/boards`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
-  }
-  if (!board) {
-    redirect(`/${locale}/orgs/${orgId}/projects/${projectId}/boards`);
+  if (!project || !board) {
+    notFound();
   }
 
-  const boardView = toBoardView(board);
+  // One "today" for the whole render: the tiles' relative range and the settings form's preview
+  // must resolve to the same window, even across a UTC midnight mid-request.
+  const today = todayUtcDateOnly();
+  const boardView = toBoardView(board, today);
 
-  const tileOutcomes = await queryBoardTiles(orgId, projectId, board);
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id, today };
+  const tileOutcomes = await queryBoardTiles(orgId, projectId, board, environmentScope);
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
-    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness);
+    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness, metricUnits);
   });
 
   const t = await getTranslations('Boards');
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow="BOARD"
-        meta={
-          freshness ? (
-            <PpPill accent={freshness.isStale ? 'amber' : 'mint'} dot>
-              {t(freshness.isStale ? 'freshnessStaleLabel' : 'freshnessAsOfLabel', { asOf: freshness.asOf })}
-            </PpPill>
-          ) : undefined
-        }
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero
+        icon={LayoutDashboard}
+        eyebrow={t('detailEyebrow')}
         title={board.name}
-        actions={
-          canManageBoards ? (
-            <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} />
-          ) : null
-        }
-      />
+        description={t('detailRange', {
+          start: boardView.resolvedDateRange.start,
+          end: boardView.resolvedDateRange.end,
+          grain: t(`grainOption.${boardView.resolvedDateRange.grain}`),
+        })}
+        actions={canManageBoards ? <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} /> : undefined}
+      >
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-muted-foreground">
+            <CalendarRange className="h-3.5 w-3.5" />
+            {t(`detailRangeKind.${boardView.dateRange.kind === 'absolute' ? 'absolute' : 'relative'}`)}
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-muted-foreground">
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            {t('detailTiles', { count: board.tiles.length })}
+          </span>
+        </div>
+      </PageHero>
 
       {canManageBoards ? (
-        <PpCard
-          icon={SlidersHorizontal}
-          iconAccent="primary"
-          title={t('settingsHeading')}
-        >
+        <ChartCard title={t('settingsHeading')} description={t('settingsDescription')} icon={Settings2}>
           <BoardSettingsForm
             orgId={orgId}
             projectId={projectId}
             boardId={boardId}
             initialName={boardView.name}
             initialDateRange={boardView.dateRange}
+            today={today}
             initialCompare={boardView.compare}
             initialGlobalFilters={boardView.globalFilters}
           />
-        </PpCard>
+        </ChartCard>
       ) : null}
 
       <section>
@@ -131,6 +146,6 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
           readOnly={!canManageBoards}
         />
       </section>
-    </PpPage>
+    </div>
   );
 }

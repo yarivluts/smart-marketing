@@ -1,5 +1,11 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
-import { collection, connectFirestoreEmulator, getDocs, getFirestore } from 'firebase/firestore';
+import {
+  collection,
+  connectFirestoreEmulator,
+  getDocs,
+  getFirestore,
+  initializeFirestore,
+} from 'firebase/firestore';
 import { FirestoreOrmRepository } from '@arbel/firebase-orm';
 
 // Both admin subpaths below are exports-map-only, invisible to this package's
@@ -88,7 +94,34 @@ export async function connectFirestoreOrm(options: FirestoreConnectionOptions): 
   const app: FirebaseApp =
     existingApp ??
     initializeApp({ apiKey: options.apiKey ?? 'demo-api-key', projectId: options.projectId }, appName);
-  const firestore = getFirestore(app);
+
+  /*
+    Against the emulator, ask for the long-polling transport.
+
+    READ THIS BEFORE RELYING ON IT: `experimentalForceLongPolling` is honoured ONLY by the
+    client SDK's browser build, whose WebChannel transport implements it. In the Node build
+    (`@firebase/firestore/dist/index.node.cjs.js`) the transport is chosen by
+    `function newConnection(databaseInfo) { return new GrpcConnection(protos, databaseInfo); }`
+    — unconditional, with `forceLongPolling` stored on the database info and never consulted.
+    So this line is a no-op under `vitest --environment node` or Jest, and load-bearing only
+    where the browser build is resolved (apps/web's suites run `environment: 'jsdom'`).
+
+    It is kept because that jsdom case is real, not because it protects every caller. What it
+    does NOT do is prevent KAN-103: the emulator's gRPC `Listen` stream losing its framing,
+    after which reads come back as `RESOURCE_EXHAUSTED: Received message larger than max
+    (4036202791 vs 4194304)` — a garbage length prefix, not a real 4GB message — or as
+    `INTERNAL: Response message parsing error: invalid wire type 6 at offset 500`. This comment
+    previously asserted the opposite, which is why the flake outlived several attempts to fix
+    it. `packages/firebase-orm-models`' own emulator suite now sidesteps the whole class by
+    connecting through the Admin SDK instead (see `test-utils/emulator.ts`); apps/api's e2e
+    specs still reach the emulator through this client path under Node and remain exposed.
+
+    Production keeps gRPC regardless: it is the faster transport, and the corruption is
+    specific to many short-lived test connections against one shared emulator.
+  */
+  const firestore = options.emulatorHost
+    ? initializeFirestore(app, { experimentalForceLongPolling: true })
+    : getFirestore(app);
 
   if (options.emulatorHost) {
     const [host, portString] = options.emulatorHost.split(':');

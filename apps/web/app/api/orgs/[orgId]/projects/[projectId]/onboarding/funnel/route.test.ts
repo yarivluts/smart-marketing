@@ -93,4 +93,27 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/onboarding/funnel', () => 
     expect(body.state.funnelSteps).toEqual([{ eventSchemaName: 'user_signed_up', stageKey: 'signup', order: 0 }]);
     expect(body.state.step).toBe('board');
   });
+
+  it('saves without advancing the wizard when advanceWizard is false (editing a confirmed funnel, KAN-199)', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Onboarding Funnel Route Edit Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = funnelRequest(organization.id, project.id, {
+      steps: [
+        { eventSchemaName: 'signup', stageKey: 'signup', order: 0 },
+        { eventSchemaName: 'document_signed', stageKey: 'other', order: 1 },
+      ],
+      advanceWizard: false,
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { state: { funnelSteps: Array<{ eventSchemaName: string }>; step: string } };
+    expect(body.state.funnelSteps.map((step) => step.eventSchemaName)).toEqual(['signup', 'document_signed']);
+    expect(body.state.step).toBe('pack');
+
+    // Anything but a literal false is the wizard's own confirm.
+    const truthy = funnelRequest(organization.id, project.id, { steps: [], advanceWizard: 'false' });
+    const truthyBody = (await (await POST(truthy.request, { params: truthy.params })).json()) as { state: { step: string } };
+    expect(truthyBody.state.step).toBe('board');
+  });
 });

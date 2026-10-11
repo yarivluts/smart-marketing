@@ -54,6 +54,9 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
   const [descriptions, setDescriptions] = useState('');
   const [keywords, setKeywords] = useState('');
   const [negativeKeywords, setNegativeKeywords] = useState('');
+  // Google Ads requires the advertiser's own EU political advertising declaration (KAN-233). No
+  // default: an unanswered question blocks submitting.
+  const [euPolitical, setEuPolitical] = useState<'yes' | 'no' | ''>('');
 
   // Meta fields.
   const [objective, setObjective] = useState<MetaObjective>('OUTCOME_TRAFFIC');
@@ -91,6 +94,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
     setDescriptions('');
     setKeywords('');
     setNegativeKeywords('');
+    setEuPolitical('');
   }
 
   function resetMetaFields(): void {
@@ -203,10 +207,15 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
         ],
       };
     } else {
+      if (euPolitical === '') {
+        setError(t('proposeDraftEuPoliticalRequiredError'));
+        return;
+      }
       draft = {
         platform: 'google_ads',
         campaignName,
         advertisingChannelType: 'SEARCH',
+        containsEuPoliticalAdvertising: euPolitical === 'yes',
         dailyBudgetUsd: parsedBudget,
         adGroups: [
           {
@@ -361,6 +370,20 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
               />
             </div>
           </div>
+          <fieldset className="flex flex-col gap-2 rounded-md border border-border p-3">
+            <legend className="px-1 text-sm font-medium">{t('proposeDraftEuPoliticalLegend')}</legend>
+            <p className="text-xs text-muted-foreground">{t('proposeDraftEuPoliticalHint')}</p>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="draft-eu-political" value="no" checked={euPolitical === 'no'} onChange={() => setEuPolitical('no')} />
+                {t('proposeDraftEuPoliticalNo')}
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <input type="radio" name="draft-eu-political" value="yes" checked={euPolitical === 'yes'} onChange={() => setEuPolitical('yes')} />
+                {t('proposeDraftEuPoliticalYes')}
+              </label>
+            </div>
+          </fieldset>
         </>
       ) : (
         <>

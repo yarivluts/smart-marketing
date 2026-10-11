@@ -20,7 +20,11 @@ import path from 'node:path';
  * `mcp.controller.e2e.spec.ts` (see that file's own "cross-project isolation" describe block).
  */
 
-type ToolGate = { kind: 'connection-scope'; permission: 'mcp.read' } | { kind: 'per-call-permission'; permission: string };
+type ToolGate =
+  | { kind: 'connection-scope'; permission: 'mcp.read' }
+  | { kind: 'per-call-permission'; permission: string }
+  /** A tool whose required permission depends on what the call does — see `register_schema` (KAN-175). */
+  | { kind: 'per-call-permission-varies'; writePermission: string; readOnlyPermission: 'mcp.read'; readOnlyWhen: string };
 
 const EXPECTED_TOOLS: Record<string, ToolGate> = {
   list_metrics: { kind: 'connection-scope', permission: 'mcp.read' },
@@ -31,27 +35,109 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   query_cohort: { kind: 'connection-scope', permission: 'mcp.read' },
   query_funnel: { kind: 'connection-scope', permission: 'mcp.read' },
   search_customers: { kind: 'connection-scope', permission: 'mcp.read' },
+  // KAN-202 I3: reads only the caller project's schema registry and writes nothing.
+  validate_records: { kind: 'connection-scope', permission: 'mcp.read' },
   list_insights: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_segments: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_win_rules: { kind: 'connection-scope', permission: 'mcp.read' },
   propose_action: { kind: 'per-call-permission', permission: 'automation.execute' },
   approve_action: { kind: 'per-call-permission', permission: 'automation.approve' },
   create_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
   create_segment: { kind: 'per-call-permission', permission: 'dashboards.write' },
-  list_projects: { kind: 'connection-scope', permission: 'mcp.read' },
-  create_project: { kind: 'per-call-permission', permission: 'project.manage' },
-  update_project: { kind: 'per-call-permission', permission: 'project.manage' },
-  archive_project: { kind: 'per-call-permission', permission: 'project.manage' },
+  // The self-service administration surface (`mcp-admin-tools.ts`): every operation a
+  // GrowthOS engineer used to have to run on a customer's behalf.
+  list_warehouse_tables: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_schemas: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_hook_endpoints: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_metric_versions: { kind: 'connection-scope', permission: 'mcp.read' },
   list_goals: { kind: 'connection-scope', permission: 'mcp.read' },
-  delete_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
   get_goal_progress: { kind: 'connection-scope', permission: 'mcp.read' },
-  audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
+  delete_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  // Dual-gated: a dry run writes nothing and needs only `mcp.read`, so the
+  // preview is reachable by someone deciding whether to ask for write access.
+  register_schema: { kind: 'per-call-permission-varies', writePermission: 'schema.write', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
+  evolve_schema: { kind: 'per-call-permission', permission: 'schema.write' },
+  // The backfill loop: registering/requesting configures the project and calls out to the integrator;
+  // reading status is an ordinary read. All act on the caller key's own environment only.
+  set_backfill_endpoint: { kind: 'per-call-permission', permission: 'project.configure' },
+  request_backfill: { kind: 'per-call-permission', permission: 'project.configure' },
+  get_backfill_status: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_backfills: { kind: 'connection-scope', permission: 'mcp.read' },
+  // KAN-202 I2: same dry-run split as register_schema; writes only the caller's own project's registry.
+  apply_schema_manifest: { kind: 'per-call-permission-varies', writePermission: 'schema.write', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
+  register_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
+  evolve_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
+  archive_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
+  set_goal_status: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  update_project_settings: { kind: 'per-call-permission', permission: 'project.configure' },
+  archive_project: { kind: 'per-call-permission', permission: 'project.configure' },
+  // KAN-199: same dry-run split as register_schema. Writes only the caller's own project's
+  // funnel, validated against that project's own schema registry.
+  set_funnel: { kind: 'per-call-permission-varies', writePermission: 'project.configure', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
+  create_hook_endpoint: { kind: 'per-call-permission', permission: 'ingest.write' },
+  set_hook_signing_secret: { kind: 'per-call-permission', permission: 'ingest.write' },
+  reexport_raw_records: { kind: 'per-call-permission', permission: 'ingest.write' },
+  purge_project_data: { kind: 'per-call-permission', permission: 'ingest.write' },
+  // KAN-197 integrator setup tools (`mcp-setup-tools.ts`): read-only, derived from the credential's
+  // own project's ingest records.
   get_setup_health: { kind: 'connection-scope', permission: 'mcp.read' },
-  get_tracking_script: { kind: 'connection-scope', permission: 'mcp.read' },
-  get_installation_instructions: { kind: 'connection-scope', permission: 'mcp.read' },
-  verify_installation: { kind: 'per-call-permission', permission: 'project.manage' },
-  test_integration_event: { kind: 'per-call-permission', permission: 'project.manage' },
+  audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
+  // KAN-202 I4: read-only, the caller's own project, and only the key's own environment.
+  check_installation: { kind: 'connection-scope', permission: 'mcp.read' },
+  get_ingest_health: { kind: 'connection-scope', permission: 'mcp.read' },
+  // The AI Ad Studio (`mcp-ad-studio-tools.ts`): the studio on `ai.use` like the web routes, its daily
+  // limits on `project.configure`, and anything sent to an ad platform on `automation.execute`.
+  list_ad_briefs: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  create_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  update_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  delete_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  plan_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  generate_ad_script: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_ad_script: { kind: 'per-call-permission', permission: 'ai.use' },
+  rewrite_ad_scene: { kind: 'per-call-permission', permission: 'ai.use' },
+  generate_ad_image_ideas: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_ad_image_ideas: { kind: 'per-call-permission', permission: 'ai.use' },
+  render_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  edit_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  select_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  list_ad_references: { kind: 'per-call-permission', permission: 'ai.use' },
+  add_ad_reference: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_reference: { kind: 'per-call-permission', permission: 'ai.use' },
+  delete_ad_reference: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  set_ad_voice: { kind: 'per-call-permission', permission: 'ai.use' },
+  set_ad_video_settings: { kind: 'per-call-permission', permission: 'ai.use' },
+  research_ad_keywords: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_audiences: { kind: 'per-call-permission', permission: 'ai.use' },
+  search_ad_interests: { kind: 'per-call-permission', permission: 'ai.use' },
+  estimate_ad_reach: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_performance_breakdown: { kind: 'per-call-permission', permission: 'ai.use' },
+  set_ad_targeting: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_ad_keywords: { kind: 'per-call-permission', permission: 'ai.use' },
+  write_search_ad: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_search_ad: { kind: 'per-call-permission', permission: 'ai.use' },
+  write_ad_copy: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_ad_copy: { kind: 'per-call-permission', permission: 'ai.use' },
+  render_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
+  render_ad_scene: { kind: 'per-call-permission', permission: 'ai.use' },
+  edit_ad_scene_clip: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_video_status: { kind: 'per-call-permission', permission: 'ai.use' },
+  assemble_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
+  start_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  advance_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  cancel_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  approve_ad_plan: { kind: 'per-call-permission', permission: 'ai.use' },
+  list_ad_export_destinations: { kind: 'per-call-permission', permission: 'ai.use' },
+  export_ad_video: { kind: 'per-call-permission', permission: 'automation.execute' },
+  export_ad_image: { kind: 'per-call-permission', permission: 'automation.execute' },
+  publish_ad: { kind: 'per-call-permission', permission: 'automation.execute' },
+  get_ad_studio_usage: { kind: 'per-call-permission', permission: 'ai.use' },
+  set_ad_studio_limits: { kind: 'per-call-permission', permission: 'project.configure' },
 };
 
-const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-setup-tools.ts'];
+const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts', 'mcp-setup-tools.ts', 'mcp-ad-studio-tools.ts'];
 
 function readToolFile(name: string): string {
   return readFileSync(path.join(__dirname, name), 'utf8');
@@ -89,6 +175,21 @@ describe('MCP tool registry is a maintained, isolation-gated inventory (KAN-77)'
     expect(actToolGates.length).toBeGreaterThan(0);
     for (const gate of actToolGates) {
       expect(gate.permission).not.toBe('mcp.read');
+    }
+  });
+
+  /**
+   * A dual-gated tool still has to put a real permission in front of the half
+   * that writes — the read-level path exists for previews only, and must never
+   * become the gate on the mutating branch (KAN-175).
+   */
+  it('a tool whose permission varies still gates its writing path above mcp.read', () => {
+    const varying = Object.values(EXPECTED_TOOLS).filter((gate) => gate.kind === 'per-call-permission-varies');
+    expect(varying.length).toBeGreaterThan(0);
+    for (const gate of varying) {
+      expect(gate.writePermission).not.toBe('mcp.read');
+      expect(gate.readOnlyPermission).toBe('mcp.read');
+      expect(gate.readOnlyWhen.length).toBeGreaterThan(0);
     }
   });
 

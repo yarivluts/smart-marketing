@@ -39,7 +39,12 @@ export function toFirmographicCompositionRows(rows: readonly WarehouseRow[], dim
 
 /**
  * Translation key for one industry value from `INDUSTRY_CATEGORIES`
- * (`@growthos/shared`) — the AC's "AI industry classification" taxonomy.
+ * (`@growthos/shared`). That taxonomy is what KAN-87's AC calls "AI industry
+ * classification", but nothing classifies with a model: the values are
+ * produced by `classifyCompanyIndustry`, a fixed keyword list over the company
+ * name with a TLD fallback, running in the tracking SDK in the visitor's own
+ * browser. Naming that here because the UI strings this mapper feeds said
+ * otherwise until KAN-153.
  * Falls back to the raw value for a category this mapper doesn't
  * recognize, same "map a fixed data-driven category through i18n" posture
  * `cancellationReasonCodeLabelKey` (KAN-84) establishes.
@@ -69,4 +74,26 @@ export function firmographicIndustryLabelKey(industry: string): string {
     default:
       return industry;
   }
+}
+
+export interface FirmographicCompositionShareRow extends FirmographicCompositionRow {
+  /** This value's share of all profiles, 0-100 (one decimal). */
+  countShare: number;
+  /** This value's share of all MRR, 0-100 (one decimal); 0 when the dimension has no MRR at all. */
+  mrrShare: number;
+}
+
+function sharePercent(part: number, whole: number): number {
+  return whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0;
+}
+
+/**
+ * The "# vs $" view of one composition breakdown: each value's share of profiles beside its share
+ * of MRR, both as percentages of the dimension's own totals, so the two can share one axis. A
+ * segment whose MRR share exceeds its count share is worth more per customer than average.
+ */
+export function toFirmographicCompositionShares(rows: readonly FirmographicCompositionRow[]): FirmographicCompositionShareRow[] {
+  const totalCount = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalMrr = rows.reduce((sum, row) => sum + row.mrr, 0);
+  return rows.map((row) => ({ ...row, countShare: sharePercent(row.count, totalCount), mrrShare: sharePercent(row.mrr, totalMrr) }));
 }

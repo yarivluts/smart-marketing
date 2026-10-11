@@ -1,0 +1,21 @@
+version: 2
+
+# Operational tables about the pipeline itself, not about any tenant's data. Kept
+# out of models/core on purpose: every _core.yml model must appear in
+# CORE_TABLE_CATALOG, the catalog metric registration validates against, and a
+# build-identity row is not something a metric should ever be registered on.
+models:
+  - name: dbt_build_info
+    description: >
+      One row per `dbt build`: the commit the runner image was built from
+      (`GIT_SHA`, NULL when unstamped) and when it ran. api-prod reads it and
+      reports it on the public /v1/health/dbt-refresh, which is how the
+      credential-free drift check (.github/workflows/prod-drift.yml, KAN-204)
+      watches the dbt-refresh Cloud Run Job.
+    columns:
+      - name: build_sha
+        description: Lower-case git hash (7-40 hex chars) of the image that ran, or NULL when the image was built without `_GIT_SHA`.
+      - name: recorded_at
+        description: When this build ran.
+        tests:
+          - not_null

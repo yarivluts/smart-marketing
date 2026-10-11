@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatMetricValue } from '@growthos/shared';
 import {
   Clock,
   Sparkles,
@@ -10,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { UnifiedGoalItem } from '@/lib/orgs/funnel-goals-synthesizer';
+import { enteredGoalTargetText, storedGoalTarget, useGoalTargetEntryError } from './goal-target-entry';
 
 export interface GoalThermometerCardProps {
   orgId: string;
@@ -20,7 +22,7 @@ export interface GoalThermometerCardProps {
   onOptimizeRequested?: (goal: UnifiedGoalItem) => void;
 }
 
-const STATUS_BADGE_STYLES: Record<UnifiedGoalItem['status'], { badge: string; dot: string; bar: string }> = {
+const STATUS_BADGE_STYLES: Record<NonNullable<UnifiedGoalItem['status']>, { badge: string; dot: string; bar: string }> = {
   on_track: {
     badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
     dot: 'bg-emerald-500',
@@ -37,6 +39,14 @@ const STATUS_BADGE_STYLES: Record<UnifiedGoalItem['status'], { badge: string; do
     bar: 'bg-rose-500',
   },
 };
+
+/**
+ * A goal figure for display. A metric that declares its unit (KAN-213) is shown in it - a ratio 0.08
+ * reads "8%". One that does not keeps the display it had before units existed, guessed from its name.
+ */
+function formatGoalValue(value: number, goal: Pick<UnifiedGoalItem, 'metricName' | 'unit'>, locale: string): string {
+  return goal.unit ? formatMetricValue(value, goal.unit, locale) : formatValue(value, goal.metricName);
+}
 
 function formatValue(value: number, metricName: string): string {
   if (metricName.includes('usd') || metricName.includes('mrr') || metricName.includes('cac')) {
@@ -57,39 +67,68 @@ export function GoalThermometerCard({
   onOptimizeRequested,
 }: GoalThermometerCardProps): React.ReactElement {
   const t = useTranslations('Goals');
+  const locale = useLocale();
+  const targetEntryError = useGoalTargetEntryError();
+  const show = (value: number) => formatGoalValue(value, goal, locale);
 
   const [isEditingTarget, setIsEditingTarget] = useState(false);
-  const [targetInput, setTargetInput] = useState(goal.targetValue !== null ? String(goal.targetValue) : '');
-  const [minInput, setMinInput] = useState(goal.rangeMin !== null ? String(goal.rangeMin) : '');
-  const [maxInput, setMaxInput] = useState(goal.rangeMax !== null ? String(goal.rangeMax) : '');
+  // A ratio goal's target is edited as a percent (KAN-213).
+  const [targetInput, setTargetInput] = useState(enteredGoalTargetText(goal.targetValue, goal.unit));
+  const [minInput, setMinInput] = useState(enteredGoalTargetText(goal.rangeMin, goal.unit));
+  const [maxInput, setMaxInput] = useState(enteredGoalTargetText(goal.rangeMax, goal.unit));
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const style = STATUS_BADGE_STYLES[goal.status] ?? STATUS_BADGE_STYLES.on_track;
+  /*
+    Numbers render only for a goal whose progress was measured. Anything else - no rows in the
+    goal's window yet, warehouse not configured, a failed query - shows the reason and the goal's
+    own target, never a 0 actual with a pace judged against it.
+  */
+  // A paused goal has no pace to judge: no status badge, no Copilot callout (KAN-213).
+  const isMeasured = goal.progressKind === 'ok' && goal.status !== null && !goal.isPaused;
+  const style = goal.status ? STATUS_BADGE_STYLES[goal.status] : STATUS_BADGE_STYLES.on_track;
+  const percentFilled = goal.percentFilled ?? 0;
 
   async function handleSaveTarget(): Promise<void> {
+    setSaveError(null);
+    const typed = goal.direction === 'range' ? [Number(minInput), Number(maxInput)] : [Number(targetInput)];
+    const outOfRange = targetEntryError(typed, goal.unit);
+    if (outOfRange) {
+      setSaveError(outOfRange);
+      return;
+    }
     setIsSaving(true);
     try {
       const payload =
         goal.direction === 'range'
-          ? { rangeMin: Number(minInput), rangeMax: Number(maxInput) }
-          : { targetValue: Number(targetInput) };
+          ? { rangeMin: storedGoalTarget(Number(minInput), goal.unit), rangeMax: storedGoalTarget(Number(maxInput), goal.unit) }
+          : { targetValue: storedGoalTarget(Number(targetInput), goal.unit) };
 
-      if (!goal.isDemo) {
-        await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+      const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      // Only reflect the new target once it was actually saved - a failed PATCH used to update
+      // the card anyway, showing a target that exists nowhere.
+      if (!res.ok) {
+        setSaveError(t('targetUpdateError'));
+        return;
       }
 
       onTargetUpdated?.(goal.id, payload);
       setIsEditingTarget(false);
     } catch {
-      // Revert / best effort
+      setSaveError(t('targetUpdateError'));
     } finally {
       setIsSaving(false);
     }
   }
+
+  const targetText =
+    goal.direction === 'range'
+      ? `${show(goal.rangeMin ?? 0)} - ${show(goal.rangeMax ?? 0)}`
+      : show(goal.targetValue ?? 0);
 
   return (
     <div
@@ -104,65 +143,81 @@ export function GoalThermometerCard({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {goal.metricName}
               </span>
-              {goal.isDemo && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {t('demoBadge')}
-                </span>
-              )}
             </div>
             <h3 className="text-base font-bold text-foreground">{goal.name}</h3>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span
-              data-testid={`goal-status-${goal.id}`}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.badge}`}
+          {goal.isPaused ? (
+            <span data-testid={`goal-paused-${goal.id}`} className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              {t('pausedBadge')}
+            </span>
+          ) : null}
+          {isMeasured && goal.status ? (
+            <div className="flex items-center gap-2">
+              <span
+                data-testid={`goal-status-${goal.id}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.badge}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                {t(`paceStatus.${goal.status}`)}
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        {isMeasured ? (
+          /* Thermometer Gauge */
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-muted-foreground">
+                {t('progressLabel')}{': '}
+                <span dir="ltr">{`${percentFilled}%`}</span>
+              </span>
+              <span className="font-bold text-foreground" dir="ltr">
+                {`${show(goal.actualValue ?? 0)} / ${targetText}`}
+              </span>
+            </div>
+
+            {/* Animated Bar with Milestone Markers */}
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                data-testid={`goal-bar-${goal.id}`}
+                role="progressbar"
+                aria-valuenow={percentFilled}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
+                style={{ width: `${Math.min(100, Math.max(2, percentFilled))}%` }}
+              />
+            </div>
+
+            {/* Expected vs Projected Timeline Strip */}
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>
+                {t('expectedAtNowLabel')}{': '}
+                <strong className="text-foreground" dir="ltr">{show(goal.expectedAtNow ?? 0)}</strong>
+              </span>
+              <span data-testid={`goal-projection-${goal.id}`}>
+                {t('projectedFinalValueLabel')}{': '}
+                <strong className="text-foreground" dir="ltr">{show(goal.projectedFinalValue ?? 0)}</strong>
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col gap-2 text-xs">
+            <span className="text-muted-foreground">
+              {t('columnTarget')}{': '}
+              <strong className="text-foreground" dir="ltr">{targetText}</strong>
+            </span>
+            <p
+              data-testid={`goal-progress-unavailable-${goal.id}`}
+              className="rounded-lg border border-dashed border-border bg-muted/30 p-2.5 text-muted-foreground"
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-              {t(`paceStatus.${goal.status}`)}
-            </span>
+              {/* A paused goal can still carry a measured (`ok`) progress kind - it just has no pace to show. */}
+              {goal.isPaused ? t('pausedNoPace') : t(`thermometerUnavailableReason.${goal.progressKind === 'ok' ? 'no_measurements' : goal.progressKind}`)}
+            </p>
           </div>
-        </div>
-
-        {/* Thermometer Gauge */}
-        <div className="mt-4 flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-medium text-muted-foreground">
-              {t('progressLabel')}{': '}
-              <span dir="ltr">{`${goal.percentFilled}%`}</span>
-            </span>
-            <span className="font-bold text-foreground" dir="ltr">
-              {goal.direction === 'range'
-                ? `${formatValue(goal.actualValue, goal.metricName)} / ${formatValue(goal.rangeMin ?? 0, goal.metricName)} - ${formatValue(goal.rangeMax ?? 0, goal.metricName)}`
-                : `${formatValue(goal.actualValue, goal.metricName)} / ${formatValue(goal.targetValue ?? 0, goal.metricName)}`}
-            </span>
-          </div>
-
-          {/* Animated Bar with Milestone Markers */}
-          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              data-testid={`goal-bar-${goal.id}`}
-              role="progressbar"
-              aria-valuenow={goal.percentFilled}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
-              style={{ width: `${Math.min(100, Math.max(2, goal.percentFilled))}%` }}
-            />
-          </div>
-
-          {/* Expected vs Projected Timeline Strip */}
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>
-              {t('expectedAtNowLabel')}{': '}
-              <strong className="text-foreground" dir="ltr">{formatValue(goal.expectedAtNow, goal.metricName)}</strong>
-            </span>
-            <span data-testid={`goal-projection-${goal.id}`}>
-              {t('projectedFinalValueLabel')}{': '}
-              <strong className="text-foreground" dir="ltr">{formatValue(goal.projectedFinalValue, goal.metricName)}</strong>
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Footer Details & Quick Action */}
@@ -243,8 +298,14 @@ export function GoalThermometerCard({
           )}
         </div>
 
-        {/* Proactive Copilot Callout for At-Risk / Off-Track Goals */}
-        {goal.status !== 'on_track' && onOptimizeRequested && (
+        {saveError ? (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            {saveError}
+          </p>
+        ) : null}
+
+        {/* Proactive Copilot Callout - only for a MEASURED at-risk / off-track goal */}
+        {isMeasured && goal.status !== 'on_track' && onOptimizeRequested && (
           <div
             data-testid={`goal-rec-card-${goal.id}`}
             className="mt-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200"

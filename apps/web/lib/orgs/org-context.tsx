@@ -11,14 +11,6 @@ export interface OrgMembershipSummary {
   organizationName: string;
   role: Role;
   status: MembershipStatus;
-  projects?: Array<{
-    id: string;
-    name: string;
-    platformType?: string;
-    businessModel?: string;
-    primaryStack?: string;
-    verifiedRequirements?: string[];
-  }>;
 }
 
 interface OrgContextResponse {

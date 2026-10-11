@@ -54,14 +54,33 @@ export function PluginConfigFields({ idPrefix, configSchema, values, fieldErrors
                 {name}
                 {field.required ? <span className="text-destructive"> {t('configFieldRequiredMarker')}</span> : null}
               </label>
-              <Input
-                id={`${idPrefix}-${name}`}
-                type={field.type === 'number' ? 'number' : 'text'}
-                required={field.required}
-                aria-invalid={Boolean(fieldErrors[name])}
-                value={typeof values[name] === 'string' ? (values[name] as string) : ''}
-                onChange={(event) => onChange(name, event.target.value)}
-              />
+              {field.type === 'enum' ? (
+                // KAN-236: an explicit choice with a blank "not answered" option - never preselected.
+                <select
+                  id={`${idPrefix}-${name}`}
+                  required={field.required}
+                  aria-invalid={Boolean(fieldErrors[name])}
+                  value={typeof values[name] === 'string' ? (values[name] as string) : ''}
+                  onChange={(event) => onChange(name, event.target.value)}
+                  className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">{t('configFieldEnumNotChosen')}</option>
+                  {(field.values ?? []).map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  id={`${idPrefix}-${name}`}
+                  type={field.type === 'number' ? 'number' : 'text'}
+                  required={field.required}
+                  aria-invalid={Boolean(fieldErrors[name])}
+                  value={typeof values[name] === 'string' ? (values[name] as string) : ''}
+                  onChange={(event) => onChange(name, event.target.value)}
+                />
+              )}
             </>
           )}
           {fieldErrors[name] ? (
@@ -102,6 +121,11 @@ export function parsePluginConfigFieldValues(
       if (field.required) {
         fieldErrors[name] = requiredErrorMessage;
       }
+      continue;
+    }
+    if (field.type === 'enum' && !(field.values ?? []).includes(String(raw))) {
+      // Only reachable with a stale value from an older schema; the server re-validates regardless.
+      fieldErrors[name] = requiredErrorMessage;
       continue;
     }
     parsedConfig[name] = field.type === 'number' ? Number(raw) : raw;

@@ -7,8 +7,15 @@ import { BaseModel, Field, Model } from '@arbel/firebase-orm';
  * "changing a definition is tracked, and historical dashboards can pin a
  * version") — the same "immutable version history" shape KAN-31's
  * `SchemaDefModel` already established for schema versions.
+ * `archived`: a family retired on purpose (`archiveMetricDefinition`) — a
+ * dead or mistaken definition that must stop appearing in the catalog and
+ * stop resolving for queries/goals/formulas, yet stays on record (never
+ * deleted) for the same audit reasons `superseded` versions do. A family
+ * has at most one non-`superseded` version, so archiving flips its one
+ * `active` version to `archived`; re-registering the same name afterwards
+ * starts a fresh version history.
  */
-export const METRIC_DEF_STATUSES = ['active', 'superseded'] as const;
+export const METRIC_DEF_STATUSES = ['active', 'superseded', 'archived'] as const;
 export type MetricDefStatus = (typeof METRIC_DEF_STATUSES)[number];
 
 /** How a metric's value is computed (plan `04 §2`): either a raw aggregation over a warehouse table, or an arithmetic formula over other metrics' own values. */
@@ -101,6 +108,15 @@ export class MetricDefModel extends BaseModel {
   /** Dimensions this metric can be broken down by, e.g. `channel`, `campaign` (plan `04 §2`). */
   @Field({ is_required: true })
   public dimensions!: string[];
+
+  /**
+   * What the metric's values mean (KAN-213), as a `MetricUnit` string from `@growthos/shared`:
+   * `number`, `count`, `ratio` (a 0-1 fraction, displayed as a percent), `percent` (already 0-100),
+   * `currency` (the project's currency) or `currency:XXX`, `duration_seconds`. Optional and never
+   * inferred: absent means a plain number, exactly how every value displayed before units existed.
+   */
+  @Field({ is_required: false })
+  public unit?: string;
 
   @Field({ is_required: true })
   public created_by!: string;

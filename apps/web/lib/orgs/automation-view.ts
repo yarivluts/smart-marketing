@@ -347,3 +347,28 @@ export function findCampaignDraftForTarget(actions: readonly AutomationActionMod
   const draft = preferred?.after.campaignDraft;
   return draft ? (draft as CampaignDraft) : undefined;
 }
+
+/**
+ * The action lifecycle as a graph, for the automation hub's flow diagram: every status is a node
+ * carrying how many actions sit in it now, and the edges are the transitions the engine allows
+ * (proposed is guardrail-checked into blocked or awaiting approval; a human approves or rejects;
+ * an approved action executes and is then verified, fails, or is rolled back).
+ */
+export const ACTION_LIFECYCLE_EDGES: readonly (readonly [AutomationActionStatus, AutomationActionStatus])[] = [
+  ['proposed', 'blocked'],
+  ['proposed', 'awaiting_approval'],
+  ['awaiting_approval', 'approved'],
+  ['awaiting_approval', 'rejected'],
+  ['approved', 'executed'],
+  ['approved', 'failed'],
+  ['executed', 'verified'],
+  ['executed', 'rolled_back'],
+];
+
+export function countActionsByStatus(actions: readonly { status: AutomationActionStatus }[]): Record<AutomationActionStatus, number> {
+  const counts = Object.fromEntries(Object.keys(STATUS_LABEL_KEYS).map((status) => [status, 0])) as Record<AutomationActionStatus, number>;
+  for (const action of actions) {
+    counts[action.status] += 1;
+  }
+  return counts;
+}

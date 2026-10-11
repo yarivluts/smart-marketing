@@ -1,20 +1,19 @@
 import {
-  calculateGoalForecast,
   calculateGoalProgress,
   computeElapsedFraction,
+  goalTargetUnitProblem,
   isGoalDirection,
   isGoalRhythm,
   MetricCompilerError,
-  type DailyObservation,
+  readPeriodValue,
+  TOTAL_GRAIN,
   type GoalDirection,
-  type GoalForecastResult,
   type GoalProgressHistoryPoint,
   type GoalProgressResult,
   type GoalRhythm,
-  type MetricQueryRequest,
 } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
-import { GoalModel } from '../models/goal.model';
+import { GoalModel, type GoalStatus } from '../models/goal.model';
 import { OrgPersonModel } from '../models/org-person.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
@@ -173,6 +172,33 @@ function validateGoalFields(params: GoalFieldsInput, reasons: string[]): Validat
   };
 }
 
+/**
+ * Refuses a target (or range bound) the goal's metric can never reach given its declared unit
+ * (KAN-213): a target of 8 on a 0-1 conversion ratio means 800% and can never be met. Targets are
+ * validated in the unit's STORED scale - a form that lets a human type "8" for 8% converts it before
+ * it reaches this service. A metric with no declared unit accepts any finite value, as before.
+ */
+function validateGoalTargetsForUnit(
+  targets: { targetValue: number | null; rangeMin: number | null; rangeMax: number | null },
+  unit: string | undefined,
+  reasons: string[],
+): void {
+  const checks: [string, number | null][] = [
+    ['Target', targets.targetValue],
+    ['Range minimum', targets.rangeMin],
+    ['Range maximum', targets.rangeMax],
+  ];
+  for (const [label, value] of checks) {
+    if (value === null) {
+      continue;
+    }
+    const problem = goalTargetUnitProblem(label, value, unit);
+    if (problem) {
+      reasons.push(problem);
+    }
+  }
+}
+
 /** Confirms `ownerPersonId` resolves to an `OrgPersonModel` belonging to `organizationId` — the same `.init` + org-match pattern `requireResourceInOrg` (`resource-library.service.ts`) uses for its own cross-tenant-safe lookup. Pushes onto `reasons` on failure rather than throwing, for the same collect-everything reason as `validateGoalFields`. */
 async function validateOrgPersonInOrg(organizationId: string, ownerPersonId: string, reasons: string[]): Promise<void> {
   const person = await OrgPersonModel.init(ownerPersonId, { organization_id: organizationId });
@@ -191,6 +217,8 @@ export async function createGoal(params: CreateGoalParams): Promise<GoalModel> {
   const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, params.metricName);
   if (!metricDef) {
     reasons.push(`Metric "${params.metricName}" is not registered (or not active) in this project.`);
+  } else if (fields) {
+    validateGoalTargetsForUnit(fields, metricDef.unit, reasons);
   }
 
   await validateOrgPersonInOrg(params.organizationId, params.ownerPersonId, reasons);
@@ -290,6 +318,16 @@ export async function updateGoal(params: UpdateGoalParams): Promise<GoalModel> {
       reasons.push('A "range" goal requires rangeMin to be less than rangeMax.');
     }
   }
+  if (reasons.length === 0) {
+    // Only the values this call changes: an existing goal saved before units existed is not
+    // retroactively refused for a bound this edit leaves alone.
+    const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, goal.metric_name);
+    validateGoalTargetsForUnit(
+      { targetValue: params.targetValue ?? null, rangeMin: params.rangeMin ?? null, rangeMax: params.rangeMax ?? null },
+      metricDef?.unit,
+      reasons,
+    );
+  }
   if (reasons.length > 0) {
     throw new InvalidGoalError(reasons);
   }
@@ -367,6 +405,8 @@ export async function updateGoalDefinition(params: UpdateGoalDefinitionParams): 
   const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, params.metricName);
   if (!metricDef) {
     reasons.push(`Metric "${params.metricName}" is not registered (or not active) in this project.`);
+  } else if (fields) {
+    validateGoalTargetsForUnit(fields, metricDef.unit, reasons);
   }
 
   await validateOrgPersonInOrg(params.organizationId, params.ownerPersonId, reasons);
@@ -454,6 +494,43 @@ export async function getGoal(organizationId: string, projectId: string, goalId:
   }
 }
 
+/**
+ * Pauses or resumes a goal (EasySign audit J-05) — see `GoalModel.status`'s
+ * own doc comment. Idempotent: setting the status a goal already has is a
+ * no-op that still returns the goal, so a double-click never errors.
+ */
+export async function setGoalStatus(organizationId: string, projectId: string, goalId: string, status: GoalStatus, actorUserId: string): Promise<GoalModel> {
+  const goal = await loadGoal(organizationId, projectId, goalId);
+  const previous: GoalStatus = goal.status ?? 'active';
+  if (previous === status) {
+    return goal;
+  }
+  goal.status = status;
+  goal.updated_by = actorUserId;
+  goal.updated_at = new Date().toISOString();
+  goal.setPathParams({ organization_id: organizationId, project_id: projectId });
+  await goal.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      actorType: 'user',
+      actorId: actorUserId,
+      action: status === 'paused' ? 'goal.pause' : 'goal.resume',
+      targetType: 'goal',
+      targetId: goalId,
+      summary: `${status === 'paused' ? 'Paused' : 'Resumed'} goal "${goal.name}"`,
+      before: { status: previous },
+      after: { status },
+    });
+  } catch {
+    // Best-effort — see the comment in createGoal above.
+  }
+
+  return goal;
+}
+
 /** Deletes a goal outright — a goal is disposable config, the same "no audit-trail-of-its-own-survival requirement" posture `deleteBoard` documents for boards. */
 export async function deleteGoal(organizationId: string, projectId: string, goalId: string, deletedByUserId: string): Promise<void> {
   const goal = await loadGoal(organizationId, projectId, goalId);
@@ -476,7 +553,21 @@ export async function deleteGoal(organizationId: string, projectId: string, goal
 }
 
 export type GoalProgressOutcome =
-  | { ok: true; actualValue: number; progress: GoalProgressResult; forecast?: GoalForecastResult }
+  | {
+      ok: true;
+      actualValue: number;
+      progress: GoalProgressResult;
+      /**
+       * Whether the metric returned any rows at all over the goal's window.
+       *
+       * `actualValue` reads 0 when nothing was measured, so a metric that has never received a single record reads 0
+       * - identical to a metric measured at zero. Pace is then computed against that 0 and the
+       * goal reads "off track", in red, with 0% filled: a project that has not started
+       * reporting is presented exactly like one that is failing, and the two need opposite
+       * responses. Callers must branch on this before showing a pace status.
+       */
+      hasMeasurements: boolean;
+    }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
 export interface QueryGoalProgressParams {
@@ -487,28 +578,17 @@ export interface QueryGoalProgressParams {
   cache?: MetricQueryResultCache;
   /** `YYYY-MM-DD`. Defaults to today (UTC) — overridable so callers/tests can pin "now". */
   asOfDate?: string;
+  /** The environment whose rows count toward the goal (KAN-196's project environment picker). Omitted, `queryMetrics` resolves the project's `prod` one. */
+  environmentId?: string;
 }
 
 function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Sums one metric's own column across every returned row — a local mirror of `sumMetric` in `apps/web/lib/orgs/board-view.ts` rather than an import across the app/package boundary (this package must not depend on `apps/web`). */
-function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): number {
-  return rows.reduce((total, row) => {
-    const raw = row[metricName] ?? null;
-    if (raw === null) {
-      return total;
-    }
-    const num = typeof raw === 'number' ? raw : Number(raw);
-    return Number.isFinite(num) ? total + num : total;
-  }, 0);
-}
-
 /**
- * Turns the same day-grain `result.series` rows `sumMetricRows` already
- * consumes into {@link GoalProgressHistoryPoint}s for `calculateGoalProgress`'s
- * minimize/range trend fit — each row's own `bucket_date` (the compiler's
+ * Turns the goal's day-grain series into {@link GoalProgressHistoryPoint}s for `calculateGoalProgress`'s
+ * minimize/range/level trend fit — each row's own `bucket_date` (the compiler's
  * per-day `GROUP BY` column, see `metrics-compiler/compiler.ts`) maps to an
  * `elapsedFraction` via the same {@link computeElapsedFraction} used for the
  * goal's own current elapsed fraction. Rows with a missing/non-numeric
@@ -544,38 +624,16 @@ function buildHistoryPoints(
   return points;
 }
 
-function buildDailyObservations(rows: readonly WarehouseRow[], metricName: string): DailyObservation[] {
-  const observations: DailyObservation[] = [];
-  for (const row of rows) {
-    const rawDate = row.bucket_date;
-    if (typeof rawDate !== 'string' || rawDate.length < 10) {
-      continue;
-    }
-    const rawValue = row[metricName] ?? null;
-    if (rawValue === null) {
-      continue;
-    }
-    const value = typeof rawValue === 'number' ? rawValue : Number(rawValue);
-    if (!Number.isFinite(value)) {
-      continue;
-    }
-    observations.push({
-      date: rawDate.slice(0, 10),
-      value,
-    });
-  }
-  return observations;
-}
-
 /**
  * Computes a goal's current progress (KAN-64, E12.1): queries the goal's own
- * metric over `[start_date, min(asOfDate, deadline)]`, sums it into a single
- * `actualValue`, also turns the same day-grain rows into `history` points
+ * metric over `[start_date, min(asOfDate, deadline)]` as ONE bucket for its
+ * `actualValue` (the period value - a rate over the period's totals, never a
+ * sum or mean of daily rates), and at day grain for `history` points
  * (`buildHistoryPoints`) so `calculateGoalProgress` can fit a trend for a
- * minimize/range goal's `projectedFinalValue` instead of a flat projection,
- * calculates predictive Monte Carlo pacing regression (KAN-308), and runs
- * it all through `calculateGoalProgress`. Mirrors `queryBoardTile`'s exact
- * error-handling shape (`board.service.ts`) — a goal's own progress
+ * minimize/range/level goal's `projectedFinalValue` instead of a flat projection,
+ * and runs it all through `calculateGoalProgress`, paced as a running total or
+ * as a level per the metric's own kind. Mirrors `queryBoardTile`'s
+ * exact error-handling shape (`board.service.ts`) — a goal's own progress
  * thermometer degrades gracefully the same way a board tile does, rather
  * than failing the whole goal detail page.
  */
@@ -600,46 +658,44 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       actualValue: 0,
       elapsedFraction: 0,
     });
-    const forecast = calculateGoalForecast({
-      direction: goal.direction,
-      targetValue: goal.target_value ?? undefined,
-      rangeMin: goal.range_min ?? undefined,
-      rangeMax: goal.range_max ?? undefined,
-      actualValue: 0,
-      startDate: goal.start_date,
-      deadline: goal.deadline,
-      asOfDate,
-      rhythm: goal.rhythm,
-      observations: [],
-    });
-    return { ok: true, actualValue: 0, progress, forecast };
+    // Not started yet, so nothing has been measured - and nothing could have been.
+    return { ok: true, actualValue: 0, progress, hasMeasurements: false };
   }
 
   const queryEnd = asOfDate < goal.deadline ? asOfDate : goal.deadline;
 
-  const request: MetricQueryRequest = {
-    metrics: [goal.metric_name],
-    time: { start: goal.start_date, end: queryEnd, grain: 'day' },
+  const window = { start: goal.start_date, end: queryEnd };
+  const shared = {
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    ...(params.executor ? { executor: params.executor } : {}),
+    ...(params.cache ? { cache: params.cache } : {}),
+    ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   };
 
   try {
-    const result = await queryMetrics({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      request,
-      ...(params.executor ? { executor: params.executor } : {}),
-      ...(params.cache ? { cache: params.cache } : {}),
-    });
-    const actualValue = sumMetricRows(result.series, goal.metric_name);
+    // The goal's actual value: the metric over the whole window as ONE bucket, so a rate is
+    // sum(numerator) / sum(denominator) for the period - summing (or averaging) daily values is only
+    // right for a plain count or sum. See `TOTAL_GRAIN`.
+    const periodResult = await queryMetrics({ ...shared, request: { metrics: [goal.metric_name], time: { ...window, grain: TOTAL_GRAIN } } });
+    const actualValue = readPeriodValue(periodResult.series, goal.metric_name) ?? 0;
+    // A rate is paced against the target itself, a running total against elapsed x target.
+    const accumulates = periodResult.accumulatesOverPeriod[goal.metric_name] ?? true;
     const elapsedFraction = computeElapsedFraction(goal.start_date, goal.deadline, asOfDate, goal.rhythm);
-    const history: GoalProgressHistoryPoint[] = buildHistoryPoints(
-      result.series,
-      goal.metric_name,
-      goal.start_date,
-      goal.deadline,
-      goal.rhythm,
-    );
-    const observations = buildDailyObservations(result.series, goal.metric_name);
+    // The day-by-day series only feeds the trend fit a minimize/range goal (or a maximize goal on a
+    // level) projects with - a maximize goal on a running total extrapolates its own actual value, so
+    // it costs no second query. A day with no events is a real zero for a count/sum metric, and the
+    // fit must see it as one; for a rate/formula metric it arrives as null and is skipped.
+    const needsHistory = goal.direction !== 'maximize' || !accumulates;
+    const history: GoalProgressHistoryPoint[] = needsHistory
+      ? buildHistoryPoints(
+          (await queryMetrics({ ...shared, request: { metrics: [goal.metric_name], time: { ...window, grain: 'day' } }, fillEmptyBuckets: true })).series,
+          goal.metric_name,
+          goal.start_date,
+          goal.deadline,
+          goal.rhythm,
+        )
+      : [];
     const progress = calculateGoalProgress({
       direction: goal.direction,
       targetValue: goal.target_value ?? undefined,
@@ -648,20 +704,12 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       actualValue,
       elapsedFraction,
       history,
+      accumulates,
     });
-    const forecast = calculateGoalForecast({
-      direction: goal.direction,
-      targetValue: goal.target_value ?? undefined,
-      rangeMin: goal.range_min ?? undefined,
-      rangeMax: goal.range_max ?? undefined,
-      actualValue,
-      startDate: goal.start_date,
-      deadline: goal.deadline,
-      asOfDate,
-      rhythm: goal.rhythm,
-      observations,
-    });
-    return { ok: true, actualValue, progress, forecast };
+    // A returned row, not the value: a metric measured at zero has a row and is a real reading; a
+    // metric that has never received a record has none (the whole-range query drops an empty
+    // window) and would otherwise read as the same 0.
+    return { ok: true, actualValue, progress, hasMeasurements: periodResult.series.length > 0 };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };

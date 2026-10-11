@@ -1,14 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { DashboardContent } from './dashboard-content';
-import { MOCK_FEED_EVENTS } from '@/components/dashboard/operational-activity-ticker';
 import messages from '../../messages/en.json';
+import { summarizeProjectHealth } from '@/lib/orgs/workspace-view';
+import type { DashboardOverview } from '@/lib/orgs/dashboard-overview';
 
 const replace = vi.fn();
+const push = vi.fn();
 
 vi.mock('@/i18n/navigation', () => ({
-  useRouter: () => ({ replace }),
+  useRouter: () => ({ replace, push }),
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={typeof href === 'string' ? href : String(href)} {...props}>
       {children}
@@ -21,335 +23,123 @@ vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-const mockUseOrgContext = vi.fn();
-vi.mock('@/lib/orgs/org-context', () => ({
-  useOrgContext: () => mockUseOrgContext(),
-}));
+const NOW = Date.parse('2026-09-20T12:00:00.000Z');
 
-function renderDashboard(props?: React.ComponentProps<typeof DashboardContent>): void {
+function renderDashboard(overview: DashboardOverview): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <DashboardContent {...props} />
+      <DashboardContent email="ada@example.com" overview={overview} now={NOW} />
     </NextIntlClientProvider>,
   );
 }
 
-const signedInAuth = {
-  user: { email: 'ada@example.com' },
-  loading: false,
-  signOut: vi.fn(),
+const signOut = vi.fn().mockResolvedValue(undefined);
+
+const healthyOverview: DashboardOverview = {
+  pendingInviteCount: 1,
+  orgs: [
+    {
+      orgId: 'org-1',
+      name: 'Acme',
+      role: 'org_owner',
+      hiddenProjectCount: 0,
+      projects: [
+        {
+          orgId: 'org-1',
+          projectId: 'p-1',
+          name: 'Growth',
+          vertical: 'SaaS',
+          onboardingStep: 'funnel',
+          health: summarizeProjectHealth(
+            {
+              environments: [
+                {
+                  environmentId: 'e-prod',
+                  environmentName: 'prod',
+                  requirements: [
+                    { requirementId: 'signups', status: 'connected', acceptedSchemas: [], rejectedSchemas: [], silentRegisteredSchemas: [], quarantineReasons: [], lastAcceptedAt: null },
+                    { requirementId: 'billing', status: 'gap', acceptedSchemas: [], rejectedSchemas: [], silentRegisteredSchemas: [], quarantineReasons: [], lastAcceptedAt: null },
+                  ],
+                  connectedCount: 1,
+                  totalCount: 2,
+                  coreConnectedCount: 1,
+                  coreTotalCount: 2,
+                  score: 50,
+                },
+              ],
+            },
+            [
+              { created_at: '2026-09-20T11:00:00.000Z', accepted_count: 40, quarantined_count: 2 },
+              { created_at: '2026-09-19T11:00:00.000Z', accepted_count: 60, quarantined_count: 0 },
+            ],
+            NOW,
+          ),
+        },
+        { orgId: 'org-1', projectId: 'p-2', name: 'Viewer Only', vertical: null, health: null },
+      ],
+    },
+  ],
 };
 
 describe('DashboardContent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.mockReturnValue(signedInAuth);
+    mockUseAuth.mockReturnValue({ user: { email: 'ada@example.com' }, loading: false, signOut });
   });
 
-  it('renders nothing while the client auth state has no user', () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: true, signOut: vi.fn() });
-    mockUseOrgContext.mockReturnValue({ memberships: [], loading: true });
-    renderDashboard();
-    expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+  it('opens on the workspace KPIs computed from the projects it was given', () => {
+    renderDashboard(healthyOverview);
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText('Welcome back, ada@example.com')).toBeInTheDocument();
+    // One project with a readable score of 50 -> average 50%; 100 records accepted over the window.
+    expect(screen.getAllByText('50%').length).toBeGreaterThan(0);
+    const hero = screen.getByTestId('page-hero');
+    expect(within(hero).getByText('100')).toBeInTheDocument();
+    // Core streams are incomplete, so the one readable project is not "fully flowing".
+    expect(within(hero).getByText('0/1')).toBeInTheDocument();
+    expect(screen.getByText('2 records rejected in the same window')).toBeInTheDocument();
   });
 
-  it('links each active organization to its org page', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme',
-          role: 'owner',
-          status: 'active',
-        },
-        {
-          membershipId: 'm2',
-          organizationId: 'org-2',
-          organizationName: 'Globex',
-          role: 'viewer',
-          status: 'invited',
-        },
-      ],
-    });
-    renderDashboard();
+  it('links each org to its page and renders a health card per project', () => {
+    renderDashboard(healthyOverview);
+    expect(screen.getByRole('link', { name: 'Acme' })).toHaveAttribute('href', '/orgs/org-1');
 
-    const acmeLink = screen.getByRole('link', { name: /Acme/ });
-    expect(acmeLink).toHaveAttribute('href', '/orgs/org-1');
-    // invited memberships are not listed as active orgs...
-    expect(screen.queryByRole('link', { name: /Globex/ })).not.toBeInTheDocument();
-    // ...but do surface as a pending-invites link to /orgs.
+    const card = screen.getByTestId('project-card-p-1');
+    expect(within(card).getByText('Growth')).toBeInTheDocument();
+    expect(within(card).getByText('1/2 streams')).toBeInTheDocument();
+    expect(within(card).getByText('Setup 2 of 4 steps done')).toBeInTheDocument();
+    expect(within(card).getByRole('link', { name: /Open project/ })).toHaveAttribute('href', '/orgs/org-1/projects/p-1/campaigns');
+    expect(within(card).getByRole('link', { name: /Continue setup/ })).toHaveAttribute('href', '/orgs/org-1/projects/p-1/onboarding');
+
+    // A project whose health the viewer cannot read says so rather than showing zeros.
+    const restricted = screen.getByTestId('project-card-p-2');
+    expect(within(restricted).getByText('Ingest health is visible to project admins.')).toBeInTheDocument();
+    expect(within(restricted).queryByRole('link', { name: /Data health/ })).not.toBeInTheDocument();
+  });
+
+  it('surfaces pending invites and always offers the all-organizations link', () => {
+    renderDashboard(healthyOverview);
     expect(screen.getByRole('link', { name: /pending invite/ })).toHaveAttribute('href', '/orgs');
+    expect(screen.getByRole('link', { name: 'View all organizations' })).toHaveAttribute('href', '/orgs');
   });
 
   it('shows a create-organization call to action when there are no orgs', () => {
-    mockUseOrgContext.mockReturnValue({ loading: false, memberships: [] });
-    renderDashboard();
-
+    renderDashboard({ orgs: [], pendingInviteCount: 0 });
     expect(screen.getByText(/not a member of any organization/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Create your first organization' })).toHaveAttribute(
-      'href',
-      '/orgs/new',
-    );
+    expect(screen.getByRole('link', { name: 'Create your first organization' })).toHaveAttribute('href', '/orgs/new');
+    expect(screen.queryByRole('link', { name: /pending invite/ })).not.toBeInTheDocument();
   });
 
-  it('always offers the all-organizations link', () => {
-    mockUseOrgContext.mockReturnValue({ loading: false, memberships: [] });
-    renderDashboard();
-    expect(screen.getByRole('link', { name: 'View all organizations' })).toHaveAttribute(
-      'href',
-      '/orgs',
-    );
+  it('signs out and returns to the login page', async () => {
+    renderDashboard({ orgs: [], pendingInviteCount: 0 });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/login'));
+    expect(signOut).toHaveBeenCalled();
   });
 
-  /* ---------------- R1: Executive KPI & Health Telemetry Grid ---------------- */
-  it('renders R1 executive KPI and health telemetry grid with pulse and latency badges', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme',
-          role: 'owner',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard({
-      telemetryMetrics: {
-        ingestUptime: '99.98%',
-        ingestLatency: '<18ms',
-        connectedPipelinesCount: 3,
-        totalPipelinesCount: 3,
-      },
-    });
-
-    const kpiSection = screen.getByLabelText('Key Health Indicators');
-    expect(kpiSection).toBeInTheDocument();
-
-    // 4 StatCards
-    expect(screen.getByText('Active Workspaces')).toBeInTheDocument();
-    expect(screen.getByText('Ingestion Health')).toBeInTheDocument();
-    expect(screen.getByText('Pipelines & Connectors')).toBeInTheDocument();
-    expect(screen.getByText('Pending Invitations')).toBeInTheDocument();
-
-    // Uptime & Latency
-    expect(screen.getByText('99.98%')).toBeInTheDocument();
-    expect(screen.getByText('<18ms')).toBeInTheDocument();
-    expect(screen.getByText('All Pipelines Synced')).toBeInTheDocument();
-  });
-
-  it('renders honest empty states when telemetry metrics are absent', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme',
-          role: 'owner',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard();
-
-    expect(screen.getByText('No stream activity')).toBeInTheDocument();
-    expect(screen.getByText('Awaiting initial batch ingest')).toBeInTheDocument();
-    expect(screen.getByText('None connected')).toBeInTheDocument();
-    expect(screen.getByText('No marketing or billing pipelines connected')).toBeInTheDocument();
-  });
-
-  /* ---------------- R2: Interactive Workspace Launchpads & Setup Readiness ---------------- */
-  it('renders R2 workspace launchpad with structured profiles, readiness meter and 1-click launch', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme Enterprise',
-          role: 'owner',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard();
-
-    // Profile tags
-    expect(screen.getByText('Web')).toBeInTheDocument();
-    expect(screen.getByText('SaaS Subscription')).toBeInTheDocument();
-    expect(screen.getByText('Stripe')).toBeInTheDocument();
-
-    // Readiness meter: 3 of 4 Ready (75%)
-    expect(screen.getByText('Setup Readiness')).toBeInTheDocument();
-    expect(screen.getByText('3 of 4 Ready (75%)')).toBeInTheDocument();
-
-    // 1-Click Launchpad button
-    const launchBtn = screen.getByRole('link', { name: 'Launch Pulse' });
-    expect(launchBtn).toHaveAttribute('href', '/orgs/org-1/projects/proj-1');
-  });
-
-  it('supports R2 client-side real-time workspace search and status filtering', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme Corp',
-          role: 'owner',
-          status: 'active',
-        },
-        {
-          membershipId: 'm2',
-          organizationId: 'org-2',
-          organizationName: 'Beta Analytics',
-          role: 'member',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard();
-
-    expect(screen.getByRole('link', { name: 'Acme Corp' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Beta Analytics' })).toBeInTheDocument();
-
-    // Search for "Beta"
-    const searchInput = screen.getByPlaceholderText('Search workspaces by name, stack, model...');
-    fireEvent.change(searchInput, { target: { value: 'Beta' } });
-
-    expect(screen.queryByRole('link', { name: 'Acme Corp' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Beta Analytics' })).toBeInTheDocument();
-
-    // Search for non-existent workspace
-    fireEvent.change(searchInput, { target: { value: 'NonExistent' } });
-    expect(screen.getByText('No matching workspaces found.')).toBeInTheDocument();
-
-    // Clear search
-    const clearBtn = screen.getByRole('button', { name: 'Clear search' });
-    fireEvent.click(clearBtn);
-
-    expect(screen.getByRole('link', { name: 'Acme Corp' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Beta Analytics' })).toBeInTheDocument();
-  });
-
-  /* ---------------- R3: Live Operational Activity Feed ---------------- */
-  it('controls R3 operational activity ticker with pause, resume, and category filtering', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme',
-          role: 'owner',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard({ initialFeedEvents: MOCK_FEED_EVENTS });
-
-    const activityFeed = screen.getByLabelText('Operational Activity Feed');
-    expect(activityFeed).toBeInTheDocument();
-
-    // Initial state: Live Stream
-    expect(screen.getByText('Live Stream')).toBeInTheDocument();
-    const pauseBtn = screen.getByRole('button', { name: /Pause Stream/ });
-    expect(pauseBtn).toBeInTheDocument();
-
-    // Toggle Pause
-    fireEvent.click(pauseBtn);
-    expect(screen.getByText('Stream Paused')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Resume Stream/ })).toBeInTheDocument();
-
-    // Toggle Resume
-    fireEvent.click(screen.getByRole('button', { name: /Resume Stream/ }));
-    expect(screen.getByText('Live Stream')).toBeInTheDocument();
-
-    // Category Filter: Touchpoints
-    const touchpointsTab = screen.getByRole('button', { name: /Touchpoints/ });
-    fireEvent.click(touchpointsTab);
-    expect(screen.getByText('High-Intent Ad Click (Google Search)')).toBeInTheDocument();
-    // Conversions should not be in the filtered list
-    expect(screen.queryByText('Enterprise Plan Checkout')).not.toBeInTheDocument();
-
-    // Category Filter: Guardrails
-    const guardrailsTab = screen.getByRole('button', { name: /Autonomous Guardrails/ });
-    fireEvent.click(guardrailsTab);
-    expect(screen.getByText('CPA Ceiling Guardrail Triggered')).toBeInTheDocument();
-  });
-
-  it('displays honest empty state when no activity events are available', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme',
-          role: 'owner',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard({ initialFeedEvents: [] });
-
-    expect(screen.getByText('No recent activity events recorded.')).toBeInTheDocument();
-  });
-
-  /* ---------------- R4: Quick-Action Cockpit ---------------- */
-  it('renders R4 quick-action cockpit with 6 glassmorphic action cards and genuine project routes', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [
-        {
-          membershipId: 'm1',
-          organizationId: 'org-1',
-          organizationName: 'Acme',
-          role: 'owner',
-          status: 'active',
-        },
-      ],
-    });
-    renderDashboard();
-
-    const cockpit = screen.getByLabelText('Quick-Action Cockpit');
-    expect(cockpit).toBeInTheDocument();
-
-    const adsAction = screen.getByRole('link', { name: /Ads & ROAS Cockpit/ });
-    expect(adsAction).toHaveAttribute('href', '/orgs/org-1/projects/proj-1/campaigns');
-    expect(adsAction.className).toContain('min-h-[56px]');
-
-    const funnelAction = screen.getByRole('link', { name: /Conversion Funnels/ });
-    expect(funnelAction).toHaveAttribute('href', '/orgs/org-1/projects/proj-1/funnel');
-
-    const cohortsAction = screen.getByRole('link', { name: /Cohort Retention/ });
-    expect(cohortsAction).toHaveAttribute('href', '/orgs/org-1/projects/proj-1/cohorts');
-
-    const integrationsAction = screen.getByRole('link', { name: /Integrations Hub/ });
-    expect(integrationsAction).toHaveAttribute('href', '/orgs/org-1/projects/proj-1/integrations');
-
-    const streamHealthAction = screen.getByRole('link', { name: /Stream Ingest Health/ });
-    expect(streamHealthAction).toHaveAttribute('href', '/orgs/org-1/projects/proj-1/billing-ops-feed');
-
-    const copilotAction = screen.getByRole('link', { name: /AI Copilot & Actions/ });
-    expect(copilotAction).toHaveAttribute('href', '/orgs/org-1/projects/proj-1/cost-guardrails');
-  });
-
-  it('gracefully falls back quick cockpit routes when user has no organization or project', () => {
-    mockUseOrgContext.mockReturnValue({
-      loading: false,
-      memberships: [],
-    });
-    renderDashboard();
-
-    const adsAction = screen.getByRole('link', { name: /Ads & ROAS Cockpit/ });
-    expect(adsAction).toHaveAttribute('href', '/orgs');
-
-    const funnelAction = screen.getByRole('link', { name: /Conversion Funnels/ });
-    expect(funnelAction).toHaveAttribute('href', '/orgs');
+  it('sends a client whose Firebase session is gone back to login', () => {
+    mockUseAuth.mockReturnValue({ user: null, loading: false, signOut });
+    renderDashboard({ orgs: [], pendingInviteCount: 0 });
+    expect(replace).toHaveBeenCalledWith('/login');
   });
 });

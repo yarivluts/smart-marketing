@@ -38,10 +38,10 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     const orgId = await createOrganization(page, 'Ingest Health E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
+    await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
@@ -54,10 +54,20 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     // render identical counts — scope to the "Overall" row specifically to
     // avoid an ambiguous match across both.
     const overallRow = page.getByRole('listitem').filter({ hasText: 'Overall' });
-    await expect(overallRow).toContainText('4 records · 2 accepted · 1 quarantined · 1 duplicate');
+    await expect(overallRow).toContainText('4 records received · 2 accepted · 1 rejected on arrival · 1 duplicate');
+    // KAN-201: arrival counts never change, so the row also says how many are still open (1 here).
+    await expect(overallRow).toContainText('1 rejected record is still awaiting action below.');
     // Error rate counts quarantined records only (1/4), not the benign
     // duplicate — a retry storm must not read as a validation problem.
-    await expect(overallRow).toContainText('25.0% error rate');
+    await expect(overallRow).toContainText('25.0% rejected on arrival');
+
+    // KAN-197: the setup-health panel reads the same records. order_completed was accepted in prod,
+    // so billing is connected (with its one rejected record noted); nothing else was sent.
+    const billingRequirement = page.getByTestId('setup-requirement-billing');
+    await expect(billingRequirement).toContainText('Connected');
+    await expect(billingRequirement).toContainText('Accepted records for "order_completed"');
+    await expect(billingRequirement).toContainText('1 record is rejected and open in quarantine ("order_completed"): missing_required_field:amount');
+    await expect(page.getByTestId('setup-requirement-ad_spend')).toContainText('Not connected');
 
     await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
     await expect(page.getByText('Reasons: missing_required_field:amount')).toBeVisible();
@@ -68,8 +78,9 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('Still quarantined: missing_required_field:amount')).toBeVisible();
 
     // Orchestration (KAN-38): before triggering a run, there's no history and no freshness snapshot yet.
-    await expect(page.getByText('No orchestration runs for this project yet.')).toBeVisible();
-    await expect(page.getByText('No successful orchestration run yet.')).toBeVisible();
+    await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
+    // KAN-201: with no runs, one message rather than two near-identical ones.
+    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toHaveCount(0);
 
     // Triggering a run actually shells out to a real dbt build (KAN-37) against the buildable-today
     // DuckDB stand-in — normally a few seconds, but a generous 60s timeout here absorbs real subprocess
@@ -91,19 +102,22 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     const orgId = await createOrganization(page, 'Ingest Health Empty E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
+    await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page — this
     // project is the org's only one, so the org page defaults its switcher to it without a `?project=`.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     await page.goto(`/en/orgs/${orgId}`);
 
     await page.getByRole('link', { name: 'Ingest health' }).click();
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
+    // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
+    await expect(page.getByText('0 of 6 setup requirements connected in the Prod environment.')).toBeVisible();
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
     await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();
-    await expect(page.getByText('No orchestration runs for this project yet.')).toBeVisible();
-    await expect(page.getByText('No successful orchestration run yet.')).toBeVisible();
+    await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
+    // KAN-201: with no runs, one message rather than two near-identical ones.
+    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toHaveCount(0);
   });
 });

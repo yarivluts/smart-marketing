@@ -1,36 +1,24 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Bell, Coins, FileText, Plus, Trophy, Users } from 'lucide-react';
+import { BookOpenCheck, CalendarDays, CalendarRange, Coins, Info, PieChart, PlusCircle, Receipt, Sparkles, Trophy } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { aggregateRepCollectionLeaderboard } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import {
-  listBillingCollectionSignalsForProject,
-  listOrgPeople,
-  listOrgProjects,
-  listRepCollectionEntriesForProject,
-} from '@/lib/orgs/queries';
+import { listBillingCollectionSignalsForProject, listOrgPeople, listOrgProjects, listRepCollectionEntriesForProject } from '@/lib/orgs/queries';
 import {
   repCollectionTypeLabelKey,
   toRepCollectionBillingSignalRow,
   toRepCollectionEntryRow,
+  toRepCollectionInsights,
   toRepCollectionLeaderboardView,
 } from '@/lib/orgs/rep-collection-view';
-import {
-  PpButton,
-  PpCard,
-  PpEmptyState,
-  PpKpiCard,
-  PpKpiGrid,
-  PpPage,
-  PpPageHeader,
-  PpPill,
-  PpTable,
-} from '@/components/pastel/primitives';
+import { projectLedgerCurrency, signalCurrencyMatchesLedger } from '@/lib/orgs/rep-collection-currency';
 import { CreateRepCollectionEntryForm } from '@/components/orgs/create-rep-collection-entry-form';
 import { RepCollectionEntryControls } from '@/components/orgs/rep-collection-entry-controls';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, DonutChart, EmptyState, PageHero, TrendChart } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -42,19 +30,17 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
-const TYPE_ACCENTS: Record<string, 'primary' | 'mint' | 'amber' | 'sky' | 'neutral'> = {
-  upgrade: 'primary',
-  expansion: 'mint',
-  save: 'amber',
-  renewal: 'sky',
-  other: 'neutral',
-};
+/** Months of history the collections-per-month chart covers. */
+const TREND_MONTHS = 6;
 
 /**
- * Stitch "Pastel Pulse" rep-attributed collections ledger (desktop bcb541bd, mobile 507d4d2b).
- *
- * Weekly/monthly sales leaderboards, live billing signals awaiting attribution,
- * reconciled ledger table with inline editing, and manual collection logger.
+ * A project's rep-attributed collections ledger (KAN-88, E20.x, plan `14
+ * §Gap 13`, "Get them Moneys"): weekly/monthly leaderboards per rep,
+ * billing-auto-suggested candidates awaiting attribution, and the full
+ * ledger table with inline rep/amount editing — gated on `dashboards.write`,
+ * the same permission Goals/Segments/Campaign Ops use for a project-scoped
+ * editable-attribution admin surface. Not a commission system; see
+ * `RepCollectionEntryModel`'s own doc comment.
  */
 export default async function RepCollectionsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -67,29 +53,30 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })) {
     notFound();
   }
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/rep-collections`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
-  const [rawEntries, people] = await Promise.all([
-    listRepCollectionEntriesForProject(orgId, projectId),
-    listOrgPeople(orgId),
-  ]);
-  const billingSignals = (await listBillingCollectionSignalsForProject(orgId, projectId, rawEntries)).map(
-    toRepCollectionBillingSignalRow,
-  );
+  // `null` when the project has not configured one — the page then says the
+  // amounts are unlabelled rather than picking a currency on its behalf.
+  const ledgerCurrency = projectLedgerCurrency(project.currency);
+
+  // Fetched once and reused for both leaderboard periods (via the pure
+  // `aggregateRepCollectionLeaderboard`) and the billing-signal linked-id
+  // check, rather than four independent full-ledger reads per page load.
+  const [rawEntries, people] = await Promise.all([listRepCollectionEntriesForProject(orgId, projectId), listOrgPeople(orgId)]);
+  const billingSignals = (await listBillingCollectionSignalsForProject(orgId, projectId, rawEntries)).map(toRepCollectionBillingSignalRow);
   const entries = rawEntries.map(toRepCollectionEntryRow);
   const peopleById = new Map(people.map((person) => [person.id, person.name]));
-
+  // An archived person (KAN-129) drops out of the rep picker below — except an entry already
+  // attributed to one keeps that option available too, so the picker still renders the entry's
+  // real current rep instead of silently falling back to unattributed in the UI.
   const activePeople = people.filter((person) => !person.archived_at).map((person) => ({ id: person.id, name: person.name }));
   const peopleRows = activePeople;
   function repPickerOptions(orgPersonId: string | null) {
@@ -99,323 +86,166 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
     const archivedRep = people.find((person) => person.id === orgPersonId);
     return archivedRep ? [...activePeople, { id: archivedRep.id, name: archivedRep.name }] : activePeople;
   }
-
   const weekView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'week'), peopleById);
   const monthView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'month'), peopleById);
+  const insights = toRepCollectionInsights(entries, { now: new Date(), months: TREND_MONTHS });
   const t = await getTranslations('RepCollections');
 
-  const monthTotal =
-    monthView.rows.reduce((sum, row) => sum + row.totalAmount, 0) + monthView.unattributedTotal;
-  const monthEntriesCount =
-    monthView.rows.reduce((sum, row) => sum + row.entryCount, 0) + monthView.unattributedCount;
-  const billingSignalsTotal = billingSignals.reduce((sum, s) => sum + s.amount, 0);
-  const topCloser = monthView.rows[0];
+  const numberFormat = new Intl.NumberFormat(locale);
+  const monthFormat = new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const formatAmount = (amount: number) => (ledgerCurrency === null ? amount.toLocaleString(locale) : t('amountWithCurrency', { amount: amount.toLocaleString(locale), currency: ledgerCurrency }));
+  const periodTotal = (view: typeof weekView) => view.rows.reduce((sum, row) => sum + row.totalAmount, 0) + view.unattributedTotal;
+  const periodCount = (view: typeof weekView) => view.rows.reduce((sum, row) => sum + row.entryCount, 0) + view.unattributedCount;
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow={t('eyebrow')}
-        title={t('title', { projectName: project.name })}
-        description={t('description')}
-        actions={
-          <PpButton variant="primary" size="sm" icon={Plus} asChild>
-            <a href="#log-collection">
-              <span>{t('createHeading')}</span>
-            </a>
-          </PpButton>
-        }
-      />
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Coins} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('leaderboardHeading.week')} value={formatAmount(periodTotal(weekView))} subtext={t('kpiEntries', { count: periodCount(weekView) })} icon={CalendarDays} />
+          <StatCard title={t('leaderboardHeading.month')} value={formatAmount(periodTotal(monthView))} subtext={t('kpiEntries', { count: periodCount(monthView) })} icon={CalendarRange} />
+          <StatCard title={t('kpiLedgerTotal')} value={formatAmount(insights.total)} subtext={t('kpiEntries', { count: entries.length })} icon={BookOpenCheck} />
+          <StatCard title={t('kpiSuggestions')} value={numberFormat.format(billingSignals.length)} icon={Sparkles} />
+        </div>
+        {/* The ledger stores `amount` as a bare number with no currency of its own,
+            so every total below is shown in the project's configured currency —
+            an assumption, stated as one, rather than a formatted number implying
+            the system knows (KAN-171). */}
+        <p className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {ledgerCurrency === null ? t('amountCurrencyUnsetNote') : t('amountCurrencyNote', { currency: ledgerCurrency })}
+        </p>
+      </PageHero>
 
-      {/* KPI Overview */}
-      <PpKpiGrid>
-        <PpKpiCard
-          label={t('kpiMtdCollections')}
-          value={`$${monthTotal.toLocaleString(locale, { maximumFractionDigits: 0 })}`}
-          accent="primary"
-          badge={monthEntriesCount > 0 ? `${monthEntriesCount} deals` : undefined}
-          badgeAccent="primary"
-          footer={t('kpiMtdSubtitle', { count: monthEntriesCount })}
-        />
-        <PpKpiCard
-          label={t('kpiActiveClosers')}
-          value={monthView.rows.length}
-          valueSuffix={t('kpiRepsSuffix')}
-          accent="mint"
-          badge={monthView.rows.length > 0 ? `${monthView.rows.length} active` : undefined}
-          badgeAccent="mint"
-          footer={
-            monthView.unattributedCount > 0
-              ? t('kpiUnattributedFooter', { count: monthView.unattributedCount })
-              : t('kpiAllAttributed')
-          }
-        />
-        <PpKpiCard
-          label={t('kpiBillingSignals')}
-          value={billingSignals.length}
-          valueSuffix={t('kpiSignalsSuffix')}
-          accent={billingSignals.length > 0 ? 'amber' : 'neutral'}
-          badge={billingSignals.length > 0 ? t('needsTriage') : undefined}
-          badgeAccent="amber"
-          footer={
-            billingSignals.length > 0
-              ? `$${billingSignalsTotal.toLocaleString(locale, { maximumFractionDigits: 0 })} awaiting claim`
-              : t('allSignalsTriaged')
-          }
-        />
-        <PpKpiCard
-          label={t('kpiTopCloser')}
-          value={topCloser ? `$${topCloser.totalAmount.toLocaleString(locale, { maximumFractionDigits: 0 })}` : '—'}
-          accent={topCloser ? 'pink' : 'neutral'}
-          badge={topCloser ? topCloser.name : undefined}
-          badgeAccent="pink"
-          footer={topCloser ? `${topCloser.entryCount} deals closed` : t('noClosersYet')}
-        />
-      </PpKpiGrid>
-
-      {/* Weekly & Monthly Leaderboards (Bento Modules) */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Weekly Leaderboard */}
-        <PpCard
-          title={t('leaderboardHeading.week')}
-          subtitle={t('weekSubtitle')}
-          icon={Trophy}
-          iconAccent="amber"
-          action={
-            <PpPill accent="amber" dot>
-              {weekView.rows.reduce((sum, r) => sum + r.entryCount, 0)} deals
-            </PpPill>
-          }
-        >
-          {weekView.rows.length === 0 ? (
-            <PpEmptyState icon={Trophy} title={t('leaderboardEmpty')} />
-          ) : (
-            <div className="flex flex-col gap-3">
-              {weekView.rows.map((row, index) => (
-                <div
-                  key={row.orgPersonId}
-                  className="flex items-center justify-between rounded-xl bg-pp-surface-container-low/60 p-3 transition-colors hover:bg-pp-surface-container"
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
-                        index === 0
-                          ? 'bg-amber-100 text-amber-900'
-                          : index === 1
-                            ? 'bg-slate-200 text-slate-800'
-                            : index === 2
-                              ? 'bg-orange-100 text-orange-900'
-                              : 'bg-pp-surface-container text-pp-outline'
-                      }`}
-                    >
-                      #{index + 1}
-                    </span>
-                    <div>
-                      <div className="font-semibold text-pp-on-surface">{row.name}</div>
-                      <div className="text-xs text-pp-outline">
-                        {row.entryCount} {row.entryCount === 1 ? 'deal' : 'deals'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-end">
-                    <div className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
-                      ${row.totalAmount.toLocaleString(locale)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {weekView.unattributedCount > 0 ? (
-            <div className="mt-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-3 text-xs text-amber-900">
-              {t('leaderboardUnattributed', {
-                amount: `$${weekView.unattributedTotal.toLocaleString(locale)}`,
-                count: weekView.unattributedCount,
-              })}
-            </div>
-          ) : null}
-        </PpCard>
-
-        {/* Monthly Leaderboard */}
-        <PpCard
-          title={t('leaderboardHeading.month')}
-          subtitle={t('monthSubtitle')}
-          icon={Coins}
-          iconAccent="mint"
-          action={
-            <PpPill accent="mint" dot>
-              ${monthTotal.toLocaleString(locale, { maximumFractionDigits: 0 })}
-            </PpPill>
-          }
-        >
-          {monthView.rows.length === 0 ? (
-            <PpEmptyState icon={Coins} title={t('leaderboardEmpty')} />
-          ) : (
-            <div className="flex flex-col gap-4">
-              {monthView.rows.map((row, index) => {
-                const maxAmount = monthView.rows[0]?.totalAmount || 1;
-                const pct = Math.round((row.totalAmount / maxAmount) * 100);
-                return (
-                  <div key={row.orgPersonId} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-pp-on-surface">
-                          {index + 1}. {row.name}
-                        </span>
-                        <span className="text-xs text-pp-outline">({row.entryCount} deals)</span>
-                      </div>
-                      <span className="font-bold text-pp-on-surface">${row.totalAmount.toLocaleString(locale)}</span>
-                    </div>
-                    <div
-                      className="h-2 w-full overflow-hidden rounded-full bg-pp-surface-container"
-                      role="progressbar"
-                      aria-valuenow={pct}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
-                      <div
-                        className="h-full rounded-full bg-pp-secondary transition-all duration-300"
-                        style={{ width: `${Math.max(5, pct)}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          {monthView.unattributedCount > 0 ? (
-            <div className="mt-4 rounded-xl border border-dashed border-pp-outline-variant bg-pp-surface-container-low/60 p-3 text-xs text-pp-outline">
-              {t('leaderboardUnattributed', {
-                amount: `$${monthView.unattributedTotal.toLocaleString(locale)}`,
-                count: monthView.unattributedCount,
-              })}
-            </div>
-          ) : null}
-        </PpCard>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {[
+          { key: 'week' as const, view: weekView },
+          { key: 'month' as const, view: monthView },
+        ].map(({ key, view }) => (
+          <ChartCard
+            key={key}
+            title={t(`leaderboardHeading.${key}`)}
+            description={t('leaderboardDescription')}
+            icon={Trophy}
+            fill
+            footer={
+              view.unattributedCount > 0
+                ? ledgerCurrency === null
+                  ? t('leaderboardUnattributedNoCurrency', { amount: view.unattributedTotal.toLocaleString(locale), count: view.unattributedCount })
+                  : t('leaderboardUnattributed', { amount: view.unattributedTotal.toLocaleString(locale), currency: ledgerCurrency, count: view.unattributedCount })
+                : undefined
+            }
+          >
+            {view.rows.length === 0 ? (
+              <EmptyState icon={Trophy} title={t('leaderboardEmpty')} compact />
+            ) : (
+              <BarList
+                items={view.rows.map((row, index) => ({
+                  key: row.orgPersonId,
+                  label: t('leaderboardRank', { rank: index + 1, name: row.name }),
+                  sublabel: t('kpiEntries', { count: row.entryCount }),
+                  value: row.totalAmount,
+                }))}
+                valueFormatter={formatAmount}
+                color="hsl(var(--success))"
+              />
+            )}
+          </ChartCard>
+        ))}
       </div>
 
-      {/* Suggested from Billing Signals */}
-      <PpCard
-        title={t('signalsHeading')}
-        subtitle={t('signalsSubtitle')}
-        icon={Bell}
-        iconAccent="amber"
-        action={
-          billingSignals.length > 0 ? (
-            <PpPill accent="amber" dot>
-              {billingSignals.length} {t('needsTriage')}
-            </PpPill>
-          ) : undefined
-        }
-      >
+      {entries.length > 0 ? (
+        <div className="grid gap-6 lg:grid-cols-5">
+          <ChartCard title={t('trendTitle')} description={t('trendDescription', { months: TREND_MONTHS })} icon={CalendarRange} className="lg:col-span-3" fill>
+            <TrendChart
+              label={t('trendTitle')}
+              xKey="month"
+              kind="bar"
+              valueFormat="compact"
+              data={insights.monthly.map((bucket) => ({ month: monthFormat.format(new Date(bucket.start)), amount: bucket.total }))}
+              series={[{ key: 'amount', label: ledgerCurrency === null ? t('trendSeries') : t('trendSeriesWithCurrency', { currency: ledgerCurrency }), color: 'hsl(var(--success))' }]}
+            />
+          </ChartCard>
+          <ChartCard title={t('byTypeTitle')} description={t('byTypeDescription')} icon={PieChart} className="lg:col-span-2" fill>
+            <DonutChart
+              label={t('byTypeTitle')}
+              layout="stacked"
+              valueFormat="compact"
+              centerValue={numberFormat.format(entries.length)}
+              centerLabel={t('byTypeCenterLabel')}
+              data={insights.byType.map((entry) => ({ label: t(repCollectionTypeLabelKey(entry.collectionType)), value: entry.total }))}
+            />
+          </ChartCard>
+        </div>
+      ) : null}
+
+      <ChartCard title={t('signalsHeading')} description={t('signalsDescription')} icon={Receipt}>
         {billingSignals.length === 0 ? (
-          <PpEmptyState icon={Bell} title={t('noSignals')} />
+          <EmptyState icon={Receipt} title={t('noSignals')} compact />
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <ul className="flex flex-col gap-4">
             {billingSignals.map((signal) => (
-              <div
-                key={signal.rawRecordId}
-                className="flex flex-col justify-between gap-3 rounded-2xl border border-pp-outline-variant/40 bg-pp-surface-container-low/40 p-4 transition-all hover:bg-pp-surface-container-low"
-              >
-                <div className="flex items-center justify-between">
-                  <PpPill accent="amber">{signal.currency.toUpperCase()}</PpPill>
-                  <span className="font-mono text-xs text-pp-outline">{signal.occurredAt.slice(0, 10)}</span>
-                </div>
-                <div>
-                  <div className="font-semibold text-pp-on-surface">Customer: {signal.customerId}</div>
-                  <div className="font-pp-display text-pp-headline-md font-bold text-pp-on-surface">
-                    ${signal.amount.toLocaleString(locale)}
-                  </div>
-                </div>
-                <div className="border-t border-pp-outline-variant/30 pt-3">
-                  <CreateRepCollectionEntryForm
-                    orgId={orgId}
-                    projectId={projectId}
-                    people={peopleRows}
-                    signal={signal}
-                  />
-                </div>
-              </div>
+              <li key={signal.rawRecordId} className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t('signalSummary', { customerId: signal.customerId, amount: signal.amount.toLocaleString(locale), currency: signal.currency.toUpperCase() })}
+                </span>
+                {signalCurrencyMatchesLedger(signal.currency, ledgerCurrency) ? null : (
+                  <p className="text-xs text-warning">{t('signalCurrencyMismatch', { signalCurrency: signal.currency.toUpperCase(), projectCurrency: ledgerCurrency ?? '' })}</p>
+                )}
+                <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} signal={signal} />
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </PpCard>
+      </ChartCard>
 
-      {/* Reconciled Collections Ledger */}
-      <PpCard
-        title={t('ledgerHeading')}
-        subtitle={t('ledgerSubtitle', { count: entries.length })}
-        icon={FileText}
-        iconAccent="primary"
-        flush
-      >
+      <ChartCard title={t('ledgerHeading')} description={t('ledgerDescription')} icon={BookOpenCheck}>
         {entries.length === 0 ? (
-          <div className="p-pp-lg">
-            <PpEmptyState icon={FileText} title={t('noEntries')} />
-          </div>
+          <EmptyState icon={BookOpenCheck} title={t('noEntries')} description={t('noEntriesDetail')} compact />
         ) : (
-          <PpTable>
-            <thead>
-              <tr>
-                <th>{t('columnCompany')}</th>
-                <th>{t('columnType')}</th>
-                <th>{t('columnPlan')}</th>
-                <th>{t('columnWhen')}</th>
-                <th>{t('columnNote')}</th>
-                <th>{t('columnRepAndAmount')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry) => {
-                const typeAccent = TYPE_ACCENTS[entry.collectionType] ?? 'neutral';
-                const planText =
-                  entry.planFrom && entry.planTo
-                    ? t('planSummary', { from: entry.planFrom, to: entry.planTo })
-                    : entry.planFrom
-                      ? t('planFromOnly', { from: entry.planFrom })
-                      : entry.planTo
-                        ? t('planToOnly', { to: entry.planTo })
-                        : '—';
-
-                return (
-                  <tr key={entry.id}>
-                    <td className="font-semibold text-pp-on-surface">{entry.company}</td>
-                    <td>
-                      <PpPill accent={typeAccent}>{t(repCollectionTypeLabelKey(entry.collectionType))}</PpPill>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-start text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pe-3 text-start font-medium">{t('columnCompany')}</th>
+                  <th className="py-2 pe-3 text-start font-medium">{t('columnType')}</th>
+                  <th className="py-2 pe-3 text-start font-medium">{t('columnPlan')}</th>
+                  <th className="py-2 pe-3 text-start font-medium">{t('columnWhen')}</th>
+                  <th className="py-2 pe-3 text-start font-medium">{t('columnNote')}</th>
+                  <th className="py-2 text-start font-medium">{t('columnRepAndAmount')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((entry) => (
+                  <tr key={entry.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/30">
+                    <td className="py-2 pe-3 font-medium">{entry.company}</td>
+                    <td className="py-2 pe-3">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{t(repCollectionTypeLabelKey(entry.collectionType))}</span>
                     </td>
-                    <td className="text-xs text-pp-outline">{planText}</td>
-                    <td className="font-mono text-xs text-pp-outline">{entry.occurredAt}</td>
-                    <td className="max-w-[200px] truncate text-xs text-pp-on-surface-variant" title={entry.note ?? ''}>
-                      {entry.note || '—'}
+                    <td className="py-2 pe-3 text-xs text-muted-foreground">
+                      {entry.planFrom && entry.planTo
+                        ? t('planSummary', { from: entry.planFrom, to: entry.planTo })
+                        : entry.planFrom
+                          ? t('planFromOnly', { from: entry.planFrom })
+                          : entry.planTo
+                            ? t('planToOnly', { to: entry.planTo })
+                            : ''}
                     </td>
-                    <td>
-                      <RepCollectionEntryControls
-                        orgId={orgId}
-                        projectId={projectId}
-                        entryId={entry.id}
-                        orgPersonId={entry.orgPersonId}
-                        amount={entry.amount}
-                        people={repPickerOptions(entry.orgPersonId)}
-                      />
+                    <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.occurredAt}</td>
+                    <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.note ?? ''}</td>
+                    <td className="py-2">
+                      <RepCollectionEntryControls orgId={orgId} projectId={projectId} entryId={entry.id} orgPersonId={entry.orgPersonId} amount={entry.amount} people={repPickerOptions(entry.orgPersonId)} />
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </PpTable>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </PpCard>
+      </ChartCard>
 
-      {/* Manual Log Entry Section */}
-      <div id="log-collection">
-        <PpCard
-          title={t('createHeading')}
-          subtitle={t('createSubtitle')}
-          icon={Plus}
-          iconAccent="primary"
-        >
-          <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} />
-        </PpCard>
-      </div>
-    </PpPage>
+      <ChartCard title={t('createHeading')} description={t('createDescription')} icon={PlusCircle}>
+        <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} />
+      </ChartCard>
+    </div>
   );
 }

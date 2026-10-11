@@ -153,10 +153,48 @@ export interface SupportLeaderboardRow {
 export interface SupportLeaderboardResult {
   /** Every distinct `ticket_id` this read saw an `opened`-stage event for, regardless of resolution. */
   ticketsOpened: number;
-  /** `ticketsOpened` minus every distinct `ticket_id` this read saw a `resolved`-stage event for — tickets still outstanding. Never negative even if a `resolved` event landed without its own `opened` event ever landing (a connector backfill gap), same "don't let malformed/partial data produce a nonsensical negative" posture other derived counts in this codebase take. */
-  openBacklog: number;
+  /**
+   * Tickets still outstanding: `ticketsOpened` minus every distinct `ticket_id`
+   * this read saw a `resolved`-stage event for — or **`null` when the read was
+   * capped**, because then it is not a computable quantity (KAN-166).
+   *
+   * A ticket is opened and resolved days or weeks apart, and the read window is
+   * the most recent N *events*. On any established project the `opened` events
+   * of older tickets age out of the window while their `resolved` events remain
+   * inside it, so the subtraction runs over two sets that describe different
+   * populations of tickets.
+   *
+   * This used to be `Math.max(0, opened - resolved)`, and the clamp is what made
+   * it dangerous rather than merely wrong. The window makes `resolved` exceed
+   * `opened` routinely, which is exactly when the clamp fires — turning the one
+   * detectable signal that the window is inconsistent into a confident **0**,
+   * rendered in the largest type on the page, telling a support manager there is
+   * no backlog. Absence rendered as reassurance, the KAN-152 shape.
+   *
+   * The old comment attributed negatives to "a connector backfill gap", i.e.
+   * malformed data. That is a real but rare cause; the window is the common one,
+   * and it is structural rather than anomalous. The clamp still stands for the
+   * uncapped case, where a negative really does mean a backfill gap.
+   */
+  openBacklog: number | null;
   /** Sorted highest-`ticketsResolved`-first. */
   rows: SupportLeaderboardRow[];
+  /**
+   * The record cap this leaderboard was computed under, when more landed
+   * `support_ticket_event` records exist than were read — `null` when the read
+   * saw all of them.
+   *
+   * Beyond `openBacklog`, this qualifies the ranking itself. The page numbers
+   * rows "1.", "2.", "3.", and a rank is a stronger claim than a count: it says
+   * *best*, not *most within an arbitrary recency window*. An agent whose
+   * resolved tickets fall outside the window ranks lower or vanishes, and
+   * nothing about the rendered list distinguishes that from having resolved
+   * nothing.
+   *
+   * Measured by over-fetching one record, never inferred from `length === cap`
+   * — that cannot tell "exactly N exist" from "far more exist".
+   */
+  sampledFrom: number | null;
 }
 
 /**
@@ -171,7 +209,7 @@ export interface SupportLeaderboardResult {
  * — an `opened`-stage event's `agent_org_person_id` is typically still null
  * (unassigned backlog), see the schema's own doc comment.
  */
-export function aggregateSupportLeaderboard(records: readonly RawRecordModel[]): SupportLeaderboardResult {
+export function aggregateSupportLeaderboard(records: readonly RawRecordModel[], sampledFrom: number | null = null): SupportLeaderboardResult {
   const parsed = records.map(parseSupportTicketEvent).filter((event): event is ParsedSupportTicketEvent => event !== null);
 
   const openedTicketIds = new Set<string>();
@@ -207,10 +245,27 @@ export function aggregateSupportLeaderboard(records: readonly RawRecordModel[]):
 
   return {
     ticketsOpened: openedTicketIds.size,
-    openBacklog: Math.max(0, openedTicketIds.size - resolvedTicketIds.size),
+    // Not computable from a capped read — the two sets describe different
+    // populations of tickets once the window has clipped either end of a
+    // lifecycle. The clamp survives only for the uncapped case, where a negative
+    // really does mean a `resolved` landed without its `opened` (a backfill gap).
+    openBacklog: sampledFrom === null ? Math.max(0, openedTicketIds.size - resolvedTicketIds.size) : null,
     rows,
+    sampledFrom,
   };
 }
+
+/**
+ * Options for {@link getSupportLeaderboardForProject}.
+ *
+ * A caller supplying its own records must also state whether they were capped,
+ * because only it knows. A union rather than an optional field, so the answer
+ * cannot be omitted: defaulting to "complete" would silently restore the
+ * clamped-zero backlog this change exists to remove (KAN-166).
+ */
+export type GetSupportLeaderboardOptions =
+  | { limit?: number; precomputedRecords?: undefined; sampledFrom?: undefined }
+  | { precomputedRecords: RawRecordModel[]; sampledFrom: number | null; limit?: undefined };
 
 /**
  * Fetches a project's bounded, landed `support_ticket_event` raw records and
@@ -223,9 +278,19 @@ export function aggregateSupportLeaderboard(records: readonly RawRecordModel[]):
 export async function getSupportLeaderboardForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetSupportLeaderboardOptions,
 ): Promise<SupportLeaderboardResult> {
   await requireProjectInOrg(organizationId, projectId);
-  const records = options?.precomputedRecords ?? (await listSupportTicketRecordsForProject(organizationId, projectId, options?.limit));
-  return aggregateSupportLeaderboard(records);
+
+  if (options && 'precomputedRecords' in options && options.precomputedRecords !== undefined) {
+    return aggregateSupportLeaderboard(options.precomputedRecords, options.sampledFrom);
+  }
+
+  // One record past the cap, then dropped: the extra row is evidence the cap was
+  // hit, never an entry. `records.length === limit` says the same thing for a
+  // project with exactly `limit` events, which is complete, and for one with
+  // fifty thousand, which is a sample (KAN-166).
+  const limit = options?.limit ?? DEFAULT_SUPPORT_LEADERBOARD_RECORD_LIMIT;
+  const fetched = await listSupportTicketRecordsForProject(organizationId, projectId, limit + 1);
+  return aggregateSupportLeaderboard(fetched.slice(0, limit), fetched.length > limit ? limit : null);
 }

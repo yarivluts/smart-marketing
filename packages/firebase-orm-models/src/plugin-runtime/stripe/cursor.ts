@@ -18,10 +18,17 @@ export interface StripeResourceCursor {
  * both without changing that shared interface. `events` bundles
  * charges/invoices/refunds (all `kind: 'event'`, each record naming its own
  * schema) into one phase; `entities` covers subscriptions alone.
+ *
+ * `events.cancellation` (KAN-306) pages through subscriptions a second time,
+ * independently of `entities.subscription`, to derive `cancellation_reason`
+ * events from each one's `cancellation_details` - an event, so it belongs to
+ * the events phase. It is optional on a persisted cursor written before it
+ * existed; such a cursor resumes everything else where it was and starts this
+ * one resource from scratch.
  */
 export interface StripeSyncCursor {
   phase: 'events' | 'entities';
-  events: { charge: StripeResourceCursor; invoice: StripeResourceCursor; refund: StripeResourceCursor };
+  events: { charge: StripeResourceCursor; invoice: StripeResourceCursor; refund: StripeResourceCursor; cancellation: StripeResourceCursor };
   entities: { subscription: StripeResourceCursor };
 }
 
@@ -32,7 +39,7 @@ function freshResourceCursor(): StripeResourceCursor {
 export function initialStripeSyncCursor(): StripeSyncCursor {
   return {
     phase: 'events',
-    events: { charge: freshResourceCursor(), invoice: freshResourceCursor(), refund: freshResourceCursor() },
+    events: { charge: freshResourceCursor(), invoice: freshResourceCursor(), refund: freshResourceCursor(), cancellation: freshResourceCursor() },
     entities: { subscription: freshResourceCursor() },
   };
 }
@@ -60,7 +67,7 @@ export function parseStripeSyncCursor(raw: string | null): StripeSyncCursor {
     ) {
       throw new InvalidStripeSyncCursorError();
     }
-    return parsed;
+    return { ...parsed, events: { ...parsed.events, cancellation: parsed.events.cancellation ?? freshResourceCursor() } };
   } catch {
     throw new InvalidStripeSyncCursorError();
   }

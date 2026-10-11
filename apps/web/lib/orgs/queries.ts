@@ -1,21 +1,17 @@
 import 'server-only';
 import { cache } from 'react';
-import type { AutopilotTelemetryResult, AttributionTelemetryResult, VideoExportTelemetryResult, CustomerExpansionSummary, AccountSegment } from '@growthos/shared';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   countSegmentMembers as countSegmentMembersInOrganization,
-  resolveDefaultQueryEnvironment as resolveDefaultQueryEnvironmentInOrganization,
   getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
   getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
   getCancellationReasonCodeBreakdownForProject as getCancellationReasonCodeBreakdownForProjectInOrganization,
   getCancellationReasonDimensionBreakdownForProject as getCancellationReasonDimensionBreakdownForProjectInOrganization,
-  getCancellationReasonFeedForProject as getCancellationReasonFeedForProjectInOrganization,
   getCancellationReasonThemeDigestForProject as getCancellationReasonThemeDigestForProjectInOrganization,
   listCancellationReasonRecordsForProject as listCancellationReasonRecordsForProjectInOrganization,
   type CancellationReasonBreakdownDimension,
   type CancellationReasonDimensionBreakdownOutcome,
-  type CancellationReasonFeedItem,
   getSignupQualityScoreOverviewForProject as getSignupQualityScoreOverviewForProjectInOrganization,
   getSignupQualityScoreDimensionBreakdownForProject as getSignupQualityScoreDimensionBreakdownForProjectInOrganization,
   getSignupQualityScoreAdjustedMetricsForProject as getSignupQualityScoreAdjustedMetricsForProjectInOrganization,
@@ -55,6 +51,7 @@ import {
   getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
   getNpsDimensionBreakdownForProject as getNpsDimensionBreakdownForProjectInOrganization,
   listSurveyResponseRecordsForProject as listSurveyResponseRecordsForProjectInOrganization,
+  type GetNpsOverviewOptions,
   type NpsOverview,
   type NpsBreakdownDimension,
   type NpsDimensionBreakdownOutcome,
@@ -91,9 +88,12 @@ import {
   listMcpOAuthGrantsForProject as listMcpOAuthGrantsForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
+  resolveMetricDisplayUnits as resolveMetricDisplayUnitsInOrganization,
   listOrgMembersWithProfiles,
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   getWarehouseFreshnessForProject as getWarehouseFreshnessForProjectInOrganization,
+  getCustomerEntityCoverage as getCustomerEntityCoverageInOrganization,
+  type CustomerEntityCoverageResult,
   type WarehouseFreshnessResult,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
@@ -106,11 +106,16 @@ import {
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
+  evaluateProjectSetupHealth as evaluateProjectSetupHealthInOrganization,
+  ProjectNotFoundError,
   listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
   listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
   listRecentDunningSubscriptionsForProject as listRecentDunningSubscriptionsForProjectInOrganization,
+  getBillingRecoveryForProject as getBillingRecoveryForProjectInOrganization,
+  type BillingRecoverySummary,
+  type GetBillingRecoveryForProjectOptions,
   listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
-  RawRecordModel,
+  type RawRecordModel,
   type RecordFieldFilter,
   type SchemaDefKind,
   listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
@@ -125,24 +130,6 @@ import {
   listRepCollectionEntriesForProject as listRepCollectionEntriesForProjectInOrganization,
   getRepCollectionLeaderboardForProject as getRepCollectionLeaderboardForProjectInOrganization,
   listBillingCollectionSignalsForProject as listBillingCollectionSignalsForProjectInOrganization,
-  getBillingRecoveryAnalyticsForProject as getBillingRecoveryAnalyticsForProjectInOrganization,
-  type BillingRecoveryAnalyticsResult,
-  type BillingRecoveryItem,
-  type ActiveDunningSummaryItem,
-  type BillingRecoveryOptions,
-  getCreativeFatigueTelemetryForProject as getCreativeFatigueTelemetryForProjectInOrganization,
-  type CreativeFatigueTelemetryResult,
-  type CreativeFatigueItem,
-  type CreativeFatigueLevel,
-  type CreativeSwapAction,
-  getPeerBenchmarksForProject as getPeerBenchmarksForProjectInOrganization,
-  getAutopilotTelemetry as getAutopilotTelemetryInOrganization,
-  getAttributionTelemetry as getAttributionTelemetryInOrganization,
-  type GetAttributionTelemetryOptions,
-  VideoAssemblyService,
-  ExpansionRadarService,
-  type PeerBenchmarksTelemetryResult,
-  type PeerBenchmarkQueryOptions,
   type RepCollectionEntryModel,
   type RepCollectionLeaderboardPeriod,
   type RepCollectionLeaderboardResult,
@@ -218,14 +205,19 @@ import {
   type TvPairingStatus,
   type WinEventModel,
   type WinRuleModel,
+  getBackfillEndpoint as getBackfillEndpointInOrganization,
+  listBackfills as listBackfillsInOrganization,
+  type BackfillStatusView,
 } from '@growthos/firebase-orm-models';
 import type {
   CancellationReasonCodeCount,
-  CancellationReasonThemeCluster,
+  CancellationReasonThemeDigest,
   FeedbackThemeCluster,
   FirmographicIndustryCount,
   FunnelStepSuggestion,
+  ParsedMetricUnit,
   Result,
+  SetupHealthReport,
   SignupQualityScoreDistribution,
 } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -252,6 +244,12 @@ export const listOrgProjects = cache(async (organizationId: string): Promise<Pro
   await ensureFirestoreOrm();
   return listOrgProjectsForOrganization(organizationId);
 });
+
+/** Live AND archived projects — only the project settings page (which offers "unarchive") wants these; everything else keeps the archived-hidden default above. */
+export async function listOrgProjectsIncludingArchived(organizationId: string): Promise<ProjectModel[]> {
+  await ensureFirestoreOrm();
+  return listOrgProjectsForOrganization(organizationId, { includeArchived: true });
+}
 
 /** Validates a `(client_id, redirect_uri)` pair against a registered MCP OAuth client (KAN-75) — throws `InvalidMcpOAuthClientError` otherwise. Used by the consent POST route before it builds any redirect through `redirect_uri`, so an unvalidated value can never become an open-redirect target. */
 export async function requireRegisteredMcpRedirectUri(clientId: string, redirectUri: string): Promise<void> {
@@ -303,12 +301,6 @@ export async function listEnvironmentsForProject(
   return listEnvironmentsForProjectInOrganization(organizationId, projectId);
 }
 
-/** The project's `prod` environment, or its first if none is named `prod`, or `null` if it has none yet. */
-export async function resolveDefaultQueryEnvironment(organizationId: string, projectId: string): Promise<EnvironmentModel | null> {
-  await ensureFirestoreOrm();
-  return resolveDefaultQueryEnvironmentInOrganization(organizationId, projectId);
-}
-
 export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
   await ensureFirestoreOrm();
   return listApiKeysForProjectInOrganization(organizationId, projectId);
@@ -351,22 +343,42 @@ export async function listMetricDefinitionsForProject(
   return listMetricDefinitionsForProjectInOrganization(organizationId, projectId);
 }
 
+/** `environmentId` narrows the list to one environment (KAN-196's project environment picker); omitted, every environment is folded in. */
 export async function listRecentIngestBatchesForProject(
   organizationId: string,
   projectId: string,
   limit?: number,
+  environmentId?: string,
 ): Promise<IngestBatchModel[]> {
   await ensureFirestoreOrm();
-  return listRecentIngestBatchesForProjectInOrganization(organizationId, projectId, limit);
+  return listRecentIngestBatchesForProjectInOrganization(organizationId, projectId, limit, environmentId);
 }
 
+/** Same `environmentId` semantics as {@link listRecentIngestBatchesForProject}. */
 export async function listQuarantinedRecordsForProject(
   organizationId: string,
   projectId: string,
   limit?: number,
+  environmentId?: string,
 ): Promise<QuarantinedRecordModel[]> {
   await ensureFirestoreOrm();
-  return listQuarantinedRecordsForProjectInOrganization(organizationId, projectId, limit);
+  return listQuarantinedRecordsForProjectInOrganization(organizationId, projectId, limit, environmentId);
+}
+
+/**
+ * KAN-197: each setup requirement's status, derived from the records the environment accepted and
+ * rejected. `environmentId` restricts the read to the environment picked in the project shell.
+ * `null` for a project that is not in the organization, so the page's own not-found handling
+ * decides what to show rather than this read throwing first.
+ */
+export async function evaluateProjectSetupHealth(organizationId: string, projectId: string, environmentId?: string): Promise<SetupHealthReport | null> {
+  await ensureFirestoreOrm();
+  try {
+    return await evaluateProjectSetupHealthInOrganization({ organizationId, projectId, environmentId });
+  } catch (error) {
+    if (error instanceof ProjectNotFoundError) return null;
+    throw error;
+  }
 }
 
 export async function listRecentBillingEventsForProject(
@@ -378,16 +390,26 @@ export async function listRecentBillingEventsForProject(
   return listRecentBillingEventsForProjectInOrganization(organizationId, projectId, limit);
 }
 
-/** The generic, single-schema record feed (KAN-81) — a project-scoped view of any registered schema's recently landed records, optionally restricted to records matching one field's exact value. */
+/** The generic, single-schema record feed (KAN-81) — a project-scoped view of any registered schema's recently landed records, optionally restricted to records matching one field's exact value. `environmentId` picks the environment (KAN-196); omitted, the project's `prod` one. */
 export async function listRecentRecordsForSchema(
   organizationId: string,
   projectId: string,
   kind: SchemaDefKind,
   schemaName: string,
   fieldFilter?: RecordFieldFilter,
+  limit?: number,
+  environmentId?: string,
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
-  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter });
+  return listRecentRecordsForSchemasInOrganization({
+    organizationId,
+    projectId,
+    kind,
+    schemaNames: [schemaName],
+    fieldFilter,
+    ...(limit !== undefined ? { limit } : {}),
+    ...(environmentId !== undefined ? { environmentId } : {}),
+  });
 }
 
 export async function listRecentChurnedSubscriptionsForProject(
@@ -408,121 +430,36 @@ export async function listRecentDunningSubscriptionsForProject(
   return listRecentDunningSubscriptionsForProjectInOrganization(organizationId, projectId, limit);
 }
 
-export async function getBillingRecoveryAnalyticsForProject(
+/** Failed Stripe payments paired with the charge that recovered them (KAN-304). */
+export async function getBillingRecoveryForProject(
   organizationId: string,
   projectId: string,
-  options?: BillingRecoveryOptions,
-): Promise<BillingRecoveryAnalyticsResult> {
+  options?: GetBillingRecoveryForProjectOptions,
+): Promise<BillingRecoverySummary> {
   await ensureFirestoreOrm();
-  return getBillingRecoveryAnalyticsForProjectInOrganization(organizationId, projectId, options);
+  return getBillingRecoveryForProjectInOrganization(organizationId, projectId, options);
 }
 
-export type {
-  BillingRecoveryAnalyticsResult,
-  BillingRecoveryItem,
-  ActiveDunningSummaryItem,
-  BillingRecoveryOptions,
-};
-
-export async function getCreativeFatigueTelemetryForProject(
-  organizationId: string,
-  projectId: string,
-  options?: { limit?: number },
-): Promise<CreativeFatigueTelemetryResult> {
-  await ensureFirestoreOrm();
-  return getCreativeFatigueTelemetryForProjectInOrganization(organizationId, projectId, options);
-}
-
-export type {
-  CreativeFatigueTelemetryResult,
-  CreativeFatigueItem,
-  CreativeFatigueLevel,
-  CreativeSwapAction,
-};
-
-export const getPeerBenchmarksForProject = cache(
-  async function getPeerBenchmarksForProject(
-    organizationId: string,
-    projectId: string,
-    options?: PeerBenchmarkQueryOptions,
-  ): Promise<PeerBenchmarksTelemetryResult> {
-    await ensureFirestoreOrm();
-    return getPeerBenchmarksForProjectInOrganization(organizationId, projectId, options);
-  },
-);
-
-export type {
-  PeerBenchmarksTelemetryResult,
-  PeerBenchmarkQueryOptions,
-};
-
-export const getAutopilotTelemetryForProject = cache(
-  async function getAutopilotTelemetryForProject(
-    organizationId: string,
-    projectId: string,
-  ): Promise<AutopilotTelemetryResult> {
-    await ensureFirestoreOrm();
-    return getAutopilotTelemetryInOrganization(organizationId, projectId);
-  },
-);
-
-export type { AutopilotTelemetryResult };
-
-export const getAttributionTelemetryForProject = cache(
-  async function getAttributionTelemetryForProject(
-    organizationId: string,
-    projectId: string,
-    options?: GetAttributionTelemetryOptions,
-  ): Promise<AttributionTelemetryResult> {
-    await ensureFirestoreOrm();
-    return getAttributionTelemetryInOrganization(organizationId, projectId, options);
-  },
-);
-
-export type { AttributionTelemetryResult, GetAttributionTelemetryOptions };
-
-export const getVideoExportTelemetryForProject = cache(
-  async function getVideoExportTelemetryForProject(
-    organizationId: string,
-    projectId: string,
-    projectName?: string,
-  ): Promise<VideoExportTelemetryResult> {
-    await ensureFirestoreOrm();
-    return VideoAssemblyService.getVideoExportTelemetry(organizationId, projectId, projectName);
-  },
-);
-
-export type { VideoExportTelemetryResult };
-
-export const getCustomerExpansionTelemetryForProject = cache(
-  async function getCustomerExpansionTelemetryForProject(
-    organizationId: string,
-    projectId: string,
-    segment: AccountSegment = 'all',
-  ): Promise<CustomerExpansionSummary> {
-    await ensureFirestoreOrm();
-    return ExpansionRadarService.getCustomerExpansionRadarTelemetry(organizationId, projectId, segment);
-  },
-);
-
-export type { CustomerExpansionSummary, AccountSegment };
-
+/** Same `environmentId` semantics as {@link listRecentIngestBatchesForProject}. */
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,
   projectId: string,
   limit?: number,
+  environmentId?: string,
 ): Promise<PipelineMessageModel[]> {
   await ensureFirestoreOrm();
-  return listFailedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit);
+  return listFailedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit, environmentId);
 }
 
+/** Same `environmentId` semantics as {@link listRecentIngestBatchesForProject}. */
 export async function listQueuedPipelineMessagesForProject(
   organizationId: string,
   projectId: string,
   limit?: number,
+  environmentId?: string,
 ): Promise<PipelineMessageModel[]> {
   await ensureFirestoreOrm();
-  return listQueuedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit);
+  return listQueuedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit, environmentId);
 }
 
 export async function listAuditLogEntriesForOrg(organizationId: string, limit?: number): Promise<AuditLogEntryModel[]> {
@@ -542,9 +479,21 @@ export async function listOrchestrationRunsForProject(
 export async function getWarehouseFreshnessForProject(params: {
   organizationId: string;
   projectId: string;
+  environmentId?: string;
 }): Promise<WarehouseFreshnessResult> {
   await ensureFirestoreOrm();
   return getWarehouseFreshnessForProjectInOrganization(params);
+}
+
+/** Customer entity coverage for one environment (setup health's backfill recommendation), from the warehouse. */
+export async function getCustomerEntityCoverage(params: {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  customerEntitySchemas: readonly string[];
+}): Promise<CustomerEntityCoverageResult> {
+  await ensureFirestoreOrm();
+  return getCustomerEntityCoverageInOrganization(params);
 }
 
 export async function verifyAuditLogChainForOrg(organizationId: string): Promise<AuditLogChainVerification> {
@@ -570,7 +519,7 @@ export async function checkProjectQueryQuota(
 export async function getEventVolumeOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { precomputedSchemaDefs?: SchemaDefModel[] },
+  options?: { precomputedSchemaDefs?: SchemaDefModel[]; environmentId?: string },
 ): Promise<EventVolumeOverviewEntry[]> {
   await ensureFirestoreOrm();
   return getEventVolumeOverviewForProjectInOrganization(organizationId, projectId, options);
@@ -579,7 +528,7 @@ export async function getEventVolumeOverviewForProject(
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetNpsOverviewOptions,
 ): Promise<NpsOverview> {
   await ensureFirestoreOrm();
   return getNpsOverviewForProjectInOrganization(organizationId, projectId, options);
@@ -656,7 +605,7 @@ export async function getCancellationReasonThemeDigestForProject(
   organizationId: string,
   projectId: string,
   options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
-): Promise<CancellationReasonThemeCluster[]> {
+): Promise<CancellationReasonThemeDigest> {
   await ensureFirestoreOrm();
   return getCancellationReasonThemeDigestForProjectInOrganization(organizationId, projectId, options);
 }
@@ -668,15 +617,6 @@ export async function getCancellationReasonDimensionBreakdownForProject(
 ): Promise<CancellationReasonDimensionBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getCancellationReasonDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
-}
-
-export async function getCancellationReasonFeedForProject(
-  organizationId: string,
-  projectId: string,
-  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
-): Promise<CancellationReasonFeedItem[]> {
-  await ensureFirestoreOrm();
-  return getCancellationReasonFeedForProjectInOrganization(organizationId, projectId, options);
 }
 
 /** The bounded, landed `onboarding_survey` raw records `getSignupQualityScoreOverviewForProject` reads — fetch once via this and pass the result via `precomputedRecords` for a page needing more than one read, same posture `listCancellationReasonRecordsForProject` establishes. */
@@ -756,14 +696,19 @@ export async function listFirmographicCompositionAlertsForProject(organizationId
 
 export type { CampaignSpendBreakdownOutcome };
 
-export async function getCampaignSpendBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignSpendBreakdownOutcome> {
-  await ensureFirestoreOrm();
-  return getCampaignSpendBreakdownForProjectInOrganization(organizationId, projectId);
+/** Scoping option every environment-aware warehouse read below accepts (KAN-196): omitted, the project's `prod` environment is queried. */
+export interface EnvironmentScope {
+  environmentId?: string;
 }
 
-export async function getCampaignPaybackBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignPaybackBreakdownOutcome> {
+export async function getCampaignSpendBreakdownForProject(organizationId: string, projectId: string, options?: EnvironmentScope): Promise<CampaignSpendBreakdownOutcome> {
   await ensureFirestoreOrm();
-  return getCampaignPaybackBreakdownForProjectInOrganization(organizationId, projectId);
+  return getCampaignSpendBreakdownForProjectInOrganization(organizationId, projectId, { environmentId: options?.environmentId });
+}
+
+export async function getCampaignPaybackBreakdownForProject(organizationId: string, projectId: string, options?: EnvironmentScope): Promise<CampaignPaybackBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getCampaignPaybackBreakdownForProjectInOrganization(organizationId, projectId, { environmentId: options?.environmentId });
 }
 
 export async function listCampaignTargetsForProject(organizationId: string, projectId: string): Promise<CampaignTargetModel[]> {
@@ -771,14 +716,14 @@ export async function listCampaignTargetsForProject(organizationId: string, proj
   return listCampaignTargetsForProjectInOrganization(organizationId, projectId);
 }
 
-export async function getPaybackOverviewForProject(organizationId: string, projectId: string): Promise<PaybackOverviewOutcome> {
+export async function getPaybackOverviewForProject(organizationId: string, projectId: string, options?: EnvironmentScope): Promise<PaybackOverviewOutcome> {
   await ensureFirestoreOrm();
-  return getPaybackOverviewForProjectInOrganization(organizationId, projectId);
+  return getPaybackOverviewForProjectInOrganization(organizationId, projectId, { environmentId: options?.environmentId });
 }
 
-export async function getQualityCalibrationBreakdownForProject(organizationId: string, projectId: string): Promise<QualityCalibrationBreakdownOutcome> {
+export async function getQualityCalibrationBreakdownForProject(organizationId: string, projectId: string, options?: EnvironmentScope): Promise<QualityCalibrationBreakdownOutcome> {
   await ensureFirestoreOrm();
-  return getQualityCalibrationBreakdownForProjectInOrganization(organizationId, projectId);
+  return getQualityCalibrationBreakdownForProjectInOrganization(organizationId, projectId, { environmentId: options?.environmentId });
 }
 
 export async function getExperimentResultsForProject(organizationId: string, projectId: string): Promise<ExperimentResultsOutcome> {
@@ -786,9 +731,10 @@ export async function getExperimentResultsForProject(organizationId: string, pro
   return getExperimentResultsForProjectInOrganization(organizationId, projectId);
 }
 
-export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
+/** `environmentId` narrows the history to one environment's alerts (KAN-196); omitted, every environment's are returned. */
+export async function listTrackingAlertsForProject(organizationId: string, projectId: string, options?: EnvironmentScope): Promise<TrackingAlertModel[]> {
   await ensureFirestoreOrm();
-  return listTrackingAlertsForProjectInOrganization(organizationId, projectId);
+  return listTrackingAlertsForProjectInOrganization(organizationId, projectId, undefined, options?.environmentId);
 }
 
 export async function getActiveAutomationGuardrailPolicy(organizationId: string, projectId: string): Promise<AutomationGuardrailPolicyConfig> {
@@ -890,6 +836,12 @@ export async function listMetricsCatalogForProject(organizationId: string, proje
   return listMetricsCatalogForProjectInOrganization(organizationId, projectId);
 }
 
+/** Every active metric's display unit (KAN-213), resolved against the project currency — what board tiles and goal cards format values with. */
+export async function resolveMetricDisplayUnits(organizationId: string, projectId: string): Promise<Record<string, ParsedMetricUnit>> {
+  await ensureFirestoreOrm();
+  return resolveMetricDisplayUnitsInOrganization(organizationId, projectId);
+}
+
 /** One tile's queried data (or a typed, renderable "why not" outcome — see `BoardTileQueryOutcome`'s own doc comment) for board render time. */
 export async function queryBoardTile(
   organizationId: string,
@@ -912,9 +864,17 @@ export async function queryBoardTiles(
   organizationId: string,
   projectId: string,
   board: Pick<BoardModel, 'date_range' | 'compare' | 'global_filters' | 'tiles'>,
+  /** `today` (UTC `YYYY-MM-DD`) pins what a relative board range resolves against — the board page passes the same value it shows in the settings form. */
+  options?: EnvironmentScope & { today?: string },
 ): Promise<BoardTileQueryOutcome[]> {
   await ensureFirestoreOrm();
-  return queryBoardTilesInOrganization({ organizationId, projectId, board });
+  return queryBoardTilesInOrganization({
+    organizationId,
+    projectId,
+    board,
+    ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
+    ...(options?.today !== undefined ? { today: options.today } : {}),
+  });
 }
 
 /** How far back the campaign detail page's spend panel looks — 28 days, the same window ad platforms themselves default to. */
@@ -937,6 +897,7 @@ export async function queryCampaignSpend(
   organizationId: string,
   projectId: string,
   campaignResourceName: string,
+  options?: EnvironmentScope,
 ): Promise<CampaignSpendOutcome> {
   await ensureFirestoreOrm();
   const end = new Date();
@@ -946,6 +907,7 @@ export async function queryCampaignSpend(
     const result = await queryMetricsInOrganization({
       organizationId,
       projectId,
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
       request: {
         metrics: ['ad_spend'],
         filters: [{ field: 'campaign_id', operator: '=', value: campaignResourceName }],
@@ -1065,7 +1027,7 @@ export async function searchProjectCustomers(
   organizationId: string,
   projectId: string,
   query: string,
-  options?: { schemaName?: string; limit?: number },
+  options?: { schemaName?: string; limit?: number; environmentId?: string },
 ): Promise<CustomerSearchOutcome> {
   await ensureFirestoreOrm();
   return searchProjectCustomersForAdminInOrganization({ organizationId, projectId, query, ...options });
@@ -1079,7 +1041,7 @@ export async function searchProjectCustomers(
 export async function queryCohortRetention(
   organizationId: string,
   projectId: string,
-  options?: { cohortMonth?: string; conversionEvent?: string; limit?: number },
+  options?: { cohortMonth?: string; conversionEvent?: string; limit?: number; environmentId?: string },
 ): Promise<CohortRetentionOutcome> {
   await ensureFirestoreOrm();
   return queryProjectCohortRetentionForAdminInOrganization({ organizationId, projectId, ...options });
@@ -1095,9 +1057,10 @@ export async function queryGoalProgress(
   organizationId: string,
   projectId: string,
   goal: GoalModel,
+  options?: EnvironmentScope,
 ): Promise<GoalProgressOutcome> {
   await ensureFirestoreOrm();
-  return queryGoalProgressInOrganization({ organizationId, projectId, goal });
+  return queryGoalProgressInOrganization({ organizationId, projectId, goal, ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}) });
 }
 
 /**
@@ -1115,12 +1078,16 @@ export async function queryProjectFunnelSteps(
 }
 
 /**
- * Recent noteworthy findings for a project (active tracking-broke alerts + fired win-rule events,
- * newest first) — the `list_insights` MCP tool's web admin counterpart, for the Insights page.
+ * Recent noteworthy findings for a project (active tracking-broke alerts, metrics that can no
+ * longer be queried as defined, and fired win-rule events, newest first) — the `list_insights` MCP
+ * tool's web admin counterpart, for the Insights page.
+ *
+ * `limit` is forwarded so the page can over-fetch by one and report truncation it has measured
+ * rather than inferred — see `splitOverFetchedFeed`. Omitted, the service applies its own default.
  */
-export async function listProjectInsights(organizationId: string, projectId: string): Promise<ProjectInsight[]> {
+export async function listProjectInsights(organizationId: string, projectId: string, limit?: number, options?: EnvironmentScope): Promise<ProjectInsight[]> {
   await ensureFirestoreOrm();
-  return listProjectInsightsInOrganization({ organizationId, projectId });
+  return listProjectInsightsInOrganization({ organizationId, projectId, limit, ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}) });
 }
 
 export async function listWinRulesForProject(organizationId: string, projectId: string): Promise<WinRuleModel[]> {
@@ -1128,21 +1095,21 @@ export async function listWinRulesForProject(organizationId: string, projectId: 
   return listWinRulesForProjectInOrganization(organizationId, projectId);
 }
 
-export async function listRecentWinEventsForProject(organizationId: string, projectId: string): Promise<WinEventModel[]> {
+export async function listRecentWinEventsForProject(organizationId: string, projectId: string, limit?: number, options?: EnvironmentScope): Promise<WinEventModel[]> {
   await ensureFirestoreOrm();
-  return listRecentWinEventsForProjectInOrganization(organizationId, projectId);
+  return listRecentWinEventsForProjectInOrganization(organizationId, projectId, limit, options?.environmentId);
 }
 
-/** The live win feed's incremental-poll building block — see `feed/route.ts`'s own doc comment. */
-export async function listWinEventsSince(organizationId: string, projectId: string, sinceIso: string): Promise<WinEventModel[]> {
+/** The live win feed's incremental-poll building block — see `feed/route.ts`'s own doc comment. `environmentId` omitted, the project's `prod` wins. */
+export async function listWinEventsSince(organizationId: string, projectId: string, sinceIso: string, options?: EnvironmentScope): Promise<WinEventModel[]> {
   await ensureFirestoreOrm();
-  return listWinEventsSinceInOrganization(organizationId, projectId, sinceIso);
+  return listWinEventsSinceInOrganization(organizationId, projectId, sinceIso, undefined, options?.environmentId);
 }
 
 /** KAN-66's trial-pipeline war-room widget query — see `getTrialPipelineSummary`'s own doc comment (`trial-pipeline.service.ts`) for its degrade-to-outcome shape. */
-export async function getTrialPipelineSummary(organizationId: string, projectId: string): Promise<TrialPipelineOutcome> {
+export async function getTrialPipelineSummary(organizationId: string, projectId: string, options?: EnvironmentScope): Promise<TrialPipelineOutcome> {
   await ensureFirestoreOrm();
-  return getTrialPipelineSummaryInOrganization({ organizationId, projectId });
+  return getTrialPipelineSummaryInOrganization({ organizationId, projectId, ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}) });
 }
 
 /** Every currently-active `event` schema name in a project — the win-rule create form's schema picker. */
@@ -1274,34 +1241,16 @@ export async function getInviteDetails(organizationId: string, membershipId: str
   };
 }
 
-/**
- * Lists bounded landed raw event records for a project from Firestore.
- * Used for dynamic funnel and telemetry aggregation when BigQuery is unconfigured.
- */
-export async function listRawRecordEventsForProject(
+/** The environment's backfill endpoint (never its secret) and its most recent backfills, for the Backfill panel. */
+export async function getProjectBackfillOverview(
   organizationId: string,
   projectId: string,
-  limit = 500,
-): Promise<RawRecordModel[]> {
+  environmentId: string,
+): Promise<{ endpoint: { url: string; schemas: { kind: string; name: string }[] } | null; backfills: BackfillStatusView[] }> {
   await ensureFirestoreOrm();
-  try {
-    return await RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
-      .where('kind', '==', 'event')
-      .limit(limit)
-      .get();
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Public queryMetrics wrapper executing analytical metrics queries against the warehouse compiler.
- */
-export async function queryMetrics(
-  organizationId: string,
-  projectId: string,
-  request: Parameters<typeof queryMetricsInOrganization>[0]['request'],
-) {
-  await ensureFirestoreOrm();
-  return queryMetricsInOrganization({ organizationId, projectId, request });
+  const [endpoint, backfills] = await Promise.all([
+    getBackfillEndpointInOrganization(organizationId, projectId, environmentId),
+    listBackfillsInOrganization(organizationId, projectId, environmentId),
+  ]);
+  return { endpoint: endpoint ? { url: endpoint.url, schemas: endpoint.schemas } : null, backfills };
 }

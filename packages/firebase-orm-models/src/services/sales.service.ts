@@ -146,6 +146,29 @@ export interface DemoFunnelResult {
   showRate: number | null;
   /** Sorted highest-`demosHeld`-first. Only reps with at least one `held`/`no_show` outcome appear. */
   rows: DemoFunnelRepRow[];
+  /**
+   * The record cap this funnel was computed under, when more landed
+   * `demo_event` records exist than were read — `null` when the read saw all
+   * of them.
+   *
+   * Every number above is derived from a bounded read of the most recent raw
+   * events, and the field comments say so honestly ("every distinct `demo_id`
+   * this read saw"). What was missing is any way for a *renderer* to know it,
+   * so the page showed them as the project's totals (KAN-164).
+   *
+   * `showRate` is the one that matters most. The window is the most recent N
+   * *events*, not demos, and one demo emits `scheduled` and then
+   * `held`/`no_show` days later — so the window cuts across demo lifecycles at
+   * both ends. Past the cap the ratio stops being the project's show rate and
+   * becomes the show rate of an arbitrary recency slice of events, which is
+   * not a quantity anyone asked for.
+   *
+   * Measured by over-fetching one record rather than inferred from
+   * `length === cap`: that comparison cannot tell "exactly N exist" from "tens
+   * of thousands exist", and those say very different things about the number
+   * printed beside them.
+   */
+  sampledFrom: number | null;
 }
 
 function computeShowRate(held: number, noShow: number): number | null {
@@ -166,7 +189,7 @@ function computeShowRate(held: number, noShow: number): number | null {
  * number" posture `SUPPORT_TICKET_SCHEMA_FIELDS`'s own `opened`/`resolved`
  * split establishes for its own unused-by-a-given-metric stage.
  */
-export function aggregateDemoFunnel(records: readonly RawRecordModel[]): DemoFunnelResult {
+export function aggregateDemoFunnel(records: readonly RawRecordModel[], sampledFrom: number | null = null): DemoFunnelResult {
   const parsed = records.map(parseDemoEvent).filter((event): event is ParsedDemoEvent => event !== null);
 
   const scheduledDemoIds = new Set<string>();
@@ -214,8 +237,22 @@ export function aggregateDemoFunnel(records: readonly RawRecordModel[]): DemoFun
     demosNoShow: noShowDemoIds.size,
     showRate: computeShowRate(heldDemoIds.size, noShowDemoIds.size),
     rows,
+    sampledFrom,
   };
 }
+
+/**
+ * Options for {@link getDemoFunnelForProject}.
+ *
+ * A caller supplying its own records must also state whether those records
+ * were capped, because only it knows. Expressed as a union rather than an
+ * optional field so the answer cannot be omitted: defaulting it to "complete"
+ * would quietly assert the thing this whole change exists to stop asserting
+ * (KAN-164).
+ */
+export type GetDemoFunnelOptions =
+  | { limit?: number; precomputedRecords?: undefined; sampledFrom?: undefined }
+  | { precomputedRecords: RawRecordModel[]; sampledFrom: number | null; limit?: undefined };
 
 /**
  * Fetches a project's bounded, landed `demo_event` raw records and
@@ -228,9 +265,19 @@ export function aggregateDemoFunnel(records: readonly RawRecordModel[]): DemoFun
 export async function getDemoFunnelForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetDemoFunnelOptions,
 ): Promise<DemoFunnelResult> {
   await requireProjectInOrg(organizationId, projectId);
-  const records = options?.precomputedRecords ?? (await listDemoEventRecordsForProject(organizationId, projectId, options?.limit));
-  return aggregateDemoFunnel(records);
+
+  if (options && 'precomputedRecords' in options && options.precomputedRecords !== undefined) {
+    return aggregateDemoFunnel(options.precomputedRecords, options.sampledFrom);
+  }
+
+  // One record past the cap, then dropped: that extra row is evidence the cap
+  // was hit, never an entry. `records.length === limit` would say the same
+  // thing for a project with exactly `limit` events — which is complete — and
+  // for one with fifty thousand, which is a sample (KAN-164).
+  const limit = options?.limit ?? DEFAULT_DEMO_FUNNEL_RECORD_LIMIT;
+  const fetched = await listDemoEventRecordsForProject(organizationId, projectId, limit + 1);
+  return aggregateDemoFunnel(fetched.slice(0, limit), fetched.length > limit ? limit : null);
 }

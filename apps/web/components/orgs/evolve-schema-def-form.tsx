@@ -3,8 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { PpButton } from '@/components/pastel/primitives';
-import { GitBranch, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { SchemaFieldsEditor, type SchemaFieldRow } from './schema-fields-editor';
 
 export interface EvolveSchemaDefFormProps {
@@ -13,11 +12,11 @@ export interface EvolveSchemaDefFormProps {
   kind: string;
   name: string;
   initialFields: SchemaFieldRow[];
-  /** Called both on cancel and after a successful evolve. */
+  /** Called both on cancel and after a successful evolve — in both cases the parent hides this form the same way (see the `router.refresh()` comment below for why success needs it too). */
   onClose: () => void;
 }
 
-/** Registers the next version of an already-registered schema. */
+/** Registers the next version of an already-registered schema, prefilled from its latest version's fields (KAN-31 AC: "evolve to v2 -> both queryable; breaking change rejected"). */
 export function EvolveSchemaDefForm({
   orgId,
   projectId,
@@ -51,6 +50,11 @@ export function EvolveSchemaDefForm({
         );
         return;
       }
+      // `router.refresh()` alone doesn't unmount this component (same key,
+      // same position in the parent's list), so its local `fields` state
+      // would otherwise keep showing the version just superseded instead of
+      // the new active one — closing it forces a fresh prefill next time
+      // "Evolve" is opened.
       router.refresh();
       onClose();
     } finally {
@@ -59,21 +63,21 @@ export function EvolveSchemaDefForm({
   }
 
   return (
-    <form className="flex flex-col gap-4 rounded-2xl bg-pp-surface-container-low/50 p-4 border border-pp-outline-variant/30 mt-3" onSubmit={handleSubmit} noValidate>
-      <h3 className="font-pp-display text-pp-headline-md text-pp-on-surface">{t('evolveHeading', { kind, name })}</h3>
+    <form className="flex flex-col gap-4 rounded-md border border-input p-4" onSubmit={handleSubmit} noValidate>
+      <h3 className="text-sm font-semibold">{t('evolveHeading', { kind, name })}</h3>
       <SchemaFieldsEditor fields={fields} onChange={setFields} />
       {error ? (
-        <p role="alert" className="text-sm font-medium text-pp-error">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
-      <div className="flex items-center gap-3">
-        <PpButton type="submit" variant="primary" size="sm" icon={GitBranch} disabled={submitting || fields.length === 0}>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={submitting || fields.length === 0}>
           {t('evolveSubmit')}
-        </PpButton>
-        <PpButton type="button" variant="ghost" size="sm" icon={X} onClick={onClose}>
+        </Button>
+        <Button type="button" variant="outline" onClick={onClose}>
           {t('cancel')}
-        </PpButton>
+        </Button>
       </div>
     </form>
   );

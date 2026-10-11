@@ -54,8 +54,8 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
   const { bindings } = await resolveOrgSessionContext(session);
 
   const principal = { type: 'user' as const, id: user.id };
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
-  const canSearchCustomers = can(bindings, principal, 'ingest.write', { orgId });
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
+  const canSearchCustomers = can(bindings, principal, 'ingest.write', { orgId, projectId });
   const query = request.nextUrl.searchParams.get('q');
 
   try {
@@ -65,10 +65,10 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     }
 
     const items = await buildOmniSearchIndexForProject(orgId, projectId, {
-      canSearchBoards: canManageBoards || can(bindings, principal, 'dashboards.read', { orgId }),
-      canSearchMetrics: can(bindings, principal, 'metrics.write', { orgId }),
+      canSearchBoards: canManageBoards || can(bindings, principal, 'dashboards.read', { orgId, projectId }),
+      canSearchMetrics: can(bindings, principal, 'metrics.write', { orgId, projectId }),
       canSearchSegments: canManageBoards,
-      canSearchCampaigns: can(bindings, principal, 'automation.execute', { orgId }),
+      canSearchCampaigns: can(bindings, principal, 'automation.execute', { orgId, projectId }),
       canSearchGoals: canManageBoards,
       canSearchWinRules: canManageBoards,
     });

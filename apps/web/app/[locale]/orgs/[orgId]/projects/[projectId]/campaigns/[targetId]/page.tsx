@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { ArrowLeft, BarChart3, History, Sparkles } from 'lucide-react';
 import { can } from '@growthos/shared';
+import { ArrowLeft, CircleDollarSign, GitBranch, History, Image as ImageIcon, Megaphone, Radio, Wallet } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -14,29 +14,23 @@ import {
   listSharedCredentials,
   queryCampaignSpend,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
+  actionStatusLabelKey,
   findCampaignDraftForTarget,
   toAutomationActionView,
   toAutomationConnectionOptions,
   toAutomationTargetView,
 } from '@/lib/orgs/automation-view';
-import {
-  PpButton,
-  PpCard,
-  PpEmptyState,
-  PpKpiCard,
-  PpKpiGrid,
-  PpMobileActionBar,
-  PpPage,
-  PpPageHeader,
-  PpPill,
-} from '@/components/pastel/primitives';
+import { buildCampaignLifecycle, countActionsByStatus, summariseSpendDays } from '@/lib/orgs/campaign-detail-view';
 import { CampaignCreativesPanel, type CampaignDraftView, type ImportedAdView } from '@/components/orgs/campaign-creatives-panel';
 import { CampaignSpendPanel } from '@/components/orgs/campaign-spend-panel';
 import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
 import { PauseCampaignButton } from '@/components/orgs/pause-campaign-button';
 import { RefreshCampaignStateButton } from '@/components/orgs/refresh-campaign-state-button';
 import { AutomationActionList } from '@/components/orgs/automation-action-list';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, EmptyState, FlowDiagram, PageHero, STATUS_TOKENS, type VizStatus } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string; targetId: string }>;
@@ -45,14 +39,31 @@ type PageProps = Readonly<{
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Campaigns' });
+  // Static, not the campaign's own label — same non-enumeration posture as
+  // the board detail page's generateMetadata (see its doc comment).
   return { title: t('metaTitle') };
 }
 
+const LIFECYCLE_EDGES = [
+  { source: 'draft', target: 'activation' },
+  { source: 'activation', target: 'live' },
+  { source: 'sync', target: 'live' },
+  { source: 'live', target: 'spend' },
+] as const;
+
 /**
- * Stitch "Pastel Pulse" campaign detail view (desktop ff4456f8, mobile b6203d37).
+ * One campaign: its last-known live state (the target row — only ever
+ * written by an executor running under an approved action), the actual ads
+ * it carries (derived from its one `campaign_draft_create` action's draft),
+ * manage actions that funnel into the existing propose→approve→execute
+ * queue (activate; pause = rollback of the executed activation — a real,
+ * audited path on every executor), and the full per-target action history
+ * timeline. Gated on `automation.execute` to view; approve/reject controls
+ * inside the timeline additionally gate on `automation.approve`, the same
+ * coarse-view/fine-action split the automation page uses.
  *
- * Shows the target campaign's live telemetry, daily budget pacing, ad spend
- * breakdown, creatives gallery, and audited automation execution ledger.
+ * The lifecycle diagram and KPI row are derived from the same rows: the latest draft and
+ * activation actions, the recorded status, the platform-read timestamp and the measured spend.
  */
 export default async function CampaignDetailPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId, targetId: rawTargetId } = await params;
@@ -67,10 +78,10 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  if (!membership || !can(bindings, principal, 'automation.execute', { orgId })) {
+  if (!membership || !can(bindings, principal, 'automation.execute', { orgId, projectId })) {
     notFound();
   }
-  const canApprove = can(bindings, principal, 'automation.approve', { orgId });
+  const canApprove = can(bindings, principal, 'automation.approve', { orgId, projectId });
 
   const [projects, targets, targetActions, attachments, credentials] = await Promise.all([
     listOrgProjects(orgId),
@@ -80,15 +91,9 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
     listSharedCredentials(orgId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
-  if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/campaigns`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
-  }
   const targetModel = targets.find((candidate) => candidate.id === targetId);
-  if (!targetModel) {
-    redirect(`/${locale}/orgs/${orgId}/projects/${projectId}/campaigns`);
+  if (!project || !targetModel) {
+    notFound();
   }
 
   const target = toAutomationTargetView(targetModel);
@@ -101,8 +106,11 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
   const executedActivation = targetActions.find(
     (action) => action.action_type === 'campaign_activation' && action.status === 'executed',
   );
-
-  const spendOutcome = await queryCampaignSpend(orgId, projectId, target.campaignResourceName ?? target.id);
+  // Same `campaign_resource_name ?? id` fallback the executors apply for a target seeded to
+  // represent a pre-existing campaign — the spend rows' `campaign_id` dimension carries the
+  // platform's own campaign id either way.
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const spendOutcome = await queryCampaignSpend(orgId, projectId, target.campaignResourceName ?? target.id, { environmentId: selectedEnvironment?.id });
   const spendView = spendOutcome.ok
     ? {
         ok: true as const,
@@ -113,181 +121,149 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
         })),
       }
     : spendOutcome;
+  const spendSummary = spendView.ok ? summariseSpendDays(spendView.days) : null;
 
   const t = await getTranslations('Campaigns');
+  const tAutomation = await getTranslations('Automation');
+  const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  const formatAt = (iso: string | undefined): string | undefined => {
+    if (!iso) return undefined;
+    const parsed = new Date(iso);
+    return Number.isNaN(parsed.getTime()) ? iso : dateTime.format(parsed);
+  };
+  const money = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+  const dayFormat = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' });
+  const formatDay = (iso: string): string => {
+    const parsed = new Date(iso);
+    return Number.isNaN(parsed.getTime()) ? iso : dayFormat.format(parsed);
+  };
 
-  const statusAccent =
-    target.campaignStatus === 'enabled'
-      ? 'mint'
-      : target.campaignStatus === 'paused'
-        ? 'amber'
-        : 'neutral';
-
-  const platformDisplay = target.externalPlatform
+  const platformName = target.externalPlatform
     ? t(`platform.${target.externalPlatform}`)
     : connection?.provider
       ? t(`platform.${connection.provider}`)
       : t('platform.simulated');
+  const statusName = target.campaignStatus ? t(`status.${target.campaignStatus}`) : t('status.none');
+  const statusTone: VizStatus = target.campaignStatus === 'enabled' ? 'ok' : target.campaignStatus === 'paused' ? 'warn' : target.campaignStatus === 'removed' ? 'error' : 'idle';
 
-  const actionControls = (
-    <>
-      <PpButton variant="secondary" size="sm" asChild>
-        <Link href={`/orgs/${orgId}/projects/${projectId}/campaigns`} className="inline-flex items-center gap-1.5">
-          <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden />
-          <span>{t('backToCampaigns')}</span>
-        </Link>
-      </PpButton>
-      {target.campaignResourceName && target.campaignStatus === 'paused' ? (
-        <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
-      ) : null}
-      {target.campaignStatus === 'enabled' && executedActivation ? (
-        <PauseCampaignButton orgId={orgId} projectId={projectId} activationActionId={executedActivation.id} />
-      ) : null}
-      <RefreshCampaignStateButton orgId={orgId} projectId={projectId} targetId={target.id} />
-    </>
-  );
+  const lifecycle = buildCampaignLifecycle({
+    actions: targetActions.map((action) => ({ actionType: action.action_type, status: action.status, proposedAt: action.proposed_at })),
+    campaignStatus: target.campaignStatus,
+    lastReadStateAt: target.lastReadStateAt,
+    spend: spendView.ok ? { days: spendView.days.length, totalUsd: spendView.totalSpendUsd } : null,
+  });
+  const flowNodes = lifecycle.map((node) => ({
+    id: node.stage,
+    label: t(`lifecycle.${node.stage}.title`),
+    value: node.stage === 'spend' && spendSummary && spendSummary.totalUsd > 0 ? money.format(spendSummary.totalUsd) : undefined,
+    sublabel: node.at ? `${t(node.stateKey)} · ${formatDay(node.at)}` : t(node.stateKey),
+    status: node.status,
+  }));
+  const flowEdges = LIFECYCLE_EDGES.map((edge) => {
+    const source = lifecycle.find((node) => node.stage === edge.source);
+    const reached = source?.status === 'ok';
+    return { ...edge, status: reached ? ('ok' as const) : ('idle' as const), animated: reached && edge.target === 'spend' };
+  });
+  const statusCounts = countActionsByStatus(actionViews);
+  const lastActionAt = [...actionViews].sort((a, b) => b.proposedAt.localeCompare(a.proposedAt))[0]?.proposedAt;
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow={t('targetBreadcrumb', { id: target.id.slice(0, 8) })}
-        meta={target.updatedAt ? t('lastKnownStateAt', { at: target.updatedAt }) : undefined}
-        title={
-          <div className="flex flex-wrap items-center gap-3">
-            <span>{target.label}</span>
-            {target.campaignStatus ? (
-              <PpPill accent={statusAccent} dot>
-                {t(`status.${target.campaignStatus}`)}
-              </PpPill>
-            ) : null}
-          </div>
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero
+        icon={Megaphone}
+        eyebrow={platformName}
+        title={target.label}
+        description={target.lastReadStateAt ? t('lastPlatformReadAt', { at: formatAt(target.lastReadStateAt) ?? '' }) : t('stateSourceNote')}
+        actions={
+          <Link
+            className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+            href={`/orgs/${orgId}/projects/${projectId}/campaigns`}
+          >
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+            {t('backToCampaigns')}
+          </Link>
         }
-        description={
-          target.campaignResourceName ? (
-            <span className="font-mono text-xs text-pp-outline" dir="ltr">
+      >
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            title={t('statusLabel')}
+            value={statusName}
+            icon={Radio}
+            badge={<span className={`h-2.5 w-2.5 rounded-full ${STATUS_TOKENS[statusTone].dot}`} aria-hidden="true" />}
+            subtext={target.updatedAt ? t('lastKnownStateAt', { at: formatAt(target.updatedAt) ?? '' }) : undefined}
+          />
+          <StatCard title={t('budgetLabel')} value={t('dailyBudget', { amount: target.dailyBudgetUsd })} icon={Wallet} subtext={connection ? `${t('connectionLabel')}: ${connection.label}` : undefined} />
+          <StatCard
+            title={t('spendHeading')}
+            value={spendView.ok && spendSummary ? money.format(spendView.totalSpendUsd) : t('noData')}
+            icon={CircleDollarSign}
+            trendData={spendView.ok ? spendView.days.map((day) => day.spendUsd) : undefined}
+            subtext={spendSummary ? t('spendActiveDays', { count: spendSummary.activeDays }) : undefined}
+          />
+          <StatCard
+            title={t('kpiActionsTaken')}
+            value={new Intl.NumberFormat(locale).format(actionViews.length)}
+            icon={History}
+            subtext={lastActionAt ? t('lastActionAt', { at: formatAt(lastActionAt) ?? '' }) : undefined}
+          />
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+          {target.importedObjective ? (
+            <span>
+              {t('objectiveLabel')}
+              {': '}
+              <span className="font-medium text-foreground" dir="ltr">
+                {target.importedObjective}
+              </span>
+            </span>
+          ) : null}
+          {target.campaignResourceName ? (
+            <span className="font-mono" dir="ltr">
               {target.campaignResourceName}
             </span>
-          ) : undefined
-        }
-        actions={actionControls}
-      />
+          ) : null}
+        </div>
+        <div className="mt-4 flex flex-wrap items-start gap-2">
+          {target.campaignResourceName && target.campaignStatus === 'paused' ? (
+            <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
+          ) : null}
+          {target.campaignStatus === 'enabled' && executedActivation ? (
+            <PauseCampaignButton orgId={orgId} projectId={projectId} activationActionId={executedActivation.id} />
+          ) : null}
+          <RefreshCampaignStateButton orgId={orgId} projectId={projectId} targetId={target.id} />
+        </div>
+      </PageHero>
 
-      {/* KPI Overview Grid */}
-      <PpKpiGrid>
-        <PpKpiCard
-          label={t('statusLabel')}
-          value={target.campaignStatus ? t(`status.${target.campaignStatus}`) : t('status.none')}
-          accent={statusAccent}
-          badge={platformDisplay}
-          badgeAccent="primary"
-          footer={target.importedObjective ? `${t('objectiveLabel')}: ${target.importedObjective}` : undefined}
-        />
-        <PpKpiCard
-          label={t('budgetLabel')}
-          value={target.dailyBudgetUsd ? `$${target.dailyBudgetUsd.toLocaleString(locale)}` : '—'}
-          valueSuffix={target.dailyBudgetUsd ? t('perDaySuffix') : undefined}
-          accent="amber"
-          badge={t('budgetLabel')}
-          badgeAccent="amber"
-          footer={t('budgetPacingNote')}
-        />
-        <PpKpiCard
-          label={t('spendTotalLabel')}
-          value={
-            spendView.ok
-              ? `$${spendView.totalSpendUsd.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              : '—'
-          }
-          accent="primary"
-          badge={spendView.ok && spendView.days.length > 0 ? `${spendView.days.length}d` : undefined}
-          badgeAccent="primary"
-          footer={spendView.ok ? t('spendChartLabel') : t(`spendDegraded.${spendView.reason}` as const)}
-        />
-        <PpKpiCard
-          label={t('connectionLabel')}
-          value={connection ? connection.label : platformDisplay}
-          accent="sky"
-          badge={connection ? connection.provider : undefined}
-          badgeAccent="sky"
-          footer={
-            target.lastReadStateAt
-              ? t('lastPlatformReadAt', { at: target.lastReadStateAt })
-              : t('stateSourceNote')
-          }
-        />
-      </PpKpiGrid>
+      <ChartCard title={t('lifecycleTitle')} description={t('lifecycleDescription')} icon={GitBranch}>
+        <FlowDiagram label={t('lifecycleTitle')} nodes={flowNodes} edges={flowEdges} height={260} />
+      </ChartCard>
 
-      {/* Main 2-Column Section */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-        {/* Left Column: Creatives & Spend */}
-        <section className="flex flex-col gap-6 lg:col-span-7">
-          <PpCard
-            title={t('creativesHeading')}
-            subtitle={t('creativesSubtitle')}
-            icon={Sparkles}
-            iconAccent="mint"
-            action={
-              target.importedAds && target.importedAds.length > 0 ? (
-                <PpPill accent="mint">{target.importedAds.length}</PpPill>
-              ) : undefined
-            }
-          >
-            <CampaignCreativesPanel draft={draft} importedAds={target.importedAds as ImportedAdView[] | undefined} />
-          </PpCard>
-
-          <PpCard
-            title={t('spendHeading')}
-            subtitle={t('spendSubtitle')}
-            icon={BarChart3}
-            iconAccent="primary"
-          >
-            <CampaignSpendPanel spend={spendView} />
-          </PpCard>
-        </section>
-
-        {/* Right Column: Automation Audit Ledger */}
-        <section className="flex flex-col gap-6 lg:col-span-5">
-          <PpCard
-            title={t('historyHeading')}
-            subtitle={t('historySubtitle')}
-            icon={History}
-            iconAccent="amber"
-            action={<PpPill accent="neutral">{t('soc2Badge')}</PpPill>}
-          >
-            {actionViews.length === 0 ? (
-              <PpEmptyState icon={History} title={t('noHistory')} />
-            ) : (
-              <AutomationActionList
-                orgId={orgId}
-                projectId={projectId}
-                actions={actionViews}
-                canApprove={canApprove}
-              />
-            )}
-          </PpCard>
-        </section>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('spendHeading')} description={t('spendDescription')} icon={CircleDollarSign} className="lg:col-span-3" fill>
+          <CampaignSpendPanel spend={spendView} />
+        </ChartCard>
+        <ChartCard title={t('creativesHeading')} icon={ImageIcon} className="lg:col-span-2" fill>
+          <CampaignCreativesPanel draft={draft} importedAds={target.importedAds as ImportedAdView[] | undefined} />
+        </ChartCard>
       </div>
 
-      {/* Mobile Sticky Action Bar */}
-      <PpMobileActionBar>
-        <div className="flex w-full items-center justify-between gap-2">
-          <PpButton variant="ghost" size="sm" asChild className="shrink-0">
-            <Link href={`/orgs/${orgId}/projects/${projectId}/campaigns`} className="inline-flex items-center gap-1">
-              <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden />
-              <span>{t('backToCampaigns')}</span>
-            </Link>
-          </PpButton>
-          <div className="flex items-center gap-2">
-            {target.campaignResourceName && target.campaignStatus === 'paused' ? (
-              <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
-            ) : null}
-            {target.campaignStatus === 'enabled' && executedActivation ? (
-              <PauseCampaignButton orgId={orgId} projectId={projectId} activationActionId={executedActivation.id} />
-            ) : null}
-            <RefreshCampaignStateButton orgId={orgId} projectId={projectId} targetId={target.id} />
+      <ChartCard title={t('historyHeading')} description={t('historyDescription')} icon={History}>
+        {actionViews.length === 0 ? (
+          <EmptyState compact icon={History} title={t('noHistory')} />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <ul className="flex flex-wrap gap-2" aria-label={t('historyStatusSummary')}>
+              {statusCounts.map(({ status, count }) => (
+                <li key={status} className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground">
+                  <span>{tAutomation(actionStatusLabelKey(status))}</span>
+                  <span className="rounded-full bg-primary/10 px-1.5 text-primary tabular-nums">{count}</span>
+                </li>
+              ))}
+            </ul>
+            <AutomationActionList orgId={orgId} projectId={projectId} actions={actionViews} canApprove={canApprove} />
           </div>
-        </div>
-      </PpMobileActionBar>
-    </PpPage>
+        )}
+      </ChartCard>
+    </div>
   );
 }

@@ -24,5 +24,5 @@ type: metric_pack
 display_name: Campaign Ops
 scopes: [metrics:write, schema:write]
 registers:
-  metrics: [collection_7d, collection_14d, collection_30d, collection_40d, roi_7d, roi_14d, roi_30d, roi_40d, quality_calibration_signups, quality_calibration_paying_signups, quality_calibration_collected_revenue_40d, quality_calibration_paying_rate, quality_calibration_avg_collected_revenue_40d]
+  metrics: [collection_7d, collection_14d, collection_30d, collection_40d, roi_7d, roi_14d, roi_30d, roi_40d, quality_calibration_signups, quality_calibration_paying_signups, quality_calibration_collected_revenue_40d, quality_calibration_matured_signups_40d, quality_calibration_matured_revenue_40d, quality_calibration_paying_rate, quality_calibration_avg_collected_revenue_40d]
 `.trim();

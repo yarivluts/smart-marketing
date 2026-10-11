@@ -38,15 +38,40 @@ export interface ClusterCancellationReasonCommentsOptions {
  * Groups free-text cancellation comments into a small set of named themes,
  * most common first — the churn-reason counterpart of `clusterFeedbackThemes`.
  * Comments that don't match any theme's keyword lexicon are dropped from the
- * digest (not forced into a catch-all bucket), same reasoning as that
- * function's own doc comment. `comments` should already be scoped to
+ * clusters (not forced into a catch-all bucket), same reasoning as that
+ * function's own doc comment — but they ARE counted, as
+ * `uncategorizedComments`, because a digest that silently omits most of its
+ * input reads as a summary of all of it. `comments` should already be scoped to
  * whatever window/reason-code slice the caller wants clustered — this
  * function itself has no notion of time or structured reason code.
  */
+/**
+ * The digest plus how much of the input it actually accounts for.
+ *
+ * Coverage is reported because the themes alone cannot be read honestly without
+ * it. The lexicon below is a fixed list of ENGLISH keywords, so a comment in
+ * another language, or one phrased outside the list, matches nothing and is
+ * dropped. Returning only the clusters left a reader unable to tell "pricing, 12
+ * comments" meaning 12 of 15 from the same sentence meaning 12 of 300 — and the
+ * second is not a finding about pricing, it is a finding about the lexicon.
+ *
+ * It also separates two states a caller was previously forced to conflate: no
+ * comments landed at all, and comments landed but none could be categorised.
+ */
+export interface CancellationReasonThemeDigest {
+  clusters: CancellationReasonThemeCluster[];
+  /** Comments handed to the clusterer. */
+  totalComments: number;
+  /** Comments assigned to a theme. */
+  matchedComments: number;
+  /** Comments no theme's keywords matched. These are dropped from the clusters, never bucketed into a catch-all. */
+  uncategorizedComments: number;
+}
+
 export function clusterCancellationReasonComments(
   comments: readonly string[],
   options?: ClusterCancellationReasonCommentsOptions,
-): CancellationReasonThemeCluster[] {
+): CancellationReasonThemeDigest {
   const maxExamples = options?.maxExamplesPerTheme ?? 3;
   const commentsByTheme = new Map<string, string[]>();
 
@@ -67,13 +92,21 @@ export function clusterCancellationReasonComments(
     commentsByTheme.set(bestTheme, existing);
   }
 
-  return Array.from(commentsByTheme.entries())
+  const clusters = Array.from(commentsByTheme.entries())
     .map(([theme, matchedComments]) => ({
       theme,
       commentCount: matchedComments.length,
       exampleComments: matchedComments.slice(0, maxExamples),
     }))
     .sort((a, b) => b.commentCount - a.commentCount || a.theme.localeCompare(b.theme));
+
+  const matchedComments = clusters.reduce((total, cluster) => total + cluster.commentCount, 0);
+  return {
+    clusters,
+    totalComments: comments.length,
+    matchedComments,
+    uncategorizedComments: comments.length - matchedComments,
+  };
 }
 
 /**

@@ -33,10 +33,10 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     const orgId = await createOrganization(page, 'Keys E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
-    await page.getByLabel(/Project (name|or Website Name)/i).fill('Client Alpha');
+    await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/(setup-checklist|onboarding)$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
@@ -46,7 +46,9 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
 
     await page.getByLabel('Name').fill('CI key');
     await page.getByLabel('Environment').selectOption({ label: 'Prod' });
-    await page.getByRole('checkbox', { name: 'ingest.write' }).check();
+    // A browser (publishable) key: the kind that goes into a website, so the snippet comes with it.
+    await page.getByRole('radio', { name: /Browser key/ }).check();
+    await page.getByLabel('Allowed domains (one per line)').fill('https://www.example.com');
     await page.getByRole('button', { name: 'Create key' }).click();
 
     await expect(page.getByText("Copy this key now — it won't be shown again.")).toBeVisible();
@@ -55,16 +57,18 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     // scoped to `MintedApiKeyDisplay`'s own element, not any `<code>` block.
     const rawKeyLocator = page.getByTestId('minted-api-key-value');
     const rawKey = await rawKeyLocator.innerText();
-    expect(rawKey).toMatch(/^gos_live_/);
+    expect(rawKey).toMatch(/^gos_pk_live_/);
 
-    // KAN-57: minting a key with `ingest.write` also surfaces the touchpoint-capture
-    // embed snippet, since the raw key it needs is only ever available right here.
+    // KAN-57: minting a browser key also surfaces the touchpoint-capture embed snippet, since the
+    // raw key it needs is only ever available right here (a server key never gets one).
     await expect(page.getByText('Website tracking snippet')).toBeVisible();
     await expect(page.locator('pre code')).toContainText(rawKey);
     await page.getByRole('button', { name: 'Copy snippet' }).click();
     const snippetClipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(snippetClipboardText).toContain(rawKey);
-    expect(snippetClipboardText).toContain('window.growthos');
+    // The @growthos/browser loader: queues calls, loads the SDK served by this app, then inits.
+    expect(snippetClipboardText).toContain('/sdk/v1/growthos.js');
+    expect(snippetClipboardText).toContain(`GrowthOS.init({"key":"${rawKey}"`);
 
     // Scoped to `MintedApiKeyDisplay`'s own container: the touchpoint snippet's
     // copy button above was just clicked too, so an unscoped 'Copied' lookup

@@ -1,9 +1,15 @@
 import { PipelineMessageModel } from '../models/pipeline-message.model';
 import { ProjectModel } from '../models/project.model';
 import { RawRecordModel } from '../models/raw-record.model';
+import { IngestBatchModel } from '../models/ingest-batch.model';
+import { QuarantinedRecordModel } from '../models/quarantined-record.model';
+import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
+import { WinEventModel } from '../models/win-event.model';
+import { TrackingAlertModel } from '../models/tracking-alert.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
-import { defaultWarehouseSink, type WarehouseSink } from '../pipeline/sink';
+import { defaultWarehouseSink, resolveBigQueryRawRecordSinkFromEnv, type WarehouseSink } from '../pipeline/sink';
+import { WarehouseNotConfiguredError } from '../warehouse/query-executor';
 import {
   STRIPE_CHARGE_EVENT_NAME,
   STRIPE_FAILED_PAYMENT_EVENT_NAME,
@@ -12,6 +18,7 @@ import {
 } from '../plugin-runtime/stripe/schemas';
 import { recordAuditLogEntry } from './audit-log.service';
 import { ProjectNotFoundError } from './resource-library.service';
+import { resolveDefaultQueryEnvironment } from './organization.service';
 
 /** Same "404-not-403, real project + wrong org indistinguishable from nonexistent" check every other project-scoped service uses — see `orchestration.service.ts`'s own copy for the KAN-26 reasoning. */
 async function requireProjectInOrg(organizationId: string, projectId: string): Promise<void> {
@@ -288,10 +295,41 @@ export interface ListRecentRecordsForSchemasParams {
   limit?: number;
   /** Restricts the feed to records whose declared `fieldName` value stringifies to exactly `value`. See `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` for how this is applied. */
   fieldFilter?: RecordFieldFilter;
+  /**
+   * The environment whose records this feed shows. Omitted, the project's default (`prod`)
+   * environment is resolved — the same rule `queryMetrics` applies, so a page built on this feed
+   * and a metric tile beside it count the same traffic. See {@link resolveFeedEnvironmentId}.
+   */
+  environmentId?: string;
+}
+
+/**
+ * The environment a human-facing Firestore feed reads when the caller names none: the project's
+ * `prod` environment, via the same {@link resolveDefaultQueryEnvironment} metric queries use.
+ *
+ * These feeds used to fold every environment together (KAN-99). A `gos_test_` key's synthetic
+ * signups therefore appeared on the prod quality-score, feedback, sales, support and billing pages
+ * while the metric tiles beside them — environment-scoped since 2026-08-19 — correctly did not, so
+ * the same page disagreed with itself and nothing said why. `null` only for a project whose
+ * provisioning partially failed and has no environments at all, where there is nothing to scope to.
+ */
+export async function resolveFeedEnvironmentId(organizationId: string, projectId: string, environmentId?: string): Promise<string | null> {
+  if (environmentId !== undefined) return environmentId;
+  return (await resolveDefaultQueryEnvironment(organizationId, projectId))?.id ?? null;
 }
 
 /** Same "over-fetch a candidate window, then filter" posture as `CHURN_FEED_CANDIDATE_WINDOW` — Firestore has no native way to filter on an arbitrary `payload` field server-side without a dedicated per-field index, so a `fieldFilter` widens the per-schema fetch to this many candidates (newest first) before filtering, rather than filtering only within `limit`'s own narrow window. A project with more than this many records landed more recently than its oldest unscanned match would miss that match — the same known, documented limitation every other Firestore-backed feed in this file already carries. */
-const RECORD_FIELD_FILTER_CANDIDATE_WINDOW = 500;
+/**
+ * How many recent records a field filter is applied ACROSS, not how many it returns.
+ *
+ * Exported because the UI has to say it. The filter is applied in memory over this
+ * many most-recent records and then capped, so a matching record older than the
+ * window is invisible and "no records match this filter" actually means "none in
+ * the last 500". A filter that silently searches a window while appearing to
+ * search the dataset is the same defect as KAN-140's "no comments landed": the
+ * empty state names the wrong cause.
+ */
+export const RECORD_FIELD_FILTER_CANDIDATE_WINDOW = 500;
 
 /** Same stringification convention `record-feed-view.ts`'s `stringifyPayloadValue` renders with, kept as its own copy here since filter-matching (server-side, never rendered) and PII-redacted display (client-facing) are different concerns that happen to share a shape. */
 function stringifyPayloadFieldValue(value: unknown): string {
@@ -327,9 +365,9 @@ function matchesFieldFilter(record: RawRecordModel, filter: RecordFieldFilter): 
 }
 
 /**
- * The most recent raw records landed for one or more schemas of the same `kind` in a project, newest
- * first, folded across every environment — same "whole project, one admin view" posture as
- * `listRecentIngestBatchesForProject`. One bounded query per schema name (Firestore has no native
+ * The most recent raw records landed for one or more schemas of the same `kind` in one environment
+ * of a project (the `prod` environment unless `environmentId` says otherwise — see
+ * {@link resolveFeedEnvironmentId}), newest first. One bounded query per schema name (Firestore has no native
  * "kind == X AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and re-sorted
  * client-side, then (optionally field-filtered and) trimmed to `limit` — so a burst in one schema can't
  * silently starve the merged feed of another's more recent records purely by fetch order. Each
@@ -344,16 +382,21 @@ export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSc
   await requireProjectInOrg(params.organizationId, params.projectId);
   const limit = params.limit ?? DEFAULT_RECORD_FEED_LIMIT;
   const fetchLimit = params.fieldFilter ? Math.max(limit, RECORD_FIELD_FILTER_CANDIDATE_WINDOW) : limit;
+  const environmentId = await resolveFeedEnvironmentId(params.organizationId, params.projectId, params.environmentId);
 
   const perSchemaResults = await Promise.all(
-    params.schemaNames.map((schemaName) =>
-      RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId })
+    params.schemaNames.map((schemaName) => {
+      let query = RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId }).query();
+      if (environmentId !== null) {
+        query = query.where('environment_id', '==', environmentId);
+      }
+      return query
         .where('kind', '==', params.kind)
         .where('schema_name', '==', schemaName)
         .orderBy('landed_at', 'desc')
         .limit(fetchLimit)
-        .get(),
-    ),
+        .get();
+    }),
   );
 
   const merged = perSchemaResults
@@ -421,7 +464,7 @@ function isChurnSignal(record: RawRecordModel): boolean {
 /**
  * The most recently landed Stripe subscriptions showing a churn signal — already canceled
  * (`canceled_at` set) or scheduled to cancel at the end of the current billing period
- * (`cancel_at_period_end`) — newest first, folded across every environment (KAN-81). See
+ * (`cancel_at_period_end`) — newest first, in the project's `prod` environment (KAN-81, KAN-99). See
  * `CHURN_FEED_CANDIDATE_WINDOW` for why this over-fetches before filtering.
  */
 export async function listRecentChurnedSubscriptionsForProject(
@@ -459,9 +502,9 @@ function isDunningSignal(record: RawRecordModel): boolean {
 }
 
 /**
- * The most recently landed Stripe subscriptions currently in dunning (KAN-94) — newest first, folded
- * across every environment. Same `CHURN_FEED_ENTITY_SCHEMA_NAMES`/candidate-window/fold-across-
- * environments posture as `listRecentChurnedSubscriptionsForProject`: a dunning subscription is just a
+ * The most recently landed Stripe subscriptions currently in dunning (KAN-94) — newest first, in the
+ * project's `prod` environment. Same `CHURN_FEED_ENTITY_SCHEMA_NAMES`/candidate-window/environment
+ * posture as `listRecentChurnedSubscriptionsForProject`: a dunning subscription is just a
  * different predicate over the same landed `stripe_subscription` snapshots, so it reuses that
  * function's own over-fetch-before-filter reasoning rather than duplicating it.
  */
@@ -489,15 +532,20 @@ export async function listRecentDunningSubscriptionsForProject(
  * sits `queued` for the instant between publish and land (`ingestBatch` lands its own batch
  * synchronously), so anything showing up here has been stuck — e.g. the process crashed between
  * publish and land — and never got a `delivered`/`failed` terminal status. Oldest first, so the
- * longest-stuck messages are the ones an operator sees first.
+ * longest-stuck messages are the ones an operator sees first. `environmentId` (KAN-196's project
+ * environment picker) narrows the list to one environment; omitted, every environment is folded in.
  */
 export async function listQueuedPipelineMessagesForProject(
   organizationId: string,
   projectId: string,
   limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+  environmentId?: string,
 ): Promise<PipelineMessageModel[]> {
-  return PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .where('status', '==', 'queued')
     .orderBy('enqueued_at')
     .limit(Math.min(limit, MAX_PIPELINE_DRAIN_BATCH_SIZE))
@@ -547,15 +595,20 @@ export async function sweepQueuedPipelineMessagesForProject(
 /**
  * The pipeline's dead-letter queue (KAN-34): every message a `landMessage` attempt has given up on,
  * across every environment in a project — same "fold every environment into one admin view" posture as
- * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first.
+ * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first. `environmentId` (KAN-196's
+ * project environment picker) narrows the list to one environment; omitted, every environment is folded in.
  */
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,
   projectId: string,
   limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+  environmentId?: string,
 ): Promise<PipelineMessageModel[]> {
-  return PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .where('status', '==', 'failed')
     .orderBy('enqueued_at', 'desc')
     .limit(Math.min(limit, MAX_PIPELINE_DRAIN_BATCH_SIZE))
@@ -598,4 +651,185 @@ export async function replayFailedPipelineMessagesForProject(
   }
 
   return result;
+}
+
+/** Bounds one `reexportRawRecordsToWarehouse` call — a backfill is run per schema, in pages, never as one unbounded scan. */
+export const MAX_RAW_RECORD_REEXPORT_BATCH_SIZE = 500;
+
+export interface ReexportRawRecordsParams {
+  organizationId: string;
+  projectId: string;
+  /** Only records of this schema (e.g. `trial_started`); omit for every schema, newest-landed first, up to `limit`. */
+  schemaName?: string;
+  limit?: number;
+  /** Test seam — production callers leave it unset so the env-configured BigQuery sink is used. */
+  sink?: WarehouseSink | null;
+  performedByUserId?: string;
+}
+
+export interface ReexportRawRecordsResult {
+  attempted: number;
+  exported: number;
+  failed: number;
+}
+
+/**
+ * Streams already-landed Firestore raw records into the BigQuery raw table again (EasySign audit
+ * P-01: records accepted before an environment's BigQuery export was configured sat in Firestore —
+ * win rules fired on them — but never reached the warehouse, so no metric could see them). Each row
+ * is inserted with its Firestore document id as `insertId`/`raw_record_id`, the same key the live
+ * `DualWarehouseSink` path uses. Note BigQuery's `insertId` dedup is only a best-effort window of
+ * about a minute, so re-exporting a record that already reached the raw table DOES land a second
+ * physical row there — idempotency is guaranteed one layer up, by `stg_raw_records`'s own
+ * dedupe on the record key (`packages/dbt-transform`), so nothing downstream double-counts.
+ * Per-record `allSettled`: one failing row never aborts the batch.
+ * Throws `WarehouseNotConfiguredError` when this deployment has no BigQuery raw export at all —
+ * there's nothing to backfill into.
+ */
+export async function reexportRawRecordsToWarehouse(params: ReexportRawRecordsParams): Promise<ReexportRawRecordsResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const sink = params.sink === undefined ? resolveBigQueryRawRecordSinkFromEnv() : params.sink;
+  if (!sink) {
+    throw new WarehouseNotConfiguredError();
+  }
+  const limit = Math.min(params.limit ?? MAX_RAW_RECORD_REEXPORT_BATCH_SIZE, MAX_RAW_RECORD_REEXPORT_BATCH_SIZE);
+
+  // The collection path already scopes to this project; filtering `schema_name` and ordering by
+  // `landed_at` is the compound query `firestore.indexes.json` declares for `raw_records`.
+  let query = RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId }).query();
+  if (params.schemaName) {
+    query = query.where('schema_name', '==', params.schemaName);
+  }
+  const records: RawRecordModel[] = await query.orderBy('landed_at', 'desc').limit(limit).get();
+
+  const outcomes = await Promise.allSettled(
+    records.map((record) =>
+      sink.insertRawRecord(
+        {
+          organizationId: record.organization_id,
+          projectId: record.project_id,
+          environmentId: record.environment_id,
+          batchId: record.batch_id,
+          kind: record.kind,
+          schemaName: record.schema_name,
+          clientId: record.client_id,
+          payload: record.payload,
+        },
+        record.id,
+      ),
+    ),
+  );
+  const exported = outcomes.filter((outcome) => outcome.status === 'fulfilled').length;
+  const result: ReexportRawRecordsResult = { attempted: records.length, exported, failed: records.length - exported };
+
+  if (params.performedByUserId) {
+    try {
+      await recordAuditLogEntry({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        actorType: 'user',
+        actorId: params.performedByUserId,
+        action: 'raw_record.reexport',
+        targetType: 'project',
+        targetId: params.projectId,
+        summary: `Re-exported ${result.exported} of ${result.attempted} raw record(s)${params.schemaName ? ` for "${params.schemaName}"` : ''} to the warehouse`,
+        after: { ...result, ...(params.schemaName ? { schemaName: params.schemaName } : {}) },
+      });
+    } catch {
+      // Best-effort — see the comment on `recordAuditLogEntry`.
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Every landed-data model {@link purgeProjectLandedData} clears — each one
+ * represents INGESTED DATA or its bookkeeping, never configuration.
+ * `IngestDedupKeyModel` matters as much as the records themselves: leaving a
+ * purged record's dedup claim behind would make a genuine re-send of that
+ * same event id look like a duplicate and be silently dropped.
+ */
+const PURGEABLE_LANDED_DATA_COLLECTION_NAMES = [
+  'raw_records',
+  'pipeline_messages',
+  'ingest_batches',
+  'quarantined_records',
+  'ingest_dedup_keys',
+  'win_events',
+  'tracking_alerts',
+] as const;
+
+/** The collection names {@link purgeProjectLandedData} clears, for callers that want to describe the operation before running it. */
+export const PURGEABLE_LANDED_DATA_COLLECTIONS: readonly string[] = PURGEABLE_LANDED_DATA_COLLECTION_NAMES;
+
+/** Deletes an already-fetched page of documents and reports how many. Kept separate from the query so each model's own `initPath(...)` call stays concretely typed — a union of model constructors loses `initPath`'s `this` binding. */
+async function deleteAllDocuments(documents: readonly { delete(): Promise<unknown> }[]): Promise<number> {
+  // Sequential rather than one batch: `@arbel/firebase-orm` exposes a per-model
+  // `delete()`, not a batch handle (the same constraint `removeMembershipCascade`
+  // documents), and a purge is a rare admin action where clarity beats throughput.
+  for (const document of documents) {
+    await document.delete();
+  }
+  return documents.length;
+}
+
+export interface PurgeProjectLandedDataParams {
+  organizationId: string;
+  projectId: string;
+  /** Restrict the purge to one environment; omit to clear every environment of the project. */
+  environmentId?: string;
+  performedByUserId: string;
+}
+
+export type PurgeProjectLandedDataResult = Record<string, number>;
+
+/**
+ * Deletes every landed ingest record (and its bookkeeping) for a project,
+ * leaving all configuration — metric definitions, goals, segments, win
+ * rules, schemas, keys, hook endpoints, automation targets, boards —
+ * untouched. This is the "start clean before real data arrives" operation
+ * the EasySign audit's J-04 needed, and which previously had no path at all
+ * short of a human with direct database access.
+ *
+ * Firestore only. The warehouse copy is cleared by deleting the same rows
+ * from the raw export table and letting the next dbt build rewrite the core
+ * models from what remains — a separate, deliberately manual step, since a
+ * deployment with no warehouse configured must still be able to purge its
+ * Firestore side.
+ */
+export async function purgeProjectLandedData(params: PurgeProjectLandedDataParams): Promise<PurgeProjectLandedDataResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const pathParams = { organization_id: params.organizationId, project_id: params.projectId };
+  const scopeToEnvironment = <Q extends { where(field: string, operator: '==', value: string): Q }>(query: Q): Q =>
+    params.environmentId === undefined ? query : query.where('environment_id', '==', params.environmentId);
+
+  const deleted: PurgeProjectLandedDataResult = {
+    raw_records: await deleteAllDocuments(await scopeToEnvironment(RawRecordModel.initPath(pathParams).query()).get()),
+    pipeline_messages: await deleteAllDocuments(await scopeToEnvironment(PipelineMessageModel.initPath(pathParams).query()).get()),
+    ingest_batches: await deleteAllDocuments(await scopeToEnvironment(IngestBatchModel.initPath(pathParams).query()).get()),
+    quarantined_records: await deleteAllDocuments(await scopeToEnvironment(QuarantinedRecordModel.initPath(pathParams).query()).get()),
+    ingest_dedup_keys: await deleteAllDocuments(await scopeToEnvironment(IngestDedupKeyModel.initPath(pathParams).query()).get()),
+    win_events: await deleteAllDocuments(await scopeToEnvironment(WinEventModel.initPath(pathParams).query()).get()),
+    tracking_alerts: await deleteAllDocuments(await scopeToEnvironment(TrackingAlertModel.initPath(pathParams).query()).get()),
+  };
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      ...(params.environmentId ? { environmentId: params.environmentId } : {}),
+      actorType: 'user',
+      actorId: params.performedByUserId,
+      action: 'project.purge_landed_data',
+      targetType: 'project',
+      targetId: params.projectId,
+      summary: `Purged ${Object.values(deleted).reduce((sum, count) => sum + count, 0)} landed data document(s) ${params.environmentId ? 'in one environment' : 'across every environment'}`,
+      after: deleted,
+    });
+  } catch {
+    // Best-effort — see the comment on `recordAuditLogEntry`.
+  }
+
+  return deleted;
 }

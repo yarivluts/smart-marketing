@@ -1,7 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { BellRing, CalendarRange, DatabaseZap, Gauge, Radio, ShieldCheck, Sparkles, Target, Wallet } from 'lucide-react';
 import { can } from '@growthos/shared';
-import { QUALITY_SCORE_PACK_PLUGIN_ID, type SignupQualityScoreBreakdownDimension } from '@growthos/firebase-orm-models';
+import {
+  DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS,
+  QUALITY_SCORE_PACK_PLUGIN_ID,
+  type SignupQualityScoreBreakdownDimension,
+} from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -16,11 +21,18 @@ import {
   listQualityMixAlertsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { qualityMixAlertStatusLabelKey, signupQualityScoreTierLabelKey, toQualityMixAlertView, toSignupQualityScoreDimensionBreakdownRows } from '@/lib/orgs/quality-score-view';
-import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import {
+  qualityMixAlertStatusLabelKey,
+  signupQualityScoreTierLabelKey,
+  toQualityMixAlertView,
+  toQualityTierSlices,
+  toSignupQualityScoreDimensionBreakdownRows,
+} from '@/lib/orgs/quality-score-view';
+import { PackSetupLanding } from '@/components/orgs/pack-setup-landing';
 import { CheckQualityMixAlertsButton } from '@/components/orgs/check-quality-mix-alerts-button';
-import { PpPage, PpPageHeader, PpCard, PpKpiCard, PpKpiGrid, PpEmptyState, PpPill, PpTable } from '@/components/pastel/primitives';
-import { Sparkles, Gauge, AlertTriangle, Layers, Calendar, Database } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, ComparisonBars, DonutChart, EmptyState, PageHero, TrendChart } from '@/components/viz';
+import { cn } from '@/lib/utils';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -32,10 +44,8 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
-const DIMENSIONS: readonly { key: SignupQualityScoreBreakdownDimension; headingKey: string; emptyKey: string }[] = [
-  { key: 'channel_id', headingKey: 'byChannelHeading', emptyKey: 'byChannelEmpty' },
-  { key: 'cohort_month', headingKey: 'byCohortHeading', emptyKey: 'byCohortEmpty' },
-];
+/** Read in this order: the channel breakdown feeds the calibration bars, the cohort one the trend line. */
+const DIMENSIONS: readonly SignupQualityScoreBreakdownDimension[] = ['channel_id', 'cohort_month'];
 
 /**
  * A project's signup-quality score distribution, quality-adjusted CAC/CPS,
@@ -60,17 +70,14 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
 
   const [projects, installs] = await Promise.all([listOrgProjects(orgId), listPluginInstallsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/intent-quality`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
   const installViews = installs.map(toPluginInstallView);
@@ -81,17 +88,22 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === QUALITY_SCORE_PACK_PLUGIN_ID);
     return (
-      <PpPage>
-        <PpPageHeader
-          eyebrow="CALIBRATION ENGINE"
-          meta={project.name}
-          title={t('title', { projectName: project.name })}
-          description={t('setupIntro')}
-        />
-        <PpCard>
-          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-        </PpCard>
-      </PpPage>
+      <PackSetupLanding
+        orgId={orgId}
+        projectId={projectId}
+        icon={Gauge}
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        intro={t('setupIntro')}
+        featuresTitle={t('setupFeaturesTitle')}
+        installTitle={t('setupInstallTitle')}
+        packs={installablePacks}
+        features={[
+          { key: 'tiers', icon: Gauge, title: t('setupFeatureTiersTitle'), description: t('setupFeatureTiersDescription') },
+          { key: 'channels', icon: Radio, title: t('setupFeatureChannelsTitle'), description: t('setupFeatureChannelsDescription') },
+          { key: 'alerts', icon: BellRing, title: t('setupFeatureAlertsTitle'), description: t('setupFeatureAlertsDescription') },
+        ]}
+      />
     );
   }
 
@@ -100,204 +112,173 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
     getSignupQualityScoreOverviewForProject(orgId, projectId, { precomputedRecords: surveyRecords }),
     getSignupQualityScoreAdjustedMetricsForProject(orgId, projectId),
     listQualityMixAlertsForProject(orgId, projectId),
-    Promise.all(DIMENSIONS.map((dimension) => getSignupQualityScoreDimensionBreakdownForProject(orgId, projectId, dimension.key))),
+    Promise.all(DIMENSIONS.map((dimension) => getSignupQualityScoreDimensionBreakdownForProject(orgId, projectId, dimension))),
   ]);
-  const alertViews = alerts.map(toQualityMixAlertView);
+  const alertViews = alertsSortedActiveFirst(alerts.map(toQualityMixAlertView));
+  const activeAlertCount = alertViews.filter((alert) => alert.status === 'active').length;
 
-  const total = distribution.totalResponses;
-  const avg = distribution.averageScore !== null ? Math.round(distribution.averageScore) : null;
-  const avgAccent = avg === null ? 'neutral' : avg >= 70 ? 'mint' : avg >= 40 ? 'amber' : 'error';
+  const numberFormat = new Intl.NumberFormat(locale);
+  const monthFormat = new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const tierSlices = toQualityTierSlices(distribution);
+  const highShare = distribution.totalResponses > 0 ? Math.round((distribution.high / distribution.totalResponses) * 100) : null;
+  const averageScore = distribution.averageScore !== null ? Math.round(distribution.averageScore) : null;
+  const [channelOutcome, cohortOutcome] = dimensionOutcomes;
+  const channelRows = channelOutcome.ok ? toSignupQualityScoreDimensionBreakdownRows(channelOutcome.rows, 'channel_id') : [];
+  const cohortRows = cohortOutcome.ok
+    ? toSignupQualityScoreDimensionBreakdownRows(cohortOutcome.rows, 'cohort_month').sort((a, b) => a.value.localeCompare(b.value))
+    : [];
+  const cohortLabel = (value: string): string => {
+    const date = new Date(value);
+    return value && !Number.isNaN(date.getTime()) ? monthFormat.format(date) : value || t('dimensionValueUnknown');
+  };
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow="CALIBRATION ENGINE"
-        meta={total > 0 ? `${total} responses` : undefined}
-        title={t('title', { projectName: project.name })}
-        description={t('description')}
-      />
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Gauge} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiScoredSignups')} value={distribution.totalResponses > 0 ? numberFormat.format(distribution.totalResponses) : t('kpiNoValue')} icon={Target} />
+          <StatCard title={t('kpiAverageScore')} value={averageScore !== null ? numberFormat.format(averageScore) : t('kpiNoValue')} progress={averageScore ?? undefined} icon={Gauge} />
+          <StatCard title={t('kpiHighShare')} value={highShare !== null ? t('kpiPercent', { percent: highShare }) : t('kpiNoValue')} progress={highShare ?? undefined} icon={Sparkles} />
+          <StatCard title={t('kpiActiveAlerts')} value={numberFormat.format(activeAlertCount)} icon={BellRing} />
+        </div>
+      </PageHero>
 
-      <PpKpiGrid>
-        <PpKpiCard
-          label={t('averageScoreLabel')}
-          value={avg !== null ? avg : '—'}
-          valueSuffix={avg !== null ? '/ 100' : undefined}
-          accent={avgAccent}
-          footer={
-            total === 0
-              ? t('distributionEmpty')
-              : t('distributionAverage', { average: avg ?? 0, count: total })
-          }
-        />
-        <PpKpiCard
-          label={t('totalResponsesLabel')}
-          value={total === 0 ? '—' : total}
-          accent="mint"
-          footer="Onboarding survey answers"
-        />
-        <PpKpiCard
-          label={t('qualityAdjustedCostPerSignupLabel')}
-          value={
-            adjustedMetrics.ok && adjustedMetrics.metrics.costPerSignup !== null
-              ? `$${adjustedMetrics.metrics.costPerSignup.toFixed(2)}`
-              : '—'
-          }
-          accent="sky"
-          footer={adjustedMetrics.ok ? 'Quality-weighted cost' : t('adjustedMetricsEmpty')}
-        />
-        <PpKpiCard
-          label={t('qualityAdjustedCacLabel')}
-          value={
-            adjustedMetrics.ok && adjustedMetrics.metrics.cac !== null
-              ? `$${adjustedMetrics.metrics.cac.toFixed(2)}`
-              : '—'
-          }
-          accent="amber"
-          footer={adjustedMetrics.ok ? 'Quality-weighted CAC' : t('adjustedMetricsEmpty')}
-        />
-      </PpKpiGrid>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('distributionHeading')} description={t('distributionDescription')} icon={Gauge} className="lg:col-span-2" fill>
+          {distribution.totalResponses === 0 ? (
+            <EmptyState icon={Gauge} title={t('distributionEmpty')} description={t('distributionEmptyDetail')} compact />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <DonutChart
+                label={t('distributionHeading')}
+                layout="stacked"
+                centerValue={averageScore !== null ? numberFormat.format(averageScore) : undefined}
+                centerLabel={t('distributionCenterLabel')}
+                data={tierSlices.map((slice) => ({ label: t(signupQualityScoreTierLabelKey(slice.tier)), value: slice.count, color: slice.color }))}
+              />
+              <p className="text-xs text-muted-foreground">{t('distributionAverage', { average: averageScore ?? 0, count: distribution.totalResponses })}</p>
+            </div>
+          )}
+        </ChartCard>
 
-      <PpCard
-        icon={Gauge}
-        iconAccent="primary"
-        title={t('distributionHeading')}
-        subtitle={
-          total > 0
-            ? t('distributionAverage', { average: avg ?? 0, count: total })
-            : undefined
-        }
-      >
-        {total === 0 ? (
-          <PpEmptyState
-            icon={Gauge}
-            title={t('distributionHeading')}
-            description={t('distributionEmpty')}
-          />
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-pp-md">
-            {(['high', 'medium', 'low'] as const).map((tier) => {
-              const count = distribution[tier];
-              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-              const accent = tier === 'high' ? 'mint' : tier === 'medium' ? 'amber' : 'pink';
-              return (
-                <div
-                  key={tier}
-                  className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/40 p-pp-lg flex flex-col justify-between space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-pp-display text-pp-headline-sm font-semibold text-pp-on-surface">
-                      {t(signupQualityScoreTierLabelKey(tier))}
-                    </span>
-                    <PpPill accent={accent}>{pct}%</PpPill>
-                  </div>
-                  <div>
-                    <div className="font-pp-display text-pp-metric text-pp-on-surface">
-                      {count}
-                    </div>
-                    <p className="text-pp-body-sm text-pp-on-surface-variant">
-                      {t('distributionCount', { count })}
-                    </p>
-                  </div>
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-pp-surface-container">
-                    <div
-                      className="h-full rounded-full bg-pp-primary transition-all duration-300"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </PpCard>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-pp-lg">
-        {DIMENSIONS.map((dimension, index) => {
-          const outcome = dimensionOutcomes[index];
-          const rows = outcome.ok ? toSignupQualityScoreDimensionBreakdownRows(outcome.rows, dimension.key) : [];
-          return (
-            <PpCard
-              key={dimension.key}
-              icon={dimension.key === 'channel_id' ? Layers : Calendar}
-              iconAccent={dimension.key === 'channel_id' ? 'primary' : 'mint'}
-              title={t(dimension.headingKey)}
-              flush={outcome.ok && rows.length > 0}
-            >
-              {!outcome.ok || rows.length === 0 ? (
-                <PpEmptyState
-                  icon={Database}
-                  title={t(dimension.headingKey)}
-                  description={t(dimension.emptyKey)}
-                />
-              ) : (
-                <PpTable>
-                  <thead>
-                    <tr>
-                      <th>Segment</th>
-                      <th className="text-end">Avg Quality</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.value}>
-                        <td className="font-medium text-pp-on-surface">{row.value || t('dimensionValueUnknown')}</td>
-                        <td className="text-end">
-                          {row.averageScore !== null ? (
-                            <PpPill accent={row.averageScore >= 70 ? 'mint' : row.averageScore >= 40 ? 'amber' : 'pink'}>
-                              {t('dimensionAverageScore', { average: Math.round(row.averageScore), count: row.sampleSize })}
-                            </PpPill>
-                          ) : (
-                            <span className="text-pp-outline">{t('dimensionValueUnknown')}</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </PpTable>
-              )}
-            </PpCard>
-          );
-        })}
+        <ChartCard title={t('byChannelHeading')} description={t('byChannelDescription')} icon={Radio} className="lg:col-span-3" fill>
+          {channelRows.length === 0 ? (
+            <EmptyState icon={DatabaseZap} title={t('byChannelEmpty')} compact />
+          ) : (
+            <BarList
+              items={channelRows.map((row) => ({
+                key: row.value || '__unknown__',
+                label: row.value || t('dimensionValueUnknown'),
+                sublabel: t('distributionCount', { count: row.sampleSize }),
+                value: row.averageScore ?? 0,
+              }))}
+              valueFormatter={(value) => t('scoreValue', { score: Math.round(value) })}
+              maxItems={8}
+              moreLabel={(hidden) => t('dimensionMore', { count: hidden })}
+            />
+          )}
+        </ChartCard>
       </div>
 
-      <PpCard
-        icon={AlertTriangle}
-        iconAccent="amber"
-        title={t('mixAlertsHeading')}
-        action={<CheckQualityMixAlertsButton orgId={orgId} projectId={projectId} />}
-      >
-        {alertViews.length === 0 ? (
-          <PpEmptyState
-            icon={AlertTriangle}
-            title={t('mixAlertsHeading')}
-            description={t('mixAlertsEmpty')}
-          />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title={t('adjustedMetricsHeading')} icon={Wallet} footer={t('adjustedMetricsWindowNote', { days: DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS })} fill>
+          {/* A CAC with no period attached is not interpretable — 90 days is a
+              choice this code makes, and the reader has no way to know it. The
+              quality weighting is stated for the same reason: "quality-adjusted"
+              names the adjustment without saying what it does (KAN-169). */}
+          {!adjustedMetrics.ok ? (
+            <EmptyState icon={DatabaseZap} title={t('adjustedMetricsEmpty')} compact />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <StatCard
+                title={t('qualityAdjustedCostPerSignupLabel')}
+                value={
+                  adjustedMetrics.metrics.costPerSignup !== null
+                    ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.costPerSignup.toFixed(2) })
+                    : t('adjustedMetricsValueUnavailable')
+                }
+                icon={Wallet}
+              />
+              <StatCard
+                title={t('qualityAdjustedCacLabel')}
+                value={adjustedMetrics.metrics.cac !== null ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.cac.toFixed(2) }) : t('adjustedMetricsValueUnavailable')}
+                icon={ShieldCheck}
+              />
+            </div>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title={t('mixAlertsHeading')}
+          description={t('mixAlertsDescription')}
+          icon={BellRing}
+          actions={<CheckQualityMixAlertsButton orgId={orgId} projectId={projectId} />}
+          fill
+        >
+          {alertViews.length === 0 ? (
+            <EmptyState icon={BellRing} title={t('mixAlertsEmpty')} compact />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {alertViews.map((alert) => (
+                <li key={alert.id} className="flex flex-col gap-2 rounded-xl border border-border px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate font-medium text-foreground">{alert.channelId || t('dimensionValueUnknown')}</span>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
+                        alert.status === 'active' ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {t(qualityMixAlertStatusLabelKey(alert.status))}
+                    </span>
+                  </div>
+                  <ComparisonBars
+                    label={t('mixAlertDelta', { baseline: Math.round(alert.baselineAvgScore), current: Math.round(alert.currentAvgScore) })}
+                    max={100}
+                    bars={[
+                      {
+                        key: 'baseline',
+                        label: t('mixAlertBaselineLabel'),
+                        value: alert.baselineAvgScore,
+                        display: t('scoreValue', { score: Math.round(alert.baselineAvgScore) }),
+                        color: 'hsl(var(--muted-foreground) / 0.45)',
+                      },
+                      {
+                        key: 'current',
+                        label: t('mixAlertCurrentLabel'),
+                        value: alert.currentAvgScore,
+                        display: t('scoreValue', { score: Math.round(alert.currentAvgScore) }),
+                        color: alert.currentAvgScore < alert.baselineAvgScore ? 'hsl(var(--warning))' : 'hsl(var(--success))',
+                      },
+                    ]}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {t('mixAlertDelta', { baseline: Math.round(alert.baselineAvgScore), current: Math.round(alert.currentAvgScore) })}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ChartCard>
+      </div>
+
+      <ChartCard title={t('byCohortHeading')} description={t('byCohortDescription')} icon={CalendarRange}>
+        {cohortRows.length === 0 ? (
+          <EmptyState icon={DatabaseZap} title={t('byCohortEmpty')} compact />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-pp-md">
-            {alertViews.map((alert) => (
-              <div
-                key={alert.id}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/40 p-pp-md"
-              >
-                <div className="min-w-0">
-                  <div className="font-pp-display text-pp-headline-sm font-semibold text-pp-on-surface">
-                    {alert.channelId || t('dimensionValueUnknown')}
-                  </div>
-                  <div className="text-pp-body-sm text-pp-on-surface-variant mt-0.5">
-                    {t('mixAlertDelta', {
-                      baseline: Math.round(alert.baselineAvgScore),
-                      current: Math.round(alert.currentAvgScore),
-                    })}
-                  </div>
-                </div>
-                <PpPill accent={alert.status === 'active' ? 'amber' : 'neutral'} dot>
-                  {t(qualityMixAlertStatusLabelKey(alert.status))}
-                </PpPill>
-              </div>
-            ))}
-          </div>
+          <TrendChart
+            label={t('byCohortHeading')}
+            xKey="cohort"
+            kind="line"
+            data={cohortRows.map((row) => ({ cohort: cohortLabel(row.value), score: row.averageScore === null ? null : Math.round(row.averageScore) }))}
+            series={[{ key: 'score', label: t('byCohortSeries') }]}
+          />
         )}
-      </PpCard>
-    </PpPage>
+      </ChartCard>
+    </div>
   );
+}
+
+function alertsSortedActiveFirst<T extends { status: string }>(alerts: T[]): T[] {
+  return [...alerts].sort((a, b) => Number(b.status === 'active') - Number(a.status === 'active'));
 }

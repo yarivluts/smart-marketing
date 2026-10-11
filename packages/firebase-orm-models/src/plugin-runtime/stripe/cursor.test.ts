@@ -8,6 +8,7 @@ describe('initialStripeSyncCursor', () => {
     expect(cursor.events.charge).toEqual({ backfillCursor: null, backfillComplete: false, lastSyncedCreated: null });
     expect(cursor.events.invoice).toEqual({ backfillCursor: null, backfillComplete: false, lastSyncedCreated: null });
     expect(cursor.events.refund).toEqual({ backfillCursor: null, backfillComplete: false, lastSyncedCreated: null });
+    expect(cursor.events.cancellation).toEqual({ backfillCursor: null, backfillComplete: false, lastSyncedCreated: null });
     expect(cursor.entities.subscription).toEqual({ backfillCursor: null, backfillComplete: false, lastSyncedCreated: null });
   });
 });
@@ -23,6 +24,15 @@ describe('parseStripeSyncCursor', () => {
     cursor.events.charge = { backfillCursor: 'ch_5', backfillComplete: false, lastSyncedCreated: 100 };
     const serialized = serializeStripeSyncCursor(cursor);
     expect(parseStripeSyncCursor(serialized)).toEqual(cursor);
+  });
+
+  it('resumes a cursor persisted before the cancellation resource existed, starting only that resource fresh', () => {
+    const legacy = initialStripeSyncCursor() as unknown as { events: Record<string, unknown> };
+    delete legacy.events.cancellation;
+    (legacy.events.charge as Record<string, unknown>).lastSyncedCreated = 500;
+    const parsed = parseStripeSyncCursor(JSON.stringify(legacy));
+    expect(parsed.events.charge.lastSyncedCreated).toBe(500);
+    expect(parsed.events.cancellation).toEqual({ backfillCursor: null, backfillComplete: false, lastSyncedCreated: null });
   });
 
   it('rejects malformed JSON', () => {

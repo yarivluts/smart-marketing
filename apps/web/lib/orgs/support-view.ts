@@ -14,9 +14,12 @@ export interface SupportLeaderboardRowView {
 
 export interface SupportLeaderboardView {
   ticketsOpened: number;
-  openBacklog: number;
+  /** `null` when the read was capped, because the backlog subtraction is not computable from a recency window — see `SupportLeaderboardResult.openBacklog` (KAN-166). */
+  openBacklog: number | null;
   /** Sorted highest-`ticketsResolved`-first. */
   rows: SupportLeaderboardRowView[];
+  /** The record cap these numbers were computed under, or `null` when the read saw everything. Qualifies the ranking as well as the backlog. */
+  sampledFrom: number | null;
 }
 
 /** The `Support` translation key whose message supplies the unit word for a {@link formatDurationSeconds} magnitude — same "helper returns a bare number/unit-key pair, the message string supplies the unit word" posture `formatMinutesAgo`/`freshnessLabel` (ingest-health) establish, so the unit itself is never a hard-coded literal outside translation resources. */
@@ -42,6 +45,7 @@ export function toSupportLeaderboardView(
   return {
     ticketsOpened: result.ticketsOpened,
     openBacklog: result.openBacklog,
+    sampledFrom: result.sampledFrom,
     rows: result.rows.map((row) => {
       const person = peopleById.get(row.agentOrgPersonId);
       return {
@@ -55,4 +59,32 @@ export function toSupportLeaderboardView(
       };
     }),
   };
+}
+
+export interface SupportTeamSummary {
+  /** Tickets resolved by an attributed agent - resolutions with no agent are not in any row. */
+  ticketsResolved: number;
+  /** The agent with the fastest average first response, or `null` when no agent has one. */
+  fastestFirstResponse: { name: string; seconds: number } | null;
+  /** The agent with the highest average CSAT, or `null` when no agent has a CSAT score. */
+  topCsat: { name: string; score: number } | null;
+}
+
+/**
+ * Team-level headline numbers derived only from the per-agent rows. Deliberately no "team average"
+ * first response or CSAT: the rows carry per-agent averages without their sample sizes, so any
+ * blend of them would be a made-up weighting. Best-agent values are exact.
+ */
+export function toSupportTeamSummary(rows: readonly SupportLeaderboardRowView[]): SupportTeamSummary {
+  let fastestFirstResponse: SupportTeamSummary['fastestFirstResponse'] = null;
+  let topCsat: SupportTeamSummary['topCsat'] = null;
+  for (const row of rows) {
+    if (row.avgFirstResponseSeconds !== null && (fastestFirstResponse === null || row.avgFirstResponseSeconds < fastestFirstResponse.seconds)) {
+      fastestFirstResponse = { name: row.name, seconds: row.avgFirstResponseSeconds };
+    }
+    if (row.avgCsatScore !== null && (topCsat === null || row.avgCsatScore > topCsat.score)) {
+      topCsat = { name: row.name, score: row.avgCsatScore };
+    }
+  }
+  return { ticketsResolved: rows.reduce((sum, row) => sum + row.ticketsResolved, 0), fastestFirstResponse, topCsat };
 }

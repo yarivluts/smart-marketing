@@ -407,7 +407,12 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     }
 
     const current = await this.apiClient.getAdSet(input.adSetResourceName);
-    await this.apiClient.updateAdSet(input.adSetResourceName, { targeting: input.targeting });
+    // The edit replaces the whole targeting spec, so carry the ad set's own Advantage+ audience
+    // switch through (KAN-235) - an edit of ages or countries must not silently turn it on or off.
+    const advantageAudience = current.targeting.advantageAudience;
+    await this.apiClient.updateAdSet(input.adSetResourceName, {
+      targeting: { ...input.targeting, ...(advantageAudience !== undefined ? { advantageAudience } : {}) },
+    });
     target.updated_at = new Date().toISOString();
     await target.save();
     return { previousTargeting: current.targeting };

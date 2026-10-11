@@ -10,10 +10,10 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ refresh }),
 }));
 
-function renderForm(hasSecret: boolean): void {
+function renderForm(hasSecret: boolean, secretKeyState: 'current' | 'rotatable' | 'unreadable' | 'vault_not_configured' | null = hasSecret ? 'current' : null): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <SetCredentialSecretForm orgId="org-1" credentialId="cred-1" hasSecret={hasSecret} />
+      <SetCredentialSecretForm orgId="org-1" credentialId="cred-1" hasSecret={hasSecret} secretKeyState={secretKeyState} />
     </NextIntlClientProvider>,
   );
 }
@@ -127,5 +127,37 @@ describe('SetCredentialSecretForm', () => {
 
     expect(await screen.findByText("Couldn't clear this secret. Please try again.")).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  /**
+   * "Secret set" is derived from stored ciphertext, which says the secret is
+   * PRESENT, not that it is READABLE. A key retired from the ring leaves a
+   * credential that looks configured and cannot be decrypted, so an admin
+   * debugging a dead connector rules out the very thing that is broken
+   * (KAN-173).
+   */
+  it('warns that a secret sealed under a retired key cannot be decrypted', () => {
+    renderForm(true, 'unreadable');
+    expect(screen.getByText(/Secret set/)).toBeInTheDocument();
+    expect(screen.getByText(/Cannot be decrypted/)).toBeInTheDocument();
+  });
+
+  it('warns, more gently, about a secret still readable under an older key', () => {
+    renderForm(true, 'rotatable');
+    expect(screen.getByText(/older key/)).toBeInTheDocument();
+    expect(screen.queryByText(/Cannot be decrypted/)).toBeNull();
+  });
+
+  /** A deployment with no vault keys can read no secret at all, which "Secret set" hid just as effectively. */
+  it('warns when the deployment has no vault keys configured', () => {
+    renderForm(true, 'vault_not_configured');
+    expect(screen.getByText(/no vault keys are configured/i)).toBeInTheDocument();
+  });
+
+  it('stays quiet for a healthy secret, so the warning means something when it appears', () => {
+    renderForm(true, 'current');
+    expect(screen.getByText(/Secret set/)).toBeInTheDocument();
+    expect(screen.queryByText(/Cannot be decrypted/)).toBeNull();
+    expect(screen.queryByText(/older key/)).toBeNull();
   });
 });

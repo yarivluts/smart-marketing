@@ -162,8 +162,8 @@ describe('Tier 1: Visual Funnels & Business Goals (R1, R2)', () => {
     const outcome = {
       ok: true as const,
       steps: [
-        { stageKey: 'step_1', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1.0 },
-        { stageKey: 'step_2', stepOrder: 2, customerCount: 250, conversionRateFromFirst: 0.5 },
+        { eventSchemaName: 'step_1_event', stageKey: 'step_1', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1.0 },
+        { eventSchemaName: 'step_2_event', stageKey: 'step_2', stepOrder: 2, customerCount: 250, conversionRateFromFirst: 0.5 },
       ],
     };
 

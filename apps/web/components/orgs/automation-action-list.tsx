@@ -103,11 +103,14 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove }: 
               const labelKey = diffFieldLabelKey(entry.key);
               return (
                 <li key={entry.key}>
-                  {t('diffRowLine', {
-                    label: labelKey ? t(labelKey) : entry.key,
-                    before: String(entry.before),
-                    after: String(entry.after),
-                  })}
+                  {/* A field with no previous value (a new campaign draft) is new, not "undefined -> x". */}
+                  {entry.before === undefined || entry.before === null
+                    ? t('diffRowLineNew', { label: labelKey ? t(labelKey) : entry.key, after: String(entry.after) })
+                    : t('diffRowLine', {
+                        label: labelKey ? t(labelKey) : entry.key,
+                        before: String(entry.before),
+                        after: String(entry.after),
+                      })}
                 </li>
               );
             })}

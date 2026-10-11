@@ -18,19 +18,31 @@ export interface AdsKpiScorecardsProps {
   className?: string;
 }
 
+/**
+ * Every card reads one nullable field off the summary and prints "No data" when it is null.
+ *
+ * This component used to paper over missing measurements with constants: `?? 14.2` for the
+ * spend change, `?? 22.1` for ROAS change, `?? -12.4` for CPA change, `?? 2.85` for CTR, and
+ * a `ctrDiff` of '+0.8%' or '-0.2%' chosen by comparing that made-up CTR against 2.0. The
+ * result was six confident scorecards on a project that had never reported a single metric.
+ *
+ * The change badges are gone outright rather than defaulted: a change is a comparison against
+ * a previous period, and nothing here computes one. They come back when a prior-period
+ * baseline does.
+ */
 export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps): React.ReactElement {
   const t = useTranslations('Campaigns');
-
-  const spendChange = summary.spendChangePct;
-  const roasChange = summary.roasChangePct;
-  const cpaChange = summary.cpaChangePct;
-  const ctrVal = summary.blendedCtrPct ?? summary.avgCtrPct ?? 0;
-  const ctrDiff = ctrVal > 0 ? (ctrVal >= 2.0 ? '+0.8%' : '-0.2%') : undefined;
+  const noData = t('noData');
 
   const activeProgress =
     summary.totalCampaignsCount > 0
       ? Math.round((summary.activeCampaignsCount / summary.totalCampaignsCount) * 100)
       : 0;
+
+  const spendSubtext =
+    summary.metaSpendUsd !== null && summary.googleSpendUsd !== null
+      ? t('spendSplitLine', { meta: summary.metaSpendUsd.toLocaleString(), google: summary.googleSpendUsd.toLocaleString() })
+      : undefined;
 
   return (
     <div
@@ -40,67 +52,59 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
       {/* 1. Total Spend */}
       <StatCard
         title={t('metricTotalSpend')}
-        value={`$${summary.totalSpendUsd.toLocaleString()}`}
-        change={spendChange !== undefined ? `+${spendChange}%` : undefined}
-        changeType="increase"
-        period={spendChange !== undefined ? 'vs prev 30d' : undefined}
+        value={summary.totalSpendUsd === null ? noData : `$${summary.totalSpendUsd.toLocaleString()}`}
         icon={DollarSign}
-        subtext={
-          summary.totalSpendUsd > 0
-            ? `Meta: $${summary.metaSpendUsd.toLocaleString()} · Google: $${summary.googleSpendUsd.toLocaleString()}`
-            : 'No live spend recorded'
-        }
+        subtext={spendSubtext}
       />
 
       {/* 2. Blended ROAS */}
       <StatCard
         title={t('metricBlendedRoas')}
-        value={`${summary.blendedRoas.toFixed(1)}x`}
-        change={roasChange !== undefined ? `+${roasChange}%` : undefined}
-        changeType="increase"
-        period={roasChange !== undefined ? 'vs prev 30d' : undefined}
+        value={summary.blendedRoas === null ? noData : `${summary.blendedRoas.toFixed(1)}x`}
         icon={TrendingUp}
-        targetHint={summary.blendedRoas > 0 ? t('roasTargetHint', { target: '3.5x' }) : undefined}
-        progress={summary.blendedRoas > 0 ? Math.min(Math.round((summary.blendedRoas / 3.5) * 100), 100) : 0}
+        // No target and no progress bar. Both used to be rendered against a
+        // hardcoded 3.5x that no project ever set: the card showed
+        // "Target: 3.5x" beside a bar filled to roas/3.5, capped at 100, so a
+        // project at 7x read as having exactly met a goal it never chose. The
+        // ROAS itself is measured and stays; the benchmark was invented.
+        // A real target belongs here once a goal can supply one (KAN-143) —
+        // until then the honest card states the number and claims nothing about
+        // whether it is good.
       />
 
       {/* 3. Impressions & Clicks */}
       <StatCard
         title={t('metricImpressionsClicks')}
         value={
-          summary.totalImpressions >= 1000
-            ? `${(summary.totalImpressions / 1000).toFixed(1)}k`
-            : String(summary.totalImpressions)
+          summary.totalImpressions === null
+            ? noData
+            : summary.totalImpressions >= 1000
+              ? `${(summary.totalImpressions / 1000).toFixed(1)}k`
+              : String(summary.totalImpressions)
         }
         icon={MousePointerClick}
         subtext={
-          summary.totalImpressions > 0 || summary.totalClicks > 0
-            ? `${t('clicksCount', { count: summary.totalClicks.toLocaleString() })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`
-            : 'No ad network telemetry recorded'
+          summary.totalClicks === null || summary.totalConversions === null
+            ? undefined
+            : `${t('clicksCount', { count: summary.totalClicks.toLocaleString() })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`
         }
       />
 
       {/* 4. Average CTR */}
       <StatCard
         title={t('metricAvgCtr')}
-        value={`${ctrVal.toFixed(2)}%`}
-        change={ctrDiff}
-        changeType={ctrVal >= 2.0 ? 'increase' : 'decrease'}
-        period={ctrDiff ? 'vs benchmark' : undefined}
+        value={summary.blendedCtrPct === null ? noData : `${summary.blendedCtrPct}%`}
         icon={Percent}
-        subtext={ctrDiff ? t('ctrBenchmarkComparison', { diff: ctrDiff }) : 'No click telemetry recorded'}
       />
 
       {/* 5. Blended CPA */}
       <StatCard
         title={t('metricBlendedCpa')}
-        value={`$${summary.blendedCpaUsd.toFixed(2)}`}
-        change={cpaChange !== undefined ? `${cpaChange}%` : undefined}
-        // A decrease in CPA is positive for performance
-        changeType={cpaChange !== undefined && cpaChange <= 0 ? 'increase' : 'decrease'}
-        period={cpaChange !== undefined ? 'vs prev 30d' : undefined}
+        value={summary.blendedCpaUsd === null ? noData : `$${summary.blendedCpaUsd.toFixed(2)}`}
         icon={Target}
-        subtext={summary.totalConversions > 0 ? `${summary.totalConversions} total conv.` : '0 total conv.'}
+        subtext={
+          summary.totalConversions === null ? undefined : t('conversionsCount', { count: summary.totalConversions })
+        }
       />
 
       {/* 6. Active Campaigns */}
@@ -110,7 +114,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         icon={Layers}
         progress={activeProgress}
         targetHint={t('liveDeliveryCount', { count: summary.activeCampaignsCount })}
-        subtext={`${activeProgress}% active`}
+        subtext={t('activeSharePct', { percent: activeProgress })}
       />
     </div>
   );

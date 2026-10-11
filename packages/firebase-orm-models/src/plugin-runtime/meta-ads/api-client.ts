@@ -41,6 +41,17 @@ export interface MetaAdSetTargeting {
   ageMin: number;
   ageMax: number;
   genders?: Array<'male' | 'female'>;
+  /**
+   * Meta's Advantage+ audience switch (`targeting_automation.advantage_audience`, KAN-235). Since
+   * Marketing API v23 an ad set create with a custom age or gender fails unless it is set, and with
+   * 1 Meta may widen the audience beyond the ages chosen. GrowthOS creates with 0 so the targeting
+   * the person chose is used exactly; an edit keeps the ad set's own value. Absent when unknown.
+   */
+  advantageAudience?: 0 | 1;
+  /** Custom or lookalike audience ids the ad set reaches (people in any of them). */
+  customAudiences?: string[];
+  /** Interests (Meta ids and names); people with any of them. */
+  interests?: { id: string; name: string }[];
 }
 
 export interface MetaCreateAdSetParams {
@@ -77,6 +88,19 @@ export interface MetaCreateAdCreativeParams {
   linkUrl: string;
   /** A hash returned by {@link MetaAdsApiClient.uploadAdImage} — referenced via `object_story_spec.link_data.image_hash`. Omitted entirely for a text-only link ad (the pre-existing behavior). */
   imageHash?: string;
+}
+
+/** A video ad creative (Ad Studio publishing): an uploaded ad video with a thumbnail, text and a link. */
+export interface MetaCreateVideoAdCreativeParams {
+  pageId: string;
+  /** From `act_{id}/advideos`. */
+  videoId: string;
+  /** A thumbnail uploaded with {@link MetaAdsApiClient.uploadAdImage}; Meta requires one for a video ad. */
+  imageHash: string;
+  primaryText: string;
+  headline: string;
+  description?: string;
+  linkUrl: string;
 }
 
 export interface MetaCreateAdCreativeResult {
@@ -127,9 +151,20 @@ export interface MetaCreateCustomAudienceResult {
   audienceId: string;
 }
 
-/** How many of an `addContactsToCustomAudience` call's contact rows Meta actually accepted onto the audience — mirrors `SinkPluginPushResult.pushed`'s own "how many did the remote system actually take" semantics for the KAN-73-follow-up Custom Audience connector. */
+/**
+ * How many of an `addContactsToCustomAudience` call's contact rows Meta
+ * actually accepted onto the audience — `null` when Meta's response carried no
+ * `num_received` at all.
+ *
+ * `null` rather than a substitute (KAN-174). This used to fall back to
+ * `contacts.length`, which reports the number we SENT under a name that means
+ * the number Meta TOOK, and reaches the user as "Last synced N records". Meta
+ * routinely accepts fewer rows than it is given — unmatched or malformed hashes
+ * are dropped — so the count is the one interesting thing about the call, and
+ * the fallback made it impossible for that number to ever reveal a shortfall.
+ */
 export interface MetaAddHashedEmailsResult {
-  numReceived: number;
+  numReceived: number | null;
 }
 
 export interface MetaCreateLookalikeAudienceParams {
@@ -188,6 +223,8 @@ export interface MetaAdsApiClient {
   createAdSet(adAccountId: string, params: MetaCreateAdSetParams): Promise<MetaCreateAdSetResult>;
   /** Creates a link-ad creative (`object_story_spec`: page id, message, link, headline/name, description, optional image hash). */
   createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult>;
+  /** A video ad creative: `object_story_spec.video_data` with the video, its thumbnail and a Learn More link. */
+  createVideoAdCreative(adAccountId: string, params: MetaCreateVideoAdCreativeParams): Promise<MetaCreateAdCreativeResult>;
   /**
    * Uploads a creative image and returns the hash `createAdCreative`
    * references via `image_hash`. Real Meta image upload (KAN-73 follow-up) —
@@ -287,7 +324,23 @@ export interface MetaAdsApiClient {
   createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult>;
 }
 
-const META_API_VERSION = 'v21.0';
+/**
+ * The Marketing API version every call uses (KAN-235: was v21.0). Marketing API versions expire far
+ * sooner than Graph API ones, and an expired version is auto-upgraded only for endpoints that did
+ * not change. Checked against the v22-v25 changelogs: the only change these requests needed is the
+ * ad set's `targeting_automation` (see {@link MetaAdSetTargeting.advantageAudience}).
+ */
+export const META_API_VERSION = 'v25.0';
+/**
+ * The id of the object a create call made. Meta has answered a create with a 2xx body that carries an
+ * `error` or no `id` at all; treating that as success stored an undefined id and hid the reason. It is
+ * now an error that quotes Meta's own answer.
+ */
+function requireCreatedId(result: { id?: string; error?: unknown }): string {
+  if (typeof result?.id === 'string' && result.id.length > 0 && !result.error) return result.id;
+  throw new MetaAdsApiError(`Meta answered a create without an id: ${JSON.stringify(result).slice(0, 500)}`, 200);
+}
+
 const META_GRAPH_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 /** Meta's real ad-set `targeting.genders` field is numeric: 1 = male, 2 = female. Omitted entirely means "all genders." */
@@ -302,7 +355,7 @@ const GENDER_CODES_REVERSE: Record<number, 'male' | 'female'> = { 1: 'male', 2: 
  * follow-up: ad-set targeting-spec edits, an already-created one) so the two
  * never drift.
  */
-function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, unknown> {
+export function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, unknown> {
   const targetingSpec: Record<string, unknown> = {
     geo_locations: { countries: targeting.countries },
     age_min: targeting.ageMin,
@@ -310,6 +363,15 @@ function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, u
   };
   if (targeting.genders && targeting.genders.length > 0) {
     targetingSpec.genders = targeting.genders.map((gender) => GENDER_CODES[gender]);
+  }
+  if (targeting.advantageAudience !== undefined) {
+    targetingSpec.targeting_automation = { advantage_audience: targeting.advantageAudience };
+  }
+  if (targeting.customAudiences && targeting.customAudiences.length > 0) {
+    targetingSpec.custom_audiences = targeting.customAudiences.map((id) => ({ id }));
+  }
+  if (targeting.interests && targeting.interests.length > 0) {
+    targetingSpec.flexible_spec = [{ interests: targeting.interests.map((interest) => ({ id: interest.id, name: interest.name })) }];
   }
   return targetingSpec;
 }
@@ -323,13 +385,22 @@ function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, u
  * {@link MetaAdSetTargeting.genders}'s own "omitted means all genders"
  * convention.
  */
-function parseMetaTargetingSpec(raw: { geo_locations: { countries: string[] }; age_min: number; age_max: number; genders?: number[] }): MetaAdSetTargeting {
+function parseMetaTargetingSpec(raw: {
+  geo_locations: { countries: string[] };
+  age_min: number;
+  age_max: number;
+  genders?: number[];
+  targeting_automation?: { advantage_audience?: number };
+}): MetaAdSetTargeting {
   const genders = (raw.genders ?? []).map((code) => GENDER_CODES_REVERSE[code]).filter((gender): gender is 'male' | 'female' => gender !== undefined);
+  const advantageAudience = raw.targeting_automation?.advantage_audience;
   return {
     countries: raw.geo_locations.countries,
     ageMin: raw.age_min,
     ageMax: raw.age_max,
     ...(genders.length > 0 ? { genders } : {}),
+    // Omitted, not undefined, when Meta does not report it: the parsed spec is stored in Firestore.
+    ...(advantageAudience === 0 || advantageAudience === 1 ? { advantageAudience } : {}),
   };
 }
 
@@ -393,8 +464,12 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       status: 'PAUSED',
       special_ad_categories: JSON.stringify([]),
       daily_budget: String(params.dailyBudgetCents),
+      // The budget lives on the campaign (CBO), so the bid strategy must too. Stated explicitly: left
+      // out, some ad accounts default to a strategy that needs a bid amount, and every ad set create
+      // then fails with 'bid amount required' (Meta error 100/1815857).
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     });
-    return { campaignId: result.id };
+    return { campaignId: requireCreatedId(result) };
   }
 
   async createAdSet(adAccountId: string, params: MetaCreateAdSetParams): Promise<MetaCreateAdSetResult> {
@@ -402,7 +477,9 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       name: params.name,
       campaign_id: params.campaignId,
       status: 'PAUSED',
-      targeting: JSON.stringify(buildMetaTargetingSpec(params.targeting)),
+      // A new ad set always states the Advantage+ audience switch (required since v23): off unless
+      // the caller chose otherwise, so the audience is exactly the targeting the person set.
+      targeting: JSON.stringify(buildMetaTargetingSpec({ ...params.targeting, advantageAudience: params.targeting.advantageAudience ?? 0 })),
       // Fixed, documented simplification (this connector always builds a
       // link-click campaign) — mirrors `GoogleAdsHttpApiClient`'s own
       // `manualCpc: {}` placeholder for a bidding detail this story doesn't
@@ -410,7 +487,26 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       optimization_goal: 'LINK_CLICKS',
       billing_event: 'IMPRESSIONS',
     });
-    return { adSetId: result.id };
+    return { adSetId: requireCreatedId(result) };
+  }
+
+  async createVideoAdCreative(adAccountId: string, params: MetaCreateVideoAdCreativeParams): Promise<MetaCreateAdCreativeResult> {
+    const objectStorySpec = {
+      page_id: params.pageId,
+      video_data: {
+        video_id: params.videoId,
+        image_hash: params.imageHash,
+        message: params.primaryText,
+        title: params.headline,
+        ...(params.description ? { link_description: params.description } : {}),
+        call_to_action: { type: 'LEARN_MORE', value: { link: params.linkUrl } },
+      },
+    };
+    const result = await this.request<{ id: string }>(`act_${adAccountId}/adcreatives`, {
+      name: params.headline,
+      object_story_spec: JSON.stringify(objectStorySpec),
+    });
+    return { creativeId: requireCreatedId(result) };
   }
 
   async createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult> {
@@ -428,7 +524,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       name: params.headline,
       object_story_spec: JSON.stringify(objectStorySpec),
     });
-    return { creativeId: result.id };
+    return { creativeId: requireCreatedId(result) };
   }
 
   async uploadAdImage(adAccountId: string, params: MetaUploadAdImageParams): Promise<MetaUploadAdImageResult> {
@@ -449,7 +545,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       status: 'PAUSED',
       creative: JSON.stringify({ creative_id: params.creativeId }),
     });
-    return { adId: result.id };
+    return { adId: requireCreatedId(result) };
   }
 
   async getAd(adId: string): Promise<MetaGetAdResult> {
@@ -471,7 +567,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
 
   async getCampaign(campaignId: string): Promise<{ campaignId: string }> {
     const result = await this.getRequest<{ id: string }>(campaignId, { fields: 'id' });
-    return { campaignId: result.id };
+    return { campaignId: requireCreatedId(result) };
   }
 
   async getCampaignState(campaignId: string): Promise<MetaCampaignStateResult> {
@@ -578,7 +674,9 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
     const result = await this.request<{ num_received?: number }>(`${audienceId}/users`, {
       payload: JSON.stringify({ schema, data }),
     });
-    return { numReceived: result.num_received ?? contacts.length };
+    // Never `?? contacts.length`: that is the number we sent, and this field
+    // names the number Meta took (KAN-174).
+    return { numReceived: result.num_received ?? null };
   }
 
   async createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult> {

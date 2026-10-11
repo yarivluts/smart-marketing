@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { PpButton } from '@/components/pastel/primitives';
+import { Button } from '@/components/ui/button';
 
 export interface DisableFieldMappingButtonProps {
   orgId: string;
@@ -36,11 +36,11 @@ export function DisableFieldMappingButton({ orgId, projectId, fieldMappingId }: 
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <PpButton type="button" variant="danger" size="sm" onClick={handleClick} disabled={submitting}>
+      <Button type="button" variant="destructive" size="sm" onClick={handleClick} disabled={submitting}>
         {t('disableMapping')}
-      </PpButton>
+      </Button>
       {error ? (
-        <p role="alert" className="text-xs text-pp-error">
+        <p role="alert" className="text-xs text-destructive">
           {t('disableMappingError')}
         </p>
       ) : null}

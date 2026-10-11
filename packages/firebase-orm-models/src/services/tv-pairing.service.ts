@@ -1,20 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { err, ok, type Result } from '@growthos/shared';
-import {
-  TvPairingModel,
-  type TvPairingPowerState,
-  type TvPairingCommandType,
-  type TvPairingPendingCommand,
-  type TvPairingCommandResult,
-  type TvPairingCecSchedule,
-} from '../models/tv-pairing.model';
-export type {
-  TvPairingPowerState,
-  TvPairingCommandType,
-  TvPairingPendingCommand,
-  TvPairingCommandResult,
-  TvPairingCecSchedule,
-};
+import { TvPairingModel } from '../models/tv-pairing.model';
 import { ProjectModel } from '../models/project.model';
 import { BoardModel } from '../models/board.model';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -162,9 +148,6 @@ export type TvPairingStatus =
       rotationSeconds: number;
       reducedMotion: boolean;
       label: string;
-      powerState?: TvPairingPowerState;
-      pendingCommand?: TvPairingPendingCommand;
-      cecSchedule?: TvPairingCecSchedule;
     }
   | { status: 'invalid' };
 
@@ -223,9 +206,6 @@ export async function getTvPairingStatus(deviceToken: string): Promise<TvPairing
     rotationSeconds: pairing.rotation_seconds ?? 30,
     reducedMotion: pairing.reduced_motion ?? false,
     label: pairing.label ?? '',
-    ...(pairing.power_state ? { powerState: pairing.power_state } : {}),
-    ...(pairing.pending_command ? { pendingCommand: pairing.pending_command } : {}),
-    ...(pairing.cec_standby_schedule ? { cecSchedule: pairing.cec_standby_schedule } : {}),
   };
 }
 
@@ -397,7 +377,6 @@ export interface UpdateTvPairingSettingsParams {
   rotationSeconds: number;
   reducedMotion: boolean;
   actorUserId: string;
-  cecSchedule?: TvPairingCecSchedule;
 }
 
 /**
@@ -439,16 +418,12 @@ export async function updateTvPairingSettings(params: UpdateTvPairingSettingsPar
     boardIds: pairing.board_ids,
     rotationSeconds: pairing.rotation_seconds,
     reducedMotion: pairing.reduced_motion,
-    cecSchedule: pairing.cec_standby_schedule,
   };
 
   pairing.label = params.label.trim();
   pairing.board_ids = params.boardIds;
   pairing.rotation_seconds = params.rotationSeconds;
   pairing.reduced_motion = params.reducedMotion;
-  if (params.cecSchedule !== undefined) {
-    pairing.cec_standby_schedule = params.cecSchedule;
-  }
   await pairing.save();
 
   try {
@@ -462,13 +437,7 @@ export async function updateTvPairingSettings(params: UpdateTvPairingSettingsPar
       targetId: pairing.id,
       summary: `Updated settings for paired TV "${pairing.label}"`,
       before,
-      after: {
-        label: pairing.label,
-        boardIds: pairing.board_ids,
-        rotationSeconds: pairing.rotation_seconds,
-        reducedMotion: pairing.reduced_motion,
-        cecSchedule: pairing.cec_standby_schedule,
-      },
+      after: { label: pairing.label, boardIds: pairing.board_ids, rotationSeconds: pairing.rotation_seconds, reducedMotion: pairing.reduced_motion },
     });
   } catch {
     // Best-effort — see the equivalent comment in claimTvPairing above.
@@ -518,157 +487,3 @@ export async function revokeTvPairing(params: RevokeTvPairingParams): Promise<Tv
 
   return pairing;
 }
-
-export interface SendTvPairingCommandParams {
-  organizationId: string;
-  projectId: string;
-  pairingId: string;
-  type: TvPairingCommandType;
-  actorUserId: string;
-  parameters?: Record<string, unknown>;
-}
-
-/**
- * Dispatches a hardware remote command to a paired TV display (KAN-307) —
- * reboot, display standby/sleep, display wake, or force reload.
- * Sets the pending command queue on the pairing doc and records an audit log entry.
- */
-export async function sendTvPairingCommand(params: SendTvPairingCommandParams): Promise<TvPairingModel> {
-  const pairing = await loadTvPairingInProject(params.organizationId, params.projectId, params.pairingId);
-  if (isRevoked(pairing)) {
-    throw new TvPairingRevokedError();
-  }
-
-  const validCommands: TvPairingCommandType[] = ['reboot', 'display_sleep', 'display_wake', 'force_reload'];
-  if (!validCommands.includes(params.type)) {
-    throw new InvalidTvPairingError([`Invalid command type "${params.type}".`]);
-  }
-
-  const commandId = randomBytes(16).toString('hex');
-  const now = new Date().toISOString();
-
-  pairing.pending_command = {
-    commandId,
-    type: params.type,
-    issuedAt: now,
-    issuedBy: params.actorUserId,
-    ...(params.parameters ? { parameters: params.parameters } : {}),
-  };
-
-  if (params.type === 'display_sleep') {
-    pairing.power_state = 'sleep';
-  } else if (params.type === 'display_wake') {
-    pairing.power_state = 'on';
-  }
-
-  await pairing.save();
-
-  try {
-    await recordAuditLogEntry({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      actorType: 'user',
-      actorId: params.actorUserId,
-      action: 'tv_pairing.command',
-      targetType: 'tv_pairing',
-      targetId: pairing.id,
-      summary: `Sent command "${params.type}" to paired TV "${pairing.label ?? pairing.id}"`,
-      after: { commandId, type: params.type },
-    });
-  } catch {
-    // Best-effort
-  }
-
-  return pairing;
-}
-
-export interface UpdateTvPairingCecScheduleParams {
-  organizationId: string;
-  projectId: string;
-  pairingId: string;
-  cecSchedule: TvPairingCecSchedule;
-  actorUserId: string;
-}
-
-/** Configures automated HDMI-CEC standby schedules for a paired display (KAN-307). */
-export async function updateTvPairingCecSchedule(params: UpdateTvPairingCecScheduleParams): Promise<TvPairingModel> {
-  const pairing = await loadTvPairingInProject(params.organizationId, params.projectId, params.pairingId);
-  if (isRevoked(pairing)) {
-    throw new TvPairingRevokedError();
-  }
-
-  pairing.cec_standby_schedule = params.cecSchedule;
-  await pairing.save();
-
-  try {
-    await recordAuditLogEntry({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      actorType: 'user',
-      actorId: params.actorUserId,
-      action: 'tv_pairing.cec_schedule',
-      targetType: 'tv_pairing',
-      targetId: pairing.id,
-      summary: `Updated CEC standby schedule for TV "${pairing.label ?? pairing.id}"`,
-      after: { cecSchedule: params.cecSchedule },
-    });
-  } catch {
-    // Best-effort
-  }
-
-  return pairing;
-}
-
-export interface AcknowledgeTvPairingCommandParams {
-  deviceToken: string;
-  commandId: string;
-  status: 'acknowledged' | 'failed';
-  error?: string;
-  powerState?: TvPairingPowerState;
-}
-
-/**
- * Acknowledges receipt and execution of a remote display command from the TV kiosk runtime (KAN-307).
- * Clears the pending command and updates the last execution result and power state.
- */
-export async function acknowledgeTvPairingCommand(params: AcknowledgeTvPairingCommandParams): Promise<Result<TvPairingModel, string>> {
-  const found = await findTvPairingByDeviceToken(params.deviceToken);
-  if (!found.ok) {
-    return found;
-  }
-  const pairing = found.value;
-  if (isRevoked(pairing) || !pairing.claimed) {
-    return err('This TV is not currently paired.');
-  }
-
-  const now = new Date().toISOString();
-  const commandType = pairing.pending_command?.commandId === params.commandId
-    ? pairing.pending_command.type
-    : 'unknown';
-
-  pairing.last_command_result = {
-    commandId: params.commandId,
-    type: commandType,
-    executedAt: now,
-    status: params.status,
-    ...(params.error ? { error: params.error } : {}),
-  };
-
-  if (pairing.pending_command?.commandId === params.commandId) {
-    pairing.pending_command = null;
-  }
-
-  if (params.powerState) {
-    pairing.power_state = params.powerState;
-  } else if (commandType === 'display_sleep') {
-    pairing.power_state = 'sleep';
-  } else if (commandType === 'display_wake') {
-    pairing.power_state = 'on';
-  }
-
-  await touchTvPairing(pairing);
-  await pairing.save();
-
-  return ok(pairing);
-}
-

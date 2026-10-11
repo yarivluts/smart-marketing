@@ -154,6 +154,34 @@ export interface NpsOverview {
   overall: NpsBreakdown;
   /** Oldest day first, one bucket per day in the trend window (including empty days). */
   dailyTrend: NpsDailyTrendPoint[];
+  /**
+   * The record cap this overview was computed under, when more landed
+   * `survey_response` records exist than were read — `null` when the read saw
+   * all of them. `overall` is then a sample, not the project's NPS.
+   */
+  sampledFrom: number | null;
+  /**
+   * The earliest UTC date (`YYYY-MM-DD`) the daily trend can be trusted from,
+   * or `null` when the read reached back past the start of the window.
+   *
+   * This is the part that misleads hardest (KAN-167). Two bounds compose here:
+   * the read takes the most recent N *responses*, and the trend then slices
+   * `windowDays` out of them. A project receiving more than N responses inside
+   * the window has its read exhausted before it reaches the window's start — so
+   * the OLDEST days of the trend come back empty **because the fetch stopped**,
+   * not because nobody answered.
+   *
+   * A wrong number is one thing; this renders a wrong *shape*. A run of blank
+   * days followed by filled ones reads as "we started collecting recently" or
+   * "volume is growing", which is exactly what a sparkline is read for. And the
+   * empty bucket's tooltip said, in words, "no responses" — asserting something
+   * about days the read never looked at.
+   *
+   * Derived from the oldest record actually read, so it states what the data
+   * supports rather than estimating it: every day from here forward was fully
+   * covered.
+   */
+  trendReliableFrom: string | null;
 }
 
 /**
@@ -178,6 +206,19 @@ export async function listSurveyResponseRecordsForProject(
 }
 
 /**
+ * Options for {@link getNpsOverviewForProject}.
+ *
+ * A caller supplying its own records must state whether they were capped —
+ * only it knows, and the Feedback page does exactly this to avoid paying for
+ * the same bounded read twice. A union rather than an optional field, so the
+ * answer cannot be omitted: defaulting to "complete" would restore the silent
+ * trend truncation this change exists to disclose (KAN-167).
+ */
+export type GetNpsOverviewOptions =
+  | { limit?: number; now?: number; windowDays?: number; precomputedRecords?: undefined; sampledFrom?: undefined }
+  | { precomputedRecords: RawRecordModel[]; sampledFrom: number | null; now?: number; windowDays?: number; limit?: undefined };
+
+/**
  * A project's NPS score, promoter/passive/detractor breakdown, and a daily
  * trend over the trailing window — computed fresh from bounded, landed
  * `survey_response` raw records, folded across every environment (same
@@ -188,14 +229,26 @@ export async function listSurveyResponseRecordsForProject(
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; now?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetNpsOverviewOptions,
 ): Promise<NpsOverview> {
   await requireProjectInOrg(organizationId, projectId);
   const limit = options?.limit ?? DEFAULT_NPS_OVERVIEW_RECORD_LIMIT;
   const windowDays = options?.windowDays ?? DEFAULT_NPS_OVERVIEW_WINDOW_DAYS;
   const now = options?.now ?? Date.now();
 
-  const records = options?.precomputedRecords ?? (await listSurveyResponseRecordsForProject(organizationId, projectId, limit));
+  let sampledFrom: number | null;
+  let records: RawRecordModel[];
+  if (options && 'precomputedRecords' in options && options.precomputedRecords !== undefined) {
+    records = options.precomputedRecords;
+    sampledFrom = options.sampledFrom;
+  } else {
+    // One record past the cap, then dropped — evidence the cap was hit, never an
+    // entry. `length === limit` cannot tell a project with exactly `limit`
+    // responses (complete) from one with tens of thousands (a sample).
+    const fetched = await listSurveyResponseRecordsForProject(organizationId, projectId, limit + 1);
+    sampledFrom = fetched.length > limit ? limit : null;
+    records = fetched.slice(0, limit);
+  }
   const responses = records.map(parseNpsResponse).filter((r): r is ParsedSurveyResponse => r !== null);
 
   const overall = computeNpsBreakdown(responses.map((r) => r.score));
@@ -214,7 +267,19 @@ export async function getNpsOverviewForProject(
     breakdown: computeNpsBreakdown(scoresByDay.get(date) ?? []),
   }));
 
-  return { overall, dailyTrend };
+  // The oldest record the read actually reached. Everything from its day forward
+  // was fully covered; anything before it is unknown rather than empty. Only
+  // meaningful when the read was capped — an uncapped read saw the project's
+  // whole history, so every day in the window is genuinely observed.
+  //
+  // `listRecentRecordsForSchemas` returns newest-first, so the oldest is last.
+  // Read off the parsed responses rather than the raw records so a trailing
+  // unparseable row cannot claim coverage the data does not have.
+  const oldestReadAt = responses.length > 0 ? responses[responses.length - 1].landedAt : null;
+  const trendReliableFrom =
+    sampledFrom !== null && oldestReadAt !== null && Date.parse(oldestReadAt) > windowStartOfDayMs ? utcDateKey(oldestReadAt) : null;
+
+  return { overall, dailyTrend, sampledFrom, trendReliableFrom };
 }
 
 /**

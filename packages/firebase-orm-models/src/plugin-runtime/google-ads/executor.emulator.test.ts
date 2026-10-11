@@ -76,6 +76,7 @@ const DRAFT: GoogleAdsCampaignDraft = {
   platform: 'google_ads',
   campaignName: 'Winning Themes',
   advertisingChannelType: 'SEARCH',
+  containsEuPoliticalAdvertising: false,
   dailyBudgetUsd: 25,
   adGroups: [
     {

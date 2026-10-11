@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { createTranslator } from 'next-intl';
+import heMessages from '@/messages/he.json';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { ActionAuditTrail, type AuditActionItem } from './action-audit-trail';
 
@@ -81,4 +83,27 @@ describe('ActionAuditTrail Component', () => {
       expect(onRollback).toHaveBeenCalledWith('act-1');
     });
   });
+
+  it('renders its Hebrew copy from he.json', () => {
+    const t = createTranslator({ locale: 'he', messages: heMessages, namespace: 'ActionAuditTrail' });
+    renderWithIntl(<ActionAuditTrail actions={mockActions} onRollback={vi.fn()} />, { locale: 'he' });
+
+    expect(screen.getByTestId('audit-trail-container')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getByTestId('audit-search-input')).toHaveAttribute('placeholder', t('searchPlaceholder'));
+    expect(screen.getByTestId('filter-status-all')).toHaveTextContent(t('filterAll', { count: 3 }));
+    expect(screen.getByText(t('columnTarget'))).toBeInTheDocument();
+    expect(screen.getByText(t('columnExecutedAt'))).toBeInTheDocument();
+    expect(screen.getByTestId('rollback-btn-act-1')).toHaveTextContent(t('rollbackButton'));
+  });
+
+  it('distinguishes an empty log from an empty filter result, in English', () => {
+    const { unmount } = renderWithIntl(<ActionAuditTrail actions={[]} />, { locale: 'en' });
+    expect(screen.getByText('No automation actions in audit log')).toBeInTheDocument();
+    unmount();
+
+    renderWithIntl(<ActionAuditTrail actions={mockActions} />, { locale: 'en' });
+    fireEvent.change(screen.getByTestId('audit-search-input'), { target: { value: 'nothing-matches' } });
+    expect(screen.getByText('No actions matching your filter')).toBeInTheDocument();
+  });
+
 });

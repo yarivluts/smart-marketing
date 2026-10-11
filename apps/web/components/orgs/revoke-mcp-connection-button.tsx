@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { Trash2 } from 'lucide-react';
-import { PpButton } from '@/components/pastel/primitives';
+import { Button } from '@/components/ui/button';
 
 export interface RevokeMcpConnectionButtonProps {
   orgId: string;
@@ -35,18 +34,11 @@ export function RevokeMcpConnectionButton({ orgId, projectId, grantId }: RevokeM
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <PpButton
-        type="button"
-        variant="danger"
-        size="sm"
-        onClick={handleClick}
-        disabled={submitting}
-        icon={Trash2}
-      >
+      <Button type="button" variant="destructive" size="sm" onClick={handleClick} disabled={submitting}>
         {t('revokeMcpConnection')}
-      </PpButton>
+      </Button>
       {error ? (
-        <p role="alert" className="text-xs text-pp-error font-medium">
+        <p role="alert" className="text-xs text-destructive">
           {t('revokeMcpConnectionError')}
         </p>
       ) : null}

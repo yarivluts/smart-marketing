@@ -14,11 +14,14 @@ import {
   ensureUserForFirebaseSession,
   generateLocalKmsKeyRing,
   GoogleCustomerMatchCredentialConfigError,
+  GOOGLE_CUSTOMER_MATCH_AD_PERSONALIZATION_CONSENT_CONFIG_FIELD,
+  GOOGLE_CUSTOMER_MATCH_AD_USER_DATA_CONSENT_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
   GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML,
   installPlugin,
+  InvalidPluginConfigError,
   listActionPluginInstallsForProject,
   listAuditLogEntriesForOrg,
   listCrmSyncRunsForSegment,
@@ -42,6 +45,7 @@ import {
   setSharedCredentialSecret,
   syncSegmentToCrm,
   UnsupportedSinkPluginError,
+  updatePluginInstallConfig,
   type SchemaFieldInput,
   type SinkPluginExecutor,
 } from '../index';
@@ -205,7 +209,7 @@ async function setupInstalledGoogleCustomerMatchPlugin(
     organizationId: organization.id,
     projectId: project.id,
     pluginId: GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
-    version: '1.0.0',
+    version: '1.1.0',
     consentedScopes: ['action:execute'],
     config: { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD]: userListName },
     installedByUserId: owner.id,
@@ -365,7 +369,37 @@ describe('resolveGoogleCustomerMatchCredentialSecret', () => {
       refreshToken: 'refresh-token',
       customerId: '1234567890',
       userListName: 'Warm leads',
+      // No consent answered in the install config: nothing is sent, nothing is assumed (KAN-236).
+      consent: {},
     });
+  });
+
+  it("carries the admin's consent answers from the install config, and only the answered ones (KAN-236)", async () => {
+    const { owner, organization, project, install, kms } = await setupInstalledGoogleCustomerMatchPlugin('Resolve Google Customer Match Consent Org');
+    const updated = await updatePluginInstallConfig({
+      organizationId: organization.id,
+      projectId: project.id,
+      installId: install.id,
+      config: { ...install.config, [GOOGLE_CUSTOMER_MATCH_AD_USER_DATA_CONSENT_CONFIG_FIELD]: 'GRANTED' },
+      performedByUserId: owner.id,
+    });
+
+    const secret = await resolveGoogleCustomerMatchCredentialSecret(organization.id, project.id, updated, kms);
+
+    expect(secret.consent).toEqual({ adUserData: 'GRANTED' });
+  });
+
+  it('rejects a consent value outside the manifest enum when the config is saved', async () => {
+    const { owner, organization, project, install } = await setupInstalledGoogleCustomerMatchPlugin('Google Customer Match Bad Consent Org');
+    await expect(
+      updatePluginInstallConfig({
+        organizationId: organization.id,
+        projectId: project.id,
+        installId: install.id,
+        config: { ...install.config, [GOOGLE_CUSTOMER_MATCH_AD_PERSONALIZATION_CONSENT_CONFIG_FIELD]: 'MAYBE' },
+        performedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidPluginConfigError);
   });
 
   it('rejects an install missing the credential-attachment config field', async () => {
@@ -375,7 +409,7 @@ describe('resolveGoogleCustomerMatchCredentialSecret', () => {
       organizationId: organization.id,
       projectId: project.id,
       pluginId: GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
-      version: '1.0.0',
+      version: '1.1.0',
       consentedScopes: ['action:execute'],
       config: { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: 'nonexistent-attachment', [GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD]: 'Warm leads' },
       installedByUserId: owner.id,
@@ -399,7 +433,7 @@ describe('resolveGoogleCustomerMatchCredentialSecret', () => {
       organizationId: organization.id,
       projectId: project.id,
       pluginId: GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
-      version: '1.0.0',
+      version: '1.1.0',
       consentedScopes: ['action:execute'],
       config: { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD]: 'Warm leads' },
       installedByUserId: owner.id,

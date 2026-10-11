@@ -3,18 +3,27 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { PpButton, PpField, ppInputClass } from '@/components/pastel/primitives';
-import { Edit2, Save, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export interface EditHookEndpointFormProps {
   orgId: string;
   projectId: string;
   hookEndpointId: string;
   initialName: string;
+  /** `undefined` for a `none`-mode endpoint — the header-name field only ever renders in `hmac_sha256` mode, since `signatureMode` itself is immutable on this form. */
   initialSignatureHeaderName?: string;
 }
 
-/** Toggles between an Edit button and an inline edit form for one hook endpoint row. */
+/**
+ * Toggles between a compact "Edit" button and an inline edit form for one
+ * hook endpoint row on the Hooks admin page (KAN-123 — the same "create +
+ * list only, no way to fix a typo'd name" gap KAN-100/KAN-117/KAN-119/
+ * KAN-120/KAN-121 already closed for their own sibling registries).
+ * `signatureMode`/`environmentId`/`hookId` stay immutable — see
+ * `updateHookEndpoint`'s own doc comment for why (recreating `hookId` would
+ * break the sending SaaS's already-configured webhook URL).
+ */
 export function EditHookEndpointForm({
   orgId,
   projectId,
@@ -68,47 +77,49 @@ export function EditHookEndpointForm({
 
   if (!editing) {
     return (
-      <PpButton type="button" variant="ghost" size="sm" icon={Edit2} onClick={startEditing}>
+      <Button type="button" variant="outline" size="sm" onClick={startEditing}>
         {t('editEndpoint')}
-      </PpButton>
+      </Button>
     );
   }
 
   return (
-    <form className="flex w-full flex-col gap-4 rounded-2xl bg-pp-surface-container-low/50 p-4 border border-pp-outline-variant/30 mt-2" onSubmit={handleSubmit} noValidate>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <PpField label={t('nameLabel')} htmlFor={`edit-hook-endpoint-name-${hookEndpointId}`}>
-          <input
-            id={`edit-hook-endpoint-name-${hookEndpointId}`}
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className={ppInputClass}
-          />
-        </PpField>
-        {initialSignatureHeaderName !== undefined ? (
-          <PpField label={t('signatureHeaderNameLabel')} htmlFor={`edit-hook-endpoint-signature-header-${hookEndpointId}`}>
-            <input
-              id={`edit-hook-endpoint-signature-header-${hookEndpointId}`}
-              required
-              placeholder="X-Hub-Signature-256"
-              value={signatureHeaderName}
-              onChange={(event) => setSignatureHeaderName(event.target.value)}
-              className={ppInputClass}
-            />
-          </PpField>
-        ) : null}
+    <form className="flex w-full flex-col gap-3" onSubmit={handleSubmit} noValidate>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor={`edit-hook-endpoint-name-${hookEndpointId}`}>
+          {t('nameLabel')}
+        </label>
+        <Input
+          id={`edit-hook-endpoint-name-${hookEndpointId}`}
+          required
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
       </div>
+      {initialSignatureHeaderName !== undefined ? (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium" htmlFor={`edit-hook-endpoint-signature-header-${hookEndpointId}`}>
+            {t('signatureHeaderNameLabel')}
+          </label>
+          <Input
+            id={`edit-hook-endpoint-signature-header-${hookEndpointId}`}
+            required
+            placeholder="X-Hub-Signature-256"
+            value={signatureHeaderName}
+            onChange={(event) => setSignatureHeaderName(event.target.value)}
+          />
+        </div>
+      ) : null}
       <div className="flex items-center gap-3">
-        <PpButton type="submit" variant="primary" size="sm" icon={Save} disabled={submitting || name.trim().length === 0}>
+        <Button type="submit" disabled={submitting || name.trim().length === 0}>
           {t('saveEndpoint')}
-        </PpButton>
-        <PpButton type="button" variant="ghost" size="sm" icon={X} disabled={submitting} onClick={() => setEditing(false)}>
+        </Button>
+        <Button type="button" variant="outline" disabled={submitting} onClick={() => setEditing(false)}>
           {t('cancelEditEndpoint')}
-        </PpButton>
+        </Button>
       </div>
       {error ? (
-        <p role="alert" className="text-sm font-medium text-pp-error">
+        <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}

@@ -14,9 +14,11 @@ import {
   queryProjectCohortRetentionForAdmin,
   queryProjectFunnelSteps,
   queryProjectFunnelStepsForAdmin,
+  registerSchemaDefinition,
   searchProjectCustomers,
   searchProjectCustomersForAdmin,
   setProjectCostQuota,
+  setProjectFunnel,
   TrackingAlertModel,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
@@ -63,21 +65,67 @@ describe('searchProjectCustomers', () => {
       { entity_id: 'cust_1', schema_name: 'customer', properties: '{"email":"a@example.com"}', last_seen_at: '2026-07-10T00:00:00Z' },
     ]);
 
-    const results = await searchProjectCustomers({
+    const page = await searchProjectCustomers({
       organizationId: organization.id,
       projectId: project.id,
       query: 'a@example.com',
       executor,
     });
 
-    expect(results).toEqual([
+    expect(page.results).toEqual([
       { entityId: 'cust_1', schemaName: 'customer', properties: { email: 'a@example.com' }, lastSeenAt: '2026-07-10T00:00:00Z' },
     ]);
+    expect(page.hasMore).toBe(false);
     expect(executor.calls).toHaveLength(1);
     expect(executor.calls[0].sql).toContain('FROM entities');
     expect(executor.calls[0].sql).toContain('entity_id LIKE @likeQuery');
     expect(executor.calls[0].params.likeQuery).toBe('%a@example.com%');
     expect(executor.calls[0].params).not.toHaveProperty('schemaName');
+  });
+
+  describe('an empty page says whether anything could have matched (KAN-137)', () => {
+    it('reports no_entity_schemas for an events-only project', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Search Customers Events Only Org');
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'user_signed_up',
+        fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      });
+
+      const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', executor: new FakeWarehouseQueryExecutor([]) });
+
+      expect(page).toEqual({ results: [], hasMore: false, limit: expect.any(Number), emptyReason: 'no_entity_schemas' });
+    });
+
+    it('leaves emptyReason unset on a plain miss once an entity schema exists', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Search Customers Entity Miss Org');
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'entity',
+        name: 'customer',
+        fields: [{ name: 'email', type: 'string', isRequired: false, isPii: true, isIdentityKey: true }],
+        createdByUserId: owner.id,
+      });
+
+      const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', executor: new FakeWarehouseQueryExecutor([]) });
+
+      expect(page.results).toEqual([]);
+      expect(page.emptyReason).toBeUndefined();
+    });
+
+    it('never sets emptyReason on a page that found rows', async () => {
+      const { organization, project } = await setupOrgWithProject('Search Customers Found Org');
+      const executor = new FakeWarehouseQueryExecutor([{ entity_id: 'cust_1', schema_name: 'customer', properties: '{}', last_seen_at: '2026-07-10T00:00:00Z' }]);
+
+      const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', executor });
+
+      expect(page.results).toHaveLength(1);
+      expect(page.emptyReason).toBeUndefined();
+    });
   });
 
   it('adds a schema_name filter when provided', async () => {
@@ -99,6 +147,54 @@ describe('searchProjectCustomers', () => {
     expect(executor.calls[0].params.likeQuery).toBe('%50\\%\\_off\\\\deal%');
   });
 
+  it('asks for one row beyond the limit, so truncation is measured rather than guessed', async () => {
+    // results.length === limit cannot distinguish "exactly 20 matched" from
+    // "thousands matched". Over-fetching by one answers it exactly.
+    const { organization, project } = await setupOrgWithProject('Search Customers Overfetch Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', limit: 5, executor });
+
+    expect(executor.calls[0].sql).toContain('LIMIT 6');
+  });
+
+  it('reports hasMore and withholds the extra row when the warehouse had more', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers HasMore Org');
+    const rows = Array.from({ length: 6 }, (_unused, index) => ({
+      entity_id: `cust_${index}`,
+      schema_name: 'customer',
+      properties: '{}',
+      last_seen_at: '2026-07-10T00:00:00Z',
+    }));
+    const executor = new FakeWarehouseQueryExecutor(rows);
+
+    const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', limit: 5, executor });
+
+    expect(page.hasMore).toBe(true);
+    expect(page.limit).toBe(5);
+    // The probe row must never be shown - it is evidence, not a result.
+    expect(page.results).toHaveLength(5);
+    expect(page.results.map((result) => result.entityId)).not.toContain('cust_5');
+  });
+
+  it('reports hasMore false when the warehouse returned exactly the limit', async () => {
+    // The case the old length-based guess got wrong: exactly `limit` rows is a
+    // COMPLETE answer, not a truncated one.
+    const { organization, project } = await setupOrgWithProject('Search Customers Exact Org');
+    const rows = Array.from({ length: 5 }, (_unused, index) => ({
+      entity_id: `cust_${index}`,
+      schema_name: 'customer',
+      properties: '{}',
+      last_seen_at: '2026-07-10T00:00:00Z',
+    }));
+    const executor = new FakeWarehouseQueryExecutor(rows);
+
+    const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', limit: 5, executor });
+
+    expect(page.hasMore).toBe(false);
+    expect(page.results).toHaveLength(5);
+  });
+
   it('rejects an empty query without ever calling the executor', async () => {
     const { organization, project } = await setupOrgWithProject('Search Customers Empty Org');
     const executor = new FakeWarehouseQueryExecutor([]);
@@ -115,8 +211,8 @@ describe('searchProjectCustomers', () => {
       { entity_id: 'cust_2', schema_name: 'customer', properties: 'not-json', last_seen_at: '2026-07-10T00:00:00Z' },
     ]);
 
-    const results = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
-    expect(results[0].properties).toBe('not-json');
+    const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+    expect(page.results[0].properties).toBe('not-json');
   });
 });
 
@@ -131,6 +227,8 @@ describe('searchProjectCustomersForAdmin (KAN-108)', () => {
 
     expect(outcome).toEqual({
       ok: true,
+      hasMore: false,
+      limit: 20,
       results: [{ entityId: 'cust_1', schemaName: 'customer', properties: { email: 'a@example.com' }, lastSeenAt: '2026-07-10T00:00:00Z' }],
     });
   });
@@ -270,49 +368,80 @@ describe('queryProjectFunnelSteps', () => {
     });
   }
 
-  it('reads the confirmed funnel from Firestore and counts distinct customers per step over the events table', async () => {
+  it('reads the confirmed funnel from Firestore and maps the sequential per-step people counts, in funnel order', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Funnel Org');
     await confirmFunnel(organization.id, project.id, owner.id);
     const executor = new FakeWarehouseQueryExecutor([
-      // Deliberately out of confirmed order — the step order comes from the funnel, not the rows.
-      { event_type: 'activated', customer_count: 2 },
-      { event_type: 'signup', customer_count: 5 },
-      { event_type: 'purchase', customer_count: 2 },
+      // Deliberately out of order, and as strings (BigQuery returns INT64 that way): rows are keyed by step index.
+      { step_index: '1', people_count: '2' },
+      { step_index: '0', people_count: '5' },
+      { step_index: '2', people_count: '1' },
     ]);
 
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1 },
-      { stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
-      { stageKey: 'conversion', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.4 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
+      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 1, conversionRateFromFirst: 0.2 },
     ]);
-    expect(executor.calls[0].sql).toContain('FROM events');
-    expect(executor.calls[0].sql).toContain('COUNT(DISTINCT entity_id) AS customer_count');
-    expect(executor.calls[0].sql).toContain('event_type IN (@funnelEvent0, @funnelEvent1, @funnelEvent2)');
-    expect(executor.calls[0].params).toMatchObject({
+    expect(executor.calls).toHaveLength(1);
+    expect(executor.calls[0].params).toEqual({
       organizationId: organization.id,
       projectId: project.id,
+      // The project's default (prod) environment, resolved server-side when the caller names none.
+      environmentId: expect.any(String),
       funnelEvent0: 'signup',
       funnelEvent1: 'activated',
       funnelEvent2: 'purchase',
     });
   });
 
+  it('builds one sequential, identity-resolving query (B20): people not events, each step after the previous one', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Sql Shape Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, environmentId: 'env-a', executor });
+
+    const { sql } = executor.calls[0];
+    // Never the old per-event count.
+    expect(sql).not.toContain('COUNT(DISTINCT entity_id)');
+    // A person: declared customer, else the visitor's stitched customer, else the visitor, else the legacy entity id.
+    expect(sql).toContain("COALESCE(LAX_STRING(e.properties['customer_id']), b.customer_id, LAX_STRING(e.properties['anon_id']), e.entity_id) AS person_id");
+    expect(sql).toContain('LEFT JOIN bridge_identity b');
+    expect(sql).toContain('AND b.environment_id = e.environment_id');
+    expect(sql).toContain("AND b.anon_id = COALESCE(LAX_STRING(e.properties['anon_id']), CASE WHEN e.event_type = 'touchpoint' THEN e.entity_id END)");
+    // Scoped exactly as before, the environment included.
+    expect(sql).toContain('e.organization_id = @organizationId');
+    expect(sql).toContain('e.project_id = @projectId');
+    expect(sql).toContain('e.environment_id = @environmentId');
+    expect(sql).toContain('e.event_type IN (@funnelEvent0, @funnelEvent1, @funnelEvent2)');
+    // Step N is built only from people who reached step N-1, at or after they reached it.
+    expect(sql).toContain('WHERE event_type = @funnelEvent0 AND person_id IS NOT NULL');
+    expect(sql).toContain('INNER JOIN step_0 prev ON prev.person_id = e.person_id');
+    expect(sql).toContain('WHERE e.event_type = @funnelEvent1 AND e.occurred_at >= prev.reached_at');
+    expect(sql).toContain('INNER JOIN step_1 prev ON prev.person_id = e.person_id');
+    expect(sql).toContain('WHERE e.event_type = @funnelEvent2 AND e.occurred_at >= prev.reached_at');
+    expect(sql).toContain('SELECT 2 AS step_index, COUNT(*) AS people_count FROM step_2');
+    expect(sql).not.toContain('step_3');
+    expect(executor.calls[0].params.environmentId).toBe('env-a');
+  });
+
   it('reports a real 0 (no division-by-zero) for a confirmed step with no events yet', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Funnel Partial Org');
     await confirmFunnel(organization.id, project.id, owner.id);
     const executor = new FakeWarehouseQueryExecutor([
-      { event_type: 'signup', customer_count: 4 },
-      // 'activated' / 'purchase' have landed no events yet — absent from the grouped rows.
+      { step_index: 0, people_count: 4 },
+      // A step whose row is missing reads as a real 0, never a dropped step.
     ]);
 
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
-      { stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
-      { stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
+      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
     ]);
   });
 
@@ -327,9 +456,44 @@ describe('queryProjectFunnelSteps', () => {
     expect(executor.calls[0].params.environmentId).toBe('env-test');
   });
 
+  it('reads a funnel set by setProjectFunnel (MCP set_funnel) exactly like a wizard-confirmed one, even when two steps share a stage key', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Set Via Mcp Org');
+    for (const name of ['document_sent', 'document_signed']) {
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name,
+        fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      });
+    }
+    await setProjectFunnel({
+      organizationId: organization.id,
+      projectId: project.id,
+      actorType: 'api_key',
+      actorId: 'key-1',
+      steps: [
+        { eventSchemaName: 'document_sent', stageKey: 'other' },
+        { eventSchemaName: 'document_signed', stageKey: 'other' },
+      ],
+    });
+    const executor = new FakeWarehouseQueryExecutor([
+      { step_index: 0, people_count: 8 },
+      { step_index: 1, people_count: 2 },
+    ]);
+
+    const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(rows).toEqual([
+      { eventSchemaName: 'document_sent', stageKey: 'other', stepOrder: 0, customerCount: 8, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.25 },
+    ]);
+  });
+
   it('returns an empty list, without touching the warehouse, when no funnel is confirmed', async () => {
     const { organization, project } = await setupOrgWithProject('Funnel Empty Org');
-    const executor = new FakeWarehouseQueryExecutor([{ event_type: 'signup', customer_count: 9 }]);
+    const executor = new FakeWarehouseQueryExecutor([{ step_index: 0, people_count: 9 }]);
 
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
@@ -355,8 +519,8 @@ describe('queryProjectFunnelStepsForAdmin', () => {
     const { owner, organization, project } = await setupOrgWithProject('Funnel Admin Ok Org');
     await confirmFunnel(organization.id, project.id, owner.id);
     const executor = new FakeWarehouseQueryExecutor([
-      { event_type: 'signup', customer_count: 10 },
-      { event_type: 'activated', customer_count: 5 },
+      { step_index: 0, people_count: 10 },
+      { step_index: 1, people_count: 5 },
     ]);
 
     const outcome = await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
@@ -364,8 +528,8 @@ describe('queryProjectFunnelStepsForAdmin', () => {
     expect(outcome).toEqual({
       ok: true,
       steps: [
-        { stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
-        { stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5 },
+        { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
+        { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5 },
       ],
     });
   });
@@ -450,7 +614,25 @@ describe('listProjectInsights', () => {
     win.setPathParams({ organization_id: organization.id, project_id: project.id });
     await win.save();
 
-    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id });
+    // A win another environment's key produced (KAN-99): a caller bound to env-1 must not see it.
+    const otherEnvironmentWin = new WinEventModel();
+    otherEnvironmentWin.organization_id = organization.id;
+    otherEnvironmentWin.project_id = project.id;
+    otherEnvironmentWin.environment_id = 'env-2';
+    otherEnvironmentWin.win_rule_id = 'rule-2';
+    otherEnvironmentWin.win_rule_name = 'Test signup';
+    otherEnvironmentWin.win_type = 'generic';
+    otherEnvironmentWin.schema_name = 'order_completed';
+    otherEnvironmentWin.raw_record_id = 'record-2';
+    otherEnvironmentWin.client_id = 'client-2';
+    otherEnvironmentWin.payload = {};
+    otherEnvironmentWin.occurred_at = '2026-07-14T00:00:00.000Z';
+    otherEnvironmentWin.created_at = '2026-07-14T00:00:00.000Z';
+    otherEnvironmentWin.setPathParams({ organization_id: organization.id, project_id: project.id });
+    await otherEnvironmentWin.save();
+
+    // The key's own environment, as `list_insights` passes it.
+    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, environmentId: 'env-1' });
 
     expect(insights).toHaveLength(2);
     // Newest first: the win (2026-07-13) before the alert (2026-07-12).
@@ -477,6 +659,70 @@ describe('listProjectInsights', () => {
 
     const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit: 2 });
     expect(insights).toHaveLength(2);
+  });
+
+  /**
+   * A warning is never evicted by wins, however recent the wins are (KAN-156).
+   *
+   * The merge used to sort all three kinds by date and slice, which reads as
+   * neutral and is not: wins are the only kind that arrives continuously, so on
+   * any active project they fill every slot. A tracking alert from last week and
+   * a `metric_health` insight — dated by the definition's `created_at`, old by
+   * construction — were both pushed out by this week's wins and never shown.
+   *
+   * That is the page's whole purpose failing silently, and it is the shape of
+   * EasySign's P-03 report: metrics failing at query time while `list_insights`
+   * "reported nothing". The audit that added the kind did not fix it, because
+   * the insight was computed correctly and then discarded on the way out.
+   *
+   * The fixture is the minimum that reproduces it: `limit` wins, all newer than
+   * the one alert. Under the old sort the alert is element `limit` and is
+   * sliced off, so this fails on the old code for the right reason rather than
+   * by counting rows.
+   */
+  it('keeps a warning that every win outranks by date', async () => {
+    const { organization, project } = await setupOrgWithProject('Warning Eviction Org');
+    const limit = 2;
+
+    const alert = new TrackingAlertModel();
+    alert.organization_id = organization.id;
+    alert.project_id = project.id;
+    alert.environment_id = 'env-1';
+    alert.schema_name = 'checkout_completed';
+    alert.status = 'active';
+    alert.trigger = 'manual';
+    alert.detected_at = '2026-07-01T00:00:00.000Z';
+    alert.last_seen_at = '2026-06-30T00:00:00.000Z';
+    alert.last_checked_at = '2026-07-01T00:00:00.000Z';
+    alert.setPathParams({ organization_id: organization.id, project_id: project.id });
+    await alert.save();
+
+    for (let i = 0; i < limit; i += 1) {
+      const win = new WinEventModel();
+      win.organization_id = organization.id;
+      win.project_id = project.id;
+      win.environment_id = 'env-1';
+      win.win_rule_id = `rule-${i}`;
+      win.win_rule_name = `Big order ${i}`;
+      win.win_type = 'generic';
+      win.schema_name = 'order_completed';
+      win.raw_record_id = `record-${i}`;
+      win.client_id = `client-${i}`;
+      win.payload = { amount: 500 };
+      // Every win is newer than the alert — the condition that used to erase it.
+      win.occurred_at = `2026-08-0${i + 1}T00:00:00.000Z`;
+      win.created_at = `2026-08-0${i + 1}T00:00:00.000Z`;
+      win.setPathParams({ organization_id: organization.id, project_id: project.id });
+      await win.save();
+    }
+
+    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit, environmentId: 'env-1' });
+
+    expect(insights).toHaveLength(limit);
+    expect({ keptTheAlert: insights.some((insight) => insight.kind === 'tracking_alert') }).toEqual({ keptTheAlert: true });
+    // Display order is still newest-first: warnings win the slot, not the sort.
+    const occurredAts = insights.map((insight) => insight.occurredAt);
+    expect(occurredAts).toEqual([...occurredAts].sort().reverse());
   });
 });
 
@@ -530,7 +776,7 @@ describe('KAN-39 cost-guardrail quota, wired via runQuotaGatedWarehouseQuery', (
       steps: [{ eventSchemaName: 'signup', stageKey: 'signup', order: 0 }],
     });
     await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
-    const executor = new FakeWarehouseQueryExecutor([{ event_type: 'signup', customer_count: 3 }]);
+    const executor = new FakeWarehouseQueryExecutor([{ step_index: 0, people_count: 3 }]);
 
     await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
     await expect(queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor })).rejects.toThrow(

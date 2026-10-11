@@ -73,8 +73,34 @@ describe('StripeSourcePluginExecutor', () => {
     expect(result.kind).toBe('event');
     expect(result.records).toHaveLength(1);
     expect(result.records[0]).toMatchObject({ event: 'stripe_charge' });
-    expect(client.listSubscriptions).not.toHaveBeenCalled();
+    // Only the cancellation-reason backfill reads subscriptions in this phase; no subscription entity is emitted here.
+    expect(client.listSubscriptions).toHaveBeenCalledTimes(1);
+    expect(result.records.every((r) => r.event !== undefined)).toBe(true);
     expect(parseStripeSyncCursor(result.nextCursor).phase).toBe('entities');
+  });
+
+  it('backfills cancellation_reason events from canceled subscriptions in the events phase', async () => {
+    const canceled: StripeSubscription = {
+      ...subscription('sub_gone', 1_700_000_000),
+      status: 'canceled',
+      canceled_at: 1_700_500_000,
+      cancellation_details: { reason: 'payment_failed', feedback: null, comment: null },
+    };
+    const client = baseClient({
+      listSubscriptions: vi.fn().mockResolvedValue({ object: 'list', data: [subscription('sub_live', 1_700_000_000), canceled], has_more: false }),
+    });
+    const { executor } = syncParams(null, client);
+    const result = await executor.sync({ organizationId: 'org_1', projectId: 'proj_1', pluginId: 'com.growthos.stripe', config: {}, credential: CREDENTIAL, cursor: null });
+
+    expect(result.kind).toBe('event');
+    expect(result.records).toEqual([
+      expect.objectContaining({
+        event_id: 'stripe:cancellation_reason:sub_gone:1700500000',
+        event: 'cancellation_reason',
+        properties: { reason_code: 'payment_failed', customer_id: 'cus_1' },
+      }),
+    ]);
+    expect(parseStripeSyncCursor(result.nextCursor).events.cancellation).toEqual({ backfillCursor: null, backfillComplete: true, lastSyncedCreated: 1_700_000_000 });
   });
 
   it('alternates to the entities phase on the next call, using the persisted cursor', async () => {

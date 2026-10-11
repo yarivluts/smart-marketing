@@ -35,6 +35,16 @@ export function bucketExpression(timeColumnSql: string, grain: TimeGrain): strin
   return `DATE_TRUNC(${dateColumnExpression(timeColumnSql)}, ${GRAIN_TO_BQ_DATE_PART[grain]})`;
 }
 
+/**
+ * The `bucket_date` a `total`-grain query (see `TOTAL_GRAIN`) stamps on its single bucket: the window's own start
+ * date, taken from its bind param (`@time_start_current`/`@time_start_previous`) rather than from
+ * the data, so every leaf of a formula carries the identical join key and the row reads like any
+ * other bucket. A constant, so it is never grouped by.
+ */
+export function totalBucketExpression(startParamName: string): string {
+  return `CAST(@${startParamName} AS DATE)`;
+}
+
 function parseDateOnly(value: string): Date {
   const date = new Date(`${value}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) {

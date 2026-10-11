@@ -2,12 +2,6 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
 import { META_CUSTOM_AUDIENCE_PLUGIN_ID } from '@growthos/firebase-orm-models';
-import { Package, Puzzle, PlusCircle, Activity, Users } from 'lucide-react';
-import {
-  PpPage,
-  PpPageHeader,
-  PpCard,
-} from '@/components/pastel/primitives';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -24,6 +18,7 @@ import {
   hasActiveInstall,
   pluginInstallHealth,
   pluginTypeForInstall,
+  readyToAddCounts,
   sourceRunStatusLabelKey,
   toPluginInstallView,
   toPluginManifestView,
@@ -36,6 +31,13 @@ import { MetaLookalikeAudienceControls } from '@/components/orgs/meta-lookalike-
 import { PluginHealthSummary } from '@/components/orgs/plugin-health-summary';
 import { PluginInstallList } from '@/components/orgs/plugin-install-list';
 import { TriggerSourcePluginRunButton } from '@/components/orgs/trigger-source-plugin-run-button';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard } from '@/components/viz/chart-card';
+import { DonutChart } from '@/components/viz/donut-chart';
+import { PageHero } from '@/components/viz/page-hero';
+import { TrendChart } from '@/components/viz/trend-chart';
+import { sourceRunSeries } from '@/lib/orgs/workspace-view';
+import { Boxes, DownloadCloud, PackageCheck, PauseCircle, PieChart, Puzzle, RefreshCw, Sparkles, Users } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -70,7 +72,7 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId })) {
     notFound();
   }
 
@@ -82,17 +84,21 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/plugins`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
   const manifestViews = manifests.map(toPluginManifestView);
   const installViews = installs.map(toPluginInstallView);
+  // A plugin already actively installed (installed/disabled) can't be installed again until it's
+  // uninstalled first (installPlugin's own PluginAlreadyInstalledError) — filtered out here rather
+  // than left for the form to discover via a failed submit.
   const installableManifests = manifestViews.filter((manifest) => !hasActiveInstall(installViews, manifest.pluginId));
-  const installableBuiltinPacks = builtinMetricPacks().filter((pack) => !hasActiveInstall(installViews, pack.pluginId));
+  const allBuiltinPacks = builtinMetricPacks();
+  const installableBuiltinPacks = allBuiltinPacks.filter((pack) => !hasActiveInstall(installViews, pack.pluginId));
+  const readyToAdd = readyToAddCounts(installViews, manifestViews, allBuiltinPacks);
 
+  // Only an active install of a `source`-type manifest has a runnable sync (KAN-47) — a disabled/
+  // uninstalled install, or one of any other plugin type, has nothing to trigger here.
   const activeSourceInstalls = installViews.filter(
     (install) => install.status === 'installed' && pluginTypeForInstall(install, manifestViews) === 'source',
   );
@@ -105,9 +111,10 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   );
   const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
 
-  const activeMetaCustomAudienceInstalls = installViews.filter(
-    (install) => install.status === 'installed' && install.pluginId === META_CUSTOM_AUDIENCE_PLUGIN_ID,
-  );
+  // The Meta Custom Audience install(s) currently active in this project — a Lookalike Audience
+  // (KAN-73 follow-up) is created from this connector's own already-synced seed audience, not any
+  // action-type plugin, so this is scoped narrower than `listActionPluginInstallsForProject`.
+  const activeMetaCustomAudienceInstalls = installViews.filter((install) => install.status === 'installed' && install.pluginId === META_CUSTOM_AUDIENCE_PLUGIN_ID);
   const lookalikeAudiencesByInstallId = new Map(
     await Promise.all(
       activeMetaCustomAudienceInstalls.map(
@@ -117,90 +124,108 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   );
 
   const t = await getTranslations('ProjectPlugins');
+  const numberFormat = new Intl.NumberFormat(locale);
+  const runningCount = installViews.filter((install) => install.status === 'installed').length;
+  const pausedCount = installViews.filter((install) => install.status === 'disabled').length;
+  const removedCount = installViews.filter((install) => install.status === 'uninstalled').length;
+  const sourceHealth = activeSourceInstalls.map((install) => pluginInstallHealth(install, 'source', sourceRunsByInstallId.get(install.id) ?? []));
+  const healthySources = sourceHealth.filter((health) => health.status === 'healthy').length;
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow={t('eyebrow')}
-        title={t('title', { projectName: project.name })}
-        description={t('description')}
-      />
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Puzzle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiRunning')} value={numberFormat.format(runningCount)} icon={PackageCheck} />
+          <StatCard title={t('kpiPaused')} value={numberFormat.format(pausedCount)} icon={PauseCircle} />
+          <StatCard
+            title={t('kpiSources')}
+            value={activeSourceInstalls.length > 0 ? `${healthySources}/${activeSourceInstalls.length}` : '-'}
+            icon={RefreshCw}
+            subtext={activeSourceInstalls.length > 0 ? t('kpiSourcesSubtext') : t('kpiSourcesNone')}
+          />
+          <StatCard
+            title={t('kpiAvailable')}
+            value={numberFormat.format(readyToAdd.plugins)}
+            icon={DownloadCloud}
+            subtext={t('kpiAvailablePacks', { count: readyToAdd.packs })}
+          />
+        </div>
+      </PageHero>
 
-      {/* 1. One-Click Builtin Metric Packs Gallery */}
-      <PpCard
-        title={t('builtinPacksHeading')}
-        subtitle={t('builtinPacksIntro')}
-        icon={Package}
-        iconAccent="primary"
-      >
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installableBuiltinPacks} />
-      </PpCard>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <ChartCard className="lg:col-span-2" title={t('installsHeading')} icon={Boxes}>
+          <PluginInstallList orgId={orgId} projectId={projectId} installs={installViews} manifests={manifestViews} />
+        </ChartCard>
+        <ChartCard title={t('mixTitle')} description={t('mixDescription')} icon={PieChart}>
+          {installViews.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('mixEmpty')}</p>
+          ) : (
+            <DonutChart
+              label={t('mixTitle')}
+              centerValue={numberFormat.format(installViews.length)}
+              centerLabel={t('mixCenter')}
+              data={[
+                { label: t('mixRunning'), value: runningCount, color: 'hsl(var(--success))' },
+                { label: t('mixPaused'), value: pausedCount, color: 'hsl(var(--warning))' },
+                { label: t('mixRemoved'), value: removedCount, color: 'hsl(var(--muted-foreground))' },
+              ]}
+              size={140}
+              layout="stacked"
+            />
+          )}
+        </ChartCard>
+      </div>
 
-      {/* 2. Install a Plugin */}
-      <PpCard
-        title={t('installHeading')}
-        icon={PlusCircle}
-        iconAccent="sky"
-      >
-        {installableManifests.length === 0 && manifestViews.length > 0 ? (
-          <p className="text-pp-body-md text-pp-on-surface-variant">{t('allManifestsInstalled')}</p>
-        ) : (
-          <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableManifests} />
-        )}
-      </PpCard>
-
-      {/* 3. Installed Plugins */}
-      <PpCard
-        title={t('installsHeading')}
-        icon={Puzzle}
-        iconAccent="mint"
-      >
-        <PluginInstallList orgId={orgId} projectId={projectId} installs={installViews} manifests={manifestViews} />
-      </PpCard>
-
-      {/* 4. Source Plugin Runtime & Health */}
       {activeSourceInstalls.length > 0 ? (
-        <PpCard
-          title={t('sourceRuntimeHeading')}
-          icon={Activity}
-          iconAccent="amber"
-        >
-          <div className="space-y-4">
+        <ChartCard title={t('sourceRuntimeHeading')} description={t('sourceRuntimeDescription')} icon={RefreshCw}>
+          <div className="flex flex-col gap-4">
             {activeSourceInstalls.map((install) => {
               const runs = sourceRunsByInstallId.get(install.id) ?? [];
               const health = pluginInstallHealth(install, 'source', runs);
+              const series = sourceRunSeries(runs);
               return (
-                <div key={install.id} className="flex flex-col gap-3 rounded-2xl bg-pp-surface-container-low p-4 text-sm">
+                <div key={install.id} className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 text-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="font-medium text-pp-on-surface">
-                      {t('installLine', { pluginId: install.pluginId, version: install.version })}
-                    </span>
+                    <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
                     <TriggerSourcePluginRunButton orgId={orgId} projectId={projectId} installId={install.id} environments={environmentOptions} />
                   </div>
                   <PluginHealthSummary health={health} />
+                  {series.length > 1 ? (
+                    <TrendChart
+                      label={t('runChartLabel', { pluginId: install.pluginId })}
+                      data={series.map((point) => ({ ...point }))}
+                      xKey="run"
+                      series={[
+                        { key: 'accepted', label: t('runChartAccepted'), color: 'hsl(var(--success))' },
+                        { key: 'quarantined', label: t('runChartQuarantined'), color: 'hsl(var(--destructive))' },
+                        { key: 'duplicate', label: t('runChartDuplicate'), color: 'hsl(var(--muted-foreground))' },
+                      ]}
+                      kind="bar"
+                      stacked
+                      height={180}
+                    />
+                  ) : null}
                   <details className="flex flex-col gap-2">
-                    <summary className="cursor-pointer text-sm font-medium text-pp-on-surface-variant hover:text-pp-on-surface">
-                      {t('sourceRunHistoryHeading')}
-                    </summary>
+                    <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{t('sourceRunHistoryHeading')}</summary>
                     <div className="pt-2">
                       {runs.length === 0 ? (
-                        <p className="text-pp-body-sm text-pp-outline">{t('sourceRunNoRuns')}</p>
+                        <p className="text-muted-foreground">{t('sourceRunNoRuns')}</p>
                       ) : (
                         <ul className="flex flex-col gap-2">
                           {runs.map((run) => (
-                            <li key={run.id} className="flex flex-col gap-1 rounded-xl bg-pp-surface-container-lowest p-3 text-xs shadow-xs">
-                              <span className="font-semibold text-pp-on-surface">
+                            <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
+                              <span className="font-medium">
                                 {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: run.startedAt })}
                               </span>
-                              <span className="text-pp-outline">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
-                              <span className="text-pp-outline">
+                              <span className="text-muted-foreground">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
+                              <span className="text-muted-foreground">
                                 {t('sourceRunCursorLine', {
                                   before: run.cursorBefore ?? t('sourceRunCursorFromScratch'),
                                   after: run.cursorAfter ?? t('sourceRunCursorFromScratch'),
                                 })}
                               </span>
                               {run.recordsFetched !== null ? (
-                                <span className="text-pp-outline">
+                                <span className="text-muted-foreground">
                                   {t('sourceRunCountsLine', {
                                     fetched: run.recordsFetched,
                                     accepted: run.recordsAccepted ?? 0,
@@ -210,7 +235,7 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
                                 </span>
                               ) : null}
                               {run.errorMessage ? (
-                                <span className="text-pp-error font-medium">{t('sourceRunErrorLine', { message: run.errorMessage })}</span>
+                                <span className="text-destructive">{t('sourceRunErrorLine', { message: run.errorMessage })}</span>
                               ) : null}
                             </li>
                           ))}
@@ -222,23 +247,29 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
               );
             })}
           </div>
-        </PpCard>
+        </ChartCard>
       ) : null}
 
-      {/* 5. Lookalike Audiences */}
+      <div className="flex flex-col gap-6">
+        <ChartCard title={t('builtinPacksHeading')} description={t('builtinPacksIntro')} icon={Sparkles}>
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installableBuiltinPacks} />
+        </ChartCard>
+
+        <ChartCard title={t('installHeading')} icon={DownloadCloud}>
+          {installableManifests.length === 0 && manifestViews.length > 0 ? (
+            <p className="text-muted-foreground">{t('allManifestsInstalled')}</p>
+          ) : (
+            <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableManifests} />
+          )}
+        </ChartCard>
+      </div>
+
       {activeMetaCustomAudienceInstalls.length > 0 ? (
-        <PpCard
-          title={t('lookalikeHeading')}
-          subtitle={t('lookalikeIntro')}
-          icon={Users}
-          iconAccent="pink"
-        >
-          <div className="space-y-4">
+        <ChartCard title={t('lookalikeHeading')} icon={Users}>
+          <div className="flex flex-col gap-4">
             {activeMetaCustomAudienceInstalls.map((install) => (
-              <div key={install.id} className="flex flex-col gap-3 rounded-2xl bg-pp-surface-container-low p-4 text-sm">
-                <span className="font-semibold text-pp-on-surface">
-                  {t('installLine', { pluginId: install.pluginId, version: install.version })}
-                </span>
+              <div key={install.id} className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 text-sm">
+                <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
                 <MetaLookalikeAudienceControls
                   orgId={orgId}
                   projectId={projectId}
@@ -249,8 +280,8 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
               </div>
             ))}
           </div>
-        </PpCard>
+        </ChartCard>
       ) : null}
-    </PpPage>
+    </div>
   );
 }

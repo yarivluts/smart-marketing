@@ -73,3 +73,40 @@ export function toNpsDimensionBreakdownRows(rows: readonly WarehouseRow[], dimen
     }))
     .sort((a, b) => b.respondents - a.respondents || a.value.localeCompare(b.value));
 }
+
+/** One day of the NPS trend in the chart's row shape. `null` means "unknown", never "zero". */
+export interface NpsTrendChartRow {
+  [key: string]: string | number | null;
+  day: string;
+  promoters: number | null;
+  passives: number | null;
+  detractors: number | null;
+  /** The day's NPS, or `null` when nobody answered that day or the day was never read. */
+  nps: number | null;
+}
+
+/**
+ * Shapes the overview's daily trend for the volume (stacked promoters/passives/detractors) and
+ * score charts. Days before `trendReliableFrom` were never read - the capped read ran out first -
+ * so every value is `null` there, and the charts leave a gap instead of drawing a false zero
+ * (KAN-167). A read day with no responses is a real zero volume but has no score.
+ */
+export function toNpsTrendChartRows(
+  dailyTrend: readonly { date: string; breakdown: { totalResponses: number; promoters: number; passives: number; detractors: number; npsScore: number | null } }[],
+  trendReliableFrom: string | null,
+  formatDay: (date: string) => string,
+): NpsTrendChartRow[] {
+  return dailyTrend.map((point) => {
+    const notRead = trendReliableFrom !== null && point.date < trendReliableFrom;
+    if (notRead) {
+      return { day: formatDay(point.date), promoters: null, passives: null, detractors: null, nps: null };
+    }
+    return {
+      day: formatDay(point.date),
+      promoters: point.breakdown.promoters,
+      passives: point.breakdown.passives,
+      detractors: point.breakdown.detractors,
+      nps: point.breakdown.totalResponses > 0 ? point.breakdown.npsScore : null,
+    };
+  });
+}

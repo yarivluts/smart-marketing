@@ -1,8 +1,11 @@
 import {
   collectIdentifiers,
   compileMetricQuery,
+  emptyBucketValueForMetric,
+  metricAccumulatesOverPeriod,
   parseFormula,
   type CompiledMetricQuery,
+  type EmptyBucketValue,
   type CompilerMetricDefinition,
   type MetricCatalog,
   type MetricQueryRequest,
@@ -12,6 +15,7 @@ import { MetricDefModel } from '../models/metric-def.model';
 import { getActiveMetricDefinition } from './metric-registry.service';
 import { listSchemaDefinitionsForProject } from './schema-registry.service';
 import { martViewName } from '../warehouse/schema-mart';
+import { BIGQUERY_DISABLED_CORE_TABLES } from '../warehouse/core-table-catalog';
 import { ProjectNotFoundError } from './resource-library.service';
 
 export class MetricNotRegisteredError extends Error {
@@ -56,7 +60,7 @@ export class MetricNotRegisteredError extends Error {
  * existing `WarehouseQueryFailedError` degrade, just one warehouse round
  * trip later.
  */
-export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set<string>([]);
+export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set<string>(BIGQUERY_DISABLED_CORE_TABLES);
 
 /** One metric (by name) whose aggregation targets a table in {@link KNOWN_UNBUILT_WAREHOUSE_TABLES}. */
 export interface UnbuiltWarehouseTableRef {
@@ -192,6 +196,10 @@ export interface CompiledProjectMetricQuery extends CompiledMetricQuery {
   definitionRefs: Record<string, string>;
   /** Every dependency of this compiled query whose table is a {@link KNOWN_UNBUILT_WAREHOUSE_TABLES} entry — empty for the overwhelmingly common case. Non-empty doesn't mean this compile *failed* (it didn't — `sql`/`params` above are still a fully valid compiled query); it's a signal for a caller about to actually execute the query (`queryMetrics`) that doing so is certain to fail against any real warehouse today, so it can fail fast with a clean `MetricTargetsUnbuiltWarehouseTableError` instead. */
   unbuiltWarehouseTables: UnbuiltWarehouseTableRef[];
+  /** Per requested metric, what an empty time bucket means for it (a real `zero`, or a `gap`) - see `EmptyBucketValue` in `@growthos/shared`. Consumed by `queryMetrics`'s opt-in `fillEmptyBuckets`. */
+  emptyBucketValues: Record<string, EmptyBucketValue>;
+  /** Per requested metric, whether its period value is a running total that grows with the window (a count/sum) or a level (a rate, an average) - see `metricAccumulatesOverPeriod` in `@growthos/shared`. What a goal's pace is judged by. */
+  accumulatesOverPeriod: Record<string, boolean>;
 }
 
 /**
@@ -224,7 +232,11 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
     ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   });
 
-  return { ...compiled, definitionRefs, unbuiltWarehouseTables };
+  const requestedNames = [...new Set(params.request.metrics)];
+  const emptyBucketValues = Object.fromEntries(requestedNames.map((name) => [name, emptyBucketValueForMetric(mappedCatalog, name)] as const));
+  const accumulatesOverPeriod = Object.fromEntries(requestedNames.map((name) => [name, metricAccumulatesOverPeriod(mappedCatalog, name)] as const));
+
+  return { ...compiled, definitionRefs, unbuiltWarehouseTables, emptyBucketValues, accumulatesOverPeriod };
 }
 
 /**

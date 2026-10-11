@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { ComparePeriod, CompilerFilter, TimeGrain } from '@growthos/shared';
+import type { ComparePeriod, CompilerFilter, DateRangeSetting } from '@growthos/shared';
 
 /**
  * The task-breakdown AC's own tile-type list (plan `13 §E11.2`: "tile types
@@ -75,13 +75,14 @@ export interface BoardTile {
   dimensions: string[];
 }
 
-export interface BoardDateRange {
-  /** Inclusive, `YYYY-MM-DD`. */
-  start: string;
-  /** Inclusive, `YYYY-MM-DD`. */
-  end: string;
-  grain: TimeGrain;
-}
+/**
+ * A board's stored date range (KAN-211): either fixed dates (`kind: 'absolute'`, or no `kind` at
+ * all - every board written before relative ranges existed) or a rolling preset (`kind:
+ * 'relative'`, e.g. last 30 days) resolved against today's UTC date whenever the board is queried
+ * or rendered. Never read `start`/`end` off this directly - go through `resolveBoardDateRange`
+ * (`board.service.ts`), which handles both kinds and the legacy shape.
+ */
+export type BoardDateRange = DateRangeSetting;
 
 /**
  * A dashboard board (plan `13 §E11.2`, `10 §2.2`): a named, project-scoped

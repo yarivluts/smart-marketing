@@ -1,14 +1,20 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import {
+  attributeIngestBatchToBackfill,
   EmptyIngestBatchError,
   getIngestBatch,
   IngestBatchTooLargeError,
   ingestBatch,
+  validateIngestBatch,
+  verifyInstallationForKey,
+  type InstallationVerification,
   type IngestBatchInput,
+  type IngestValidationSummary,
 } from '@growthos/firebase-orm-models';
 import { Public } from '../authz/public.decorator';
 import { ApiKeyAuthGuard, type ApiKeyAuthenticatedRequest } from '../authz/api-key-auth.guard';
 import { RequireApiKeyScope } from '../authz/api-key-scope.decorator';
+import { AllowPublishableKey } from '../authz/allow-publishable-key.decorator';
 import { parseEntitiesRequestBody, parseEventsRequestBody, parseMeasuresRequestBody } from './ingest-request';
 
 interface IngestBatchResponse {
@@ -18,7 +24,43 @@ interface IngestBatchResponse {
   quarantined: number;
   duplicates: number;
   total: number;
+  /**
+   * The records that were not accepted, each with the reason.
+   *
+   * Counts alone cannot be acted on. A sender whose event name is not registered, or whose
+   * payload carries one undeclared property, previously read `202` with `accepted: 0` and had
+   * to know to call `GET /v1/ingest/batches/{id}` - an endpoint nothing in the response
+   * mentions - to find out why. The reasons were computed during validation and discarded at
+   * this boundary.
+   *
+   * Absent when nothing was rejected, so a clean batch is unchanged from a caller's point of
+   * view and the field's presence is itself the signal.
+   */
+  rejected?: { client_id: string; status: string; reasons?: string[] }[];
 }
+
+/** The `X-GrowthOS-Backfill-Id` header, trimmed, or undefined when absent or unusable. */
+function backfillIdFromHeaders(headers: ApiKeyAuthenticatedRequest['headers']): string | undefined {
+  const raw = headers['x-growthos-backfill-id'];
+  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+  return value && value.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value) ? value : undefined;
+}
+
+/**
+ * A browser sending with `sendBeacon` (or as `text/plain` to skip the CORS preflight) delivers the
+ * JSON as a string; anything else is the parsed body already.
+ */
+function jsonBody(body: unknown): unknown {
+  if (typeof body !== 'string') return body;
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new BadRequestException('The request body is not valid JSON.');
+  }
+}
+
+/** At most this many schema names per check - enough for any site, small enough to stay one cheap read each. */
+const MAX_EXPECTED_SCHEMAS = 50;
 
 /** `ApiKeyAuthGuard` always populates this before a route handler runs (it throws first if authentication fails), so a missing context here would mean the guard was bypassed, not a caller error. */
 function requireApiKeyContext(request: ApiKeyAuthenticatedRequest) {
@@ -36,8 +78,27 @@ function requireApiKeyContext(request: ApiKeyAuthenticatedRequest) {
 export class IngestController {
   @Post('events')
   @HttpCode(202)
+  @AllowPublishableKey()
   ingestEvents(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestBatchResponse> {
-    return this.handleBatch(request, parseEventsRequestBody(body));
+    return this.handleBatch(request, parseEventsRequestBody(jsonBody(body)));
+  }
+
+  /**
+   * The installation check: which project and environment this key writes to and, from real
+   * records only, how each schema in `?expect=a,b` is doing there (receiving, stale, quarantined,
+   * registered with no data, not registered) with the next step. A secret key without `expect`
+   * gets every schema; a publishable key only the ones it names (default: touchpoint).
+   */
+  @Get('verify')
+  @AllowPublishableKey()
+  verify(@Req() request: ApiKeyAuthenticatedRequest, @Query('expect') expect?: string | string[]): Promise<InstallationVerification> {
+    const context = requireApiKeyContext(request);
+    const names = (Array.isArray(expect) ? expect : [expect ?? ''])
+      .flatMap((value) => value.split(','))
+      .map((name) => name.trim())
+      .filter(Boolean);
+    if (names.length > MAX_EXPECTED_SCHEMAS) throw new BadRequestException(`Name at most ${MAX_EXPECTED_SCHEMAS} schemas in expect.`);
+    return verifyInstallationForKey(context, names);
   }
 
   @Post('entities')
@@ -50,6 +111,26 @@ export class IngestController {
   @HttpCode(202)
   ingestMeasures(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestBatchResponse> {
     return this.handleBatch(request, parseMeasuresRequestBody(body));
+  }
+
+  // KAN-202 I3: the same checks ingest runs, without storing anything - for an integrator's CI
+  // conformance tests. 200, not 202: nothing is queued; the answer is complete in the response.
+  @Post('events/validate')
+  @HttpCode(200)
+  validateEvents(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestValidationSummary> {
+    return this.handleValidation(request, parseEventsRequestBody(body));
+  }
+
+  @Post('entities/validate')
+  @HttpCode(200)
+  validateEntities(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestValidationSummary> {
+    return this.handleValidation(request, parseEntitiesRequestBody(body));
+  }
+
+  @Post('measures/validate')
+  @HttpCode(200)
+  validateMeasures(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestValidationSummary> {
+    return this.handleValidation(request, parseMeasuresRequestBody(body));
   }
 
   @Get('batches/:batchId')
@@ -71,6 +152,18 @@ export class IngestController {
     };
   }
 
+  private async handleValidation(request: ApiKeyAuthenticatedRequest, input: IngestBatchInput): Promise<IngestValidationSummary> {
+    const context = requireApiKeyContext(request);
+    try {
+      return await validateIngestBatch({ organizationId: context.organizationId, projectId: context.projectId, input });
+    } catch (error) {
+      if (error instanceof EmptyIngestBatchError || error instanceof IngestBatchTooLargeError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+  }
+
   private async handleBatch(request: ApiKeyAuthenticatedRequest, input: IngestBatchInput): Promise<IngestBatchResponse> {
     const context = requireApiKeyContext(request);
     try {
@@ -80,6 +173,22 @@ export class IngestController {
         environmentId: context.environmentId,
         input,
       });
+      // A backfill resend is tagged by header. Attribution is best-effort and never affects the
+      // batch: an unknown id, or one from another environment, just leaves it untagged.
+      const backfillId = backfillIdFromHeaders(request.headers);
+      if (backfillId) {
+        try {
+          await attributeIngestBatchToBackfill({
+            organizationId: context.organizationId,
+            projectId: context.projectId,
+            environmentId: context.environmentId,
+            batchId: summary.batchId,
+            backfillId,
+          });
+        } catch {
+          // Attribution must never turn an accepted batch into an error.
+        }
+      }
       return {
         batch_id: summary.batchId,
         kind: summary.kind,
@@ -87,6 +196,7 @@ export class IngestController {
         quarantined: summary.quarantined,
         duplicates: summary.duplicates,
         total: summary.total,
+        ...(summary.rejected.length > 0 ? { rejected: summary.rejected } : {}),
       };
     } catch (error) {
       if (error instanceof EmptyIngestBatchError || error instanceof IngestBatchTooLargeError) {

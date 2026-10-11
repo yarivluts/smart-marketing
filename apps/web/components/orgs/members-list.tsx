@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { InitialsAvatar } from '@/components/viz/initials-avatar';
 import type { OrgMemberSummary } from '@growthos/firebase-orm-models';
 import { isInvitableRole } from '@growthos/shared';
 import { RemoveMemberButton } from './remove-member-button';
@@ -38,9 +39,12 @@ export async function MembersList({
         return (
           <li
             key={member.membershipId}
-            className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm"
+            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
           >
-            <span>{member.email}</span>
+            <span className="flex min-w-0 items-center gap-3">
+              <InitialsAvatar name={member.displayName || member.email} seed={member.userId} size="sm" />
+              <span className="truncate">{member.email}</span>
+            </span>
             <div className="flex items-center gap-3">
               {canManageMembers && changeableRole ? (
                 <>

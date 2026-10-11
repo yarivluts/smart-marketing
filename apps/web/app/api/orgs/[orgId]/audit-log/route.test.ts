@@ -98,7 +98,7 @@ describe('GET /api/orgs/[orgId]/audit-log', () => {
     // `createOrganizationWithOwner` itself records an `organization.create` entry (KAN-44 follow-up) — this is the org's genesis entry, not an empty log.
     expect(body.entries).toHaveLength(1);
     expect(body.entries[0]).toMatchObject({ action: 'organization.create', actorId: owner.id, targetId: organization.id });
-    expect(body.chain).toEqual({ valid: true, entryCount: 1 });
+    expect(body.chain).toEqual({ valid: true, entryCount: 1, forks: [] });
   });
 
   it('surfaces an entry recorded by another service (mintApiKey) with a valid chain', async () => {
@@ -125,6 +125,6 @@ describe('GET /api/orgs/[orgId]/audit-log', () => {
     // 2 entries, not 1: `createOrganizationWithOwner` itself records an `organization.create` entry (KAN-44 follow-up) ahead of the mint below.
     expect(body.entries).toHaveLength(2);
     expect(body.entries[0]).toMatchObject({ action: 'api_key.mint', actorId: owner.id, projectId: project.id });
-    expect(body.chain).toEqual({ valid: true, entryCount: 2 });
+    expect(body.chain).toEqual({ valid: true, entryCount: 2, forks: [] });
   });
 });

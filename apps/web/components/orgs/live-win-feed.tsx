@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Radio, Trophy } from 'lucide-react';
+import { ChartCard } from '@/components/viz/chart-card';
+import { EmptyState } from '@/components/viz/empty-state';
+import { cn } from '@/lib/utils';
 import type { WinEventFeedItem } from '@/lib/orgs/win-rule-view';
 
 export interface LiveWinFeedProps {
@@ -37,22 +41,34 @@ export function LiveWinFeed({ orgId, projectId }: LiveWinFeedProps): React.React
   }, [orgId, projectId]);
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold">{t('feedHeading')}</h2>
-        <span className={connected ? 'text-xs text-green-600' : 'text-xs text-muted-foreground'}>
+    <ChartCard
+      title={t('feedHeading')}
+      icon={Radio}
+      fill
+      actions={
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+            connected ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground',
+          )}
+        >
+          <span className={cn('h-1.5 w-1.5 rounded-full', connected ? 'animate-pulse bg-success' : 'bg-muted-foreground/60')} aria-hidden="true" />
           {connected ? t('feedConnected') : t('feedConnecting')}
         </span>
-      </div>
+      }
+    >
       {items.length === 0 ? (
-        <p className="text-muted-foreground">{t('feedEmpty')}</p>
+        <EmptyState icon={Radio} title={t('feedEmpty')} compact />
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((item) => (
-            <li key={item.id} className="flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm">
-              <span>{t('feedItem', { winRuleName: item.winRuleName, schemaName: item.schemaName, clientId: item.clientId })}</span>
+            <li key={item.id} className="flex items-center gap-2 rounded-xl border border-success/30 bg-success/5 px-3 py-2 text-sm">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success/15 text-success" aria-hidden="true">
+                <Trophy className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0 truncate">{t('feedItem', { winRuleName: item.winRuleName, schemaName: item.schemaName, clientId: item.clientId })}</span>
               {item.winType !== 'generic' ? (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
                   {t(`winTypeLabel.${item.winType}`)}
                 </span>
               ) : null}
@@ -60,6 +76,6 @@ export function LiveWinFeed({ orgId, projectId }: LiveWinFeedProps): React.React
           ))}
         </ul>
       )}
-    </section>
+    </ChartCard>
   );
 }

@@ -14,10 +14,15 @@ import {
   KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listAuditLogEntriesForOrg,
   listBoardsForProject,
+  listEnvironmentsForProject,
   ProjectNotFoundError,
   queryBoardTile,
   queryBoardTiles,
   registerMetricDefinition,
+  resolveBoardDateRange,
+  migrateSeededBoardsToRelativeDateRange,
+  hasUntouchedSeededDefaultDateRange,
+  BOARD_DATE_RANGE_MIGRATION_ACTOR_ID,
   saveBoardTiles,
   setProjectCostQuota,
   updateBoardSettings,
@@ -26,6 +31,12 @@ import {
   type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
+import {
+  registerTwoDayRatioMetrics,
+  TWO_DAY_RATIO_MEAN_OF_DAILY_RATES,
+  TWO_DAY_RATIO_PERIOD_VALUE,
+  TwoDayRatioWarehouse,
+} from '../test-utils/two-day-ratio-warehouse';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('board-tests');
@@ -153,7 +164,7 @@ class FakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
 }
 
 describe('createBoard', () => {
-  it('creates an empty board with a default trailing-30-day date range', async () => {
+  it('creates an empty board with a default rolling last-30-days date range (KAN-211)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Create Org');
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
 
@@ -161,8 +172,11 @@ describe('createBoard', () => {
     expect(board.tiles).toEqual([]);
     expect(board.global_filters).toEqual([]);
     expect(board.compare).toBeNull();
-    expect(board.date_range.grain).toBe('day');
-    expect(board.date_range.start < board.date_range.end).toBe(true);
+    // Stored as a preset, not frozen dates - so it still means "the last 30 days" a month later.
+    const reloaded = await getBoard(organization.id, project.id, board.id);
+    expect(reloaded?.date_range).toEqual({ kind: 'relative', preset: 'last_30_days', grain: 'day' });
+    expect(resolveBoardDateRange(board.date_range, '2026-08-27')).toEqual({ start: '2026-07-29', end: '2026-08-27', grain: 'day' });
+    expect(resolveBoardDateRange(board.date_range, '2026-09-26')).toEqual({ start: '2026-08-28', end: '2026-09-26', grain: 'day' });
     expect(board.created_by).toBe(owner.id);
     expect(board.seeded_by_plugin_id).toBeNull();
   });
@@ -245,7 +259,7 @@ describe('updateBoardSettings', () => {
       globalFilters: [{ field: 'channel', operator: '=', value: 'google' }],
       updatedByUserId: owner.id,
     });
-    expect(withFilters.date_range).toEqual({ start: '2026-01-01', end: '2026-01-31', grain: 'day' });
+    expect(withFilters.date_range).toEqual({ kind: 'absolute', start: '2026-01-01', end: '2026-01-31', grain: 'day' });
     expect(withFilters.compare).toBe('previous_period');
     expect(withFilters.global_filters).toEqual([{ field: 'channel', operator: '=', value: 'google' }]);
     expect(withFilters.name).toBe('Revenue');
@@ -410,7 +424,7 @@ describe('saveBoardTiles', () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Grain Org');
     await registerCohortRetention(organization.id, project.id, owner.id);
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
-    expect(board.date_range.grain).toBe('day');
+    expect(resolveBoardDateRange(board.date_range).grain).toBe('day');
 
     await expect(
       saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [heatmapTile()], updatedByUserId: owner.id }),
@@ -445,7 +459,7 @@ describe('saveBoardTiles', () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Histogram Org');
     await registerEngagementDepthHistogram(organization.id, project.id, owner.id, ['days_active_bucket']);
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Engagement', createdByUserId: owner.id });
-    expect(board.date_range.grain).toBe('day');
+    expect(resolveBoardDateRange(board.date_range).grain).toBe('day');
 
     const saved = await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [histogramTile()], updatedByUserId: owner.id });
     expect(saved.tiles[0].dimensions).toEqual(['days_active_bucket']);
@@ -547,7 +561,7 @@ describe('queryBoardTile', () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Query Org');
     await registerAdSpend(organization.id, project.id, owner.id);
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
-    const rows: WarehouseRow[] = [{ bucket_date: board.date_range.start, ad_spend: 100 }];
+    const rows: WarehouseRow[] = [{ bucket_date: resolveBoardDateRange(board.date_range).start, ad_spend: 100 }];
     const executor = new FakeWarehouseQueryExecutor(rows);
 
     const outcome = await queryBoardTile({
@@ -590,7 +604,7 @@ describe('queryBoardTile', () => {
       organizationId: organization.id,
       projectId: project.id,
       name: 'landing_page_views',
-      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
       dimensions: [],
       createdByUserId: owner.id,
     });
@@ -602,7 +616,7 @@ describe('queryBoardTile', () => {
       projectId: project.id,
       board,
       tile: bigNumberTile({ metricNames: ['ad_spend'] }),
-      executor: new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, ad_spend: 1 }]),
+      executor: new FakeWarehouseQueryExecutor([{ bucket_date: resolveBoardDateRange(board.date_range).start, ad_spend: 1 }]),
       cache: new InMemoryMetricQueryResultCache(),
     });
     expect(first.ok).toBe(true);
@@ -612,7 +626,7 @@ describe('queryBoardTile', () => {
       projectId: project.id,
       board,
       tile: bigNumberTile({ metricNames: ['landing_page_views'], title: 'Landing page views' }),
-      executor: new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, landing_page_views: 1 }]),
+      executor: new FakeWarehouseQueryExecutor([{ bucket_date: resolveBoardDateRange(board.date_range).start, landing_page_views: 1 }]),
       cache: new InMemoryMetricQueryResultCache(),
     });
     expect(second.ok).toBe(false);
@@ -635,7 +649,7 @@ describe('queryBoardTile', () => {
       createdByUserId: owner.id,
     });
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Funnel', createdByUserId: owner.id });
-    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, signups: 1 }]);
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: resolveBoardDateRange(board.date_range).start, signups: 1 }]);
 
     try {
       const outcome = await queryBoardTile({
@@ -659,7 +673,7 @@ describe('queryBoardTile', () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Query Funnel Event Now Real Org');
     await registerSignups(organization.id, project.id, owner.id);
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Funnel', createdByUserId: owner.id });
-    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, signups: 1 }]);
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: resolveBoardDateRange(board.date_range).start, signups: 1 }]);
 
     const outcome = await queryBoardTile({
       organizationId: organization.id,
@@ -757,7 +771,7 @@ describe('queryBoardTile', () => {
     // The board's own default range is a trailing 30 days — deliberately far
     // narrower than the fixed floor a histogram tile's query should widen to,
     // proving the widening isn't merely "whatever the board already covers".
-    expect(board.date_range.start > '1970-01-01').toBe(true);
+    expect(resolveBoardDateRange(board.date_range).start > '1970-01-01').toBe(true);
 
     class RecordingWarehouseQueryExecutor implements WarehouseQueryExecutor {
       public lastQuery: { sql: string; params: Record<string, unknown> } | undefined;
@@ -778,7 +792,7 @@ describe('queryBoardTile', () => {
     });
 
     expect(executor.lastQuery?.params.time_start_current).toBe('1970-01-01');
-    expect(executor.lastQuery?.params.time_end_current).toBe(board.date_range.end);
+    expect(executor.lastQuery?.params.time_end_current).toBe(resolveBoardDateRange(board.date_range).end);
   });
 
   it('rethrows a genuinely unexpected executor error rather than degrading it to a generic outcome', async () => {
@@ -821,9 +835,9 @@ describe('queryBoardTiles', () => {
       execute(query: { sql: string }): Promise<WarehouseRow[]> {
         this.callCount += 1;
         if (query.sql.includes('ad_spend')) {
-          return Promise.resolve([{ bucket_date: board.date_range.start, ad_spend: 42 }]);
+          return Promise.resolve([{ bucket_date: resolveBoardDateRange(board.date_range).start, ad_spend: 42 }]);
         }
-        return Promise.resolve([{ bucket_date: board.date_range.start, signups: 7 }]);
+        return Promise.resolve([{ bucket_date: resolveBoardDateRange(board.date_range).start, signups: 7 }]);
       }
     }
 
@@ -845,8 +859,8 @@ describe('queryBoardTiles', () => {
 
     expect(batchedOutcomes).toEqual(individualOutcomes);
     expect(batchedOutcomes).toEqual([
-      { ok: true, series: [{ bucket_date: board.date_range.start, ad_spend: 42 }] },
-      { ok: true, series: [{ bucket_date: board.date_range.start, signups: 7 }] },
+      { ok: true, series: [{ bucket_date: resolveBoardDateRange(board.date_range).start, ad_spend: 42 }] },
+      { ok: true, series: [{ bucket_date: resolveBoardDateRange(board.date_range).start, signups: 7 }] },
     ]);
     expect(batchedExecutor.callCount).toBe(2);
   });
@@ -882,11 +896,11 @@ describe('queryBoardTiles', () => {
       projectId: project.id,
       board,
       tile: bigNumberTile({ metricNames: ['ad_spend'], title: 'Ad spend' }),
-      executor: new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, ad_spend: 1 }]),
+      executor: new FakeWarehouseQueryExecutor([{ bucket_date: resolveBoardDateRange(board.date_range).start, ad_spend: 1 }]),
       cache: new InMemoryMetricQueryResultCache(),
     });
 
-    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, ad_spend: 1, signups: 1 }]);
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: resolveBoardDateRange(board.date_range).start, ad_spend: 1, signups: 1 }]);
     const outcomes = await queryBoardTiles({
       organizationId: organization.id,
       projectId: project.id,
@@ -909,5 +923,428 @@ describe('queryBoardTiles', () => {
         board: { date_range: { start: '2026-01-01', end: '2026-01-07', grain: 'day' }, compare: null, global_filters: [], tiles: [] },
       }),
     ).rejects.toThrow(ProjectNotFoundError);
+  });
+});
+
+describe('queryBoardTiles environment scoping (KAN-196)', () => {
+  it('queries every tile against the prod environment by default and against a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Env Scope Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    await registerSignups(organization.id, project.id, owner.id);
+    const created = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    await saveBoardTiles({
+      organizationId: organization.id,
+      projectId: project.id,
+      boardId: created.id,
+      tiles: [bigNumberTile({ metricNames: ['ad_spend'], title: 'Ad spend' }), bigNumberTile({ metricNames: ['signups'], title: 'Signups' })],
+      updatedByUserId: owner.id,
+    });
+    const board = (await getBoard(organization.id, project.id, created.id))!;
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const stagingEnv = environments.find((environment) => environment.name === 'staging')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+
+    await queryBoardTiles({ organizationId: organization.id, projectId: project.id, board, executor, cache: new InMemoryMetricQueryResultCache() });
+    expect(capturedEnvironmentIds).toEqual([prodEnv.id, prodEnv.id]);
+
+    capturedEnvironmentIds.length = 0;
+    await queryBoardTiles({ organizationId: organization.id, projectId: project.id, board, executor, cache: new InMemoryMetricQueryResultCache(), environmentId: stagingEnv.id });
+    expect(capturedEnvironmentIds).toEqual([stagingEnv.id, stagingEnv.id]);
+  });
+});
+
+describe('relative board date ranges (KAN-211)', () => {
+  it('updateBoardSettings stores a relative preset, and switching kinds leaves no stale fields behind', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Relative Settings Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    const base = { organizationId: organization.id, projectId: project.id, boardId: board.id, updatedByUserId: owner.id };
+
+    await updateBoardSettings({ ...base, dateRange: { kind: 'absolute', start: '2026-01-01', end: '2026-01-31', grain: 'week' } });
+    expect((await getBoard(organization.id, project.id, board.id))?.date_range).toEqual({ kind: 'absolute', start: '2026-01-01', end: '2026-01-31', grain: 'week' });
+
+    await updateBoardSettings({ ...base, dateRange: { kind: 'relative', preset: 'last_7_days', grain: 'day' } });
+    // Read back from Firestore: an update that merged maps would leave the old start/end in place.
+    expect((await getBoard(organization.id, project.id, board.id))?.date_range).toEqual({ kind: 'relative', preset: 'last_7_days', grain: 'day' });
+
+    await updateBoardSettings({ ...base, dateRange: { start: '2026-03-01', end: '2026-03-31', grain: 'month' } });
+    expect((await getBoard(organization.id, project.id, board.id))?.date_range).toEqual({ kind: 'absolute', start: '2026-03-01', end: '2026-03-31', grain: 'month' });
+  });
+
+  it('rejects an unknown preset and a date that is not a real YYYY-MM-DD', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Relative Invalid Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    const base = { organizationId: organization.id, projectId: project.id, boardId: board.id, updatedByUserId: owner.id };
+
+    await expect(
+      updateBoardSettings({ ...base, dateRange: { kind: 'relative', preset: 'last_2_days' as never, grain: 'day' } }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+    await expect(updateBoardSettings({ ...base, dateRange: { start: '2026-02-30', end: '2026-03-01', grain: 'day' } })).rejects.toBeInstanceOf(InvalidBoardError);
+  });
+
+  it('reads a legacy { start, end, grain } board (no kind) as the absolute range it always was', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Legacy Range Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    const created = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Legacy', createdByUserId: owner.id });
+    const stored = (await getBoard(organization.id, project.id, created.id))!;
+    stored.date_range = { start: '2026-08-01', end: '2026-08-27', grain: 'day' };
+    await stored.save();
+
+    const board = (await getBoard(organization.id, project.id, created.id))!;
+    expect(board.date_range).toEqual({ start: '2026-08-01', end: '2026-08-27', grain: 'day' });
+    expect(resolveBoardDateRange(board.date_range, '2026-09-26')).toEqual({ start: '2026-08-01', end: '2026-08-27', grain: 'day' });
+
+    let captured: Record<string, unknown> = {};
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        captured = query.params;
+        return Promise.resolve([]);
+      },
+    };
+    await queryBoardTile({ organizationId: organization.id, projectId: project.id, board, tile: bigNumberTile(), executor, cache: new InMemoryMetricQueryResultCache(), today: '2026-09-26' });
+    expect(captured.time_start_current).toBe('2026-08-01');
+    expect(captured.time_end_current).toBe('2026-08-27');
+  });
+
+  it('resolves a relative range at query time, and compares it against the resolved previous period', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Relative Query Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    const created = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    await updateBoardSettings({
+      organizationId: organization.id,
+      projectId: project.id,
+      boardId: created.id,
+      dateRange: { kind: 'relative', preset: 'last_7_days', grain: 'day' },
+      compare: 'previous_period',
+      updatedByUserId: owner.id,
+    });
+    const board = (await getBoard(organization.id, project.id, created.id))!;
+
+    const capturedParams: Record<string, unknown>[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedParams.push(query.params);
+        return Promise.resolve([]);
+      },
+    };
+    await queryBoardTile({ organizationId: organization.id, projectId: project.id, board, tile: bigNumberTile(), executor, cache: new InMemoryMetricQueryResultCache(), today: '2026-09-26' });
+    await queryBoardTiles({
+      organizationId: organization.id,
+      projectId: project.id,
+      board: { date_range: board.date_range, compare: board.compare, global_filters: board.global_filters, tiles: [bigNumberTile()] },
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+      today: '2026-10-26',
+    });
+
+    expect(capturedParams[0]).toMatchObject({
+      time_start_current: '2026-09-20',
+      time_end_current: '2026-09-26',
+      time_start_previous: '2026-09-13',
+      time_end_previous: '2026-09-19',
+    });
+    // A month later the same stored board reads a month later - it rolls forward on its own.
+    expect(capturedParams[1]).toMatchObject({ time_start_current: '2026-10-20', time_end_current: '2026-10-26' });
+  });
+});
+
+describe('queryBoardTile empty-bucket fill (KAN-210 follow-up)', () => {
+  async function boardOverWeek(orgName: string) {
+    const setup = await setupOrgWithProject(orgName);
+    const created = await createBoard({ organizationId: setup.organization.id, projectId: setup.project.id, name: 'Marketing', createdByUserId: setup.owner.id });
+    await updateBoardSettings({
+      organizationId: setup.organization.id,
+      projectId: setup.project.id,
+      boardId: created.id,
+      dateRange: { start: '2026-09-19', end: '2026-09-25', grain: 'day' },
+      updatedByUserId: setup.owner.id,
+    });
+    const board = (await getBoard(setup.organization.id, setup.project.id, created.id))!;
+    return { ...setup, board };
+  }
+
+  it('a line tile over a count metric gets a 0 for every day without events', async () => {
+    const { owner, organization, project, board } = await boardOverWeek('Board Fill Count Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const executor = new FakeWarehouseQueryExecutor([
+      { bucket_date: '2026-09-19', signups: 2 },
+      { bucket_date: '2026-09-25', signups: 4 },
+    ]);
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'line', metricNames: ['signups'], title: 'Signups' }),
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome.ok && outcome.series.map((row) => [row.bucket_date, row.signups])).toEqual([
+      ['2026-09-19', 2],
+      ['2026-09-20', 0],
+      ['2026-09-21', 0],
+      ['2026-09-22', 0],
+      ['2026-09-23', 0],
+      ['2026-09-24', 0],
+      ['2026-09-25', 4],
+    ]);
+  });
+
+  it('a bar tile over an avg metric gets null (a gap) for a day without events, never 0', async () => {
+    const { owner, organization, project, board } = await boardOverWeek('Board Fill Avg Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'avg_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-09-24', avg_spend: 10 }]);
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'bar', metricNames: ['avg_spend'], title: 'Average spend' }),
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome.ok && outcome.series).toHaveLength(7);
+    expect(outcome.ok && outcome.series.filter((row) => row.avg_spend === null)).toHaveLength(6);
+    expect(outcome.ok && outcome.series.find((row) => row.bucket_date === '2026-09-24')?.avg_spend).toBe(10);
+  });
+
+  it('a table tile and a query with no rows at all are left as the warehouse returned them', async () => {
+    const { owner, organization, project, board } = await boardOverWeek('Board Fill Table Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const rows: WarehouseRow[] = [{ bucket_date: '2026-09-19', signups: 2 }];
+
+    const table = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'table', metricNames: ['signups'], title: 'Signups' }),
+      executor: new FakeWarehouseQueryExecutor(rows),
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+    expect(table).toEqual({ ok: true, series: rows });
+
+    const empty = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'line', metricNames: ['signups'], title: 'Signups' }),
+      executor: new FakeWarehouseQueryExecutor([]),
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+    expect(empty).toEqual({ ok: true, series: [] });
+  });
+});
+
+describe('queryBoardTile period values (B24: a ratio is not the mean of its daily ratios)', () => {
+  async function twoDayBoard(orgName: string, compare?: 'previous_period') {
+    const setup = await setupOrgWithProject(orgName);
+    await registerTwoDayRatioMetrics(setup.organization.id, setup.project.id, setup.owner.id);
+    const created = await createBoard({ organizationId: setup.organization.id, projectId: setup.project.id, name: 'Landing page', createdByUserId: setup.owner.id });
+    await updateBoardSettings({
+      organizationId: setup.organization.id,
+      projectId: setup.project.id,
+      boardId: created.id,
+      dateRange: { start: '2026-09-01', end: '2026-09-02', grain: 'day' },
+      ...(compare ? { compare } : {}),
+      updatedByUserId: setup.owner.id,
+    });
+    const board = (await getBoard(setup.organization.id, setup.project.id, created.id))!;
+    return { ...setup, board };
+  }
+
+  it('a big-number tile over a ratio queries the whole range as ONE bucket and gets 2/101 = 1.98%, not the 50.5% mean of 100% and 1%', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Ratio Big Number Org');
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['lp_conversion_rate'], title: 'Conversion rate', dimensions: ['campaign_id'] }),
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    // The query asked for the period, not for days - and without the tile's breakdown, since a big
+    // number is one number and adding up per-campaign rates would be the same fallacy again.
+    expect(warehouse.queries).toHaveLength(1);
+    const [query] = warehouse.queries;
+    expect(query.sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(query.sql).not.toContain('DATE_TRUNC');
+    expect(query.sql).not.toContain('`campaign_id`');
+    expect(query.params).toMatchObject({ time_start_current: '2026-09-01', time_end_current: '2026-09-02' });
+
+    expect(outcome.ok && outcome.series).toHaveLength(1);
+    const value = outcome.ok ? Number(outcome.series[0].lp_conversion_rate) : Number.NaN;
+    expect(value).toBeCloseTo(TWO_DAY_RATIO_PERIOD_VALUE, 10);
+    expect(value).not.toBeCloseTo(TWO_DAY_RATIO_MEAN_OF_DAILY_RATES, 2);
+  });
+
+  it('a compared big number gets a period value for each period from the same single-bucket query', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Ratio Compare Org', 'previous_period');
+    const warehouse = new TwoDayRatioWarehouse();
+
+    await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['lp_conversion_rate'], title: 'Conversion rate' }),
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    const [query] = warehouse.queries;
+    expect(query.sql).toContain('CAST(@time_start_previous AS DATE) AS bucket_date');
+    expect(query.params).toMatchObject({ time_start_previous: '2026-08-30', time_end_previous: '2026-08-31' });
+  });
+
+  it('a big number over a count is unchanged: the single bucket holds the same 101 the daily buckets sum to', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Count Big Number Org');
+    const cache = new InMemoryMetricQueryResultCache();
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const bigNumber = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['lp_visitors'], title: 'Visitors' }),
+      executor: warehouse,
+      cache,
+    });
+    // A line tile over the same metric and window keeps its daily series - and does not share the
+    // big number's cache entry just because the metric and dates match.
+    const line = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'line', metricNames: ['lp_visitors'], title: 'Visitors' }),
+      executor: warehouse,
+      cache,
+    });
+
+    expect(bigNumber.ok && bigNumber.series.map((row) => row.lp_visitors)).toEqual([101]);
+    expect(line.ok && line.series.map((row) => row.lp_visitors)).toEqual([1, 100]);
+    expect(warehouse.queries).toHaveLength(2);
+    expect(warehouse.queries[1].sql).toContain('DATE_TRUNC');
+  });
+
+  it('a funnel tile reads each step over the whole range too (so a count_distinct or ratio step is its period value, never a sum of daily values)', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Funnel Period Org');
+    const warehouse = new TwoDayRatioWarehouse();
+
+    await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'funnel', metricNames: ['lp_visitors', 'lp_conversions'], title: 'Landing funnel' }),
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(warehouse.queries[0].sql).not.toContain('DATE_TRUNC');
+  });
+});
+
+describe('migrateSeededBoardsToRelativeDateRange (KAN-211)', () => {
+  /** Recreates a board exactly as pre-KAN-211 seeding left it: frozen dates computed on its creation day. */
+  async function legacyBoard(
+    organizationId: string,
+    projectId: string,
+    ownerId: string,
+    name: string,
+    seededByPluginId: string | undefined,
+    dateRange: { start: string; end: string; grain: 'day' | 'week' },
+  ) {
+    const created = await createBoard({ organizationId, projectId, name, createdByUserId: ownerId, ...(seededByPluginId ? { seededByPluginId } : {}) });
+    const stored = (await getBoard(organizationId, projectId, created.id))!;
+    stored.date_range = dateRange;
+    stored.created_at = '2026-08-27T10:15:00.000Z';
+    await stored.save();
+    return stored;
+  }
+
+  it('switches only untouched pack-seeded boards, is idempotent, and supports a dry run', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Migration Org');
+    const frozen = { start: '2026-07-29', end: '2026-08-27', grain: 'day' as const };
+    const seeded = await legacyBoard(organization.id, project.id, owner.id, 'Landing page performance', 'com.growthos.landing-page-pack', frozen);
+    const human = await legacyBoard(organization.id, project.id, owner.id, 'My board', undefined, frozen);
+    const customized = await legacyBoard(organization.id, project.id, owner.id, 'Seeded but re-dated', 'com.growthos.landing-page-pack', {
+      start: '2026-06-01',
+      end: '2026-06-30',
+      grain: 'day',
+    });
+    const regrained = await legacyBoard(organization.id, project.id, owner.id, 'Seeded but weekly', 'com.growthos.landing-page-pack', { ...frozen, grain: 'week' });
+    const updatedByBefore = seeded.updated_by;
+
+    const dryRun = await migrateSeededBoardsToRelativeDateRange({ organizationId: organization.id, dryRun: true });
+    expect(dryRun.dryRun).toBe(true);
+    expect(dryRun.scanned).toBe(4);
+    expect(dryRun.migrated.map((ref) => ref.boardId)).toEqual([seeded.id]);
+    expect((await getBoard(organization.id, project.id, seeded.id))?.date_range).toEqual(frozen);
+
+    const result = await migrateSeededBoardsToRelativeDateRange({ organizationId: organization.id });
+    expect(result.migrated).toEqual([
+      { organizationId: organization.id, projectId: project.id, boardId: seeded.id, name: 'Landing page performance', previousDateRange: frozen },
+    ]);
+
+    const migrated = (await getBoard(organization.id, project.id, seeded.id))!;
+    expect(migrated.date_range).toEqual({ kind: 'relative', preset: 'last_30_days', grain: 'day' });
+    expect(migrated.updated_by).toBe(updatedByBefore);
+    expect((await getBoard(organization.id, project.id, human.id))?.date_range).toEqual(frozen);
+    expect((await getBoard(organization.id, project.id, customized.id))?.date_range).toEqual({ start: '2026-06-01', end: '2026-06-30', grain: 'day' });
+    expect((await getBoard(organization.id, project.id, regrained.id))?.date_range).toEqual({ ...frozen, grain: 'week' });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(
+      entries.some((entry) => entry.target_id === seeded.id && entry.actor_id === BOARD_DATE_RANGE_MIGRATION_ACTOR_ID && entry.actor_type === 'system'),
+    ).toBe(true);
+
+    const secondRun = await migrateSeededBoardsToRelativeDateRange({ organizationId: organization.id });
+    expect(secondRun.migrated).toEqual([]);
+  });
+
+  it('scans every organization when unscoped, and rejects a project scope without an organization', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Migration Unscoped Org');
+    const seeded = await legacyBoard(organization.id, project.id, owner.id, 'Marketing overview', 'com.growthos.saas-marketing-metrics', {
+      start: '2026-07-29',
+      end: '2026-08-27',
+      grain: 'day',
+    });
+
+    const result = await migrateSeededBoardsToRelativeDateRange({ dryRun: true });
+    expect(result.migrated.some((ref) => ref.boardId === seeded.id)).toBe(true);
+    await expect(migrateSeededBoardsToRelativeDateRange({ projectId: project.id })).rejects.toThrow(/organizationId/);
+  });
+
+  it('hasUntouchedSeededDefaultDateRange tolerates a seed that straddled UTC midnight', () => {
+    const base = { seeded_by_plugin_id: 'com.growthos.landing-page-pack', created_at: '2026-08-28T00:00:00.004Z' };
+    expect(hasUntouchedSeededDefaultDateRange({ ...base, date_range: { start: '2026-07-29', end: '2026-08-27', grain: 'day' } })).toBe(true);
+    expect(hasUntouchedSeededDefaultDateRange({ ...base, date_range: { start: '2026-07-30', end: '2026-08-28', grain: 'day' } })).toBe(true);
+    expect(hasUntouchedSeededDefaultDateRange({ ...base, date_range: { start: '2026-07-28', end: '2026-08-26', grain: 'day' } })).toBe(false);
+    expect(hasUntouchedSeededDefaultDateRange({ ...base, date_range: { kind: 'relative', preset: 'last_30_days', grain: 'day' } })).toBe(false);
+    expect(hasUntouchedSeededDefaultDateRange({ ...base, seeded_by_plugin_id: null, date_range: { start: '2026-07-29', end: '2026-08-27', grain: 'day' } })).toBe(false);
+    expect(
+      hasUntouchedSeededDefaultDateRange({
+        seeded_by_plugin_id: 'com.growthos.landing-page-pack',
+        created_at: Date.parse('2026-08-27T10:00:00.000Z') as unknown as string,
+        date_range: { start: '2026-07-29', end: '2026-08-27', grain: 'day' },
+      }),
+    ).toBe(true);
   });
 });

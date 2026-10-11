@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { METRIC_FILTER_OPERATORS, TIME_GRAINS, COMPARE_PERIODS, type CompilerFilter, type MetricQueryRequest, type MetricQueryTimeRange } from '@growthos/shared';
+import { METRIC_FILTER_OPERATORS, METRIC_QUERY_GRAINS, COMPARE_PERIODS, type CompilerFilter, type MetricQueryRequest, type MetricQueryTimeRange } from '@growthos/shared';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -53,8 +53,8 @@ function parseTime(value: unknown): MetricQueryTimeRange {
   if (!isPlainObject(value) || !isNonEmptyString(value.start) || !isNonEmptyString(value.end) || !isNonEmptyString(value.grain)) {
     throw new BadRequestException('Request body must include a "time" object with non-empty "start", "end", and "grain".');
   }
-  if (!(TIME_GRAINS as readonly string[]).includes(value.grain)) {
-    throw new BadRequestException(`"time.grain" must be one of: ${TIME_GRAINS.join(', ')}.`);
+  if (!(METRIC_QUERY_GRAINS as readonly string[]).includes(value.grain)) {
+    throw new BadRequestException(`"time.grain" must be one of: ${METRIC_QUERY_GRAINS.join(', ')}.`);
   }
   if (value.compare !== undefined) {
     if (!isNonEmptyString(value.compare) || !(COMPARE_PERIODS as readonly string[]).includes(value.compare)) {

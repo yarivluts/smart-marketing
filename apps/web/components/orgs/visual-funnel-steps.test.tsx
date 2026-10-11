@@ -3,91 +3,139 @@ import { screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { VisualFunnelSteps } from './visual-funnel-steps';
 import { renderWithIntl } from '../../tests/e2e/helpers/test-harness';
+import { calculateFunnelStepItems, type FunnelStepItem } from '../../lib/orgs/funnel-goals-synthesizer';
+
+const STEPS: FunnelStepItem[] = [
+  { stageKey: 'sent', stageLabel: 'Sent', stepOrder: 1, customerCount: 500, conversionPercent: 100, dropOffPercent: 0 },
+  { stageKey: 'viewed', stageLabel: 'Viewed', stepOrder: 2, customerCount: 200, conversionPercent: 40, dropOffPercent: 60 },
+  { stageKey: 'signed', stageLabel: 'Signed', stepOrder: 3, customerCount: 150, conversionPercent: 30, dropOffPercent: 25 },
+];
 
 describe('VisualFunnelSteps Component', () => {
-  it('renders default EasySign conversion funnel with accurate step counts and testids', () => {
-    renderWithIntl(<VisualFunnelSteps />);
-
-    expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
-    expect(screen.getByTestId('funnel-step-sent')).toBeInTheDocument();
-    expect(screen.getByTestId('funnel-step-viewed')).toBeInTheDocument();
-    expect(screen.getByTestId('funnel-step-signed')).toBeInTheDocument();
-
-    expect(screen.getByTestId('count-sent')).toHaveTextContent('1000 users');
-    expect(screen.getByTestId('count-viewed')).toHaveTextContent('380 users');
-    expect(screen.getByTestId('count-signed')).toHaveTextContent('220 users');
+  /*
+    Called with no steps, this component used to render `createMockEasySignFunnel()` -
+    1000 / 380 / 220 users, a 62% drop-off alert and an "Ask AI Copilot" button - so any caller
+    without a funnel still put invented numbers on screen. Those tests asserted the sample
+    (1000 users, 38%, -62% drop-off); they are replaced by this one.
+  */
+  it('renders nothing - no sample funnel, no alert - when given no steps', () => {
+    const { container } = renderWithIntl(<VisualFunnelSteps steps={[]} funnelName="EasySign" />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByTestId('funnel-dropoff-alert-card')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ask-copilot-btn')).not.toBeInTheDocument();
   });
 
-  it('renders precise conversion percentages, drop-off indicators, and progress bar widths', () => {
-    renderWithIntl(<VisualFunnelSteps />);
+  it('never renders a "Simulated Mode" badge', () => {
+    renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" />);
+    expect(screen.queryByText(/Simulated/)).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByTestId('pct-sent')).toHaveTextContent('100%');
-    expect(screen.getByTestId('pct-viewed')).toHaveTextContent('38%');
-    expect(screen.getByTestId('pct-signed')).toHaveTextContent('22%');
+  it('renders measured counts, conversion percentages, drop-offs and bar widths', () => {
+    renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" />);
 
-    expect(screen.getByTestId('dropoff-viewed')).toHaveTextContent('-62% drop-off');
-    expect(screen.getByTestId('dropoff-signed')).toHaveTextContent('-42% drop-off');
+    expect(screen.getByText('Conversion Funnel: EasySign')).toBeInTheDocument();
+    expect(screen.getByTestId('count-sent')).toHaveTextContent('500 people');
+    expect(screen.getByTestId('count-viewed')).toHaveTextContent('200 people');
+    expect(screen.getByTestId('count-signed')).toHaveTextContent('150 people');
 
+    expect(screen.getByTestId('pct-viewed')).toHaveTextContent('40%');
+    expect(screen.getByTestId('dropoff-viewed')).toHaveTextContent('60% drop-off');
+    // B22: the arrow says "down"; a minus sign on top read as a double negative.
+    expect(screen.getByTestId('dropoff-viewed')).not.toHaveTextContent('-60%');
     expect(screen.getByTestId('bar-sent')).toHaveStyle({ width: '100%' });
-    expect(screen.getByTestId('bar-viewed')).toHaveStyle({ width: '38%' });
-    expect(screen.getByTestId('bar-signed')).toHaveStyle({ width: '22%' });
+    expect(screen.getByTestId('bar-signed')).toHaveStyle({ width: '30%' });
   });
 
-  it('displays proactive drop-off alert card and invokes onAskCopilot callback on click', () => {
+  /*
+    B20: EasySign's page showed "Total Started 4", every later step "6 users", "Overall Conversion 150%" and
+    "-0% drop-off". With the sequential people counts the query now returns, it reads 4 -> 2 -> 2 -> 2 -> 2.
+  */
+  it("renders EasySign's funnel in people: 50% overall, one real drop-off, no signed zero", () => {
+    const easySign = calculateFunnelStepItems([
+      { eventSchemaName: 'touchpoint', stageKey: 'awareness', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.5 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.5 },
+    ]);
+    renderWithIntl(<VisualFunnelSteps steps={easySign} funnelName="EasySign" />);
+
+    expect(screen.getByTestId('count-awareness')).toHaveTextContent('4 people');
+    expect(screen.getByTestId('count-signup')).toHaveTextContent('2 people');
+    expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('50%');
+    expect(screen.getByTestId('dropoff-signup')).toHaveTextContent('50% drop-off');
+    expect(screen.getByTestId('dropoff-signup')).not.toHaveTextContent('-50%');
+    // B22: 4 entrants are too few for an alert or a Copilot suggestion, however large the drop.
+    expect(screen.queryByTestId('funnel-dropoff-alert-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dropoff-other')).toHaveTextContent('0% drop-off');
+    expect(screen.getByTestId('dropoff-other')).not.toHaveTextContent('-0%');
+    // A zero loss is not styled as a loss: no red arrow, neutral colour (KAN-216 follow-up).
+    expect(screen.getByTestId('dropoff-other')).toHaveAttribute('data-loss', 'false');
+    expect(screen.getByTestId('dropoff-other').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('dropoff-signup')).toHaveAttribute('data-loss', 'true');
+    // Nothing above 100% anywhere on the card.
+    expect(screen.queryAllByText(/(^|\D)(10[1-9]|1[1-9]\d|[2-9]\d\d|\d{4,})%/)).toHaveLength(0);
+  });
+
+  it('says "1 person", not "1 people"', () => {
+    renderWithIntl(
+      <VisualFunnelSteps
+        steps={[{ stageKey: 'solo', stageLabel: 'Solo', stepOrder: 0, customerCount: 1, conversionPercent: 100, dropOffPercent: 0 }]}
+        funnelName="EasySign"
+      />,
+    );
+    expect(screen.getByTestId('count-solo')).toHaveTextContent('1 person');
+  });
+
+  it('never renders an overall conversion above 100%, even if handed counts that grow', () => {
+    renderWithIntl(
+      <VisualFunnelSteps
+        steps={calculateFunnelStepItems([
+          { stageKey: 'a', stepOrder: 0, customerCount: 4 },
+          { stageKey: 'b', stepOrder: 1, customerCount: 6 },
+        ])}
+        funnelName="EasySign"
+      />,
+    );
+    expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('100%');
+    expect(screen.queryByText('150%')).not.toBeInTheDocument();
+  });
+
+  it('shows the drop-off alert for a measured high drop-off and invokes onAskCopilot', () => {
     const handleAskCopilot = vi.fn();
-    renderWithIntl(<VisualFunnelSteps onAskCopilot={handleAskCopilot} />);
+    renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" onAskCopilot={handleAskCopilot} />);
 
     expect(screen.getByTestId('funnel-dropoff-alert-card')).toBeInTheDocument();
-
-    const askBtn = screen.getByTestId('ask-copilot-btn');
-    expect(askBtn).toBeInTheDocument();
-    fireEvent.click(askBtn);
+    // B22: the loss is named by both ends - the step people left from and the one they never reached.
+    const from = STEPS[0].stageLabel;
+    const worst = [...STEPS].slice(1).sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0];
+    const to = worst.stageLabel;
+    expect(screen.getByTestId('funnel-dropoff-alert-card')).toHaveTextContent(`did not go on to "${to}"`);
+    expect(screen.getByTestId('funnel-dropoff-alert-card')).toHaveTextContent(new RegExp(`reached "(${from}|${STEPS[STEPS.indexOf(worst) - 1].stageLabel})"`));
+    fireEvent.click(screen.getByTestId('ask-copilot-btn'));
     expect(handleAskCopilot).toHaveBeenCalledTimes(1);
   });
 
-  it('renders simulated mode badge when isSimulated is true', () => {
-    renderWithIntl(<VisualFunnelSteps isSimulated={true} />);
-    expect(screen.getByText('Simulated Mode (Zero-Config)')).toBeInTheDocument();
+  it('shows the alert without an action button when there is nothing to apply', () => {
+    renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" />);
+    expect(screen.getByTestId('funnel-dropoff-alert-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('ask-copilot-btn')).not.toBeInTheDocument();
   });
-
-  it('supports custom step items accurately', () => {
-    const customSteps = [
-      {
-        stageKey: 'landing',
-        stageLabel: 'Landing Page',
-        stepOrder: 1,
-        customerCount: 5000,
-        conversionPercent: 100,
-        dropOffPercent: 0,
-      },
-      {
-        stageKey: 'checkout',
-        stageLabel: 'Checkout',
-        stepOrder: 2,
-        customerCount: 1500,
-        conversionPercent: 30,
-        dropOffPercent: 70,
-      },
+  /*
+    KAN-199: a funnel set over MCP can have several steps in the same stage (EasySign's
+    document_created / document_sent / document_signed all classify as "other"). Each is its own
+    row, told apart by its event schema name, and the drop-off highlight lands on one step only.
+  */
+  it('renders every step of a funnel whose steps share a stage key, labelled by event name', () => {
+    const shared: FunnelStepItem[] = [
+      { eventSchemaName: 'signup', stageKey: 'signup', stageLabel: 'Signup', stepOrder: 0, customerCount: 100, conversionPercent: 100, dropOffPercent: 0 },
+      { eventSchemaName: 'document_sent', stageKey: 'other', stageLabel: 'Other', stepOrder: 1, customerCount: 50, conversionPercent: 50, dropOffPercent: 50 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stageLabel: 'Other', stepOrder: 2, customerCount: 40, conversionPercent: 40, dropOffPercent: 20 },
     ];
+    renderWithIntl(<VisualFunnelSteps steps={shared} funnelName="EasySign" />);
 
-    renderWithIntl(<VisualFunnelSteps steps={customSteps} funnelName="Checkout Funnel" />);
-
-    expect(screen.getByTestId('funnel-step-landing')).toBeInTheDocument();
-    expect(screen.getByTestId('funnel-step-checkout')).toBeInTheDocument();
-    expect(screen.getByTestId('count-landing')).toHaveTextContent('5000 users');
-    expect(screen.getByTestId('count-checkout')).toHaveTextContent('1500 users');
-    expect(screen.getByTestId('dropoff-checkout')).toHaveTextContent('-70% drop-off');
-  });
-
-  it('renders honest empty state when steps array is empty (KAN-300)', () => {
-    renderWithIntl(<VisualFunnelSteps steps={[]} funnelName="GrowthOS Funnel" />);
-
-    expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
-    expect(screen.getByText('Conversion Funnel: GrowthOS Funnel')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'No funnel confirmed yet for this project. Confirm a funnel mapping during onboarding to see conversion here.',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('event-0')).toHaveTextContent('signup');
+    expect(screen.getByTestId('event-1')).toHaveTextContent('document_sent');
+    expect(screen.getByTestId('event-2')).toHaveTextContent('document_signed');
+    expect(screen.getAllByTestId('funnel-step-other')).toHaveLength(2);
+    expect(screen.getAllByTestId('funnel-step-other').filter((row) => row.className.includes('border-amber-300'))).toHaveLength(1);
   });
 });

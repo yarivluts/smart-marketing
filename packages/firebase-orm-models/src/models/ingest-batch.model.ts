@@ -69,4 +69,8 @@ export class IngestBatchModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_at!: string;
+
+  /** Set when the sender tagged the batch with `X-GrowthOS-Backfill-Id` for a backfill in this environment - attributes its counts to that backfill. */
+  @Field()
+  public backfill_id?: string;
 }

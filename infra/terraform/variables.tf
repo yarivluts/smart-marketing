@@ -28,5 +28,7 @@ variable "secret_ids" {
   default = [
     "google-ads-developer-token",
     "meta-user-access-token",
+    "meta-app-id",
+    "meta-app-secret",
   ]
 }

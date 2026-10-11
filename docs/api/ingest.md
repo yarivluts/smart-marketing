@@ -6,10 +6,22 @@ deliberately documents *what the code does*, not the full aspirational contract 
 [`docs/plan/12-api-reference.md`](../plan/12-api-reference.md); the divergences from that
 plan sketch are called out explicitly in [§9](#9-differences-from-the-plan-sketch).
 
+Connecting a whole site (keys, the browser snippet, the Node SDK, verifying it works)? Start with
+[`docs/integrations/quick-start.md`](../integrations/quick-start.md). This page is the wire contract
+underneath.
+
 If you are pushing real data and something is silently missing from your boards, read
 [§5 (validation & quarantine)](#5-validation--quarantine) and
 [§9](#9-differences-from-the-plan-sketch) first — the three record kinds do **not** share a
 payload shape, and unknown fields are quarantined, not dropped or accepted.
+
+**Machine-readable contract (KAN-202 I1).** `GET /v1/ingest/contract` returns this API as an
+OpenAPI 3.1 document without a key: the three request envelopes, the batch response, the batch
+limit, and in `x-growthos-rules` the rules a JSON shape cannot express. Those rules say identity
+goes inside `properties`, `ts` is source time, the touchpoint is the first event of a visit, and
+entity upserts send the whole row. It is built from the constants ingest enforces, and
+`apps/api/src/ingest/ingest-contract.spec.ts` holds it against the real envelope validation.
+Field-level schemas are per project: read them with `list_schemas`.
 
 ## 1. Authentication
 
@@ -33,6 +45,19 @@ Authorization: Bearer gos_live_xxxxxxxx        # or gos_test_… for a test envi
   `Retry-After` header (seconds). Rate limiting is checked only *after* auth + scope pass,
   so an unknown key can never exhaust a real key's budget.
 
+### 1.1 Publishable (browser) keys
+
+A web page never holds a secret key. Mint a **browser key** instead (Keys page, `kind: publishable`):
+
+- Prefix `gos_pk_live_` / `gos_pk_test_`; it always carries exactly `ingest.write`.
+- It works only on `POST /v1/ingest/events` and `GET /v1/ingest/verify` (403 anywhere else), and
+  only from its **allowed origins**, checked against the browser's `Origin` header:
+  `https://www.example.com`, `https://*.example.com` (subdomains only), `http://localhost:3000`.
+  Edit them on the key's card; a change takes effect on the next request.
+- CORS is answered for those two routes. The key may also come as `?key=gos_pk_...` with a
+  `text/plain` JSON body - exactly what `navigator.sendBeacon` sends on page unload, with no preflight.
+- A secret key is refused in a URL (401), and on the browser routes when it arrives from a web page (403).
+
 ## 2. Endpoints
 
 | Method | Path | Body kind |
@@ -41,6 +66,7 @@ Authorization: Bearer gos_live_xxxxxxxx        # or gos_test_… for a test envi
 | `POST` | `/v1/ingest/entities` | entity upserts of one `type` |
 | `POST` | `/v1/ingest/measures` | pre-aggregated measures |
 | `GET`  | `/v1/ingest/batches/{batch_id}` | per-record validation results for a prior batch |
+| `GET`  | `/v1/ingest/verify?expect=a,b` | installation check (section 11) |
 
 All three `POST` endpoints return **`202 Accepted`** with a batch summary even when some (or
 all) records were quarantined — a bad record quarantines only itself; it does not fail the
@@ -163,6 +189,15 @@ payload but are neither validated nor rejected**. Putting a schema field at the 
 instead of inside `properties`/`attributes`/`dimensions` means it will not be validated and
 will not populate the warehouse column for that field.
 
+> **Validation is strict inside the sub-object and silent outside it — and that is backwards.**
+> An undeclared key inside `properties` is fatal and loud: the record quarantines with
+> `unregistered_field:<name>`, so you find out immediately. An unknown key *outside* it is
+> accepted, stored, and never looked at again — no error, no warning, no rejected entry. So the
+> format is strictest exactly where a mistake announces itself, and most permissive exactly where
+> it cannot. **If a field seems to be accepted but never appears anywhere downstream, check
+> whether you put it at the top level instead of in the sub-object.** This bit real integrations
+> (KAN-124) before it was written down here.
+
 ## 5. Validation & quarantine
 
 A schema for the record's kind + name must be **registered and active** (Schema Registry,
@@ -185,15 +220,56 @@ Ingest Health admin page (KAN-34/35) once its schema is fixed or evolved. A quar
 never claims its dedup slot, so a corrected retry of the same client id can still be accepted
 later.
 
+**Validate without sending (KAN-202 I3).** `POST /v1/ingest/events/validate`,
+`/entities/validate` and `/measures/validate` take the same body and key as the matching ingest
+endpoint and run the same checks: envelope, registered schema, fields. They store nothing, so no
+batch, dedup claim or quarantine entry is created, and they answer `200` with each record's
+verdict:
+
+```json
+{ "kind": "event", "total": 2, "valid": 1, "invalid": 1,
+  "records": [ { "client_id": "v-ok", "status": "valid" },
+               { "client_id": "v-bad", "status": "invalid", "reasons": ["unregistered_field:coupon"] } ] }
+```
+
+Use it in CI to assert that sample payloads conform before a deploy. A record that validates is
+accepted by ingest, unless it repeats a record already accepted in that environment: dedup
+depends on history, not on the payload, so it is not evaluated here.
+
 ## 6. Implicit event envelope fields
 
 On **event** records only, `anon_id` and `customer_id` are accepted inside `properties`
 without being declared on the schema (they are validated as strings if present). The platform's
 own tracking snippet (KAN-57) attaches them to every event it fires; without this implicit
 acceptance, any hand-registered event schema would quarantine 100% of real snippet traffic with
-`unregistered_field:anon_id`. To make either field participate in identity stitching (KAN-56),
-still declare it explicitly with `is_identity_key`. This implicit acceptance applies to events
-only — entity/measure validation is unchanged.
+`unregistered_field:anon_id`. This implicit acceptance applies to events only — entity/measure
+validation is unchanged.
+
+**Send them inside `properties`, not at the top level.** "Envelope" here means *the tracker
+attaches them to every event*, not *they sit outside the `properties` bag* — the two readings
+point to opposite places and the wrong one fails silently. `IngestEventRecord` is
+`{event_id, event, ts, properties}` and declares no top-level identity field: a top-level
+`anon_id` is tolerated, not supported. It is stored verbatim, never validated, and — before
+KAN-124 — was invisible to identity stitching entirely, producing no `bridge_identity` edge and
+no `fact_attribution` join, with no error, because an unjoined touchpoint is indistinguishable
+from a visitor who never converted. The warehouse now falls back to the top-level position to
+recover such records, but that is a recovery path for data already landed, **not a supported
+shape to build against**.
+
+**You do not need to declare them to get identity stitching.** On the BigQuery warehouse that
+production runs, `stg_identity_key_observations` reads `anon_id` and `customer_id` from
+`properties` by fixed path, whether or not the schema declares them — so declaring them buys
+nothing there. (The DuckDB leg used in dev/CI *does* join the registered-identity-key seed, which
+is where the "declare it with `is_identity_key`" rule this section used to state comes from; it
+is true there and misleading for these two fields on the live warehouse. Project-registered
+*custom* identity keys — `user_id`, `email_hash`, … — do still need the declaration, and today
+participate on the DuckDB leg only.)
+
+**Never declare either one `is_required` on an event schema.** `customer_id` is absent until
+`identify()` has run, so a required declaration quarantines every event from a not-yet-identified
+visitor — all anonymous traffic — and a schema cannot be deleted or archived, with `evolve_schema`
+additive-only, so the mistake is permanent. Registration warns about this (KAN-120). Declaring
+either field *optional* is fine and has always been.
 
 ## 7. Idempotency & dedup
 
@@ -225,6 +301,37 @@ a deliberately deferred tradeoff (same posture as the schema-registry active-ver
   "total": 1
 }
 ```
+
+When anything was **not** accepted, the same response carries a `rejected` array with the
+reason per record — you do not need a second call to find out what went wrong:
+
+```jsonc
+{
+  "batch_id": "b_790",
+  "kind": "event",
+  "accepted": 0,
+  "quarantined": 1,
+  "duplicates": 0,
+  "total": 1,
+  "rejected": [
+    {
+      "client_id": "evt_1",
+      "status": "quarantined",           // "quarantined" | "duplicate"
+      "reasons": ["schema_not_registered:signup"]
+    }
+  ]
+}
+```
+
+`rejected` is **absent** when every record was accepted, so its presence is itself the signal.
+It lists only the records that were not accepted, so the response stays proportional to what
+went wrong rather than to batch size.
+
+> **The status code is still `202`, including when `accepted` is `0`.** A batch that rejected
+> every record is not a transport failure, and the endpoint has always answered 202 for it —
+> so a client checking only `res.ok` will read success. Check `accepted`, or the presence of
+> `rejected`. Whether a wholly-rejected batch should answer non-2xx is an open API decision
+> (it would break existing callers), not an oversight.
 
 ### 8.2 `GET /v1/ingest/batches/{batch_id}` — per-record results
 
@@ -299,3 +406,26 @@ curl -X POST "$INGEST_URL/v1/ingest/measures" \
 # Per-record results
 curl "$INGEST_URL/v1/ingest/batches/b_789" -H "Authorization: Bearer $GOS_KEY"
 ```
+
+## 11. Checking an installation - `GET /v1/ingest/verify`
+
+```bash
+curl -H "Authorization: Bearer $GROWTHOS_KEY" \
+  "https://<api>/v1/ingest/verify?expect=touchpoint,signup,document_signed,customer"
+```
+
+Answers which project and environment the key writes to and - from real records only, never from
+a manual flag or test data - the status of each expected schema (any kind):
+
+| status | meaning |
+| ------ | ------- |
+| `receiving` | accepted in the last 24 hours |
+| `stale` | accepted before, nothing in the last 24 hours |
+| `quarantined` | records arrived but every one was rejected (see `quarantineReasons`) |
+| `registered_no_data` | the schema is registered; nothing arrived in this environment |
+| `not_registered` | not registered - every record of it would be rejected |
+
+Each schema carries a plain-words `fix`; `report.status` is `ok` only when every checked schema is
+receiving with nothing waiting in quarantine. Without `expect`, a secret key gets every schema in
+the environment; a publishable key only checks what it names (default: `touchpoint`). Nothing is
+sent or stored by checking.

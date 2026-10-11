@@ -154,9 +154,14 @@ Read tools (need only the connection-level `mcp.read`):
 | `compare_periods` | Same as `query_metric` plus a period-over-period comparison |
 | `decompose` | Same as `query_metric` broken down by one or more dimensions |
 | `query_cohort` | Signup-month × period-number retention matrix |
-| `query_funnel` | Per-stage distinct-customer counts for the project's confirmed funnel, with conversion rate off the first step |
+| `query_funnel` | For each step of the project's confirmed funnel, the people who reached it having gone through every earlier step in order (`people_count`, never increasing; a visitor who becomes a customer counts once), with `conversion_rate_from_first` / `conversion_rate_from_previous`, `event_schema_name`, `stage_key` and `step_order`. Steps can be passed straight back to `set_funnel`. The camelCase keys (`eventSchemaName`, `stageKey`, `stepOrder`, `customerCount`, `conversionRateFromFirst`) are deprecated duplicates kept for one release. With no confirmed funnel yet it returns `status: "no_funnel_defined"` and a message pointing to `set_funnel` |
 | `search_customers` | Substring search over Customer 360 entity records |
+| `validate_records` | Check sample records (`kind`, `records`, and `type` for entities) against the project's registered schemas exactly as ingest would, storing nothing: each record `valid` or `invalid` with the reasons ingest would quarantine it for. Same check as REST `POST /v1/ingest/(events|entities|measures)/validate` |
 | `list_insights` | Recent tracking-broke alerts and fired win-rule events |
+| `get_setup_health` | Whether each setup requirement (landing-page attribution, signups, product usage, customer entity, billing, ad spend) is `connected`, `error` (only rejected records) or a `gap` in one environment, plus a one-line summary per environment the credential can see. An API key reports only on its own environment; a project-wide OAuth connection can name any with `environment`. Each requirement lists the `schemas` behind its status and `mapping: "inferred_from_schema_name"`, since schemas are matched to requirements by their names. Derived only from accepted and quarantined ingest records; nothing can be marked connected by hand |
+| `audit_installation_gaps` | Every requirement not connected in that environment: what was received, `impact_summary`, `satisfied_by`, `connected_in_other_environments` and `how_to_fix` steps naming real pages, ingest endpoints and MCP tools. Billing accepts `subscription_state_change` events from any billing system, not only Stripe. Also returns `customer_coverage` (distinct `properties.customer_id` in the environment's events against customer entity records, from the warehouse) and `customer_backfill` with steps (Backfill panel, then `request_backfill`) when under 90% have a record; without a readable warehouse it falls back to "events accepted, no customer entity ever" and says no count is available |
+| `check_installation` | The installation check for one environment (the key's own; OAuth may name one): for each name in `expect` (or every schema registered or sent), `receiving` / `stale` / `quarantined` (with reasons) / `registered_no_data` / `not_registered`, the fix, and an overall `ok` / `attention` - from real records only, nothing sent. Same check as `GET /v1/ingest/verify`, the SDKs' `verify()` and the Installation page, whose link it returns |
+| `get_ingest_health` | Ingest health per event in one environment (the key's own; OAuth may name one): accepted records per UTC day over `window_days` and in total (`accepted_in_window_is_lower_bound` when the per-event read cap is hit), `last_seen_at`, records still open in quarantine with their reasons, and whether a tracking-broke alert is active; `other_schemas` lists entity/measure schemas and names sent but never registered. Same data as the Ingest health page |
 
 Act tools (each requires its own extra permission, re-checked on every call):
 
@@ -166,6 +171,56 @@ Act tools (each requires its own extra permission, re-checked on every call):
 | `approve_action` | `automation.approve` (OAuth/human only) | Approve an `awaiting_approval` action so it can execute |
 | `create_goal` | `dashboards.write` | Create a goal pinning a metric to a target/range and deadline |
 | `create_segment` | `dashboards.write` | Save a named customer segment filter definition |
+| `apply_schema_manifest` | `schema.write` (a `dry_run: true` preview needs only `mcp.read`) | Register and evolve the project's schemas from one manifest (`schemas: [{ kind, name, fields }]`, each as `register_schema` takes it). Reports per schema `register`, `evolve` (added optional fields or changed flags), `unchanged`, `blocked` (breaking, with reasons) or `invalid`; writes nothing if any schema is blocked or invalid. Schemas missing from the manifest are left alone |
+| `set_funnel` | `project.configure` (a `dry_run: true` preview needs only `mcp.read`) | Define or replace the project's confirmed funnel: an ordered list of at least 2 registered event schema names (or `{ event_schema_name, stage_key }` objects; camelCase keys and `query_funnel`'s own step objects are accepted too). Same funnel the web onboarding wizard confirms and the Funnel page charts |
+
+AI Ad Studio tools give an agent the whole studio, using the same engine, limits, rules and audit as the Ad Studio page. They need these permissions:
+
+- `ai.use` for the studio itself.
+- `project.configure` for the daily limits.
+- `automation.execute` to send anything to an ad platform. Only an OAuth (human) connection can hold it, never an API key.
+
+Rendering takes minutes, so no tool waits for it to finish. Start the work with one tool, then call the status or advance tool repeatedly until it is done.
+
+| Tool | Requires | What it does |
+| --- | --- | --- |
+| `list_ad_briefs` | `ai.use` | Every ad with how far it has come |
+| `get_ad_brief` | `ai.use` | One ad in full: brief, plan, scenes with their video state, image ideas with each placement's images and versions, video progress and the assembled video, the latest autopilot run, exports, and its web link |
+| `create_ad_brief` / `update_ad_brief` / `delete_ad_brief` | `ai.use` | Create, change or delete an ad (delete removes its script, ideas, images, clips, videos and runs) |
+| `plan_ad_brief` | `ai.use` | Deep plan from the landing page, the project's results and campaigns, and Google Ads search volumes, with recommendations |
+| `generate_ad_script` / `save_ad_script` | `ai.use` | Write the video script with AI (3-10 s scenes, at most 60 s) or save an edited one. Hebrew narration gets a `pronunciation` (full nikud, numbers as words) that the video model reads; it is added on save (one AI text call) and redone when the narration changes |
+| `rewrite_ad_scene` | `ai.use` | Propose a rewrite of one scene by an instruction; not saved until sent back with `save_ad_script` |
+| `set_ad_voice` | `ai.use` | The one narrator voice of every scene (a preset or a custom description; `none` clears it), so separately rendered scenes sound alike. Each scene's `delivery` (`voiceover` or `on_screen`) and `speaker` (which person in the shot talks) are set with `save_ad_script` |
+| `set_ad_video_settings` | `ai.use` | Advanced video settings of the ad, field by field: `resolution` (360p / 720p / 1080p, sent to Gemini Omni; the assembled video is 1080p for 1080p clips, else 720p), `style` (7 visual styles), `music` (auto / none / custom + `music_description`) and `avoid` (what never to show). Style, music and exclusions go into every scene prompt - Omni has no fields for them. A change makes the old clips out of date |
+| `research_ad_keywords` | `ai.use` | Keyword ideas with Google's own monthly searches, competition and top-of-page bid range, for seed phrases and/or the landing page, in a chosen country and language (busiest first, up to 100). Uses the project's attached Google Ads account; says why when it cannot (`status: unavailable` + reason). Not an AI call, nothing saved |
+| `save_ad_keywords` | `ai.use` | The keywords the search ad bids on (at most 50, with match type BROAD / PHRASE / EXACT and the volumes they were chosen by), the negative keywords and the targeting; `clear: true` removes them |
+| `write_search_ad` / `save_search_ad` | `ai.use` | Write with AI (one text call, from the brief, the plan and the keywords) or save the Google responsive search ad: 3-15 unique headlines (30), 2-4 descriptions (90), display paths (15). `get_ad_brief` returns it under `search` |
+| `get_ad_audiences` / `search_ad_interests` | `ai.use` | Read only, from the project's Meta ad account: its custom, lookalike and saved audiences, and Meta interests matching a word - each with Meta's size range. Without a Meta account, `status: unavailable` + reason |
+| `estimate_ad_reach` | `ai.use` | Meta's monthly reach estimate for the ad's audience (the saved targeting, with any fields given changed; not saved) |
+| `get_ad_performance_breakdown` | `ai.use` | The Meta ad account's last 90 days by `age_gender`, `placement` or `country`: spend, impressions, clicks, link clicks and conversions per segment |
+| `set_ad_targeting` | `ai.use` | Who the Meta ad targets: countries, ages, genders, custom/lookalike audiences and interests (field by field; `clear: true` removes it). `publish_ad` to Meta targets it |
+| `write_ad_copy` / `save_ad_copy` | `ai.use` | Write with AI (one call, missing ones by default) or save the ad copy next to each creative: headline (30), primary text (90) and description (90), for the video and every image idea; null clears one |
+| `list_ad_references` | `ai.use` | The ad's reference images (app screenshots, AI illustrations) and whether illustrations can be drawn |
+| `add_ad_reference` | `ai.use` | Add a reference image: upload a PNG/JPEG (base64), e.g. a sharp screenshot of the real app, or draw an illustration (counts as an image) |
+| `get_ad_reference` / `delete_ad_reference` | `ai.use` | Look at a reference image, or delete it (it is removed from every scene). Scenes attach up to 3 images with `save_ad_script` (`references`: screen, subject or first_frame), and the video model gets them with the scene prompt |
+| `generate_ad_image_ideas` / `save_ad_image_ideas` | `ai.use` | Write image ad ideas with AI (optionally for chosen placements) or save edited ones |
+| `render_ad_image` | `ai.use` | Render one idea in one placement (square, portrait, story, landscape) with Gemini 3.1 Flash Image |
+| `edit_ad_image` | `ai.use` | Change a finished image by an instruction; the result is a new, selected version |
+| `select_ad_image` | `ai.use` | Pick which version of an idea's placement is used |
+| `get_ad_image` | `ai.use` | The image itself (MCP image content) with its details |
+| `render_ad_video` / `render_ad_scene` / `edit_ad_scene_clip` | `ai.use` | Start Gemini Omni clips for every stale scene, for one scene, or as an edit of a scene's clip |
+| `get_ad_video_status` | `ai.use` | Move rendering clips along, run the AI quality check of ready clips (one per call), and return each scene's state and `qa` verdict (`passed`, `issues` with what was heard and each problem, `skipped`, `error`); poll while generating or until every clip is checked |
+| `assemble_ad_video` | `ai.use` | Join the current clips into the finished video |
+| `start_ad_autopilot` | `ai.use` | Plan -> script -> image ideas -> (person confirms) -> images -> clips -> assembled video, each only if missing; keeps anything existing or edited. `confirm_plan` (default true) stops at `awaiting_approval` before rendering |
+| `advance_ad_autopilot` | `ai.use` | Do the next unit of a run; call again until `status` is not `running` |
+| `approve_ad_plan` | `ai.use` | Confirm a run waiting at `awaiting_approval` so it renders the images and video - only after the person said to go ahead |
+| `get_ad_autopilot` / `cancel_ad_autopilot` | `ai.use` | Read a run without advancing it, or stop it (a waiting plan included) |
+| `list_ad_export_destinations` | `ai.use` | Where creatives can go (Meta, YouTube, Google Ads) and why not where they cannot |
+| `export_ad_video` | `automation.execute` (OAuth/human only) | Upload the assembled video to the Meta ad account or the YouTube channel |
+| `export_ad_image` | `automation.execute` (OAuth/human only) | Upload an image to Meta's ad image library or as a Google Ads image asset |
+| `publish_ad` | `automation.execute` (OAuth/human only) | Create a real, PAUSED ad from an image or the video: Meta campaign + ad set + creative + ad, or a Google Display campaign + responsive display ad (images), or with `search: true` a Google Search campaign (Google Search only) from the saved search ad, keywords and negatives, targeted where the keywords were researched. Returns the link to the ad |
+| `get_ad_studio_usage` | `ai.use` | Daily limits, today's usage, which models are configured, and the clip quality-check setting |
+| `set_ad_studio_limits` | `project.configure` | Set the daily limits for AI text calls, video seconds and images, and the clip quality check (`video_qa_enabled`, `video_qa_retries` 0-2) |
 
 ## Safety & limits
 

@@ -15,6 +15,7 @@ import {
   InMemoryMetricQueryResultCache,
   InvalidCampaignTargetError,
   listCampaignTargetsForProject,
+  listEnvironmentsForProject,
   ProjectNotFoundError,
   setCampaignTargetBudget,
   type WarehouseQueryExecutor,
@@ -169,6 +170,26 @@ describe('getCampaignSpendBreakdownForProject', () => {
     expect(byId.get('untargeted_campaign')).toEqual({ campaignId: 'untargeted_campaign', actualSpend: 40, monthlyBudget: null, status: 'no_target' });
     expect(outcome.rows).toHaveLength(4);
   });
+
+  it('reports no_spend_data rather than a measured zero when the project has no spend at all', async () => {
+    // The case that was quietly wrong: a project whose ad connector has never
+    // synced has targets but an empty series. Every targeted campaign used to
+    // render "0 spent against your target - On target", which reads as
+    // comfortably under budget rather than as having no idea.
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Spend No Data Org');
+    await ensureSaasMetricPackSchemasRegistered(organization.id, project.id, owner.id);
+    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+    await setCampaignTargetBudget({ organizationId: organization.id, projectId: project.id, campaignId: 'never_synced_campaign', monthlyBudget: 5000, updatedByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    const outcome = await getCampaignSpendBreakdownForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+
+    expect(outcome.rows).toEqual([
+      { campaignId: 'never_synced_campaign', actualSpend: null, monthlyBudget: 5000, status: 'no_spend_data' },
+    ]);
+  });
 });
 
 describe('getPaybackOverviewForProject', () => {
@@ -246,6 +267,25 @@ describe('getCampaignPaybackBreakdownForProject', () => {
       { campaignId: 'spring_social', collectedRevenue40d: 50, roi40d: null },
     ]);
   });
+
+  it('asks for each campaign\'s lifetime as ONE bucket, so roi_40d is the ratio of its lifetime totals and a campaign never splits into one partial row per calendar year (B24)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Payback Total Grain Org');
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+    const queries: { sql: string }[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        queries.push(query);
+        return Promise.resolve([]);
+      },
+    };
+
+    await getCampaignPaybackBreakdownForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(queries[0].sql).not.toContain('DATE_TRUNC');
+    expect(queries[0].sql).toContain('GROUP BY `campaign_id`');
+  });
 });
 
 describe('getQualityCalibrationBreakdownForProject', () => {
@@ -284,5 +324,43 @@ describe('getQualityCalibrationBreakdownForProject', () => {
       { qualityTier: 'medium', signups: 0, payingSignups: 0, payingRate: null, collectedRevenue40d: 0, avgCollectedRevenue40d: null },
       { qualityTier: 'high', signups: 10, payingSignups: 8, payingRate: 0.8, collectedRevenue40d: 6000, avgCollectedRevenue40d: 600 },
     ]);
+  });
+});
+
+describe('campaign-ops warehouse reads: environment scoping (KAN-196)', () => {
+  it('every breakdown queries the prod environment by default and a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Ops Env Scope Org');
+    await ensureSaasMetricPackSchemasRegistered(organization.id, project.id, owner.id);
+    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const devEnv = environments.find((environment) => environment.name === 'dev')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+    const readers = [
+      getCampaignSpendBreakdownForProject,
+      getPaybackOverviewForProject,
+      getCampaignPaybackBreakdownForProject,
+      getQualityCalibrationBreakdownForProject,
+    ] as const;
+
+    for (const read of readers) {
+      capturedEnvironmentIds.length = 0;
+      const byDefault = await read(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+      expect(byDefault.ok).toBe(true);
+      expect(capturedEnvironmentIds).toEqual([prodEnv.id]);
+
+      capturedEnvironmentIds.length = 0;
+      const scoped = await read(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache(), environmentId: devEnv.id });
+      expect(scoped.ok).toBe(true);
+      expect(capturedEnvironmentIds).toEqual([devEnv.id]);
+    }
   });
 });

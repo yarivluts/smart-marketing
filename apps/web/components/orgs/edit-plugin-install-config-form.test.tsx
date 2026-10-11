@@ -78,6 +78,31 @@ describe('EditPluginInstallConfigForm', () => {
     expect(screen.getByRole('button', { name: 'Edit config' })).toBeInTheDocument();
   });
 
+  it('renders an enum field as a choice that starts unanswered, and only sends it once chosen (KAN-236)', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ install: { id: 'install-1' } }) } as Response);
+    const enumSchema = {
+      user_list_name: { type: 'string' as const, required: true },
+      ad_user_data_consent: { type: 'enum' as const, required: false, values: ['GRANTED', 'DENIED'] },
+      ad_personalization_consent: { type: 'enum' as const, required: false, values: ['GRANTED', 'DENIED'] },
+    };
+    renderForm({ configSchema: enumSchema as unknown as typeof CONFIG_SCHEMA, initialConfig: { user_list_name: 'Warm leads' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit config' }));
+    const userData = screen.getByLabelText(/ad_user_data_consent/);
+    expect(userData.tagName).toBe('SELECT');
+    expect(userData).toHaveValue('');
+    expect(screen.getAllByRole('option', { name: 'Not answered' })).toHaveLength(2);
+
+    fireEvent.change(userData, { target: { value: 'GRANTED' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save config' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects/project-1/plugins/install-1',
+      expect.objectContaining({ body: JSON.stringify({ config: { user_list_name: 'Warm leads', ad_user_data_consent: 'GRANTED' } }) }),
+    );
+  });
+
   it('shows an inline required-field error and does not submit when a required field is cleared', async () => {
     renderForm();
     fireEvent.click(screen.getByRole('button', { name: 'Edit config' }));

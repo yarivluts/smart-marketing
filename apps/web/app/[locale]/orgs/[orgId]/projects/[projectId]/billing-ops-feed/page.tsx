@@ -1,31 +1,32 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { AlertTriangle, BarChart3, CreditCard, PieChart, PlugZap, Receipt, RotateCcw, UserMinus, Wallet, XCircle } from 'lucide-react';
+import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
+  getBillingRecoveryForProject,
   listEnvironmentsForProject,
   listOrgProjects,
   listRecentBillingEventsForProject,
   listRecentChurnedSubscriptionsForProject,
   listRecentDunningSubscriptionsForProject,
-  getBillingRecoveryAnalyticsForProject,
 } from '@/lib/orgs/queries';
-import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from '@/lib/orgs/billing-ops-view';
+import {
+  DEFAULT_BILLING_OPS_FEED_LIMIT,
+  DEFAULT_CHURN_FEED_LIMIT,
+  DEFAULT_DUNNING_FEED_LIMIT,
+} from '@growthos/firebase-orm-models';
+import { billingOpsFeedEntryTypeLabelKey, splitOverFetchedFeed, toBillingOpsFeedEntryView, type BillingOpsFeedEntryType } from '@/lib/orgs/billing-ops-view';
+import { BILLING_OPS_TYPES, billingOpsKpis, groupFeedByDay, summariseBillingFeed, sumMrrByCurrency } from '@/lib/orgs/billing-ops-summary';
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 import { dunningFeedEntryStatusLabelKey, toDunningFeedEntryView } from '@/lib/orgs/dunning-feed-view';
-import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
-import {
-  PpPage,
-  PpPageHeader,
-  PpKpiGrid,
-  PpKpiCard,
-  PpCard,
-  PpTable,
-  PpPill,
-} from '@/components/pastel/primitives';
-import { Receipt, TrendingDown, AlertTriangle, ShieldCheck, RotateCw } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { RecoveredPaymentsSection } from '@/components/orgs/recovered-payments-section';
+import { FeedTimeline, type FeedTimelineGroup } from '@/components/orgs/feed-timeline';
+import { ChartCard, DonutChart, EmptyState, PageHero, TrendChart, type VizStatus } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -37,14 +38,38 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
+const TYPE_TONE: Record<BillingOpsFeedEntryType, VizStatus> = { charge: 'ok', failed_payment: 'error', refund: 'warn' };
+const TYPE_COLOR: Record<BillingOpsFeedEntryType, string> = {
+  charge: 'hsl(var(--success))',
+  failed_payment: 'hsl(var(--destructive))',
+  refund: 'hsl(var(--warning))',
+};
+
 /**
- * A project's billing-ops feed (KAN-80, gap-analysis Gap 5+15: "operational record-level feeds"):
- * New charges / failed charges / refunds as a browsable list, the bridge from aggregate metrics to
- * daily ops. Reads landed `RawRecordModel`s scoped to the Stripe billing event schemas.
+ * A project's billing-ops feed (KAN-80, gap-analysis Gap 5+15: "operational record-level feeds" —
+ * new charges / failed charges / refunds as a browsable list, the bridge from aggregate metrics to
+ * daily ops). Reads the same landed `RawRecordModel`s KAN-36's event-volume sparkline already reads,
+ * scoped to the Stripe billing event schemas (KAN-49). Gated on `ingest.write`, same "whole feature,
+ * not just mutation, is admin-only" posture as the sibling ingest-health page — this feed exposes
+ * per-customer payment failures, operationally sensitive the same way a quarantined record's raw
+ * payload is.
  *
- * Folded into the Stitch Pastel Pulse layout (desktop e9857ed6 + 1d086740, mobile 9ab2ca30 + 28d5a9e1),
- * presenting operational billing events, churned subscriptions, and active dunning lifecycle without
- * fabricated metrics.
+ * A second section (KAN-81, generalizing this same page + query pattern per plan `14 §Gap 5`'s "live
+ * record feeds ... churn") lists the most recently landed `stripe_subscription` entities showing a
+ * churn signal — already canceled or scheduled to cancel at period end.
+ *
+ * A third section (KAN-94) lists subscriptions currently in Stripe's dunning cycle (`past_due`/
+ * `unpaid` status) — the gap doc's own stretch goal, closing the gap this doc comment used to flag as
+ * deliberately out of scope ("no subscription-lifecycle/dunning model exists yet"): `status` is
+ * already a landed field on every `stripe_subscription` entity (KAN-49), so a dunning feed needed only
+ * a new predicate over the same snapshots the churn feed already reads, not a new model.
+ *
+ * A fourth section (KAN-304) pairs each failed payment with the successful charge that recovered it
+ * inside the dunning window (`getBillingRecoveryForProject`) - recovered amounts per currency, the
+ * recovery rate over attempts whose window has closed, and the time it took.
+ *
+ * The KPIs, per-day chart and currency totals are computed over exactly the entries listed, so they
+ * inherit each feed's cap note: a truncated feed is a window, and its totals are a window's totals.
  */
 export default async function BillingOpsFeedPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -57,419 +82,235 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
 
-  const [projects, rawRecords, churnRecords, dunningRecords, environments, recoveryAnalytics] = await Promise.all([
+  // Each feed is fetched one row beyond its cap so truncation is MEASURED rather
+  // than inferred. `entries.length === cap` cannot distinguish "exactly 100
+  // landed" from "thousands landed", and on a billing page those read very
+  // differently: the second means the operator is looking at a window, not a
+  // ledger. The extra row is never rendered - it is evidence, not an entry.
+  const [projects, rawRecords, churnRecords, dunningRecords, environments, recovery] = await Promise.all([
     listOrgProjects(orgId),
-    listRecentBillingEventsForProject(orgId, projectId),
-    listRecentChurnedSubscriptionsForProject(orgId, projectId),
-    listRecentDunningSubscriptionsForProject(orgId, projectId),
+    listRecentBillingEventsForProject(orgId, projectId, DEFAULT_BILLING_OPS_FEED_LIMIT + 1),
+    listRecentChurnedSubscriptionsForProject(orgId, projectId, DEFAULT_CHURN_FEED_LIMIT + 1),
+    listRecentDunningSubscriptionsForProject(orgId, projectId, DEFAULT_DUNNING_FEED_LIMIT + 1),
     listEnvironmentsForProject(orgId, projectId),
-    getBillingRecoveryAnalyticsForProject(orgId, projectId).catch(() => ({
-      hasData: false,
-      recoveredRevenueTotal: 0,
-      rolling30dRecovered: 0,
-      rolling90dRecovered: 0,
-      atRiskMrrTotal: 0,
-      activeDunningCount: 0,
-      recoveryRatePct: 0,
-      failedPaymentsCount: 0,
-      recoveredPaymentsCount: 0,
-      avgRecoveryHours: 0,
-      recentRecoveries: [],
-      activeDunning: [],
-    })),
+    getBillingRecoveryForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/billing-ops-feed`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
-  const entries = rawRecords.map(toBillingOpsFeedEntryView);
-  const churnEntries = churnRecords.map(toChurnFeedEntryView);
-  const dunningEntries = dunningRecords.map(toDunningFeedEntryView);
-  const hasBillingData =
-    entries.length > 0 || churnEntries.length > 0 || dunningEntries.length > 0 || recoveryAnalytics.hasData;
+  const billingPage = splitOverFetchedFeed(rawRecords, DEFAULT_BILLING_OPS_FEED_LIMIT);
+  const churnPage = splitOverFetchedFeed(churnRecords, DEFAULT_CHURN_FEED_LIMIT);
+  const dunningPage = splitOverFetchedFeed(dunningRecords, DEFAULT_DUNNING_FEED_LIMIT);
+  const billingTruncated = billingPage.truncated;
+  const churnTruncated = churnPage.truncated;
+  const dunningTruncated = dunningPage.truncated;
+  const entries = billingPage.rows.map(toBillingOpsFeedEntryView);
+  const churnEntries = churnPage.rows.map(toChurnFeedEntryView);
+  const dunningEntries = dunningPage.rows.map(toDunningFeedEntryView);
 
   const t = await getTranslations('BillingOpsFeed');
   const tEnv = await getTranslations('EnvBadge');
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
+  const environmentName = (id: string): string => environmentDisplayNameById.get(id) ?? id;
+
+  const integer = new Intl.NumberFormat(locale);
+  const dayFormat = new Intl.DateTimeFormat(locale, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const shortDay = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const timeFormat = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' });
+  const formatDay = (day: string, format: Intl.DateTimeFormat): string => {
+    const parsed = new Date(`${day}T00:00:00Z`);
+    return Number.isNaN(parsed.getTime()) ? day : format.format(parsed);
+  };
+  const formatTime = (iso: string): string => {
+    const parsed = new Date(iso);
+    return Number.isNaN(parsed.getTime()) ? iso : timeFormat.format(parsed);
+  };
+  const amountShort = (amount: number | null, currency: string | null): string | undefined =>
+    amount === null || currency === null ? undefined : t('amountShort', { amount: integer.format(amount), currency: currency.toUpperCase() });
+  const meta = (landedAt: string, clientId: string, environmentId: string): string =>
+    `${t('landedAtLine', { landedAt: formatTime(landedAt) })} · ${t('clientIdLine', { clientId })} · ${environmentName(environmentId)}`;
+
+  const summary = summariseBillingFeed(entries);
+  // With no billing events at all the counts are unknown, not zero - render the no-value state
+  // so the KPIs never contradict the "connect Stripe" empty state below them.
+  const kpis = billingOpsKpis(summary, { eventCount: entries.length, churnCount: churnEntries.length, dunningCount: dunningEntries.length });
+  const kpiValue = (value: number | null): string => (value === null ? t('kpiNoValue') : integer.format(value));
+  const eventKpiSub = kpis.hasBillingEvents ? t('kpiWindowSub', { count: entries.length }) : t('kpiNoEventsSub');
+  const churnMrr = sumMrrByCurrency(churnEntries);
+  const dunningMrr = sumMrrByCurrency(dunningEntries);
+  const mrrLine = (totals: { currency: string; mrr: number }[]): string | undefined =>
+    totals.length === 0 ? undefined : totals.map((total) => t('amountShort', { amount: integer.format(total.mrr), currency: total.currency })).join(' · ');
+
+  const billingGroups: FeedTimelineGroup[] = groupFeedByDay(entries).map((group) => ({
+    key: group.day,
+    label: formatDay(group.day, dayFormat),
+    items: group.entries.map((entry) => ({
+      id: entry.id,
+      tone: TYPE_TONE[entry.type],
+      title: t(billingOpsFeedEntryTypeLabelKey(entry.type)),
+      aside: amountShort(entry.amount, entry.currency) ?? t('amountUnknown'),
+      lines: [
+        ...(entry.customerId ? [{ text: t('customerLine', { customerId: entry.customerId }) }] : []),
+        ...(entry.failureMessage ? [{ text: t('failureLine', { message: entry.failureMessage }), emphasis: true }] : []),
+        ...(entry.refundReason ? [{ text: t('refundReasonLine', { reason: entry.refundReason }) }] : []),
+      ],
+      meta: meta(entry.landedAt, entry.clientId, entry.environmentId),
+    })),
+  }));
+  const churnGroups: FeedTimelineGroup[] = groupFeedByDay(churnEntries).map((group) => ({
+    key: group.day,
+    label: formatDay(group.day, dayFormat),
+    items: group.entries.map((entry) => ({
+      id: entry.id,
+      tone: entry.canceledAt ? 'error' : 'warn',
+      title: entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer'),
+      aside: entry.mrrNormalized === null || entry.currency === null ? t('amountUnknown') : t('mrrShort', { amount: integer.format(entry.mrrNormalized), currency: entry.currency.toUpperCase() }),
+      lines: entry.canceledAt
+        ? [{ text: t('canceledAtLine', { canceledAt: entry.canceledAt }), emphasis: true }]
+        : entry.cancelAtPeriodEnd
+          ? [{ text: t('cancelAtPeriodEndLine', { currentPeriodEnd: entry.currentPeriodEnd ?? '' }), emphasis: true }]
+          : [],
+      meta: meta(entry.landedAt, entry.clientId, entry.environmentId),
+    })),
+  }));
+  const dunningGroups: FeedTimelineGroup[] = groupFeedByDay(dunningEntries).map((group) => ({
+    key: group.day,
+    label: formatDay(group.day, dayFormat),
+    items: group.entries.map((entry) => ({
+      id: entry.id,
+      tone: entry.status === 'unpaid' ? 'error' : 'warn',
+      title: entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('dunningUnknownCustomer'),
+      aside: entry.mrrNormalized === null || entry.currency === null ? t('amountUnknown') : t('mrrShort', { amount: integer.format(entry.mrrNormalized), currency: entry.currency.toUpperCase() }),
+      lines: [{ text: t(dunningFeedEntryStatusLabelKey(entry.status)), emphasis: true }],
+      meta: meta(entry.landedAt, entry.clientId, entry.environmentId),
+    })),
+  }));
+
+  const connectAction = (
+    <Link
+      href={`/orgs/${orgId}/projects/${projectId}/plugins`}
+      className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+    >
+      <PlugZap className="h-4 w-4" aria-hidden="true" />
+      {t('connectStripeCta')}
+    </Link>
+  );
 
   return (
-    <PpPage>
-      {/* 1. Header */}
-      <PpPageHeader
-        eyebrow="FINANCIAL TELEMETRY & OPERATIONS"
-        meta={hasBillingData ? 'Stripe Webhooks Live' : 'Awaiting Ingestion'}
-        title={t('title', { projectName: project.name })}
-        description={t('description')}
-        actions={
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-pp-secondary-container/60 px-3 py-1.5 text-xs font-semibold text-pp-secondary">
-              <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-              <span>{hasBillingData ? '12ms Real-time Sync' : 'No Active Feed'}</span>
-            </span>
-          </div>
-        }
-      />
-
-      {/* 2. Top KPI Deck */}
-      <PpKpiGrid>
-        <PpKpiCard
-          label="Billing Events"
-          value={entries.length}
-          valueSuffix="records"
-          badge="30d Window"
-          accent="primary"
-          footer="Charges, refunds, and dunning logs"
-        />
-        <PpKpiCard
-          label={t('churnHeading')}
-          value={churnEntries.length}
-          valueSuffix="subs"
-          badge={churnEntries.length > 0 ? 'At Risk' : 'Zero Churn'}
-          badgeAccent={churnEntries.length > 0 ? 'pink' : 'mint'}
-          accent="pink"
-          footer={t('churnCapNote', { count: churnEntries.length })}
-        />
-        <PpKpiCard
-          label={t('dunningHeading')}
-          value={dunningEntries.length}
-          valueSuffix="subs"
-          badge={dunningEntries.length > 0 ? 'Action Req' : 'Clear'}
-          badgeAccent={dunningEntries.length > 0 ? 'amber' : 'mint'}
-          accent="amber"
-          footer={t('dunningCapNote', { count: dunningEntries.length })}
-        />
-        <PpKpiCard
-          label="Ingestion Health"
-          value={hasBillingData ? 'Active' : 'Idle'}
-          badge={hasBillingData ? 'Live' : 'No Data'}
-          badgeAccent={hasBillingData ? 'mint' : 'neutral'}
-          accent="mint"
-          footer="Stripe Webhook Sync"
-        />
-      </PpKpiGrid>
-
-      {/* 3. Section 1: Recovery Revenue & Dunning Performance (KAN-304, Stitch e9857ed6) */}
-      <PpCard
-        title={t('recoveryHeroTitle')}
-        subtitle={t('recoveryHeroSubtitle')}
-        icon={RotateCw}
-        iconAccent="mint"
-      >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
-            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
-              {t('recoveredRevenue30d')}
-            </p>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-pp-secondary">
-              {recoveryAnalytics.rolling30dRecovered > 0 ? (
-                `$${recoveryAnalytics.rolling30dRecovered.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              ) : (
-                <span className="text-pp-outline font-normal">—</span>
-              )}
-            </div>
-            <p className="mt-1 text-pp-label-xs text-pp-outline">
-              {t('recoveredRevenue90d')}: ${recoveryAnalytics.rolling90dRecovered.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
-            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
-              {t('recoveryRate')}
-            </p>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-pp-on-surface">
-              {recoveryAnalytics.failedPaymentsCount > 0 ? (
-                `${recoveryAnalytics.recoveryRatePct}%`
-              ) : (
-                <span className="text-pp-outline font-normal">—</span>
-              )}
-            </div>
-            <p className="mt-1 text-pp-label-xs text-pp-outline">
-              {recoveryAnalytics.recoveredPaymentsCount} of {recoveryAnalytics.failedPaymentsCount} payments recovered
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
-            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
-              {t('avgPaybackRate')}
-            </p>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-pp-on-surface">
-              {recoveryAnalytics.recoveredPaymentsCount > 0 ? (
-                t('hoursDuration', { hours: recoveryAnalytics.avgRecoveryHours })
-              ) : (
-                <span className="text-pp-outline font-normal">—</span>
-              )}
-            </div>
-            <p className="mt-1 text-pp-label-xs text-pp-outline">
-              {t('avgRecoveryDuration')}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low/50 p-4">
-            <p className="text-pp-label-sm font-semibold text-pp-on-surface-variant uppercase tracking-wider">
-              {t('atRiskDunningMrr')}
-            </p>
-            <div className="mt-2 text-2xl font-bold tracking-tight text-amber-700 dark:text-amber-400">
-              {recoveryAnalytics.atRiskMrrTotal > 0 ? (
-                `$${recoveryAnalytics.atRiskMrrTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-              ) : (
-                <span className="text-pp-outline font-normal">—</span>
-              )}
-            </div>
-            <p className="mt-1 text-pp-label-xs text-pp-outline">
-              {t('activeDunningFlows', { count: recoveryAnalytics.activeDunningCount })}
-            </p>
-          </div>
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Receipt} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiCharges')} value={kpiValue(kpis.charge)} icon={CreditCard} subtext={eventKpiSub} />
+          <StatCard title={t('kpiFailed')} value={kpiValue(kpis.failed_payment)} icon={XCircle} subtext={eventKpiSub} />
+          <StatCard title={t('kpiRefunds')} value={kpiValue(kpis.refund)} icon={RotateCcw} subtext={eventKpiSub} />
+          <StatCard
+            title={t('kpiAtRisk')}
+            value={kpiValue(kpis.atRisk)}
+            icon={AlertTriangle}
+            subtext={kpis.atRisk === null ? t('kpiNoEventsSub') : t('kpiAtRiskSub', { churn: churnEntries.length, dunning: dunningEntries.length })}
+          />
         </div>
-      </PpCard>
+      </PageHero>
 
-      {/* 4. Section 2: Recent Payment Recoveries */}
-      <PpCard
-        title={t('recentRecoveriesHeading')}
-        subtitle={t('recentRecoveriesSubtitle')}
-        icon={RotateCw}
-        iconAccent="mint"
-        flush={recoveryAnalytics.recentRecoveries.length > 0}
-      >
-        {recoveryAnalytics.recentRecoveries.length === 0 ? (
-          <p className="text-pp-body-md text-pp-on-surface-variant">{t('recentRecoveriesEmpty')}</p>
-        ) : (
-          <div className="space-y-4">
-            <PpTable>
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Recovered Amount</th>
-                  <th>Payback Latency</th>
-                  <th>Failed Date</th>
-                  <th>Recovered Date</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recoveryAnalytics.recentRecoveries.map((item) => (
-                  <tr key={item.id}>
-                    <td className="font-mono text-xs text-pp-on-surface font-medium">
-                      {item.customerId ? t('customerLine', { customerId: item.customerId }) : '—'}
-                    </td>
-                    <td className="font-semibold text-pp-secondary">
-                      {t('recoveredAmountLine', { amount: item.recoveredAmount, currency: item.currency.toUpperCase() })}
-                    </td>
-                    <td className="text-pp-body-sm font-medium text-pp-on-surface">
-                      {t('recoveredInHours', { hours: item.latencyHours })}
-                    </td>
-                    <td className="text-pp-label-sm text-pp-outline font-mono">
-                      {item.failedAt}
-                    </td>
-                    <td className="text-pp-label-sm text-pp-outline font-mono">
-                      {item.recoveredAt}
-                    </td>
-                    <td>
-                      <PpPill accent="mint" dot>
-                        {t('statusRecovered')}
-                      </PpPill>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </PpTable>
+      {entries.length === 0 ? (
+        <EmptyState icon={Receipt} title={t('empty')} description={t('emptyHint')} action={connectAction} />
+      ) : (
+        <>
+          <div className="grid gap-6 lg:grid-cols-5">
+            <ChartCard title={t('activityTitle')} description={t('activityDescription')} icon={BarChart3} className="lg:col-span-3" fill>
+              <TrendChart
+                label={t('activityTitle')}
+                kind="bar"
+                stacked
+                xKey="day"
+                height={240}
+                data={summary.byDay.map((row) => ({ day: formatDay(row.day, shortDay), charge: row.charge, failed_payment: row.failed_payment, refund: row.refund }))}
+                series={BILLING_OPS_TYPES.map((type) => ({ key: type, label: t(billingOpsFeedEntryTypeLabelKey(type)), color: TYPE_COLOR[type] }))}
+                showLegend
+              />
+            </ChartCard>
+            <ChartCard title={t('mixTitle')} description={t('mixDescription')} icon={PieChart} className="lg:col-span-2" fill>
+              <DonutChart
+                label={t('mixTitle')}
+                layout="stacked"
+                size={160}
+                centerValue={integer.format(entries.length)}
+                centerLabel={t('mixCenterLabel')}
+                data={BILLING_OPS_TYPES.filter((type) => summary.counts[type] > 0).map((type) => ({ label: t(billingOpsFeedEntryTypeLabelKey(type)), value: summary.counts[type], color: TYPE_COLOR[type] }))}
+              />
+            </ChartCard>
           </div>
-        )}
-      </PpCard>
 
-      {/* 5. Section 3: Operational Billing Feed */}
-      <PpCard
-        title={t('title', { projectName: project.name })}
-        subtitle={t('description')}
-        icon={Receipt}
-        iconAccent="primary"
-        flush={entries.length > 0}
-      >
-        {entries.length === 0 ? (
-          <div className="space-y-4">
-            <MissingIntegrationAlert
-              orgId={orgId}
-              projectId={projectId}
-              metricKey="MRR"
-              connectorId="stripe"
-              customTitle="No Ingested Billing Events"
-              customMissingPoints={[
-                'customer.subscription.created/updated/deleted webhooks',
-                'invoice.payment_succeeded and payment_failed events',
-              ]}
-              customImpactMetrics={['Daily Operational Feed', 'Net MRR Velocity', 'Dunning Recovery']}
-            />
-            <p className="text-pp-body-md text-pp-on-surface-variant">{t('empty')}</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <PpTable>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Customer</th>
-                  <th>Details</th>
-                  <th>Environment</th>
-                  <th>Landed At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>
-                      <PpPill accent={entry.failureMessage ? 'error' : entry.refundReason ? 'amber' : 'mint'}>
-                        {t(billingOpsFeedEntryTypeLabelKey(entry.type))}
-                      </PpPill>
-                    </td>
-                    <td className="font-semibold text-pp-on-surface">
-                      {entry.amount === null || entry.currency === null
-                        ? t('amountUnknown')
-                        : t('amountLine', { amount: entry.amount, currency: entry.currency.toUpperCase() })}
-                    </td>
-                    <td className="text-pp-on-surface-variant font-mono text-xs">
-                      {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : '—'}
-                    </td>
-                    <td className="text-pp-body-sm">
-                      {entry.failureMessage ? (
-                        <span className="text-pp-error font-medium">{t('failureLine', { message: entry.failureMessage })}</span>
-                      ) : entry.refundReason ? (
-                        <span className="text-amber-700 font-medium">{t('refundReasonLine', { reason: entry.refundReason })}</span>
-                      ) : (
-                        <span className="text-pp-outline">—</span>
-                      )}
-                    </td>
-                    <td className="text-pp-body-sm text-pp-on-surface-variant">
-                      {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                    </td>
-                    <td className="text-pp-label-sm text-pp-outline font-mono">
-                      {entry.landedAt}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </PpTable>
-            <p className="p-pp-lg pt-0 text-pp-label-sm text-pp-outline">{t('capNote', { count: entries.length })}</p>
-          </div>
-        )}
-      </PpCard>
+          {summary.totalsByCurrency.length > 0 ? (
+            <ChartCard title={t('totalsTitle')} description={t('totalsDescription')} icon={Wallet} footer={t('amountUnitNote')}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-xs text-muted-foreground">
+                      <th className="py-2 pe-3 text-start font-medium">{t('columnCurrency')}</th>
+                      {BILLING_OPS_TYPES.map((type) => (
+                        <th key={type} className="py-2 pe-3 text-end font-medium">
+                          {t(billingOpsFeedEntryTypeLabelKey(type))}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.totalsByCurrency.map((row) => (
+                      <tr key={row.currency} className="border-b border-border/60 last:border-0">
+                        <td className="py-2 pe-3 font-semibold">{row.currency}</td>
+                        {BILLING_OPS_TYPES.map((type) => (
+                          <td key={type} className="py-2 pe-3 text-end tabular-nums" dir="ltr">
+                            {integer.format(row[type])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </ChartCard>
+          ) : null}
 
-      {/* 4. Section 2: Churned Subscriptions */}
-      <PpCard
-        title={t('churnHeading')}
-        subtitle={t('churnCapNote', { count: churnEntries.length })}
-        icon={TrendingDown}
-        iconAccent="pink"
-        flush={churnEntries.length > 0}
-      >
-        {churnEntries.length === 0 ? (
-          <p className="text-pp-body-md text-pp-on-surface-variant">{t('churnEmpty')}</p>
-        ) : (
-          <div className="space-y-4">
-            <PpTable>
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>MRR Impact</th>
-                  <th>Churn Schedule</th>
-                  <th>Environment</th>
-                  <th>Landed At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {churnEntries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="font-medium text-pp-on-surface">
-                      {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer')}
-                    </td>
-                    <td className="font-semibold text-pp-error">
-                      {entry.mrrNormalized === null || entry.currency === null
-                        ? t('amountUnknown')
-                        : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
-                    </td>
-                    <td className="text-pp-body-sm">
-                      {entry.canceledAt ? (
-                        <span className="text-pp-error font-medium">{t('canceledAtLine', { canceledAt: entry.canceledAt })}</span>
-                      ) : entry.cancelAtPeriodEnd ? (
-                        <span className="text-amber-700 font-medium">{t('cancelAtPeriodEndLine', { currentPeriodEnd: entry.currentPeriodEnd ?? '' })}</span>
-                      ) : (
-                        <span className="text-pp-outline">—</span>
-                      )}
-                    </td>
-                    <td className="text-pp-body-sm text-pp-on-surface-variant">
-                      {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                    </td>
-                    <td className="text-pp-label-sm text-pp-outline font-mono">
-                      {entry.landedAt}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </PpTable>
-            <p className="p-pp-lg pt-0 text-pp-label-sm text-pp-outline">{t('churnCapNote', { count: churnEntries.length })}</p>
-          </div>
-        )}
-      </PpCard>
+          <ChartCard
+            title={t('timelineTitle')}
+            description={billingTruncated ? t('capNoteTruncated', { count: entries.length }) : t('capNote', { count: entries.length })}
+            icon={Receipt}
+            footer={t('amountUnitNote')}
+          >
+            <FeedTimeline label={t('timelineTitle')} groups={billingGroups} />
+          </ChartCard>
+        </>
+      )}
 
-      {/* 5. Section 3: Subscriptions in Dunning */}
-      <PpCard
-        title={t('dunningHeading')}
-        subtitle={t('dunningCapNote', { count: dunningEntries.length })}
-        icon={AlertTriangle}
-        iconAccent="amber"
-        flush={dunningEntries.length > 0}
-      >
-        {dunningEntries.length === 0 ? (
-          <p className="text-pp-body-md text-pp-on-surface-variant">{t('dunningEmpty')}</p>
-        ) : (
-          <div className="space-y-4">
-            <PpTable>
-              <thead>
-                <tr>
-                  <th>Customer</th>
-                  <th>Dunning Status</th>
-                  <th>MRR At Risk</th>
-                  <th>Environment</th>
-                  <th>Landed At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dunningEntries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="font-medium text-pp-on-surface">
-                      {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('dunningUnknownCustomer')}
-                    </td>
-                    <td>
-                      <PpPill accent="amber" dot>
-                        {t(dunningFeedEntryStatusLabelKey(entry.status))}
-                      </PpPill>
-                    </td>
-                    <td className="font-semibold text-amber-700">
-                      {entry.mrrNormalized === null || entry.currency === null
-                        ? t('amountUnknown')
-                        : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
-                    </td>
-                    <td className="text-pp-body-sm text-pp-on-surface-variant">
-                      {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                    </td>
-                    <td className="text-pp-label-sm text-pp-outline font-mono">
-                      {entry.landedAt}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </PpTable>
-            <p className="p-pp-lg pt-0 text-pp-label-sm text-pp-outline">{t('dunningCapNote', { count: dunningEntries.length })}</p>
-          </div>
-        )}
-      </PpCard>
-    </PpPage>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard
+          title={t('churnHeading')}
+          description={churnTruncated ? t('churnCapNoteTruncated', { count: churnEntries.length }) : t('churnCapNote', { count: churnEntries.length })}
+          icon={UserMinus}
+          footer={mrrLine(churnMrr) ? t('mrrAtRiskLine', { amounts: mrrLine(churnMrr) ?? '' }) : undefined}
+          fill
+        >
+          {churnEntries.length === 0 ? <EmptyState compact icon={UserMinus} title={t('churnEmpty')} /> : <FeedTimeline label={t('churnHeading')} groups={churnGroups} />}
+        </ChartCard>
+        <ChartCard
+          title={t('dunningHeading')}
+          description={dunningTruncated ? t('dunningCapNoteTruncated', { count: dunningEntries.length }) : t('dunningCapNote', { count: dunningEntries.length })}
+          icon={AlertTriangle}
+          footer={mrrLine(dunningMrr) ? t('mrrAtRiskLine', { amounts: mrrLine(dunningMrr) ?? '' }) : undefined}
+          fill
+        >
+          {dunningEntries.length === 0 ? <EmptyState compact icon={AlertTriangle} title={t('dunningEmpty')} /> : <FeedTimeline label={t('dunningHeading')} groups={dunningGroups} />}
+        </ChartCard>
+      </div>
+
+      <RecoveredPaymentsSection summary={recovery} />
+    </div>
   );
 }

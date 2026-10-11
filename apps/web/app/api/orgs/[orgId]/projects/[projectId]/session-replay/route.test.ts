@@ -150,7 +150,11 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/session-replay', () => {
     const { request, params } = replayRequest(organization.id, project.id, { template });
     const response = await POST(request, { params });
     expect(response.status).toBe(200);
-    expect((await response.json()) as { template: string }).toEqual({ template });
+    // `filtersByPage` is part of the contract, not incidental: it is the only
+    // thing that distinguishes a template which filters to the row's page from
+    // one that opens the same view every time (KAN-160). Asserted here so the
+    // route cannot quietly stop reporting it.
+    expect((await response.json()) as { template: string; filtersByPage: boolean }).toEqual({ template, filtersByPage: true });
     expect(await projectTemplate(organization.id, project.id)).toBe(template);
   });
 
@@ -165,7 +169,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/session-replay', () => {
     const clear = replayRequest(organization.id, project.id, { template: '' });
     const response = await POST(clear.request, { params: clear.params });
     expect(response.status).toBe(200);
-    expect((await response.json()) as { template: string }).toEqual({ template: '' });
+    expect((await response.json()) as { template: string; filtersByPage: boolean }).toEqual({ template: '', filtersByPage: false });
     // Regression: the service used to assign `undefined` to clear the field, which the ORM's
     // `getDocumentData()` silently drops from the `updateDoc()` call — so the old value stayed
     // in Firestore forever even though the API claimed success. Must genuinely persist as ''.
@@ -178,7 +182,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/session-replay', () => {
     const { request, params } = replayRequest(organization.id, project.id, { template: '   ' });
     const response = await POST(request, { params });
     expect(response.status).toBe(200);
-    expect((await response.json()) as { template: string }).toEqual({ template: '' });
+    expect((await response.json()) as { template: string; filtersByPage: boolean }).toEqual({ template: '', filtersByPage: false });
     expect(await projectTemplate(organization.id, project.id)).toBe('');
   });
 
@@ -188,6 +192,6 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/session-replay', () => {
     const { request, params } = replayRequest(organization.id, project.id, {});
     const response = await POST(request, { params });
     expect(response.status).toBe(200);
-    expect((await response.json()) as { template: string }).toEqual({ template: '' });
+    expect((await response.json()) as { template: string; filtersByPage: boolean }).toEqual({ template: '', filtersByPage: false });
   });
 });

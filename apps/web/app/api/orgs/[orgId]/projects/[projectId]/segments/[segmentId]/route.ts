@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidSegmentError, SegmentNotFoundError, type SegmentModel } from '@growthos/firebase-orm-models';
 import { assignSegmentOwner, deleteSegment, updateSegmentDefinition, updateSegmentStatus } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseUpdateSegmentRequestBody } from '@/lib/orgs/parse-segment-fields';
 import { toSegmentSummaryView } from '@/lib/orgs/segment-view';
 
@@ -12,7 +12,7 @@ interface RouteParams {
 /** Deletes a segment outright (see `deleteSegment`'s own doc comment for why a segment, like a goal or board, has no keep-forever audit requirement of its own). */
 export async function DELETE(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, segmentId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -42,7 +42,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams): Pr
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, segmentId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

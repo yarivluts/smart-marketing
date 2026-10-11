@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PipelineMessageModel } from '@growthos/firebase-orm-models';
 import {
   computeIngestHealthSummary,
+  formatErrorRate,
   formatMinutesAgo,
   formatThroughput,
   toQueuedPipelineMessageView,
@@ -25,7 +26,7 @@ function batch(overrides: Partial<IngestBatchView> & Pick<IngestBatchView, 'id' 
 describe('computeIngestHealthSummary', () => {
   it('returns all-zero, null-freshness rollups for a project with no batches yet', () => {
     const summary = computeIngestHealthSummary([], NOW);
-    expect(summary.overall).toMatchObject({ batchCount: 0, totalRecords: 0, errorRatePercent: 0, latestBatchAt: null, freshnessMinutes: null });
+    expect(summary.overall).toMatchObject({ batchCount: 0, totalRecords: 0, errorRatePercent: null, latestBatchAt: null, freshnessMinutes: null });
     expect(summary.byKind).toEqual([]);
     expect(summary.batchesConsidered).toBe(0);
   });
@@ -67,10 +68,11 @@ describe('computeIngestHealthSummary', () => {
     expect(computeIngestHealthSummary([mixed], NOW).overall.errorRatePercent).toBe(25);
   });
 
-  it('reports 0% error rate when total records is 0, not NaN/Infinity', () => {
+  it('reports no error rate (null) when total records is 0 - not 0%, NaN or Infinity', () => {
     const batches = [batch({ id: 'b1', createdAt: '2026-07-06T11:58:00Z', totalCount: 0 })];
     const summary = computeIngestHealthSummary(batches, NOW);
-    expect(summary.overall.errorRatePercent).toBe(0);
+    expect(summary.overall.errorRatePercent).toBeNull();
+    expect(summary.byKind[0].errorRatePercent).toBeNull();
   });
 
   it('computes freshness in minutes since the most recent batch', () => {
@@ -149,5 +151,19 @@ describe('toQueuedPipelineMessageView', () => {
   it('computes minutes elapsed since the message was enqueued', () => {
     const view = toQueuedPipelineMessageView(message({}), NOW);
     expect(view).toEqual({ id: 'msg-1', kind: 'event', environmentId: 'env-prod', clientId: 'evt-1', minutesAgo: 5 });
+  });
+});
+
+describe('formatErrorRate', () => {
+  it('has no value for a rate over zero received records, so it is never shown as 0.0%', () => {
+    expect(formatErrorRate(null)).toBeNull();
+    expect(formatErrorRate(computeIngestHealthSummary([], NOW).overall.errorRatePercent)).toBeNull();
+  });
+
+  it('formats a measured rate to one decimal, including a real 0.0%', () => {
+    expect(formatErrorRate(25)).toBe('25.0');
+    expect(formatErrorRate(0)).toBe('0.0');
+    const clean = batch({ id: 'b1', createdAt: '2026-07-06T11:58:00Z', totalCount: 3, acceptedCount: 3 });
+    expect(formatErrorRate(computeIngestHealthSummary([clean], NOW).overall.errorRatePercent)).toBe('0.0');
   });
 });

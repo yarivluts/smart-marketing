@@ -1,3 +1,4 @@
+import { CANCELLATION_REASON_SCHEMA_NAME, type CancellationReasonCode } from '@growthos/shared';
 import { computeSubscriptionMrrNormalized } from './mrr';
 import {
   STRIPE_CHARGE_EVENT_NAME,
@@ -126,11 +127,11 @@ export function mapSubscriptionToEntityRecord(subscription: StripeSubscription):
 }
 
 /**
- * Maps Stripe's customer exit survey cancellation feedback to our standardized
- * `CancellationReasonCode` taxonomy (KAN-306).
+ * Stripe's Customer Portal exit-survey `feedback` value -> this codebase's `CancellationReasonCode`
+ * taxonomy (`@growthos/shared`). A value Stripe adds later, or one with no counterpart here, falls to
+ * `other` - the taxonomy's own escape hatch - rather than being guessed into a specific bucket.
  */
-export function mapStripeCancellationFeedbackToReasonCode(feedback?: string | null): string {
-  if (!feedback) return 'other';
+export function mapStripeCancellationFeedbackToReasonCode(feedback: string): CancellationReasonCode {
   switch (feedback) {
     case 'too_expensive':
       return 'too_expensive';
@@ -145,49 +146,67 @@ export function mapStripeCancellationFeedbackToReasonCode(feedback?: string | nu
     case 'too_complex':
     case 'low_quality':
       return 'technical_issues';
-    case 'other':
     default:
       return 'other';
   }
 }
 
+function nonEmpty(value: string | null | undefined): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+}
+
 /**
- * Extracts a `cancellation_reason` event record when a Stripe subscription carries exit survey feedback
- * or reason details (KAN-306).
+ * Maps a canceled (or scheduled-to-cancel) Stripe subscription's `cancellation_details` to one
+ * `cancellation_reason` event (KAN-306) - the same schema a cancel flow or exit survey sends through
+ * the tracking SDK (`CANCELLATION_REASON_SCHEMA_FIELDS`: `reason_code` + optional `comment`, with the
+ * implicit `customer_id` envelope field), so a Stripe-reported reason shows up on the Churn Reasons page
+ * beside every other one. Returns `null` when there is no reason to record:
+ *
+ * - no `canceled_at`: the subscription is not canceled (or its cancellation was undone), and there is
+ *   no real cancellation time to date the event by - a reason is never stamped with "now";
+ * - no `cancellation_details`, or nothing in it but `reason: 'cancellation_requested'`: the customer
+ *   canceled without saying why, which is a cancellation, not a reason.
+ *
+ * Code precedence: `reason: 'payment_failed'` -> `payment_failed` (involuntary churn: Stripe canceled
+ * after retries ran out, whatever survey state exists); otherwise the customer's survey `feedback`;
+ * otherwise `other` when there is still something to record (a free-text comment, or a dispute-driven
+ * cancellation).
+ *
+ * `event_id` is `stripe:cancellation_reason:<subscription id>:<canceled_at>`. Stripe sends
+ * `customer.subscription.updated` repeatedly for one subscription (and `.deleted` when a scheduled
+ * cancellation takes effect), all carrying the same `canceled_at` for the same cancellation, so every
+ * re-delivery claims the same ingest dedup slot and lands once. A subscription reactivated and then
+ * canceled again gets a new `canceled_at`, hence a new event.
  */
-export function mapStripeSubscriptionToCancellationReasonRecord(
-  subscription: StripeSubscription,
-): Record<string, unknown> | null {
+export function mapStripeSubscriptionToCancellationReasonRecord(subscription: StripeSubscription): Record<string, unknown> | null {
+  if (subscription.canceled_at === null || subscription.canceled_at === undefined) return null;
   const details = subscription.cancellation_details;
-  if (!details || (!details.feedback && !details.comment && !details.reason)) {
+  if (!details) return null;
+
+  const feedback = nonEmpty(details.feedback);
+  const comment = nonEmpty(details.comment);
+  const reason = nonEmpty(details.reason);
+
+  let reasonCode: CancellationReasonCode;
+  if (reason === 'payment_failed') {
+    reasonCode = 'payment_failed';
+  } else if (feedback !== null) {
+    reasonCode = mapStripeCancellationFeedbackToReasonCode(feedback);
+  } else if (comment !== null || reason === 'payment_disputed') {
+    reasonCode = 'other';
+  } else {
     return null;
   }
 
-  const reasonCode = details.feedback
-    ? mapStripeCancellationFeedbackToReasonCode(details.feedback)
-    : details.reason === 'payment_failed'
-      ? 'technical_issues'
-      : 'other';
-
-  const comment = typeof details.comment === 'string' && details.comment.trim().length > 0 ? details.comment.trim() : null;
-  const landedTs = toIso(subscription.canceled_at ?? Math.floor(Date.now() / 1000));
-
-  const properties: Record<string, unknown> = {
-    reason_code: reasonCode,
-    customer_id: subscription.customer,
-  };
-  if (comment !== null) {
-    properties.comment = comment;
-  }
-
+  const customerId = nonEmpty(subscription.customer);
   return {
-    client_id: `stripe_cancel_${subscription.id}`,
-    schema_name: 'cancellation_reason',
-    payload: {
-      event: 'cancellation_reason',
-      event_id: `evt_cancel_${subscription.id}`,
-      ts: landedTs,
-      properties,
+    event_id: `stripe:cancellation_reason:${subscription.id}:${subscription.canceled_at}`,
+    event: CANCELLATION_REASON_SCHEMA_NAME,
+    ts: toIso(subscription.canceled_at),
+    properties: {
+      reason_code: reasonCode,
+      ...(comment !== null ? { comment } : {}),
+      ...(customerId !== null ? { customer_id: customerId } : {}),
     },
   };
 }

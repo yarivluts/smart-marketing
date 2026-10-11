@@ -2,7 +2,7 @@ import type { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
-  connectFirestoreOrm,
+  connectFirestoreOrmAdmin,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
@@ -30,7 +30,14 @@ let baseUrl: string;
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';
   process.env.FIREBASE_PROJECT_ID = 'demo-growthos-test';
-  await connectFirestoreOrm({ projectId: 'demo-growthos-test', emulatorHost: '127.0.0.1:8100' });
+  // Admin SDK, not the client SDK (KAN-128). These specs previously called
+  // connectFirestoreOrm against the emulator, which is the gRPC Listen stream
+  // that corrupts - the signature being RESOURCE_EXHAUSTED with a nonsense
+  // multi-gigabyte size, a garbage length prefix rather than a real message. It
+  // failed CI on documentation-only pull requests. The Admin SDK reads
+  // FIRESTORE_EMULATOR_HOST from the environment itself and opens no long-lived
+  // stream, so there is no framing to lose.
+  await connectFirestoreOrmAdmin({ projectId: 'demo-growthos-test' });
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication();
@@ -199,15 +206,16 @@ describe('MetricsController (e2e)', () => {
       projectId: project.id,
       name: 'ad_spend',
       definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
-      dimensions: [],
+      // Both operands carry `channel`: a formula may only declare dimensions every operand shares.
+      dimensions: ['channel'],
       createdByUserId: owner.id,
     });
     await registerMetricDefinition({
       organizationId: organization.id,
       projectId: project.id,
       name: 'signups',
-      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
-      dimensions: [],
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fixture_signup_export', timeColumn: 'date', filters: [] } },
+      dimensions: ['channel'],
       createdByUserId: owner.id,
     });
     await registerMetricDefinition({

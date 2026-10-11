@@ -14,19 +14,17 @@ import {
   getPaybackOverviewForProject,
   getQualityCalibrationBreakdownForProject,
   queryGoalProgress,
-  listRawRecordEventsForProject,
+  resolveMetricDisplayUnits,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildFunnelGoalsCockpitData } from '@/lib/orgs/funnel-goals-synthesizer';
 import { FunnelGoalsDashboard } from '@/components/orgs/funnel-goals-dashboard';
-import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
-import { PpPage } from '@/components/pastel/primitives';
 import type {
   FunnelStepsOutcome,
   CohortRetentionOutcome,
   PaybackOverviewOutcome,
   QualityCalibrationBreakdownOutcome,
   GoalProgressOutcome,
-  RawRecordModel,
 } from '@growthos/firebase-orm-models';
 
 type PageProps = Readonly<{
@@ -41,9 +39,11 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * Unified Funnel, Goals & Revenue Health Cockpit (Milestone 2):
- * Consolidates Visual Conversion Pipelines (EasySign), Dynamic Business Metric Goals,
- * Linear Pace Extrapolations, Cohort Retention Heatmap Matrix, Payback Velocity (7d..40d),
- * and Intent Tier Quality Calibration with instant zero-config synthesis.
+ * Consolidates the project's own conversion funnel, metric goals with linear pace, the cohort
+ * retention matrix, payback velocity (7d..40d) and intent-tier quality calibration.
+ *
+ * Every section renders only what was measured for this project. Where a query failed or nothing
+ * has landed yet, the section says so - it never falls back to sample data (Jira B15).
  */
 export default async function FunnelPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -58,9 +58,9 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
 
-  const canExecute = can(bindings, principal, 'automation.execute', { orgId });
-  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId });
-  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
+  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
+  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
 
   if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
@@ -69,55 +69,47 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/funnel`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+
   let funnelOutcome: FunnelStepsOutcome | null = null;
-  let rawRecords: RawRecordModel[] = [];
   let cohortOutcome: CohortRetentionOutcome | null = null;
   let paybackOutcome: PaybackOverviewOutcome | null = null;
   let calibrationOutcome: QualityCalibrationBreakdownOutcome | null = null;
 
   try {
-    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId);
+    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId, environmentScope);
   } catch {
     funnelOutcome = null;
   }
 
-  // When BigQuery is not configured or returns no steps, query landed event records from Firestore
-  if (!funnelOutcome || !funnelOutcome.ok || funnelOutcome.steps.length === 0) {
-    try {
-      rawRecords = await listRawRecordEventsForProject(orgId, projectId);
-    } catch {
-      rawRecords = [];
-    }
-  }
-
   try {
-    cohortOutcome = await queryCohortRetention(orgId, projectId);
+    cohortOutcome = await queryCohortRetention(orgId, projectId, environmentScope);
   } catch {
     cohortOutcome = null;
   }
 
   try {
-    paybackOutcome = await getPaybackOverviewForProject(orgId, projectId);
+    paybackOutcome = await getPaybackOverviewForProject(orgId, projectId, environmentScope);
   } catch {
     paybackOutcome = null;
   }
 
   try {
-    calibrationOutcome = await getQualityCalibrationBreakdownForProject(orgId, projectId);
+    calibrationOutcome = await getQualityCalibrationBreakdownForProject(orgId, projectId, environmentScope);
   } catch {
     calibrationOutcome = null;
   }
 
-  const [goals, metricCatalog, people] = await Promise.all([
+  const [goals, metricCatalog, people, metricUnits] = await Promise.all([
     listGoalsForProject(orgId, projectId).catch(() => []),
     listMetricsCatalogForProject(orgId, projectId).catch(() => []),
     listOrgPeople(orgId).catch(() => []),
+    resolveMetricDisplayUnits(orgId, projectId).catch(() => ({})),
   ]);
 
   const personNameById = new Map(people.map((p) => [p.id, p.name]));
@@ -127,47 +119,28 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     await Promise.all(
       goals.map(async (goal) => {
         try {
-          const outcome = await queryGoalProgress(orgId, projectId, goal);
+          const outcome = await queryGoalProgress(orgId, projectId, goal, environmentScope);
           goalOutcomes.set(goal.id, outcome);
         } catch {
-          // Fallback to synthesizer standard progress calculation
+          // Left out of the map: the synthesizer reports this goal's progress as `query_error`.
         }
       }),
     );
   }
 
-  const hasWarehouseSteps = Boolean(funnelOutcome && funnelOutcome.ok && funnelOutcome.steps.length > 0);
-  const hasEventData = hasWarehouseSteps || rawRecords.length > 0;
-
   const cockpitData = buildFunnelGoalsCockpitData({
     funnelOutcome,
-    rawRecords: !hasWarehouseSteps ? rawRecords : undefined,
     goals,
     goalOutcomes,
     personNameById,
+    metricUnits,
     cohortOutcome,
     paybackOutcome,
     calibrationOutcome,
-    projectId,
   });
 
   return (
-    <PpPage className="space-y-6">
-      {!hasEventData && (
-        <MissingIntegrationAlert
-          orgId={orgId}
-          projectId={projectId}
-          metricKey="CONVERSION_FUNNEL"
-          connectorId="growthos_sdk"
-          customTitle="Tracking SDK & Funnel Telemetry"
-          customMissingPoints={[
-            'Step progression telemetry (Landing -> Signup -> Activation -> Paid)',
-            'Web SDK page view pings and persistent client anonymous IDs',
-          ]}
-          customImpactMetrics={['Multi-Step Conversion Funnel Velocity', 'Dropoff Bottleneck Diagnostics', 'True ROI Attribution']}
-        />
-      )}
-
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <FunnelGoalsDashboard
         orgId={orgId}
         projectId={projectId}
@@ -177,6 +150,6 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
         metricCatalog={metricCatalog}
         people={people.filter((p) => !p.archived_at).map((p) => ({ id: p.id, name: p.name }))}
       />
-    </PpPage>
+    </div>
   );
 }

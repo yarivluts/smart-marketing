@@ -12,7 +12,11 @@ vi.mock('@/i18n/navigation', () => ({
     </a>
   ),
   usePathname: () => mockUsePathname(),
+  // The header's LanguageSwitcher navigates with it.
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
+// The header's UserMenu reads the session; signed out it renders nothing.
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ user: null, signOut: vi.fn() }) }));
 
 const homeItem: AppShellNavItem = { href: '/orgs/org-1', label: 'Home', icon: 'Home' };
 const boardsItem: AppShellNavItem = { href: '/orgs/org-1/projects/p1/boards', label: 'Boards', icon: 'LayoutGrid' };

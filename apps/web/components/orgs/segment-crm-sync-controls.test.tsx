@@ -85,4 +85,16 @@ describe('SegmentCrmSyncControls', () => {
     renderControls({ latestRun: { id: 'run-1', status: 'failed', startedAt: '2026-08-20T00:00:00.000Z', finishedAt: '2026-08-20T00:00:05.000Z', attempts: 1, recordsAttempted: 3, recordsPushed: null, errorMessage: 'boom' } });
     expect(screen.getByText('Last sync failed')).toBeInTheDocument();
   });
+
+  /**
+   * A succeeded run whose destination never reported a count used to render as
+   * "Last synced 0 records" — a confident, alarming and wrong claim about a run
+   * that in fact worked (KAN-174). Zero and unknown are different answers, and
+   * only one of them makes someone go looking for a broken sync.
+   */
+  it('says the destination did not report a count, rather than claiming zero, for a succeeded run with no count', () => {
+    renderControls({ latestRun: { id: 'run-1', status: 'succeeded', startedAt: '2026-08-20T00:00:00.000Z', finishedAt: '2026-08-20T00:00:05.000Z', attempts: 1, recordsAttempted: 3, recordsPushed: null, errorMessage: null } });
+    expect(screen.getByText(/did not report how many records it accepted/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 records/)).toBeNull();
+  });
 });

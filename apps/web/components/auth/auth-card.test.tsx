@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { AuthCard } from './auth-card';
+import he from '@/messages/he.json';
 
 describe('AuthCard Component', () => {
   it('renders auth card with title, subtitle, and child content', () => {
@@ -28,8 +29,20 @@ describe('AuthCard Component', () => {
       { locale: 'en' },
     );
 
-    expect(screen.getByText('Autonomous AI Marketing')).toBeInTheDocument();
-    expect(screen.getByText('256-bit SSL Encrypted')).toBeInTheDocument();
-    expect(screen.getByText('SOC2 Compliant')).toBeInTheDocument();
+    expect(screen.getByText('Guarded automation')).toBeInTheDocument();
+    expect(screen.getByText('Encrypted in transit (HTTPS)')).toBeInTheDocument();
+    expect(screen.getByText('Every change audit-logged')).toBeInTheDocument();
+    // No certification the product cannot back up.
+    expect(screen.queryByText(/SOC ?2/i)).toBeNull();
+  });
+
+  it('renders the branding side in Hebrew from the translation files', () => {
+    renderWithIntl(
+      <AuthCard title="x">
+        <div>Form Content</div>
+      </AuthCard>,
+      { locale: 'he' },
+    );
+    expect(screen.getByText(he.Auth.brandFeature1Title)).toBeInTheDocument();
   });
 });

@@ -3,9 +3,12 @@ import { BadRequestException } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
+  getConfirmedFunnelSteps,
   getMetricCatalogDetail,
   listMetricsCatalogForProject,
   listProjectInsights,
+  listSegmentsForProject,
+  listWinRulesForProject,
   MetricNotRegisteredError,
   MetricTargetsUnbuiltWarehouseTableError,
   ProjectNotFoundError,
@@ -13,11 +16,17 @@ import {
   queryMetrics,
   queryProjectCohortRetention,
   queryProjectFunnelSteps,
+  resolveMetricDisplayUnits,
   recordAuditLogEntry,
   searchProjectCustomers,
+  validateIngestBatch,
+  EmptyIngestBatchError,
+  IngestBatchTooLargeError,
+  type IngestBatchInput,
   WarehouseNotConfiguredError,
+  type FunnelStepResult,
 } from '@growthos/firebase-orm-models';
-import { MetricCompilerError } from '@growthos/shared';
+import { MetricCompilerError, serializeMetricUnit, TOTAL_GRAIN } from '@growthos/shared';
 import { parseMetricQueryRequestBody } from '../metrics/metrics-request';
 import type { McpAuthContext } from './mcp-auth.guard';
 
@@ -62,7 +71,8 @@ export function toolInputSchema(shape: Record<string, z.ZodTypeAny>): any {
   return shape;
 }
 
-export type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+/** A tool's answer: JSON text, and for the Ad Studio's image tools also the image itself (MCP image content). */
+export type ToolResult = { content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean };
 
 export function textResult(value: unknown): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
@@ -71,6 +81,53 @@ export function textResult(value: unknown): ToolResult {
 export function errorResult(message: string): ToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
 }
+
+/**
+ * One `query_funnel` step on the MCP surface (B21). Snake_case like every other MCP tool, so a step can be fed
+ * straight back into `set_funnel` (which reads `event_schema_name`/`stage_key`); the camelCase keys the tool
+ * used to return are kept, deprecated, for one release so existing readers do not break.
+ */
+export interface FunnelStepOutput {
+  event_schema_name: string;
+  stage_key: string;
+  step_order: number;
+  people_count: number;
+  conversion_rate_from_first: number;
+  conversion_rate_from_previous: number;
+  /** @deprecated Use `event_schema_name`. */
+  eventSchemaName: string;
+  /** @deprecated Use `stage_key`. */
+  stageKey: string;
+  /** @deprecated Use `step_order`. */
+  stepOrder: number;
+  /** @deprecated Use `people_count`. */
+  customerCount: number;
+  /** @deprecated Use `conversion_rate_from_first`. */
+  conversionRateFromFirst: number;
+}
+
+export function toFunnelStepOutputs(steps: readonly FunnelStepResult[]): FunnelStepOutput[] {
+  return steps.map((step, index) => {
+    const previousCount = index === 0 ? step.customerCount : steps[index - 1].customerCount;
+    return {
+      event_schema_name: step.eventSchemaName,
+      stage_key: step.stageKey,
+      step_order: step.stepOrder,
+      people_count: step.customerCount,
+      conversion_rate_from_first: step.conversionRateFromFirst,
+      conversion_rate_from_previous: previousCount > 0 ? step.customerCount / previousCount : 0,
+      eventSchemaName: step.eventSchemaName,
+      stageKey: step.stageKey,
+      stepOrder: step.stepOrder,
+      customerCount: step.customerCount,
+      conversionRateFromFirst: step.conversionRateFromFirst,
+    };
+  });
+}
+
+/** What `query_funnel` says when the project has no confirmed funnel yet (KAN-199). */
+export const NO_FUNNEL_DEFINED_MESSAGE =
+  'This project has no confirmed funnel yet, so there is nothing to count. Define one with set_funnel (an ordered list of at least 2 registered event schema names; pass dry_run first to check it) or confirm one in the web onboarding wizard.';
 
 /**
  * Appends one audit-log entry for a single MCP tool call (KAN-77 AC: "every tool call lands in the
@@ -173,10 +230,65 @@ function describeMetricsError(error: unknown): string {
  * extra-validation, not in three independently-maintained copies of the
  * parse-query-respond sequence.
  */
+type MetricQueryRequestBody = ReturnType<typeof parseMetricQueryRequestBody>;
+
+/** One dimension combination's period values in a `compare_periods` answer - see {@link buildPeriodTotals}. */
+interface PeriodTotalsEntry {
+  dimensions: Record<string, string | number | null>;
+  current: Record<string, number | null>;
+  previous: Record<string, number | null>;
+  /** (current - previous) / previous x 100, per metric; null when either side is missing or the previous value is 0. */
+  change_pct: Record<string, number | null>;
+}
+
+function toFiniteOrNull(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === '') {
+    return null;
+  }
+  const value = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Folds a compared `total`-grain result (one row per period per dimension combination) into one
+ * entry per combination: each metric's current and previous PERIOD value, and the change between
+ * them. The values are the warehouse's own - a rate evaluated over each period's totals - so an
+ * agent never has to (and must not) derive them by summing or averaging the per-bucket `series`.
+ */
+function buildPeriodTotals(rows: readonly Record<string, string | number | null>[], request: MetricQueryRequestBody): PeriodTotalsEntry[] {
+  const dimensions = [...new Set(request.dimensions ?? [])];
+  const metrics = [...new Set(request.metrics)];
+  const entries = new Map<string, PeriodTotalsEntry>();
+  for (const row of rows) {
+    const dimensionValues = Object.fromEntries(dimensions.map((dimension) => [dimension, row[dimension] ?? null]));
+    const key = JSON.stringify(dimensions.map((dimension) => dimensionValues[dimension]));
+    const entry = entries.get(key) ?? {
+      dimensions: dimensionValues,
+      current: Object.fromEntries(metrics.map((metric) => [metric, null])),
+      previous: Object.fromEntries(metrics.map((metric) => [metric, null])),
+      change_pct: {},
+    };
+    const side = row.period === 'previous' ? entry.previous : entry.current;
+    for (const metric of metrics) {
+      side[metric] = toFiniteOrNull(row[metric]);
+    }
+    entries.set(key, entry);
+  }
+  for (const entry of entries.values()) {
+    for (const metric of metrics) {
+      const current = entry.current[metric];
+      const previous = entry.previous[metric];
+      entry.change_pct[metric] = current !== null && previous !== null && previous !== 0 ? ((current - previous) / previous) * 100 : null;
+    }
+  }
+  return [...entries.values()];
+}
+
 async function runMetricQueryTool(
   auth: McpAuthContext,
   args: unknown,
-  extraValidate?: (request: ReturnType<typeof parseMetricQueryRequestBody>) => string | undefined,
+  extraValidate?: (request: MetricQueryRequestBody) => string | undefined,
+  options: { periodTotals?: boolean } = {},
 ): Promise<ToolResult> {
   try {
     const request = parseMetricQueryRequestBody(args);
@@ -187,13 +299,32 @@ async function runMetricQueryTool(
     // API-key caller: the key's bound environment; OAuth (human) caller:
     // undefined, so queryMetrics resolves the project's prod default — see
     // McpAuthContext.environmentId's own doc comment.
-    const result = await queryMetrics({
+    const scope = {
       organizationId: auth.organizationId,
       projectId: auth.projectId,
       ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
-      request,
-    });
-    return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
+    };
+    // A period comparison is about each period's VALUE. For a rate that is the formula over the
+    // period's totals (sum(conversions) / sum(visitors)), which no sum or mean of the bucketed
+    // series can recover - so it is asked of the warehouse directly, as one `total`-grain bucket per
+    // period. A request that is already `total` grain is its own answer.
+    const wantsTotals = options.periodTotals === true;
+    const totalsRequest: MetricQueryRequestBody = { ...request, time: { ...request.time, grain: TOTAL_GRAIN } };
+    const [result, displayUnits, totalsResult] = await Promise.all([
+      queryMetrics({
+        ...scope,
+        request,
+        // One row per bucket of the range, the same series a board line/bar tile draws: a silent
+        // missing day would read to an agent as "no data", or as two adjacent days, when it was a 0.
+        fillEmptyBuckets: true,
+      }),
+      resolveMetricDisplayUnits(auth.organizationId, auth.projectId),
+      wantsTotals && request.time.grain !== TOTAL_GRAIN ? queryMetrics({ ...scope, request: totalsRequest }) : Promise.resolve(undefined),
+    ]);
+    // Each queried metric's unit (KAN-213), so a 0.5 in a "ratio" column is read as 50%, not 0.5.
+    const units = Object.fromEntries(request.metrics.map((metric) => [metric, serializeMetricUnit(displayUnits[metric] ?? { kind: 'number' })]));
+    const periodTotals = wantsTotals ? { period_totals: buildPeriodTotals((totalsResult ?? result).series, request) } : {};
+    return textResult({ series: result.series, ...periodTotals, units, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
   } catch (error) {
     return errorResult(describeMetricsError(error));
   }
@@ -215,7 +346,11 @@ const metricQueryInputShape = {
   metric: z.unknown().describe('One metric name (string), or an array of metric names to query together.'),
   dimensions: z.unknown().optional().describe('Breakdown dimensions — each must be declared on every requested metric.'),
   filters: z.unknown().optional().describe('Array of { field, op, value } — op is one of =, !=, >, >=, <, <=, in.'),
-  time: z.unknown().describe('{ start: "YYYY-MM-DD", end: "YYYY-MM-DD", grain: day|week|month|quarter|year, compare?: previous_period|previous_year }'),
+  time: z
+    .unknown()
+    .describe(
+      '{ start: "YYYY-MM-DD", end: "YYYY-MM-DD", grain: day|week|month|quarter|year|total, compare?: previous_period|previous_year } - "total" returns the whole range as ONE bucket: the period value.',
+    ),
 };
 
 const cohortInputShape = {
@@ -224,17 +359,25 @@ const cohortInputShape = {
     .string()
     .optional()
     .describe('Which event must fire again for a customer to count as "retained" in a later period. Omit for "any activity that period" (the default).'),
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional().describe('Maximum cohort rows to return, newest cohort first.'),
 };
 
 const searchCustomersInputShape = {
-  query: z.string().min(1),
+  query: z.string().min(1).describe('Substring to look for. Matched with SQL LIKE against the entity id and against the whole properties object serialised to JSON — so it also matches property NAMES, not just values, and a short query like "e" will match almost every row. Not fuzzy and not tokenised: use a distinctive fragment.'),
   schema_name: z.string().optional().describe('Restrict to one entity schema, e.g. "customer".'),
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional().describe('Maximum matching customers to return.'),
+};
+
+const validateRecordsInputShape = {
+  kind: z.enum(['event', 'entity', 'measure']).describe('Which ingest endpoint the records are for: event (POST /v1/ingest/events), entity (/entities) or measure (/measures).'),
+  type: z.string().optional().describe('entity only: the entity schema name, as the batch-level "type" of POST /v1/ingest/entities.'),
+  records: z
+    .unknown()
+    .describe('The records exactly as they would be sent: events as { event_id, event, ts, properties }, entities as { id, attributes }, measures as { measure, ts, value, dimensions }. Up to the ingest batch limit.'),
 };
 
 const listInsightsInputShape = {
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional().describe('Maximum insights to return, most recent first.'),
 };
 
 const describeMetricInputShape = {
@@ -246,7 +389,8 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'list_metrics',
     {
       title: 'List metrics',
-      description: "List every metric registered in this project's active metric catalog, with lineage.",
+      description:
+        "List every metric registered in this project's active metric catalog, with lineage and its unit when one is declared (count, ratio = a 0-1 fraction shown as a percent, percent = 0-100, currency, duration_seconds; absent = a plain number). A goal target is given in that unit: 8% on a ratio metric is 0.08.",
       inputSchema: {},
     },
     auditedToolHandler(auth, 'list_metrics', async () => {
@@ -259,7 +403,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'describe_metric',
     {
       title: 'Describe metric',
-      description: 'Get the full definition (aggregation/formula, dimensions, lineage) of one registered metric by name.',
+      description: 'Get the full definition (aggregation/formula, dimensions, lineage) of one registered metric by name, including requiredEvents - which event schema has to be registered and sent for this metric to count anything, since knowing the warehouse table it reads does not tell you what to emit.',
       inputSchema: toolInputSchema(describeMetricInputShape),
     },
     auditedToolHandler(auth, 'describe_metric', async (args: any) => {
@@ -277,7 +421,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Query metric',
       description:
-        'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse.',
+        'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse. The series has one row per time bucket in the range: a bucket with no events is 0 for a count/count_distinct/sum metric and null ("no value", not zero) for an avg/min/max or formula metric. An entirely empty result means nothing was recorded in the range at all. For a value over the whole range (e.g. "what was the conversion rate last month") use grain "total", which returns one row with the metric evaluated over the period: never sum or average bucket values of a rate/formula, avg or count_distinct metric - day 1 at 1/1 and day 2 at 1/100 average 50.5%, but the period rate is 2/101 = 1.98%.',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
     auditedToolHandler(auth, 'query_metric', async (args: any) => runMetricQueryTool(auth, args)),
@@ -288,12 +432,15 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Compare periods',
       description:
-        'Query one or more metrics with a period-over-period comparison ("time.compare": previous_period or previous_year, required) — the result series is split by a "period" column for "current" vs. "prior".',
+        'Query one or more metrics with a period-over-period comparison ("time.compare": previous_period or previous_year, required) — the result series is split by a "period" column for "current" vs. "prior". "period_totals" holds each period\'s own value per metric (and per dimension combination) plus change_pct, computed by the warehouse over each whole period - compare those, never sums or averages of the series (a rate over a period is not the mean of its daily rates).',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
     auditedToolHandler(auth, 'compare_periods', async (args: any) =>
-      runMetricQueryTool(auth, args, (request) =>
-        request.time.compare ? undefined : 'compare_periods requires "time.compare" to be "previous_period" or "previous_year".',
+      runMetricQueryTool(
+        auth,
+        args,
+        (request) => (request.time.compare ? undefined : 'compare_periods requires "time.compare" to be "previous_period" or "previous_year".'),
+        { periodTotals: true },
       ),
     ),
   );
@@ -348,15 +495,24 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Query funnel',
       description:
-        "Query this project's confirmed funnel (onboarding wizard step order): distinct customer count per stage, ordered by step, each stage's count also expressed as a conversion rate off the first step.",
+        "Query this project's confirmed funnel: for each step, in step order, how many PEOPLE reached it having gone through every earlier step in order (people_count; a person is the customer, or the visitor before they identify - a visitor who later becomes a customer counts once), so counts never increase from one step to the next. Each step also carries conversion_rate_from_first and conversion_rate_from_previous (0..1), the event schema it counts (event_schema_name), its funnel stage (stage_key; several steps can share one) and its position (step_order). The steps can be passed straight back to set_funnel. The camelCase keys (eventSchemaName, stageKey, stepOrder, customerCount, conversionRateFromFirst) are DEPRECATED duplicates kept for one release; read the snake_case ones. A project only has a funnel once one is confirmed - with set_funnel or in the web onboarding wizard. Until then this returns status \"no_funnel_defined\" with an empty steps list and a message saying so, rather than a bare empty list that would read as a funnel nobody entered.",
       inputSchema: {},
     },
     auditedToolHandler(auth, 'query_funnel', async () => {
       try {
         const steps = await queryProjectFunnelSteps({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}) });
-        return textResult({ steps });
+        if (steps.length === 0) {
+          // KAN-199: an empty list was indistinguishable from "a funnel with nobody in it", and an
+          // integrator who never opened the web wizard had no way to learn a funnel must be set.
+          return textResult({ status: 'no_funnel_defined', steps: [], message: NO_FUNNEL_DEFINED_MESSAGE });
+        }
+        return textResult({ steps: toFunnelStepOutputs(steps) });
       } catch (error) {
-        return errorResult(describeMetricsError(error));
+        // The funnel exists but could not be counted: say which funnel, so a warehouse problem is not
+        // mistaken for a missing or wrong funnel definition.
+        const configured = await getConfirmedFunnelSteps(auth.organizationId, auth.projectId).catch(() => []);
+        const funnelNote = configured.length > 0 ? ` The confirmed funnel is: ${configured.map((step) => step.eventSchemaName).join(' -> ')}.` : '';
+        return errorResult(`${describeMetricsError(error)}${funnelNote}`);
       }
     }),
   );
@@ -365,16 +521,60 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'search_customers',
     {
       title: 'Search customers',
-      description: "Substring-search this project's customer/entity records (Customer 360) by id or property value.",
+      description:
+        "Look a customer up by identifier. Despite the name this is NOT a general-purpose search: it matches a substring against the entity id or against the whole attributes object serialised to JSON, which includes the KEY names — so every row with a field called \"plan\" matches the query \"plan\", and any short or common query matches nearly everything. Use a distinctive identifier (a uid, an external id, an exact value); do not use it to explore. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned — narrow the query rather than assuming the list is complete. Customer 360 is populated only by ENTITY-kind ingestion: a project sending only events has no rows here however much data it sends, and its empty result then carries empty_reason \"no_entity_schemas\" rather than looking like a miss.",
       inputSchema: toolInputSchema(searchCustomersInputShape),
     },
     auditedToolHandler(auth, 'search_customers', async (args: any) => {
       const { query, schema_name: schemaName, limit } = args as { query: string; schema_name?: string; limit?: number };
       try {
-        const results = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
-        return textResult({ results });
+        const page = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
+        // KAN-137: an empty list must say when nothing COULD match, not only that nothing did -
+        // an events-only project has populated cohorts and an empty Customer 360, by design.
+        if (page.emptyReason === 'no_entity_schemas') {
+          return textResult({
+            results: [],
+            has_more: false,
+            limit: page.limit,
+            empty_reason: 'no_entity_schemas',
+            note: 'This project has no active entity-kind schema, so Customer 360 has no source: search_customers reads only ENTITY-kind records, and no query can match until one is registered and entity records are sent. Cohorts and funnels count people from EVENT-kind records instead, so they can be populated while this is empty.',
+          });
+        }
+        // has_more is reported because a truncated list that looks complete is
+        // how a caller concludes "no such customer" from "I only saw 20 of them".
+        return textResult({ results: page.results, has_more: page.hasMore, limit: page.limit });
       } catch (error) {
         return errorResult(describeMetricsError(error));
+      }
+    }),
+  );
+
+  // KAN-202 I3: ingest's own envelope + schema checks, storing nothing - the same service the
+  // REST /v1/ingest/*/validate endpoints use, so an agent and a CI job get identical verdicts.
+  server.registerTool(
+    'validate_records',
+    {
+      title: 'Validate records',
+      description:
+        "Check sample records against this project's registered schemas exactly as ingest would - envelope fields, schema registered, every property declared and correctly typed - without storing anything (no batch, no quarantine entry, no dedup claim). Returns each record's status (valid or invalid) and the reasons ingest would quarantine it for. A valid record is accepted by ingest unless it repeats one already accepted; dedup is not evaluated. The same check is available over REST at POST /v1/ingest/(events|entities|measures)/validate for CI.",
+      inputSchema: toolInputSchema(validateRecordsInputShape),
+    },
+    auditedToolHandler(auth, 'validate_records', async (args: any) => {
+      const { kind, type, records } = args as { kind: IngestBatchInput['kind']; type?: string; records?: unknown };
+      if (!Array.isArray(records)) {
+        return errorResult('records must be an array of records, shaped as the ingest endpoint for this kind takes them.');
+      }
+      if (kind === 'entity' && (typeof type !== 'string' || type.trim().length === 0)) {
+        return errorResult('type is required for entity records: it is the entity schema name.');
+      }
+      const input: IngestBatchInput = kind === 'entity' ? { kind, type: type as string, records } : { kind, records };
+      try {
+        return textResult(await validateIngestBatch({ organizationId: auth.organizationId, projectId: auth.projectId, input }));
+      } catch (error) {
+        if (error instanceof EmptyIngestBatchError || error instanceof IngestBatchTooLargeError) {
+          return errorResult(error.message);
+        }
+        throw error;
       }
     }),
   );
@@ -388,8 +588,60 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     },
     auditedToolHandler(auth, 'list_insights', async (args: any) => {
       const { limit } = args as { limit?: number };
-      const insights = await listProjectInsights({ organizationId: auth.organizationId, projectId: auth.projectId, limit });
+      const insights = await listProjectInsights({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), limit });
       return textResult({ insights });
+    }),
+  );
+
+  // The two read tools the EasySign audit (P-09) found missing everywhere: a
+  // caller could `create_segment` but never see what segments exist, and
+  // could see win *events* but never the rules that fire them. Same
+  // connection-scope `mcp.read` gate as every other read tool here; both
+  // are Firestore-backed config reads, no warehouse round trip.
+  server.registerTool(
+    'list_segments',
+    {
+      title: 'List segments',
+      description: "List every saved segment in this project (name, entity schema, filters, work-list status) — the read side of create_segment.",
+      inputSchema: {},
+    },
+    auditedToolHandler(auth, 'list_segments', async () => {
+      const segments = await listSegmentsForProject(auth.organizationId, auth.projectId);
+      return textResult({
+        segments: segments.map((segment) => ({
+          id: segment.id,
+          name: segment.name,
+          schema_name: segment.schema_name,
+          filters: segment.filters,
+          event_conditions: segment.event_conditions ?? [],
+          status: segment.status ?? null,
+          owner_person_id: segment.owner_person_id ?? null,
+          created_at: segment.created_at,
+        })),
+      });
+    }),
+  );
+
+  server.registerTool(
+    'list_win_rules',
+    {
+      title: 'List win rules',
+      description: 'List every win rule configured in this project (name, the event schema it watches, its filters, win type, active flag) — the rules behind the win_event insights list_insights reports.',
+      inputSchema: {},
+    },
+    auditedToolHandler(auth, 'list_win_rules', async () => {
+      const rules = await listWinRulesForProject(auth.organizationId, auth.projectId);
+      return textResult({
+        win_rules: rules.map((rule) => ({
+          id: rule.id,
+          name: rule.name,
+          schema_name: rule.schema_name,
+          filters: rule.filters,
+          win_type: rule.win_type,
+          active: rule.active,
+          updated_at: rule.updated_at,
+        })),
+      });
     }),
   );
 }

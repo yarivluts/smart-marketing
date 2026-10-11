@@ -169,3 +169,54 @@ describe('GoalTargetInput — range (rangeMin/rangeMax)', () => {
     );
   });
 });
+
+describe('GoalTargetInput on a ratio metric (KAN-213)', () => {
+  beforeEach(() => {
+    refresh.mockClear();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  function renderRatio(): void {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <GoalTargetInput
+          orgId="org-1"
+          projectId="project-1"
+          goalId="goal-1"
+          goalName="Conversion"
+          direction="maximize"
+          targetValue={0.08}
+          rangeMin={null}
+          rangeMax={null}
+          unit="ratio"
+        />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  it('shows the stored fraction as a percent, with a % beside it', () => {
+    renderRatio();
+    expect(screen.getByLabelText('Target value for Conversion')).toHaveValue(8);
+    expect(screen.getByText('%')).toBeInTheDocument();
+  });
+
+  it('PATCHes the typed percent as a fraction', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
+    renderRatio();
+    const input = screen.getByLabelText('Target value for Conversion');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/goals/goal-1', expect.objectContaining({ body: JSON.stringify({ targetValue: 0.12 }) }));
+  });
+
+  it('refuses a percent above 100 and reverts', async () => {
+    renderRatio();
+    const input = screen.getByLabelText('Target value for Conversion');
+    fireEvent.change(input, { target: { value: '800' } });
+    fireEvent.blur(input);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a value between 0 and 100.');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(input).toHaveValue(8);
+  });
+});

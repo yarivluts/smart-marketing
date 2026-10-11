@@ -8,6 +8,14 @@ export const GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD = 'goog
 export const GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD = 'user_list_name';
 
 /**
+ * The advertiser's consent answers for the uploaded users (KAN-236), sent to Google as the offline
+ * user data job's `consent`. `enum` (GRANTED/DENIED) rather than boolean so "not answered" stays
+ * distinct from "denied": an unanswered field is simply not sent, never defaulted by GrowthOS.
+ */
+export const GOOGLE_CUSTOMER_MATCH_AD_USER_DATA_CONSENT_CONFIG_FIELD = 'ad_user_data_consent';
+export const GOOGLE_CUSTOMER_MATCH_AD_PERSONALIZATION_CONSENT_CONFIG_FIELD = 'ad_personalization_consent';
+
+/**
  * The built-in Google Ads Customer Match plugin's own `plugin.yaml`
  * (KAN-72 follow-up, plan `13 §E21.2`'s own "audience attach" bullet —
  * deferred at KAN-72 merge time for the same reason KAN-73's own Custom
@@ -34,13 +42,15 @@ export const GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD = 'user_list_name';
  */
 export const GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML = `
 id: ${GOOGLE_CUSTOMER_MATCH_PLUGIN_ID}
-version: 1.0.0
+version: 1.1.0
 type: action
 display_name: Google Ads Customer Match Sync
 scopes: [action:execute]
 config_schema:
   ${GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD}: { type: string, required: true }
   ${GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD}: { type: string, required: true }
+  ${GOOGLE_CUSTOMER_MATCH_AD_USER_DATA_CONSENT_CONFIG_FIELD}: { type: enum, values: [GRANTED, DENIED], required: false }
+  ${GOOGLE_CUSTOMER_MATCH_AD_PERSONALIZATION_CONSENT_CONFIG_FIELD}: { type: enum, values: [GRANTED, DENIED], required: false }
 endpoints:
   action: ./executor.ts
 `.trim();

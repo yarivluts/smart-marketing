@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
-import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
-import type { ProjectModel } from '../models/project.model';
+import {
+  collectIdentifiers,
+  fillEmptyBuckets,
+  parseFormula,
+  resolveMetricUnit,
+  type CompilerParamValue,
+  type MetricQueryRequest,
+  type ParsedMetricUnit,
+} from '@growthos/shared';
+import { ProjectModel } from '../models/project.model';
 import type { MetricAggregationDef, MetricDefModel, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
@@ -37,6 +45,7 @@ function buildResultCacheKey(
   environmentId: string | null,
   definitionRefs: Record<string, string>,
   params: Record<string, CompilerParamValue>,
+  shape: { grain: MetricQueryRequest['time']['grain']; dimensions: readonly string[] },
 ): string {
   const sortEntries = <T>(record: Record<string, T>) => Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
   // `environmentId` is included explicitly even though a resolved env also
@@ -44,7 +53,22 @@ function buildResultCacheKey(
   // left the env unset, two different environments' queries would otherwise
   // share one cache entry and serve each other's rows, the same
   // cross-slice-leak reasoning as including org/project above.
-  const canonical = JSON.stringify({ organizationId, projectId, environmentId, definitionRefs: sortEntries(definitionRefs), params: sortEntries(params) });
+  //
+  // `shape` - the grain and the breakdown - never appears in `params` (it is
+  // compiled into the SQL text, not bound), yet it changes the rows
+  // completely. Without it a whole-range `total` query and a day-grain query
+  // over the same metric and window shared one entry, as did a big-number
+  // tile and a split-by-campaign bar tile on the same board: whichever ran
+  // first served its rows to the other.
+  const canonical = JSON.stringify({
+    organizationId,
+    projectId,
+    environmentId,
+    definitionRefs: sortEntries(definitionRefs),
+    params: sortEntries(params),
+    grain: shape.grain,
+    dimensions: [...new Set(shape.dimensions)],
+  });
   return createHash('sha256').update(canonical).digest('hex');
 }
 
@@ -79,6 +103,19 @@ export interface QueryMetricsParams {
   precomputedProject?: ProjectModel;
   precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>;
   precomputedQuota?: ProjectCostQuota;
+  /**
+   * Completes the returned series to one row per time bucket of the requested range (KAN-210
+   * follow-up) - 0 for a count/count_distinct/sum metric, `null` (a gap, never a made-up 0) for
+   * avg/min/max and formula metrics. See `fillEmptyBuckets` in `@growthos/shared` for the exact
+   * rules, including why an entirely empty result stays empty.
+   *
+   * Opt-in, because not every caller wants a row per bucket: a heatmap reads an absent cohort cell as
+   * "not observable yet", a histogram queries from a 1970 floor, and the many internal callers that
+   * only sum a series gain nothing but rows. Time-series surfaces - board line/bar tiles, goal
+   * progress, the MCP metric tools - turn it on, so they all show the same series. Applied after the
+   * result cache, which keeps the warehouse's own rows, so filled and unfilled callers share entries.
+   */
+  fillEmptyBuckets?: boolean;
 }
 
 export interface MetricQueryResult {
@@ -86,6 +123,8 @@ export interface MetricQueryResult {
   /** `metric:<name>@v<version>` per metric the query depends on (requested or transitively referenced by a formula) — see `compileMetricQueryForProject`. */
   definitionRefs: Record<string, string>;
   cacheHit: boolean;
+  /** Per requested metric: a running total (true) or a level such as a rate (false) - see `CompiledProjectMetricQuery.accumulatesOverPeriod`. */
+  accumulatesOverPeriod: Record<string, boolean>;
 }
 
 /**
@@ -164,10 +203,19 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     throw new MetricTargetsUnbuiltWarehouseTableError(metricName, table);
   }
 
-  const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params);
+  const shapeSeries = (rows: WarehouseRow[]): WarehouseRow[] =>
+    params.fillEmptyBuckets
+      ? fillEmptyBuckets(rows, { time: params.request.time, dimensions: [...new Set(params.request.dimensions ?? [])], metrics: compiled.emptyBucketValues })
+      : rows;
+
+  const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params, {
+    grain: params.request.time.grain,
+    dimensions: params.request.dimensions ?? [],
+  });
+  const accumulatesOverPeriod = compiled.accumulatesOverPeriod;
   const cached = cache.get(cacheKey);
   if (cached) {
-    return { series: cached, definitionRefs: compiled.definitionRefs, cacheHit: true };
+    return { series: shapeSeries(cached), definitionRefs: compiled.definitionRefs, cacheHit: true, accumulatesOverPeriod };
   }
 
   const quota = await checkProjectQueryQuota(params.organizationId, params.projectId, new Date(), params.precomputedQuota);
@@ -188,7 +236,7 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     }
     cache.set(cacheKey, series, cacheTtlSeconds);
     await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs, estimatedCostUsd);
-    return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
+    return { series: shapeSeries(series), definitionRefs: compiled.definitionRefs, cacheHit: false, accumulatesOverPeriod };
   } catch (error) {
     const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';
     await logCostAttempt(params.organizationId, params.projectId, outcome, compiled.definitionRefs);
@@ -202,6 +250,8 @@ export interface MetricCatalogEntry {
   version: number;
   definitionKind: MetricDefinitionKind;
   dimensions: string[];
+  /** The metric's declared unit (KAN-213) — see `MetricDefModel.unit`. Absent when none is declared, meaning a plain number. */
+  unit?: string;
 }
 
 /** `GET /v1/metrics` (plan `12 §3`): every metric family's current `active` version in a project — deliberately excludes `superseded` versions, unlike the admin UI's `listMetricDefinitionsForProject` (KAN-40), which browses the full history. */
@@ -209,7 +259,13 @@ export async function listMetricsCatalogForProject(organizationId: string, proje
   const defs = await listMetricDefinitionsForProject(organizationId, projectId);
   return defs
     .filter((def) => def.status === 'active')
-    .map((def) => ({ name: def.name, version: def.version, definitionKind: def.definition_kind, dimensions: def.dimensions }));
+    .map((def) => ({
+      name: def.name,
+      version: def.version,
+      definitionKind: def.definition_kind,
+      dimensions: def.dimensions,
+      ...(def.unit ? { unit: def.unit } : {}),
+    }));
 }
 
 /** `GET /v1/metrics/{name}`'s "definition + lineage" shape — `dependsOn` is the formula's own direct metric references (not transitive; a dashboard/AI caller wanting the full dependency tree can walk it one hop at a time via repeat calls). Empty for an aggregation-kind metric, which depends on no other metric. */
@@ -217,6 +273,69 @@ export interface MetricCatalogDetail extends MetricCatalogEntry {
   aggregation?: MetricAggregationDef;
   formula?: string;
   dependsOn: string[];
+  /**
+   * What has to be sent for this metric to be non-zero, in the caller's own terms.
+   *
+   * A metric names a warehouse table, and knowing the table tells you nothing about what to
+   * emit: `signups` reads `fact_funnel_event`, and no amount of staring at that name reveals
+   * that it wants an event whose schema is called `signup` carrying a `customer_id`. Someone
+   * integrating would register a schema, POST successfully, see `accepted: 1`, and still read
+   * zero - with the definition in front of them and no way to tell what was missing.
+   *
+   * Undefined when the metric reads a table this cannot speak for (a custom measure/entity
+   * mart, or a core table with no event-shaped source). Saying nothing is better than guessing.
+   */
+  requiredEvents?: RequiredEventHint[];
+}
+
+/** One event a metric needs in order to count anything. */
+export interface RequiredEventHint {
+  /** The `schema` value the ingest envelope must carry, i.e. the registered schema's name. */
+  event: string;
+  /** Envelope/property fields the metric reads, so an event that omits them counts for nothing. */
+  requiredFields: string[];
+  /** Why this event, in one line — the actual derivation, not a restatement of the filter. */
+  because: string;
+}
+
+/**
+ * Derives {@link MetricCatalogDetail.requiredEvents} from an aggregation definition.
+ *
+ * Only `fact_funnel_event` is modelled here, deliberately. Its lineage is simple and total —
+ * `fact_funnel_event` selects every non-touchpoint row of `events` and sets
+ * `step = properties.event_name ?? event_type`, where `event_type` is the record's own
+ * `schema_name` — so a `step = X` filter means exactly "send an event whose schema is X".
+ *
+ * The other core tables are not guessed at. `dim_subscription` and `fact_revenue_event` fold
+ * several event types through their own logic, and a hint that is confidently wrong is worse
+ * than none: it would send someone off to emit an event that changes nothing.
+ */
+function deriveRequiredEvents(aggregation: MetricAggregationDef | undefined): RequiredEventHint[] | undefined {
+  if (!aggregation || aggregation.table !== 'fact_funnel_event') {
+    return undefined;
+  }
+
+  const stepFilter = (aggregation.filters ?? []).find((filter) => filter.field === 'step' && filter.operator === '=');
+  if (!stepFilter || typeof stepFilter.value !== 'string') {
+    // No step filter means the metric counts every event, which is a real answer worth giving.
+    return [
+      {
+        event: '*',
+        requiredFields: aggregation.column ? [aggregation.column] : [],
+        because: 'Counts every non-touchpoint event this project ingests, whatever its schema.',
+      },
+    ];
+  }
+
+  return [
+    {
+      event: stepFilter.value,
+      // customer_id on fact_funnel_event is the record's entity_id, which the ingest envelope
+      // carries — so naming the column directly would send someone looking for a property.
+      requiredFields: aggregation.column === 'customer_id' ? ['customer_id (envelope)'] : aggregation.column ? [aggregation.column] : [],
+      because: `fact_funnel_event.step is the event's own schema name, so this metric counts events registered and sent as "${stepFilter.value}".`,
+    },
+  ];
 }
 
 /** `GET /v1/metrics/{name}` (plan `12 §3`): the active version's full definition, or `null` if no metric is registered under that name — the same 404-not-403 non-enumeration posture as every other cross-tenant lookup in this codebase (there's nothing tenant-scoped to leak here, but the shape is kept consistent). */
@@ -226,13 +345,32 @@ export async function getMetricCatalogDetail(organizationId: string, projectId: 
     return null;
   }
   const dependsOn = active.definition_kind === 'formula' && active.formula ? [...collectIdentifiers(parseFormula(active.formula))] : [];
+  const requiredEvents = deriveRequiredEvents(active.aggregation);
   return {
     name: active.name,
     version: active.version,
     definitionKind: active.definition_kind,
     dimensions: active.dimensions,
+    ...(active.unit ? { unit: active.unit } : {}),
     ...(active.aggregation ? { aggregation: active.aggregation } : {}),
     ...(active.formula ? { formula: active.formula } : {}),
     dependsOn,
+    ...(requiredEvents ? { requiredEvents } : {}),
   };
+}
+
+/**
+ * Every active metric's display unit in a project (KAN-213), keyed by metric name: each declared
+ * unit resolved against the project's own currency (a bare `currency` unit means "this project's
+ * currency"), and every metric with no declared unit as a plain `number`. What a board, a goal card
+ * or an MCP response formats a metric's value with - one read of the catalog plus the project, not
+ * one per value.
+ */
+export async function resolveMetricDisplayUnits(organizationId: string, projectId: string): Promise<Record<string, ParsedMetricUnit>> {
+  const [defs, project] = await Promise.all([
+    listMetricDefinitionsForProject(organizationId, projectId),
+    ProjectModel.init(projectId, { organization_id: organizationId }),
+  ]);
+  const projectCurrency = project && project.organization_id === organizationId ? project.currency : undefined;
+  return Object.fromEntries(defs.filter((def) => def.status === 'active').map((def) => [def.name, resolveMetricUnit(def.unit, projectCurrency)]));
 }

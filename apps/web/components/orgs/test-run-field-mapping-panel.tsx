@@ -3,10 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
-import { PpButton, ppInputClass } from '@/components/pastel/primitives';
-import { Play, Check, X, FlaskConical, CheckCircle2, Zap } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { FieldMappingConfidenceScore, FieldMappingLatencyMetrics } from '@growthos/shared';
+import { Button } from '@/components/ui/button';
 
 export interface TestRunHookDeliveryOption {
   id: string;
@@ -26,8 +23,6 @@ interface TestRunResponseBody {
   envelopeErrors: string[];
   schemaRegistered: boolean;
   schemaValidationErrors: string[];
-  latencyProfile?: FieldMappingLatencyMetrics;
-  confidenceScore?: FieldMappingConfidenceScore;
 }
 
 interface ApplyResponseBody extends TestRunResponseBody {
@@ -37,7 +32,14 @@ interface ApplyResponseBody extends TestRunResponseBody {
 
 /**
  * Runs a saved mapping against a sample payload without persisting anything
- * (KAN-54 AC: "test-run on sample").
+ * (KAN-54 AC: "test-run on sample") — the sample is either pasted JSON or an
+ * already-queued hook delivery's raw payload (KAN-53). Collapsed by default
+ * on the field-mappings list so browsing the list stays uncluttered. Once a
+ * test-run against a real queued delivery comes back clean, an "apply to
+ * delivery" action (KAN-54 follow-up) lands the mapped record for real via
+ * the ingest pipeline and marks the delivery handled — see
+ * `applyFieldMappingToDelivery`'s own doc comment for why this reuses the
+ * exact same validation path rather than trusting the earlier preview.
  */
 export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hookDeliveries }: TestRunFieldMappingPanelProps): React.ReactElement {
   const t = useTranslations('FieldMappings');
@@ -94,6 +96,8 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
       }
       const body = (await response.json()) as ApplyResponseBody;
       if (!body.applied) {
+        // Re-validation at apply time disagreed with the earlier preview (e.g. the schema evolved,
+        // or the delivery changed, in between) — show the same error rendering a test-run would.
         setResult(body);
         setApplyError(t('applyToDeliveryValidationChanged'));
         return;
@@ -108,9 +112,9 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
 
   if (!open) {
     return (
-      <PpButton type="button" variant="secondary" size="sm" icon={FlaskConical} onClick={() => setOpen(true)}>
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>
         {t('testRun')}
-      </PpButton>
+      </Button>
     );
   }
 
@@ -122,13 +126,13 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
     result.schemaValidationErrors.length === 0;
 
   return (
-    <div className="flex w-full flex-col gap-3 rounded-2xl bg-pp-surface-container-low/70 p-4 border border-pp-outline-variant/30 mt-2">
+    <div className="flex w-full flex-col gap-2 rounded-md border border-input p-2">
       {hookDeliveries.length > 0 ? (
         <select
           aria-label={t('sampleFromDeliveryLabel')}
           value={hookDeliveryId}
           onChange={(event) => setHookDeliveryId(event.target.value)}
-          className={cn(ppInputClass, 'text-xs py-2')}
+          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
         >
           <option value="">{t('samplePastedLabel')}</option>
           {hookDeliveries.map((delivery) => (
@@ -144,119 +148,46 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
           placeholder={t('samplePayloadPlaceholder')}
           value={samplePayload}
           onChange={(event) => setSamplePayload(event.target.value)}
-          className={cn(ppInputClass, 'min-h-24 p-3 font-mono text-xs')}
+          className="min-h-24 rounded-md border border-input bg-background p-2 font-mono text-xs"
         />
       ) : null}
       <div className="flex items-center gap-2">
-        <PpButton
-          type="button"
-          size="sm"
-          icon={Play}
-          onClick={handleRun}
-          disabled={submitting || (!hookDeliveryId && samplePayload.trim().length === 0)}
-        >
+        <Button type="button" size="sm" onClick={handleRun} disabled={submitting || (!hookDeliveryId && samplePayload.trim().length === 0)}>
           {t('runTestRun')}
-        </PpButton>
+        </Button>
         {isSuccess && hookDeliveryId ? (
-          <PpButton type="button" variant="secondary" size="sm" icon={Check} onClick={handleApply} disabled={applying}>
+          <Button type="button" variant="outline" size="sm" onClick={handleApply} disabled={applying}>
             {t('applyToDelivery')}
-          </PpButton>
+          </Button>
         ) : null}
-        <PpButton type="button" variant="ghost" size="sm" icon={X} onClick={() => setOpen(false)}>
+        <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
           {t('close')}
-        </PpButton>
+        </Button>
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-pp-error font-medium">
+        <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       ) : null}
       {applyError ? (
-        <p role="alert" className="text-xs text-pp-error font-medium">
+        <p role="alert" className="text-xs text-destructive">
           {applyError}
         </p>
       ) : null}
       {result ? (
-        <div className="flex flex-col gap-2.5 text-xs">
-          {result.confidenceScore ? (
-            <div className="flex items-center justify-between">
-              <div
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold',
-                  result.confidenceScore.level === 'high'
-                    ? 'bg-[#E6FAF5] text-[#0E624C] dark:bg-[#00513f]/40 dark:text-[#3fdeb4]'
-                    : result.confidenceScore.level === 'medium'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-                    : 'bg-pp-error/15 text-pp-error',
-                )}
-                data-testid="confidence-badge"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span className="font-bold">{t('confidenceBadge', { confidence: result.confidenceScore.score })}</span>
-              </div>
-              <span className="text-[11px] text-pp-outline font-medium">
-                {t('confidenceTier', { level: result.confidenceScore.level })}
-              </span>
-            </div>
-          ) : null}
-
-          <div className="rounded-xl bg-[#1e1e24] text-[#f2eff8] p-3 font-mono text-xs flex flex-col gap-2">
-            <pre className="max-h-48 overflow-auto">
-              {JSON.stringify(result.record, null, 2)}
-            </pre>
-            <div className="pt-2 border-t border-[#303036] flex items-center justify-between text-[11px] text-[#787586]">
-              {result.latencyProfile ? (
-                <span data-testid="latency-benchmark">
-                  {t('executionLatency', {
-                    avgLatencyMs: result.latencyProfile.avgLatencyMs,
-                    p90Ms: result.latencyProfile.p90Ms,
-                    p95Ms: result.latencyProfile.p95Ms,
-                  })}
-                </span>
-              ) : (
-                <span>{t('executionLatencyFallback')}</span>
-              )}
-              <span className={cn('flex items-center gap-1 font-sans font-semibold', isSuccess ? 'text-[#55EFC4]' : 'text-pp-error')}>
-                <Check className="w-3 h-3" />
-                {isSuccess ? t('schemaMatched') : t('schemaValidationFailed')}
-              </span>
-            </div>
-          </div>
-
-          {result.confidenceScore?.recommendation ? (
-            <div
-              className="bg-pp-primary-fixed/20 dark:bg-pp-primary-container/20 p-3 rounded-xl flex items-center justify-between border border-pp-primary/20"
-              data-testid="ai-recommendation"
-            >
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-pp-primary shrink-0" />
-                <div className="text-xs text-pp-on-surface">
-                  <span className="font-bold text-pp-primary">{t('aiRecommendationLabel')}: </span>
-                  <span>{result.confidenceScore.recommendation}</span>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {result.errors.length > 0 ? (
-            <p className="text-pp-error font-medium">{t('mappingErrors', { errors: result.errors.join(', ') })}</p>
-          ) : null}
-          {result.envelopeErrors.length > 0 ? (
-            <p className="text-pp-error font-medium">{t('envelopeErrors', { errors: result.envelopeErrors.join(', ') })}</p>
-          ) : null}
-          {!result.schemaRegistered ? (
-            <p className="text-pp-outline font-medium">{t('schemaNotRegisteredWarning')}</p>
-          ) : null}
+        <div className="flex flex-col gap-1 text-xs">
+          <pre className="max-h-40 overflow-auto rounded-md bg-muted/50 p-2">{JSON.stringify(result.record, null, 2)}</pre>
+          {result.errors.length > 0 ? <p className="text-destructive">{t('mappingErrors', { errors: result.errors.join(', ') })}</p> : null}
+          {result.envelopeErrors.length > 0 ? <p className="text-destructive">{t('envelopeErrors', { errors: result.envelopeErrors.join(', ') })}</p> : null}
+          {!result.schemaRegistered ? <p className="text-muted-foreground">{t('schemaNotRegisteredWarning')}</p> : null}
           {result.schemaValidationErrors.length > 0 ? (
-            <p className="text-pp-error font-medium">
-              {t('schemaValidationErrors', { errors: result.schemaValidationErrors.join(', ') })}
-            </p>
+            <p className="text-destructive">{t('schemaValidationErrors', { errors: result.schemaValidationErrors.join(', ') })}</p>
           ) : null}
-          {isSuccess ? <p className="text-pp-secondary font-bold">{t('testRunSuccess')}</p> : null}
+          {isSuccess ? <p className="text-green-600 dark:text-green-400">{t('testRunSuccess')}</p> : null}
         </div>
       ) : null}
       {applySummary ? (
-        <p className="text-xs text-pp-secondary font-bold">
+        <p className="text-xs text-green-600 dark:text-green-400">
           {t('applyToDeliverySuccess', {
             accepted: applySummary.accepted,
             quarantined: applySummary.quarantined,

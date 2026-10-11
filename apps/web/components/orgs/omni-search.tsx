@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, LayoutGrid, Megaphone, Search, Target, Trophy, User, Users } from 'lucide-react';
+import { BarChart3, Compass, LayoutGrid, Megaphone, Search, Target, Trophy, User, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { searchOmniSearchItems, type OmniSearchItem, type OmniSearchResultType } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
@@ -15,6 +15,7 @@ const RESULT_ICONS: Record<OmniSearchResultType, typeof Search> = {
   goal: Target,
   win_rule: Trophy,
   customer: User,
+  page: Compass,
 };
 
 /** A customer match only ever comes from a live server-side substring search (KAN-116, unlike every other result type's eagerly-cached, client-ranked index) — short enough not to spend a warehouse query on every keystroke, but not so long the palette feels unresponsive. */
@@ -24,11 +25,20 @@ const CUSTOMER_SEARCH_DEBOUNCE_MS = 200;
 interface OmniSearchTriggerProps {
   orgId: string;
   projectId: string;
+  /**
+   * Static "jump to this page" shortcuts for every nav destination
+   * `ProjectLayout` renders — already translated and permission-filtered
+   * server-side (see `buildOmniSearchPageShortcuts`), so unlike the fetched
+   * `items` index below, these are available for ranking immediately, with
+   * no fetch round-trip.
+   */
+  pageShortcuts?: OmniSearchItem[];
 }
 
 /**
  * KAN-85 global omnisearch: a Cmd/Ctrl-K palette jumping to a project's
- * boards, metrics, segments, campaigns, goals, and win rules. The index is fetched lazily on
+ * boards, metrics, segments, campaigns, goals, win rules, and (KAN-85 follow-up)
+ * every other nav page. The index is fetched lazily on
  * first open (not on every page load — see `omnisearch.ts`'s own doc
  * comment for why an eager per-page-load fetch would be too heavy) and then
  * ranked entirely client-side via the shared `searchOmniSearchItems`
@@ -37,7 +47,7 @@ interface OmniSearchTriggerProps {
  * server-side search runs as the query changes and its matches are merged
  * in alongside the client-ranked results — see the effect below.
  */
-export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps): React.ReactElement {
+export function OmniSearchTrigger({ orgId, projectId, pageShortcuts = [] }: OmniSearchTriggerProps): React.ReactElement {
   const t = useTranslations('OmniSearch');
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -135,7 +145,10 @@ export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps):
     };
   }, [open, query, orgId, projectId]);
 
-  const staticResults = useMemo(() => searchOmniSearchItems(items ?? [], query), [items, query]);
+  const staticResults = useMemo(
+    () => searchOmniSearchItems([...(items ?? []), ...pageShortcuts], query),
+    [items, pageShortcuts, query],
+  );
   const results = useMemo(() => [...staticResults, ...customerItems], [staticResults, customerItems]);
 
   useEffect(() => {
@@ -207,7 +220,10 @@ export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps):
             <ul role="listbox" aria-label={t('dialogLabel')} className="max-h-80 overflow-y-auto py-2">
               {query.trim() === '' ? (
                 <li className="px-4 py-6 text-center text-sm text-muted-foreground">{t('emptyPrompt')}</li>
-              ) : loading ? (
+              ) : loading && results.length === 0 ? (
+                // Page shortcuts (unlike the fetched index) rank immediately with no fetch wait
+                // needed — only fall back to the loading state while there's truly nothing to show
+                // yet, so a matching page shortcut still appears during that first fetch.
                 <li className="px-4 py-6 text-center text-sm text-muted-foreground">{t('loading')}</li>
               ) : results.length === 0 ? (
                 <li className="px-4 py-6 text-center text-sm text-muted-foreground">{t('noResults', { query })}</li>

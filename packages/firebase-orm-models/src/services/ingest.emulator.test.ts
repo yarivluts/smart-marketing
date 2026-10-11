@@ -9,8 +9,10 @@ import {
   getIngestBatch,
   IngestBatchTooLargeError,
   ingestBatch,
+  listQuarantinedRecordsForProject,
   listRawRecordsForBatch,
   registerSchemaDefinition,
+  validateIngestBatch,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -288,6 +290,49 @@ describe('ingestBatch — entities', () => {
 
     expect(summary.accepted).toBe(1);
     expect(summary.quarantined).toBe(1);
+  });
+
+  /**
+   * B13 (EasySign, 2026-09-25). An entity upsert is a new version of a row. Deduping on the id alone
+   * meant the first version won forever: a customer's plan change from free to pro came back as
+   * `duplicates: 1`, never landed, and Customer 360 froze at signup. A later batch must land a
+   * changed version, an identical resend must still be a no-op, and a change BACK to an earlier
+   * value must land too - which is why the comparison is with the latest version, not every version.
+   */
+  it('lands every changed version of an entity, dedupes only an identical resend of the latest', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Entity Upsert Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [{ name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    const upsert = (plan: string) =>
+      ingestBatch({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: prodEnvironment.id,
+        input: { kind: 'entity', type: 'customer', records: [{ id: 'cust_1', attributes: { plan } }] },
+      });
+
+    const outcomes: Array<[string, number, number]> = [];
+    for (const plan of ['free', 'pro', 'pro', 'free']) {
+      const summary = await upsert(plan);
+      outcomes.push([plan, summary.accepted, summary.duplicates]);
+      if (summary.accepted === 1) {
+        const [landed] = await listRawRecordsForBatch(organization.id, project.id, summary.batchId);
+        expect((landed.payload.attributes as Record<string, unknown>).plan).toBe(plan);
+      }
+    }
+
+    expect(outcomes).toEqual([
+      ['free', 1, 0], // first version
+      ['pro', 1, 0], // the upgrade - the case that used to be dropped
+      ['pro', 0, 1], // identical resend of the latest: still a no-op
+      ['free', 1, 0], // back to an earlier value: must land, it is the newest version
+    ]);
   });
 });
 
@@ -582,5 +627,75 @@ describe('getIngestBatch', () => {
 
     const fromOwnEnvironment = await getIngestBatch(organization.id, project.id, prodEnvironment.id, summary.batchId);
     expect(fromOwnEnvironment?.total_count).toBe(1);
+  });
+});
+
+describe("validateIngestBatch (KAN-202 I3): ingest's own checks, nothing stored", () => {
+  const records = [
+    { event_id: 'ok-1', event: 'order_completed', ts: '2026-07-03T10:15:00Z', properties: { net: 349, anon_id: 'anon-1' } },
+    { event_id: 'bad-type', event: 'order_completed', ts: '2026-07-03T10:16:00Z', properties: { net: '349' } },
+    { event_id: 'bad-field', event: 'order_completed', ts: '2026-07-03T10:17:00Z', properties: { net: 1, coupon: 'X' } },
+    { event_id: 'no-schema', event: 'never_registered', ts: '2026-07-03T10:18:00Z', properties: {} },
+    { event: 'order_completed', properties: { net: 1 } },
+  ];
+
+  async function projectWithOrderSchema(name: string) {
+    const setup = await setupProject(name);
+    await registerSchemaDefinition({
+      organizationId: setup.organization.id,
+      projectId: setup.project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: [{ name: 'net', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: setup.owner.id,
+    });
+    return setup;
+  }
+
+  it('gives each record the reasons ingest would quarantine it for', async () => {
+    const { organization, project } = await projectWithOrderSchema('Validate Records Org');
+    const summary = await validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records } });
+    expect(summary).toMatchObject({ kind: 'event', total: 5, valid: 1, invalid: 4 });
+    expect(summary.records).toEqual([
+      { client_id: 'ok-1', status: 'valid' },
+      { client_id: 'bad-type', status: 'invalid', reasons: ['field_type_mismatch:net'] },
+      { client_id: 'bad-field', status: 'invalid', reasons: ['unregistered_field:coupon'] },
+      { client_id: 'no-schema', status: 'invalid', reasons: ['schema_not_registered:never_registered'] },
+      { client_id: 'event#4', status: 'invalid', reasons: ['missing_field:event_id', 'missing_field:ts'] },
+    ]);
+  });
+
+  it('agrees with ingest record for record', async () => {
+    const { organization, project, devEnvironment } = await projectWithOrderSchema('Validate Agrees Org');
+    const validation = await validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records } });
+    const ingested = await ingestBatch({ organizationId: organization.id, projectId: project.id, environmentId: devEnvironment.id, input: { kind: 'event', records } });
+    const batch = await getIngestBatch(organization.id, project.id, devEnvironment.id, ingested.batchId);
+    expect(batch!.record_results.map((result) => ({ client_id: result.client_id, ok: result.status === 'accepted', reasons: result.reasons }))).toEqual(
+      validation.records.map((result) => ({ client_id: result.client_id, ok: result.status === 'valid', reasons: result.reasons })),
+    );
+  });
+
+  it('stores nothing: no quarantine entry, and a later real send of the same record is not a duplicate', async () => {
+    const { organization, project, devEnvironment } = await projectWithOrderSchema('Validate Stores Nothing Org');
+    await validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records } });
+    expect(await listQuarantinedRecordsForProject(organization.id, project.id, 50, devEnvironment.id)).toHaveLength(0);
+    const ingested = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      input: { kind: 'event', records: [records[0]] },
+    });
+    expect(ingested).toMatchObject({ accepted: 1, duplicates: 0 });
+  });
+
+  it('refuses an empty or oversized batch like ingest does', async () => {
+    const { organization, project } = await projectWithOrderSchema('Validate Limits Org');
+    await expect(validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records: [] } })).rejects.toBeInstanceOf(
+      EmptyIngestBatchError,
+    );
+    const tooMany = Array.from({ length: 1001 }, (_unused, index) => ({ ...records[0], event_id: 'e' + index }));
+    await expect(validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records: tooMany } })).rejects.toBeInstanceOf(
+      IngestBatchTooLargeError,
+    );
   });
 });

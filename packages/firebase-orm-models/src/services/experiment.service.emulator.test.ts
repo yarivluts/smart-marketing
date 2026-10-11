@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '../index';
+import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, InMemoryMetricQueryResultCache, type WarehouseQueryExecutor } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 import { ensureExperimentPackRegistered } from '../plugin-runtime/experiment-pack';
 import { getExperimentResultsForProject } from './experiment.service';
@@ -42,5 +42,24 @@ describe('getExperimentResultsForProject', () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.ok === false && outcome.reason).toBe('query_error');
+  });
+
+  it('counts each variant\'s distinct customers over the experiment\'s whole lifetime as ONE bucket, not once per calendar year (B24)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Experiment Results Total Grain Org');
+    await ensureExperimentPackRegistered(organization.id, project.id, owner.id);
+    const queries: { sql: string }[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        queries.push(query);
+        return Promise.resolve([]);
+      },
+    };
+
+    const outcome = await getExperimentResultsForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+
+    expect(outcome.ok).toBe(true);
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(queries[0].sql).not.toContain('DATE_TRUNC');
   });
 });

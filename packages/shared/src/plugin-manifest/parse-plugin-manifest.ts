@@ -68,6 +68,14 @@ function validateConfigSchema(raw: unknown, reasons: string[]): Record<string, P
       reasons.push(`config_schema field "${name}"'s \`required\` must be a boolean.`);
       continue;
     }
+    if (entry.type === 'enum') {
+      if (!isStringArray(entry.values) || entry.values.length === 0 || new Set(entry.values).size !== entry.values.length) {
+        reasons.push(`config_schema field "${name}" of type enum must list its \`values\` as distinct strings.`);
+        continue;
+      }
+      configSchema[name] = { type: 'enum', required: entry.required ?? false, values: [...entry.values] };
+      continue;
+    }
     configSchema[name] = { type: entry.type, required: entry.required ?? false };
   }
   return configSchema;

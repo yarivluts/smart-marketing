@@ -49,6 +49,13 @@ export interface GoogleAdsCampaignDraft {
   advertisingChannelType: 'SEARCH';
   dailyBudgetUsd: number;
   adGroups: CampaignDraftAdGroup[];
+  /**
+   * The advertiser's own self-declaration of whether this campaign contains political advertising
+   * aimed at the European Union (KAN-233). Google Ads v25 requires it on every campaign: without it
+   * the campaign cannot get keywords and Google blocks further changes on the whole account. It is a
+   * legal statement, so it is always the person's explicit answer - never defaulted by GrowthOS.
+   */
+  containsEuPoliticalAdvertising: boolean;
 }
 
 /**

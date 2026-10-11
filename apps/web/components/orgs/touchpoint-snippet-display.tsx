@@ -2,13 +2,17 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { renderEmbedSnippet } from '@growthos/tracking-sdk';
-import { Copy, Check, Code } from 'lucide-react';
-import { PpButton } from '@/components/pastel/primitives';
+import { installSnippet } from '@growthos/browser';
+import { Button } from '@/components/ui/button';
 
 export interface TouchpointSnippetDisplayProps {
   writeKey: string;
   ingestBaseUrl: string;
+}
+
+/** The GrowthOS API base (without /v1/ingest) from the ingest URL the app is configured with. */
+export function apiBaseFromIngestUrl(ingestBaseUrl: string): string {
+  return ingestBaseUrl.replace(/\/+$/, '').replace(/\/v1\/ingest$/, '');
 }
 
 /**
@@ -18,10 +22,22 @@ export interface TouchpointSnippetDisplayProps {
  * returns it again). Pasting this `<script>` tag into a site captures
  * UTM/click-ids at entry and attaches them to every event the tracker sends.
  */
-export function TouchpointSnippetDisplay({ writeKey, ingestBaseUrl }: TouchpointSnippetDisplayProps): React.ReactElement {
+export function TouchpointSnippetDisplay({
+  writeKey,
+  ingestBaseUrl,
+}: TouchpointSnippetDisplayProps): React.ReactElement {
   const t = useTranslations('ApiKeys');
   const [copied, setCopied] = useState(false);
-  const snippet = useMemo(() => renderEmbedSnippet({ writeKey, ingestBaseUrl }), [writeKey, ingestBaseUrl]);
+  // The SDK script is served by this app itself (apps/web/scripts/copy-sdk.mjs), so its origin is ours.
+  const snippet = useMemo(
+    () =>
+      installSnippet({
+        key: writeKey,
+        api: apiBaseFromIngestUrl(ingestBaseUrl),
+        scriptUrl: `${typeof window === 'undefined' ? '' : window.location.origin}/sdk/v1/growthos.js`,
+      }),
+    [writeKey, ingestBaseUrl],
+  );
 
   async function handleCopy(): Promise<void> {
     try {
@@ -33,26 +49,16 @@ export function TouchpointSnippetDisplay({ writeKey, ingestBaseUrl }: Touchpoint
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low p-5 shadow-pp-candy">
-      <div className="flex items-center gap-2">
-        <Code className="w-5 h-5 text-pp-secondary" />
-        <p className="text-pp-body-md font-bold text-pp-on-surface">{t('touchpointSnippetHeading')}</p>
-      </div>
-      <p className="text-pp-body-sm text-pp-on-surface-variant">{t('touchpointSnippetIntro')}</p>
-      <pre className="max-h-64 overflow-auto rounded-xl bg-pp-inverse-surface p-4 text-xs font-mono text-pp-inverse-on-surface">
+    <div className="flex flex-col gap-3 rounded-md border border-input bg-muted/50 p-4">
+      <p className="text-sm font-medium">{t('touchpointSnippetHeading')}</p>
+      <p className="text-sm text-muted-foreground">{t('touchpointSnippetIntro')}</p>
+      <pre className="max-h-64 overflow-auto rounded-md bg-background p-3 text-xs">
         <code>{snippet}</code>
       </pre>
-      <div className="pt-1">
-        <PpButton
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={handleCopy}
-          icon={copied ? Check : Copy}
-        >
-          {copied ? t('copied') : t('copySnippet')}
-        </PpButton>
-      </div>
+      <p className="text-xs text-muted-foreground">{t('touchpointSnippetVerify')}</p>
+      <Button type="button" variant="outline" size="sm" onClick={handleCopy} className="self-start">
+        {copied ? t('copied') : t('copySnippet')}
+      </Button>
     </div>
   );
 }

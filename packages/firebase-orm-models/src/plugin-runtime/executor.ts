@@ -67,9 +67,25 @@ export interface SinkPluginPushParams {
   records: readonly Record<string, unknown>[];
 }
 
-/** One push call's outcome — how many of {@link SinkPluginPushParams.records} the remote system actually accepted. */
+/** One push call's outcome. */
 export interface SinkPluginPushResult {
-  pushed: number;
+  /**
+   * How many of {@link SinkPluginPushParams.records} the remote system
+   * accepted, or `null` when it did not say.
+   *
+   * The distinction is not pedantic: this number reaches the user as "Last
+   * synced N records". A connector whose remote returns a real accept-count
+   * (Meta's `num_received`) must report that count or `null`, never the number
+   * it submitted — audience uploads routinely drop unmatched rows, so
+   * substituting the send-count guarantees the figure can never show a
+   * shortfall (KAN-174).
+   *
+   * A connector whose remote has no such concept reports what it can and says
+   * so at its own call site: Google Ads accepts every row into an offline job
+   * and matches asynchronously, and a CRM webhook returning 2xx has taken the
+   * whole batch.
+   */
+  pushed: number | null;
   /**
    * An external resource id this push created or reused, for a connector
    * whose destination is a single persistent remote object rather than a

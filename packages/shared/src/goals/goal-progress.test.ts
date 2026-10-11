@@ -346,3 +346,26 @@ describe('calculateGoalProgress - range', () => {
     expect(result.projectedFinalValue).toBeCloseTo(18, 10);
   });
 });
+
+describe('calculateGoalProgress - a maximize goal on a level metric (a rate, not a running total)', () => {
+  it('paces a 5% conversion goal against 5% itself, not against elapsed x 5%, and does not extrapolate the rate', () => {
+    // The period value of a 2-day window at 1/1 then 1/100 is 2/101 = 1.98% - never the 50.5% mean of the daily rates.
+    const actualValue = 2 / 101;
+    const level = calculateGoalProgress({ direction: 'maximize', targetValue: 0.05, actualValue, elapsedFraction: 0.1, accumulates: false });
+    expect(level.expectedAtNow).toBe(0.05);
+    expect(level.status).toBe('off_track');
+    expect(level.projectedFinalValue).toBeCloseTo(actualValue, 10);
+    expect(level.isGoalMet).toBe(false);
+
+    // The running-total pacing would have called the same 1.98% on track and projected 19.8%.
+    const accumulated = calculateGoalProgress({ direction: 'maximize', targetValue: 0.05, actualValue, elapsedFraction: 0.1 });
+    expect(accumulated.status).toBe('on_track');
+    expect(accumulated.projectedFinalValue).toBeCloseTo(0.198, 3);
+  });
+
+  it('is on track once the rate reaches the target, at any point of the window', () => {
+    const result = calculateGoalProgress({ direction: 'maximize', targetValue: 0.05, actualValue: 0.06, elapsedFraction: 0.05, accumulates: false });
+    expect(result.status).toBe('on_track');
+    expect(result.isGoalMet).toBe(true);
+  });
+});

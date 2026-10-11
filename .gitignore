@@ -31,9 +31,6 @@ apps/web/repro-tmp.mjs
 
 # Logs
 *.log
-.sprint-lock
-.sprint-transaction.json
-*.sprint-tmp
 npm-debug.log*
 pnpm-debug.log*
 
@@ -46,8 +43,6 @@ Thumbs.db
 
 # Claude Code tooling scratch space (agent worktrees, etc.) — not project content
 .claude/
-.agents/
-ORIGINAL_REQUEST.md
 
 # Terraform
 infra/terraform/.terraform/
@@ -59,3 +54,9 @@ infra/terraform/override.tf
 infra/terraform/override.tf.json
 infra/terraform/*_override.tf
 infra/terraform/*_override.tf.json
+
+# Local validation screenshots — evidence for a run, never part of the repo
+apps/web/*.png
+
+# The browser SDK bundle, copied from @growthos/browser at build time (apps/web/scripts/copy-sdk.mjs).
+apps/web/public/sdk/

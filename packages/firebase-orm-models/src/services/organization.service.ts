@@ -158,10 +158,6 @@ export interface CreateProjectParams {
   organizationId: string;
   name: string;
   vertical?: string;
-  platformType?: string;
-  businessModel?: string;
-  transactionType?: string;
-  primaryStack?: string;
   /** The human who created this project, if any — audited when present. Omit for a caller with no real user actor (test fixtures, a future non-human caller), the same "no synthetic system actor" posture `triggerOrchestrationRun`'s optional actor param establishes. */
   createdByUserId?: string;
 }
@@ -182,10 +178,6 @@ export async function createProject(params: CreateProjectParams): Promise<Create
   project.name = params.name;
   project.organization_id = params.organizationId;
   project.vertical = params.vertical;
-  project.platform_type = params.platformType;
-  project.business_model = params.businessModel;
-  project.transaction_type = params.transactionType;
-  project.primary_stack = params.primaryStack;
   project.setPathParams({ organization_id: params.organizationId });
   await project.save();
 
@@ -318,11 +310,18 @@ export async function listOrgMembersWithProfiles(organizationId: string): Promis
   }));
 }
 
-/** Every project in an org, for the project switcher. */
-export async function listOrgProjects(organizationId: string): Promise<ProjectModel[]> {
-  return ProjectModel.initPath({ organization_id: organizationId })
+export interface ListOrgProjectsOptions {
+  /** Include projects `archiveProject` has retired (see `ProjectModel.archived_at`) — off by default, so every existing caller keeps seeing only live projects. */
+  includeArchived?: boolean;
+}
+
+/** Every live project in an org, for the project switcher — archived ones are hidden unless `includeArchived` is set (the settings page that offers "unarchive" is the one caller that wants them). */
+export async function listOrgProjects(organizationId: string, options: ListOrgProjectsOptions = {}): Promise<ProjectModel[]> {
+  const projects = await ProjectModel.initPath({ organization_id: organizationId })
     .where('organization_id', '==', organizationId)
     .get();
+  // `unarchiveProject` clears the stamp with an explicit `null` (see its own comment), so both spellings mean "live".
+  return options.includeArchived ? projects : projects.filter((project) => project.archived_at === undefined || project.archived_at === null);
 }
 
 /** The fixed dev/staging/prod environments provisioned for one project (KAN-30's key-creation environment picker). */

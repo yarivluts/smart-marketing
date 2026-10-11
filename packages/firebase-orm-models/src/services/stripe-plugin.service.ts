@@ -17,8 +17,8 @@ import { ProjectNotFoundError, listActiveAttachmentsForProject } from './resourc
 import { EnvironmentNotFoundError } from './key.service';
 import { PluginInstallNotFoundError } from './plugin-registry.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
+import type { IngestRecordResult } from '../models/ingest-batch.model';
 import { ingestBatch, type IngestBatchSummary } from './ingest.service';
-import { ensureCancellationReasonSchemaRegistered } from './churn-reason.service';
 
 /** An install claims to be (or was resolved as) the built-in Stripe plugin, but isn't configured with a usable Stripe credential yet — surfaced identically whether the caller is a webhook delivery or a "Run now" click. */
 export class StripeCredentialConfigError extends Error {
@@ -109,12 +109,37 @@ export interface ProcessStripeWebhookEventParams {
   kms: KmsProvider;
 }
 
+/**
+ * Every ingest batch one webhook delivery produced, totalled. A delivery can land more than one batch
+ * (a subscription's entity snapshot plus its `cancellation_reason` event, KAN-306); reporting only the
+ * last batch would silently drop the first one's quarantines from the result.
+ */
+export interface StripeWebhookIngestSummary {
+  batches: IngestBatchSummary[];
+  total: number;
+  accepted: number;
+  quarantined: number;
+  duplicates: number;
+  rejected: IngestRecordResult[];
+}
+
+export function combineIngestBatchSummaries(batches: readonly IngestBatchSummary[]): StripeWebhookIngestSummary {
+  return {
+    batches: [...batches],
+    total: batches.reduce((sum, batch) => sum + batch.total, 0),
+    accepted: batches.reduce((sum, batch) => sum + batch.accepted, 0),
+    quarantined: batches.reduce((sum, batch) => sum + batch.quarantined, 0),
+    duplicates: batches.reduce((sum, batch) => sum + batch.duplicates, 0),
+    rejected: batches.flatMap((batch) => batch.rejected),
+  };
+}
+
 export interface ProcessStripeWebhookEventResult {
   eventId: string;
   eventType: string;
   /** `false` for an event type this connector doesn't map to a commerce schema — still a successful call, nothing to land. */
   handled: boolean;
-  summary?: IngestBatchSummary;
+  summary?: StripeWebhookIngestSummary;
 }
 
 /**
@@ -168,28 +193,20 @@ export async function processStripeWebhookEvent(params: ProcessStripeWebhookEven
     return { eventId: event.id, eventType: event.type, handled: false };
   }
 
-  let lastSummary: IngestBatchSummary | undefined;
+  // Sequential, in mapping order: the subscription snapshot lands before the cancellation reason
+  // derived from it. A `cancellation_reason` schema not yet registered (the Churn Reason pack owns it)
+  // quarantines just that record, replayable later - same "no synthetic actor" posture as above.
+  const batches: IngestBatchSummary[] = [];
   for (const input of inputs) {
-    if (input.kind === 'event') {
-      const hasCancellation = (input.records as Array<{ schema_name?: string }>).some(
-        (r) => r.schema_name === 'cancellation_reason',
-      );
-      if (hasCancellation) {
-        await ensureCancellationReasonSchemaRegistered({
-          organizationId: params.organizationId,
-          projectId: params.projectId,
-          createdByUserId: 'system:stripe-webhook',
-        }).catch(() => null);
-      }
-    }
-
-    lastSummary = await ingestBatch({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      environmentId: params.environmentId,
-      input,
-    });
+    batches.push(
+      await ingestBatch({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        environmentId: params.environmentId,
+        input,
+      }),
+    );
   }
 
-  return { eventId: event.id, eventType: event.type, handled: true, summary: lastSummary! };
+  return { eventId: event.id, eventType: event.type, handled: true, summary: combineIngestBatchSummaries(batches) };
 }

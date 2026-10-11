@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSessionReplayLink, SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER } from './link';
+import { buildSessionReplayLink, sessionReplayTemplateFiltersByPage, SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER } from './link';
 
 const CLARITY_TEMPLATE = `https://clarity.microsoft.com/projects/view/abc123/impressions?Url=${SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER}`;
 
@@ -44,5 +44,49 @@ describe('buildSessionReplayLink', () => {
 
   it('rejects a template that is not a URL at all', () => {
     expect(buildSessionReplayLink('not a url', 'https://example.com/lp-a')).toBeNull();
+  });
+
+  /**
+   * A filtering template plus a blank page used to substitute to a filter for
+   * the empty string: a link that opens the tool showing nothing, rendered on a
+   * table cell that is itself blank. The board got an empty clickable cell
+   * whose only tell was the cursor (KAN-161).
+   *
+   * A row with no landing page has nothing to watch, so no link is the honest
+   * render. The non-filtering case is left alone deliberately — "open my replay
+   * tool" is as valid on a row with no page as on one with a page.
+   */
+  it('returns null for a filtering template when the row has no landing page', () => {
+    const filtering = `https://tool.example/?url=${SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER}`;
+    expect(buildSessionReplayLink(filtering, '')).toBeNull();
+    expect(buildSessionReplayLink(filtering, '   ')).toBeNull();
+    // Still linked when there IS a page, so the guard cannot silently disable the feature.
+    expect(buildSessionReplayLink(filtering, 'https://example.com/lp-a')).not.toBeNull();
+    // A plain link-out is unaffected by the row having no page.
+    expect(buildSessionReplayLink('https://clarity.microsoft.com/projects', '')).toBe('https://clarity.microsoft.com/projects');
+  });
+});
+
+/**
+ * Whether a template filters to the row's own page — invisible in the rendered
+ * link, since both kinds render as an ordinary anchor on every row while one
+ * opens the same unfiltered view every time. The save form and the board
+ * tooltip both branch on this so the difference is stated somewhere (KAN-160).
+ */
+describe('sessionReplayTemplateFiltersByPage', () => {
+  it('is true only when the exact placeholder is present', () => {
+    expect(sessionReplayTemplateFiltersByPage(`https://tool.example/?url=${SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER}`)).toBe(true);
+    expect(sessionReplayTemplateFiltersByPage('https://clarity.microsoft.com/projects')).toBe(false);
+    expect(sessionReplayTemplateFiltersByPage(undefined)).toBe(false);
+    expect(sessionReplayTemplateFiltersByPage('')).toBe(false);
+  });
+
+  /**
+   * The typos are the point. Each of these is a valid https URL, saves without
+   * complaint, and renders a link on every row — so nothing else in the system
+   * distinguishes them from a template that works.
+   */
+  it.each(['{landingpage}', '{landing-page}', '{LANDING_PAGE}', '{page}'])('treats %s as a template that does not filter', (typo) => {
+    expect(sessionReplayTemplateFiltersByPage(`https://tool.example/?url=${typo}`)).toBe(false);
   });
 });

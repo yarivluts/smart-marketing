@@ -1,8 +1,18 @@
-import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import type { CompiledMetricQuery } from '@growthos/shared';
+import {
+  defaultWarehouseQueryExecutor,
+  WarehouseNotConfiguredError,
+  WarehouseQueryFailedError,
+  type WarehouseQueryExecutor,
+  type WarehouseRow,
+  type WarehouseSqlDialect,
+} from '../warehouse/query-executor';
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
-import { getOnboardingState } from './onboarding.service';
+import { auditMetricCatalogHealth } from './metric-registry.service';
+import { getConfirmedFunnelSteps } from './onboarding.service';
+import { activeSchemaNamesForKind, listSchemaDefinitionsForProject } from './schema-registry.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 
 /**
@@ -13,8 +23,9 @@ import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './c
  * `queryMetrics`, KAN-42) or `list_metrics`/`describe_metric` (the already-
  * built metrics catalog). All three hand-write parameterized SQL against a
  * dbt core table (`entities`, KAN-37; `fact_cohort_retention`, KAN-62;
- * `events`, KAN-37 — see `queryProjectFunnelSteps` for why the funnel reads
- * `events` directly rather than the `fact_funnel_step` model) and run it
+ * `events` + `bridge_identity`, KAN-37/KAN-56 — see `queryProjectFunnelSteps`
+ * for why the funnel reads those directly rather than the `fact_funnel_step`
+ * model) and run it
  * through the same {@link WarehouseQueryExecutor} the compiler-produced SQL in
  * `metrics-query.service.ts` uses — `CompiledMetricQuery` is just
  * `{ sql, params }`, so this is legitimate reuse of that interface's own
@@ -90,7 +101,31 @@ function rowToCustomerResult(row: WarehouseRow): CustomerSearchResult {
 }
 
 /** `search_customers` (plan `12 §6.2`, Customer 360): substring search over the `entities` core dbt table's latest-snapshot rows, environment-scoped like every other warehouse read since session-B's mixing catch (2026-08-19) — see `QueryMetricsParams.environmentId`. */
-export async function searchProjectCustomers(params: SearchProjectCustomersParams): Promise<CustomerSearchResult[]> {
+/**
+ * One page of customer search results, plus whether the warehouse held more.
+ *
+ * `hasMore` is MEASURED rather than guessed: the query asks for `limit + 1` rows
+ * and reports the extra one without returning it. Inferring truncation from
+ * `results.length === limit` cannot distinguish "exactly `limit` matched" from
+ * "thousands matched", which is the difference between a complete answer and a
+ * silently truncated one — and a caller shown a capped list with no signal will
+ * reasonably read it as the whole set.
+ */
+export interface CustomerSearchPage {
+  results: CustomerSearchResult[];
+  hasMore: boolean;
+  /** The cap actually applied, after clamping — so a caller can say what it is rather than guess. */
+  limit: number;
+  /**
+   * Set only on an empty page whose emptiness is structural rather than a miss (KAN-137): with no
+   * active entity-kind schema nothing is ever written to the entities table, so no query could
+   * match. A project that sends only events has populated cohorts and an empty Customer 360, and
+   * "no entity schemas" is a different answer from "no matches".
+   */
+  emptyReason?: 'no_entity_schemas';
+}
+
+export async function searchProjectCustomers(params: SearchProjectCustomersParams): Promise<CustomerSearchPage> {
   const trimmedQuery = params.query.trim();
   if (trimmedQuery.length === 0) {
     throw new InvalidMcpToolRequestError('query must not be empty.');
@@ -119,16 +154,27 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
     queryParams.schemaName = params.schemaName;
   }
 
-  const sql = `SELECT entity_id, schema_name, properties, last_seen_at FROM entities WHERE ${filters.join(' AND ')} ORDER BY last_seen_at DESC LIMIT ${limit}`;
+  // `limit + 1`: the extra row is never returned, it only answers "was there
+  // more?". See CustomerSearchPage.
+  const sql = `SELECT entity_id, schema_name, properties, last_seen_at FROM entities WHERE ${filters.join(' AND ')} ORDER BY last_seen_at DESC LIMIT ${limit + 1}`;
   const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'search_customers' }, () =>
     executor.execute({ sql, params: queryParams }),
   );
-  return rows.map(rowToCustomerResult);
+  const hasMore = rows.length > limit;
+  if (rows.length === 0) {
+    // Checked only on an empty page: a search that found rows pays no extra read, and "no source"
+    // is only ever claimed when it is true.
+    const schemaDefs = await listSchemaDefinitionsForProject(params.organizationId, params.projectId);
+    if (activeSchemaNamesForKind(schemaDefs, 'entity').length === 0) {
+      return { results: [], hasMore: false, limit, emptyReason: 'no_entity_schemas' };
+    }
+  }
+  return { results: rows.slice(0, limit).map(rowToCustomerResult), hasMore, limit };
 }
 
 /** Mirrors `SegmentMemberCountOutcome`/`SegmentMemberListOutcome`'s exact ok/degraded shape and reason vocabulary (`segment.service.ts`) — `searchProjectCustomersForAdmin` below backs a page's own search box, not an MCP tool call that can just error out, so the same three expected-not-buggy warehouse failure modes degrade instead of throwing. */
 export type CustomerSearchOutcome =
-  | { ok: true; results: CustomerSearchResult[] }
+  | { ok: true; results: CustomerSearchResult[]; hasMore: boolean; limit: number }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
 
 /**
@@ -144,8 +190,8 @@ export type CustomerSearchOutcome =
  */
 export async function searchProjectCustomersForAdmin(params: SearchProjectCustomersParams): Promise<CustomerSearchOutcome> {
   try {
-    const results = await searchProjectCustomers(params);
-    return { ok: true, results };
+    const page = await searchProjectCustomers(params);
+    return { ok: true, results: page.results, hasMore: page.hasMore, limit: page.limit };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };
@@ -265,46 +311,147 @@ export interface QueryProjectFunnelStepsParams {
 }
 
 export interface FunnelStepResult {
+  /** The event schema this step counts (`events.event_type`). Two steps can share a stage key (several events all classified `other`, say), so this — not `stageKey` — is what tells steps apart. */
+  eventSchemaName: string;
   stageKey: string;
   stepOrder: number;
-  /** Distinct customers who ever reached this stage (`fact_funnel_step`'s own "first reached" grain — a customer can't inflate this by re-firing the same step event). */
+  /**
+   * PEOPLE (not events, and not only identified customers) who reached this step having reached every
+   * earlier step first, in order — see {@link buildFunnelStepsQuery}. Non-increasing along the funnel by
+   * construction. The name predates B20 and is kept so existing readers do not break.
+   */
   customerCount: number;
-  /** `customerCount` as a fraction of the funnel's first step's own `customerCount` (1.0 for the first step itself; 0 when the first step had nobody). Computed here, not in SQL — a single small division over an already-small result set. */
+  /** `customerCount` as a fraction of the funnel's first step's own `customerCount` (1.0 for the first step itself; 0 when the first step had nobody). Never above 1: the counts are sequential. */
   conversionRateFromFirst: number;
 }
 
+export interface BuildFunnelStepsQueryParams {
+  organizationId: string;
+  projectId: string;
+  /** Omitted only when the project has no environment to default to — same as every other warehouse read here. */
+  environmentId?: string;
+  /** The funnel's event schema names, first step first. */
+  eventSchemaNames: readonly string[];
+  /** Defaults to `bigquery` (production). `duckdb` only so tests can run this exact query on a real engine. */
+  dialect?: WarehouseSqlDialect;
+}
+
+/** The schema name of the platform's anonymous-click stream — the one event whose own id is a visitor id when it declares no `anon_id` (`bridge_identity`/`fact_attribution` treat it the same way). */
+const TOUCHPOINT_EVENT_TYPE = 'touchpoint';
+
 /**
- * The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool:
- * per-stage distinct-customer counts for the project's own human-confirmed
- * funnel, in the confirmed step order, each stage's count also expressed as a
- * conversion rate off the first step.
+ * A JSON text field of `events.properties`, mirroring the dbt `json_text_field` macro leg for leg (BigQuery's
+ * `lax_string(col[key])` is what `fact_attribution` already runs in production; DuckDB's
+ * `json_extract_string` is that macro's default leg). `key` is a fixed literal owned by this file, never input.
+ */
+export function jsonTextField(dialect: WarehouseSqlDialect, column: string, key: 'customer_id' | 'anon_id'): string {
+  return dialect === 'bigquery' ? `LAX_STRING(${column}['${key}'])` : `json_extract_string(${column}, '$.${key}')`;
+}
+
+/**
+ * The `query_funnel` SQL: how many PEOPLE went through the funnel's steps IN ORDER (B20).
  *
- * The confirmed funnel lives in Firestore (`OnboardingStateModel.funnel_steps`,
- * KAN-68), NOT in the warehouse: the dbt `fact_funnel_step` model that would
- * otherwise hold it stays DuckDB-only because its `funnel_step_mappings` seed
- * has no real warehouse export yet (same posture #133 lifted for the identity
- * chain). So this reads the confirmed steps from Firestore and counts distinct
- * customers per step straight off the BigQuery-enabled `events` core table —
- * the same hand-written-SQL-over-`WarehouseQueryExecutor` pattern
- * `searchProjectCustomers`/`queryProjectCohortRetention` use. A step is keyed
- * by its `eventSchemaName` matched against `events.event_type` (the same
- * fixed-path narrowing #133 took for identity): the onboarding wizard proposes
- * funnel steps *from* event schemas, so this is the faithful key, and it keeps
- * every dynamic value a bound parameter rather than the DuckDB fixture model's
- * data-driven `coalesce(event_name, event_type)` label.
+ * It used to be `COUNT(DISTINCT entity_id) ... GROUP BY event_type`, which was wrong twice over on a project
+ * following the documented ingest contract (`{event_id, event, ts, properties}`, identity in properties):
+ * `entity_id` is the per-EVENT id there, so it counted events, not people; and every step was counted on its
+ * own, so a later step could exceed an earlier one. EasySign saw 4 → 6 → 6 → 6 → 6 (150% "conversion") where
+ * the truth was 4 → 2 → 2 → 2 → 2.
  *
- * `COUNT(DISTINCT entity_id)` is the distinct-customer count reaching each
- * step, so a customer re-firing the same step event can't inflate it — the
- * same "first reached" grain `fact_funnel_step` computes, without needing the
- * per-customer min-timestamp. One row per confirmed step (a step with no
- * events yet reports a real `0`, not a dropped row, so the funnel's drop-off
- * is visible end to end). A project whose funnel isn't confirmed yet (no
- * onboarding state, or an empty funnel) returns an empty list without touching
- * the warehouse.
+ * Who a person is — the same rules `bridge_identity`/`fact_attribution` apply:
+ *   1. an event declaring `properties.customer_id` belongs to that customer;
+ *   2. otherwise its visitor (`properties.anon_id`, or — for a touchpoint that declares none — the touchpoint's
+ *      own id, which the snippet sets to the anon id) resolves through `bridge_identity` to the customer that
+ *      visitor became, so the touchpoint and the signup it led to are ONE person;
+ *   3. a visitor nobody has resolved yet is a person in their own right (the anon id);
+ *   4. an event declaring neither id keeps `entity_id` — the older convention, where the event id named the
+ *      person.
+ *
+ * Sequential: a person counts at step N only when they reached every step 0..N in order — for each step, their
+ * earliest occurrence at or after the moment they reached the previous step (earliest is optimal: any later
+ * choice could only rule out more of the next step's occurrences). Ties count as in order, since two events
+ * written by one server request routinely share a timestamp. Counts are therefore non-increasing by
+ * construction, and overall conversion cannot exceed 100%.
+ *
+ * One query, every dynamic value a bound parameter (`@organizationId`, `@projectId`, `@environmentId`,
+ * `@funnelEvent<i>` per step). The step CTEs are generated per step because the funnel's length is per-project
+ * configuration held in Firestore — that is also why this lives here and not in a dbt model. Only structure
+ * (step indexes) is spliced into the SQL, never a value.
+ */
+export function buildFunnelStepsQuery(params: BuildFunnelStepsQueryParams): CompiledMetricQuery {
+  const dialect = params.dialect ?? 'bigquery';
+  const stepCount = params.eventSchemaNames.length;
+  if (stepCount === 0) {
+    throw new InvalidMcpToolRequestError('A funnel needs at least one step.');
+  }
+
+  const queryParams: Record<string, string> = {
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+  };
+  const filters = ['e.organization_id = @organizationId', 'e.project_id = @projectId'];
+  if (params.environmentId !== undefined) {
+    filters.push('e.environment_id = @environmentId');
+    queryParams.environmentId = params.environmentId;
+  }
+  const stepParams = params.eventSchemaNames.map((name, index) => {
+    queryParams[`funnelEvent${index}`] = name;
+    return `@funnelEvent${index}`;
+  });
+  filters.push(`e.event_type IN (${stepParams.join(', ')})`);
+
+  const customerId = jsonTextField(dialect, 'e.properties', 'customer_id');
+  const anonId = jsonTextField(dialect, 'e.properties', 'anon_id');
+
+  const personEvents = `funnel_events AS (
+  SELECT
+    e.event_type,
+    e.occurred_at,
+    COALESCE(${customerId}, b.customer_id, ${anonId}, e.entity_id) AS person_id
+  FROM events e
+  LEFT JOIN bridge_identity b
+    ON b.organization_id = e.organization_id
+    AND b.project_id = e.project_id
+    AND b.environment_id = e.environment_id
+    AND b.anon_id = COALESCE(${anonId}, CASE WHEN e.event_type = '${TOUCHPOINT_EVENT_TYPE}' THEN e.entity_id END)
+  WHERE ${filters.join('\n    AND ')}
+)`;
+
+  const stepCtes = stepParams.map((param, index) =>
+    index === 0
+      ? `step_0 AS (
+  SELECT person_id, MIN(occurred_at) AS reached_at
+  FROM funnel_events
+  WHERE event_type = ${param} AND person_id IS NOT NULL
+  GROUP BY person_id
+)`
+      : `step_${index} AS (
+  SELECT e.person_id, MIN(e.occurred_at) AS reached_at
+  FROM funnel_events e
+  INNER JOIN step_${index - 1} prev ON prev.person_id = e.person_id
+  WHERE e.event_type = ${param} AND e.occurred_at >= prev.reached_at
+  GROUP BY e.person_id
+)`,
+  );
+
+  const counts = stepParams.map((_, index) => `SELECT ${index} AS step_index, COUNT(*) AS people_count FROM step_${index}`);
+
+  const sql = `WITH ${[personEvents, ...stepCtes].join(',\n')}\n${counts.join('\nUNION ALL\n')}`;
+  return { sql, params: queryParams };
+}
+
+/**
+ * The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool: for the project's own confirmed funnel,
+ * how many people reached each step having gone through every earlier one in order, with each step's count
+ * also expressed as a conversion rate off the first step.
+ *
+ * The confirmed funnel lives in Firestore (`OnboardingStateModel.funnel_steps`, KAN-68; `set_funnel`), NOT in
+ * the warehouse, so the dbt `fact_funnel_step` model cannot hold it; this reads the steps from Firestore and
+ * runs {@link buildFunnelStepsQuery} against the BigQuery `events` and `bridge_identity` core tables. One row
+ * per confirmed step (a step nobody reached reports a real `0`). A project whose funnel isn't confirmed yet
+ * returns an empty list without touching the warehouse (or the quota).
  */
 export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsParams): Promise<FunnelStepResult[]> {
-  const state = await getOnboardingState(params.organizationId, params.projectId);
-  const steps = [...(state?.funnel_steps ?? [])].sort((a, b) => a.order - b.order);
+  const steps = await getConfirmedFunnelSteps(params.organizationId, params.projectId);
   if (steps.length === 0) {
     return [];
   }
@@ -312,42 +459,25 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
-  const filters = ['organization_id = @organizationId', 'project_id = @projectId'];
-  const queryParams: Record<string, string> = {
+  const query = buildFunnelStepsQuery({
     organizationId: params.organizationId,
     projectId: params.projectId,
-  };
-  if (environmentId !== undefined) {
-    filters.push('environment_id = @environmentId');
-    queryParams.environmentId = environmentId;
-  }
-
-  // The distinct event schema names across the confirmed steps, bound as
-  // parameters (never spliced into the SQL) — a funnel could in principle map
-  // two stages to the same event schema, so dedupe for the `IN` list and fan
-  // the count back out to every step below.
-  const schemaNames = [...new Set(steps.map((step) => step.eventSchemaName))];
-  const boundSchemaParams = schemaNames.map((name, index) => {
-    const paramName = `funnelEvent${index}`;
-    queryParams[paramName] = name;
-    return `@${paramName}`;
+    ...(environmentId !== undefined ? { environmentId } : {}),
+    eventSchemaNames: steps.map((step) => step.eventSchemaName),
+    ...(executor.dialect !== undefined ? { dialect: executor.dialect } : {}),
   });
-  filters.push(`event_type IN (${boundSchemaParams.join(', ')})`);
+  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'query_funnel' }, () => executor.execute(query));
 
-  const sql = `SELECT event_type, COUNT(DISTINCT entity_id) AS customer_count FROM events WHERE ${filters.join(' AND ')} GROUP BY event_type`;
-  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'query_funnel' }, () =>
-    executor.execute({ sql, params: queryParams }),
-  );
-
-  const countByEventType = new Map<string, number>();
+  const countByStepIndex = new Map<number, number>();
   for (const row of rows) {
-    countByEventType.set(String(row.event_type ?? ''), Number(row.customer_count ?? 0));
+    countByStepIndex.set(Number(row.step_index), Number(row.people_count ?? 0));
   }
 
-  const firstStepCount = countByEventType.get(steps[0].eventSchemaName) ?? 0;
-  return steps.map((step) => {
-    const customerCount = countByEventType.get(step.eventSchemaName) ?? 0;
+  const firstStepCount = countByStepIndex.get(0) ?? 0;
+  return steps.map((step, index) => {
+    const customerCount = countByStepIndex.get(index) ?? 0;
     return {
+      eventSchemaName: step.eventSchemaName,
       stageKey: step.stageKey,
       stepOrder: step.order,
       customerCount,
@@ -363,7 +493,7 @@ export type FunnelStepsOutcome =
 
 /**
  * The admin-page counterpart of {@link queryProjectFunnelSteps} (the `query_funnel` MCP tool) — same
- * "confirmed funnel from Firestore, distinct-customer counts from the warehouse" semantics, but wraps
+ * "confirmed funnel from Firestore, sequential people counts from the warehouse" semantics, but wraps
  * the warehouse call the same way {@link searchProjectCustomersForAdmin} does so a page rendering the
  * funnel can show a typed "why not" state instead of crashing. Closes the admin-surface gap this MCP
  * tool never got a human-facing home for: the onboarding wizard lets a human confirm a funnel mapping
@@ -388,7 +518,7 @@ export async function queryProjectFunnelStepsForAdmin(params: QueryProjectFunnel
   }
 }
 
-export type ProjectInsightKind = 'tracking_alert' | 'win_event';
+export type ProjectInsightKind = 'tracking_alert' | 'win_event' | 'metric_health';
 export type ProjectInsightSeverity = 'info' | 'warning';
 
 interface ProjectInsightBase {
@@ -407,32 +537,67 @@ interface ProjectInsightBase {
  */
 export type ProjectInsight =
   | (ProjectInsightBase & { kind: 'tracking_alert'; schemaName: string; lastSeenAt: string })
-  | (ProjectInsightBase & { kind: 'win_event'; winRuleName: string; schemaName: string; clientId: string });
+  | (ProjectInsightBase & { kind: 'win_event'; winRuleName: string; schemaName: string; clientId: string })
+  | (ProjectInsightBase & { kind: 'metric_health'; metricName: string; version: number; reasons: string[] });
 
 export interface ListProjectInsightsParams {
   organizationId: string;
   projectId: string;
   limit?: number;
+  /** Whose wins to include: an API key's own bound environment; omitted (a human caller), the project's `prod` one (KAN-99). */
+  environmentId?: string;
 }
 
 const DEFAULT_INSIGHTS_LIMIT = 20;
 const MAX_INSIGHTS_LIMIT = 100;
 
 /**
- * `list_insights` (plan `12 §6.2`): fans out to the two per-project "here is
- * something noteworthy" feeds that already exist — active tracking-broke
- * episodes (KAN-36) and fired win-rule events (KAN-65/66) — and merges them
- * newest-first. Both sources are Firestore-backed, not warehouse-backed, so
- * (unlike every other tool in this file/module) this one actually returns
- * real data in every environment today, with no KAN-18 dependency.
+ * `list_insights` (plan `12 §6.2`): fans out to the per-project "here is
+ * something noteworthy" feeds — active tracking-broke episodes (KAN-36),
+ * fired win-rule events (KAN-65/66), and (EasySign audit P-03) every active
+ * metric that registration validation would reject today, so a catalog
+ * that can't be queried is flagged here rather than discovered one raw
+ * warehouse error at a time — and merges them newest-first. Every source is
+ * Firestore-backed, not warehouse-backed, so (unlike every other tool in
+ * this file/module) this one actually returns real data in every
+ * environment today, with no KAN-18 dependency.
+ *
+ * A `metric_health` insight's `occurredAt` is the definition's own
+ * `created_at` (the moment the broken definition entered the catalog), so
+ * it reads as long-standing rather than as news, and stays stable across
+ * calls the same way an alert's `detected_at` does. It is deliberately NOT
+ * what decides whether the insight survives the limit — see the
+ * warnings-before-wins note at the bottom of this function, which exists
+ * because dating them that way used to guarantee they were the first thing
+ * dropped.
  */
 export async function listProjectInsights(params: ListProjectInsightsParams): Promise<ProjectInsight[]> {
   const limit = clampLimit(params.limit, DEFAULT_INSIGHTS_LIMIT, MAX_INSIGHTS_LIMIT);
 
-  const [alerts, wins] = await Promise.all([
+  const [alerts, wins, metricProblems] = await Promise.all([
     listActiveTrackingAlertsForProject(params.organizationId, params.projectId),
-    listRecentWinEventsForProject(params.organizationId, params.projectId, limit),
+    listRecentWinEventsForProject(params.organizationId, params.projectId, limit, params.environmentId),
+    auditMetricCatalogHealth(params.organizationId, params.projectId),
   ]);
+
+  const metricHealthInsights: ProjectInsight[] = metricProblems.map((problem) => ({
+    kind: 'metric_health',
+    id: `metric-health:${problem.metricDefId}`,
+    title: `Metric "${problem.name}" cannot be queried as defined`,
+    detail: problem.reasons.join(' '),
+    // Straight off the problem, which carries the definition's own `created_at`.
+    // This used to be a lookup into a second read of the same collection, with
+    // `?? new Date(0).toISOString()` behind it — so a lookup miss rendered a
+    // 1970 timestamp to the user as if it were the real one, and (being the
+    // oldest possible date, under a newest-first sort) put the insight at the
+    // very back of the queue to be dropped. A safety net that hid the thing it
+    // was protecting.
+    occurredAt: problem.createdAt,
+    severity: 'warning',
+    metricName: problem.name,
+    version: problem.version,
+    reasons: problem.reasons,
+  }));
 
   const alertInsights: ProjectInsight[] = alerts.map((alert) => ({
     kind: 'tracking_alert',
@@ -457,7 +622,33 @@ export async function listProjectInsights(params: ListProjectInsightsParams): Pr
     clientId: win.client_id,
   }));
 
-  return [...alertInsights, ...winInsights]
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-    .slice(0, limit);
+  const newestFirst = (a: ProjectInsight, b: ProjectInsight) => b.occurredAt.localeCompare(a.occurredAt);
+
+  // Warnings claim their slots before wins do, rather than every kind competing
+  // on recency alone (KAN-156).
+  //
+  // Merging all three and slicing by date looked neutral and was not. A
+  // `metric_health` insight is dated by the *definition's* `created_at` — old
+  // by construction, deliberately so, "so it sorts as old news rather than
+  // crowding out today's wins". Under a newest-first slice that guarantees it
+  // is dropped first. A project with `limit` recent wins therefore showed
+  // nothing else at all: not one broken metric, not one silent schema. The
+  // tracking alerts that led this list were pushed out the same way once they
+  // aged past a day of wins.
+  //
+  // That is the exact failure EasySign's P-03 audit reported — 32 of 40 metrics
+  // failing at query time while `list_insights` "reported nothing" — and fixing
+  // the audit (which added this kind) did not fix it, because the insight was
+  // computed correctly and then discarded before it was returned.
+  //
+  // The asymmetry is the point: a win is a nice-to-know that recurs, a warning
+  // is something broken that stays broken until someone acts. Losing the
+  // newest win costs a scroll; losing the only warning costs the reason the
+  // page exists. Both source lists are independently bounded upstream
+  // (`DEFAULT_TRACKING_ALERT_LIST_LIMIT`, and one problem per active metric),
+  // so warnings-first cannot itself grow unboundedly.
+  const warnings = [...alertInsights, ...metricHealthInsights].sort(newestFirst).slice(0, limit);
+  const winsThatFit = winInsights.sort(newestFirst).slice(0, Math.max(0, limit - warnings.length));
+
+  return [...warnings, ...winsThatFit].sort(newestFirst);
 }

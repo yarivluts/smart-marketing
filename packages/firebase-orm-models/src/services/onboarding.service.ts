@@ -1,4 +1,5 @@
-import { proposeFunnelSteps, type FunnelStepSuggestion } from '@growthos/shared';
+import { FUNNEL_STAGE_KEYS, isFunnelStageKey, proposeFunnelSteps, type FunnelStageKey, type FunnelStepSuggestion } from '@growthos/shared';
+import type { AuditActorType } from '../models/audit-log-entry.model';
 import { ProjectModel } from '../models/project.model';
 import {
   OnboardingStateModel,
@@ -67,13 +68,8 @@ export async function getOnboardingState(organizationId: string, projectId: stri
   return matches[0] ?? null;
 }
 
-/** Starts (or resumes) a project's onboarding wizard — creates the singleton state doc on first visit, audit-logged once since it marks "time to value" measurement starting (KAN-68 AC). Idempotent: a second call against an already-started project just returns the existing state untouched. */
-export async function getOrCreateOnboardingState(organizationId: string, projectId: string, userId: string): Promise<OnboardingStateModel> {
-  const existing = await getOnboardingState(organizationId, projectId);
-  if (existing) {
-    return existing;
-  }
-
+/** Writes a fresh, untouched ("pack" step, nothing selected, no funnel) singleton state doc — the shared half of {@link getOrCreateOnboardingState} and {@link setProjectFunnel}, without the "wizard started" audit/activation side effects only the former should emit. */
+async function createOnboardingStateDoc(organizationId: string, projectId: string, startedBy: string): Promise<OnboardingStateModel> {
   const now = new Date().toISOString();
   const state = new OnboardingStateModel();
   state.organization_id = organizationId;
@@ -84,12 +80,23 @@ export async function getOrCreateOnboardingState(organizationId: string, project
   state.source_connection_method = null;
   state.connected_source_plugin_id = null;
   state.funnel_steps = [];
-  state.started_by = userId;
+  state.started_by = startedBy;
   state.started_at = now;
   state.completed_at = null;
   state.updated_at = now;
   state.setPathParams({ organization_id: organizationId, project_id: projectId });
   await state.save();
+  return state;
+}
+
+/** Starts (or resumes) a project's onboarding wizard — creates the singleton state doc on first visit, audit-logged once since it marks "time to value" measurement starting (KAN-68 AC). Idempotent: a second call against an already-started project just returns the existing state untouched. */
+export async function getOrCreateOnboardingState(organizationId: string, projectId: string, userId: string): Promise<OnboardingStateModel> {
+  const existing = await getOnboardingState(organizationId, projectId);
+  if (existing) {
+    return existing;
+  }
+
+  const state = await createOnboardingStateDoc(organizationId, projectId, userId);
 
   try {
     await recordAuditLogEntry({
@@ -231,13 +238,17 @@ export interface ConfirmOnboardingFunnelStepsParams {
   projectId: string;
   userId: string;
   steps: readonly OnboardingFunnelStep[];
+  /** `false` when the funnel is being edited from outside the wizard's own funnel step (KAN-199: the confirmed-funnel summary's "Edit funnel"), so re-editing it never skips the wizard past steps the human has not done. Defaults to `true`, the wizard's own confirm. */
+  advanceWizard?: boolean;
 }
 
 /** Persists the human-confirmed funnel step order (KAN-68 AC: "user confirms") — the proposal from {@link proposeOnboardingFunnelSteps} edited/reordered/pruned by the human, verbatim. */
 export async function confirmOnboardingFunnelSteps(params: ConfirmOnboardingFunnelStepsParams): Promise<OnboardingStateModel> {
   const state = await getOrCreateOnboardingState(params.organizationId, params.projectId, params.userId);
   state.funnel_steps = params.steps.map((step, index) => ({ ...step, order: index }));
-  advanceStep(state, 'board');
+  if (params.advanceWizard !== false) {
+    advanceStep(state, 'board');
+  }
   state.updated_at = new Date().toISOString();
   await state.save();
 
@@ -249,6 +260,169 @@ export async function confirmOnboardingFunnelSteps(params: ConfirmOnboardingFunn
   });
 
   return state;
+}
+
+/**
+ * The project's confirmed funnel, in step order — `[]` when none has been confirmed (no onboarding
+ * state at all, or one whose funnel step was never confirmed/was confirmed empty). The one read path
+ * every consumer of the confirmed funnel shares: `query_funnel`, the Funnel page and `set_funnel`.
+ */
+export async function getConfirmedFunnelSteps(organizationId: string, projectId: string): Promise<OnboardingFunnelStep[]> {
+  const state = await getOnboardingState(organizationId, projectId);
+  return [...(state?.funnel_steps ?? [])].sort((a, b) => a.order - b.order);
+}
+
+/** The fewest steps {@link setProjectFunnel} accepts: a single step has no conversion to measure. */
+export const MIN_FUNNEL_STEPS = 2;
+
+/** One requested funnel step. `stageKey` is optional — when omitted it is inferred from the event name by the same keyword heuristic the wizard's proposal uses (`proposeFunnelSteps`). */
+export interface FunnelStepInput {
+  eventSchemaName: string;
+  stageKey?: string;
+}
+
+/** Every reason a requested funnel was refused, collected in one pass (not just the first) so a caller can fix the whole list at once — plus the event schemas that WOULD be accepted, since "unknown schema" alone leaves the caller guessing. */
+export class InvalidFunnelDefinitionError extends Error {
+  constructor(
+    public readonly reasons: string[],
+    public readonly availableEventSchemas: string[],
+  ) {
+    super(`Invalid funnel: ${reasons.join('; ')}`);
+    this.name = 'InvalidFunnelDefinitionError';
+  }
+}
+
+export interface PreviewProjectFunnelParams {
+  organizationId: string;
+  projectId: string;
+  steps: readonly FunnelStepInput[];
+}
+
+export interface ProjectFunnelPreview {
+  /** The funnel exactly as it would be stored — ordered, with every stage key resolved. */
+  steps: OnboardingFunnelStep[];
+  /** The currently confirmed funnel it would replace (`[]` if none). */
+  previousSteps: OnboardingFunnelStep[];
+  /** `false` when `steps` is identical to `previousSteps`, i.e. committing would be a no-op. */
+  changed: boolean;
+}
+
+function sameFunnel(a: readonly OnboardingFunnelStep[], b: readonly OnboardingFunnelStep[]): boolean {
+  return a.length === b.length && a.every((step, index) => step.eventSchemaName === b[index].eventSchemaName && step.stageKey === b[index].stageKey);
+}
+
+/**
+ * Validates a requested funnel against the project's own schema registry and resolves it into the
+ * exact `OnboardingFunnelStep[]` that {@link setProjectFunnel} would store, writing nothing. Rules:
+ * at least {@link MIN_FUNNEL_STEPS} steps; every step names a registered, ACTIVE event schema of this
+ * project (a funnel step is counted by `events.event_type`, so an entity/measure schema, or a name
+ * nothing was ever registered under, could only ever count zero); no event twice (its count would
+ * be the same number at two points of the funnel, which reads as a step nobody drops off at); and
+ * an explicit stage key must be one of `FUNNEL_STAGE_KEYS`.
+ */
+export async function previewProjectFunnel(params: PreviewProjectFunnelParams): Promise<ProjectFunnelPreview> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const schemaDefs = await listSchemaDefinitionsForProject(params.organizationId, params.projectId);
+  const eventSchemaNames = activeSchemaNamesForKind(schemaDefs, 'event');
+  const activeEvents = new Set(eventSchemaNames);
+  const otherKindByName = new Map(schemaDefs.filter((def) => def.status === 'active' && def.kind !== 'event').map((def) => [def.name, def.kind]));
+
+  const reasons: string[] = [];
+  if (params.steps.length < MIN_FUNNEL_STEPS) {
+    reasons.push(`A funnel needs at least ${MIN_FUNNEL_STEPS} steps; got ${params.steps.length}.`);
+  }
+
+  const firstPositionByName = new Map<string, number>();
+  const resolved: OnboardingFunnelStep[] = [];
+  params.steps.forEach((step, index) => {
+    const position = index + 1;
+    const name = step.eventSchemaName;
+    if (name.trim().length === 0) {
+      reasons.push(`Step ${position} has an empty event schema name.`);
+      return;
+    }
+    const earlier = firstPositionByName.get(name);
+    if (earlier !== undefined) {
+      reasons.push(`"${name}" appears more than once (steps ${earlier} and ${position}); each event can be only one step.`);
+    } else {
+      firstPositionByName.set(name, position);
+    }
+    if (!activeEvents.has(name)) {
+      const otherKind = otherKindByName.get(name);
+      reasons.push(
+        otherKind
+          ? `"${name}" is registered as a ${otherKind} schema, not an event; a funnel step must be an event schema.`
+          : `"${name}" is not a registered event schema in this project.`,
+      );
+    }
+
+    let stageKey: FunnelStageKey;
+    if (step.stageKey === undefined) {
+      stageKey = proposeFunnelSteps([name])[0].stageKey;
+    } else if (isFunnelStageKey(step.stageKey)) {
+      stageKey = step.stageKey;
+    } else {
+      reasons.push(`Step ${position} ("${name}") has stage key "${step.stageKey}", which is not one of: ${FUNNEL_STAGE_KEYS.join(', ')}.`);
+      return;
+    }
+    resolved.push({ eventSchemaName: name, stageKey, order: index });
+  });
+
+  if (reasons.length > 0) {
+    throw new InvalidFunnelDefinitionError(reasons, eventSchemaNames);
+  }
+
+  const previousSteps = await getConfirmedFunnelSteps(params.organizationId, params.projectId);
+  return { steps: resolved, previousSteps, changed: !sameFunnel(resolved, previousSteps) };
+}
+
+export interface SetProjectFunnelParams extends PreviewProjectFunnelParams {
+  actorType: AuditActorType;
+  actorId: string;
+}
+
+/**
+ * Replaces the project's confirmed funnel with a validated one (see {@link previewProjectFunnel} for
+ * the rules) — the programmatic counterpart of the wizard's own "confirm funnel" step, writing the
+ * SAME field (`OnboardingStateModel.funnel_steps`) that {@link confirmOnboardingFunnelSteps} writes
+ * and `query_funnel`/the Funnel page read, so there is exactly one confirmed funnel per project
+ * whichever surface set it.
+ *
+ * Two deliberate differences from the wizard's confirm: it does NOT advance the wizard's `step` (a
+ * funnel defined over MCP says nothing about whether a human picked a pack or connected a source, and
+ * jumping a fresh wizard straight to its final screen would hide those steps), and a project with no
+ * wizard state yet gets one created silently — without the "onboarding started" audit entry and
+ * activation event, since no human started anything. Audit-logged as `funnel.set` with the previous
+ * and new step lists.
+ */
+export async function setProjectFunnel(params: SetProjectFunnelParams): Promise<ProjectFunnelPreview> {
+  const preview = await previewProjectFunnel(params);
+
+  const state =
+    (await getOnboardingState(params.organizationId, params.projectId)) ??
+    (await createOnboardingStateDoc(params.organizationId, params.projectId, params.actorId));
+  state.funnel_steps = preview.steps;
+  state.updated_at = new Date().toISOString();
+  await state.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: params.actorType,
+      actorId: params.actorId,
+      action: 'funnel.set',
+      targetType: 'onboarding_state',
+      targetId: state.id,
+      summary: `Set the project funnel: ${preview.steps.map((step) => step.eventSchemaName).join(' -> ')}`,
+      before: { steps: preview.previousSteps },
+      after: { steps: preview.steps },
+    });
+  } catch {
+    // Best-effort — same posture as every other audit write in this file.
+  }
+
+  return preview;
 }
 
 export interface CompleteOnboardingParams {

@@ -3,12 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  ackTvPairingCommand,
   fetchTvPairingStatus,
   fetchTvRotationManifest,
   requestTvPairing,
-  type TvCecSchedule,
-  type TvPowerState,
   type TvRotationManifest,
 } from '@/lib/tv/tv-client';
 import { TvPairingScreen } from '@/components/tv/tv-pairing-screen';
@@ -23,25 +20,6 @@ const CLAIMED_POLL_INTERVAL_MS = 90000;
 
 type TvAppPhase = 'loading' | 'pairing' | 'claimed' | 'error';
 
-function isWithinCecSleepSchedule(schedule: TvCecSchedule): boolean {
-  if (!schedule.enabled || !schedule.sleepTime || !schedule.wakeTime) {
-    return false;
-  }
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const [sh, sm] = schedule.sleepTime.split(':').map(Number);
-  const [wh, wm] = schedule.wakeTime.split(':').map(Number);
-  if (Number.isNaN(sh) || Number.isNaN(sm) || Number.isNaN(wh) || Number.isNaN(wm)) {
-    return false;
-  }
-  const sleepMinutes = sh * 60 + sm;
-  const wakeMinutes = wh * 60 + wm;
-  if (sleepMinutes <= wakeMinutes) {
-    return currentMinutes >= sleepMinutes && currentMinutes < wakeMinutes;
-  }
-  return currentMinutes >= sleepMinutes || currentMinutes < wakeMinutes;
-}
-
 /**
  * The war-room TV's full client-side state machine (KAN-67, E12.3): mint (or
  * resume) a pairing, show the code and poll until an admin claims it, then
@@ -51,7 +29,6 @@ function isWithinCecSleepSchedule(schedule: TvCecSchedule): boolean {
  * transition (`deviceToken` change, unmount) is what keeps this AC's "no
  * leak over 24h" promise: no interval or `EventSource` ever outlives the
  * phase it was created for.
- * Extended in KAN-307 with remote display power management, CEC standby, and command dispatch.
  */
 export function TvApp(): React.ReactElement {
   const t = useTranslations('TvMode');
@@ -59,8 +36,8 @@ export function TvApp(): React.ReactElement {
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [manifest, setManifest] = useState<TvRotationManifest | null>(null);
+  const [lastManifestAt, setLastManifestAt] = useState<number | null>(null);
   const [resetCounter, setResetCounter] = useState(0);
-  const [powerState, setPowerState] = useState<TvPowerState>('on');
 
   // Ensures a device token exists — resumes an already-claimed pairing from
   // `localStorage`, or mints a brand-new one. Re-runs whenever `resetCounter`
@@ -102,6 +79,12 @@ export function TvApp(): React.ReactElement {
     }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Tracked locally (not via a ref synced on render, and not via reading
+    // React `phase` state, which wouldn't reflect this tick's own result
+    // until after a re-render) so the very poll that transitions into
+    // 'claimed' immediately schedules its *next* tick at the slower claimed
+    // cadence, instead of one extra tick at the pending cadence while
+    // waiting for React to catch up.
     let knownPhase: TvAppPhase = phase;
 
     async function poll(): Promise<void> {
@@ -117,69 +100,15 @@ export function TvApp(): React.ReactElement {
           if (typeof window !== 'undefined') {
             window.localStorage.setItem(STORAGE_KEY, deviceToken as string);
           }
-
-          // Check remote command queue (KAN-307)
-          if (status.pendingCommand) {
-            const cmd = status.pendingCommand;
-            if (cmd.type === 'force_reload') {
-              try {
-                await ackTvPairingCommand(deviceToken as string, {
-                  commandId: cmd.commandId,
-                  status: 'acknowledged',
-                });
-              } catch {
-                // best effort ack before reload
-              }
-              window.location.reload();
-              return;
-            }
-            if (cmd.type === 'reboot') {
-              try {
-                await ackTvPairingCommand(deviceToken as string, {
-                  commandId: cmd.commandId,
-                  status: 'acknowledged',
-                });
-              } catch {
-                // best effort
-              }
-              if (typeof window !== 'undefined') {
-                window.localStorage.removeItem(STORAGE_KEY);
-              }
-              setDeviceToken(null);
-              setManifest(null);
-              setPhase('loading');
-              setResetCounter((current) => current + 1);
-              return;
-            }
-            if (cmd.type === 'display_sleep') {
-              setPowerState('sleep');
-              void ackTvPairingCommand(deviceToken as string, {
-                commandId: cmd.commandId,
-                status: 'acknowledged',
-                powerState: 'sleep',
-              });
-            } else if (cmd.type === 'display_wake') {
-              setPowerState('on');
-              void ackTvPairingCommand(deviceToken as string, {
-                commandId: cmd.commandId,
-                status: 'acknowledged',
-                powerState: 'on',
-              });
-            }
-          } else if (status.powerState) {
-            setPowerState(status.powerState);
-          }
-
-          // Check automated CEC standby schedule
-          if (status.cecSchedule?.enabled && isWithinCecSleepSchedule(status.cecSchedule)) {
-            setPowerState((current) => (current === 'on' ? 'standby' : current));
-          }
-
           const nextManifest = await fetchTvRotationManifest(deviceToken as string);
           if (!cancelled) {
             knownPhase = 'claimed';
             setManifest(nextManifest);
             setPhase('claimed');
+            // Stamped only on SUCCESS. The failure path below deliberately
+            // leaves the last good manifest on screen, so this timestamp is the
+            // only thing that can tell a blip from an outage (KAN-172).
+            setLastManifestAt(Date.now());
           }
         } else {
           if (typeof window !== 'undefined') {
@@ -194,7 +123,10 @@ export function TvApp(): React.ReactElement {
           return;
         }
       } catch {
-        // Transient network error
+        // A transient network error just leaves the current phase/manifest
+        // as-is until the next poll tick — the same "don't fail the whole
+        // screen over one flaky request" posture the rotation screen's own
+        // board-frame fetch takes.
       }
       if (!cancelled) {
         timer = setTimeout(poll, knownPhase === 'claimed' ? CLAIMED_POLL_INTERVAL_MS : PENDING_POLL_INTERVAL_MS);
@@ -210,45 +142,14 @@ export function TvApp(): React.ReactElement {
     };
   }, [deviceToken]);
 
-  function handleWakeDisplay(): void {
-    setPowerState('on');
-    if (deviceToken) {
-      void ackTvPairingCommand(deviceToken, {
-        commandId: `local-wake-${Date.now()}`,
-        status: 'acknowledged',
-        powerState: 'on',
-      });
-    }
-  }
-
   if (phase === 'claimed' && manifest && deviceToken) {
-    return (
-      <div className="relative w-full h-full">
-        {(powerState === 'sleep' || powerState === 'standby') && (
-          <div
-            role="region"
-            aria-label="Display Standby Mode"
-            tabIndex={0}
-            onClick={handleWakeDisplay}
-            onKeyDown={handleWakeDisplay}
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-zinc-500 font-mono select-none cursor-pointer outline-none"
-          >
-            <div className="w-3 h-3 rounded-full bg-emerald-700 animate-ping mb-4" />
-            <p className="text-sm font-semibold tracking-widest uppercase text-zinc-400">
-              {powerState === 'sleep' ? t('displaySleep') : t('cecStandby')}
-            </p>
-            <p className="text-xs text-zinc-600 mt-2">{t('pressAnyKeyToWake')}</p>
-          </div>
-        )}
-        <TvRotationScreen deviceToken={deviceToken} manifest={manifest} />
-      </div>
-    );
+    return <TvRotationScreen deviceToken={deviceToken} manifest={manifest} lastManifestAt={lastManifestAt} pollIntervalMs={CLAIMED_POLL_INTERVAL_MS} />;
   }
 
   if (phase === 'error') {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-pp-surface p-8 text-center font-pp-body">
-        <p className="text-2xl text-pp-error font-medium">{t('pairingError')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
+        <p className="text-2xl text-muted-foreground">{t('pairingError')}</p>
       </main>
     );
   }
@@ -258,8 +159,8 @@ export function TvApp(): React.ReactElement {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-pp-surface p-8 text-center font-pp-body">
-      <p className="text-xl text-pp-outline font-mono animate-pulse">{t('loading')}</p>
+    <main className="flex min-h-screen items-center justify-center bg-background p-8 text-center">
+      <p className="text-xl text-muted-foreground">{t('loading')}</p>
     </main>
   );
 }

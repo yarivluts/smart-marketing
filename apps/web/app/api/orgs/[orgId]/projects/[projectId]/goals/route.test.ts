@@ -47,6 +47,21 @@ async function setupOrgProject(orgName: string) {
   return { ownerSession, owner, organization, project };
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 async function registerSignups(organizationId: string, projectId: string, createdByUserId: string) {
   return registerMetricDefinition({
     organizationId,
@@ -120,6 +135,38 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/goals', () => {
     const response = await GET(request, { params });
     expect(response.status).toBe(404);
   });
+
+  it(
+    'KAN-136: lets a project-scoped project_admin list goals for THEIR OWN project — before this ' +
+      "fix a project-scoped binding never satisfied this route's permission check at all",
+    async () => {
+      const { ownerSession, organization, project } = await setupOrgProject('Goal List Project-Scoped Org');
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = goalsRequest(organization.id, project.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ goals: [] });
+    },
+  );
+
+  it(
+    "KAN-136 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org — a project-scope binding never grants access sideways',
+    async () => {
+      const { ownerSession, organization, project } = await setupOrgProject('Goal List Sibling Project Org');
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = goalsRequest(organization.id, otherProject.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/goals', () => {
@@ -160,6 +207,42 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/goals', () => {
     expect(body.reasons.length).toBeGreaterThan(0);
   });
 
+  it('refuses a target of 8 on a 0-1 ratio metric (it would mean 800%), and accepts 0.08 (KAN-213)', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Goal Ratio Target Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signup_share',
+      definition: { kind: 'formula', formula: 'signups / signups' },
+      dimensions: [],
+      unit: 'ratio',
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const goal = (targetValue: number) => ({
+      name: 'Lift conversion to 8%',
+      metricName: 'signup_share',
+      direction: 'maximize',
+      targetValue,
+      startDate: '2026-09-01',
+      deadline: '2026-12-31',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+    });
+
+    const refused = goalsRequest(organization.id, project.id, goal(8));
+    const refusedResponse = await POST(refused.request, { params: refused.params });
+    expect(refusedResponse.status).toBe(400);
+    const refusedBody = (await refusedResponse.json()) as { error: string; reasons: string[] };
+    expect(refusedBody.error).toBe('invalid_goal');
+    expect(refusedBody.reasons.join(' ')).toContain('For 8%, use 0.08.');
+
+    const accepted = goalsRequest(organization.id, project.id, goal(0.08));
+    expect((await POST(accepted.request, { params: accepted.params })).status).toBe(201);
+  });
+
   it('creates a goal, then lists it', async () => {
     const { ownerSession, organization, project, owner } = await setupOrgProject('Goal Create Org');
     await registerSignups(organization.id, project.id, owner.id);
@@ -185,5 +268,26 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/goals', () => {
     const listed = (await listResponse.json()) as { goals: Array<{ id: string }> };
     expect(listed.goals).toHaveLength(1);
     expect(listed.goals[0].id).toBe(body.goal.id);
+  });
+
+  it('KAN-136: lets a project-scoped editor create a goal in THEIR OWN project', async () => {
+    const { organization, project, owner } = await setupOrgProject('Goal Create Project-Scoped Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'editor', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = goalsRequest(organization.id, project.id, {
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
   });
 });

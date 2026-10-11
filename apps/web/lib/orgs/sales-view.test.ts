@@ -9,6 +9,7 @@ describe('toDemoFunnelView', () => {
       demosHeld: 3,
       demosNoShow: 1,
       showRate: 0.75,
+      sampledFrom: null,
       rows: [
         { repOrgPersonId: 'rep-1', demosHeld: 2, demosNoShow: 0, showRate: 1 },
         { repOrgPersonId: 'rep-2', demosHeld: 1, demosNoShow: 1, showRate: 0.5 },
@@ -24,6 +25,7 @@ describe('toDemoFunnelView', () => {
       demosHeld: 3,
       demosNoShow: 1,
       showRate: 0.75,
+      sampledFrom: null,
       rows: [
         { repOrgPersonId: 'rep-1', name: 'Ada', photoUrl: 'https://example.com/ada.png', demosHeld: 2, demosNoShow: 0, showRate: 1 },
         { repOrgPersonId: 'rep-2', name: 'Grace', photoUrl: null, demosHeld: 1, demosNoShow: 1, showRate: 0.5 },
@@ -37,6 +39,7 @@ describe('toDemoFunnelView', () => {
       demosHeld: 1,
       demosNoShow: 0,
       showRate: 1,
+      sampledFrom: null,
       rows: [{ repOrgPersonId: 'rep-removed', demosHeld: 1, demosNoShow: 0, showRate: 1 }],
     };
 
@@ -45,7 +48,24 @@ describe('toDemoFunnelView', () => {
   });
 
   it('passes through a null project-wide show rate unchanged', () => {
-    const result: DemoFunnelResult = { demosScheduled: 2, demosHeld: 0, demosNoShow: 0, showRate: null, rows: [] };
+    const result: DemoFunnelResult = { demosScheduled: 2, demosHeld: 0, demosNoShow: 0, showRate: null, rows: [], sampledFrom: null };
     expect(toDemoFunnelView(result, new Map()).showRate).toBeNull();
+  });
+  /**
+   * `sampledFrom` has to survive the mapping, because the page decides whether
+   * to qualify every number on it from this one field. Dropping it here would
+   * restore the exact defect (KAN-164) while every other assertion above
+   * stayed green — the counts map correctly whether or not they are complete.
+   */
+  it('carries the sampling cap through to the view', () => {
+    const sampled: DemoFunnelResult = {
+      demosScheduled: 500,
+      demosHeld: 300,
+      demosNoShow: 100,
+      showRate: 0.75,
+      rows: [{ repOrgPersonId: 'rep-1', demosHeld: 300, demosNoShow: 100, showRate: 0.75 }],
+      sampledFrom: 500,
+    };
+    expect(toDemoFunnelView(sampled, new Map()).sampledFrom).toBe(500);
   });
 });

@@ -13,7 +13,8 @@ vi.mock('next-intl/middleware', () => ({
   default: () => intlMiddlewareMock,
 }));
 
-import middleware from './middleware';
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
+import middleware, { config } from './middleware';
 
 function requestFor(path: string, options: { cookie?: string } = {}): NextRequest {
   const headers = new Headers();
@@ -28,6 +29,13 @@ describe('middleware', () => {
     const response = middleware(requestFor('/en/dashboard'));
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('https://growthos.test/en/login?from=%2Fdashboard');
+  });
+
+  it('keeps the query string in ?from= so a link with context survives signing in', () => {
+    const response = middleware(requestFor('/he/orgs/o1/integrations/meta?projectId=p1'));
+    const location = new URL(response.headers.get('location') as string);
+    expect(location.pathname).toBe('/he/login');
+    expect(location.searchParams.get('from')).toBe('/orgs/o1/integrations/meta?projectId=p1');
   });
 
   it('passes an authenticated visitor through to a protected route', () => {
@@ -62,6 +70,13 @@ describe('middleware', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
+  it('lets anyone read the privacy policy without signing in, in every locale (Meta links to it)', () => {
+    intlMiddlewareMock.mockReturnValue(NextResponse.next());
+    for (const path of ['/en/privacy', '/he/privacy']) {
+      expect(middleware(requestFor(path)).headers.get('location')).toBeNull();
+    }
+  });
+
   it('lets an unauthenticated visitor reach the public home page', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en'));
@@ -74,5 +89,21 @@ describe('middleware', () => {
     const response = middleware(requestFor('/dashboard'));
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('https://growthos.test/en/dashboard');
+  });
+});
+
+/**
+ * /api/health is read hourly by .github/workflows/prod-drift.yml, which holds no
+ * credentials (KAN-204). If the auth gate or the locale redirect ever ran on it,
+ * the drift check would read a login page (or a 307) instead of the build SHA.
+ * Asserted through Next's own matcher compiler, not a hand-rolled regex.
+ */
+describe('middleware matcher', () => {
+  it('never runs on the public health endpoint', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/api/health' })).toBe(false);
+  });
+
+  it('still runs on locale-prefixed pages, so skipping /api did not switch the gate off', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/en/dashboard' })).toBe(true);
   });
 });

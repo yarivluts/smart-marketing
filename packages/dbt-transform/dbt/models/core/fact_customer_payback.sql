@@ -156,5 +156,24 @@ select
     collected_revenue_7d,
     collected_revenue_14d,
     collected_revenue_30d,
-    collected_revenue_40d
+    collected_revenue_40d,
+    -- Whether each window has actually ELAPSED for this customer (KAN-179).
+    --
+    -- `collected_revenue_40d` sums charges with `days_since_acquisition <= 40`
+    -- and nothing checked that 40 days had passed, so a customer acquired
+    -- yesterday contributed a "40-day revenue" figure measuring one day. Read
+    -- alone that is merely incomplete; averaged it is worse, because every
+    -- immature customer adds one to the denominator and roughly nothing to the
+    -- numerator. The faster a project acquires, the worse its payback looks --
+    -- the exact opposite of the truth.
+    --
+    -- Emitted as flags rather than by nulling the revenue: `sum` skips nulls
+    -- but `count_distinct customer_id` would still count the customer, so
+    -- nulling alone would leave the average wrong in the same direction while
+    -- looking fixed. A filter both halves of a ratio can apply is the only
+    -- thing that actually corrects it.
+    {{ growthos_datediff('acquired_at', dbt.current_timestamp(), 'day') }} >= 7 as window_7d_complete,
+    {{ growthos_datediff('acquired_at', dbt.current_timestamp(), 'day') }} >= 14 as window_14d_complete,
+    {{ growthos_datediff('acquired_at', dbt.current_timestamp(), 'day') }} >= 30 as window_30d_complete,
+    {{ growthos_datediff('acquired_at', dbt.current_timestamp(), 'day') }} >= 40 as window_40d_complete
 from aggregated

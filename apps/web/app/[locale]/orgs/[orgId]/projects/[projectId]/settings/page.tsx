@@ -1,30 +1,17 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/navigation';
-import { BadgeCheck, Shield, ExternalLink } from 'lucide-react';
 import { can } from '@growthos/shared';
+import { Archive, BadgeCheck, Clock, Coins, FolderKanban, Layers, Settings } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgPeople, listOrgProjects, listSharedCredentials, listAuditLogEntriesForOrg, listOrgMembers } from '@/lib/orgs/queries';
+import { listEnvironmentsForProject, listOrgProjectsIncludingArchived } from '@/lib/orgs/queries';
 import { ProjectSettingsForm } from '@/components/orgs/project-settings-form';
-import {
-  AccountGovernanceHub,
-  type ConnectedPlatform,
-  type GovernanceMember,
-  type AuditLogEntry,
-  type PlatformStatus,
-  type MemberStatus,
-} from '@/components/governance/account-governance-hub';
-import {
-  PpPage,
-  PpPageHeader,
-  PpKpiGrid,
-  PpKpiCard,
-  PpCard,
-  PpButton,
-  PpPill,
-} from '@/components/pastel/primitives';
+import { ArchiveProjectButton } from '@/components/orgs/archive-project-button';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard } from '@/components/viz/chart-card';
+import { InitialsAvatar } from '@/components/viz/initials-avatar';
+import { PageHero } from '@/components/viz/page-hero';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -56,391 +43,94 @@ export default async function ProjectSettingsPage({ params }: PageProps): Promis
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId, projectId })) {
     notFound();
   }
 
-  const [projects, sharedCredentials, orgMembers, people, auditLogs] = await Promise.all([
-    listOrgProjects(orgId),
-    listSharedCredentials(orgId).catch(() => []),
-    listOrgMembers(orgId).catch(() => []),
-    listOrgPeople(orgId).catch(() => []),
-    listAuditLogEntriesForOrg(orgId, 50).catch(() => []),
-  ]);
+  // Including archived: this is the one page that must still resolve an archived project, so an admin can unarchive it.
+  const [projects, environments] = await Promise.all([listOrgProjectsIncludingArchived(orgId), listEnvironmentsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/settings`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
-
-  const initialPlatforms: ConnectedPlatform[] = sharedCredentials.map((cred) => {
-    const isDisconnected = Boolean(cred.archived_at);
-    const hasSecret = Boolean(cred.encrypted_secret);
-    const hasScopes = Boolean(cred.available_scopes && cred.available_scopes.length > 0);
-
-    let status: PlatformStatus;
-    let expiresIn: string;
-
-    if (isDisconnected) {
-      status = 'disconnected';
-      expiresIn = 'Revoked';
-    } else if (!hasSecret) {
-      status = 'unverified';
-      expiresIn = 'Awaiting Token';
-    } else if (!hasScopes) {
-      status = 'degraded';
-      expiresIn = 'Scopes Unassigned';
-    } else {
-      status = 'connected';
-      expiresIn = 'Active KMS Vault';
-    }
-
-    const providerLabel =
-      cred.provider === 'google_ads'
-        ? 'Google Ads API'
-        : cred.provider === 'meta_ads'
-          ? 'Meta Graph API'
-          : cred.provider === 'stripe'
-            ? 'Stripe Billing'
-            : cred.provider === 'ga4'
-              ? 'Google Analytics 4'
-              : cred.name || 'Custom Credential';
-
-    const typeLabel =
-      cred.provider === 'google_ads'
-        ? 'Search & Performance Max'
-        : cred.provider === 'meta_ads'
-          ? 'Social Paid Media'
-          : cred.provider === 'stripe'
-            ? 'Payment Gateway'
-            : cred.provider === 'ga4'
-              ? 'Web Analytics'
-              : 'Custom Integration';
-
-    return {
-      name: cred.name || providerLabel,
-      type: typeLabel,
-      status,
-      accounts: `${cred.available_scopes?.length ?? 0} Connected Scope${(cred.available_scopes?.length ?? 0) === 1 ? '' : 's'}`,
-      syncRate: hasSecret ? 'Real-time Webhook' : 'Sync Paused',
-      scopes: cred.available_scopes && cred.available_scopes.length > 0 ? cred.available_scopes : ['read', 'manage'],
-      expiresIn,
-    };
-  });
-
-  const latestAuditByUser = new Map<string, Date>();
-  for (const log of auditLogs) {
-    if (log.actor_id && log.created_at) {
-      const existing = latestAuditByUser.get(log.actor_id);
-      const logDate = new Date(log.created_at);
-      if (!existing || logDate > existing) {
-        latestAuditByUser.set(log.actor_id, logDate);
-      }
-    }
-  }
-
-  const formatLastActive = (date: Date | undefined, fallbackStatus?: string): { lastActive: string; memberStatus: MemberStatus } => {
-    if (!date) {
-      if (fallbackStatus === 'invited') return { lastActive: 'Invited (Pending)', memberStatus: 'invited' };
-      if (fallbackStatus === 'suspended') return { lastActive: 'Suspended', memberStatus: 'suspended' };
-      return { lastActive: 'No recent activity', memberStatus: 'offline' };
-    }
-    const diffMs = Math.max(0, Date.now() - date.getTime());
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMinutes / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMinutes < 15) return { lastActive: 'Active now', memberStatus: 'active' };
-    if (diffMinutes < 60) return { lastActive: `${diffMinutes}m ago`, memberStatus: 'active' };
-    if (diffHours < 24) return { lastActive: `${diffHours}h ago`, memberStatus: 'active' };
-    if (diffDays < 7) return { lastActive: `${diffDays}d ago`, memberStatus: 'offline' };
-    return { lastActive: date.toLocaleDateString(), memberStatus: 'offline' };
-  };
-
-  const activePeople = people.filter((p) => !p.archived_at);
-  const initialMembers: GovernanceMember[] =
-    orgMembers.length > 0
-      ? orgMembers.map((member) => {
-          const displayName = member.displayName || member.email || 'Member';
-          const initials =
-            displayName
-              .split(' ')
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((w) => w[0].toUpperCase())
-              .join('') || 'U';
-
-          let role: GovernanceMember['role'] = 'Agency Admin';
-          if (member.role === 'editor') {
-            role = 'Media Buyer';
-          } else if (member.role === 'operator') {
-            role = 'Experimenter';
-          } else if (member.role === 'viewer') {
-            role = 'Client Viewer';
-          }
-
-          const latestAudit = latestAuditByUser.get(member.userId);
-          const { lastActive, memberStatus } = formatLastActive(latestAudit, member.status);
-
-          const finalStatus: MemberStatus =
-            member.status === 'suspended'
-              ? 'suspended'
-              : member.status === 'invited'
-                ? 'invited'
-                : memberStatus;
-
-          return {
-            name: displayName,
-            initials,
-            email: member.email,
-            role,
-            lastActive,
-            status: finalStatus,
-          };
-        })
-      : activePeople.map((person) => {
-          const initials =
-            person.name
-              .split(' ')
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((w) => w[0].toUpperCase())
-              .join('') || 'U';
-
-          let role: GovernanceMember['role'] = 'Agency Admin';
-          const titleLower = (person.title || '').toLowerCase();
-          if (titleLower.includes('buyer') || titleLower.includes('media')) {
-            role = 'Media Buyer';
-          } else if (titleLower.includes('exp') || titleLower.includes('growth')) {
-            role = 'Experimenter';
-          } else if (titleLower.includes('viewer') || titleLower.includes('client')) {
-            role = 'Client Viewer';
-          }
-
-          const latestAudit = latestAuditByUser.get(person.id) || latestAuditByUser.get(person.created_by);
-          const { lastActive, memberStatus } = formatLastActive(latestAudit);
-
-          return {
-            name: person.name,
-            initials,
-            email: person.email,
-            role,
-            lastActive,
-            status: memberStatus,
-          };
-        });
-
-  const initialAuditLogs: AuditLogEntry[] = auditLogs.map((entry) => {
-    const actionLower = entry.action.toLowerCase();
-    const summaryLower = (entry.summary || '').toLowerCase();
-
-    let status: 'success' | 'warning' | 'error' = 'success';
-    if (
-      actionLower.includes('fail') ||
-      actionLower.includes('error') ||
-      actionLower.includes('violation') ||
-      actionLower.includes('reject') ||
-      summaryLower.includes('failed') ||
-      summaryLower.includes('error')
-    ) {
-      status = 'error';
-    } else if (
-      actionLower.includes('warn') ||
-      actionLower.includes('suspend') ||
-      actionLower.includes('archive') ||
-      actionLower.includes('revoke') ||
-      actionLower.includes('pause') ||
-      actionLower.includes('kill') ||
-      summaryLower.includes('warn') ||
-      summaryLower.includes('paused')
-    ) {
-      status = 'warning';
-    }
-
-    return {
-      id: entry.id,
-      timestamp: entry.created_at
-        ? new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : 'Recent',
-      actor:
-        entry.actor_id === user.id
-          ? `${user.email ?? 'Current User'}`
-          : `${entry.actor_type}:${entry.actor_id.slice(0, 8)}`,
-      action: entry.summary || entry.action.replace(/\./g, ' ').toUpperCase(),
-      target: entry.target_id
-        ? `${entry.target_type}:${entry.target_id.slice(0, 8)}`
-        : entry.project_id
-          ? `Project ${entry.project_id.slice(0, 8)}`
-          : 'Organization',
-      status,
-    };
-  });
 
   const t = await getTranslations('ProjectSettings');
+  const tEnv = await getTranslations('EnvBadge');
+  const archived = project.archived_at !== undefined && project.archived_at !== null;
+  // How much of the project's own profile is declared: name is required; vertical, currency and time zone are optional but every report reads them.
+  const profileFields = [project.name, project.vertical, project.currency, project.timezone];
+  const filled = profileFields.filter((value) => typeof value === 'string' && value.trim().length > 0).length;
+  const completeness = Math.round((filled / profileFields.length) * 100);
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow={t('coreConfiguration')}
-        title={t('title', { projectName: project.name })}
-        description={t('intro')}
-        actions={
-          <PpButton variant="ghost" size="sm" icon={ExternalLink} asChild>
-            <Link href={`/orgs/${orgId}/projects/${projectId}/setup-checklist`}>
-              {t('checklistLink')}
-            </Link>
-          </PpButton>
-        }
-      />
-
-      {/* 4 Pastel Executive KPI Summary Row */}
-      <PpKpiGrid>
-        <PpKpiCard
-          label={t('planKpi')}
-          value="Enterprise"
-          badge="Prod"
-          badgeAccent="primary"
-          accent="primary"
-          footer={<span>Dedicated Edge Pod</span>}
-        />
-        <PpKpiCard
-          label={t('workspacesKpi')}
-          value={`${projects.length}`}
-          valueSuffix="Linked"
-          badge={`${projects.length} Workspaces`}
-          badgeAccent="amber"
-          accent="amber"
-          footer={<span className="truncate">{projects.map((p) => p.name).slice(0, 3).join(', ')}</span>}
-        />
-        <PpKpiCard
-          label={t('teamKpi')}
-          value={`${activePeople.length}`}
-          valueSuffix={people.length > activePeople.length ? ` / ${people.length}` : undefined}
-          badge={`${activePeople.length} ${t('active')}`}
-          badgeAccent="mint"
-          accent="mint"
-          footer={<span>Role-based access matrix active</span>}
-        />
-        <PpKpiCard
-          label={t('credentialsKpi')}
-          value={`${sharedCredentials.length}`}
-          badge={sharedCredentials.length > 0 ? t('active') : t('none')}
-          badgeAccent={sharedCredentials.length > 0 ? 'mint' : 'neutral'}
-          accent="sky"
-          footer={
-            <span>
-              {initialPlatforms.filter((p) => p.status === 'connected').length} connected marketing pipelines
-            </span>
-          }
-        />
-      </PpKpiGrid>
-
-      {/* Main Bento Grid: Form on Left (7 cols), Governance Overview on Right (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-7">
-          <PpCard
-            title={t('identityCardTitle')}
-            subtitle={t('identityCardSubtitle')}
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Settings} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('intro')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard
+            title={t('kpiProfile')}
+            value={`${completeness}%`}
             icon={BadgeCheck}
-            iconAccent="primary"
-          >
-            <ProjectSettingsForm
-              orgId={orgId}
-              projectId={projectId}
-              initialName={project.name}
-              initialVertical={project.vertical ?? ''}
-              initialPlatformType={project.platform_type ?? 'web'}
-              initialBusinessModel={project.business_model ?? 'saas_subscription'}
-              initialTransactionType={project.transaction_type ?? 'monthly_recurring'}
-              initialPrimaryStack={project.primary_stack ?? 'custom_web'}
-            />
-          </PpCard>
+            progress={completeness}
+            subtext={t('kpiProfileSubtext', { filled, total: profileFields.length })}
+          />
+          <StatCard title={t('kpiCurrency')} value={project.currency || t('notDeclared')} icon={Coins} />
+          <StatCard title={t('kpiTimezone')} value={project.timezone || t('notDeclared')} icon={Clock} />
+          <StatCard title={t('kpiEnvironments')} value={String(environments.length)} icon={Layers} subtext={archived ? t('kpiArchived') : t('kpiActive')} />
         </div>
+      </PageHero>
 
-        <div className="lg:col-span-5 space-y-6">
-          <PpCard
-            title={t('governanceCardTitle')}
-            subtitle={t('governanceCardSubtitle')}
-            icon={Shield}
-            iconAccent="mint"
-          >
-            <div className="space-y-4 text-xs">
-              <div>
-                <span className="font-semibold text-pp-outline uppercase tracking-wider block mb-2">
-                  Live Marketing Connectors
-                </span>
-                {initialPlatforms.length === 0 ? (
-                  <p className="text-pp-outline py-2">{t('noCredentials')}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {initialPlatforms.slice(0, 3).map((platform) => (
-                      <div
-                        key={platform.name}
-                        className="flex items-center justify-between rounded-xl bg-pp-surface-container/30 p-2.5"
-                      >
-                        <div>
-                          <p className="font-semibold text-pp-on-surface">{platform.name}</p>
-                          <p className="text-[11px] text-pp-outline">{platform.type}</p>
-                        </div>
-                        <PpPill
-                          accent={
-                            platform.status === 'connected'
-                              ? 'mint'
-                              : platform.status === 'pending'
-                                ? 'amber'
-                                : 'error'
-                          }
-                          dot
-                        >
-                          {platform.status}
-                        </PpPill>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <ChartCard className="lg:col-span-2" title={t('formTitle')} description={t('formDescription')} icon={Settings}>
+          <ProjectSettingsForm
+            orgId={orgId}
+            projectId={projectId}
+            initialName={project.name}
+            initialVertical={project.vertical ?? ''}
+            initialCurrency={project.currency ?? ''}
+            initialTimezone={project.timezone ?? ''}
+          />
+        </ChartCard>
 
-              <div className="border-t border-pp-outline-variant/20 pt-3 space-y-3">
-                <span className="font-semibold text-pp-outline uppercase tracking-wider block">
-                  {t('securityEnforcements')}
-                </span>
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="font-semibold text-pp-on-surface">{t('hardware2fa')}</p>
-                    <p className="text-[11px] text-pp-outline">{t('hardware2faDesc')}</p>
-                  </div>
-                  <PpPill accent="mint" dot>{t('active')}</PpPill>
-                </div>
-                <div className="flex items-center justify-between py-1 border-t border-pp-outline-variant/20 pt-2">
-                  <div>
-                    <p className="font-semibold text-pp-on-surface">{t('auditTamper')}</p>
-                    <p className="text-[11px] text-pp-outline">{t('auditTamperDesc')}</p>
-                  </div>
-                  <PpPill accent="mint" dot>{t('active')}</PpPill>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-pp-surface-container/30 p-2.5">
-                  <span className="font-medium text-pp-on-surface">{t('dataRetention')}</span>
-                  <span className="rounded bg-pp-surface-container-lowest px-2 py-0.5 text-xs font-semibold text-pp-primary shadow-pp-candy">
-                    {t('retentionValue')}
-                  </span>
-                </div>
+        <div className="flex flex-col gap-6">
+          <ChartCard title={t('profileTitle')} icon={FolderKanban}>
+            <div className="flex items-center gap-3">
+              <InitialsAvatar name={project.name} seed={projectId} size="lg" />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-foreground">{project.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{project.vertical || t('notDeclared')}</p>
               </div>
             </div>
-          </PpCard>
+            <p className="mt-3 truncate rounded-lg bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground" dir="ltr">
+              {projectId}
+            </p>
+          </ChartCard>
+
+          <ChartCard title={t('environmentsTitle')} description={t('environmentsDescription')} icon={Layers}>
+            {environments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('environmentsNone')}</p>
+            ) : (
+              <ul className="flex flex-wrap gap-2">
+                {environments.map((environment) => (
+                  <li key={environment.id} className="rounded-full border border-border bg-background/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-foreground">
+                    {tEnv(environment.name)}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ChartCard>
         </div>
       </div>
 
-      {/* Full-width Detailed Governance, RBAC & Audit Hub */}
-      <AccountGovernanceHub
-        orgId={orgId}
-        projectId={projectId}
-        isDataConnected={true}
-        initialPlatforms={initialPlatforms}
-        initialMembers={initialMembers}
-        initialAuditLogs={initialAuditLogs}
-      />
-    </PpPage>
+      <section className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-5 shadow-sm">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Archive className="h-5 w-5 text-destructive" aria-hidden="true" />
+          {t('archiveHeading')}
+        </h2>
+        <p className="text-sm text-muted-foreground">{archived ? t('archivedNote', { at: project.archived_at ?? '' }) : t('archiveHelp')}</p>
+        <div>
+          <ArchiveProjectButton orgId={orgId} projectId={projectId} archived={archived} />
+        </div>
+      </section>
+    </div>
   );
 }

@@ -21,7 +21,7 @@ import type { MetricDefinitionInput } from '../../services/metric-registry.servi
  * `fact_subscription_event`) — real `dbt-transform` core models as of the
  * 2026-08-21 KAN-59 follow-up (`packages/dbt-transform/dbt/models/core/`),
  * derived from the generic `entities`/`events` tables plus Stripe's own
- * subscription-snapshot history (see `stg_stripe_subscription_history`'s own
+ * subscription-snapshot history (see `stg_subscription_history`'s own
  * doc comment). Before that follow-up these were aspirational-but-canonical
  * names with no real dbt model behind them — `metrics-compiler`'s
  * `test-catalog.ts` still uses that older convention for its own,

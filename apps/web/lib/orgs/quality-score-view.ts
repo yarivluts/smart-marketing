@@ -98,3 +98,23 @@ export function signupQualityScoreTierLabelKey(tier: SignupQualityScoreTier): st
       return tier;
   }
 }
+
+export interface QualityTierSlice {
+  tier: SignupQualityScoreTier;
+  count: number;
+  /** A theme token, so the donut reads low = red, medium = amber, high = green in light and dark. */
+  color: string;
+}
+
+const TIER_COLORS: Record<SignupQualityScoreTier, string> = {
+  low: 'hsl(var(--destructive))',
+  medium: 'hsl(var(--warning))',
+  high: 'hsl(var(--success))',
+};
+
+/** The score distribution as donut slices, low to high, dropping empty tiers so the ring has no zero-width gaps. */
+export function toQualityTierSlices(distribution: Readonly<Record<SignupQualityScoreTier, number>>): QualityTierSlice[] {
+  return (['low', 'medium', 'high'] as const)
+    .map((tier) => ({ tier, count: distribution[tier], color: TIER_COLORS[tier] }))
+    .filter((slice) => slice.count > 0);
+}

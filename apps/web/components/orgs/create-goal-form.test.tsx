@@ -106,3 +106,47 @@ describe('CreateGoalForm', () => {
     expect(push).not.toHaveBeenCalled();
   });
 });
+
+describe('CreateGoalForm on a ratio metric (KAN-213)', () => {
+  beforeEach(() => {
+    push.mockClear();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  function renderRatioForm(): void {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <CreateGoalForm orgId="org-1" projectId="project-1" metricCatalog={[{ name: 'lp_conversion_rate', dimensions: [], unit: 'ratio' }]} people={people} />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lift landing page conversion to 8%' } });
+    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-01' } });
+    fireEvent.change(screen.getByLabelText('Deadline'), { target: { value: '2026-12-31' } });
+  }
+
+  it('takes the target as a percent and sends the fraction: 8 is stored as 0.08', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ goal: { id: 'goal-1' } }) } as Response);
+    renderRatioForm();
+    expect(screen.getByText('In percent: 8 means 8%.')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Target value'), { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create goal' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as { targetValue: number };
+    expect(body.targetValue).toBe(0.08);
+  });
+
+  it('refuses a percent above 100 before sending anything', async () => {
+    renderRatioForm();
+    fireEvent.change(screen.getByLabelText('Target value'), { target: { value: '800' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create goal' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a value between 0 and 100.');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows no percent hint for a metric without a unit', () => {
+    renderForm();
+    expect(screen.queryByText('In percent: 8 means 8%.')).not.toBeInTheDocument();
+  });
+});

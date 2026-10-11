@@ -62,6 +62,11 @@ describe('parseMetricQueryRequestBody', () => {
     expect(() => parseMetricQueryRequestBody({ metric: 'cac', time: { start: '2026-01-01', grain: 'day' } })).toThrow(BadRequestException);
   });
 
+  it('accepts the "total" grain - the whole range as one bucket, a period value (B24)', () => {
+    const parsed = parseMetricQueryRequestBody({ metric: 'lp_conversion_rate', time: { ...VALID_TIME, grain: 'total', compare: 'previous_period' } });
+    expect(parsed.time).toEqual({ start: '2026-01-01', end: '2026-01-07', grain: 'total', compare: 'previous_period' });
+  });
+
   it('rejects an unknown time grain', () => {
     expect(() => parseMetricQueryRequestBody({ metric: 'cac', time: { ...VALID_TIME, grain: 'decade' } })).toThrow(BadRequestException);
   });

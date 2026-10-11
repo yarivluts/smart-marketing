@@ -7,6 +7,7 @@ import {
   CAMPAIGN_OPS_PACK_ROI_FORMULA_METRICS,
   type CampaignOpsPackMetricDefinition,
 } from './metrics';
+import { builtinMetricUnit } from '../builtin-metric-units';
 
 export * from './manifest';
 export * from './metrics';
@@ -31,6 +32,7 @@ async function registerOne(
       name: metric.name,
       definition: metric.definition,
       dimensions: metric.dimensions,
+      unit: builtinMetricUnit(metric.name),
       createdByUserId,
     });
     return 'registered';

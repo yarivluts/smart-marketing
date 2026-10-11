@@ -8,7 +8,6 @@ const refresh = vi.fn();
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ refresh }),
-  Link: ({ children, href, ...props }: any) => <a href={href} {...props}>{children}</a>,
 }));
 
 function renderForm(): void {
@@ -43,14 +42,7 @@ describe('ProjectSettingsForm', () => {
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Storefront',
-        vertical: 'fintech',
-        platformType: 'web',
-        businessModel: 'saas_subscription',
-        transactionType: 'monthly_recurring',
-        primaryStack: 'custom_web',
-      }),
+      body: JSON.stringify({ name: 'Storefront', vertical: 'fintech', currency: '', timezone: '' }),
     });
   });
 

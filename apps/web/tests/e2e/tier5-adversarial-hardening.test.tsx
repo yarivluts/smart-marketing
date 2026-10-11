@@ -22,6 +22,7 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 import {
+  copilotEngineMessages,
   renderWithIntl,
 } from './helpers/test-harness';
 import enMessages from '../../messages/en.json';
@@ -310,11 +311,9 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(zeroStarted[1].conversionPercent).toBe(0);
       expect(zeroStarted[1].dropOffPercent).toBe(0);
 
-      // 4. Null outcome fallback synthesis
-      const synthesized = buildVisualFunnelData(null, 'test-seed');
-      expect(synthesized.isSimulated).toBe(true);
-      expect(synthesized.steps.length).toBe(3);
-      expect(synthesized.overallConversionPercent).toBeGreaterThan(0);
+      // 4. Null outcome: reported as a failed query with no numbers. This used to assert a
+      // synthesized 3-step sample funnel with a positive conversion rate (Jira B15).
+      expect(buildVisualFunnelData(null)).toEqual({ kind: 'query_error' });
     });
 
     it('5.2.2 Inverted drop-offs: clamps drop-off percentage to 0% when a subsequent step has more users than preceding step', () => {
@@ -412,7 +411,6 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(getHeatmapCellColor(15)).toContain('bg-rose-500/20');
       expect(getHeatmapCellColor(0)).toContain('bg-muted/30');
 
-      const onSelectEvent = vi.fn();
       const mockCohortRow = {
         cohortMonth: '2026-01-01',
         cohortLabel: 'Jan 2026',
@@ -425,19 +423,13 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       };
 
       renderWithIntl(
-        <CohortRetentionMatrix
-          cohorts={[mockCohortRow]}
-          periodNumbers={[0, 1, 2]}
-          onSelectConversionEvent={onSelectEvent}
-        />,
+        <CohortRetentionMatrix cohorts={[mockCohortRow]} periodNumbers={[0, 1, 2]} projectName="EasySign" />,
       );
 
-      // Filter clicks
-      fireEvent.click(screen.getByTestId('filter-purchases'));
-      expect(onSelectEvent).toHaveBeenCalledWith('purchase');
-
-      fireEvent.click(screen.getByTestId('filter-sign-ins'));
-      expect(onSelectEvent).toHaveBeenCalledWith('sign_in');
+      expect(screen.getByTestId('retention-cell-2026-01-01-p1')).toHaveTextContent('65%');
+      // The Purchases / Sign-ins filter pills are gone: they relabelled the same all-activity
+      // matrix without re-querying anything (Jira B15).
+      expect(screen.queryByTestId('filter-purchases')).not.toBeInTheDocument();
     });
   });
 
@@ -445,42 +437,62 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
   // Module 3 (AI Copilot & Automation): Mixed Hebrew/English NLP commands, budget surge guardrails, emergency kill switch, 1-click rollback
   // =========================================================================
   describe('5.3 Module 3: AI Copilot & Automation Hardening', () => {
-    it('5.3.1 Mixed Hebrew/English NLP commands: parses all intent vectors, extracts budget numbers, and falls back gracefully', () => {
-      // Hebrew Budget Increase
-      const heBudget = processCopilotQuery('הגדל תקציב ל-400$', { locale: 'he' });
-      expect(heBudget.actionProposal).toBeDefined();
+    it('5.3.1 Mixed Hebrew/English NLP: acts only on campaigns that exist and declines what it cannot measure', () => {
+      /*
+        This used to call processCopilotQuery with no context at all and assert that it
+        still produced proposals - against `target-meta-1`, "Meta Retargeting Leads" at
+        "$150/day", and a rebalance labelled "Shift $500/day". None of those ids or figures
+        existed anywhere; the engine declared a CopilotContext and ignored it. Since the
+        chat panel POSTs an approved proposal to the real automation endpoint, the test was
+        pinning a path from a typed sentence to a budget change on a live ad account,
+        routed by invented identifiers.
+      */
+      const context = {
+        targets: [
+          { id: 'tgt-real-1', label: 'EasySign Brand', dailyBudgetUsd: 120, status: 'enabled' },
+        ],
+      };
+
+      const he = copilotEngineMessages('he');
+      const en = copilotEngineMessages('en');
+
+      // Hebrew budget increase, against the one real campaign.
+      const heBudget = processCopilotQuery('הגדל תקציב ל-400$', context, he);
       expect(heBudget.actionProposal?.actionType).toBe('budget_change');
+      expect(heBudget.actionProposal?.targetId).toBe('tgt-real-1');
+      expect(heBudget.actionProposal?.beforeValue).toBe('$120/day');
       expect(heBudget.actionProposal?.afterValue).toBe('$400/day');
-      expect(heBudget.message.role).toBe('assistant');
+      // No invented forecast attached to it.
+      expect(heBudget.actionProposal?.estimatedImpact).toBeUndefined();
 
-      // Hebrew Search Campaign Draft
-      const heDraft = processCopilotQuery('צור קמפיין חיפוש חדש לעורכי דין', { locale: 'he' });
+      // The same query with no campaigns to act on asks which campaign, and proposes nothing.
+      const heBudgetNoTargets = processCopilotQuery('הגדל תקציב ל-400$', {}, he);
+      expect(heBudgetNoTargets.actionProposal).toBeUndefined();
+      expect(heBudgetNoTargets.message.content).toBe(heMessages.CopilotEngine.noCampaign);
+
+      // Draft creation needs no prior measurement, only a budget.
+      const heDraft = processCopilotQuery('צור קמפיין חיפוש חדש לעורכי דין בתקציב 200', context, he);
       expect(heDraft.actionProposal?.actionType).toBe('campaign_draft_create');
-      expect(heDraft.message.content).toContain('טיוטת קמפיין');
 
-      // Hebrew Rebalancing
-      const heRebalance = processCopilotQuery('איזון תקציב בין גוגל למטא', { locale: 'he' });
-      expect(heRebalance.actionProposal?.actionType).toBe('budget_change');
-      expect(heRebalance.actionProposal?.targetLabel).toContain('Shift $500/day');
-
-      // Hebrew Campaign Pause
-      const hePause = processCopilotQuery('השהה קמפיין עם CAC גבוה', { locale: 'he' });
+      // Pause resolves the real campaign rather than a hardcoded "low ROAS" one.
+      const hePause = processCopilotQuery('השהה קמפיין', context, he);
       expect(hePause.actionProposal?.actionType).toBe('campaign_activation');
+      expect(hePause.actionProposal?.targetId).toBe('tgt-real-1');
       expect(hePause.actionProposal?.afterValue).toBe('PAUSED');
 
-      // English Top Performing Ads
-      const enAds = processCopilotQuery('What are our top performing ads this week?', { locale: 'en' });
-      expect(enAds.message.content).toContain('top-performing ads this week');
+      // Rebalancing and "top performing" both need performance figures nothing measures.
+      const heRebalance = processCopilotQuery('איזון תקציב בין גוגל למטא', context, he);
+      expect(heRebalance.actionProposal).toBeUndefined();
+      expect(heRebalance.message.content).toBe(heMessages.CopilotEngine.noPerformanceData);
+
+      const enAds = processCopilotQuery('What are our top performing ads this week?', {}, en);
       expect(enAds.actionProposal).toBeUndefined();
+      expect(enAds.message.content).toContain('no performance data');
 
-      // Mixed Hebrew & English BiDi string
-      const mixedQuery = processCopilotQuery('תעשה shift budget ל-Meta Ads בבקשה', { locale: 'he' });
-      expect(mixedQuery.actionProposal?.actionType).toBe('budget_change');
-
-      // Unrecognized fallback
-      const unknownQuery = processCopilotQuery('random unparseable sentence 12345', { locale: 'en' });
+      // Unrecognized fallback.
+      const unknownQuery = processCopilotQuery('random unparseable sentence', {}, en);
       expect(unknownQuery.actionProposal).toBeUndefined();
-      expect(unknownQuery.message.content).toContain('How can I help you optimize');
+      expect(unknownQuery.message.content).toContain('How can I help you');
     });
 
     it('5.3.2 Budget surge & multi-constraint guardrails: strictly enforces 50% max daily increase, spend ceilings, protected targets, allowed UTC hours', () => {
@@ -639,15 +651,19 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(emptyHe).toHaveLength(0);
     });
 
-    it('5.4.2 Zero-division resilience: cac and roas calculations return 0 and never throw NaN / Infinity on zero values', () => {
-      // CAC
-      expect(calculateBlendedCac(0, 0)).toBe(0);
-      expect(calculateBlendedCac(5000, 0)).toBe(0);
+    it('5.4.2 Zero-division resilience: cac and roas return null on an undefined ratio and never NaN / Infinity', () => {
+      /*
+        These used to expect 0. A CAC of 0 reads as "we acquire customers for free" and a
+        ROAS of 0 as "this spend returned nothing", but both cases here mean the ratio has
+        no denominator - which is a different statement, and the one the UI must render as
+        "No data". A real measured 0 still comes back as 0 (last assertion of each pair).
+      */
+      expect(calculateBlendedCac(0, 0)).toBeNull();
+      expect(calculateBlendedCac(5000, 0)).toBeNull();
       expect(calculateBlendedCac(0, 50)).toBe(0);
 
-      // ROAS
-      expect(calculateBlendedRoas(0, 0)).toBe(0);
-      expect(calculateBlendedRoas(5000, 0)).toBe(0);
+      expect(calculateBlendedRoas(0, 0)).toBeNull();
+      expect(calculateBlendedRoas(5000, 0)).toBeNull();
       expect(calculateBlendedRoas(0, 500)).toBe(0);
 
       // Full Synthesizer with zero data
@@ -669,38 +685,37 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(Number.isFinite(zeroMetrics.blendedRoas)).toBe(true);
     });
 
-    it('5.4.3 Period-over-period time-window scaling: scales 7d (7/30), 30d (1.0), and 90d (3.0) metrics with 100% channel sum parity', () => {
-      // 30d baseline
-      const report30d = buildExecutiveReportData({ timeWindow: '30d', seed: 'test-scaling' });
-      // 7d scaled
-      const report7d = buildExecutiveReportData({ timeWindow: '7d', seed: 'test-scaling' });
-      // 90d scaled
-      const report90d = buildExecutiveReportData({ timeWindow: '90d', seed: 'test-scaling' });
+    it('5.4.3 Time-window switching reports no data for an unmeasured project and still renders the controls', () => {
+      /*
+        This assertion used to be that 7d spend was LESS than 30d spend and 90d GREATER —
+        for a project with no targets and no warehouse rows. Nothing was being scaled: the
+        builder invented a baseline of $8,500 Meta / $5,750 Google and multiplied it by
+        7/30, 1.0 or 3.0, so the test confirmed the arithmetic of a fabrication. With no
+        measurements there is nothing to scale and nothing to compare.
+      */
+      const report30d = buildExecutiveReportData({ timeWindow: '30d' });
+      const report7d = buildExecutiveReportData({ timeWindow: '7d' });
+      const report90d = buildExecutiveReportData({ timeWindow: '90d' });
 
-      expect(report7d.metrics.totalSpendUsd).toBeLessThan(report30d.metrics.totalSpendUsd);
-      expect(report90d.metrics.totalSpendUsd).toBeGreaterThan(report30d.metrics.totalSpendUsd);
-
-      // Channel allocation percentage sums to 100% across all windows
       for (const report of [report7d, report30d, report90d]) {
-        const totalPct = report.channels.reduce((sum, c) => sum + c.percentage, 0);
-        expect(totalPct).toBe(100);
+        expect(report.metrics.totalSpendUsd).toBeNull();
+        expect(report.channels).toHaveLength(0);
       }
 
-      // Render ExecutiveBlendedReport and test time-window filter buttons
-      renderWithIntl(<ExecutiveBlendedReport seed="test-scaling" />);
+      /*
+        The component no longer offers 7 / 30 / 90 day pills. They changed nothing but their own
+        highlight - spend is only ever measured over a trailing 30 days - so "7 Days" relabelled
+        30-day spend. It now states the one window it has, and with no spend it shows neither a
+        "Live" badge nor the 50/50 channel split it used to fall back to.
+      */
+      renderWithIntl(<ExecutiveBlendedReport />);
 
-      const btn7d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window7d });
-      const btn30d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window30d });
-      const btn90d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window90d });
-
-      expect(btn7d).toBeInTheDocument();
-      expect(btn30d).toBeInTheDocument();
-      expect(btn90d).toBeInTheDocument();
-
-      // Click 7d
-      fireEvent.click(btn7d);
-      // Click 90d
-      fireEvent.click(btn90d);
+      expect(screen.queryByRole('button', { name: enMessages.ExecutiveReport.window7d })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: enMessages.ExecutiveReport.window90d })).not.toBeInTheDocument();
+      expect(screen.getByTestId('report-window-label')).toHaveTextContent(enMessages.ExecutiveReport.timeRange30d);
+      expect(screen.queryByTestId('zero-config-badge')).not.toBeInTheDocument();
+      expect(screen.getByTestId('channel-allocation-empty')).toBeInTheDocument();
+      expect(screen.queryByTestId('channel-split-bar')).not.toBeInTheDocument();
     });
   });
 });

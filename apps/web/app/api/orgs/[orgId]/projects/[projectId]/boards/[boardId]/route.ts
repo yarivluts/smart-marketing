@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { BoardNotFoundError, InvalidBoardError } from '@growthos/firebase-orm-models';
 import { deleteBoard, updateBoardSettings } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseUpdateBoardSettingsRequestBody } from '@/lib/orgs/parse-board-fields';
 import { toBoardView } from '@/lib/orgs/board-view';
 
@@ -12,7 +12,7 @@ interface RouteParams {
 /** Renames a board and/or updates its board-level date range, compare period, and global filters (KAN-60, plan `10 §2.2`). Every field is optional — only what's sent is changed. */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, boardId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
 /** Deletes a board outright (audit-logged — see `deleteBoard`'s own doc comment). */
 export async function DELETE(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, boardId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

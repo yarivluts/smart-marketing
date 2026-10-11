@@ -27,7 +27,7 @@ describe('validateAgainstSchema', () => {
 
   it('does NOT implicitly allow the envelope fields on entity/measure kinds — only events carry snippet properties', () => {
     expect(validateAgainstSchema({ plan: 'pro', anon_id: 'anon-1' }, planOnly, 'entity')).toEqual(['unregistered_field:anon_id']);
-    expect(validateAgainstSchema({ plan: 'pro', anon_id: 'anon-1' }, planOnly)).toEqual(['unregistered_field:anon_id']);
+    expect(validateAgainstSchema({ plan: 'pro', anon_id: 'anon-1' }, planOnly, 'measure')).toEqual(['unregistered_field:anon_id']);
   });
 
   it('an explicit declaration of an envelope field wins over the implicit rule (its own declared type applies)', () => {

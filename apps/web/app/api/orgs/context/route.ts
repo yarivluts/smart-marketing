@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
-import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
-import { listOrgProjects } from '@/lib/orgs/queries';
-import { parseProjectProfile } from '@/lib/projects/project-profile';
 
 /**
  * Feeds the client-side `OrgProvider`/`PermissionProvider` (see
@@ -19,31 +16,5 @@ export async function GET(): Promise<NextResponse> {
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-
-  const membershipsWithProjects = await Promise.all(
-    memberships.map(async (m) => {
-      if (!isActiveMembershipStatus(m.status)) {
-        return m;
-      }
-      try {
-        const rawProjects = await listOrgProjects(m.organizationId);
-        const projects = rawProjects.map((p) => {
-          const profile = parseProjectProfile(p);
-          return {
-            id: p.id,
-            name: p.name,
-            platformType: profile.platformType,
-            businessModel: profile.businessModel,
-            primaryStack: profile.primaryStack,
-            verifiedRequirements: p.verified_requirements || [],
-          };
-        });
-        return { ...m, projects };
-      } catch {
-        return m;
-      }
-    }),
-  );
-
-  return NextResponse.json({ userId: user.id, memberships: membershipsWithProjects, bindings });
+  return NextResponse.json({ userId: user.id, memberships, bindings });
 }

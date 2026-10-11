@@ -1,7 +1,15 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createBoard, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, registerMetricDefinition } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createBoard,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+  registerMetricDefinition,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { PUT } from './route';
 
@@ -46,6 +54,21 @@ async function setupOrgProjectBoard(orgName: string) {
   });
   const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
   return { ownerSession, owner, organization, project, board };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function putRequest(
@@ -117,5 +140,16 @@ describe('PUT /api/orgs/[orgId]/projects/[projectId]/boards/[boardId]/tiles', ()
     const body = (await response.json()) as { board: { tiles: Array<{ id: string }> } };
     expect(body.board.tiles).toHaveLength(1);
     expect(body.board.tiles[0].id).toBe('tile-1');
+  });
+
+  it('KAN-136: lets a project-scoped editor save a tile layout in THEIR OWN project', async () => {
+    const { ownerSession, organization, project, board } = await setupOrgProjectBoard('Board Tiles Project-Scoped Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'editor', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = putRequest(organization.id, project.id, board.id, { tiles: [validTile] });
+    const response = await PUT(request, { params });
+    expect(response.status).toBe(200);
   });
 });

@@ -1,4 +1,18 @@
-import { checkRecordEnvelope, type RawRecordModel, type SchemaFieldDef } from '@growthos/firebase-orm-models';
+import {
+  checkRecordEnvelope,
+  IMPLICIT_EVENT_ENVELOPE_FIELDS,
+  type RawRecordModel,
+  type SchemaFieldDef,
+} from '@growthos/firebase-orm-models';
+
+/**
+ * The identity keys every event record can carry in its `properties` without the schema declaring
+ * them (`IMPLICIT_EVENT_ENVELOPE_FIELDS`: `anon_id`, `customer_id`) — the exact values identity
+ * stitching (`bridge_identity`, `fact_attribution`, the funnel query) joins on. The record feed
+ * surfaces them on their own labelled line, because a record that renders only its declared fields
+ * hides precisely the two values an integrator needs when attribution or the funnel does not join up.
+ */
+export const RECORD_FEED_IDENTITY_KEYS: readonly string[] = IMPLICIT_EVENT_ENVELOPE_FIELDS;
 
 /** A redaction placeholder standing in for any `is_pii` field's value — never sent to the client at all, unlike `billing-ops-view.ts`'s Stripe-specific fields (none of which are declared PII). */
 const REDACTED_VALUE = '••••••';
@@ -37,6 +51,39 @@ export interface RecordFeedEntryView {
   clientId: string;
   landedAt: string;
   fields: RecordFeedFieldView[];
+  /**
+   * The record's identity keys (`RECORD_FEED_IDENTITY_KEYS`) that are actually present in its
+   * `properties`, in that fixed order — empty for a record carrying neither, and always empty for a
+   * non-event record (only events carry the implicit envelope fields). A key the schema explicitly
+   * declares `is_pii` is redacted exactly like any other PII field. Declared identity keys appear
+   * here rather than also in `fields`, so the same value never renders twice.
+   */
+  identity: RecordFeedFieldView[];
+}
+
+function isIdentityKey(name: string): boolean {
+  return RECORD_FEED_IDENTITY_KEYS.includes(name);
+}
+
+/**
+ * The field names the record feed's filter may offer for one schema: its declared non-PII fields
+ * (identity keys excluded, they get their own group) and, for an event schema, the identity keys —
+ * unless the schema itself declares one `is_pii`, in which case filtering on it would round-trip a
+ * PII value through the page's own query string. The server-side filter already reads these from
+ * the same `properties` map (`matchesFieldFilter` in `pipeline.service.ts`), so no query change is
+ * needed for an undeclared identity key to be filterable.
+ */
+export function recordFeedFilterOptions(
+  kind: RawRecordModel['kind'],
+  fieldDefs: readonly SchemaFieldDef[],
+): { declared: string[]; identity: string[] } {
+  const piiNames = new Set(fieldDefs.filter((fieldDef) => fieldDef.is_pii).map((fieldDef) => fieldDef.name));
+  return {
+    declared: fieldDefs
+      .filter((fieldDef) => !fieldDef.is_pii && (kind !== 'event' || !isIdentityKey(fieldDef.name)))
+      .map((fieldDef) => fieldDef.name),
+    identity: kind === 'event' ? RECORD_FEED_IDENTITY_KEYS.filter((name) => !piiNames.has(name)) : [],
+  };
 }
 
 export function toRecordFeedEntryView(record: RawRecordModel, fieldDefs: readonly SchemaFieldDef[]): RecordFeedEntryView {
@@ -49,15 +96,30 @@ export function toRecordFeedEntryView(record: RawRecordModel, fieldDefs: readonl
   // ingest path (only caught once a real end-to-end record — not a hand-built flat-payload test
   // fixture — was rendered through this view).
   const { fieldsToValidate } = checkRecordEnvelope(record.kind, record.payload);
+  const isEvent = record.kind === 'event';
+  const piiNames = new Set(fieldDefs.filter((fieldDef) => fieldDef.is_pii).map((fieldDef) => fieldDef.name));
+  const identity: RecordFeedFieldView[] = isEvent
+    ? RECORD_FEED_IDENTITY_KEYS.flatMap((name) => {
+        const value = stringifyPayloadValue(fieldsToValidate[name]);
+        if (value === '') {
+          return [];
+        }
+        const isPii = piiNames.has(name);
+        return [{ name, value: isPii ? REDACTED_VALUE : value, isPii }];
+      })
+    : [];
   return {
     id: record.id,
     environmentId: record.environment_id,
     clientId: record.client_id,
     landedAt: record.landed_at,
-    fields: fieldDefs.map((fieldDef) => ({
-      name: fieldDef.name,
-      value: fieldDef.is_pii ? REDACTED_VALUE : stringifyPayloadValue(fieldsToValidate[fieldDef.name]),
-      isPii: fieldDef.is_pii,
-    })),
+    fields: fieldDefs
+      .filter((fieldDef) => !isEvent || !isIdentityKey(fieldDef.name))
+      .map((fieldDef) => ({
+        name: fieldDef.name,
+        value: fieldDef.is_pii ? REDACTED_VALUE : stringifyPayloadValue(fieldsToValidate[fieldDef.name]),
+        isPii: fieldDef.is_pii,
+      })),
+    identity,
   };
 }

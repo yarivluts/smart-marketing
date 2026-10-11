@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidSessionReplayUrlTemplateError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
+import { sessionReplayTemplateFiltersByPage } from '@growthos/shared';
 import { setProjectSessionReplayUrlTemplate } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
@@ -39,7 +40,12 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       template,
       setByUserId: user.id,
     });
-    return NextResponse.json({ template: project.session_replay_url_template ?? '' }, { status: 200 });
+    // `filtersByPage` is reported, not inferred by the client: a template
+    // without the placeholder saves successfully and renders links on every
+    // row, all of them opening the same unfiltered page. Success alone does not
+    // tell the admin which of the two they configured (KAN-160).
+    const saved = project.session_replay_url_template ?? '';
+    return NextResponse.json({ template: saved, filtersByPage: sessionReplayTemplateFiltersByPage(saved) }, { status: 200 });
   } catch (err) {
     if (err instanceof ProjectNotFoundError) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });

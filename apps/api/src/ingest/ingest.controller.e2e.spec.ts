@@ -2,7 +2,7 @@ import type { AddressInfo } from 'node:net';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
-  connectFirestoreOrm,
+  connectFirestoreOrmAdmin,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
@@ -30,7 +30,14 @@ let baseUrl: string;
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';
   process.env.FIREBASE_PROJECT_ID = 'demo-growthos-test';
-  await connectFirestoreOrm({ projectId: 'demo-growthos-test', emulatorHost: '127.0.0.1:8100' });
+  // Admin SDK, not the client SDK (KAN-128). These specs previously called
+  // connectFirestoreOrm against the emulator, which is the gRPC Listen stream
+  // that corrupts - the signature being RESOURCE_EXHAUSTED with a nonsense
+  // multi-gigabyte size, a garbage length prefix rather than a real message. It
+  // failed CI on documentation-only pull requests. The Admin SDK reads
+  // FIRESTORE_EMULATOR_HOST from the environment itself and opens no long-lived
+  // stream, so there is no framing to lose.
+  await connectFirestoreOrmAdmin({ projectId: 'demo-growthos-test' });
 
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   app = moduleRef.createNestApplication();
@@ -70,6 +77,18 @@ async function setupProjectWithKey(orgName: string, scopes: ('ingest.write' | 'm
 }
 
 describe('IngestController (e2e)', () => {
+  it('serves the ingest contract without a key, while the ingest routes still require one (KAN-202 I1)', async () => {
+    const res = await fetch(`${baseUrl}/v1/ingest/contract`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
+    expect(body.openapi).toBe('3.1.0');
+    expect(Object.keys(body.paths)).toContain('/ingest/events');
+
+    // The contract route must not have loosened its siblings: batches still needs a key.
+    const batch = await fetch(`${baseUrl}/v1/ingest/batches/any-id`);
+    expect(batch.status).toBe(401);
+  });
+
   it('rejects (401) a request with no Authorization header', async () => {
     const res = await fetch(`${baseUrl}/v1/ingest/events`, {
       method: 'POST',
@@ -121,6 +140,70 @@ describe('IngestController (e2e)', () => {
     expect(res.status).toBe(400);
   });
 
+  describe('POST /v1/ingest/(events|entities|measures)/validate (KAN-202 I3)', () => {
+    it('returns what ingest would do with each record, and stores nothing', async () => {
+      const { organization, project, owner, rawKey } = await setupProjectWithKey('Validate Endpoint Org');
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'order_completed',
+        fields: [{ name: 'net', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      });
+      const batch = [
+        { event_id: 'v-ok', event: 'order_completed', ts: '2026-07-03T10:15:00Z', properties: { net: 1 } },
+        { event_id: 'v-bad', event: 'order_completed', ts: '2026-07-03T10:15:00Z', properties: { net: 1, coupon: 'X' } },
+      ];
+
+      const res = await fetch(`${baseUrl}/v1/ingest/events/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${rawKey}` },
+        body: JSON.stringify({ batch }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        kind: 'event',
+        total: 2,
+        valid: 1,
+        invalid: 1,
+        records: [
+          { client_id: 'v-ok', status: 'valid' },
+          { client_id: 'v-bad', status: 'invalid', reasons: ['unregistered_field:coupon'] },
+        ],
+      });
+
+      // Nothing was claimed: the same valid record then ingests as new, not as a duplicate.
+      const ingest = await fetch(`${baseUrl}/v1/ingest/events`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${rawKey}` },
+        body: JSON.stringify({ batch: [batch[0]] }),
+      });
+      expect(await ingest.json()).toMatchObject({ accepted: 1, duplicates: 0 });
+    });
+
+    it('validates entities against the batch type, and needs the same key and scope as ingest', async () => {
+      const { rawKey } = await setupProjectWithKey('Validate Entities Org');
+      const res = await fetch(`${baseUrl}/v1/ingest/entities/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${rawKey}` },
+        body: JSON.stringify({ type: 'customer', records: [{ id: 'cus_1', attributes: { plan: 'pro' } }] }),
+      });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ kind: 'entity', invalid: 1, records: [{ client_id: 'cus_1', reasons: ['schema_not_registered:customer'] }] });
+
+      const { rawKey: metricsOnlyKey } = await setupProjectWithKey('Validate Scope Org', ['metrics.write']);
+      const forbidden = await fetch(`${baseUrl}/v1/ingest/measures/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${metricsOnlyKey}` },
+        body: JSON.stringify({ records: [{ measure: 'ad_spend', ts: '2026-07-03T00:00:00Z', value: 1 }] }),
+      });
+      expect(forbidden.status).toBe(403);
+      const unauthenticated = await fetch(`${baseUrl}/v1/ingest/events/validate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch: [] }) });
+      expect(unauthenticated.status).toBe(401);
+    });
+  });
+
   it('accepts a valid event batch (202 + batch_id) and the batch is queryable per-record via GET /batches/{id}', async () => {
     const { organization, project, owner, rawKey } = await setupProjectWithKey('Full Flow Org');
     await registerSchemaDefinition({
@@ -143,9 +226,28 @@ describe('IngestController (e2e)', () => {
       }),
     });
     expect(postRes.status).toBe(202);
-    const posted = (await postRes.json()) as { batch_id: string; accepted: number; quarantined: number };
+    const posted = (await postRes.json()) as {
+      batch_id: string;
+      accepted: number;
+      quarantined: number;
+      rejected?: { client_id: string; status: string; reasons?: string[] }[];
+    };
     expect(posted.accepted).toBe(1);
     expect(posted.quarantined).toBe(1);
+
+    /*
+      The reason comes back inline, on the POST itself.
+
+      It was computed during validation and then dropped at the controller boundary, so a
+      caller read 202 with quarantined: 1 and had to already know that
+      GET /v1/ingest/batches/{id} existed - nothing in the response mentions it - to find out
+      what was wrong. That is the difference between a sender who fixes their payload and one
+      who ships a silent integration.
+    */
+    expect(posted.rejected).toHaveLength(1);
+    expect(posted.rejected?.[0].client_id).toBe('ord_5002-evt');
+    expect(posted.rejected?.[0].status).toBe('quarantined');
+    expect(posted.rejected?.[0].reasons?.length ?? 0).toBeGreaterThan(0);
 
     const getRes = await fetch(`${baseUrl}/v1/ingest/batches/${posted.batch_id}`, {
       headers: { Authorization: `Bearer ${rawKey}` },

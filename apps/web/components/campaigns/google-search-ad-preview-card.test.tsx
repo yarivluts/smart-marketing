@@ -31,6 +31,22 @@ describe('GoogleSearchAdPreviewCard', () => {
     expect(screen.getByText('contract automation')).toBeInTheDocument();
   });
 
+  // Same reasoning as the Meta card: an absent final URL must not render as a real domain.
+  it('drops the breadcrumb entirely when the ad has no final URL', () => {
+    renderWithIntl(
+      <GoogleSearchAdPreviewCard
+        campaignName="Google Search - Commercial"
+        headlines={['Electronic Signature Tool']}
+        descriptions={['Close deals faster with automated signing workflows.']}
+        finalUrl=""
+      />,
+    );
+
+    expect(screen.queryByText(/growthos\.io/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/› ads ›/)).not.toBeInTheDocument();
+    expect(screen.getByText('Electronic Signature Tool')).toBeInTheDocument();
+  });
+
   it('renders in Hebrew RTL with correct translation', () => {
     renderWithIntl(
       <GoogleSearchAdPreviewCard

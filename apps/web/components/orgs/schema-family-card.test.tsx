@@ -47,6 +47,15 @@ describe('SchemaFamilyCard', () => {
     expect(screen.getByText('currency')).toBeInTheDocument();
   });
 
+  it('shows the active version up front and keeps superseded ones one click away', () => {
+    renderCard();
+    const superseded = screen.getByText('v1 — Superseded').closest('details');
+    expect(superseded).not.toBeNull();
+    expect(superseded).not.toHaveAttribute('open');
+    expect(screen.getByText('v2 — Active').closest('details')).toBeNull();
+    expect(screen.getByText('2 fields · 2 versions')).toBeInTheDocument();
+  });
+
   it('opens an evolve form prefilled from the latest version when Evolve is clicked', () => {
     renderCard();
     fireEvent.click(screen.getByRole('button', { name: 'Evolve' }));

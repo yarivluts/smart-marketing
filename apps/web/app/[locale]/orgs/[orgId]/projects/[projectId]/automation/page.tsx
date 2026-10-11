@@ -7,7 +7,6 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import {
   getActiveAutomationGuardrailPolicy,
   getAutomationKillSwitchStatus,
-  getCampaignSpendBreakdownForProject,
   listActiveAttachmentsForProject,
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
@@ -15,6 +14,7 @@ import {
   listSharedCredentials,
   queryProjectFunnelSteps,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   toAutomationActionView,
   toAutomationConnectionOptions,
@@ -22,11 +22,13 @@ import {
   toAutomationTargetView,
 } from '@/lib/orgs/automation-view';
 import { AutomationHubDashboard } from '@/components/orgs/automation-hub-dashboard';
+import { Workflow } from 'lucide-react';
+import { ChartCard, FlowDiagram, type VizStatus } from '@/components/viz';
+import { ACTION_LIFECYCLE_EDGES, actionStatusLabelKey, countActionsByStatus } from '@/lib/orgs/automation-view';
+import type { AutomationActionStatus } from '@growthos/firebase-orm-models';
 import { synthesizeProactiveRecommendations } from '@/lib/orgs/recommendation-synthesizer';
-import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
-import { calculateFunnelStepItems, type FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
-
-import { PpPage } from '@/components/pastel/primitives';
+import { calculateFunnelStepItems } from '@/lib/orgs/funnel-goals-synthesizer';
+import type { FunnelStepsOutcome } from '@growthos/firebase-orm-models';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -55,22 +57,12 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  if (!membership || !can(bindings, principal, 'automation.execute', { orgId })) {
+  if (!membership || !can(bindings, principal, 'automation.execute', { orgId, projectId })) {
     notFound();
   }
-  const canApprove = can(bindings, principal, 'automation.approve', { orgId });
+  const canApprove = can(bindings, principal, 'automation.approve', { orgId, projectId });
 
-  const [
-    projects,
-    killSwitchStatus,
-    policy,
-    targets,
-    actions,
-    activeAttachments,
-    credentials,
-    spendOutcome,
-    funnelOutcome,
-  ] = await Promise.all([
+  const [projects, killSwitchStatus, policy, targets, actions, activeAttachments, credentials] = await Promise.all([
     listOrgProjects(orgId),
     getAutomationKillSwitchStatus(orgId),
     getActiveAutomationGuardrailPolicy(orgId, projectId),
@@ -78,59 +70,95 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     listAutomationActionsForProject(orgId, projectId),
     listActiveAttachmentsForProject(orgId, projectId),
     listSharedCredentials(orgId),
-    getCampaignSpendBreakdownForProject(orgId, projectId).catch(() => ({ ok: false as const, reason: 'query_error' as const })),
-    queryProjectFunnelSteps(orgId, projectId).catch(() => null),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/automation`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
   const targetViews = targets.map(toAutomationTargetView);
   const actionViews = actions.map(toAutomationActionView);
   const connectionOptions = toAutomationConnectionOptions(activeAttachments, credentials);
 
-  // Build unified campaign items joining Firestore targets with BigQuery spend breakdown
-  const { items: unifiedCampaigns } = buildUnifiedAdsCockpitData(
-    targetViews,
-    spendOutcome && spendOutcome.ok ? spendOutcome : null,
-  );
+  /*
+    Proactive recommendations, built from what this project has actually measured.
 
-  // Filter out campaigns that lack real spend data to prevent displaying fabricated metrics (KAN-294 / KAN-300 follow-up)
-  const liveUnifiedCampaigns =
-    spendOutcome && spendOutcome.ok && spendOutcome.rows.length > 0
-      ? unifiedCampaigns.filter((c) => {
-          const row = spendOutcome.rows.find(
-            (r) => r.campaignId === c.campaignResourceName || r.campaignId === c.id || r.campaignId === c.label,
-          );
-          return Boolean(row && row.actualSpend > 0);
-        })
-      : [];
+    This page used to hand the recommender a literal for every performance field - the same
+    `roas: 3.8`, `conversions: 45`, `cpaUsd: 18`, `clicks: 1000`, `impressions: 40000` for
+    every campaign, and `spend30dUsd` as `dailyBudgetUsd * 20` - plus a hardcoded two-step
+    funnel with a 62% drop-off. None of it came from anywhere.
 
-  // Derive real funnel steps without hardcoded fabricated fallback
-  const funnelSteps: FunnelStepItem[] =
-    funnelOutcome && funnelOutcome.ok && funnelOutcome.steps.length > 0
-      ? calculateFunnelStepItems(
-          funnelOutcome.steps.map((s, idx) => ({
-            stageKey: s.stageKey,
-            stepOrder: s.stepOrder ?? idx,
-            customerCount: s.customerCount,
-            conversionRateFromFirst: s.conversionRateFromFirst,
-          })),
-        )
-      : [];
+    That was not only invented, it defeated the guard added when
+    `recommendation-synthesizer` was fixed to skip campaigns without a measured ROAS: a
+    literal 3.8 is never null, so the "scale this high-performing campaign" branch fired for
+    every campaign on every project - and it is approvable against a real ad account. The
+    constant also sat permanently above the 3.5 threshold and below nothing, so the opposite
+    branch (pause a campaign under 1.8) could never fire at all.
 
-  // Synthesize proactive recommendations based on live verified campaign stats and real funnel steps
+    Nothing measures ROAS, conversions, CTR or CPA yet, so those stay null and the
+    ROAS-driven recommendations correctly produce nothing. The funnel is the project's own or
+    absent - never a stand-in.
+  */
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  let funnelOutcome: FunnelStepsOutcome | null = null;
+  try {
+    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId, { environmentId: selectedEnvironment?.id });
+  } catch {
+    funnelOutcome = null;
+  }
+
+  const funnelSteps =
+    funnelOutcome && funnelOutcome.ok ? calculateFunnelStepItems(funnelOutcome.steps) : [];
+
   const proactiveRecs = synthesizeProactiveRecommendations(
-    liveUnifiedCampaigns,
+    targetViews.map((tv) => ({
+      id: tv.id,
+      targetId: tv.id,
+      label: tv.label,
+      platform: 'meta_ads' as const,
+      status: (tv.campaignStatus || 'enabled') as 'enabled' | 'paused' | 'removed' | 'none',
+      // Real: it is the budget the campaign is configured with.
+      dailyBudgetUsd: tv.dailyBudgetUsd,
+      spend30dUsd: null,
+      impressions: null,
+      clicks: null,
+      ctrPct: null,
+      cpaUsd: null,
+      conversions: null,
+      roas: null,
+    })),
     funnelSteps,
   );
 
+  const tAutomation = await getTranslations('Automation');
+  const statusCounts = countActionsByStatus(actionViews);
+  // How each state reads at a glance: problems red, waiting amber, done green, empty grey.
+  const lifecycleTone: Record<AutomationActionStatus, VizStatus> = {
+    proposed: 'ok',
+    blocked: 'error',
+    awaiting_approval: 'warn',
+    rejected: 'idle',
+    approved: 'ok',
+    executed: 'ok',
+    failed: 'error',
+    verified: 'ok',
+    rolled_back: 'warn',
+  };
+  const lifecycleNodes = (Object.keys(statusCounts) as AutomationActionStatus[]).map((status) => ({
+    id: status,
+    label: tAutomation(actionStatusLabelKey(status)),
+    value: String(statusCounts[status]),
+    status: statusCounts[status] > 0 ? lifecycleTone[status] : ('idle' as const),
+  }));
+  const lifecycleEdges = ACTION_LIFECYCLE_EDGES.map(([source, target]) => ({
+    source,
+    target,
+    animated: statusCounts[target] > 0,
+    status: statusCounts[target] > 0 ? lifecycleTone[target] : ('idle' as const),
+  }));
+
   return (
-    <PpPage>
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
       <AutomationHubDashboard
         orgId={orgId}
         projectId={projectId}
@@ -144,7 +172,10 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
         canExecute={true}
         canApprove={canApprove}
       />
-    </PpPage>
+      <ChartCard title={tAutomation('lifecycleTitle')} description={tAutomation('lifecycleDescription')} icon={Workflow}>
+        <FlowDiagram label={tAutomation('lifecycleTitle')} nodes={lifecycleNodes} edges={lifecycleEdges} height={300} />
+      </ChartCard>
+    </div>
   );
 }
 

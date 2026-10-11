@@ -1,7 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST as register } from '../route';
 import { POST as evolve } from './route';
@@ -37,7 +43,22 @@ async function setupOrgProject(orgName: string) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
-  return { ownerSession, organization, project };
+  return { ownerSession, owner, organization, project };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function request(orgId: string, projectId: string, path: 'metric-defs' | 'metric-defs/evolve', body: unknown) {
@@ -100,6 +121,34 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve', () =>
     expect(body.metricDef.dimensions).toEqual(['channel', 'campaign']);
   });
 
+  it('registers with a unit, keeps it on an evolve that omits it, and clears it with null (KAN-213)', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Evolve Metric Unit Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const registerReq = request(organization.id, project.id, 'metric-defs', { ...adSpendV1, unit: 'currency:usd' });
+    const registered = await register(registerReq.request, { params: registerReq.params });
+    expect(registered.status).toBe(201);
+    expect(((await registered.json()) as { metricDef: { unit: string | null } }).metricDef.unit).toBe('currency:USD');
+
+    const keep = request(organization.id, project.id, 'metric-defs/evolve', adSpendV1);
+    const kept = await evolve(keep.request, { params: keep.params });
+    expect(((await kept.json()) as { metricDef: { unit: string | null } }).metricDef.unit).toBe('currency:USD');
+
+    const clear = request(organization.id, project.id, 'metric-defs/evolve', { ...adSpendV1, unit: null });
+    const cleared = await evolve(clear.request, { params: clear.params });
+    expect(((await cleared.json()) as { metricDef: { version: number; unit: string | null } }).metricDef).toMatchObject({ version: 3, unit: null });
+
+    const bad = request(organization.id, project.id, 'metric-defs/evolve', { ...adSpendV1, unit: 'fraction' });
+    const refused = await evolve(bad.request, { params: bad.params });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { reasons: string[] }).reasons.join(' ')).toContain('Unknown metric unit "fraction"');
+
+    const wrongType = request(organization.id, project.id, 'metric-defs/evolve', { ...adSpendV1, unit: 5 });
+    const wrongTypeResponse = await evolve(wrongType.request, { params: wrongType.params });
+    expect(wrongTypeResponse.status).toBe(400);
+    expect(await wrongTypeResponse.json()).toEqual({ error: 'invalid_unit' });
+  });
+
   it('rejects an invalid evolution (a formula referencing an unregistered metric)', async () => {
     const { ownerSession, organization, project } = await setupOrgProject('Evolve Invalid Metric Org');
     getServerSessionMock.mockResolvedValue(ownerSession);
@@ -123,5 +172,22 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve', () =>
     const body = (await response.json()) as { error: string; reasons: string[] };
     expect(body.error).toBe('invalid_definition');
     expect(body.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('KAN-136: lets a project-scoped editor evolve a metric in THEIR OWN project', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Evolve Project-Scoped Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const registerReq = request(organization.id, project.id, 'metric-defs', adSpendV1);
+    expect((await register(registerReq.request, { params: registerReq.params })).status).toBe(201);
+
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'editor', owner.id);
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const evolveReq = request(organization.id, project.id, 'metric-defs/evolve', {
+      name: 'ad_spend',
+      definition: adSpendV1.definition,
+      dimensions: ['channel', 'campaign'],
+    });
+    const response = await evolve(evolveReq.request, { params: evolveReq.params });
+    expect(response.status).toBe(201);
   });
 });

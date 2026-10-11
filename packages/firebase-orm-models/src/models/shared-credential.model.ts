@@ -7,7 +7,7 @@ import type { SecretEnvelope } from '../vault';
  * connector stories (KAN-49/50/51); `generic` covers anything pushed in
  * manually (e.g. a CRM API key) ahead of a dedicated plugin existing.
  */
-export const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'stripe', 'ga4', 'generic'] as const;
+export const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'youtube', 'stripe', 'ga4', 'generic'] as const;
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number];
 
 export function isCredentialProvider(value: string): value is CredentialProvider {
@@ -73,4 +73,16 @@ export class SharedCredentialModel extends BaseModel {
 
   @Field()
   public archived_by?: string | null;
+
+  /**
+   * When the secret's token stops working, for credentials connected through an OAuth flow (e.g.
+   * "Connect with Facebook"); null when the provider reported no expiry, absent for secrets pasted by
+   * hand. Lets the UI warn before a connection lapses and offer to reconnect.
+   */
+  @Field()
+  public token_expires_on?: string | null;
+
+  /** How the secret was set: `oauth` for a connect flow, absent for one pasted by hand. */
+  @Field()
+  public connected_via?: 'oauth' | null;
 }

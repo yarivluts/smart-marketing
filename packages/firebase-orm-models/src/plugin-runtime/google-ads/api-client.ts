@@ -38,6 +38,67 @@ export interface GoogleAdsCreateCustomerMatchUserListResult {
   userListResourceName: string;
 }
 
+export type GoogleAdsConsentStatus = 'GRANTED' | 'DENIED';
+
+/**
+ * The advertiser's consent for the uploaded users (KAN-236), sent at the offline user data job
+ * level (`CustomerMatchUserListMetadata.consent`); Google needs it for users in the EEA. It is the
+ * advertiser's own statement, so each part is sent only when the install's admin chose a value.
+ */
+export interface GoogleAdsCustomerMatchConsent {
+  adUserData?: GoogleAdsConsentStatus;
+  adPersonalization?: GoogleAdsConsentStatus;
+}
+
+/** A paused Display campaign carrying one responsive display ad (Ad Studio publishing). */
+export interface GoogleAdsDisplayAdCampaignParams {
+  name: string;
+  /** Daily budget in the account's currency, in micros. */
+  dailyBudgetMicros: number;
+  /** Max CPC for the ad group, in micros. */
+  cpcBidMicros: number;
+  /** The advertiser's own EU political advertising self-declaration (required on every campaign). */
+  containsEuPoliticalAdvertising: boolean;
+  /** Image asset resource names: 1.91:1 marketing image(s) and 1:1 square image(s). */
+  marketingImageAssets: string[];
+  squareImageAssets: string[];
+  headlines: string[];
+  longHeadline: string;
+  descriptions: string[];
+  businessName: string;
+  finalUrl: string;
+}
+
+export interface GoogleAdsSearchAdCampaignParams {
+  name: string;
+  /** Daily budget in the account's currency, in micros. */
+  dailyBudgetMicros: number;
+  /** Max CPC for the ad group, in micros. */
+  cpcBidMicros: number;
+  /** The advertiser's own EU political advertising self-declaration (required on every campaign). */
+  containsEuPoliticalAdvertising: boolean;
+  /** The responsive search ad: 3-15 headlines (30 characters), 2-4 descriptions (90). */
+  headlines: string[];
+  descriptions: string[];
+  path1: string;
+  path2: string;
+  finalUrl: string;
+  keywords: { text: string; matchType: 'BROAD' | 'PHRASE' | 'EXACT' }[];
+  /** Searches that must not show the ad, added as phrase-match negatives on the ad group. */
+  negativeKeywords: string[];
+  /** `geoTargetConstants/...` resource names; empty targets every location. */
+  geoTargetConstants: string[];
+  /** `languageConstants/...` resource names; empty targets every language. */
+  languageConstants: string[];
+}
+
+export interface GoogleAdsDisplayAdCampaignResult {
+  campaignBudgetResourceName: string;
+  campaignResourceName: string;
+  adGroupResourceName: string;
+  adResourceName: string;
+}
+
 export interface GoogleAdsAddCustomerMatchOperationsResult {
   /** The number of member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
   numReceived: number;
@@ -98,7 +159,7 @@ export interface GoogleAdsAddressMatchInfo {
 }
 
 /**
- * The Google Ads REST API (v17) mutate/OAuth calls this connector needs,
+ * The Google Ads REST API (v25) mutate/OAuth calls this connector needs,
  * kept as a small interface (not the `google-ads-api` npm SDK) so a run's
  * own executor can be driven by a fake client in tests without any network
  * access — the same "buildable-today, swap the provider later" seam
@@ -148,7 +209,12 @@ export interface GoogleAdsApiClient {
    * one upload call, mirroring `MetaAdsApiClient.addContactsToCustomAudience`'s
    * shape for the sibling connector.
    */
-  addContactsToCustomerMatchUserList(customerId: string, userListResourceName: string, contacts: readonly GoogleAdsContactMatchKey[]): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
+  addContactsToCustomerMatchUserList(
+    customerId: string,
+    userListResourceName: string,
+    contacts: readonly GoogleAdsContactMatchKey[],
+    consent?: GoogleAdsCustomerMatchConsent,
+  ): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
   /**
    * Adds keywords and/or negative keywords to an already-created ad group
    * (KAN-72 follow-up, "post-creation keyword edits") — the same
@@ -199,12 +265,57 @@ export interface GoogleAdsApiClient {
    * exact shape one resource type down.
    */
   setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
+  /**
+   * Uploads an image to the account's asset library as an image asset (Ad Studio image export), ready
+   * to be used in responsive display and Performance Max ads. Returns the asset's resource name.
+   */
+  uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }>;
+  /** Creates a paused Display campaign (budget, campaign, ad group) with one responsive display ad. */
+  createDisplayAdCampaign(customerId: string, params: GoogleAdsDisplayAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult>;
+  /**
+   * Creates a paused Search campaign (Google Search only, no Display expansion) targeting the given
+   * locations and languages, with one ad group holding a responsive search ad, the keywords and the
+   * negative keywords.
+   */
+  createSearchAdCampaign(customerId: string, params: GoogleAdsSearchAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult>;
 }
 
-const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
+/**
+ * The Google Ads API version every call uses (KAN-233: was v17, long sunset). The request bodies
+ * below were checked field by field against Google's v25 discovery document.
+ */
+export const GOOGLE_ADS_API_VERSION = 'v25';
+const GOOGLE_ADS_API_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
 const GOOGLE_OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 /** Refresh 60s before Google's own reported expiry, so a call in flight never races an about-to-expire token. */
 const ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS = 60_000;
+
+/**
+ * Exchanges the credential's long-lived refresh token for a short-lived access token at Google's
+ * OAuth2 token endpoint. Shared by the mutate client and the keyword-ideas lookup (KAN-230). The
+ * token is returned in memory only; a failure never includes the request body (which carries the
+ * client secret and refresh token) in its message.
+ */
+export async function requestGoogleAdsAccessToken(
+  options: Pick<GoogleAdsApiClientOptions, 'clientId' | 'clientSecret' | 'refreshToken'>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ accessToken: string; expiresInSeconds: number }> {
+  const response = await fetchImpl(GOOGLE_OAUTH_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: options.clientId,
+      client_secret: options.clientSecret,
+      refresh_token: options.refreshToken,
+      grant_type: 'refresh_token',
+    }).toString(),
+  });
+  if (!response.ok) {
+    throw new GoogleAdsApiError(`Failed to refresh a Google Ads OAuth access token (status ${response.status}).`, response.status);
+  }
+  const body = (await response.json()) as { access_token: string; expires_in: number };
+  return { accessToken: body.access_token, expiresInSeconds: body.expires_in };
+}
 
 interface CachedAccessToken {
   token: string;
@@ -248,21 +359,8 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     if (this.cachedAccessToken && this.cachedAccessToken.expiresAtMs > Date.now()) {
       return this.cachedAccessToken.token;
     }
-    const response = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: this.options.clientId,
-        client_secret: this.options.clientSecret,
-        refresh_token: this.options.refreshToken,
-        grant_type: 'refresh_token',
-      }).toString(),
-    });
-    if (!response.ok) {
-      throw new GoogleAdsApiError(`Failed to refresh a Google Ads OAuth access token (status ${response.status}).`, response.status);
-    }
-    const body = (await response.json()) as { access_token: string; expires_in: number };
-    this.cachedAccessToken = { token: body.access_token, expiresAtMs: Date.now() + body.expires_in * 1000 - ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS };
+    const body = await requestGoogleAdsAccessToken(this.options);
+    this.cachedAccessToken = { token: body.accessToken, expiresAtMs: Date.now() + body.expiresInSeconds * 1000 - ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS };
     return this.cachedAccessToken.token;
   }
 
@@ -299,6 +397,9 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
           status: 'PAUSED',
           campaignBudget: campaignBudgetResourceName,
           manualCpc: {},
+          containsEuPoliticalAdvertising: draft.containsEuPoliticalAdvertising
+            ? 'CONTAINS_EU_POLITICAL_ADVERTISING'
+            : 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
         },
       },
     ]);
@@ -438,7 +539,9 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
         create: {
           name: params.name,
           membershipStatus: 'OPEN',
-          crmBasedUserListInfo: { uploadKeyType: 'CONTACT_INFO' },
+          // The resource field is `crmBasedUserList` (its type is CrmBasedUserListInfo); the old
+          // `crmBasedUserListInfo` key was rejected as an unknown field (KAN-233).
+          crmBasedUserList: { uploadKeyType: 'CONTACT_INFO' },
         },
       },
     ]);
@@ -449,9 +552,18 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     customerId: string,
     userListResourceName: string,
     contacts: readonly GoogleAdsContactMatchKey[],
+    consent?: GoogleAdsCustomerMatchConsent,
   ): Promise<GoogleAdsAddCustomerMatchOperationsResult> {
+    // Job-level consent (KAN-236): only the answers the advertiser actually gave are sent.
+    const consentBody = {
+      ...(consent?.adUserData ? { adUserData: consent.adUserData } : {}),
+      ...(consent?.adPersonalization ? { adPersonalization: consent.adPersonalization } : {}),
+    };
     const jobResult = await this.postAction<{ resourceName: string }>(`customers/${customerId}/offlineUserDataJobs:create`, {
-      job: { type: 'CUSTOMER_MATCH_USER_LIST', customerMatchUserListMetadata: { userList: userListResourceName } },
+      job: {
+        type: 'CUSTOMER_MATCH_USER_LIST',
+        customerMatchUserListMetadata: { userList: userListResourceName, ...(Object.keys(consentBody).length > 0 ? { consent: consentBody } : {}) },
+      },
     });
     const jobResourceName = jobResult.resourceName;
 
@@ -528,5 +640,135 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
 
   async setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void> {
     await this.mutate(customerId, 'adGroupAds', [{ update: { resourceName: adResourceName, status }, updateMask: 'status' }]);
+  }
+
+  async createDisplayAdCampaign(customerId: string, params: GoogleAdsDisplayAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult> {
+    // A non-shared budget is named after its campaign; everything is created PAUSED for a person to review.
+    const budget = await this.mutate(customerId, 'campaignBudgets', [
+      { create: { name: `${params.name} Budget`, amountMicros: String(Math.round(params.dailyBudgetMicros)), deliveryMethod: 'STANDARD', explicitlyShared: false } },
+    ]);
+    const campaignBudgetResourceName = budget.results[0].resourceName;
+    const campaign = await this.mutate(customerId, 'campaigns', [
+      {
+        create: {
+          name: params.name,
+          advertisingChannelType: 'DISPLAY',
+          status: 'PAUSED',
+          campaignBudget: campaignBudgetResourceName,
+          manualCpc: {},
+          containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising ? 'CONTAINS_EU_POLITICAL_ADVERTISING' : 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
+        },
+      },
+    ]);
+    const campaignResourceName = campaign.results[0].resourceName;
+    try {
+      return await this.createDisplayAdGroupAndAd(customerId, params, campaignBudgetResourceName, campaignResourceName);
+    } catch (error) {
+      // Nothing half-built is left behind: remove the campaign and its budget, then report the real error.
+      await this.mutate(customerId, 'campaigns', [{ remove: campaignResourceName }]).catch(() => undefined);
+      await this.mutate(customerId, 'campaignBudgets', [{ remove: campaignBudgetResourceName }]).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  private async createDisplayAdGroupAndAd(
+    customerId: string,
+    params: GoogleAdsDisplayAdCampaignParams,
+    campaignBudgetResourceName: string,
+    campaignResourceName: string,
+  ): Promise<GoogleAdsDisplayAdCampaignResult> {
+    const adGroup = await this.mutate(customerId, 'adGroups', [
+      { create: { name: `${params.name} - ad group`, campaign: campaignResourceName, status: 'ENABLED', type: 'DISPLAY_STANDARD', cpcBidMicros: String(Math.round(params.cpcBidMicros)) } },
+    ]);
+    const adGroupResourceName = adGroup.results[0].resourceName;
+    const ad = await this.mutate(customerId, 'adGroupAds', [
+      {
+        create: {
+          adGroup: adGroupResourceName,
+          status: 'PAUSED',
+          ad: {
+            name: params.name,
+            finalUrls: [params.finalUrl],
+            responsiveDisplayAd: {
+              marketingImages: params.marketingImageAssets.map((asset) => ({ asset })),
+              squareMarketingImages: params.squareImageAssets.map((asset) => ({ asset })),
+              headlines: params.headlines.map((text) => ({ text })),
+              longHeadline: { text: params.longHeadline },
+              descriptions: params.descriptions.map((text) => ({ text })),
+              businessName: params.businessName,
+            },
+          },
+        },
+      },
+    ]);
+    return { campaignBudgetResourceName, campaignResourceName, adGroupResourceName, adResourceName: ad.results[0].resourceName };
+  }
+
+  async createSearchAdCampaign(customerId: string, params: GoogleAdsSearchAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult> {
+    // Everything is created PAUSED for a person to review; the budget is named after its campaign.
+    const budget = await this.mutate(customerId, 'campaignBudgets', [
+      { create: { name: `${params.name} Budget`, amountMicros: String(Math.round(params.dailyBudgetMicros)), deliveryMethod: 'STANDARD', explicitlyShared: false } },
+    ]);
+    const campaignBudgetResourceName = budget.results[0].resourceName;
+    const campaign = await this.mutate(customerId, 'campaigns', [
+      {
+        create: {
+          name: params.name,
+          advertisingChannelType: 'SEARCH',
+          status: 'PAUSED',
+          campaignBudget: campaignBudgetResourceName,
+          manualCpc: {},
+          // Google Search only: no search partners and no Display expansion, so the spend goes where the keywords were researched.
+          networkSettings: { targetGoogleSearch: true, targetSearchNetwork: false, targetContentNetwork: false, targetPartnerSearchNetwork: false },
+          containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising ? 'CONTAINS_EU_POLITICAL_ADVERTISING' : 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
+        },
+      },
+    ]);
+    const campaignResourceName = campaign.results[0].resourceName;
+    try {
+      const criteria = [
+        ...params.geoTargetConstants.map((geoTargetConstant) => ({ create: { campaign: campaignResourceName, location: { geoTargetConstant } } })),
+        ...params.languageConstants.map((languageConstant) => ({ create: { campaign: campaignResourceName, language: { languageConstant } } })),
+      ];
+      if (criteria.length) await this.mutate(customerId, 'campaignCriteria', criteria);
+      const adGroup = await this.mutate(customerId, 'adGroups', [
+        { create: { name: `${params.name} - ad group`, campaign: campaignResourceName, status: 'ENABLED', type: 'SEARCH_STANDARD', cpcBidMicros: String(Math.round(params.cpcBidMicros)) } },
+      ]);
+      const adGroupResourceName = adGroup.results[0].resourceName;
+      const ad = await this.mutate(customerId, 'adGroupAds', [
+        {
+          create: {
+            adGroup: adGroupResourceName,
+            status: 'PAUSED',
+            ad: {
+              finalUrls: [params.finalUrl],
+              responsiveSearchAd: {
+                headlines: params.headlines.map((text) => ({ text })),
+                descriptions: params.descriptions.map((text) => ({ text })),
+                ...(params.path1 ? { path1: params.path1 } : {}),
+                ...(params.path1 && params.path2 ? { path2: params.path2 } : {}),
+              },
+            },
+          },
+        },
+      ]);
+      const keywordOperations = [
+        ...params.keywords.map((keyword) => ({ create: { adGroup: adGroupResourceName, status: 'ENABLED', keyword: { text: keyword.text, matchType: keyword.matchType } } })),
+        ...params.negativeKeywords.map((text) => ({ create: { adGroup: adGroupResourceName, negative: true, keyword: { text, matchType: 'PHRASE' } } })),
+      ];
+      if (keywordOperations.length) await this.mutate(customerId, 'adGroupCriteria', keywordOperations);
+      return { campaignBudgetResourceName, campaignResourceName, adGroupResourceName, adResourceName: ad.results[0].resourceName };
+    } catch (error) {
+      // Nothing half-built is left behind: remove the campaign (with its criteria and ad group) and its budget.
+      await this.mutate(customerId, 'campaigns', [{ remove: campaignResourceName }]).catch(() => undefined);
+      await this.mutate(customerId, 'campaignBudgets', [{ remove: campaignBudgetResourceName }]).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }> {
+    // v25 Asset: `type` is output only; an `imageAsset` with `data` makes it an IMAGE asset.
+    const result = await this.mutate(customerId, 'assets', [{ create: { name: params.name, imageAsset: { data: params.base64Data } } }]);
+    return { assetResourceName: result.results[0].resourceName };
   }
 }

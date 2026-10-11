@@ -37,14 +37,21 @@ export function CreativePreviewGallery({
   const [platformFilter, setPlatformFilter] = useState<'all' | 'meta_ads' | 'google_ads' | 'simulated'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Extract or synthesize creative cards from campaigns
+  /**
+   * Every card here comes from something the campaign really has: an ad imported from the
+   * platform, or a draft a human actually submitted.
+   *
+   * There used to be a third branch that synthesized a "realistic preview" for any campaign
+   * with neither — inventing headlines, body copy, keywords and a growthos.io destination
+   * from the campaign's name. Those cards were indistinguishable from imported ones, in a
+   * gallery whose entire purpose is showing what is genuinely running on the ad platforms.
+   * A campaign with no creatives now contributes no cards, and the empty state below says so.
+   */
   const creatives = useMemo(() => {
     const list: CreativeCardItem[] = [];
 
     for (const item of items) {
-      let addedForCampaign = false;
-
-      // 1. Check imported ads
+      // 1. Ads imported from the platform
       if (item.importedAds && item.importedAds.length > 0) {
         item.importedAds.forEach((ad, idx) => {
           list.push({
@@ -54,11 +61,10 @@ export function CreativePreviewGallery({
             type: 'meta',
             metaAd: ad,
           });
-          addedForCampaign = true;
         });
       }
 
-      // 2. Check draft
+      // 2. Creatives from a draft a human submitted through GrowthOS
       if (item.draft) {
         if (item.draft.platform === 'google_ads') {
           item.draft.adGroups.forEach((ag, idx) => {
@@ -74,7 +80,6 @@ export function CreativePreviewGallery({
                 keywords: ag.keywords.map((k) => k.text),
               },
             });
-            addedForCampaign = true;
           });
         } else if (item.draft.platform === 'meta') {
           item.draft.adSets.forEach((adSet, idx) => {
@@ -93,44 +98,6 @@ export function CreativePreviewGallery({
                 status: item.status === 'enabled' ? 'ACTIVE' : 'PAUSED',
               },
             });
-            addedForCampaign = true;
-          });
-        }
-      }
-
-      // 3. If no explicit ads attached, synthesize a realistic preview based on campaign platform/label
-      if (!addedForCampaign) {
-        if (item.platform === 'google_ads') {
-          list.push({
-            id: `${item.id}-synth-google`,
-            campaignName: item.label,
-            platform: item.platform,
-            type: 'google_search',
-            googleAd: {
-              headlines: [`${item.label} Official`, 'Smart Growth & ROI', 'Get Started Today'],
-              descriptions: [
-                `Accelerate your marketing performance with ${item.label}. High-converting campaigns tailored to your goals.`,
-                'Join thousands of high-growth teams scaling with zero-friction operations.',
-              ],
-              finalUrl: 'https://growthos.io',
-              keywords: ['growth marketing', 'marketing automation', 'campaign performance'],
-            },
-          });
-        } else {
-          list.push({
-            id: `${item.id}-synth-meta`,
-            campaignName: item.label,
-            platform: item.platform,
-            type: 'meta',
-            metaAd: {
-              adName: `${item.label} Creative A`,
-              headline: `Discover ${item.label} — Scale Faster`,
-              primaryText: `🚀 Maximize your growth velocity with ${item.label}. Automated optimizations, smart targeting, and real-time performance tracking.`,
-              description: 'Zero-configuration growth marketing platform.',
-              linkUrl: 'https://growthos.io',
-              callToActionType: 'SIGN_UP',
-              status: item.status === 'enabled' ? 'ACTIVE' : 'PAUSED',
-            },
           });
         }
       }

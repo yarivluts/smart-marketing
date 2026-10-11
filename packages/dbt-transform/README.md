@@ -95,6 +95,13 @@ authenticate — see `packages/firebase-orm-models/src/warehouse/`).
     tool. See the model's own doc comment for the label-derivation and
     grain rules.
 
+- `models/ops/` (KAN-204) — `dbt_build_info`: one row per `dbt build`
+  recording the runner image's `GIT_SHA` (NULL when unstamped). api-prod
+  reports it on `/v1/health/dbt-refresh`, which is how the credential-free
+  drift alarm (`.github/workflows/prod-drift.yml`) watches the scheduled job.
+  Kept out of `core/` so it never enters the metric catalog. Build the image
+  with `_GIT_SHA` - see `docs/deploy-api.md`.
+
 This is a deliberately generic, denormalized shape — no join-graph/mart layer
 yet (the same simplification KAN-41's metrics compiler already documents for
 its own dimension/filter handling). Vertical-specific canonical tables (plan

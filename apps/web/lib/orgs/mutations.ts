@@ -77,6 +77,15 @@ import {
   type EnsureTouchpointSchemaRegisteredResult,
   ensureTouchpointSchemaRegistered as ensureTouchpointSchemaRegisteredInOrganization,
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
+  archiveMetricDefinition as archiveMetricDefinitionInOrganization,
+  type ArchiveMetricDefinitionParams,
+  setGoalStatus as setGoalStatusInOrganization,
+  type GoalStatus,
+  archiveProject as archiveProjectInOrganization,
+  unarchiveProject as unarchiveProjectInOrganization,
+  reexportRawRecordsToWarehouse as reexportRawRecordsToWarehouseInOrganization,
+  type ReexportRawRecordsParams,
+  type ReexportRawRecordsResult,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   type FieldMappingModel,
   getOrCreateOnboardingState as getOrCreateOnboardingStateInOrganization,
@@ -131,8 +140,9 @@ import {
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
   renameApiKey as renameApiKeyInOrganization,
+  setApiKeyAllowedOrigins as setApiKeyAllowedOriginsInOrganization,
   type OrchestrationRunModel,
-  PluginInstallModel,
+  type PluginInstallModel,
   type PluginManifestModel,
   type PluginSourceRunModel,
   type ProcessStripeWebhookEventResult,
@@ -200,19 +210,16 @@ import {
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
   updateTvPairingSettings as updateTvPairingSettingsInOrganization,
-  sendTvPairingCommand as sendTvPairingCommandInOrganization,
-  updateTvPairingCecSchedule as updateTvPairingCecScheduleInOrganization,
-  acknowledgeTvPairingCommand as acknowledgeTvPairingCommandInOrganization,
   type RequestTvPairingResult,
   type TvPairingModel,
-  type TvPairingCommandType,
-  type TvPairingPowerState,
-  type TvPairingPendingCommand,
-  type TvPairingCommandResult,
-  type TvPairingCecSchedule,
+  setBackfillEndpoint as setBackfillEndpointInOrganization,
+  requestBackfill as requestBackfillInOrganization,
+  getBackfillStatus as getBackfillStatusInOrganization,
+  type BackfillStatusView,
 } from '@growthos/firebase-orm-models';
-import type { SegmentWorkListStatus, PluginScope, Result } from '@growthos/shared';
+import type { SegmentWorkListStatus } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { getServerKmsProvider } from '@/lib/vault/kms-provider';
 
 interface CreateOrganizationInput {
   name: string;
@@ -241,10 +248,6 @@ interface CreateProjectInput {
   organizationId: string;
   name: string;
   vertical?: string;
-  platformType?: string;
-  businessModel?: string;
-  transactionType?: string;
-  primaryStack?: string;
   createdByUserId?: string;
 }
 
@@ -258,12 +261,8 @@ interface UpdateProjectDetailsInput {
   projectId: string;
   name: string;
   vertical?: string;
-  platformType?: string;
-  businessModel?: string;
-  transactionType?: string;
-  primaryStack?: string;
-  verifiedRequirements?: string[];
-  customHiddenModules?: string[];
+  currency?: string;
+  timezone?: string;
   actorUserId: string;
 }
 
@@ -610,6 +609,8 @@ interface MintApiKeyInput {
   name: string;
   scopes: readonly ApiKeyScope[];
   createdByUserId: string;
+  kind?: 'secret' | 'publishable';
+  allowedOrigins?: readonly string[];
 }
 
 export async function mintApiKey(input: MintApiKeyInput): Promise<MintApiKeyResult> {
@@ -640,6 +641,19 @@ interface RenameApiKeyInput {
 export async function renameApiKey(input: RenameApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return renameApiKeyInOrganization(input);
+}
+
+interface SetApiKeyAllowedOriginsInput {
+  organizationId: string;
+  projectId: string;
+  apiKeyId: string;
+  allowedOrigins: readonly string[];
+  actorUserId: string;
+}
+
+export async function setApiKeyAllowedOrigins(input: SetApiKeyAllowedOriginsInput): Promise<ApiKeyModel> {
+  await ensureFirestoreOrm();
+  return setApiKeyAllowedOriginsInOrganization(input);
 }
 
 interface IssueMcpAuthorizationCodeInput {
@@ -885,6 +899,7 @@ interface RegisterMetricDefinitionInput {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  unit?: string | null;
   createdByUserId: string;
 }
 
@@ -899,6 +914,7 @@ interface EvolveMetricDefinitionInput {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  unit?: string | null;
   createdByUserId: string;
 }
 
@@ -1161,83 +1177,6 @@ interface UpdatePluginInstallConfigInput {
 export async function updatePluginInstallConfig(input: UpdatePluginInstallConfigInput): Promise<PluginInstallModel> {
   await ensureFirestoreOrm();
   return updatePluginInstallConfigInOrganization(input);
-}
-
-export interface EnsurePluginInstallInput {
-  organizationId: string;
-  projectId: string;
-  pluginId: string;
-  installedByUserId?: string;
-  config?: Record<string, unknown>;
-}
-
-/**
- * Ensures a connector is registered as active/installed in Firestore.
- * If already existing, re-enables it if disabled. If missing, saves a new PluginInstallModel.
- */
-export async function ensurePluginInstall(input: EnsurePluginInstallInput): Promise<PluginInstallModel> {
-  await ensureFirestoreOrm();
-  const { organizationId, projectId, pluginId, installedByUserId = 'system', config = {} } = input;
-  const existingInstalls = await PluginInstallModel.initPath({
-    organization_id: organizationId,
-    project_id: projectId,
-  }).query().get();
-
-  const active = existingInstalls.find((inst: PluginInstallModel) => inst.plugin_id === pluginId);
-  if (active) {
-    if (active.status !== 'installed') {
-      active.status = 'installed';
-      active.enabled_at = new Date().toISOString();
-      if (Object.keys(config).length > 0) {
-        active.config = { ...active.config, ...config };
-      }
-      await active.save();
-    }
-    return active;
-  }
-
-  const install = new PluginInstallModel();
-  install.organization_id = organizationId;
-  install.project_id = projectId;
-  install.plugin_id = pluginId;
-  install.version = '1.0.0';
-  install.status = 'installed';
-  install.granted_scopes = ['ingest:write', 'dashboards:write'] as PluginScope[];
-  install.config = config;
-  install.installed_by = installedByUserId;
-  install.installed_at = new Date().toISOString();
-  install.setPathParams({ organization_id: organizationId, project_id: projectId });
-  await install.save();
-  return install;
-}
-
-export interface DisablePluginInstallByPluginIdInput {
-  organizationId: string;
-  projectId: string;
-  pluginId: string;
-}
-
-/**
- * Pauses/disables a plugin install by plugin ID in a project.
- */
-export async function disablePluginInstallByPluginId(input: DisablePluginInstallByPluginIdInput): Promise<boolean> {
-  await ensureFirestoreOrm();
-  const { organizationId, projectId, pluginId } = input;
-  const existingInstalls = await PluginInstallModel.initPath({
-    organization_id: organizationId,
-    project_id: projectId,
-  }).query().get();
-
-  const active = existingInstalls.find(
-    (inst: PluginInstallModel) => inst.plugin_id === pluginId && inst.status === 'installed',
-  );
-  if (active) {
-    active.status = 'disabled';
-    active.disabled_at = new Date().toISOString();
-    await active.save();
-    return true;
-  }
-  return false;
 }
 
 interface RunSourcePluginInstallInput {
@@ -1647,54 +1586,12 @@ export interface UpdateTvPairingSettingsInput {
   rotationSeconds: number;
   reducedMotion: boolean;
   actorUserId: string;
-  cecSchedule?: TvPairingCecSchedule;
 }
 
 export async function updateTvPairingSettings(input: UpdateTvPairingSettingsInput): Promise<TvPairingModel> {
   await ensureFirestoreOrm();
   return updateTvPairingSettingsInOrganization(input);
 }
-
-export interface SendTvPairingCommandInput {
-  organizationId: string;
-  projectId: string;
-  pairingId: string;
-  type: TvPairingCommandType;
-  actorUserId: string;
-  parameters?: Record<string, unknown>;
-}
-
-export async function sendTvPairingCommand(input: SendTvPairingCommandInput): Promise<TvPairingModel> {
-  await ensureFirestoreOrm();
-  return sendTvPairingCommandInOrganization(input);
-}
-
-export interface UpdateTvPairingCecScheduleInput {
-  organizationId: string;
-  projectId: string;
-  pairingId: string;
-  cecSchedule: TvPairingCecSchedule;
-  actorUserId: string;
-}
-
-export async function updateTvPairingCecSchedule(input: UpdateTvPairingCecScheduleInput): Promise<TvPairingModel> {
-  await ensureFirestoreOrm();
-  return updateTvPairingCecScheduleInOrganization(input);
-}
-
-export interface AcknowledgeTvPairingCommandInput {
-  deviceToken: string;
-  commandId: string;
-  status: 'acknowledged' | 'failed';
-  error?: string;
-  powerState?: TvPairingPowerState;
-}
-
-export async function acknowledgeTvPairingCommand(input: AcknowledgeTvPairingCommandInput): Promise<Result<TvPairingModel, string>> {
-  await ensureFirestoreOrm();
-  return acknowledgeTvPairingCommandInOrganization(input);
-}
-
 
 /** Starts (or resumes) a project's onboarding wizard (KAN-68) — creates the singleton state doc on first visit. */
 export async function startOnboarding(
@@ -1738,6 +1635,7 @@ export interface ConfirmOnboardingFunnelStepsInput {
   projectId: string;
   userId: string;
   steps: readonly OnboardingFunnelStep[];
+  advanceWizard?: boolean;
 }
 
 /** The wizard's "confirm the AI-proposed funnel mapping" step. */
@@ -2004,4 +1902,55 @@ export async function rollbackAutomationAction(
   const targetId = await getAutomationActionTargetIdInOrganization(organizationId, projectId, actionId);
   const executor = await resolveAutomationActionExecutorForTargetInOrganization(organizationId, projectId, targetId, kms);
   return rollbackAutomationActionInOrganization({ organizationId, projectId, actionId, reason: 'manual', actorId, executor });
+}
+
+/** Retires a metric family — see `archiveMetricDefinition`'s own doc comment (EasySign audit J-02). */
+export async function archiveMetricDefinition(input: ArchiveMetricDefinitionParams): Promise<MetricDefModel> {
+  await ensureFirestoreOrm();
+  return archiveMetricDefinitionInOrganization(input);
+}
+
+/** Pauses/resumes a goal — see `setGoalStatus`'s own doc comment (EasySign audit J-05). */
+export async function setGoalStatus(organizationId: string, projectId: string, goalId: string, status: GoalStatus, actorUserId: string): Promise<GoalModel> {
+  await ensureFirestoreOrm();
+  return setGoalStatusInOrganization(organizationId, projectId, goalId, status, actorUserId);
+}
+
+/** Retires a project without deleting anything under it — see `archiveProject`'s own doc comment (EasySign audit J-06). */
+export async function archiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  await ensureFirestoreOrm();
+  return archiveProjectInOrganization(organizationId, projectId, actorUserId);
+}
+
+export async function unarchiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  await ensureFirestoreOrm();
+  return unarchiveProjectInOrganization(organizationId, projectId, actorUserId);
+}
+
+/** Backfills already-landed raw records into the warehouse's raw table — see `reexportRawRecordsToWarehouse`'s own doc comment (EasySign audit P-01). */
+export async function reexportRawRecordsToWarehouse(input: ReexportRawRecordsParams): Promise<ReexportRawRecordsResult> {
+  await ensureFirestoreOrm();
+  return reexportRawRecordsToWarehouseInOrganization(input);
+}
+
+/** Registers or updates this environment's backfill endpoint; the signing secret is present only when issued. */
+export async function setProjectBackfillEndpoint(input: {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  url: string;
+  schemas: { kind: string; name: string }[];
+  rotateSecret: boolean;
+  actedByUserId: string;
+}): Promise<{ url: string; schemas: { kind: string; name: string }[]; signingSecret?: string }> {
+  await ensureFirestoreOrm();
+  const result = await setBackfillEndpointInOrganization({ ...input, kms: getServerKmsProvider() });
+  return { url: result.endpoint.url, schemas: result.endpoint.schemas, ...(result.signingSecret ? { signingSecret: result.signingSecret } : {}) };
+}
+
+/** Asks this environment's backfill endpoint to resend its records; delivery happens within the call. */
+export async function requestProjectBackfill(input: { organizationId: string; projectId: string; environmentId: string; requestedByUserId: string }): Promise<BackfillStatusView> {
+  await ensureFirestoreOrm();
+  const request = await requestBackfillInOrganization({ ...input, kms: getServerKmsProvider() });
+  return getBackfillStatusInOrganization(input.organizationId, input.projectId, request.id, input.environmentId);
 }

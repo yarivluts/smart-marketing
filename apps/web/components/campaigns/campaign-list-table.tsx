@@ -45,11 +45,11 @@ export function CampaignListTable({
 
   return (
     <div
-      className={`overflow-x-auto rounded-2xl border border-pp-outline-variant/60 bg-pp-surface-container-lowest shadow-pp-candy ${className}`}
+      className={`overflow-x-auto rounded-2xl border border-border bg-card shadow-xs ${className}`}
       data-testid="campaign-list-table"
     >
       <table className="w-full text-start text-xs">
-        <thead className="border-b border-pp-outline-variant/60 bg-pp-surface-container-low text-[11px] font-bold uppercase tracking-wider text-pp-outline">
+        <thead className="border-b border-border bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
           <tr>
             <th scope="col" className="px-5 py-3.5 text-start">
               {t('columnCampaign')}
@@ -74,7 +74,7 @@ export function CampaignListTable({
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-pp-outline-variant/30 font-pp-body-sm text-pp-body-sm">
+        <tbody className="divide-y divide-border">
           {items.map((item) => {
             const platformCfg = PLATFORM_CONFIG[item.platform] || PLATFORM_CONFIG.simulated;
             const platformName = t(`platform.${item.platform}`, { defaultMessage: item.platform });
@@ -82,7 +82,7 @@ export function CampaignListTable({
             return (
               <tr
                 key={item.id}
-                className="transition-colors hover:bg-pp-surface-container-low/50"
+                className="transition-colors hover:bg-muted/30"
                 data-testid={`campaign-row-${item.id}`}
               >
                 {/* Campaign & Platform */}
@@ -96,14 +96,14 @@ export function CampaignListTable({
                       </span>
                       <Link
                         href={`/orgs/${orgId}/projects/${projectId}/campaigns/${item.targetId}`}
-                        className="font-pp-label-md text-pp-label-md font-bold text-pp-on-surface hover:text-pp-primary hover:underline leading-tight flex items-center gap-1"
+                        className="font-bold text-foreground hover:text-primary hover:underline leading-tight flex items-center gap-1"
                       >
                         <span>{item.label}</span>
-                        <ArrowUpRight className="h-3.5 w-3.5 text-pp-outline opacity-60" aria-hidden="true" />
+                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-60" aria-hidden="true" />
                       </Link>
                     </div>
                     {item.objective ? (
-                      <span className="text-[10px] text-pp-on-surface-variant font-mono truncate max-w-[220px]">
+                      <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[220px]">
                         {item.objective}
                       </span>
                     ) : null}
@@ -134,23 +134,30 @@ export function CampaignListTable({
                   />
                 </td>
 
+                {/*
+                  Spend, ROAS, CTR and CPA are each null when GrowthOS has no measurement,
+                  and every one of these cells renders "No data" rather than a figure. The
+                  warehouse supplies spend only; the rest have no source wired up yet.
+                */}
                 {/* Spend (30d) */}
                 <td className="px-5 py-4">
                   <div className="flex flex-col">
-                    <span className="font-bold text-pp-on-surface text-xs" dir="ltr">
-                      {`$${item.spend30dUsd.toLocaleString()}`}
+                    <span className="font-bold text-foreground text-xs" dir="ltr">
+                      {item.spend30dUsd === null ? t('noData') : `$${item.spend30dUsd.toLocaleString()}`}
                     </span>
-                    <span className="text-[10px] text-pp-on-surface-variant">
-                      {item.conversions > 0
-                        ? t('conversionsCountShort', { count: item.conversions })
-                        : '0 conv'}
-                    </span>
+                    {item.conversions === null ? null : (
+                      <span className="text-[10px] text-muted-foreground">
+                        {t('conversionsCountShort', { count: item.conversions })}
+                      </span>
+                    )}
                   </div>
                 </td>
 
                 {/* ROAS Badge */}
                 <td className="px-5 py-4">
-                  {item.roas > 0 ? (
+                  {item.roas === null ? (
+                    <span className="text-[11px] text-muted-foreground">{t('noData')}</span>
+                  ) : (
                     <Badge
                       variant={item.roas >= 3.0 ? 'success' : item.roas >= 2.0 ? 'warning' : 'secondary'}
                       size="sm"
@@ -159,25 +166,29 @@ export function CampaignListTable({
                       <TrendingUp className="h-3 w-3 me-1 shrink-0" aria-hidden="true" />
                       <span dir="ltr">{`${item.roas}x`}</span>
                     </Badge>
-                  ) : (
-                    <span className="text-xs text-pp-outline">—</span>
                   )}
                 </td>
 
                 {/* Performance (CTR / CPA) */}
                 <td className="px-5 py-4">
-                  {item.ctrPct > 0 || item.cpaUsd > 0 ? (
-                    <div className="flex flex-col text-[11px] gap-0.5">
-                      <span className="font-semibold text-pp-on-surface">
-                        <span dir="ltr">{`${item.ctrPct}%`}</span> {t('ctrLabel')}
-                      </span>
-                      <span className="text-pp-on-surface-variant">
-                        <span dir="ltr">{`$${item.cpaUsd}`}</span> {t('cpaLabel')}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-pp-outline">—</span>
-                  )}
+                  <div className="flex flex-col text-[11px] gap-0.5">
+                    {item.ctrPct === null && item.cpaUsd === null ? (
+                      <span className="text-muted-foreground">{t('noData')}</span>
+                    ) : (
+                      <>
+                        {item.ctrPct === null ? null : (
+                          <span className="font-semibold text-foreground">
+                            <span dir="ltr">{`${item.ctrPct}%`}</span> {t('ctrLabel')}
+                          </span>
+                        )}
+                        {item.cpaUsd === null ? null : (
+                          <span className="text-muted-foreground">
+                            <span dir="ltr">{`$${item.cpaUsd}`}</span> {t('cpaLabel')}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </td>
 
                 {/* Actions */}
@@ -187,7 +198,7 @@ export function CampaignListTable({
                       <button
                         type="button"
                         onClick={onSelectCreativesTab}
-                        className="inline-flex items-center gap-1 rounded-full bg-pp-surface-container-high px-2.5 py-1 font-pp-label-sm text-[11px] font-semibold text-pp-on-surface hover:bg-pp-surface-container-highest shadow-2xs cursor-pointer transition-colors"
+                        className="inline-flex items-center gap-1 rounded-lg bg-secondary px-2.5 py-1 text-[11px] font-semibold text-secondary-foreground hover:bg-secondary/80 shadow-2xs cursor-pointer transition-colors"
                       >
                         <Eye className="h-3 w-3" aria-hidden="true" />
                         <span>{t('quickViewCreatives')}</span>
@@ -195,7 +206,7 @@ export function CampaignListTable({
                     ) : null}
                     <Link
                       href={`/orgs/${orgId}/projects/${projectId}/campaigns/${item.targetId}`}
-                      className="rounded-lg p-1.5 text-pp-outline hover:bg-pp-surface-container hover:text-pp-on-surface transition-colors"
+                      className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                       title={t('inspectTarget')}
                     >
                       <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />

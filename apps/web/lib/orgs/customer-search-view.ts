@@ -52,7 +52,7 @@ export function toCustomerSearchEntryView(result: CustomerSearchResult, fieldDef
 
 /** Mirrors `SegmentMemberListView`'s exact ok/degraded-kind split for the same reason — a search results panel degrades the same honest way a segment's member list does rather than crashing the page. */
 export type CustomerSearchView =
-  | { kind: 'ok'; entries: CustomerSearchEntryView[] }
+  | { kind: 'ok'; entries: CustomerSearchEntryView[]; hasMore: boolean; limit: number }
   | { kind: 'warehouse_not_configured' }
   | { kind: 'quota_exceeded' }
   | { kind: 'query_error' };
@@ -69,6 +69,8 @@ export function buildCustomerSearchView(outcome: CustomerSearchOutcome, activeSc
   }
   return {
     kind: 'ok',
+    hasMore: outcome.hasMore,
+    limit: outcome.limit,
     entries: outcome.results.map((result) => {
       const fieldDefs = activeSchemaDefsByKindAndName.get(schemaDefMapKey('entity', result.schemaName))?.field_defs ?? [];
       return toCustomerSearchEntryView(result, fieldDefs);

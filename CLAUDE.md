@@ -11,12 +11,6 @@ scheduled Claude agent. This file is the contract every run follows. Read it fir
    `needs-human` or `blocked-by` an unfinished task.
 3. At the **end of every run, update `PROGRESS.md`**: what you completed, the exact stopping point if
    mid-task, anything blocked and why, the next step, and anything waiting on a human.
-4. Follow [the sprint workflow](./docs/sprints.md): inspect `pnpm sprints list`, start the selected
-   sprint, and work within it. Skip `verification-pending` until its acceptance gap is addressed.
-   Synchronize completed issue statuses to Jira, then run `pnpm sprints complete-ready` at the end
-   of every run. A fully finished active sprint closes and archives its done rows automatically.
-   If closing a sprint with unfinished work, explicitly use `complete ID --carry-to ID|backlog`.
-   Never delete task history or archive unfinished rows.
 
 ## Engineering rules (non-negotiable)
 
@@ -25,7 +19,12 @@ scheduled Claude agent. This file is the contract every run follows. Read it fir
 - **Firestore only via `@growthos/firebase-orm-models`** (which wraps `@arbel/firebase-orm`). Never
   import the raw Firebase SDK in app/feature code. New collections = new models in that package.
 - **No hard-coded UI strings.** All user-facing text lives in translation resource files
-  (`next-intl`, en + he). A lint rule enforces this.
+  (`next-intl`, en + he). Enforced by a ratchet test, not a lint rule:
+  `apps/web/messages/hardcoded-strings.test.ts` counts hard-coded JSX text and fails if the total
+  rises. `react/jsx-no-literals` is deliberately `off` — it flags punctuation as eagerly as prose,
+  and a rule that has to be disabled to get work done is how this guarantee became decorative once
+  already (KAN-176: the rule was off, this file claimed it was not, and 183 strings accumulated).
+  The baseline goes down, never up; moving strings into `en.json`/`he.json` is how you lower it.
 - **No Hebrew in code files.** Hebrew belongs only in translation resource files, never in `.ts`/
   `.tsx`/config/source.
 - **Everything user-manageable gets an admin surface.** If a human needs to view or change it, build
@@ -66,6 +65,27 @@ pnpm typecheck     # tsc --noEmit across all packages
 ```
 
 `pnpm build && pnpm test` must be green before every PR.
+
+## Credentials
+
+**Never** look for a token in a `.env`, a dotfile, or this repo — there are none, by design.
+Every GrowthOS credential lives in Google Secret Manager (project `growthos-g2w84`) and is
+fetched at the moment of use:
+
+```bash
+TOKEN="$(scripts/secrets/get-secret.sh jira-api-token)"      # bash
+$token = ./scripts/secrets/get-secret.ps1 jira-api-token     # PowerShell
+```
+
+Never print one, never write one to disk, and never ask a human to paste one into a chat —
+a value that reaches a terminal reaches a transcript, and a transcript is a file that syncs.
+A secret that has been seen in a transcript is burned: say so plainly and rotate it.
+
+[`docs/agent-credentials.md`](./docs/agent-credentials.md) has the catalogue, the
+prerequisites, how to add or rotate one, and how scheduled cloud runs read the same store.
+The same rules bind every agent working here — [`AGENTS.md`](./AGENTS.md) and
+[`GEMINI.md`](./GEMINI.md) point back at this file so Codex/ChatGPT Code and Gemini CLI
+pick them up too.
 
 ## Backlog & Jira
 

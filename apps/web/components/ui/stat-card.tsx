@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Sparkline } from '@/components/viz/sparkline';
 
 export interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
@@ -28,6 +29,7 @@ export function StatCard({
   badge,
   targetHint,
   progress,
+  trendData,
   subtext,
   className,
   ...props
@@ -57,19 +59,25 @@ export function StatCard({
       ? 'down'
       : 'neutral';
 
+  // A value made of words or a date ("no data yet", a time zone, "26 Sep 2026") is not a metric:
+  // the display-number size would wrap it over two huge lines, and forcing LTR would scramble Hebrew.
+  const isTextValue = typeof value === 'string' && /[A-Za-z\u0590-\u05ff]{2,}/.test(value);
+
   return (
     <Card
       hoverable
-      className={cn('flex flex-col justify-between p-6 transition-all duration-200', className)}
+      className={cn('relative flex flex-col justify-between overflow-hidden p-pp-lg transition-all duration-200', className)}
       {...props}
     >
+      {/* Accent bar on the inline-start edge, clipped by the card's radius (a border would curve past the corners). */}
+      <span aria-hidden="true" className="absolute inset-y-0 start-0 w-1 bg-pp-primary" />
       <div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium text-muted-foreground truncate">{title}</span>
+          <span className="text-pp-label-sm uppercase tracking-wider text-pp-outline">{title}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {badge}
             {Icon ? (
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
                 <Icon className="h-5 w-5" />
               </div>
             ) : null}
@@ -77,13 +85,20 @@ export function StatCard({
         </div>
 
         <div className="mt-3 flex items-baseline gap-2">
-          <span dir="ltr" className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground inline-block">
-            {value}
-          </span>
+          {isTextValue ? (
+            <span dir="auto" className="inline-block text-pp-headline-md font-semibold text-pp-on-surface-variant">
+              {value}
+            </span>
+          ) : (
+            <span dir="ltr" className="inline-block font-pp-display text-pp-metric text-pp-on-surface">
+              {value}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
+        {trendData && trendData.length > 1 ? <Sparkline values={trendData} className="h-9" /> : null}
         {progress !== undefined ? (
           <div className="w-full">
             <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">

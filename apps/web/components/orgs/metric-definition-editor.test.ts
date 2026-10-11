@@ -1,5 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { blankMetricDefinitionFormState, metricDefinitionFormStateToRequestBody } from './metric-definition-editor';
+import {
+  blankMetricDefinitionFormState,
+  metricDefinitionFormStateToRequestBody,
+  metricUnitFromFormState,
+  metricUnitToFormState,
+  metricVersionToFormState,
+} from './metric-definition-editor';
+
+describe('metric unit form fields (KAN-213)', () => {
+  it('submits null for no unit, the kind otherwise, and currency:XXX only when a code is given', () => {
+    expect(metricUnitFromFormState({ unitKind: '', currencyCode: 'USD' })).toBeNull();
+    expect(metricUnitFromFormState({ unitKind: 'ratio', currencyCode: '' })).toBe('ratio');
+    expect(metricUnitFromFormState({ unitKind: 'currency', currencyCode: '  ' })).toBe('currency');
+    expect(metricUnitFromFormState({ unitKind: 'currency', currencyCode: 'ils' })).toBe('currency:ILS');
+    expect(metricUnitFromFormState({ unitKind: 'count', currencyCode: 'ILS' })).toBe('count');
+  });
+
+  it('reads a stored unit back into the form, falling back to none for an unreadable one', () => {
+    expect(metricUnitToFormState('currency:EUR')).toEqual({ unitKind: 'currency', currencyCode: 'EUR' });
+    expect(metricUnitToFormState('ratio')).toEqual({ unitKind: 'ratio', currencyCode: '' });
+    expect(metricUnitToFormState(null)).toEqual({ unitKind: '', currencyCode: '' });
+    expect(metricUnitToFormState('bogus')).toEqual({ unitKind: '', currencyCode: '' });
+  });
+
+  it('prefills an evolve from the version\'s unit and always sends it', () => {
+    const state = metricVersionToFormState({
+      id: 'm1',
+      version: 1,
+      status: 'active',
+      definitionKind: 'formula',
+      aggregation: null,
+      formula: 'lp_conversions / lp_visitors',
+      dimensions: [],
+      unit: 'ratio',
+    });
+    expect(metricDefinitionFormStateToRequestBody(state)).toEqual({
+      definition: { kind: 'formula', formula: 'lp_conversions / lp_visitors' },
+      dimensions: [],
+      unit: 'ratio',
+    });
+  });
+});
 
 describe('metricDefinitionFormStateToRequestBody', () => {
   it('builds an aggregation request body, including the column when set', () => {
@@ -8,6 +49,7 @@ describe('metricDefinitionFormStateToRequestBody', () => {
     expect(body).toEqual({
       definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
       dimensions: ['channel'],
+      unit: null,
     });
   });
 

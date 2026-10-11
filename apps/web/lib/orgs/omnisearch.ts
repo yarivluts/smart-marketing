@@ -1,5 +1,6 @@
 import 'server-only';
 import type { OmniSearchItem } from '@growthos/shared';
+import type { AppShellNavItem } from '@/components/orgs/app-shell';
 import {
   listAutomationTargetStatesForProject,
   listBoardsForProject,
@@ -125,4 +126,34 @@ export async function buildOmniSearchCustomerItems(
     description: result.schemaName,
     href: `${base}/customers?q=${encodeURIComponent(result.entityId)}&schema=${encodeURIComponent(result.schemaName)}`,
   }));
+}
+
+/**
+ * Turns `ProjectLayout`'s own nav items into "jump to this page" omnisearch
+ * results — the deferred follow-up from restoring the pre-redesign nav
+ * (see `layout.tsx`'s doc comment and PROGRESS.md's 2026-09-01 entry): those
+ * items became reachable from the sidebar again, but were still invisible to
+ * Cmd/Ctrl-K, since the static index above only ever covered listed
+ * *entities* (a specific board, a specific goal), never the destination
+ * *pages* themselves (e.g. jumping straight to the Cost guardrails page, or
+ * to the Segments page when the project has zero segments yet). Every nav
+ * item passed in is already translated and permission-filtered by the caller
+ * (`ProjectLayout` computes the exact same `can()` checks its own sidebar
+ * renders against), so this is a pure label/href passthrough — the page's
+ * own destination doubles as its `id`. De-dupes by href (first occurrence
+ * wins) so a caller that accidentally passes the same nav item twice (e.g.
+ * concatenating overlapping section arrays) can never produce two results
+ * with the same `id`, which would collide as the same React list key.
+ */
+export function buildOmniSearchPageShortcuts(navItems: readonly AppShellNavItem[]): OmniSearchItem[] {
+  const seenHrefs = new Set<string>();
+  const items: OmniSearchItem[] = [];
+  for (const item of navItems) {
+    if (seenHrefs.has(item.href)) {
+      continue;
+    }
+    seenHrefs.add(item.href);
+    items.push({ id: item.href, type: 'page', label: item.label, href: item.href });
+  }
+  return items;
 }

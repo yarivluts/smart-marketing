@@ -37,4 +37,14 @@ export class IngestDedupKeyModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_at!: string;
+
+  /**
+   * Entities only: a hash of the attributes of the LATEST accepted version of this entity
+   * (`entityContentHash` in ingest.service.ts). An entity upsert is a new version of a row, not a
+   * repeat of an event, so a resend is a duplicate only when it matches the latest version exactly -
+   * see `isDuplicateOfClaim`. Absent on event/measure claims and on entity claims written before
+   * B13 (2026-09-25), which are then treated as "no known latest version".
+   */
+  @Field({ is_required: false })
+  public content_hash?: string;
 }

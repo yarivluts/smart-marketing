@@ -89,8 +89,11 @@ models:
           - not_null
           - unique
       - name: customer_id
-        tests:
-          - not_null
+        description: >
+          The converting customer: the event's declared properties.customer_id,
+          else (for an event declaring neither anon_id nor customer_id) its
+          entity_id. NULL for an anonymous conversion - one that declares an
+          anon_id but no customer_id - which is never a customer, only a visitor.
       - name: conversion_event_id
         tests:
           - not_null
@@ -111,43 +114,15 @@ models:
           The crediting touchpoint's captured entry URL, or null when that
           touchpoint carried none (and always null for `unattributed`
           rows). Deliberately not coalesced here — see the model's doc comment.
+      - name: via_identity
+        description: >
+          True when the crediting touchpoint was reached through the
+          customer's resolved identity (bridge_identity), false when only
+          through the conversion's own anon_id or when unattributed.
+          Landing-page performance counts only the true rows as conversions.
+        tests:
+          - not_null
       - name: credit
-        tests:
-          - not_null
-
-  - name: fact_attribution_paths
-    description: >
-      Omnichannel multi-touch conversion journey pathways (KAN-312): aggregates customer
-      touchpoint sequences before conversion, total touches, first and last touch channels,
-      and conversion cycle duration.
-    columns:
-      - name: path_key
-        tests:
-          - not_null
-          - unique
-      - name: conversion_event_id
-        tests:
-          - not_null
-      - name: total_touches
-        tests:
-          - not_null
-
-  - name: fact_attribution_markov
-    description: >
-      Markov chain transition probability matrix (KAN-312): state-to-state channel
-      transitions and empirical transition probabilities across customer journeys.
-    columns:
-      - name: transition_key
-        tests:
-          - not_null
-          - unique
-      - name: from_channel
-        tests:
-          - not_null
-      - name: to_channel
-        tests:
-          - not_null
-      - name: transition_probability
         tests:
           - not_null
 
@@ -328,7 +303,7 @@ models:
       reactivate transition, derived by diffing consecutive landed
       subscription snapshots. Feeds the SaaS pack's `reactivations`/
       `trial_starts`/`trial_conversions` metrics. See
-      `stg_stripe_subscription_history`'s own doc comment for the exact
+      `stg_subscription_history`'s own doc comment for the exact
       transition rules.
     columns:
       - name: subscription_event_key
@@ -476,6 +451,27 @@ models:
       - name: collected_revenue_40d
         tests:
           - not_null
+      - name: window_7d_complete
+        description: >
+          Whether 7 days have actually elapsed since `acquired_at`. The
+          `collected_revenue_*d` columns sum charges within the window without
+          checking the window has passed, so a recently-acquired customer's
+          figure covers less time than its name says (KAN-179).
+        tests:
+          - not_null
+      - name: window_14d_complete
+        tests:
+          - not_null
+      - name: window_30d_complete
+        tests:
+          - not_null
+      - name: window_40d_complete
+        description: >
+          The one that matters most: `quality_calibration_avg_collected_revenue_40d`
+          divides by a signup count, so counting immature customers in the
+          denominator understates payback in proportion to acquisition rate.
+        tests:
+          - not_null
 
   - name: fact_cancellation_reason
     description: >
@@ -591,6 +587,14 @@ models:
           - accepted_values:
               values: ['true', 'false']
       - name: collected_revenue_40d
+        tests:
+          - not_null
+      - name: window_7d_complete
+        description: Carried from `fact_customer_payback`; `false` when no payback row exists, so an unmatured signup is never counted as matured (KAN-179).
+        tests:
+          - not_null
+      - name: window_40d_complete
+        description: What `quality_calibration_matured_signups_40d` and `quality_calibration_matured_revenue_40d` filter on, so both halves of the average share one population.
         tests:
           - not_null
       - name: ts

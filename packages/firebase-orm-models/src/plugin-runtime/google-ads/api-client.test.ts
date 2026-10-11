@@ -20,6 +20,7 @@ const DRAFT: GoogleAdsCampaignDraft = {
   platform: 'google_ads',
   campaignName: 'Winning Themes',
   advertisingChannelType: 'SEARCH',
+  containsEuPoliticalAdvertising: false,
   dailyBudgetUsd: 25,
   adGroups: [
     {
@@ -38,6 +39,114 @@ const DRAFT: GoogleAdsCampaignDraft = {
 describe('GoogleAdsHttpApiClient', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('removes the campaign and budget it created when the display ad group or ad then fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/7' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/55' }] }))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'Invalid bid' } }, false, 400))
+      .mockResolvedValue(jsonResponse({ results: [{ resourceName: 'x' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const params = {
+      name: 'Sign fast',
+      dailyBudgetMicros: 20_000_000,
+      cpcBidMicros: 1_000_000,
+      containsEuPoliticalAdvertising: false,
+      marketingImageAssets: ['customers/123/assets/1'],
+      squareImageAssets: ['customers/123/assets/2'],
+      headlines: ['Sign fast'],
+      longHeadline: 'Sign in 30 seconds',
+      descriptions: ['Try it free'],
+      businessName: 'EasySign',
+      finalUrl: 'https://easysign.example',
+    };
+    await expect(new GoogleAdsHttpApiClient(OPTIONS).createDisplayAdCampaign('123', params as never)).rejects.toBeInstanceOf(GoogleAdsApiError);
+    const cleanup = fetchMock.mock.calls.slice(4).map(([url, init]) => [String(url).split('/').pop(), JSON.parse(String((init as RequestInit).body))]);
+    expect(cleanup).toEqual([
+      ['campaigns:mutate', { operations: [{ remove: 'customers/123/campaigns/55' }] }],
+      ['campaignBudgets:mutate', { operations: [{ remove: 'customers/123/campaignBudgets/7' }] }],
+    ]);
+  });
+
+  it('creates a paused Google-Search-only campaign targeted by location and language, with the RSA, keywords and negatives', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/8' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/56' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{}, {}] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroups/67' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroupAds/67~78' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{}, {}] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).createSearchAdCampaign('123', {
+      name: 'Search',
+      dailyBudgetMicros: 50_000_000,
+      cpcBidMicros: 6_000_000,
+      containsEuPoliticalAdvertising: false,
+      headlines: ['A1', 'A2', 'A3'],
+      descriptions: ['D1', 'D2'],
+      path1: 'sign',
+      path2: 'now',
+      finalUrl: 'https://easysign.example',
+      keywords: [{ text: 'sign pdf', matchType: 'EXACT' }],
+      negativeKeywords: ['free'],
+      geoTargetConstants: ['geoTargetConstants/2376'],
+      languageConstants: ['languageConstants/1027'],
+    });
+    expect(result).toEqual({
+      campaignBudgetResourceName: 'customers/123/campaignBudgets/8',
+      campaignResourceName: 'customers/123/campaigns/56',
+      adGroupResourceName: 'customers/123/adGroups/67',
+      adResourceName: 'customers/123/adGroupAds/67~78',
+    });
+    const calls = fetchMock.mock.calls.slice(1).map(([url, init]) => [String(url).split('/').pop(), JSON.parse(String((init as RequestInit).body)).operations]);
+    expect(calls[1][1][0].create).toMatchObject({
+      advertisingChannelType: 'SEARCH',
+      status: 'PAUSED',
+      networkSettings: { targetGoogleSearch: true, targetSearchNetwork: false, targetContentNetwork: false, targetPartnerSearchNetwork: false },
+      containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
+    });
+    expect(calls[2]).toEqual([
+      'campaignCriteria:mutate',
+      [
+        { create: { campaign: 'customers/123/campaigns/56', location: { geoTargetConstant: 'geoTargetConstants/2376' } } },
+        { create: { campaign: 'customers/123/campaigns/56', language: { languageConstant: 'languageConstants/1027' } } },
+      ],
+    ]);
+    expect(calls[3][1][0].create).toMatchObject({ type: 'SEARCH_STANDARD', cpcBidMicros: '6000000' });
+    expect(calls[4][1][0].create).toMatchObject({
+      status: 'PAUSED',
+      ad: { finalUrls: ['https://easysign.example'], responsiveSearchAd: { headlines: [{ text: 'A1' }, { text: 'A2' }, { text: 'A3' }], descriptions: [{ text: 'D1' }, { text: 'D2' }], path1: 'sign', path2: 'now' } },
+    });
+    expect(calls[5]).toEqual([
+      'adGroupCriteria:mutate',
+      [
+        { create: { adGroup: 'customers/123/adGroups/67', status: 'ENABLED', keyword: { text: 'sign pdf', matchType: 'EXACT' } } },
+        { create: { adGroup: 'customers/123/adGroups/67', negative: true, keyword: { text: 'free', matchType: 'PHRASE' } } },
+      ],
+    ]);
+  });
+
+  it('removes the search campaign and budget it created when a later step fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/8' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/56' }] }))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'Bad location' } }, false, 400))
+      .mockResolvedValue(jsonResponse({ results: [{}] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const params = { name: 'S', dailyBudgetMicros: 1, cpcBidMicros: 1, containsEuPoliticalAdvertising: false, headlines: [], descriptions: [], path1: '', path2: '', finalUrl: 'https://x.example', keywords: [], negativeKeywords: [], geoTargetConstants: ['geoTargetConstants/1'], languageConstants: [] };
+    await expect(new GoogleAdsHttpApiClient(OPTIONS).createSearchAdCampaign('123', params)).rejects.toBeInstanceOf(GoogleAdsApiError);
+    const cleanup = fetchMock.mock.calls.slice(4).map(([url, init]) => [String(url).split('/').pop(), JSON.parse(String((init as RequestInit).body))]);
+    expect(cleanup).toEqual([
+      ['campaigns:mutate', { operations: [{ remove: 'customers/123/campaigns/56' }] }],
+      ['campaignBudgets:mutate', { operations: [{ remove: 'customers/123/campaignBudgets/8' }] }],
+    ]);
   });
 
   it('refreshes an OAuth access token once and reuses it across multiple calls', async () => {
@@ -70,7 +179,7 @@ describe('GoogleAdsHttpApiClient', () => {
     await new GoogleAdsHttpApiClient(OPTIONS).setCampaignStatus('123', 'customers/123/campaigns/1', 'REMOVED');
 
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/campaigns:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/campaigns:mutate');
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer access-token-1');
     expect(headers['developer-token']).toBe('dev-token');
@@ -115,11 +224,11 @@ describe('GoogleAdsHttpApiClient', () => {
 
     const urls = fetchMock.mock.calls.slice(1).map(([url]: [string]) => url);
     expect(urls).toEqual([
-      'https://googleads.googleapis.com/v17/customers/123/campaignBudgets:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/campaigns:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/adGroups:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/campaignBudgets:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/campaigns:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/adGroups:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/adGroupAds:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/adGroupCriteria:mutate',
     ]);
 
     const budgetBody = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
@@ -129,6 +238,7 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(campaignBody.operations[0].create).toMatchObject({
       name: 'Winning Themes',
       advertisingChannelType: 'SEARCH',
+      containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
       status: 'PAUSED',
       campaignBudget: 'customers/123/campaignBudgets/1',
     });
@@ -188,7 +298,7 @@ describe('GoogleAdsHttpApiClient', () => {
 
     expect(result).toBe('customers/123/campaignBudgets/1');
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/googleAds:search');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/googleAds:search');
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer access-token-1');
     expect(headers['developer-token']).toBe('dev-token');
@@ -238,11 +348,26 @@ describe('GoogleAdsHttpApiClient', () => {
 
     expect(result).toEqual({ userListResourceName: 'customers/123/userLists/1' });
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/userLists:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/userLists:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
-      { create: { name: 'Segment: Paying customers', membershipStatus: 'OPEN', crmBasedUserListInfo: { uploadKeyType: 'CONTACT_INFO' } } },
+      { create: { name: 'Segment: Paying customers', membershipStatus: 'OPEN', crmBasedUserList: { uploadKeyType: 'CONTACT_INFO' } } },
     ]);
+  });
+
+  it("sends the person's EU political advertising declaration as Google's enum when it is yes", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/1' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/1' }] }))
+      .mockResolvedValue(jsonResponse({ results: [{ resourceName: 'customers/123/x/1' }, { resourceName: 'customers/123/x/2' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).createCampaignDraft('123', { ...DRAFT, containsEuPoliticalAdvertising: true });
+
+    const campaignBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(campaignBody.operations[0].create.containsEuPoliticalAdvertising).toBe('CONTAINS_EU_POLITICAL_ADVERTISING');
   });
 
   it('uploads hashed-email-only contacts to a Customer Match user list via create -> addOperations -> run, in order, against the job\'s own resource name', async () => {
@@ -262,9 +387,9 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(result).toEqual({ numReceived: 2 });
     const urls = fetchMock.mock.calls.slice(1).map(([url]: [string]) => url);
     expect(urls).toEqual([
-      'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs:create',
-      'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs/456:addOperations',
-      'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs/456:run',
+      'https://googleads.googleapis.com/v25/customers/123/offlineUserDataJobs:create',
+      'https://googleads.googleapis.com/v25/customers/123/offlineUserDataJobs/456:addOperations',
+      'https://googleads.googleapis.com/v25/customers/123/offlineUserDataJobs/456:run',
     ]);
 
     const createBody = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
@@ -379,6 +504,27 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ hashedEmail: 'hash-email-a' }, { addressInfo: { city: 'Mountain View' } }] } }]);
   });
 
+  it("sends the advertiser's consent on the offline user data job only when answered (KAN-236)", async () => {
+    const jobBody = async (consent?: Parameters<GoogleAdsHttpApiClient['addContactsToCustomerMatchUserList']>[3]) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+        .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+        .mockResolvedValue(jsonResponse({}));
+      vi.stubGlobal('fetch', fetchMock);
+      await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [{ hashedEmail: 'hash-a' }], consent);
+      return JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body)).job.customerMatchUserListMetadata;
+    };
+
+    expect(await jobBody({ adUserData: 'GRANTED', adPersonalization: 'DENIED' })).toEqual({
+      userList: 'customers/123/userLists/1',
+      consent: { adUserData: 'GRANTED', adPersonalization: 'DENIED' },
+    });
+    expect(await jobBody({ adPersonalization: 'GRANTED' })).toEqual({ userList: 'customers/123/userLists/1', consent: { adPersonalization: 'GRANTED' } });
+    expect(await jobBody({})).toEqual({ userList: 'customers/123/userLists/1' });
+    expect(await jobBody()).toEqual({ userList: 'customers/123/userLists/1' });
+  });
+
   it('omits the addressInfo entry entirely when a contact has none, keeping the payload byte-identical to before mailing-address support', async () => {
     const fetchMock = vi
       .fn()
@@ -433,7 +579,7 @@ describe('GoogleAdsHttpApiClient', () => {
       negativeKeywordResourceNames: ['customers/123/adGroupCriteria/3'],
     });
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupCriteria:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
       { create: { adGroup: 'customers/123/adGroups/1', status: 'ENABLED', keyword: { text: 'blue widgets', matchType: 'PHRASE' } } },
@@ -461,7 +607,7 @@ describe('GoogleAdsHttpApiClient', () => {
     await new GoogleAdsHttpApiClient(OPTIONS).removeAdGroupCriteria('123', ['customers/123/adGroupCriteria/1', 'customers/123/adGroupCriteria/2']);
 
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupCriteria:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
       { remove: 'customers/123/adGroupCriteria/1' },
@@ -498,7 +644,7 @@ describe('GoogleAdsHttpApiClient', () => {
 
     expect(result).toEqual({ adResourceName: 'customers/123/adGroupAds/2' });
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupAds:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
       {
@@ -541,7 +687,7 @@ describe('GoogleAdsHttpApiClient', () => {
     await new GoogleAdsHttpApiClient(OPTIONS).setAdGroupAdStatus('123', 'customers/123/adGroupAds/1', 'PAUSED');
 
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupAds:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([{ update: { resourceName: 'customers/123/adGroupAds/1', status: 'PAUSED' }, updateMask: 'status' }]);
   });

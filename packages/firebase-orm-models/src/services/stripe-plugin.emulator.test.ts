@@ -6,12 +6,14 @@ import {
   createProject,
   createSharedCredential,
   DuplicateSchemaDefinitionError,
+  ensureCancellationReasonSchemaRegistered,
   ensureStripeCommerceSchemasRegistered,
   ensureUserForFirebaseSession,
   generateLocalKmsKeyRing,
   getActiveSchemaDefinition,
   getMostRecentRawRecordForSchema,
   installPlugin,
+  listRecentRecordsForSchemas,
   LocalKmsProvider,
   processStripeWebhookEvent,
   registerPluginManifest,
@@ -381,6 +383,101 @@ describe('processStripeWebhookEvent', () => {
 
     const landed = await getMostRecentRawRecordForSchema(organization.id, project.id, environment.id, 'event', 'stripe_charge');
     expect((landed!.payload.properties as Record<string, unknown>).charge_id).toBe('ch_1');
+  });
+
+  it('lands a subscription cancellation reason once, however many times Stripe re-delivers it, and reports every batch it landed', async () => {
+    const { owner, organization, project, environment, install, kms } = await setupInstalledStripePlugin('Stripe Webhook Cancellation Org');
+    await ensureStripeCommerceSchemasRegistered(organization.id, project.id, owner.id);
+    await ensureCancellationReasonSchemaRegistered({ organizationId: organization.id, projectId: project.id, createdByUserId: owner.id });
+
+    const scheduled = {
+      id: 'sub_c1',
+      object: 'subscription',
+      customer: 'cus_c1',
+      status: 'active',
+      currency: 'usd',
+      current_period_end: 1_700_100_000,
+      cancel_at_period_end: true,
+      canceled_at: 1_700_050_000,
+      created: 1_690_000_000,
+      items: { data: [{ price: { unit_amount: 2000, currency: 'usd', recurring: { interval: 'month', interval_count: 1 } }, quantity: 1 }] },
+      cancellation_details: { reason: 'cancellation_requested', feedback: 'too_expensive', comment: 'Too pricey' },
+    };
+    const deliver = async (id: string, type: string, object: Record<string, unknown>) => {
+      const body = JSON.stringify({ id, object: 'event', type, created: 1_700_050_000, data: { object } });
+      return processStripeWebhookEvent({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: environment.id,
+        installId: install.id,
+        rawBody: body,
+        signatureHeader: signedWebhookBody(body, 'whsec_test_456'),
+        kms,
+      });
+    };
+
+    const first = await deliver('evt_c1', 'customer.subscription.updated', scheduled);
+    expect(first.summary?.batches).toHaveLength(2);
+    expect(first.summary).toMatchObject({ total: 2, accepted: 2, quarantined: 0, duplicates: 0 });
+
+    // Stripe re-delivers the identical update: both the entity snapshot and the reason are duplicates.
+    const redelivered = await deliver('evt_c2', 'customer.subscription.updated', scheduled);
+    expect(redelivered.summary).toMatchObject({ total: 2, accepted: 0, duplicates: 2 });
+
+    // The scheduled cancellation takes effect: a new subscription snapshot, but the same cancellation.
+    const takesEffect = await deliver('evt_c3', 'customer.subscription.deleted', { ...scheduled, status: 'canceled', cancel_at_period_end: false });
+    expect(takesEffect.summary).toMatchObject({ total: 2, accepted: 1, duplicates: 1 });
+
+    const reasons = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: environment.id,
+      kind: 'event',
+      schemaNames: ['cancellation_reason'],
+    });
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0].payload.properties).toEqual({ reason_code: 'too_expensive', comment: 'Too pricey', customer_id: 'cus_c1' });
+  });
+
+  it('quarantines (does not drop) a Stripe cancellation reason while the cancellation_reason schema is unregistered, and still counts it in the combined summary', async () => {
+    const { owner, organization, project, environment, install, kms } = await setupInstalledStripePlugin('Stripe Webhook Unregistered Reason Org');
+    await ensureStripeCommerceSchemasRegistered(organization.id, project.id, owner.id);
+
+    const body = JSON.stringify({
+      id: 'evt_u1',
+      object: 'event',
+      type: 'customer.subscription.deleted',
+      created: 1_700_050_000,
+      data: {
+        object: {
+          id: 'sub_u1',
+          object: 'subscription',
+          customer: 'cus_u1',
+          status: 'canceled',
+          currency: 'usd',
+          current_period_end: 1_700_100_000,
+          cancel_at_period_end: false,
+          canceled_at: 1_700_050_000,
+          created: 1_690_000_000,
+          items: { data: [] },
+          cancellation_details: { reason: 'payment_failed', feedback: null, comment: null },
+        },
+      },
+    });
+    const result = await processStripeWebhookEvent({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: environment.id,
+      installId: install.id,
+      rawBody: body,
+      signatureHeader: signedWebhookBody(body, 'whsec_test_456'),
+      kms,
+    });
+
+    expect(result.summary).toMatchObject({ total: 2, accepted: 1, quarantined: 1 });
+    expect(result.summary?.rejected).toEqual([
+      expect.objectContaining({ client_id: 'stripe:cancellation_reason:sub_u1:1700050000', reasons: ['schema_not_registered:cancellation_reason'] }),
+    ]);
   });
 
   it('acknowledges (handled: false) an event type it does not map, without landing anything', async () => {

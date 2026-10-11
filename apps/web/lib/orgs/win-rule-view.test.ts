@@ -16,6 +16,7 @@ function winRule(overrides: Partial<WinRuleModel> & Pick<WinRuleModel, 'id'>): W
 
 function winEvent(overrides: Partial<WinEventModel> & Pick<WinEventModel, 'id'>): WinEventModel {
   return {
+    win_rule_id: 'rule-1',
     win_rule_name: 'Big order',
     win_type: 'generic',
     schema_name: 'order_completed',
@@ -52,6 +53,7 @@ describe('toWinEventFeedItem', () => {
     const item = toWinEventFeedItem(winEvent({ id: 'w1' }));
     expect(item).toEqual({
       id: 'w1',
+      winRuleId: 'rule-1',
       winRuleName: 'Big order',
       winType: 'generic',
       schemaName: 'order_completed',

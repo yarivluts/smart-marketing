@@ -22,6 +22,12 @@ import {
   type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
+import {
+  registerTwoDayRatioMetrics,
+  TWO_DAY_RATIO_MEAN_OF_DAILY_RATES,
+  TWO_DAY_RATIO_PERIOD_VALUE,
+  TwoDayRatioWarehouse,
+} from '../test-utils/two-day-ratio-warehouse';
 
 /** Emulator-backed tests for KAN-42's `queryMetrics`/catalog read-side — the Firestore-resolving layer `POST /v1/metrics/query` and `GET /v1/metrics(/{name})` sit on top of. */
 
@@ -146,7 +152,7 @@ describe('queryMetrics', () => {
       // A real (non-`KNOWN_UNBUILT_WAREHOUSE_TABLES`) table, deliberately not `fact_funnel_event`
       // (the SaaS pack's real `signups` table) — this test exercises the cache/executor plumbing,
       // which is only reachable once a query compiles past the "buildable table" fast-fail.
-      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
       dimensions: [],
       createdByUserId: owner.id,
     });
@@ -551,6 +557,86 @@ describe('getMetricCatalogDetail', () => {
     });
   });
 
+  /**
+   * Knowing a metric reads `fact_funnel_event` tells an integrator nothing about what to send.
+   * The lineage is real and total - fact_funnel_event selects every non-touchpoint row of
+   * `events` and sets step = properties.event_name ?? event_type, where event_type is the
+   * record's own schema_name - so a `step = 'signup'` filter means exactly "register and send
+   * an event whose schema is signup". Without that spelled out, someone registers a schema,
+   * POSTs successfully, sees accepted:1, and still reads zero with no way to tell why.
+   */
+  it('tells a caller which event has to be sent for a funnel metric to count', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Detail Lineage Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: {
+        kind: 'aggregation',
+        aggregation: {
+          function: 'count_distinct',
+          table: 'fact_funnel_event',
+          column: 'customer_id',
+          timeColumn: 'ts',
+          filters: [{ field: 'step', operator: '=', value: 'signup' }],
+        },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const detail = await getMetricCatalogDetail(organization.id, project.id, 'signups');
+
+    expect(detail?.requiredEvents).toEqual([
+      {
+        event: 'signup',
+        requiredFields: ['customer_id (envelope)'],
+        because:
+          `fact_funnel_event.step is the event's own schema name, so this metric counts events registered and sent as "signup".`,
+      },
+    ]);
+  });
+
+  it('says a funnel metric with no step filter counts every event', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Detail Lineage All Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'dau',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'fact_funnel_event', column: 'customer_id', timeColumn: 'ts', filters: [] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const detail = await getMetricCatalogDetail(organization.id, project.id, 'dau');
+    expect(detail?.requiredEvents?.[0].event).toBe('*');
+  });
+
+  /*
+    Deliberately silent for tables whose lineage folds several event types through their own
+    logic. A hint that is confidently wrong is worse than none - it would send someone off to
+    emit an event that changes nothing.
+  */
+  it('claims nothing for a table it cannot speak for', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Detail Lineage Quiet Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'mrr',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'sum', table: 'dim_subscription', column: 'mrr', timeColumn: 'started_at', filters: [] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    expect((await getMetricCatalogDetail(organization.id, project.id, 'mrr'))?.requiredEvents).toBeUndefined();
+  });
+
   it('returns a formula metric with its direct dependencies as dependsOn', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Detail Formula Org');
     await registerMetricDefinition({
@@ -583,5 +669,133 @@ describe('getMetricCatalogDetail', () => {
     expect(detail?.formula).toBe('ad_spend / signups');
     expect(detail?.dependsOn).toEqual(expect.arrayContaining(['ad_spend', 'signups']));
     expect(detail?.dependsOn).toHaveLength(2);
+  });
+});
+
+describe('queryMetrics fillEmptyBuckets (KAN-210 follow-up)', () => {
+  async function registerSpendSignupsAndCac(organizationId: string, projectId: string, createdByUserId: string) {
+    await registerMetricDefinition({
+      organizationId,
+      projectId,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId,
+    });
+    await registerMetricDefinition({
+      organizationId,
+      projectId,
+      name: 'signups',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
+      dimensions: [],
+      createdByUserId,
+    });
+    await registerMetricDefinition({
+      organizationId,
+      projectId,
+      name: 'cac',
+      definition: { kind: 'formula', formula: 'ad_spend / signups' },
+      dimensions: [],
+      createdByUserId,
+    });
+  }
+
+  it('fills count/sum metrics with 0 and formula metrics with null, only when asked, from the same cache entry', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Fill Org');
+    await registerSpendSignupsAndCac(organization.id, project.id, owner.id);
+    const rows: WarehouseRow[] = [
+      { bucket_date: '2026-01-01', ad_spend: 100, signups: 4, cac: 25 },
+      { bucket_date: '2026-01-03', ad_spend: 50, signups: null, cac: null },
+    ];
+    const executor = new FakeWarehouseQueryExecutor(rows);
+    const cache = new InMemoryMetricQueryResultCache();
+    const request = { metrics: ['ad_spend', 'signups', 'cac'], time: { start: '2026-01-01', end: '2026-01-04', grain: 'day' as const } };
+
+    const unfilled = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
+    expect(unfilled.series).toEqual(rows);
+
+    const filled = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache, fillEmptyBuckets: true });
+    expect(filled.cacheHit).toBe(true);
+    expect(executor.callCount).toBe(1);
+    expect(filled.series).toEqual([
+      { bucket_date: '2026-01-01', ad_spend: 100, signups: 4, cac: 25 },
+      { bucket_date: '2026-01-02', ad_spend: 0, signups: 0, cac: null },
+      { bucket_date: '2026-01-03', ad_spend: 50, signups: 0, cac: null },
+      { bucket_date: '2026-01-04', ad_spend: 0, signups: 0, cac: null },
+    ]);
+
+    // The cached rows themselves were not rewritten by the fill.
+    const again = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
+    expect(again.series).toEqual(rows);
+  });
+});
+
+describe('queryMetrics total grain - a period value (B24)', () => {
+  it('queries a ratio over the whole range as ONE bucket: the SQL divides the period totals and the result is 2/101 = 1.98%, NOT 50.5%', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Total Grain Org');
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const result = await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['lp_conversion_rate'], time: { start: '2026-09-01', end: '2026-09-02', grain: 'total' } },
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+      fillEmptyBuckets: true,
+    });
+
+    const [query] = warehouse.queries;
+    // Each operand aggregated over the whole window, the formula applied once on top.
+    expect(query.sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(query.sql).toContain('HAVING COUNT(*) > 0');
+    expect(query.sql).toContain('SAFE_DIVIDE(value_lp_conversions, value_lp_visitors) AS `lp_conversion_rate`');
+    expect(query.sql).not.toContain('DATE_TRUNC');
+    expect(query.sql).not.toContain('GROUP BY bucket_date');
+    expect(query.params).toMatchObject({ time_start_current: '2026-09-01', time_end_current: '2026-09-02' });
+
+    // One row - the period - even with fillEmptyBuckets on.
+    expect(result.series).toHaveLength(1);
+    const value = Number(result.series[0].lp_conversion_rate);
+    expect(value).toBeCloseTo(TWO_DAY_RATIO_PERIOD_VALUE, 10);
+    expect(value).not.toBeCloseTo(TWO_DAY_RATIO_MEAN_OF_DAILY_RATES, 2);
+    expect(result.accumulatesOverPeriod).toEqual({ lp_conversion_rate: false });
+  });
+
+  it('reports a count as accumulating, and its whole-range value equals the sum of its daily values', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Total Grain Count Org');
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const warehouse = new TwoDayRatioWarehouse();
+    const cache = new InMemoryMetricQueryResultCache();
+    const time = { start: '2026-09-01', end: '2026-09-02' };
+
+    const total = await queryMetrics({ organizationId: organization.id, projectId: project.id, request: { metrics: ['lp_visitors'], time: { ...time, grain: 'total' } }, executor: warehouse, cache });
+    const daily = await queryMetrics({ organizationId: organization.id, projectId: project.id, request: { metrics: ['lp_visitors'], time: { ...time, grain: 'day' } }, executor: warehouse, cache });
+
+    expect(total.accumulatesOverPeriod).toEqual({ lp_visitors: true });
+    expect(total.series.map((row) => row.lp_visitors)).toEqual([101]);
+    expect(daily.series.reduce((sum, row) => sum + Number(row.lp_visitors), 0)).toBe(101);
+  });
+
+  it('never serves one grain\'s or one breakdown\'s cached rows to another request over the same metric and window', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Cache Shape Org');
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const warehouse = new TwoDayRatioWarehouse();
+    const cache = new InMemoryMetricQueryResultCache();
+    const time = { start: '2026-09-01', end: '2026-09-02' };
+    const base = { organizationId: organization.id, projectId: project.id, executor: warehouse, cache };
+
+    const daily = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], time: { ...time, grain: 'day' } } });
+    const total = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], time: { ...time, grain: 'total' } } });
+    const byCampaign = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], dimensions: ['campaign_id'], time: { ...time, grain: 'total' } } });
+    const totalAgain = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], time: { ...time, grain: 'total' } } });
+
+    expect(daily.cacheHit).toBe(false);
+    expect(total.cacheHit).toBe(false);
+    expect(byCampaign.cacheHit).toBe(false);
+    expect(totalAgain.cacheHit).toBe(true);
+    expect(daily.series).toHaveLength(2);
+    expect(total.series).toHaveLength(1);
+    expect(warehouse.queries).toHaveLength(3);
   });
 });

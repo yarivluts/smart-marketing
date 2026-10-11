@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Key, Copy, Check } from 'lucide-react';
-import { PpButton, PpPill } from '@/components/pastel/primitives';
+import { Button } from '@/components/ui/button';
 
 export interface MintedApiKeyDisplayProps {
   rawKey: string;
@@ -30,37 +29,18 @@ export function MintedApiKeyDisplay({ rawKey, onDismiss }: MintedApiKeyDisplayPr
   }
 
   return (
-    <div
-      data-testid="minted-api-key-display"
-      className="flex flex-col gap-3 rounded-2xl border border-pp-outline-variant/30 bg-pp-surface-container-low p-5 shadow-pp-candy"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Key className="w-5 h-5 text-pp-primary" />
-          <span className="text-pp-body-md font-bold text-pp-on-surface">{t('secretShownOnceWarning')}</span>
-        </div>
-        <PpPill accent="amber">{t('secretShownOnceWarning')}</PpPill>
-      </div>
-
-      <div className="rounded-xl bg-pp-inverse-surface p-4">
-        <code data-testid="minted-api-key-value" className="break-all font-mono text-sm text-pp-inverse-on-surface">
-          {rawKey}
-        </code>
-      </div>
-
-      <div className="flex items-center gap-3 pt-1">
-        <PpButton
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={handleCopy}
-          icon={copied ? Check : Copy}
-        >
+    <div data-testid="minted-api-key-display" className="flex flex-col gap-3 rounded-md border border-input bg-muted/50 p-4">
+      <p className="text-sm font-medium">{t('secretShownOnceWarning')}</p>
+      <code data-testid="minted-api-key-value" className="break-all rounded-md bg-background p-3 text-sm">
+        {rawKey}
+      </code>
+      <div className="flex items-center gap-3">
+        <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
           {copied ? t('copied') : t('copySecret')}
-        </PpButton>
-        <PpButton type="button" variant="primary" size="sm" onClick={onDismiss}>
+        </Button>
+        <Button type="button" size="sm" onClick={onDismiss}>
           {t('done')}
-        </PpButton>
+        </Button>
       </div>
     </div>
   );

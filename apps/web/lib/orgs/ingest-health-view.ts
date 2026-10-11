@@ -50,8 +50,11 @@ export interface IngestHealthRollup {
    * expected idempotent-retry outcome (see `IngestRecordResult`'s own doc
    * comment), not a data-quality problem, so folding it into "error rate"
    * would make a harmless client retry storm read as an ingestion outage.
+   *
+   * `null` when no record was received: a rate over nothing is not 0%, and rendering it as
+   * "0.0% rejected" would read as a measured clean bill of health (see `formatErrorRate`).
    */
-  errorRatePercent: number;
+  errorRatePercent: number | null;
   latestBatchAt: string | null;
   /** Minutes since `latestBatchAt`, or `null` if this bucket has no batches at all. */
   freshnessMinutes: number | null;
@@ -83,7 +86,7 @@ function rollupKind(kind: SchemaDefKind | 'overall', batches: readonly IngestBat
       acceptedCount: 0,
       quarantinedCount: 0,
       duplicateCount: 0,
-      errorRatePercent: 0,
+      errorRatePercent: null,
       latestBatchAt: null,
       freshnessMinutes: null,
       throughputPerMinute: 0,
@@ -106,7 +109,7 @@ function rollupKind(kind: SchemaDefKind | 'overall', batches: readonly IngestBat
     earliestMs = Math.min(earliestMs, createdMs);
   }
 
-  const errorRatePercent = totalRecords === 0 ? 0 : (quarantinedCount / totalRecords) * 100;
+  const errorRatePercent = totalRecords === 0 ? null : (quarantinedCount / totalRecords) * 100;
   const windowMinutes = Math.max((nowMs - earliestMs) / 60_000, MIN_THROUGHPUT_WINDOW_MINUTES);
   const throughputPerMinute = totalRecords / windowMinutes;
   const freshnessMinutes = Math.max(0, (nowMs - latestMs) / 60_000);
@@ -207,6 +210,14 @@ export function toQueuedPipelineMessageView(message: PipelineMessageModel, nowMs
     clientId: message.client_id,
     minutesAgo: (nowMs - new Date(message.enqueued_at).getTime()) / 60_000,
   };
+}
+
+/**
+ * The rejected-on-arrival rate to one decimal place, or `null` when there is no rate to show (zero
+ * records received). Callers render `null` as the empty value, never as "0.0%".
+ */
+export function formatErrorRate(errorRatePercent: number | null): string | null {
+  return errorRatePercent === null ? null : errorRatePercent.toFixed(1);
 }
 
 /** `"<1"` below a minute, otherwise the rounded whole-minute count — used for the "last batch N min ago" display. */

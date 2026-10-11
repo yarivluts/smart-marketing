@@ -294,6 +294,32 @@ describe('getEventVolumeOverviewForProject', () => {
     expect(overview.filter((candidate) => candidate.schemaName === 'order_completed')).toHaveLength(3);
   });
 
+  /**
+   * The state this overview cannot distinguish, which the schema-defs page now covers with a
+   * second signal.
+   *
+   * The overview is built from LANDED records, and a quarantined record never lands - it is
+   * diverted before raw_records is written. So a schema whose traffic is being rejected in
+   * full reports lastSeenAt: null, identical to a schema nobody has ever sent anything to.
+   * The page rendered that as "Never received a record", which reads as "you have not sent
+   * anything" at precisely the moment hundreds of records are arriving and bouncing.
+   *
+   * Pinning it here rather than calling it a bug: the overview is correct about what it
+   * measures. The fix belongs in the surface, which must read quarantine separately - and if
+   * this assertion ever flips, that surface is showing a number it no longer needs to.
+   */
+  it('cannot see rejected traffic: a schema whose records were all quarantined reads as never seen', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Event Volume Rejected Org');
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+
+    const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
+    const entry = overview.find((candidate) => candidate.schemaName === 'signup' && candidate.environmentId === environmentId);
+
+    expect(entry).toBeDefined();
+    expect(entry?.lastSeenAt).toBeNull();
+    expect(entry?.dailyCounts.every((bucket) => bucket.count === 0)).toBe(true);
+  });
+
   it('reports the most recent lastSeenAt and does not lose recent days when a schema lands more records than the per-event cap', async () => {
     const { owner, organization, project, environmentId } = await setupOrgWithProject('Event Volume Busy Org');
     await registerEventSchema(organization.id, project.id, 'page_view', owner.id);
@@ -356,5 +382,36 @@ describe('getEventVolumeOverviewForProject', () => {
     expect(devEntry?.lastSeenAt).toBe(TEN_MINUTES_AGO);
     expect(prodEntry?.lastSeenAt).toBeNull();
     expect(prodEntry?.dailyCounts.every((bucket) => bucket.count === 0)).toBe(true);
+  });
+});
+
+describe('tracking-alert reads: environment scoping (KAN-196)', () => {
+  it('listTrackingAlertsForProject returns only the named environment\'s alerts when environmentId is passed, and every environment\'s when omitted', async () => {
+    const { owner, organization, project, environmentId: devEnvironmentId, prodEnvironmentId } = await setupOrgWithProject('Tracking Alert Env Scope Org');
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: devEnvironmentId, schemaName: 'signup', landedAt: TWO_HOURS_AGO });
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironmentId, schemaName: 'signup', landedAt: TWO_HOURS_AGO });
+    await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: NOW });
+
+    const devOnly = await listTrackingAlertsForProject(organization.id, project.id, undefined, devEnvironmentId);
+    expect(devOnly.map((alert) => alert.environment_id)).toEqual([devEnvironmentId]);
+
+    const everyEnvironment = await listTrackingAlertsForProject(organization.id, project.id);
+    expect(everyEnvironment.map((alert) => alert.environment_id).sort()).toEqual([devEnvironmentId, prodEnvironmentId].sort());
+  });
+
+  it('getEventVolumeOverviewForProject returns only the named environment\'s entries when environmentId is passed, and one per environment when omitted', async () => {
+    const { owner, organization, project, environments, environmentId: devEnvironmentId, prodEnvironmentId } = await setupOrgWithProject('Event Volume Env Scope Org');
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: devEnvironmentId, schemaName: 'signup', landedAt: TEN_MINUTES_AGO });
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironmentId, schemaName: 'signup', landedAt: TWO_HOURS_AGO });
+
+    const devOnly = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7, environmentId: devEnvironmentId });
+    expect(devOnly).toHaveLength(1);
+    expect(devOnly[0].environmentId).toBe(devEnvironmentId);
+    expect(devOnly[0].lastSeenAt).toBe(TEN_MINUTES_AGO);
+
+    const everyEnvironment = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
+    expect(everyEnvironment).toHaveLength(environments.length);
   });
 });

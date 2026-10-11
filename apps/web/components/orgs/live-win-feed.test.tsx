@@ -43,6 +43,7 @@ function renderFeed(): void {
 
 const item: WinEventFeedItem = {
   id: 'win-1',
+  winRuleId: 'rule-1',
   winRuleName: 'Big order',
   winType: 'generic',
   schemaName: 'order_completed',

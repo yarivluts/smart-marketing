@@ -1,19 +1,14 @@
+import { Link2, MonitorPlay, PlayCircle, SlidersHorizontal } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, FlowDiagram, PageHero } from '@/components/viz';
+import { summarizeSessionReplayTemplate } from '@/lib/orgs/session-replay-view';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import { Video, ShieldCheck, ExternalLink, Link2, BookOpen, Layers } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
-import {
-  PpPage,
-  PpPageHeader,
-  PpKpiGrid,
-  PpKpiCard,
-  PpCard,
-  PpPill,
-} from '@/components/pastel/primitives';
 import { SessionReplaySettingsForm } from '@/components/orgs/session-replay-settings-form';
 
 type PageProps = Readonly<{
@@ -51,133 +46,54 @@ export default async function SessionReplaySettingsPage({ params }: PageProps): 
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId, projectId })) {
     notFound();
   }
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/session-replay`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
   const t = await getTranslations('SessionReplaySettings');
-  const hasTemplate = Boolean(project.session_replay_url_template?.trim());
+  const summary = summarizeSessionReplayTemplate(project.session_replay_url_template);
+  const toolLabel = summary.tool ? t(`toolName.${summary.tool}`) : t('notConfigured');
 
   return (
-    <PpPage>
-      <PpPageHeader
-        eyebrow={t('eyebrow')}
-        title={t('title', { projectName: project.name })}
-        description={t('intro')}
-      />
-
-      <PpKpiGrid>
-        <PpKpiCard
-          label={t('kpiStatus')}
-          value={hasTemplate ? t('kpiStatusActive') : t('kpiStatusNotConfigured')}
-          accent={hasTemplate ? 'mint' : 'neutral'}
-        />
-        <PpKpiCard
-          label={t('kpiSupportedVendors')}
-          value="4 Tested"
-          accent="primary"
-        />
-        <PpKpiCard
-          label="Target Parameter"
-          value="{landing_page}"
-          accent="neutral"
-        />
-        <PpKpiCard
-          label={t('kpiPrivacyPosture')}
-          value="Zero-DOM Scrub"
-          accent="mint"
-        />
-      </PpKpiGrid>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Main Configuration Card (7 Cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          <PpCard
-            title={t('templateLabel')}
-            subtitle={t('intro')}
-            icon={Link2}
-            iconAccent="primary"
-            action={
-              hasTemplate ? (
-                <PpPill accent="mint">{t('kpiStatusActive')}</PpPill>
-              ) : (
-                <PpPill accent="neutral">{t('kpiStatusNotConfigured')}</PpPill>
-              )
-            }
-          >
-            <SessionReplaySettingsForm
-              orgId={orgId}
-              projectId={projectId}
-              initialTemplate={project.session_replay_url_template ?? ''}
-              templateLabel={t('templateLabel')}
-              templatePlaceholder={t('templatePlaceholder', { landing_page: '{landing_page}' })}
-              templateHelp={t('templateHelp', { landing_page: '{landing_page}' })}
-              saveLabel={t('save')}
-              savedLabel={t('saved')}
-              saveErrorLabel={t('saveError')}
-              availableTokensHeading={t('availableTokensHeading')}
-              previewHeading={t('previewHeading')}
-            />
-          </PpCard>
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={PlayCircle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('intro')}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatCard title={t('kpiTool')} value={toolLabel} icon={MonitorPlay} />
+          <StatCard title={t('kpiFiltering')} value={summary.tool ? (summary.filtersByPage ? t('filteringOn') : t('filteringOff')) : t('notConfigured')} icon={SlidersHorizontal} />
         </div>
+      </PageHero>
 
-        {/* Vendor Playbook & Recommendations (5 Cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <PpCard
-            title={t('vendorsHeading')}
-            subtitle="Recommended session recording tools and sample URL structures."
-            icon={BookOpen}
-            iconAccent="mint"
-          >
-            <div className="flex flex-col gap-4">
-              {/* Microsoft Clarity */}
-              <div className="p-3.5 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-pp-on-surface">Microsoft Clarity</span>
-                  <PpPill accent="mint">Recommended · Free</PpPill>
-                </div>
-                <p className="text-xs text-pp-on-surface-variant">{t('clarityDesc')}</p>
-                <code className="text-[11px] font-mono text-pp-primary bg-pp-surface-container px-2 py-1 rounded-lg break-all select-all">
-                  https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url={'{landing_page}'}
-                </code>
-              </div>
-
-              {/* PostHog */}
-              <div className="p-3.5 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-pp-on-surface">PostHog</span>
-                  <PpPill accent="primary">Open Source</PpPill>
-                </div>
-                <p className="text-xs text-pp-on-surface-variant">{t('posthogDesc')}</p>
-                <code className="text-[11px] font-mono text-pp-primary bg-pp-surface-container px-2 py-1 rounded-lg break-all select-all">
-                  https://app.posthog.com/recordings?url={'{landing_page}'}
-                </code>
-              </div>
-
-              {/* FullStory */}
-              <div className="p-3.5 rounded-2xl bg-pp-surface-container-low/60 border border-pp-outline-variant/20 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-sm text-pp-on-surface">FullStory</span>
-                  <PpPill accent="neutral">Enterprise</PpPill>
-                </div>
-                <p className="text-xs text-pp-on-surface-variant">{t('fullstoryDesc')}</p>
-                <code className="text-[11px] font-mono text-pp-primary bg-pp-surface-container px-2 py-1 rounded-lg break-all select-all">
-                  https://app.fullstory.com/ui/ORG/segments?filter=url:{'{landing_page}'}
-                </code>
-              </div>
-            </div>
-          </PpCard>
-        </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('flowTitle')} description={t('flowDescription')} icon={Link2} className="lg:col-span-3">
+          <FlowDiagram
+            label={t('flowTitle')}
+            height={220}
+            nodes={[
+              { id: 'row', label: t('flowBoardRow'), sublabel: t('flowBoardRowSub'), status: 'ok', href: `/orgs/${orgId}/projects/${projectId}/boards` },
+              { id: 'template', label: t('flowTemplate'), sublabel: t('flowTemplateSub'), status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle' },
+              {
+                id: 'tool',
+                label: toolLabel,
+                sublabel: summary.tool ? (summary.filtersByPage ? t('flowToolFiltered') : t('flowToolUnfiltered')) : undefined,
+                status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle',
+              },
+            ]}
+            edges={[
+              { source: 'row', target: 'template', animated: Boolean(summary.tool), status: summary.tool ? 'ok' : 'idle' },
+              { source: 'template', target: 'tool', animated: Boolean(summary.tool), status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle' },
+            ]}
+          />
+        </ChartCard>
+        <ChartCard title={t('formTitle')} icon={SlidersHorizontal} className="lg:col-span-2">
+          <SessionReplaySettingsForm orgId={orgId} projectId={projectId} initialTemplate={project.session_replay_url_template ?? ''} />
+        </ChartCard>
       </div>
-    </PpPage>
+    </div>
   );
 }

@@ -43,8 +43,8 @@ async function setupOrgWithProject(orgName: string) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
-  const devEnvironment = environments.find((environment) => environment.name === 'dev')!;
-  return { owner, organization, project, environmentId: devEnvironment.id };
+  const prodEnvironment = environments.find((environment) => environment.name === 'prod')!;
+  return { owner, organization, project, environmentId: prodEnvironment.id };
 }
 
 /** Lands one `stripe_charge` raw record with a real event envelope shape (`{event, event_id, ts, properties}`) — reading `payload.amount` directly (rather than `payload.properties.amount`) is a known, documented mistake elsewhere in this codebase (see `listBillingCollectionSignalsForProject`'s own doc comment), so this helper deliberately mirrors the correct shape `churn-reason.emulator.test.ts`/`feedback.emulator.test.ts` already establish, not `pipeline.emulator.test.ts`'s flat (incorrect) fixture. `amount`/`amountRefunded` are Stripe's own smallest-currency-unit convention (cents), matching what a real Stripe charge event carries. */

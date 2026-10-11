@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { ApiKeyScope } from '@growthos/shared';
+import type { ApiKeyKind, ApiKeyScope } from '@growthos/shared';
 
 /**
  * A minted API key (KAN-28: plan `12 §1` / `06 §1`), scoped to exactly one
@@ -41,6 +41,14 @@ export class ApiKeyModel extends BaseModel {
   /** Least-privilege scope list, each a member of `API_KEY_SCOPES` (`@growthos/shared`). */
   @Field({ is_required: true })
   public scopes!: ApiKeyScope[];
+
+  /** `publishable` keys sit in web pages: they only send events, and only from `allowed_origins`. Absent on keys minted before the kind existed - those are secret. */
+  @Field({ is_required: false })
+  public kind?: ApiKeyKind;
+
+  /** For a publishable key: the web origins it accepts events from (see `api-key-origins.ts`). */
+  @Field({ is_required: false })
+  public allowed_origins?: string[];
 
   @Field({ is_required: true })
   public created_by!: string;

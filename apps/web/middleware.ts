@@ -6,7 +6,8 @@ import { SESSION_COOKIE_NAME } from './lib/auth/constants';
 const intlMiddleware = createIntlMiddleware(routing);
 
 // Fail-closed, like the API's PermissionGuard (KAN-24): a locale-prefixed
-const PUBLIC_PATHS = new Set(['/', '/login', '/login/token', '/signup', '/pricing', '/tv']);
+// page is protected unless explicitly listed here.
+const PUBLIC_PATHS = new Set(['/', '/login', '/login/token', '/signup', '/privacy']);
 // Invite links (KAN-25's join flow) are shared before the recipient
 // necessarily has an account, so every `/invite/:orgId/:membershipId` must
 // stay reachable pre-auth; the page itself prompts sign-in/sign-up inline.
@@ -41,7 +42,9 @@ export default function middleware(request: NextRequest): NextResponse {
       // Locale-agnostic (no `/${matchedLocale}` prefix) so the login form can
       // hand it straight to next-intl's locale-prefixing router without
       // double-prefixing.
-      loginUrl.searchParams.set('from', pathWithoutLocale);
+      // The query string too, so a link that carries its context (e.g. ?projectId= or ?brief=&step=)
+      // still has it after signing in; resolveRedirectTarget only accepts same-app relative paths.
+      loginUrl.searchParams.set('from', `${pathWithoutLocale}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
   }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { ApiKeyNotFoundError, InvalidApiKeyNameError } from '@growthos/firebase-orm-models';
-import { renameApiKey, revokeApiKey } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { ApiKeyNotFoundError, InvalidAllowedOriginsError, NotAPublishableKeyError, InvalidApiKeyNameError } from '@growthos/firebase-orm-models';
+import { renameApiKey, revokeApiKey, setApiKeyAllowedOrigins } from '@/lib/orgs/mutations';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -11,7 +11,7 @@ interface RouteParams {
 /** Revokes a key immediately (KAN-30/KAN-28 AC) — gated on `keys.manage`, same as minting. */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, apiKeyId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'keys.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'keys.manage');
   if (error) {
     return error;
   }
@@ -36,16 +36,31 @@ export async function DELETE(_request: Request, { params }: RouteParams): Promis
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, apiKeyId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'keys.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'keys.manage');
   if (error) {
     return error;
   }
 
-  const parsed = await parseJsonBody<{ name?: unknown }>(request);
+  const parsed = await parseJsonBody<{ name?: unknown; allowedOrigins?: unknown }>(request);
   if (parsed.error) {
     return parsed.error;
   }
-  const { name } = parsed.body;
+  const { name, allowedOrigins } = parsed.body;
+  // A publishable key's allowed origins can change (a new domain, a staging site); nothing else of a key's access can.
+  if (allowedOrigins !== undefined) {
+    if (!Array.isArray(allowedOrigins) || !allowedOrigins.every((origin) => typeof origin === 'string')) {
+      return NextResponse.json({ error: 'invalid_origins', issue: 'invalid_origin' }, { status: 400 });
+    }
+    try {
+      const apiKey = await setApiKeyAllowedOrigins({ organizationId: orgId, projectId, apiKeyId, allowedOrigins, actorUserId: user.id });
+      return NextResponse.json({ apiKeyId: apiKey.id, allowedOrigins: apiKey.allowed_origins ?? [] });
+    } catch (err) {
+      if (err instanceof ApiKeyNotFoundError) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+      if (err instanceof NotAPublishableKeyError) return NextResponse.json({ error: 'not_publishable' }, { status: 400 });
+      if (err instanceof InvalidAllowedOriginsError) return NextResponse.json({ error: 'invalid_origins', issue: err.issue }, { status: 400 });
+      throw err;
+    }
+  }
   if (typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }

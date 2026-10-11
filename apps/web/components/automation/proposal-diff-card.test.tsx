@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import heMessages from '@/messages/he.json';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { ProposalDiffCard, type ActionProposalData } from './proposal-diff-card';
 
@@ -87,4 +88,17 @@ describe('ProposalDiffCard Component', () => {
     expect(screen.getByTestId('guardrail-warning-banner')).toBeInTheDocument();
     expect(screen.getByText('Exceeds standard 50% daily budget change threshold')).toBeInTheDocument();
   });
+
+  it('renders its Hebrew button labels from he.json', () => {
+    const { unmount } = renderWithIntl(<ProposalDiffCard proposal={mockProposal} />, { locale: 'he' });
+    expect(screen.getByTestId('quick-execute-button')).toHaveTextContent(heMessages.ProposalDiffCard.approveAndExecute);
+    unmount();
+
+    renderWithIntl(
+      <ProposalDiffCard proposal={{ ...mockProposal, status: 'executed' }} onRollback={vi.fn()} />,
+      { locale: 'he' },
+    );
+    expect(screen.getByTestId('proposal-rollback-button')).toHaveTextContent(heMessages.ProposalDiffCard.rollbackButton);
+  });
+
 });

@@ -50,8 +50,32 @@ export interface CompilerMetricDefinition {
 
 export type MetricCatalog = ReadonlyMap<string, CompilerMetricDefinition>;
 
+/** The calendar grains a board or chart buckets a range by - the grains a human picks from. */
 export const TIME_GRAINS = ['day', 'week', 'month', 'quarter', 'year'] as const;
 export type TimeGrain = (typeof TIME_GRAINS)[number];
+
+/**
+ * The whole requested range as ONE bucket (per compared period), stamped with the range's start
+ * date. This is how a period's value is computed - a big number, a goal's actual, a
+ * period-over-period change - because it is the only correct way for a metric that is not a plain
+ * count or sum.
+ *
+ * A formula metric is composed from its aggregation operands inside the query, so over a single
+ * bucket `conversions / visitors` evaluates as sum(conversions) / sum(visitors) across the whole
+ * range. Deriving the same number from a per-day series instead is the average-of-ratios fallacy:
+ * day 1 at 1/1 (100%) and day 2 at 1/100 (1%) average to 50.5%, while the period's real rate is
+ * 2/101 = 1.98%. The same holds for avg/min/max (the mean of daily means weights a quiet day like a
+ * busy one) and for count_distinct (a customer active on two days is one customer, not two). For a
+ * count or a sum the single bucket equals the sum of the daily buckets, so nothing changes there.
+ *
+ * Not a calendar grain, so it is not in {@link TIME_GRAINS}: a board's own grain picker never
+ * offers it. It is a query grain only - see {@link METRIC_QUERY_GRAINS}.
+ */
+export const TOTAL_GRAIN = 'total' as const;
+
+/** Every grain a metric query accepts: the calendar grains plus {@link TOTAL_GRAIN}. */
+export const METRIC_QUERY_GRAINS = [...TIME_GRAINS, TOTAL_GRAIN] as const;
+export type MetricQueryGrain = (typeof METRIC_QUERY_GRAINS)[number];
 
 export const COMPARE_PERIODS = ['previous_period', 'previous_year'] as const;
 export type ComparePeriod = (typeof COMPARE_PERIODS)[number];
@@ -61,7 +85,8 @@ export interface MetricQueryTimeRange {
   start: string;
   /** Inclusive, `YYYY-MM-DD`. */
   end: string;
-  grain: TimeGrain;
+  /** A calendar grain buckets the range; {@link TOTAL_GRAIN} returns the whole range as one bucket (a period value). */
+  grain: MetricQueryGrain;
   compare?: ComparePeriod;
 }
 

@@ -14,13 +14,19 @@
 -- with `status = 'failed'` — proving a failed charge is never collected
 -- revenue: every window is $0, not null (the left join still produces a row
 -- for a customer with zero *succeeded* charges).
-with expected(customer_id, collected_revenue_7d, collected_revenue_14d, collected_revenue_30d, collected_revenue_40d) as (
+--
+-- Both fixture customers signed up in July 2026, so every window has long
+-- since elapsed and all four maturity flags are true (KAN-179). Asserted
+-- rather than ignored: the flags decide which customers the 40-day average
+-- counts, and a flag stuck `false` would silently empty that metric while
+-- every revenue column here still matched.
+with expected(customer_id, collected_revenue_7d, collected_revenue_14d, collected_revenue_30d, collected_revenue_40d, window_7d_complete, window_40d_complete) as (
     values
-        ('cust_p1', 100.0, 150.0, 180.0, 200.0),
-        ('cust_p2', 0.0, 0.0, 0.0, 0.0)
+        ('cust_p1', 100.0, 150.0, 180.0, 200.0, true, true),
+        ('cust_p2', 0.0, 0.0, 0.0, 0.0, true, true)
 ),
 actual as (
-    select customer_id, collected_revenue_7d, collected_revenue_14d, collected_revenue_30d, collected_revenue_40d
+    select customer_id, collected_revenue_7d, collected_revenue_14d, collected_revenue_30d, collected_revenue_40d, window_7d_complete, window_40d_complete
     from {{ ref('fact_customer_payback') }}
     where project_id = 'proj_18'
 )

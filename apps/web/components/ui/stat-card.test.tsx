@@ -38,4 +38,30 @@ describe('StatCard', () => {
     expect(screen.getByText('Target: $100k')).toBeInTheDocument();
     expect(screen.getByText('80%')).toBeInTheDocument();
   });
+
+  it('shows a value made of words in a smaller style with automatic direction', () => {
+    // "no data yet" in Hebrew, written with escapes: code files carry no Hebrew literals.
+    const noData = '\u05d0\u05d9\u05df \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd';
+    render(
+      <>
+        <StatCard title="Revenue" value={noData} />
+        <StatCard title="Time zone" value="Asia/Jerusalem" />
+      </>,
+    );
+    for (const text of [noData, 'Asia/Jerusalem']) {
+      const value = screen.getByText(text);
+      expect(value).not.toHaveClass('text-pp-metric');
+      expect(value).toHaveAttribute('dir', 'auto');
+    }
+    expect(screen.queryByText('1,840')).not.toBeInTheDocument();
+  });
+
+  it('draws the accent as an inner bar clipped by the card, not a curved border', () => {
+    const { container } = render(<StatCard title="Signups" value={3} data-testid="card" />);
+    const card = screen.getByTestId('card');
+    expect(card).toHaveClass('overflow-hidden');
+    expect(card.className).not.toMatch(/border-s-4/);
+    expect(container.querySelector('span[aria-hidden="true"].bg-pp-primary')).not.toBeNull();
+    expect(screen.getByText('3')).toHaveClass('text-pp-metric');
+  });
 });

@@ -13,6 +13,7 @@ import {
   InvalidGoalError,
   KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listAuditLogEntriesForOrg,
+  listEnvironmentsForProject,
   listGoalsForProject,
   ProjectNotFoundError,
   queryGoalProgress,
@@ -24,6 +25,12 @@ import {
   type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
+import {
+  registerTwoDayRatioMetrics,
+  TWO_DAY_RATIO_MEAN_OF_DAILY_RATES,
+  TWO_DAY_RATIO_PERIOD_VALUE,
+  TwoDayRatioWarehouse,
+} from '../test-utils/two-day-ratio-warehouse';
 
 /** Emulator-backed tests for KAN-64's goal CRUD + `queryGoalProgress` — the Firestore-resolving layer the goals admin surface and detail page sit on top of. */
 
@@ -57,7 +64,7 @@ async function registerSignups(organizationId: string, projectId: string, create
     organizationId,
     projectId,
     name: 'signups',
-    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
     dimensions: [],
     createdByUserId,
   });
@@ -68,7 +75,7 @@ async function registerCostPerSignup(organizationId: string, projectId: string, 
     organizationId,
     projectId,
     name: 'cost_per_signup',
-    definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_landing_page_performance', column: 'cost_per_signup', timeColumn: 'date', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_landing_page_performance', column: 'conversions', timeColumn: 'activity_date', filters: [] } },
     dimensions: [],
     createdByUserId,
   });
@@ -80,6 +87,23 @@ class FakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
   execute(): Promise<WarehouseRow[]> {
     this.callCount += 1;
     return Promise.resolve(this.rows);
+  }
+}
+
+/**
+ * Answers a goal's two queries the way the warehouse would: the whole-window (`total` grain) query
+ * that gives the goal its actual value with `total`, and the day-grain query behind its trend fit
+ * with `daily`. A plain fake returning the same rows to both would hand the period query a day row.
+ */
+class GrainAwareFakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
+  public callCount = 0;
+  constructor(
+    private readonly daily: WarehouseRow[],
+    private readonly total: WarehouseRow[],
+  ) {}
+  execute(query: { sql: string }): Promise<WarehouseRow[]> {
+    this.callCount += 1;
+    return Promise.resolve(query.sql.includes('DATE_TRUNC') ? this.daily : this.total);
   }
 }
 
@@ -726,7 +750,7 @@ describe('updateGoalDefinition', () => {
 });
 
 describe('queryGoalProgress', () => {
-  it('sums the metric series into actualValue and computes on_track pace for a maximize goal', async () => {
+  it('reads the metric over the whole window into actualValue and computes on_track pace for a maximize goal, in one query', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Goal Query Org');
     await registerSignups(organization.id, project.id, owner.id);
     const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
@@ -744,11 +768,13 @@ describe('queryGoalProgress', () => {
       createdByUserId: owner.id,
     });
 
-    const rows: WarehouseRow[] = [
-      { bucket_date: '2026-01-01', signups: 30 },
-      { bucket_date: '2026-01-02', signups: 30 },
-    ];
-    const executor = new FakeWarehouseQueryExecutor(rows);
+    const executor = new GrainAwareFakeWarehouseQueryExecutor(
+      [
+        { bucket_date: '2026-01-01', signups: 30 },
+        { bucket_date: '2026-01-02', signups: 30 },
+      ],
+      [{ bucket_date: '2026-01-01', signups: 60 }],
+    );
 
     const outcome = await queryGoalProgress({
       organizationId: organization.id,
@@ -838,10 +864,13 @@ describe('queryGoalProgress', () => {
     // 60), extrapolating to 40 at elapsedFraction 1 — below the target-value
     // fallback (a flat 110, the two rows' sum) the pre-trend v1 behavior
     // would have produced.
-    const executor = new FakeWarehouseQueryExecutor([
-      { bucket_date: '2026-01-01', cost_per_signup: 60 },
-      { bucket_date: '2026-01-06', cost_per_signup: 50 },
-    ]);
+    const executor = new GrainAwareFakeWarehouseQueryExecutor(
+      [
+        { bucket_date: '2026-01-01', cost_per_signup: 60 },
+        { bucket_date: '2026-01-06', cost_per_signup: 50 },
+      ],
+      [{ bucket_date: '2026-01-01', cost_per_signup: 55 }],
+    );
 
     const outcome = await queryGoalProgress({
       organizationId: organization.id,
@@ -855,6 +884,49 @@ describe('queryGoalProgress', () => {
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error('expected ok outcome');
     expect(outcome.progress.projectedFinalValue).toBeCloseTo(40, 10);
+  });
+
+  it('counts a day with no events as a real 0 in a count metric\'s trend (KAN-210 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Minimize Zero Fill Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Daily signups ceiling',
+      metricName: 'signups',
+      direction: 'minimize',
+      targetValue: 50,
+      startDate: '2026-01-01',
+      deadline: '2026-01-11',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    // Only days 1 and 6 had events. Unfilled, the fit saw two equal points and projected a flat 10;
+    // filled, days 2-5 are the zeros they really were: points (0,10) (.1,0) (.2,0) (.3,0) (.4,0)
+    // (.5,10) fit a flat line at their mean, 20/6.
+    const outcome = await queryGoalProgress({
+      organizationId: organization.id,
+      projectId: project.id,
+      goal,
+      executor: new GrainAwareFakeWarehouseQueryExecutor(
+        [
+          { bucket_date: '2026-01-01', signups: 10 },
+          { bucket_date: '2026-01-06', signups: 10 },
+        ],
+        [{ bucket_date: '2026-01-01', signups: 20 }],
+      ),
+      cache: new InMemoryMetricQueryResultCache(),
+      asOfDate: '2026-01-06',
+    });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.actualValue).toBe(20);
+    expect(outcome.hasMeasurements).toBe(true);
+    expect(outcome.progress.projectedFinalValue).toBeCloseTo(20 / 6, 10);
   });
 
   it('degrades to a "warehouse not configured" outcome instead of throwing, using the default executor', async () => {
@@ -1092,5 +1164,105 @@ describe('queryGoalProgress', () => {
     // Never reaches the warehouse — an inverted [start_date, asOfDate] range
     // would otherwise throw a `MetricCompilerError` (`deriveTimeWindows`).
     expect(executor.callCount).toBe(0);
+  });
+});
+
+describe('queryGoalProgress on a ratio metric (B24: the period value, not a mean of daily rates)', () => {
+  async function conversionGoal(orgName: string, targetValue: number) {
+    const { owner, organization, project } = await setupOrgWithProject(orgName);
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Landing page conversion',
+      metricName: 'lp_conversion_rate',
+      direction: 'maximize',
+      targetValue,
+      startDate: '2026-09-01',
+      deadline: '2026-09-21', // 20-day window; 2026-09-03 is 10% in
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+    return { organization, project, goal };
+  }
+
+  it('reports 2/101 = 1.98% as the actual value - queried as ONE whole-window bucket - never 50.5%', async () => {
+    const { organization, project, goal } = await conversionGoal('Goal Ratio Actual Org', 0.05);
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const outcome = await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor: warehouse, cache: new InMemoryMetricQueryResultCache(), asOfDate: '2026-09-03' });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.actualValue).toBeCloseTo(TWO_DAY_RATIO_PERIOD_VALUE, 10);
+    expect(outcome.actualValue).not.toBeCloseTo(TWO_DAY_RATIO_MEAN_OF_DAILY_RATES, 2);
+    expect(outcome.hasMeasurements).toBe(true);
+    const periodQuery = warehouse.queries.find((query) => !query.sql.includes('DATE_TRUNC'));
+    expect(periodQuery?.sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(periodQuery?.params).toMatchObject({ time_start_current: '2026-09-01', time_end_current: '2026-09-03' });
+  });
+
+  it('paces a rate against the target itself: 1.98% against a 5% target is off track even 10% into the window', async () => {
+    const { organization, project, goal } = await conversionGoal('Goal Ratio Pace Org', 0.05);
+
+    const outcome = await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor: new TwoDayRatioWarehouse(), cache: new InMemoryMetricQueryResultCache(), asOfDate: '2026-09-03' });
+
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    // A running-total pace would expect 10% x 5% = 0.5% by now, call 1.98% on track and project
+    // 19.8%. A rate does not accumulate: the bar is 5% all window long.
+    expect(outcome.progress.expectedAtNow).toBe(0.05);
+    expect(outcome.progress.status).toBe('off_track');
+    expect(outcome.progress.isGoalMet).toBe(false);
+    expect(outcome.progress.projectedFinalValue).toBeLessThan(0.05);
+  });
+
+  it('is on track once the period rate clears the target', async () => {
+    const { organization, project, goal } = await conversionGoal('Goal Ratio Met Org', 0.015);
+
+    const outcome = await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor: new TwoDayRatioWarehouse(), cache: new InMemoryMetricQueryResultCache(), asOfDate: '2026-09-03' });
+
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.progress.status).toBe('on_track');
+    expect(outcome.progress.isGoalMet).toBe(true);
+  });
+});
+
+describe('queryGoalProgress environment scoping (KAN-196)', () => {
+  it('counts the prod environment by default and a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Env Scope Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Signups goal',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 100,
+      startDate: '2026-01-01',
+      deadline: '2026-01-11',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const devEnv = environments.find((environment) => environment.name === 'dev')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+    const cache = new InMemoryMetricQueryResultCache();
+
+    await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor, cache, asOfDate: '2026-01-06' });
+    await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor, cache, asOfDate: '2026-01-06', environmentId: devEnv.id });
+
+    expect(capturedEnvironmentIds).toEqual([prodEnv.id, devEnv.id]);
   });
 });

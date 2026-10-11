@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { DuplicateSchemaDefinitionError, InvalidSchemaDefinitionError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { registerSchemaDefinition } from '@/lib/orgs/mutations';
 import { listOrgProjects, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseSchemaDefRequestBody } from '@/lib/orgs/parse-schema-fields';
 import { toSchemaDefView } from '@/lib/orgs/schema-def-view';
 
@@ -20,7 +20,7 @@ interface RouteParams {
  */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'schema.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'schema.write');
   if (error) {
     return error;
   }
@@ -36,7 +36,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Registers v1 of a new entity/event/measure schema (KAN-31 AC: "register v1"). */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'schema.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'schema.write');
   if (error) {
     return error;
   }

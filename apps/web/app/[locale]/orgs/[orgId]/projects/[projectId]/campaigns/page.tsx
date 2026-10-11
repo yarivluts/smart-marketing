@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -12,6 +13,7 @@ import {
   listSharedCredentials,
   getCampaignSpendBreakdownForProject,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   findCampaignDraftForTarget,
   toAutomationConnectionOptions,
@@ -19,8 +21,6 @@ import {
 } from '@/lib/orgs/automation-view';
 import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
 import { AdsPerformanceDashboard } from '@/components/campaigns/ads-performance-dashboard';
-import { MissingIntegrationAlert } from '@/components/integrations/missing-integration-alert';
-import { PpPage } from '@/components/pastel/primitives';
 import type { CampaignDraftView } from '@/components/campaigns/campaign-creatives-panel';
 import type { CampaignSpendBreakdownOutcome } from '@/lib/orgs/queries';
 
@@ -53,17 +53,20 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
 
-  const canExecute = can(bindings, principal, 'automation.execute', { orgId });
-  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId });
-  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
+  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
+  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
 
   if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
   let spendOutcome: CampaignSpendBreakdownOutcome | null = null;
   try {
-    spendOutcome = await getCampaignSpendBreakdownForProject(orgId, projectId);
+    spendOutcome = await getCampaignSpendBreakdownForProject(orgId, projectId, environmentScope);
   } catch {
     spendOutcome = null;
   }
@@ -78,10 +81,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
 
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
-    if (projects.length > 0) {
-      redirect(`/${locale}/orgs/${orgId}/projects/${projects[0].id}/campaigns`);
-    }
-    redirect(`/${locale}/orgs/${orgId}`);
+    notFound();
   }
 
   const connections = toAutomationConnectionOptions(attachments, credentials);
@@ -120,22 +120,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   );
 
   return (
-    <PpPage className="space-y-6">
-      {(!spendOutcome || !spendOutcome.ok || targetViews.length === 0) && (
-        <MissingIntegrationAlert
-          orgId={orgId}
-          projectId={projectId}
-          metricKey="CAC"
-          connectorId="google_ads"
-          customTitle="Google & Meta Ad Spend Streams"
-          customMissingPoints={[
-            'Daily synchronized campaign spend feeds (Google Search & Meta Feed)',
-            'Creative and adset impression / click breakdowns',
-          ]}
-          customImpactMetrics={['Blended Customer Acquisition Cost (CAC)', 'ROAS by Channel', 'Automated Budget Rebalancing']}
-        />
-      )}
-
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <AdsPerformanceDashboard
         orgId={orgId}
         projectId={projectId}
@@ -146,7 +131,8 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
         connections={connections}
         canExecute={canExecute}
         spendOutcome={spendOutcome}
+        spendWindowDays={CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS}
       />
-    </PpPage>
+    </div>
   );
 }

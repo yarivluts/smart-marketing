@@ -88,6 +88,14 @@ export const STRIPE_SUBSCRIPTION_STATUSES = [
 ] as const;
 export type StripeSubscriptionStatus = (typeof STRIPE_SUBSCRIPTION_STATUSES)[number];
 
+/**
+ * Stripe's `subscription.cancellation_details` (KAN-306): why a subscription was canceled. `reason` is
+ * Stripe's own system reason (`cancellation_requested` | `payment_disputed` | `payment_failed`);
+ * `feedback` is the customer's pick from the Customer Portal exit survey (`customer_service` |
+ * `low_quality` | `missing_features` | `other` | `switched_service` | `too_complex` | `too_expensive` |
+ * `unused`); `comment` is the customer's free text. Every field is nullable, and the object itself is
+ * absent on older API versions.
+ */
 export interface StripeCancellationDetails {
   comment?: string | null;
   feedback?: string | null;

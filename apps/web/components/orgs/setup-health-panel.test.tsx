@@ -1,0 +1,173 @@
+import { describe, expect, it } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import { deriveSetupHealth, SETUP_REQUIREMENT_IDS, type SetupSchemaObservation } from '@growthos/shared';
+import { SetupHealthPanel } from './setup-health-panel';
+import en from '../../messages/en.json';
+import he from '../../messages/he.json';
+
+function observation(overrides: Partial<SetupSchemaObservation> & Pick<SetupSchemaObservation, 'schemaName' | 'kind'>): SetupSchemaObservation {
+  return { environmentId: 'env-dev', registered: true, lastAcceptedAt: null, openQuarantinedCount: 0, quarantineReasons: [], ...overrides };
+}
+
+/** EasySign dev (KAN-197): touchpoints, signups, documents and customers flowing; billing rejected; no ad spend. */
+const DEV_HEALTH = deriveSetupHealth(
+  [{ id: 'env-dev', name: 'dev' }],
+  [
+    observation({ schemaName: 'touchpoint', kind: 'event', lastAcceptedAt: '2026-09-25T16:11:58.000Z' }),
+    observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' }),
+    observation({ schemaName: 'document_created', kind: 'event', lastAcceptedAt: '2026-09-25T16:13:10.000Z' }),
+    observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-25T16:12:05.000Z' }),
+    observation({ schemaName: 'subscription_state_change', kind: 'event', registered: false, openQuarantinedCount: 2, quarantineReasons: ['schema_not_registered:subscription_state_change'] }),
+    observation({ schemaName: 'ad_spend', kind: 'measure', registered: true }),
+  ],
+).environments[0];
+
+function renderPanel(locale: 'en' | 'he', environmentLabel: string) {
+  return render(
+    <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : he}>
+      <SetupHealthPanel health={DEV_HEALTH} environmentLabel={environmentLabel} />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe('SetupHealthPanel (KAN-197)', () => {
+  it('shows each requirement with the status its records give it, and why', () => {
+    renderPanel('en', 'Development');
+    expect(screen.getByText('4 of 6 setup requirements connected in the Development environment.')).toBeInTheDocument();
+
+    const signups = within(screen.getByTestId('setup-requirement-signups'));
+    expect(signups.getByText('Connected')).toBeInTheDocument();
+    expect(signups.getByText('Accepted records for "signup", latest at 2026-09-25T16:12:04.000Z.')).toBeInTheDocument();
+
+    const billing = within(screen.getByTestId('setup-requirement-billing'));
+    expect(billing.getByText('Rejected records only')).toBeInTheDocument();
+    expect(billing.getByText(/2 records are rejected and open in quarantine \("subscription_state_change"\)/)).toBeInTheDocument();
+    expect(billing.getByText(/subscription_state_change events or the Stripe connector/)).toBeInTheDocument();
+
+    const adSpend = within(screen.getByTestId('setup-requirement-ad_spend'));
+    expect(adSpend.getByText('Not connected')).toBeInTheDocument();
+    expect(adSpend.getByText('Registered but never received in this environment: "ad_spend".')).toBeInTheDocument();
+  });
+
+  it('says the schema-to-requirement match is inferred from names, in both locales', () => {
+    renderPanel('en', 'Development');
+    expect(screen.getByTestId('setup-health-mapping-note')).toHaveTextContent(en.SetupHealth.mappingNote);
+    expect(en.SetupHealth.mappingNote).toContain('order_viewed');
+    expect(he.SetupHealth.mappingNote).not.toBe(en.SetupHealth.mappingNote);
+  });
+
+  it('never shows the impact line for a connected requirement', () => {
+    renderPanel('en', 'Development');
+    expect(within(screen.getByTestId('setup-requirement-signups')).queryByText(/funnel has no entry step/)).not.toBeInTheDocument();
+  });
+
+  for (const [locale, label] of [
+    ['en', en.EnvBadge.dev],
+    ['he', he.EnvBadge.dev],
+  ] as const) {
+    it(`${locale}: every requirement and status renders from translations, never a raw key`, () => {
+      const { container } = renderPanel(locale, label);
+      expect(container.textContent).not.toMatch(/SetupHealth\./);
+      for (const id of SETUP_REQUIREMENT_IDS) {
+        expect(screen.getByTestId(`setup-requirement-${id}`)).toBeInTheDocument();
+      }
+    });
+  }
+
+  it('shows completion as a ring and the core requirements as their own count', () => {
+    renderPanel('en', 'Development');
+    const ring = screen.getByRole('img', { name: '4 of 6 setup requirements connected' });
+    expect(ring).toHaveAttribute('data-percent', String(DEV_HEALTH.score));
+    expect(ring).toHaveTextContent('4/6');
+    expect(screen.getByText(`${DEV_HEALTH.coreConnectedCount}/${DEV_HEALTH.coreTotalCount}`)).toBeInTheDocument();
+    expect(screen.getByText('1 with rejected records only · 1 not connected')).toBeInTheDocument();
+  });
+
+  it('leaves a zero count out of the breakdown line', () => {
+    const noErrors = deriveSetupHealth(
+      [{ id: 'env-dev', name: 'dev' }],
+      [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' })],
+    ).environments[0];
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <SetupHealthPanel health={noErrors} environmentLabel="Development" />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText('5 not connected')).toBeInTheDocument();
+  });
+
+  it('marks each checklist row with its status and importance', () => {
+    renderPanel('en', 'Development');
+    expect(screen.getByTestId('setup-requirement-signups')).toHaveAttribute('data-status', 'connected');
+    expect(screen.getByTestId('setup-requirement-billing')).toHaveAttribute('data-status', 'error');
+    expect(screen.getByTestId('setup-requirement-ad_spend')).toHaveAttribute('data-status', 'gap');
+    expect(within(screen.getByTestId('setup-requirement-signups')).getByText('Core')).toBeInTheDocument();
+  });
+
+  it('he: renders the Hebrew copy, not the English', () => {
+    renderPanel('he', he.EnvBadge.dev);
+    expect(screen.getByText(he.SetupHealth.heading)).toBeInTheDocument();
+    expect(screen.getAllByText(he.SetupHealth.status.connected).length).toBe(4);
+    expect(he.SetupHealth.heading).not.toBe(en.SetupHealth.heading);
+  });
+});
+
+describe('SetupHealthPanel: customer coverage and the backfill hint', () => {
+  /** Signups flow and entities arrive for new customers: "connected", the rollout case. */
+  const ROLLOUT = deriveSetupHealth(
+    [{ id: 'env-dev', name: 'dev' }],
+    [
+      observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' }),
+      observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-25T16:12:05.000Z' }),
+    ],
+  ).environments[0];
+  /** Signups flow, the customer entity is registered but nothing has arrived. */
+  const NO_CUSTOMERS = deriveSetupHealth(
+    [{ id: 'env-dev', name: 'dev' }],
+    [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' }), observation({ schemaName: 'customer', kind: 'entity' })],
+  ).environments[0];
+
+  function renderHealth(health: typeof ROLLOUT, props: { coverage?: { eventCustomers: number; withCustomerRecord: number } | null; backfillHref?: string } = {}, locale: 'en' | 'he' = 'en') {
+    return render(
+      <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : he}>
+        <SetupHealthPanel health={health} environmentLabel="Development" {...props} />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  it('the rollout case: connected, yet 95 of 100 customers in events have no record - the hint says so and links to the Backfill panel', () => {
+    renderHealth(ROLLOUT, { coverage: { eventCustomers: 100, withCustomerRecord: 5 }, backfillHref: '#backfill-heading' });
+    const row = within(screen.getByTestId('setup-requirement-customer_profiles'));
+    expect(row.getByText('Connected')).toBeInTheDocument();
+    expect(row.getByTestId('setup-customer-coverage')).toHaveTextContent('5 of 100 customers seen in events have a customer record (5%).');
+    const hint = within(row.getByTestId('setup-backfill-hint'));
+    expect(hint.getByText(/^95 of 100 customers seen in events have no customer record \(5% covered\)/)).toBeInTheDocument();
+    expect(hint.getByRole('link', { name: 'Request a backfill' })).toHaveAttribute('href', '#backfill-heading');
+  });
+
+  it('full coverage shows the count and no hint', () => {
+    renderHealth(ROLLOUT, { coverage: { eventCustomers: 12, withCustomerRecord: 12 }, backfillHref: '#backfill-heading' });
+    expect(screen.getByTestId('setup-customer-coverage')).toHaveTextContent('12 of 12 customers seen in events have a customer record (100%).');
+    expect(screen.queryByTestId('setup-backfill-hint')).toBeNull();
+  });
+
+  it('without the warehouse: no count is shown, and the hint falls back to naming the events when no customer entity ever arrived', () => {
+    renderHealth(NO_CUSTOMERS, { coverage: null });
+    expect(screen.queryByTestId('setup-customer-coverage')).toBeNull();
+    expect(within(screen.getByTestId('setup-backfill-hint')).getByText(/Events are already accepted here \("signup"\)/)).toBeInTheDocument();
+    // No Backfill panel for this viewer: the hint explains the fix but links nowhere.
+    expect(screen.queryByRole('link', { name: 'Request a backfill' })).toBeNull();
+  });
+
+  it('without the warehouse, an entity that has arrived shows no hint (no count to go on)', () => {
+    renderHealth(ROLLOUT, { coverage: null });
+    expect(screen.queryByTestId('setup-backfill-hint')).toBeNull();
+  });
+
+  it('renders the coverage hint in Hebrew from he.json', () => {
+    renderHealth(ROLLOUT, { coverage: { eventCustomers: 100, withCustomerRecord: 5 } }, 'he');
+    const expected = he.SetupHealth.backfillCoverageHint.replace('{missing}', '95').replace('{total}', '100').replace('{percent}', '5');
+    expect(screen.getByTestId('setup-backfill-hint')).toHaveTextContent(expected);
+  });
+});

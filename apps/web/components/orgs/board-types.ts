@@ -14,8 +14,15 @@
 // `INVITABLE_ROLES`) from it directly, so re-declaring those same three
 // vocabularies here too would just be a second copy to keep in sync by
 // hand — re-exported from there instead.
-export { TIME_GRAINS, COMPARE_PERIODS, METRIC_FILTER_OPERATORS } from '@growthos/shared';
-export type { TimeGrain as TimeGrainRow, ComparePeriod as ComparePeriodRow, MetricFilterOperator as MetricFilterOperatorRow, CompilerFilter as GlobalFilterRow } from '@growthos/shared';
+export { TIME_GRAINS, COMPARE_PERIODS, METRIC_FILTER_OPERATORS, RELATIVE_DATE_PRESETS, resolveDateRangeSetting, resolveRelativeDatePreset } from '@growthos/shared';
+export type {
+  TimeGrain as TimeGrainRow,
+  ComparePeriod as ComparePeriodRow,
+  MetricFilterOperator as MetricFilterOperatorRow,
+  CompilerFilter as GlobalFilterRow,
+  DateRangeSetting as DateRangeSettingRow,
+  RelativeDatePreset as RelativeDatePresetRow,
+} from '@growthos/shared';
 
 export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap', 'histogram'] as const;
 export type BoardTileTypeRow = (typeof BOARD_TILE_TYPES)[number];
@@ -46,6 +53,8 @@ export interface BoardTileRow {
 export interface MetricCatalogEntryRow {
   name: string;
   dimensions: string[];
+  /** The metric's declared unit (KAN-213) — a goal form types a `ratio` target as a percent. */
+  unit?: string;
 }
 
 /** Default size (in grid columns/rows) for a newly added tile of each type — big numbers are small, everything else needs room for a chart/table/steps. */

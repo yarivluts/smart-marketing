@@ -7,7 +7,7 @@ import {
 import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
 import { QuarantinedRecordModel } from '../models/quarantined-record.model';
 import type { SchemaDefKind, SchemaFieldDef, SchemaFieldType } from '../models/schema-def.model';
-import { getActiveSchemaDefinition } from './schema-registry.service';
+import { getActiveSchemaDefinition, IMPLICIT_EVENT_ENVELOPE_FIELDS } from './schema-registry.service';
 import { enqueueAcceptedRecordsForPipeline, landPipelineMessages } from './pipeline.service';
 import { evaluateRecordAgainstWinRules } from './win-rule.service';
 
@@ -54,6 +54,20 @@ export interface IngestBatchSummary {
   accepted: number;
   quarantined: number;
   duplicates: number;
+  /**
+   * The records that were NOT accepted, with the reason each was rejected.
+   *
+   * The counts alone cannot be acted on: "quarantined: 1" tells a sender that something was
+   * wrong without saying what, and the per-record reasons were already computed here and then
+   * dropped on the way out - they were readable only by a second call to
+   * `GET /v1/ingest/batches/{id}`, which nothing in the response points at. So the common
+   * failure was a caller POSTing, reading a 202, and never learning that an unregistered event
+   * name or one stray property had rejected the whole batch.
+   *
+   * Only the rejected records, not every record: a fully accepted batch adds nothing to the
+   * response, and the payload stays proportional to what went wrong rather than to batch size.
+   */
+  rejected: IngestRecordResult[];
 }
 
 interface PreparedRecord {
@@ -63,6 +77,8 @@ interface PreparedRecord {
   envelopeReasons: string[];
   /** The whole raw record as submitted (not just `fieldsToValidate`) — an accepted record's pipeline/warehouse payload (KAN-33) is the full envelope, e.g. an event's `event_id`/`ts` alongside its `properties`. */
   raw: Record<string, unknown>;
+  /** Entities only: {@link entityContentHash} of this version's attributes. */
+  contentHash?: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -126,6 +142,41 @@ function sortedJson(record: Record<string, unknown>): string {
 }
 
 /**
+ * A stable hash of an entity record's attributes, used to tell an identical resend of an entity
+ * (a retried batch, a no-op) from a new version of it (an upsert that must land). Exported so the
+ * quarantine replay path compares versions the same way ingest does.
+ */
+export function entityContentHash(fieldsToValidate: Record<string, unknown>): string {
+  return createHash('sha256').update(sortedJson(fieldsToValidate)).digest('hex');
+}
+
+/**
+ * Whether an incoming record repeats one an earlier batch already accepted (B13, 2026-09-25).
+ *
+ * For events and measures the dedup key IS the record's identity, so any existing claim means a
+ * repeat. An entity is different: its id names a row, and each upsert is a new version of that row
+ * ("upsert replaces the whole row, latest wins" - `entities.sql` keeps the latest by `landed_at`).
+ * Deduping entities on the id alone meant the first version won forever: every later upsert - a
+ * plan upgrade, a deactivation - was silently counted as a duplicate and dropped, and Customer 360
+ * froze at signup. So an entity repeats only when it matches the LATEST accepted version's content.
+ * Comparing with the latest (not with every version ever seen) is what lets a change back to an
+ * earlier value (free -> pro -> free) land too.
+ */
+export function isDuplicateOfClaim(
+  kind: SchemaDefKind,
+  claim: Pick<IngestDedupKeyModel, 'content_hash'> | null | undefined,
+  contentHash: string | undefined,
+): boolean {
+  if (!claim) {
+    return false;
+  }
+  if (kind !== 'entity') {
+    return true;
+  }
+  return claim.content_hash !== undefined && claim.content_hash === contentHash;
+}
+
+/**
  * Turns one raw record into its client-facing id, the schema family it
  * should validate against, and the field map to check — per plan `12
  * §2.1`/`§2.2`'s three sketches: an event's schema name is its own `event`
@@ -157,6 +208,7 @@ function prepareRecord(input: IngestBatchInput, record: unknown, index: number):
       fieldsToValidate,
       envelopeReasons,
       raw: r,
+      contentHash: entityContentHash(fieldsToValidate),
     };
   }
 
@@ -196,7 +248,10 @@ const FIELD_TYPE_VALIDATORS: Record<SchemaFieldType, (value: unknown) => boolean
  * identity stitching (KAN-56) still declares it explicitly with
  * `is_identity_key`, same as before.
  */
-export const IMPLICIT_EVENT_ENVELOPE_FIELDS = ['anon_id', 'customer_id'] as const;
+// Defined in `schema-registry.service.ts` so registration can reject these names
+// without an import cycle (this module already imports from that one). Re-exported
+// here because this is where callers expect to find it.
+export { IMPLICIT_EVENT_ENVELOPE_FIELDS } from './schema-registry.service';
 
 /**
  * Reject-list validation against a schema's registered fields: every required field must be present
@@ -204,9 +259,13 @@ export const IMPLICIT_EVENT_ENVELOPE_FIELDS = ['anon_id', 'customer_id'] as cons
  * dropped (plan `08 §2`). Exported so `quarantine.service.ts`'s replay path can re-run the identical
  * check against the current (possibly since-evolved) active schema, rather than duplicating it.
  * `kind` gates {@link IMPLICIT_EVENT_ENVELOPE_FIELDS} — only `event` records carry snippet-attached
- * identity properties; entity/measure validation is unchanged.
+ * identity properties; entity/measure validation is unchanged. It is REQUIRED rather than optional
+ * on purpose: omitting it silently empties that implicit list, so an event's envelope identity
+ * properties would come back as `unregistered_field` and quarantine the record. Every record being
+ * validated has a kind, so there is no honest reason to omit one, and making the compiler insist
+ * turns an invariant that had to be re-checked by hand across call sites into one it enforces.
  */
-export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[], kind?: SchemaDefKind): string[] {
+export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[], kind: SchemaDefKind): string[] {
   const reasons: string[] = [];
   const declared = new Set(fieldDefs.map((field) => field.name));
 
@@ -250,6 +309,37 @@ export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs
  */
 export function dedupKeyId(environmentId: string, kind: SchemaDefKind, schemaName: string, clientId: string): string {
   return createHash('sha256').update(`${environmentId}:${kind}:${schemaName}:${clientId}`).digest('hex');
+}
+
+/**
+ * Prefetch every distinct schema a batch needs, in parallel, rather than one `await` per record -
+ * a batch touching k distinct event/entity/measure names costs one round of k concurrent reads
+ * instead of up to k sequential ones. Records whose envelope already failed need no schema.
+ */
+async function prefetchActiveSchemas(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  records: readonly Pick<PreparedRecord, 'schemaName' | 'envelopeReasons'>[],
+): Promise<Map<string, Awaited<ReturnType<typeof getActiveSchemaDefinition>>>> {
+  const schemaNames = Array.from(new Set(records.filter((record) => record.envelopeReasons.length === 0).map((record) => record.schemaName)));
+  return new Map(await Promise.all(schemaNames.map(async (name) => [name, await getActiveSchemaDefinition(organizationId, projectId, kind, name)] as const)));
+}
+
+/**
+ * Why a record with a valid envelope does not conform to its registered schema: the schema is not
+ * registered, or the fields do not match it. Empty when it conforms. The one schema check both
+ * ingest and `validateIngestBatch` run, so a validation pass can never disagree with ingest.
+ */
+function schemaConformanceReasons(
+  record: Pick<PreparedRecord, 'schemaName' | 'fieldsToValidate'>,
+  schemaDef: Awaited<ReturnType<typeof getActiveSchemaDefinition>> | undefined,
+  kind: SchemaDefKind,
+): string[] {
+  if (!schemaDef) {
+    return [`schema_not_registered:${record.schemaName}`];
+  }
+  return validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs, kind);
 }
 
 /** Every count the batch summary needs, in one pass over `results` rather than one `.filter()` per status. */
@@ -301,31 +391,20 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   );
   const preparedWithClaims = prepared.map((record, index) => ({ ...record, existingClaim: existingClaims[index] }));
 
-  // Prefetch every distinct schema this batch actually needs, in parallel,
-  // rather than one `await` per record inside the loop below — a batch
-  // touching k distinct event/entity/measure names now costs one round of k
-  // concurrent reads instead of up to k sequential ones.
-  const schemaNames = Array.from(
-    new Set(preparedWithClaims.filter((record) => record.envelopeReasons.length === 0).map((record) => record.schemaName)),
-  );
-  const schemaDefsByName = new Map(
-    await Promise.all(
-      schemaNames.map(
-        async (name) =>
-          [name, await getActiveSchemaDefinition(params.organizationId, params.projectId, params.input.kind, name)] as const,
-      ),
-    ),
-  );
+  const schemaDefsByName = await prefetchActiveSchemas(params.organizationId, params.projectId, params.input.kind, preparedWithClaims);
 
   const recordResults: IngestRecordResult[] = [];
-  const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown> }[] = [];
+  const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown>; contentHash?: string }[] = [];
   // Every quarantined record's raw payload (KAN-34), persisted best-effort after the batch itself is
   // durable — see the comment on the `QuarantinedRecordModel` writes below.
   const quarantinedToPersist: { clientId: string; schemaName: string; payload: Record<string, unknown>; reasons: string[] }[] = [];
   // Two records in the *same* batch sharing a client id must also dedupe
   // against each other, not only against a claim already persisted by an
   // earlier batch — `existingClaims` alone can't catch that since neither
-  // has been saved yet at read time.
+  // has been saved yet at read time. For entities this means one version per
+  // entity per batch (the first): the warehouse keeps one row per
+  // (batch, client id) too, so a second version in the same batch could not
+  // land there anyway. Send later versions in later batches.
   const acceptedInThisBatch = new Set<string>();
 
   for (const record of preparedWithClaims) {
@@ -339,20 +418,12 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       });
       continue;
     }
-    if (record.existingClaim || acceptedInThisBatch.has(record.dedupId)) {
+    if (isDuplicateOfClaim(params.input.kind, record.existingClaim, record.contentHash) || acceptedInThisBatch.has(record.dedupId)) {
       recordResults.push({ client_id: record.clientId, status: 'duplicate' });
       continue;
     }
 
-    const schemaDef = schemaDefsByName.get(record.schemaName) ?? null;
-    if (!schemaDef) {
-      const reasons = [`schema_not_registered:${record.schemaName}`];
-      recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
-      quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });
-      continue;
-    }
-
-    const reasons = validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs, params.input.kind);
+    const reasons = schemaConformanceReasons(record, schemaDefsByName.get(record.schemaName), params.input.kind);
     if (reasons.length > 0) {
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
       quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });
@@ -363,6 +434,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
         clientId: record.clientId,
         schemaName: record.schemaName,
         payload: record.raw,
+        contentHash: record.contentHash,
       });
       acceptedInThisBatch.add(record.dedupId);
     }
@@ -419,7 +491,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   // batches racing on the same client id — not a reason to turn an
   // otherwise-successful ingest into a 500 for the caller.
   await Promise.all(
-    acceptedClaims.map(async ({ dedupId, clientId }) => {
+    acceptedClaims.map(async ({ dedupId, clientId, contentHash }) => {
       const claim = new IngestDedupKeyModel();
       claim.organization_id = params.organizationId;
       claim.project_id = params.projectId;
@@ -428,6 +500,10 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       claim.client_id = clientId;
       claim.batch_id = batch.id;
       claim.created_at = batch.created_at;
+      if (contentHash !== undefined) {
+        // Overwrites the previous version's claim: the latest version is what the next upsert is compared with.
+        claim.content_hash = contentHash;
+      }
       claim.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
       try {
         await claim.save(dedupId);
@@ -493,6 +569,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
     accepted: batch.accepted_count,
     quarantined: batch.quarantined_count,
     duplicates: batch.duplicate_count,
+    rejected: recordResults.filter((result) => result.status !== 'accepted'),
   };
 }
 
@@ -513,4 +590,47 @@ export async function getIngestBatch(
     return null;
   }
   return batch;
+}
+
+export type IngestValidationStatus = 'valid' | 'invalid';
+
+export interface IngestValidationRecordResult {
+  client_id: string;
+  status: IngestValidationStatus;
+  /** The reasons ingest would quarantine the record for; absent when valid. */
+  reasons?: string[];
+}
+
+export interface IngestValidationSummary {
+  kind: SchemaDefKind;
+  total: number;
+  valid: number;
+  invalid: number;
+  records: IngestValidationRecordResult[];
+}
+
+/**
+ * Checks a batch against the envelope rules and the project's registered schemas exactly as
+ * `ingestBatch` would, and stores nothing (KAN-202 I3): no batch, no dedup claim, no quarantine
+ * entry, no pipeline publish. For an integrator's CI conformance tests - a payload that validates
+ * here is accepted by ingest unless it repeats a record already accepted (dedup is not a property
+ * of the payload's shape, so it is not evaluated). Schemas are project-wide, so no environment is
+ * involved.
+ */
+export async function validateIngestBatch(params: Omit<IngestBatchParams, 'environmentId'>): Promise<IngestValidationSummary> {
+  const records = params.input.records;
+  if (records.length === 0) {
+    throw new EmptyIngestBatchError();
+  }
+  if (records.length > MAX_INGEST_BATCH_SIZE) {
+    throw new IngestBatchTooLargeError(MAX_INGEST_BATCH_SIZE);
+  }
+  const prepared = records.map((record, index) => prepareRecord(params.input, record, index));
+  const schemaDefsByName = await prefetchActiveSchemas(params.organizationId, params.projectId, params.input.kind, prepared);
+  const results: IngestValidationRecordResult[] = prepared.map((record) => {
+    const reasons = record.envelopeReasons.length > 0 ? record.envelopeReasons : schemaConformanceReasons(record, schemaDefsByName.get(record.schemaName), params.input.kind);
+    return reasons.length > 0 ? { client_id: record.clientId, status: 'invalid', reasons } : { client_id: record.clientId, status: 'valid' };
+  });
+  const valid = results.filter((result) => result.status === 'valid').length;
+  return { kind: params.input.kind, total: results.length, valid, invalid: results.length - valid, records: results };
 }
