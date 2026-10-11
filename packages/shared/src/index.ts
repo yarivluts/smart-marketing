@@ -13,6 +13,7 @@ export * from './metrics-compiler';
 export * from './metric-units';
 export * from './plugin-manifest';
 export * from './touchpoint-capture';
+export * from './developer-guides/samples';
 export * from './mapping-engine';
 export * from './mapping-suggestion';
 export * from './funnel-suggestion';
