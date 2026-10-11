@@ -6,6 +6,9 @@ connectors, IDEs, or a headless agent you write yourself — can query a project
 and insights, and (with the right permission) create goals/segments or propose automation changes, in
 natural language.
 
+The public developer area at **`/developers/mcp`** has the same setup with the deployment's real
+endpoint filled in. `api.growthos.app` below is a placeholder for your deployment's API base.
+
 This doc gets a new client connected in under 10 minutes. Pick the section for your client:
 
 - [Claude Desktop](#claude-desktop)
