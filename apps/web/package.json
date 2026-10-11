@@ -12,7 +12,8 @@
     "test:e2e": "playwright test",
     "test:e2e:sharded": "node scripts/e2e-sharded.mjs",
     "lint": "eslint \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "validate:guides": "node scripts/validate-developer-guides.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
