@@ -211,7 +211,7 @@ export function VideoStudio({
     path: string,
     body?: unknown,
     successText?: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     setPending(key);
     setMessage(null);
     try {
@@ -231,8 +231,10 @@ export function VideoStudio({
       }
       setNow(new Date());
       router.refresh();
+      return response.ok;
     } catch {
       setMessage({ tone: 'error', text: t('errorGeneric') });
+      return false;
     } finally {
       setPending(null);
     }
@@ -557,13 +559,14 @@ export function VideoStudio({
                       <button
                         type="button"
                         onClick={async () => {
-                          await act(
+                          const ok = await act(
                             `edit:${scene.id}`,
                             `/scenes/${scene.id}/edit`,
                             { instruction },
                             t('video.started'),
                           );
-                          setInstructions((current) => ({ ...current, [scene.id]: '' }));
+                          // Keep the instruction when the edit failed, so it can be retried without retyping.
+                          if (ok) setInstructions((current) => ({ ...current, [scene.id]: '' }));
                         }}
                         disabled={
                           !videoAvailable ||

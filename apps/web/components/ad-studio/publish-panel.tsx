@@ -239,6 +239,8 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }
+    } catch {
+      setMessage({ tone: 'error', text: errorMessage({}) });
     } finally {
       setPending(false);
     }

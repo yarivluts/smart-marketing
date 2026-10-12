@@ -19,6 +19,8 @@ import type { AdStudioReferenceView } from '@/lib/ad-studio/engine';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { SceneTimeline } from './scene-timeline';
+import { useRefreshSafeDraft, useUnsavedChangesGuard } from './use-editor-draft';
+import { ServerChangedNotice } from './server-changed-notice';
 import { MobileAccordionItem } from './mobile-accordion';
 import { AddNikudButton } from './add-nikud-button';
 import { SpeakerControl } from './speaker-control';
@@ -67,13 +69,18 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
   const [rewrite, setRewrite] = React.useState<{ sceneId: string; instruction: string; pending: boolean; proposal: AdStudioScene | null } | null>(null);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
 
-  React.useEffect(() => {
-    setScenes(initialScenes);
-    setSavedJson(JSON.stringify(initialScenes));
-  }, [initialScenes]);
-
   const issues = validateAdStudioScenes(scenes);
   const dirty = JSON.stringify(scenes) !== savedJson;
+  // Another panel's save refreshes the page: keep unsaved scenes, and say when the saved script moved on.
+  const { serverChanged, reload } = useRefreshSafeDraft(initialScenes, {
+    savedJson,
+    dirty,
+    reset: (value) => {
+      setScenes(value);
+      setSavedJson(JSON.stringify(value));
+    },
+  });
+  useUnsavedChangesGuard(dirty, t('editing.leaveUnsaved'));
   const hebrew = isHebrewLanguage(language);
   const readyReferences = references.filter((reference) => reference.status === 'ready');
   const referenceById = new Map(references.map((reference) => [reference.id, reference]));
@@ -126,6 +133,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       setSavedJson(JSON.stringify(body.brief?.scenes ?? scenes));
       setMessage({ tone: 'ok', text: t('scriptSaved') });
       router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -145,6 +154,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       setScenes(body.brief.scenes);
       setSavedJson(JSON.stringify(body.brief.scenes));
       router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -168,6 +179,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       }
       setRewrite((current) => (current ? { ...current, pending: false, proposal: body.scene ?? null } : current));
     } catch {
+      // A dropped connection says so instead of silently stopping the spinner.
+      setMessage({ tone: 'error', text: t('errorGeneric') });
       setRewrite((current) => (current ? { ...current, pending: false } : current));
     }
   }
@@ -214,6 +227,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
           )}
         </div>
       </div>
+
+      {serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
 
       <SceneTimeline scenes={scenes} activeSceneId={activeSceneId} />
 

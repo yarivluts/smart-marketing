@@ -144,4 +144,15 @@ describe('ImageStudio', () => {
     const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body).toEqual({ destination: 'google_ads', title: `Sign fast - Sign fast - ${heMessages.AdStudio.images.format.square}` });
   });
+
+  it('asks before rewriting existing ideas, and does nothing when the person cancels', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    renderStudio();
+    fireEvent.click(screen.getByRole('button', { name: 'Write new ideas with AI' }));
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
 });
