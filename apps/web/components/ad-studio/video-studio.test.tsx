@@ -162,7 +162,7 @@ describe('VideoStudio', () => {
   });
 
   it('asks before assembling when a scene in the video failed the AI check', () => {
-    const flagged = { status: 'issues' as const, issues: [{ kind: 'audio' as const, severity: 'major' as const, detail: 'A word is cut off', atSeconds: 2 }], transcript: null };
+    const flagged = { status: 'issues' as const, issues: [{ kind: 'audio' as const, severity: 'major' as const, detail: 'A word is cut off', atSeconds: 2 }], transcript: null, checkedOn: '2026-10-12T10:00:00.000Z' };
     const clips = [clip('c1', 'a', 1, 'ready', fp(0)), clip('c2', 'b', 1, 'ready', fp(1), { qa: flagged })];
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
