@@ -54,7 +54,7 @@ export async function planAdStudioBrief(
     deps: { now: ctx.now, ...ctx.deps },
   });
   const prompt = buildPlanPrompt(input, evidence);
-  const generated = await meteredCall(ctx, 'plan', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioPlanSchema }));
+  const generated = await meteredCall(ctx, 'plan', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioPlanSchema, effort: 'high' }));
   const { plan } = sanitizeAdStudioPlan(generated, availableEvidenceSources(evidence));
   return saveAdStudioPlan({
     organizationId: ctx.organizationId,

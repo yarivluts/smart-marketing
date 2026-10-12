@@ -1,5 +1,9 @@
 import { z } from 'zod/v4';
 import {
+  AD_STUDIO_RSA_DESCRIPTION_MAX,
+  AD_STUDIO_RSA_DESCRIPTIONS,
+  AD_STUDIO_RSA_HEADLINE_MAX,
+  AD_STUDIO_RSA_HEADLINES,
   buildSearchAdPrompt,
   cleanKeywordSeeds,
   fitSearchAd,
@@ -20,6 +24,8 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureOrm } from './runtime';
 import { meteredCall, type AdStudioCallContext } from './metering';
+import { repairOverLength } from './length-repair';
+import { AdStudioProviderError } from './llm';
 import { serverKms } from './planning-sources';
 
 /** How many ideas a research lookup asks Google for, and how many it keeps (busiest first). */
@@ -120,5 +126,19 @@ export async function writeAdStudioSearchAd(ctx: AdStudioCallContext & { briefId
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
   const prompt = buildSearchAdPrompt(adStudioBriefInput(brief), brief.search_keywords?.keywords ?? [], context);
   const written = await meteredCall(ctx, 'search_ad', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: SearchAdSchema }));
-  return saveAdStudioSearchAd({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, ad: fitSearchAd(written), now: ctx.now });
+  // Over-long headlines and descriptions are rewritten to fit rather than dropped or cut.
+  const repaired = await repairOverLength(ctx, 'search_ad', brief.id, brief.language, [
+    ...written.headlines.map((text, index) => ({ id: `h${index}`, text, max: AD_STUDIO_RSA_HEADLINE_MAX })),
+    ...written.descriptions.map((text, index) => ({ id: `d${index}`, text, max: AD_STUDIO_RSA_DESCRIPTION_MAX })),
+  ]);
+  const ad = fitSearchAd({
+    ...written,
+    headlines: written.headlines.map((text, index) => repaired.get(`h${index}`) ?? text),
+    descriptions: written.descriptions.map((text, index) => repaired.get(`d${index}`) ?? text),
+  });
+  // Refuse cleanly before saving when the model gave too little to make a valid ad.
+  if (ad.headlines.length < AD_STUDIO_RSA_HEADLINES.min || ad.descriptions.length < AD_STUDIO_RSA_DESCRIPTIONS.min) {
+    throw new AdStudioProviderError('invalid_output', 'The model returned too few usable headlines or descriptions for a search ad.');
+  }
+  return saveAdStudioSearchAd({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, ad, now: ctx.now });
 }

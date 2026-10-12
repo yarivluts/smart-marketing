@@ -227,16 +227,25 @@ describe('Ad Studio search ads', () => {
           path1: 'e signature',
           path2: 'lawyers',
         }),
+        // The one over-long headline is rewritten to fit instead of being cut to "Electronic signature in 30".
+        JSON.stringify({ items: [{ id: 'h0', text: 'E-signature in 30 seconds' }] }),
       ],
     });
     const written = await writeSearchAd(request('POST'), ctx.p);
     expect(written.status).toBe(200);
     const { brief } = (await written.json()) as { brief: { searchAd: { headlines: string[]; descriptions: string[]; path1: string } } };
-    expect(brief.searchAd.headlines).toEqual(['Electronic signature in 30', 'Sign PDF online', 'Start free trial']);
+    expect(brief.searchAd.headlines).toEqual(['E-signature in 30 seconds', 'Sign PDF online', 'Start free trial']);
+    const repairAsk = String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body);
+    expect(repairAsk).toContain('"id\\":\\"h0');
+    expect(repairAsk).not.toContain('Start free trial');
     expect(brief.searchAd.path1).toBe('e-signature');
     const prompt = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).contents[0].parts[0].text as string;
     expect(prompt).toContain('Keywords the ad bids on (monthly searches): electronic signature (12100), sign pdf (880)');
-    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId))[0]).toMatchObject({ kind: 'search_ad', outcome: 'succeeded' });
+    const usage = await listAdStudioUsage(ctx.orgId, ctx.projectId);
+    expect(usage.map((row) => [row.kind, row.outcome])).toEqual([
+      ['search_ad', 'succeeded'],
+      ['search_ad', 'succeeded'],
+    ]);
 
     const edited = await saveSearchAd(request('PUT', { ad: { ...brief.searchAd, headlines: [...brief.searchAd.headlines, 'x'.repeat(31)] } }), ctx.p);
     expect(edited.status).toBe(400);
