@@ -3975,7 +3975,9 @@
           "skipped": "Not checked",
           "error": "Check failed"
         }
-      }
+      },
+      "assembleFlagged": "The AI check found problems in scene {scenes}. Assemble the video anyway?",
+      "assembleAnyway": "Assemble anyway"
     },
     "clipFailure": {
       "not_configured": "no video model is configured",

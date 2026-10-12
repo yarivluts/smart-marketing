@@ -161,6 +161,19 @@ describe('VideoStudio', () => {
     expect(screen.queryByText(/Assemble again to include them/)).not.toBeInTheDocument();
   });
 
+  it('asks before assembling when a scene in the video failed the AI check', () => {
+    const flagged = { status: 'issues' as const, issues: [{ kind: 'audio' as const, severity: 'major' as const, detail: 'A word is cut off', atSeconds: 2 }], transcript: null };
+    const clips = [clip('c1', 'a', 1, 'ready', fp(0)), clip('c2', 'b', 1, 'ready', fp(1), { qa: flagged })];
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    renderStudio({ initialClips: clips });
+    fireEvent.click(screen.getByRole('button', { name: 'Assemble video' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('The AI check found problems in scene 2.');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Assemble video' })).toBeInTheDocument();
+  });
+
   it('keeps assembly off until every scene is ready, and says an older video is out of date', () => {
     const video: AdStudioVideoView = { id: 'v1', status: 'ready', failureReason: null, clipIds: ['old1', 'old2'], durationSeconds: 13, requestedOn: '2026-09-27T09:00:00.000Z', assembledOn: '2026-09-27T09:01:00.000Z' };
     renderStudio({ initialClips: [clip('c1', 'a', 1, 'ready', fp(0))], initialVideos: [video] });

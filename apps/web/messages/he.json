@@ -3975,7 +3975,9 @@
           "skipped": "לא נבדק",
           "error": "הבדיקה נכשלה"
         }
-      }
+      },
+      "assembleFlagged": "בדיקת ה-AI מצאה בעיות בסצנה {scenes}. להרכיב את הסרטון בכל זאת?",
+      "assembleAnyway": "להרכיב בכל זאת"
     },
     "clipFailure": {
       "not_configured": "לא הוגדר מודל וידאו",
