@@ -80,6 +80,12 @@ async function setup(scopes: string[]) {
   const { organization } = await createOrganizationWithOwner({ name: 'MCP Ad Studio Org', ownerUserId: owner.id });
   const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
   const auth = { organizationId: organization.id, projectId: project.id, principalKind: 'api_key', scopes, apiKeyId: 'key-1' } as unknown as McpAuthContext;
+  // The same project over an OAuth connection approved by the owner (a person, not a key).
+  const asOwner = () => connect({ organizationId: organization.id, projectId: project.id, principalKind: 'oauth', userId: owner.id, grantId: 'grant-1', clientId: 'client-1' } as McpAuthContext);
+  return { auth, ...connect(auth), asOwner, owner, orgId: organization.id };
+}
+
+function connect(auth: McpAuthContext) {
   const handlers = new Map<string, (args: unknown) => Promise<ToolResult>>();
   registerMcpAdStudioTools({ registerTool: (name: string, _config: unknown, handler: (args: unknown) => Promise<ToolResult>) => handlers.set(name, handler) } as never, auth);
   const call = async (name: string, args: Record<string, unknown> = {}) => {
@@ -92,7 +98,7 @@ async function setup(scopes: string[]) {
     if (result.isError) throw new Error(`${name} failed: ${(result.content[0] as { text: string }).text}`);
     return JSON.parse((result.content[0] as { text: string }).text) as T;
   };
-  return { auth, call, json, orgId: organization.id };
+  return { call, json };
 }
 
 const BRIEF = { name: 'Sign fast', objective: 'Trial signups', product_description: 'E-signatures for lawyers', format: 'vertical', language: 'en', target_seconds: 10 };
@@ -336,18 +342,31 @@ describe('Ad Studio MCP tools', () => {
     expect(published.isError).toBe(true);
     expect((published.content[0] as { text: string }).text).toContain('"automation.execute"');
 
-    const limits = await agent.json<{ daily_images: number }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 });
-    expect(limits.daily_images).toBe(0);
-    // The AI quality check of clips: on with one retry by default; a partial change keeps the rest.
-    expect((await agent.json<{ video_qa: unknown }>('get_ad_studio_usage')).video_qa).toEqual({ enabled: true, retries: 1 });
-    const qa = await agent.json<{ video_qa: unknown }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 2 });
-    expect(qa.video_qa).toEqual({ enabled: true, retries: 2 });
-    const badRetries = await agent.call('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 9 });
-    expect((badRetries.content[0] as { text: string }).text).toContain('videoQa.retries must be a whole number from 0 to 2');
-    // The image size: 2K by default, settable, and kept by a call that leaves it out.
-    expect((await agent.json<{ image_size: string }>('get_ad_studio_usage')).image_size).toBe('2K');
-    expect((await agent.json<{ image_size: string }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0, image_size: '1K' })).image_size).toBe('1K');
-    expect((await agent.json<{ image_size: string }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 })).image_size).toBe('1K');
+    // The limits cap platform spend (KAN-363): a customer's key, even with project.configure, cannot raise them.
+    const byKey = await agent.call('set_ad_studio_limits', { daily_text_generations: 1000, daily_video_seconds: 3600, daily_images: 500 });
+    expect(byKey.isError).toBe(true);
+    expect((byKey.content[0] as { text: string }).text).toContain('Only a GrowthOS platform operator');
+    // Nor can the owner over OAuth unless they are a platform operator.
+    const owner = agent.asOwner();
+    process.env.GROWTHOS_PLATFORM_OPERATORS = 'someone-else@example.com';
+    expect((await owner.call('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60 })).isError).toBe(true);
+    process.env.GROWTHOS_PLATFORM_OPERATORS = agent.owner.email;
+    try {
+      const limits = await owner.json<{ daily_images: number }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 });
+      expect(limits.daily_images).toBe(0);
+      // The AI quality check of clips: on with one retry by default; a partial change keeps the rest.
+      expect((await agent.json<{ video_qa: unknown }>('get_ad_studio_usage')).video_qa).toEqual({ enabled: true, retries: 1 });
+      const qa = await owner.json<{ video_qa: unknown }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 2 });
+      expect(qa.video_qa).toEqual({ enabled: true, retries: 2 });
+      const badRetries = await owner.call('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 9 });
+      expect((badRetries.content[0] as { text: string }).text).toContain('videoQa.retries must be a whole number from 0 to 2');
+      // The image size: 2K by default, settable, and kept by a call that leaves it out.
+      expect((await agent.json<{ image_size: string }>('get_ad_studio_usage')).image_size).toBe('2K');
+      expect((await owner.json<{ image_size: string }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0, image_size: '1K' })).image_size).toBe('1K');
+      expect((await owner.json<{ image_size: string }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 })).image_size).toBe('1K');
+    } finally {
+      delete process.env.GROWTHOS_PLATFORM_OPERATORS;
+    }
     const ideas = await agent.json<{ id: string }[]>('save_ad_image_ideas', { brief_id: ad.id, ideas: [{ id: 'c1', visual_prompt: 'A phone', headline: '', formats: ['square'] }] });
     const overLimit = await agent.call('render_ad_image', { brief_id: ad.id, idea_id: ideas[0].id, format: 'square' });
     expect((overLimit.content[0] as { text: string }).text).toContain('daily Ad Studio limit for images is reached (0 of 0)');

@@ -21,6 +21,12 @@ export async function findUserByEmail(email: string): Promise<UserModel | null> 
   return matches[0] ?? null;
 }
 
+/** The platform-wide user row by id, or null when there is none. */
+export async function findUserById(userId: string): Promise<UserModel | null> {
+  if (!userId) return null;
+  return (await UserModel.init(userId)) ?? null;
+}
+
 function normalizeEmail(email: string): string {
   return email.toLowerCase();
 }

@@ -223,7 +223,7 @@ Rendering takes minutes, so no tool waits for it to finish. Start the work with 
 | `export_ad_image` | `automation.execute` (OAuth/human only) | Upload an image to Meta's ad image library or as a Google Ads image asset |
 | `publish_ad` | `automation.execute` (OAuth/human only) | Create a real, PAUSED ad from an image or the video: Meta campaign + ad set + creative + ad, or a Google Display campaign + responsive display ad (images), or with `search: true` a Google Search campaign (Google Search only) from the saved search ad, keywords and negatives, targeted where the keywords were researched. Returns the link to the ad |
 | `get_ad_studio_usage` | `ai.use` | Daily limits, today's usage, which models are configured, and the clip quality-check setting |
-| `set_ad_studio_limits` | `project.configure` | Set the daily limits for AI text calls, video seconds and images, and the clip quality check (`video_qa_enabled`, `video_qa_retries` 0-2) |
+| `set_ad_studio_limits` | `project.configure` + GrowthOS platform operator over OAuth | Set the daily limits for AI text calls, video seconds and images, the quality check of clips and images (`video_qa_enabled`, `video_qa_retries` 0-2) and the image size (`image_size` 1K/2K). The limits cap platform spend, so an API key is always refused and an OAuth user must be on the `GROWTHOS_PLATFORM_OPERATORS` allowlist (KAN-363) |
 
 ## Safety & limits
 
