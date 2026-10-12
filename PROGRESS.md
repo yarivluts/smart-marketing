@@ -17,6 +17,57 @@ Template for each entry:
 
 ---
 
+## 2026-10-12 - Ad Studio made right: AI quality, safe editing, UX, brand kit (KAN-342/343/363/371, KAN-379..388)
+
+- **Last completed:** Yariv asked to make the AI ad editor perfect. Three reviews (product/UX on prod screenshots, AI output quality, editing workflow) produced ~45 findings; all but a few are shipped:
+  - **QA bugs (#614):**
+    - RTL scene timeline.
+    - Select chevrons.
+    - AI limits and platform internals visible only to platform operators (`GROWTHOS_PLATFORM_OPERATORS`, set to Yariv on web-prod/preprod).
+    - Mobile AI-call cards.
+  - **AI quality (#615):**
+    - `claude-opus-5-5`, streamed, effort per call.
+    - Gemini timeouts and retries.
+    - Shared writing rules: no invented claims, Hebrew addressing/spelling/RTL.
+    - Narration word budget.
+    - Untrusted page and editor text tagged.
+    - Over-long copy repaired instead of cut.
+    - Scene rewrite with plan context and the editor's current scenes.
+  - **Safe editing (#617):**
+    - Drafts survive refreshes.
+    - Leave guard.
+    - Undo for AI copy.
+    - Visible network errors.
+    - Autopilot backoff, pause and resume.
+    - No duplicate briefs.
+  - **UX (#616, #621, #622, #623, #625):**
+    - Honest AI clip check (lip sync only on camera, details in the ad language).
+    - First-frame posters and uncropped thumbnails.
+    - Plain data notices.
+    - Side-by-side review.
+    - Folded Plan step.
+    - Country picker.
+    - Create-step gallery.
+    - Confirm before assembling flagged scenes.
+  - **Tools (#618, #619, #624, #626, #628):**
+    - Hand-written scripts unlock rendering.
+    - Rewrite one image idea.
+    - Narration word meter and claim check.
+    - Choose the clip version for the video.
+    - Hebrew shot descriptions translated for the models.
+    - Script save conflicts (409 + "save mine anyway").
+  - **Brand (#620, #630):** brand kit (name, tone, words to avoid, colours) followed by every prompt, plus a logo shown as the advertiser in previews.
+  - **Publishing (#627, #629):**
+    - Image safe zones for stories and the display crop.
+    - Several creatives as paused ads in one Meta ad set.
+- **Verification:** every batch was deployed via the merge queue (main CI green first). Prod checked as the QA org admin: all Ad Studio steps return 200 on desktop and mobile, with no console errors or sideways scroll.
+- **In progress (exact stopping point):** the last batch (#627-#630) merges and deploys through the queue.
+- **Blocked + why:** none.
+- **Next step:**
+  - Overlay the image headline in code instead of having the image model draw it (deferred: prod renders show clean Hebrew today).
+  - 2K renders for story and portrait (a cost decision).
+- **Waiting on human:** nothing.
+
 ## 2026-10-12 - Developer area: integration guides, verified against a test environment (KAN-378)
 
 - **Last completed:** Yariv asked for a developer area with guides for connecting to GrowthOS (API, MCP, event setup on the server or client side), and for proof that it works against a test environment.
