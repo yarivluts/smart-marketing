@@ -310,6 +310,10 @@ export class AdStudioClipModel extends BaseModel {
   @Field({ is_required: false })
   public lease_until?: string | null;
 
+  /** The version the person chose for the assembled video; absent or false lets the newest current clip be used. */
+  @Field({ is_required: false })
+  public chosen?: boolean | null;
+
   /**
    * The AI quality check of a ready clip: Gemini watches it, compares the speech with the scene's
    * narration and looks for visual defects. `passed` (nothing major), `issues` (at least one major

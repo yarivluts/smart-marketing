@@ -1,6 +1,7 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
 import type { AdStudioKeywordCompetition, AdStudioKeywordIdea, AdStudioKeywordTargeting } from './planning';
 import { UNTRUSTED_INPUT_RULE, adWritingRules } from './writing-rules';
+import { brandKitRules } from './brand-kit';
 
 /**
  * Search ads: the keywords an ad bids on, researched with Google's own monthly volumes, and the
@@ -291,7 +292,7 @@ export function buildSearchAdPrompt(brief: AdStudioBriefInput, keywords: readonl
       '- Google mixes headlines and descriptions in any order, so each one must make sense on its own and none may repeat another.',
       '- Put the main keywords in several headlines, word for word where it reads naturally: ads that echo the search get clicked.',
       '- Mix: the benefit, the product name, features and a call to action; an offer or deadline only when the brief or context states one. Write numbers as digits.',
-      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
       `- ${UNTRUSTED_INPUT_RULE}`,
       '- Do not invent prices, discounts, statistics, awards, guarantees or testimonials. No exclamation mark in headlines; no ALL CAPS words.',
       `- path1 and path2 extend the display URL (at most ${AD_STUDIO_RSA_PATH_MAX} characters each, one or two words, no spaces): e.g. "sign" and "free-trial". Use the ad language when it reads naturally.`,

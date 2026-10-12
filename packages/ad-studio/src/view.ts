@@ -66,6 +66,8 @@ export interface AdStudioClipView {
   parentClipId: string | null;
   /** The edit instruction (edits only). */
   instruction: string | null;
+  /** The version the person chose for the video. */
+  chosen?: boolean;
   requestedOn: string;
   completedOn: string | null;
   /** The AI quality check, once it ran; null while the clip renders or waits for it. */

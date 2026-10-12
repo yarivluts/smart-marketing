@@ -18,6 +18,7 @@ import { PUT as saveScript } from './briefs/[briefId]/script/route';
 import { POST as generateScript } from './briefs/[briefId]/script/generate/route';
 import { POST as rewriteScene } from './briefs/[briefId]/scenes/[sceneId]/rewrite/route';
 import { PUT as putSettings } from './settings/route';
+import { GET as getBrandKit, PUT as putBrandKit } from './brand-kit/route';
 import { POST as vocalize } from './briefs/[briefId]/vocalize/route';
 import { POST as generateConcepts } from './briefs/[briefId]/image-concepts/generate/route';
 import { PUT as saveCopy } from './briefs/[briefId]/copy/route';
@@ -351,5 +352,30 @@ describe('Ad Studio routes', () => {
     expect([403, 404]).toContain((await putSettings(request('PUT', { dailyTextGenerations: 5, dailyVideoSeconds: 5 }), { params: Promise.resolve({ orgId, projectId }) })).status);
     const deleted = await deleteBrief(request('DELETE'), { params: Promise.resolve({ orgId, projectId, briefId }) });
     expect(deleted.status).toBe(200);
+  });
+
+  it('brand kit: a project admin sets it, an editor cannot, and every AI prompt then follows it', async () => {
+    const { owner, ownerSession, orgId, projectId } = await setup();
+    const p = { params: Promise.resolve({ orgId, projectId }) };
+    const kit = { brandName: 'EasySign', toneOfVoice: 'warm, never pushy', avoidWords: ['cheap'], colors: ['#5B4FE9'] };
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const saved = await putBrandKit(request('PUT', { brandKit: kit }), p);
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { brandKit: { colors: string[] } }).brandKit.colors).toEqual(['#5b4fe9']);
+    expect((await putBrandKit(request('PUT', { brandKit: { ...kit, colors: ['blue'] } }), p)).status).toBe(400);
+
+    const editor = await memberSession(orgId, projectId, 'editor', owner.id);
+    getServerSessionMock.mockResolvedValue(editor);
+    expect([403, 404]).toContain((await putBrandKit(request('PUT', { brandKit: { ...kit, brandName: 'Other' } }), p)).status);
+    expect(((await (await getBrandKit(request('GET'), p)).json()) as { brandKit: { brandName: string } }).brandKit.brandName).toBe('EasySign');
+
+    // The next AI call carries the brand rules.
+    const briefId = await createBriefAs(editor, orgId, projectId);
+    const fetchMock = geminiReplies(JSON.stringify({ title: 'Sign fast', scenes: [{ durationSeconds: 5, visualPrompt: 'A lawyer signs on a phone', voiceover: 'Sign in seconds', onScreenText: '' }] }));
+    await generateScript(request('POST'), { params: Promise.resolve({ orgId, projectId, briefId }) });
+    const sent = String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body);
+    expect(sent).toContain('The brand is \\"EasySign\\"');
+    expect(sent).toContain('Never use these words or phrases: \\"cheap\\"');
+    expect(sent).toContain('#5b4fe9');
   });
 });

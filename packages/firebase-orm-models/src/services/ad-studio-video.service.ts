@@ -84,6 +84,15 @@ export async function createAdStudioClip(params: {
 }): Promise<AdStudioClipModel> {
   const existing = await listAdStudioClips(params.organizationId, params.projectId, params.briefId);
   const version = existing.filter((clip) => clip.scene_id === params.sceneId).reduce((max, clip) => Math.max(max, clip.version), 0) + 1;
+  // A new render or edit of the scene is what the person wants next: an earlier choice no longer holds.
+  await Promise.all(
+    existing
+      .filter((clip) => clip.scene_id === params.sceneId && clip.chosen)
+      .map((clip) => {
+        clip.chosen = false;
+        return clip.save();
+      }),
+  );
   const clip = new AdStudioClipModel();
   clip.organization_id = params.organizationId;
   clip.project_id = params.projectId;
@@ -108,7 +117,35 @@ export async function createAdStudioClip(params: {
   clip.completed_on = null;
   clip.lease_token = null;
   clip.lease_until = null;
+  clip.chosen = false;
   clip.setPathParams(pathParams(params.organizationId, params.projectId));
+  await clip.save();
+  return clip;
+}
+
+/** A clip that cannot be chosen for the video: it is not ready. */
+export class AdStudioClipNotChoosableError extends Error {
+  constructor() {
+    super('Only a ready clip can be used in the video.');
+    this.name = 'AdStudioClipNotChoosableError';
+  }
+}
+
+/**
+ * Makes one ready version of a scene the one the assembled video uses (over a newer one the person
+ * liked less). The other versions of the scene are unmarked; a later render clears the choice.
+ */
+export async function chooseAdStudioClip(organizationId: string, projectId: string, briefId: string, clipId: string): Promise<AdStudioClipModel> {
+  const clip = await getAdStudioClip(organizationId, projectId, briefId, clipId);
+  if (clip.status !== 'ready') throw new AdStudioClipNotChoosableError();
+  const siblings = (await listAdStudioClips(organizationId, projectId, briefId)).filter((other) => other.scene_id === clip.scene_id && other.id !== clip.id && other.chosen);
+  await Promise.all(
+    siblings.map((other) => {
+      other.chosen = false;
+      return other.save();
+    }),
+  );
+  clip.chosen = true;
   await clip.save();
   return clip;
 }
