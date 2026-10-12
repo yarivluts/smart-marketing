@@ -3846,8 +3846,6 @@
     "fieldLandingPage": "Landing page (optional)",
     "landingPagePlaceholder": "https://",
     "fieldFormat": "Frame",
-    "formatVertical": "Vertical 9:16 - Reels, Stories, Shorts",
-    "formatHorizontal": "Horizontal 16:9 - YouTube, in-stream",
     "fieldLanguage": "Ad language",
     "languageEn": "English",
     "languageHe": "Hebrew",
@@ -3871,7 +3869,7 @@
     "dailyVideo": "Video seconds per day",
     "saveLimits": "Save limits",
     "limitsSaved": "Limits saved.",
-    "readOnlyLimits": "Only project admins can change these limits.",
+    "readOnlyLimits": "Daily limits come from your GrowthOS plan. Contact us to change them.",
     "recentUsage": "Recent AI calls",
     "usageEmpty": "No AI calls yet.",
     "usageWhen": "When",
@@ -4431,7 +4429,8 @@
       "qaDescription": "Gemini watches every rendered clip, compares the narration with the script and looks for embarrassing mistakes. The autopilot re-renders a scene that fails.",
       "qaEnabled": "Check every clip",
       "qaRetries": "Automatic re-renders per scene",
-      "collapsed": "Studio settings and AI usage"
+      "collapsed": "Studio settings and AI usage",
+      "customerDescription": "Your daily AI allowance and the latest AI calls. Daily limits come from your GrowthOS plan."
     },
     "pronunciation": "Pronunciation (with nikud)",
     "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
@@ -4868,7 +4867,10 @@
         "invalid_audience": "an audience or interest is not a Meta one",
         "unknown": "a rule was broken"
       }
-    }
+    },
+    "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
+    "formatVerticalHint": "For Reels, Stories and Shorts.",
+    "formatHorizontalHint": "For YouTube and in-stream video."
   },
   "MetaConnect": {
     "title": "Connect with Facebook",

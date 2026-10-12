@@ -22,6 +22,10 @@ export interface AdStudioUsageRow {
 export interface AdStudioAdminPanelProps {
   orgId: string;
   projectId: string;
+  /**
+   * A GrowthOS platform operator (KAN-363): sees the infrastructure (models, storage, ffmpeg) and
+   * sets the daily limits. A customer sees only the limits' source and the recent AI calls.
+   */
   canConfigure: boolean;
   textModel: { provider: 'anthropic' | 'gemini'; model: string } | null;
   videoConfigured: boolean;
@@ -56,10 +60,11 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 }
 
 /**
- * The studio's admin surface: which models it uses, whether deep analysis has Google Ads keyword
- * data and why not, the project's daily limits (editable with `project.configure`, audited
- * server-side), today's usage against them and the recent AI calls with their outcome - so spend and
- * failures such as a provider out of credit are visible, not guessed.
+ * The studio's settings card. For a customer: whether deep analysis has Google Ads keyword data and
+ * why not, that the daily limits come from their plan, and the recent AI calls with their outcome -
+ * so failures such as a provider out of credit are visible, not guessed. For a GrowthOS platform
+ * operator (KAN-363) also the models, storage and ffmpeg, today's usage against the limits, and the
+ * form that sets them (audited server-side). Customers already see usage in the page's KPIs.
  */
 export function AdStudioAdminPanel({
   orgId,
@@ -128,22 +133,26 @@ export function AdStudioAdminPanel({
           <h2 id="ad-studio-admin-heading" className="text-base font-semibold">
             {t('adminTitle')}
           </h2>
-          <p className="text-xs text-muted-foreground">{t('adminDescription')}</p>
+          <p className="text-xs text-muted-foreground">{canConfigure ? t('adminDescription') : t('admin.customerDescription')}</p>
         </div>
       </header>
 
       <dl className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-border px-3 py-2">
-          <dt className="text-xs text-muted-foreground">{t('textModel')}</dt>
-          <dd className={cn('text-sm font-medium', !textModel && 'text-destructive')} dir="ltr">
-            {textModel ? t('textModelValue', { provider: t(`providerName.${textModel.provider}`), model: textModel.model }) : t('notConfigured')}
-          </dd>
-        </div>
-        <div className="rounded-xl border border-border px-3 py-2">
-          <dt className="text-xs text-muted-foreground">{t('videoModel')}</dt>
-          <dd className={cn('text-sm font-medium', !videoConfigured && 'text-destructive')}>{videoConfigured ? t('videoModelValue') : t('notConfigured')}</dd>
-        </div>
-        {storage ? (
+        {canConfigure ? (
+          <div className="rounded-xl border border-border px-3 py-2">
+            <dt className="text-xs text-muted-foreground">{t('textModel')}</dt>
+            <dd className={cn('text-sm font-medium', !textModel && 'text-destructive')} dir="ltr">
+              {textModel ? t('textModelValue', { provider: t(`providerName.${textModel.provider}`), model: textModel.model }) : t('notConfigured')}
+            </dd>
+          </div>
+        ) : null}
+        {canConfigure ? (
+          <div className="rounded-xl border border-border px-3 py-2">
+            <dt className="text-xs text-muted-foreground">{t('videoModel')}</dt>
+            <dd className={cn('text-sm font-medium', !videoConfigured && 'text-destructive')}>{videoConfigured ? t('videoModelValue') : t('notConfigured')}</dd>
+          </div>
+        ) : null}
+        {canConfigure && storage ? (
           <div className="rounded-xl border border-border px-3 py-2" data-testid="ad-studio-admin-storage">
             <dt className="text-xs text-muted-foreground">{t('storage')}</dt>
             <dd className="text-sm font-medium" dir="auto">
@@ -151,7 +160,7 @@ export function AdStudioAdminPanel({
             </dd>
           </div>
         ) : null}
-        {ffmpegAvailable !== undefined ? (
+        {canConfigure && ffmpegAvailable !== undefined ? (
           <div className="rounded-xl border border-border px-3 py-2" data-testid="ad-studio-admin-ffmpeg">
             <dt className="text-xs text-muted-foreground">{t('ffmpeg')}</dt>
             <dd className={cn('text-sm font-medium', ffmpegAvailable ? 'text-success' : 'text-destructive')}>{ffmpegAvailable ? t('ffmpegReady') : t('ffmpegMissing')}</dd>
@@ -166,11 +175,13 @@ export function AdStudioAdminPanel({
         </div>
       </dl>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <UsageBar label={t('usageTodayText')} used={usageToday.textGenerations} limit={limits.dailyTextGenerations} />
-        <UsageBar label={t('usageTodayVideo')} used={usageToday.videoSeconds} limit={limits.dailyVideoSeconds} />
-        <UsageBar label={t('usageTodayImages')} used={usageToday.images} limit={limits.dailyImages} />
-      </div>
+      {canConfigure ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <UsageBar label={t('usageTodayText')} used={usageToday.textGenerations} limit={limits.dailyTextGenerations} />
+          <UsageBar label={t('usageTodayVideo')} used={usageToday.videoSeconds} limit={limits.dailyVideoSeconds} />
+          <UsageBar label={t('usageTodayImages')} used={usageToday.images} limit={limits.dailyImages} />
+        </div>
+      ) : null}
 
       {canConfigure ? (
         <form method="post" onSubmit={save} className="flex flex-wrap items-end gap-3">
@@ -225,27 +236,56 @@ export function AdStudioAdminPanel({
         {recentUsage.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t('usageEmpty')}</p>
         ) : (
-          <div className="max-h-64 overflow-auto rounded-xl border border-border">
+          <>
+          {/* Phones: one card per call, so dates and model ids don't wrap mid-value (KAN-343). */}
+          <ul className="flex max-h-80 flex-col gap-2 overflow-auto sm:hidden" data-testid="ad-studio-usage-cards">
+            {recentUsage.map((row) => (
+              <li key={row.id} className="flex flex-col gap-0.5 rounded-xl border border-border px-3 py-2 text-xs">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium">
+                    {t(`usageKind.${row.kind}`)}
+                    {row.kind === 'video_scene' || row.kind === 'video_edit' ? <span className="text-muted-foreground tabular-nums">{` · ${t('secondsShort', { seconds: row.units })}`}</span> : null}
+                  </span>
+                  <bdi className="shrink-0 whitespace-nowrap text-muted-foreground tabular-nums" dir="ltr">
+                    {formatWhen(row.occurredOn)}
+                  </bdi>
+                </div>
+                <span className={row.outcome === 'failed' ? 'text-destructive' : 'text-success'}>
+                  {row.outcome === 'failed' && row.failureReason ? t(`providerErrors.${row.failureReason}`) : t(`usageOutcome.${row.outcome}`)}
+                </span>
+                {canConfigure ? (
+                  <span className="break-all text-muted-foreground" dir="ltr">
+                    {row.model}
+                  </span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+          <div className="hidden max-h-64 overflow-auto rounded-xl border border-border sm:block">
             <table className="w-full text-start text-xs">
               <thead>
                 <tr className="bg-muted/50 text-muted-foreground">
                   <th className="sticky top-0 bg-muted px-3 py-1.5 text-start font-medium">{t('usageWhen')}</th>
                   <th className="sticky top-0 bg-muted px-3 py-1.5 text-start font-medium">{t('usageWhat')}</th>
-                  <th className="sticky top-0 bg-muted px-3 py-1.5 text-start font-medium">{t('usageModel')}</th>
+                  {canConfigure ? <th className="sticky top-0 bg-muted px-3 py-1.5 text-start font-medium">{t('usageModel')}</th> : null}
                   <th className="sticky top-0 bg-muted px-3 py-1.5 text-start font-medium">{t('usageResult')}</th>
                 </tr>
               </thead>
               <tbody>
                 {recentUsage.map((row) => (
                   <tr key={row.id} className="border-t border-border" data-testid="ad-studio-usage-row">
-                    <td className="px-3 py-1.5 tabular-nums">{formatWhen(row.occurredOn)}</td>
+                    <td className="whitespace-nowrap px-3 py-1.5 tabular-nums">
+                      <bdi dir="ltr">{formatWhen(row.occurredOn)}</bdi>
+                    </td>
                     <td className="px-3 py-1.5">
                       {t(`usageKind.${row.kind}`)}
                       {row.kind === 'video_scene' || row.kind === 'video_edit' ? <span className="text-muted-foreground tabular-nums">{` · ${t('secondsShort', { seconds: row.units })}`}</span> : null}
                     </td>
-                    <td className="px-3 py-1.5" dir="ltr">
-                      {row.model}
-                    </td>
+                    {canConfigure ? (
+                      <td className="px-3 py-1.5" dir="ltr">
+                        {row.model}
+                      </td>
+                    ) : null}
                     <td className={cn('px-3 py-1.5', row.outcome === 'failed' ? 'text-destructive' : 'text-success')}>
                       {row.outcome === 'failed' && row.failureReason ? t(`providerErrors.${row.failureReason}`) : t(`usageOutcome.${row.outcome}`)}
                     </td>
@@ -254,6 +294,7 @@ export function AdStudioAdminPanel({
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </section>

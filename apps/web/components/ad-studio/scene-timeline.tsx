@@ -9,7 +9,8 @@ const SEGMENT_TONES = ['bg-primary', 'bg-primary/70', 'bg-primary/50', 'bg-prima
 
 /**
  * The script on a fixed one-minute ruler: each scene a segment as wide as its share of 60 seconds,
- * so the space left - or the overrun - is visible before anything is saved or rendered.
+ * so the space left - or the overrun - is visible before anything is saved or rendered. The bar and
+ * its ruler follow the page direction: in Hebrew the first scene starts at the right (KAN-371).
  */
 export function SceneTimeline({ scenes, activeSceneId }: { scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds'>[]; activeSceneId?: string | null }): React.ReactElement {
   const t = useTranslations('AdStudio');
@@ -22,7 +23,7 @@ export function SceneTimeline({ scenes, activeSceneId }: { scenes: readonly Pick
         <span className={cn('font-semibold tabular-nums', over > 0 ? 'text-destructive' : 'text-foreground')}>{t('totalOfMax', { total })}</span>
         {over > 0 ? <span className="text-destructive">{t('overLimit', { seconds: over })}</span> : null}
       </div>
-      <div className="relative flex h-7 w-full overflow-hidden rounded-lg bg-muted" dir="ltr" role="img" aria-label={t('totalOfMax', { total })}>
+      <div className="relative flex h-7 w-full overflow-hidden rounded-lg bg-muted" role="img" aria-label={t('totalOfMax', { total })}>
         {segments.map((segment, index) => (
           <div
             key={segment.id}
@@ -38,7 +39,7 @@ export function SceneTimeline({ scenes, activeSceneId }: { scenes: readonly Pick
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums" dir="ltr" aria-hidden="true">
+      <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums" aria-hidden="true">
         {[0, 15, 30, 45, 60].map((mark) => (
           <span key={mark} dir="auto">
             {t('secondsShort', { seconds: mark })}

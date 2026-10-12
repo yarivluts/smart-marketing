@@ -92,6 +92,7 @@ import {
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
+import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -141,7 +142,9 @@ export default async function AdStudioPage({
   if (!membership || !can(bindings, principal, 'ai.use', { orgId, projectId })) {
     notFound();
   }
-  const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId });
+  // The daily AI limits cap platform spend, and the models/storage/ffmpeg are platform internals:
+  // both belong to a GrowthOS platform operator, not to the customer's project admin (KAN-363).
+  const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId }) && isPlatformOperator(user.email);
   const canExport = can(bindings, principal, 'automation.execute', { orgId, projectId });
   const canConnectAccounts =
     can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
