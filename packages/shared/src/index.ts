@@ -38,3 +38,4 @@ export * from './ad-studio';
 export * from './firestore/index-drift';
 export * from './deploy/prod-drift';
 export * from './deploy/build-sha';
+export * from './auth/platform-operator';

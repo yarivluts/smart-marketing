@@ -54,6 +54,7 @@ import {
   AdStudioSearchInvalidError,
   saveAdStudioImageConcepts,
   setAdStudioSettings,
+  findUserById,
   updateAdStudioBriefDetails,
   type AdStudioBriefModel,
   type AdStudioExportModel,
@@ -121,10 +122,22 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, type AdStudioMetaTargeting, defaultMetaTargeting, metaTargetingIssues, normalizeMetaTargeting, isSearchTargeting, defaultSearchTargeting, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, type AdStudioMetaTargeting, defaultMetaTargeting, metaTargetingIssues, normalizeMetaTargeting, isSearchTargeting, defaultSearchTargeting, isPlatformOperator, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
+
+/**
+ * The Ad Studio limits cap what the platform spends on a customer's behalf, so only a GrowthOS
+ * platform operator changes them (KAN-363), over MCP as on the web. That is a person: an OAuth
+ * connection whose user is on the operator allowlist. An API key belongs to the customer and never
+ * qualifies.
+ */
+export async function mcpCallerIsPlatformOperator(auth: McpAuthContext, env: Readonly<Record<string, string | undefined>> = process.env): Promise<boolean> {
+  if (auth.principalKind !== 'oauth' || !auth.userId) return false;
+  const user = await findUserById(auth.userId);
+  return isPlatformOperator(user?.email ?? null, env);
+}
 
 /**
  * The AI Ad Studio over MCP: everything the Ad Studio page does, for an agent. Briefs, the deep plan,
@@ -1493,7 +1506,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     'set_ad_studio_limits',
     {
       title: 'Set Ad Studio limits',
-      description: 'Sets the project\'s daily Ad Studio limits (bounded so a typo cannot open unlimited spend). Audited. Requires "project.configure".',
+      description: 'Sets the project\'s daily Ad Studio limits (bounded so a typo cannot open unlimited spend). Audited. Requires "project.configure" and a GrowthOS platform operator connected over OAuth; an API key cannot change them.',
       inputSchema: toolInputSchema({
         daily_text_generations: z.number().describe('AI text calls per day, 0-1000.'),
         daily_video_seconds: z.number().describe('Seconds of generated video per day, 0-3600.'),
@@ -1505,6 +1518,9 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     },
     auditedToolHandler(auth, 'set_ad_studio_limits', async (args: any) =>
       runAdStudioTool(auth, 'project.configure', args, async (a: { daily_text_generations: number; daily_video_seconds: number; daily_images?: number; video_qa_enabled?: boolean; video_qa_retries?: number; image_size?: '1K' | '2K' }) => {
+        if (!(await mcpCallerIsPlatformOperator(auth))) {
+          return errorResult('Only a GrowthOS platform operator can change the Ad Studio limits; they come from the GrowthOS plan. get_ad_studio_usage shows them.');
+        }
         const current = await getAdStudioSettings(auth.organizationId, auth.projectId);
         const videoQa =
           a.video_qa_enabled !== undefined || a.video_qa_retries !== undefined
