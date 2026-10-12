@@ -39,3 +39,18 @@ describe('copy prompts', () => {
     expect(prompt.system).toContain('Never invent facts');
   });
 });
+
+describe('rewriting one image idea', () => {
+  it('names the idea, shows the others for distinctness, and passes the request as tagged data', async () => {
+    const { buildImageConceptRewritePrompt } = await import('./images');
+    const concepts = [
+      { visualPrompt: 'A desk without paper', headline: 'No more paper' },
+      { visualPrompt: 'A grey office', headline: 'Sign online' },
+    ];
+    const prompt = buildImageConceptRewritePrompt(BRIEF, concepts, 1, 'warmer light');
+    expect(prompt.system).toContain('Rewrite only idea 2');
+    expect(prompt.user).toContain('"visualPrompt":"A desk without paper"');
+    expect(prompt.user).toContain(['<editor_request>', 'warmer light', '</editor_request>'].join('\n'));
+    expect(prompt.user).not.toContain('Propose the image ideas.');
+  });
+});

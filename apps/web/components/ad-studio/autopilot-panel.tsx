@@ -26,6 +26,14 @@ export interface AutopilotPanelProps {
 
 /** Pause between advance calls; each call itself does real work (an image, a plan), so this only spaces them. */
 const ADVANCE_GAP_MS = 1500;
+/** Longest wait between retries after failures, and how many failures in a row pause the run. */
+const MAX_BACKOFF_MS = 30_000;
+const MAX_FAILURES = 6;
+
+/** The wait before the next advance: the normal gap, doubled for each failure in a row, capped. */
+export function autopilotRetryDelay(failures: number): number {
+  return failures === 0 ? ADVANCE_GAP_MS : Math.min(ADVANCE_GAP_MS * 2 ** failures, MAX_BACKOFF_MS);
+}
 
 const KNOWN_REASONS = new Set([
   'qa_issues',
@@ -97,12 +105,15 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
 
   // Drive a running run: advance, apply, pause, repeat. A step that finishes refreshes the page's
   // server parts (script editor, image studio, video) so its result is there to edit right away.
-  const runId = running ? run?.id : null;
+  // A run that kept failing pauses here instead of retrying forever; Resume starts the loop again.
+  const [paused, setPaused] = React.useState(false);
+  const runId = running && !paused ? run?.id : null;
   React.useEffect(() => {
     if (!runId) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let lastSignature = '';
+    let failures = 0;
     const tick = async () => {
       try {
         const response = await fetch(`${base}/${runId}/advance`, { method: 'POST', cache: 'no-store' });
@@ -110,7 +121,15 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
         if (stopped) return;
         if (!response.ok || !body.run) {
           setMessage(errorMessageRef.current(body));
+          // A refusal (no access, the ad was deleted) will not change by asking again: stop now.
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            setPaused(true);
+            return;
+          }
+          failures += 1;
         } else {
+          failures = 0;
+          setMessage(null);
           setRun(body.run);
           const signature = body.run.steps.map((step) => `${step.status}:${step.progress?.done ?? ''}`).join('|');
           if (signature !== lastSignature) {
@@ -129,9 +148,15 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
           if (body.run.status !== 'running') return;
         }
       } catch {
-        // A dropped request: the next tick tries again.
+        // A dropped request: try again, a little later each time.
+        failures += 1;
       }
-      if (!stopped) timer = setTimeout(() => void tick(), ADVANCE_GAP_MS);
+      if (stopped) return;
+      if (failures >= MAX_FAILURES) {
+        setPaused(true);
+        return;
+      }
+      timer = setTimeout(() => void tick(), autopilotRetryDelay(failures));
     };
     void tick();
     return () => {
@@ -151,7 +176,12 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
       });
       const body = (await response.json().catch(() => ({}))) as { run?: AdStudioRunView } & AdStudioApiError;
       if (!response.ok || !body.run) setMessage(errorMessage(body));
-      else setRun(body.run);
+      else {
+        setPaused(false);
+        setRun(body.run);
+      }
+    } catch {
+      setMessage(errorMessage({}));
     } finally {
       setPending(null);
     }
@@ -170,6 +200,8 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
       }
       setRun(body.run);
       if (stepHrefs) router.push(stepHrefs.create);
+    } catch {
+      setMessage(errorMessage({}));
     } finally {
       setPending(null);
     }
@@ -183,6 +215,8 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
       const body = (await response.json().catch(() => ({}))) as { run?: AdStudioRunView };
       if (body.run) setRun(body.run);
       router.refresh();
+    } catch {
+      setMessage(errorMessage({}));
     } finally {
       setPending(null);
     }
@@ -295,6 +329,19 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
             <p className={cn('text-sm font-semibold', run.status === 'failed' ? 'text-destructive' : run.status === 'done' ? 'text-success' : 'text-foreground')} role="status">
               {t(`autopilot.runStatus.${run.status}`)}
             </p>
+            {running && paused ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMessage(null);
+                  setPaused(false);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+                data-testid="ad-studio-autopilot-resume"
+              >
+                {t('autopilot.resume')}
+              </button>
+            ) : null}
             {running ? (
               <button
                 type="button"
@@ -325,6 +372,7 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
               );
             })}
           </ol>
+          {running ? <p className="text-xs text-muted-foreground">{paused ? t('autopilot.pausedHint') : t('autopilot.keepOpen')}</p> : null}
           {run.status === 'done' ? <p className="text-xs text-muted-foreground">{t('autopilot.doneHint')}</p> : null}
         </div>
       ) : null}
