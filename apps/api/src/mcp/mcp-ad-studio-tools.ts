@@ -347,7 +347,9 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
           format: slot.format,
           state: slot.generating ? 'generating' : slot.selected && slot.current ? 'ready' : slot.selected ? 'out_of_date' : slot.versions[0]?.status === 'failed' ? 'failed' : 'none',
           selected_image_id: slot.selected?.id ?? null,
-          versions: slot.versions.map((image) => ({ image_id: image.id, version: image.version, kind: image.kind, status: image.status, instruction: image.instruction, failure_code: image.failureCode })),
+          versions: slot.versions.map((image) => ({ image_id: image.id, version: image.version, kind: image.kind, status: image.status, instruction: image.instruction, failure_code: image.failureCode,
+            // The AI check of the image: a misspelled headline, stray text, a deformed hand; null on images made before it.
+            qa: image.qa ? { status: image.qa.status, renders: image.qa.renders, issues: image.qa.issues.map((issue) => ({ severity: issue.severity, ...(issue.code ? { code: issue.code } : {}), detail: issue.detail })) } : null })),
         })),
     })),
     video: {
@@ -1479,6 +1481,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         return textResult({
           limits: { daily_text_generations: settings.dailyTextGenerations, daily_video_seconds: settings.dailyVideoSeconds, daily_images: settings.dailyImages },
           video_qa: { enabled: settings.videoQa.enabled, retries: settings.videoQa.retries },
+          image_size: settings.imageSize,
           today: { day: usage.day, text_generations: usage.textGenerations, video_seconds: usage.videoSeconds, images: usage.images },
           models: { text: providers.text, video: providers.videoConfigured, images: resolveAdStudioImageGenerator() !== null },
         });
@@ -1495,12 +1498,13 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         daily_text_generations: z.number().describe('AI text calls per day, 0-1000.'),
         daily_video_seconds: z.number().describe('Seconds of generated video per day, 0-3600.'),
         daily_images: z.number().optional().describe('Images (renders and edits) per day, 0-500. Omit to keep the current one.'),
-        video_qa_enabled: z.boolean().optional().describe('Whether every rendered clip gets the AI quality check. Omit to keep the current setting.'),
-        video_qa_retries: z.number().optional().describe('Automatic re-renders per scene whose clip fails the check, 0-2. Omit to keep the current one.'),
+        video_qa_enabled: z.boolean().optional().describe('Whether every rendered clip and image gets the AI quality check. Omit to keep the current setting.'),
+        video_qa_retries: z.number().optional().describe('Automatic re-renders per scene or image that fails the check, 0-2. Omit to keep the current one.'),
+        image_size: z.enum(['1K', '2K']).optional().describe('The size images are rendered at: 2K meets the recommended Meta sizes, 1K is cheaper for drafts. Omit to keep the current one.'),
       }),
     },
     auditedToolHandler(auth, 'set_ad_studio_limits', async (args: any) =>
-      runAdStudioTool(auth, 'project.configure', args, async (a: { daily_text_generations: number; daily_video_seconds: number; daily_images?: number; video_qa_enabled?: boolean; video_qa_retries?: number }) => {
+      runAdStudioTool(auth, 'project.configure', args, async (a: { daily_text_generations: number; daily_video_seconds: number; daily_images?: number; video_qa_enabled?: boolean; video_qa_retries?: number; image_size?: '1K' | '2K' }) => {
         const current = await getAdStudioSettings(auth.organizationId, auth.projectId);
         const videoQa =
           a.video_qa_enabled !== undefined || a.video_qa_retries !== undefined
@@ -1513,6 +1517,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
           dailyVideoSeconds: a.daily_video_seconds,
           ...(a.daily_images !== undefined ? { dailyImages: a.daily_images } : {}),
           ...(videoQa ? { videoQa } : {}),
+          ...(a.image_size !== undefined ? { imageSize: a.image_size } : {}),
           actorId: actorId(auth),
         });
         return textResult({
@@ -1520,6 +1525,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
           daily_video_seconds: settings.dailyVideoSeconds,
           daily_images: settings.dailyImages,
           video_qa: { enabled: settings.videoQa.enabled, retries: settings.videoQa.retries },
+          image_size: settings.imageSize,
         });
       }),
     ),

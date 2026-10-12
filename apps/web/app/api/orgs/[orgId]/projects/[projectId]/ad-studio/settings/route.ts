@@ -15,8 +15,8 @@ interface RouteParams {
 }
 
 /**
- * Sets the project's daily Ad Studio limits (AI text calls, seconds of video, images) and the AI
- * quality check of clips. Audited. These limits cap what the platform spends on a customer's behalf,
+ * Sets the project's daily Ad Studio limits (AI text calls, seconds of video, images), the AI
+ * quality check of clips and images, and the size images are rendered at. Audited. These limits cap what the platform spends on a customer's behalf,
  * so a GrowthOS platform operator sets them, never the customer (KAN-363): `project.configure` on
  * the project and an operator sign-in.
  */
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
   if (!isPlatformOperator(user.email)) {
     return NextResponse.json({ error: 'platform_operator_required' }, { status: 403 });
   }
-  const parsed = await parseJsonBody<{ dailyTextGenerations?: unknown; dailyVideoSeconds?: unknown; dailyImages?: unknown; videoQa?: unknown }>(request);
+  const parsed = await parseJsonBody<{ dailyTextGenerations?: unknown; dailyVideoSeconds?: unknown; dailyImages?: unknown; videoQa?: unknown; imageSize?: unknown }>(request);
   if (parsed.error) return parsed.error;
   const toNumber = (value: unknown) => (typeof value === 'number' ? value : Number.NaN);
   try {
@@ -40,6 +40,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
       ...(parsed.body?.dailyImages !== undefined ? { dailyImages: toNumber(parsed.body.dailyImages) } : {}),
       // Optional too: an older client keeps the quality-check setting. A malformed value is refused by the service.
       ...(parsed.body?.videoQa !== undefined ? { videoQa: parseVideoQa(parsed.body.videoQa) } : {}),
+      // 1K or 2K; anything else is refused by the service.
+      ...(parsed.body?.imageSize !== undefined ? { imageSize: String(parsed.body.imageSize) } : {}),
       actorId: user.id,
     });
     return NextResponse.json({ settings });

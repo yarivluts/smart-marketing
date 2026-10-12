@@ -178,13 +178,13 @@ describe('AdStudioAdminPanel AI quality check', () => {
       />,
       { locale: 'en' },
     );
-    fireEvent.change(screen.getByLabelText('Automatic re-renders per scene'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Automatic re-renders per scene or image'), { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save limits' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string)).toMatchObject({ videoQa: { enabled: true, retries: 2 } });
     // Turning the check off disables the retries choice.
-    fireEvent.click(screen.getByLabelText('Check every clip'));
-    expect(screen.getByLabelText('Automatic re-renders per scene')).toBeDisabled();
+    fireEvent.click(screen.getByLabelText('Check every clip and image'));
+    expect(screen.getByLabelText('Automatic re-renders per scene or image')).toBeDisabled();
     vi.unstubAllGlobals();
   });
 });

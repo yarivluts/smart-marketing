@@ -19,6 +19,7 @@ import {
   exportAdStudioImage,
   getAdStudioBrief,
   getAdStudioImage,
+  getAdStudioSettings,
   listAdStudioImages,
   markAdStudioImageFailed,
   markAdStudioImageReady,
@@ -30,10 +31,12 @@ import {
   type AdStudioExportModel,
   type AdStudioImageExportDestination,
   type AdStudioImageModel,
+  type AdStudioImageQa,
 } from '@growthos/firebase-orm-models';
 import { briefPromptInput } from './brand';
 import { ensureOrm, getServerKmsProvider } from './runtime';
-import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './llm';
+import { AdStudioProviderError, resolveAdStudioLlm, resolveAdStudioReviewer, type AdStudioLlm, type AdStudioReviewer } from './llm';
+import { betterImageVerdict, reviewAdStudioImage, type ImageQaSubject, type ImageQaVerdict } from './image-qa';
 import { englishForModel } from './translate';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { repairOverLength } from './length-repair';
@@ -60,11 +63,13 @@ export interface AdStudioImageDeps {
   storage: AdStudioMediaStorage;
   /** Translates a picture described in Hebrew into English for the image model; absent or null sends it as written. */
   llm?: AdStudioLlm | null;
+  /** Checks each finished image (spelling of the headline, stray text, deformed hands); absent or null skips the check. */
+  reviewer?: AdStudioReviewer | null;
   now?: () => Date;
 }
 
 export function resolveAdStudioImageDeps(env: NodeJS.ProcessEnv = process.env): AdStudioImageDeps {
-  return { images: resolveAdStudioImageGenerator(env), storage: resolveAdStudioMediaStorage(env), llm: resolveAdStudioLlm(env) };
+  return { images: resolveAdStudioImageGenerator(env), storage: resolveAdStudioMediaStorage(env), llm: resolveAdStudioLlm(env), reviewer: resolveAdStudioReviewer(env) };
 }
 
 interface BriefContext {
@@ -90,6 +95,7 @@ export function toAdStudioImageView(image: AdStudioImageModel): AdStudioImageVie
     mimeType: image.mime_type ?? null,
     requestedOn: image.requested_on,
     completedOn: image.completed_on ?? null,
+    qa: image.qa ? { status: image.qa.status, issues: image.qa.issues, renders: image.qa.renders } : null,
   };
 }
 
@@ -184,28 +190,80 @@ export async function rewriteAdStudioImageConcept(ctx: AdStudioCallContext & { b
   });
 }
 
-/** Runs one image call inside the daily image limit, stores the result and records the usage either way. */
+/** The project's quality-check setting (shared with video) and how many re-renders a failing image gets. */
+interface ImageCheckPlan {
+  enabled: boolean;
+  retries: number;
+}
+
+/**
+ * Renders, checks and - while the check finds a major problem and retries remain - renders again,
+ * keeping the best image. Every render counts toward the daily image limit; a retry the limit no
+ * longer allows, or one the provider refuses, ends the loop with the best image so far.
+ */
+async function renderChecked(
+  ctx: BriefContext,
+  deps: AdStudioImageDeps,
+  kind: 'image' | 'image_edit',
+  check: ImageCheckPlan,
+  subject: ImageQaSubject,
+  render: () => Promise<AdStudioGeneratedImage>,
+): Promise<{ image: AdStudioGeneratedImage; renders: number; qa: AdStudioImageQa }> {
+  const reviewer = check.enabled ? (deps.reviewer ?? null) : null;
+  const attempts = reviewer ? 1 + check.retries : 1;
+  let best: { image: AdStudioGeneratedImage; verdict: ImageQaVerdict } | null = null;
+  let renders = 0;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) {
+      try {
+        await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind, units: 1, now: deps.now?.() });
+      } catch {
+        break;
+      }
+    }
+    let image: AdStudioGeneratedImage;
+    try {
+      renders += 1;
+      image = await render();
+    } catch (error) {
+      if (!best) throw Object.assign(error instanceof Error ? error : new Error(String(error)), { renders });
+      break;
+    }
+    const verdict: ImageQaVerdict = reviewer
+      ? await reviewAdStudioImage({ ...ctx, image, subject, reviewer, now: deps.now?.() })
+      : { status: 'skipped', issues: [], text: null, model: null };
+    if (!best || betterImageVerdict(verdict, best.verdict)) best = { image, verdict };
+    if (verdict.status !== 'issues') break;
+  }
+  const chosen = best as { image: AdStudioGeneratedImage; verdict: ImageQaVerdict };
+  return { image: chosen.image, renders, qa: { ...chosen.verdict, renders } };
+}
+
+/** Runs the image calls inside the daily image limit, stores the kept image and records the usage either way. */
 async function produceImage(
   ctx: BriefContext,
   deps: AdStudioImageDeps,
   record: AdStudioImageModel,
   kind: 'image' | 'image_edit',
+  check: ImageCheckPlan,
+  subject: ImageQaSubject,
   call: (generator: AdStudioImageGenerator) => Promise<AdStudioGeneratedImage>,
 ): Promise<AdStudioImageModel> {
   const now = deps.now ?? (() => new Date());
-  const usage = { organizationId: ctx.organizationId, projectId: ctx.projectId, kind, provider: 'gemini', model: record.model, units: 1, briefId: ctx.briefId, actorId: ctx.actorId };
+  const usage = { organizationId: ctx.organizationId, projectId: ctx.projectId, kind, provider: 'gemini', model: record.model, briefId: ctx.briefId, actorId: ctx.actorId };
   try {
     const generator = deps.images;
     if (!generator) throw new AdStudioProviderError('not_configured', 'No image model is configured.');
-    const image = await call(generator);
+    const { image, renders, qa } = await renderChecked(ctx, deps, kind, check, subject, () => call(generator));
     const objectPath = adStudioImageObjectPath({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: ctx.briefId, imageId: record.id, mimeType: image.mimeType });
     await deps.storage.upload(objectPath, image.bytes, image.mimeType);
-    await recordAdStudioUsage({ ...usage, outcome: 'succeeded', now: now() });
-    return await markAdStudioImageReady(record, { gcsPath: objectPath, mimeType: image.mimeType, byteSize: image.bytes.length, now: now() });
+    await recordAdStudioUsage({ ...usage, units: renders, outcome: 'succeeded', now: now() });
+    return await markAdStudioImageReady(record, { gcsPath: objectPath, mimeType: image.mimeType, byteSize: image.bytes.length, qa, now: now() });
   } catch (error) {
     const code = error instanceof AdStudioProviderError ? error.code : 'storage_error';
     const message = error instanceof Error ? error.message : String(error);
-    if (code !== 'not_configured') await recordAdStudioUsage({ ...usage, outcome: 'failed', failureReason: code, now: now() });
+    const renders = (error as { renders?: number }).renders ?? 1;
+    if (code !== 'not_configured') await recordAdStudioUsage({ ...usage, units: renders, outcome: 'failed', failureReason: code, now: now() });
     await markAdStudioImageFailed(record, { code, message, now: now() });
     if (error instanceof AdStudioProviderError) throw error;
     throw new AdStudioProviderError('provider_error', message);
@@ -223,6 +281,7 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
   if (!concept) throw new AdStudioImageRequestError('concept_not_found');
   if (!concept.formats.includes(ctx.format)) throw new AdStudioImageRequestError('format_not_in_concept');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image', units: 1, now: deps.now?.() });
+  const settings = await getAdStudioSettings(ctx.organizationId, ctx.projectId);
   const input = await briefPromptInput(brief);
   // A picture described in Hebrew reaches the image model in English; the fingerprint keeps the words as written.
   const visualPrompt = await englishForModel(concept.visualPrompt, { ...ctx, llm: deps.llm, now: deps.now?.() });
@@ -238,10 +297,14 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
     prompt,
     provider: 'gemini',
     model: deps.images?.model ?? 'unconfigured',
+    imageSize: settings.imageSize,
     actorId: ctx.actorId,
     now: deps.now?.(),
   });
-  return produceImage(ctx, deps, record, 'image', (generator) => generator.generate({ prompt, aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format] }));
+  const subject = { headline: concept.headline, visualPrompt: concept.visualPrompt, language: input.language };
+  return produceImage(ctx, deps, record, 'image', settings.videoQa, subject, (generator) =>
+    generator.generate({ prompt, aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize }),
+  );
 }
 
 /**
@@ -257,6 +320,8 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
   const parent = await getAdStudioImage(ctx.organizationId, ctx.projectId, ctx.briefId, ctx.imageId);
   if (parent.status !== 'ready' || !parent.gcs_path) throw new AdStudioImageRequestError('image_not_editable');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image_edit', units: 1, now: deps.now?.() });
+  const [brief, settings] = await Promise.all([getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId), getAdStudioSettings(ctx.organizationId, ctx.projectId)]);
+  const concept = (brief.image_concepts ?? []).find((candidate) => candidate.id === parent.concept_id);
   const bytes = await readAdStudioObject(deps.storage, parent.gcs_path, MAX_STORED_IMAGE_BYTES);
   // The person's words are kept on the image; the image model gets them in English.
   const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
@@ -273,11 +338,19 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
     prompt: instruction,
     provider: 'gemini',
     model: deps.images?.model ?? 'unconfigured',
+    imageSize: settings.imageSize,
     actorId: ctx.actorId,
     now: deps.now?.(),
   });
-  return produceImage(ctx, deps, record, 'image_edit', (generator) =>
-    generator.edit({ instruction: modelInstruction, image: { bytes, mimeType: parent.mime_type ?? 'image/png' }, aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format] }),
+  // The edit may change the words on purpose, so the check looks for misspellings, not for the original headline.
+  const subject = { headline: null, visualPrompt: `${concept?.visualPrompt ?? ''}\nEdited as asked: ${instruction}`.trim(), language: brief.language };
+  return produceImage(ctx, deps, record, 'image_edit', settings.videoQa, subject, (generator) =>
+    generator.edit({
+      instruction: modelInstruction,
+      image: { bytes, mimeType: parent.mime_type ?? 'image/png' },
+      aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format],
+      imageSize: settings.imageSize,
+    }),
   );
 }
 

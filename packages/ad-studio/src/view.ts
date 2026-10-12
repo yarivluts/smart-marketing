@@ -113,6 +113,15 @@ export interface AdStudioImageView {
   mimeType: string | null;
   requestedOn: string;
   completedOn: string | null;
+  /** The AI check of the image (headline spelling, stray text, deformed hands); null on images made before it existed. */
+  qa: AdStudioImageQaView | null;
+}
+
+export interface AdStudioImageQaView {
+  status: 'passed' | 'issues' | 'skipped' | 'error';
+  issues: { severity: 'major' | 'minor'; code?: 'headline_mismatch'; detail: string }[];
+  /** How many renders it took to reach this image. */
+  renders: number;
 }
 
 /** One concept in one placement: its versions, the chosen one, and whether that one still matches the concept. */

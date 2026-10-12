@@ -1,5 +1,5 @@
 import type { AdStudioImageFormat } from '@growthos/shared';
-import { AdStudioImageModel, type AdStudioImageKind } from '../models/ad-studio-image.model';
+import { AdStudioImageModel, type AdStudioImageKind, type AdStudioImageQa } from '../models/ad-studio-image.model';
 
 /**
  * Ad Studio image records (image ads next to the video). The engine (`@growthos/ad-studio`) calls
@@ -51,6 +51,8 @@ export async function createAdStudioImage(params: {
   prompt: string;
   provider: string;
   model: string;
+  /** The size asked of the image model; omitted for edits made before sizes existed. */
+  imageSize?: string | null;
   actorId: string;
   now?: Date;
 }): Promise<AdStudioImageModel> {
@@ -73,6 +75,7 @@ export async function createAdStudioImage(params: {
   image.selected = false;
   image.provider = params.provider;
   image.model = params.model;
+  image.image_size = params.imageSize ?? null;
   image.requested_by = params.actorId;
   image.requested_on = (params.now ?? new Date()).toISOString();
   image.setPathParams(pathParams(params.organizationId, params.projectId));
@@ -86,9 +89,10 @@ export async function createAdStudioImage(params: {
  */
 export async function markAdStudioImageReady(
   image: AdStudioImageModel,
-  params: { gcsPath: string; mimeType: string; byteSize: number; now?: Date },
+  params: { gcsPath: string; mimeType: string; byteSize: number; qa?: AdStudioImageQa | null; now?: Date },
 ): Promise<AdStudioImageModel> {
   image.status = 'ready';
+  if (params.qa) image.qa = params.qa;
   image.gcs_path = params.gcsPath;
   image.mime_type = params.mimeType;
   image.byte_size = params.byteSize;

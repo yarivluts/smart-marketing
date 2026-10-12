@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { AdStudioAdminPanel, type AdStudioAdminPanelProps } from './ad-studio-admin-panel';
@@ -48,6 +48,21 @@ describe('AdStudioAdminPanel audiences (KAN-363)', () => {
     expect(screen.getByTestId('ad-studio-admin-ffmpeg')).toBeInTheDocument();
     expect(text).toContain('3/50');
     expect(screen.getByRole('button', { name: 'Save limits' })).toBeInTheDocument();
+  });
+
+  it('lets an operator choose the image size, 2K by default, and saves it with the limits', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ settings: {} }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(<AdStudioAdminPanel {...PROPS} canConfigure />, { locale: 'en' });
+    const size = screen.getByTestId('ad-studio-image-size') as HTMLSelectElement;
+    expect(size.value).toBe('2K');
+    expect(screen.getByRole('option', { name: '2K - recommended' })).toBeInTheDocument();
+    fireEvent.change(size, { target: { value: '1K' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save limits' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ imageSize: '1K', videoQa: { enabled: true, retries: 1 } });
+    vi.unstubAllGlobals();
   });
 
   it('renders the calls as phone cards and a desktop table, each date kept left-to-right (KAN-343)', () => {

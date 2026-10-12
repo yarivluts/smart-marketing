@@ -120,9 +120,14 @@ describe('Ad Studio MCP tools', () => {
       expect.objectContaining({ format: 'square', state: 'ready', selected_image_id: edited.image_id }),
       expect.objectContaining({ format: 'story', state: 'none', selected_image_id: null, versions: [] }),
     ]);
+    // Each version carries its AI check, so an agent sees a misspelled headline as a person does.
+    const square = state.image_ideas[0].placements[0].versions as { qa: { status: string; renders: number } | null }[];
+    expect(square.map((version) => version.qa?.renders)).toEqual([1, 1]);
+    expect(square.every((version) => ['passed', 'issues', 'error'].includes(version.qa?.status ?? ''))).toBe(true);
 
     const usage = await json<{ today: { images: number; text_generations: number } }>('get_ad_studio_usage');
-    expect(usage.today).toMatchObject({ images: 2, text_generations: 1 });
+    // The ideas are one AI text call; each of the two images gets an AI check, which counts as one too.
+    expect(usage.today).toMatchObject({ images: 2, text_generations: 3 });
   });
 
   it('runs the autopilot to the plan, waits for the person to confirm it, then to finished creatives', async () => {
@@ -339,6 +344,10 @@ describe('Ad Studio MCP tools', () => {
     expect(qa.video_qa).toEqual({ enabled: true, retries: 2 });
     const badRetries = await agent.call('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, video_qa_retries: 9 });
     expect((badRetries.content[0] as { text: string }).text).toContain('videoQa.retries must be a whole number from 0 to 2');
+    // The image size: 2K by default, settable, and kept by a call that leaves it out.
+    expect((await agent.json<{ image_size: string }>('get_ad_studio_usage')).image_size).toBe('2K');
+    expect((await agent.json<{ image_size: string }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0, image_size: '1K' })).image_size).toBe('1K');
+    expect((await agent.json<{ image_size: string }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 })).image_size).toBe('1K');
     const ideas = await agent.json<{ id: string }[]>('save_ad_image_ideas', { brief_id: ad.id, ideas: [{ id: 'c1', visual_prompt: 'A phone', headline: '', formats: ['square'] }] });
     const overLimit = await agent.call('render_ad_image', { brief_id: ad.id, idea_id: ideas[0].id, format: 'square' });
     expect((overLimit.content[0] as { text: string }).text).toContain('daily Ad Studio limit for images is reached (0 of 0)');

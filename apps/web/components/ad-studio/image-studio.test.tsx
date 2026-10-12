@@ -29,6 +29,7 @@ function image(overrides: Partial<AdStudioImageView> = {}): AdStudioImageView {
     mimeType: 'image/png',
     requestedOn: '2026-09-28T10:00:00.000Z',
     completedOn: '2026-09-28T10:00:05.000Z',
+    qa: null,
     ...overrides,
   };
 }
@@ -65,6 +66,32 @@ afterEach(() => {
 });
 
 describe('ImageStudio', () => {
+  it('shows the AI check of each image: passed after re-renders, or what is wrong with a misspelled headline, unfolded', () => {
+    renderStudio({
+      initialImages: [
+        image({ qa: { status: 'passed', issues: [], renders: 2 } }),
+        image({
+          id: 'i2',
+          format: 'story',
+          conceptFingerprint: imageConceptFingerprint(CONCEPT, 'story', 'en'),
+          qa: { status: 'issues', renders: 2, issues: [{ severity: 'major', code: 'headline_mismatch', detail: 'Sing fast' }, { severity: 'minor', detail: 'Slight blur' }] },
+        }),
+      ],
+    });
+    expect(screen.getByTestId('ad-studio-image-manage')).toHaveAttribute('open');
+    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-passed')).toHaveTextContent('AI check passed after 2 renders');
+    const issues = within(screen.getByTestId('ad-studio-image-slot-story')).getByTestId('ad-studio-image-qa-issues');
+    expect(issues).toHaveTextContent('The headline in the image is not spelled as written. The image reads: "Sing fast"');
+    expect(issues).toHaveTextContent('Slight blur');
+  });
+
+  it('keeps the images folded and quiet when the check passed or did not run', () => {
+    renderStudio({ initialImages: [image({ qa: { status: 'skipped', issues: [], renders: 1 } })] });
+    expect(screen.getByTestId('ad-studio-image-manage')).not.toHaveAttribute('open');
+    expect(screen.queryByTestId('ad-studio-image-qa-issues')).toBeNull();
+    expect(screen.queryByTestId('ad-studio-image-qa-passed')).toBeNull();
+  });
+
   it('shows each placement of an idea with its image and state, and renders a missing one', async () => {
     const fetchMock = vi.fn(async () => json({ concepts: [CONCEPT], images: [image(), image({ id: 'i2', format: 'story', conceptFingerprint: imageConceptFingerprint(CONCEPT, 'story', 'en') })] }));
     vi.stubGlobal('fetch', fetchMock);

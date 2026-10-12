@@ -14,6 +14,9 @@ import {
   normalizeSearchAd,
   normalizeVideoSettings,
   isDefaultVideoSettings,
+  isAdStudioImageSize,
+  DEFAULT_AD_STUDIO_IMAGE_SIZE,
+  type AdStudioImageSize,
   validateAdStudioImageConcepts,
   validateAdStudioScenes,
   type AdStudioAdCopy,
@@ -464,6 +467,8 @@ export interface AdStudioSettingsView {
   dailyImages: number;
   /** The AI quality check of rendered clips: on or off, and how many automatic re-renders a failing scene gets. */
   videoQa: { enabled: boolean; retries: number };
+  /** The size images are rendered at: 2K meets Meta's recommended sizes, 1K is cheaper for drafts. */
+  imageSize: AdStudioImageSize;
   /** False while the project is still on the defaults. */
   customized: boolean;
   lastChangedOn: string | null;
@@ -477,6 +482,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
       dailyVideoSeconds: AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
       dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
       videoQa: { enabled: true, retries: AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES },
+      imageSize: DEFAULT_AD_STUDIO_IMAGE_SIZE,
       customized: false,
       lastChangedOn: null,
     };
@@ -486,6 +492,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
     dailyVideoSeconds: settings.daily_video_seconds,
     dailyImages: settings.daily_images ?? AD_STUDIO_DEFAULT_DAILY_IMAGES,
     videoQa: { enabled: settings.video_qa_enabled ?? true, retries: settings.video_qa_retries ?? AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES },
+    imageSize: isAdStudioImageSize(settings.image_size) ? settings.image_size : DEFAULT_AD_STUDIO_IMAGE_SIZE,
     customized: true,
     lastChangedOn: settings.last_changed_on,
   };
@@ -500,6 +507,8 @@ export async function setAdStudioSettings(params: {
   dailyImages?: number;
   /** Omitted by callers that predate the quality check: the current settings are kept. */
   videoQa?: { enabled: boolean; retries: number };
+  /** Omitted by callers that predate image sizes: the current size is kept. */
+  imageSize?: string;
   actorId: string;
   now?: Date;
 }): Promise<AdStudioSettingsView> {
@@ -516,12 +525,14 @@ export async function setAdStudioSettings(params: {
   if (params.videoQa && (typeof params.videoQa.enabled !== 'boolean' || !Number.isInteger(params.videoQa.retries) || params.videoQa.retries < 0 || params.videoQa.retries > AD_STUDIO_MAX_VIDEO_QA_RETRIES)) {
     reasons.push(`videoQa.retries must be a whole number from 0 to ${AD_STUDIO_MAX_VIDEO_QA_RETRIES}`);
   }
+  if (params.imageSize !== undefined && !isAdStudioImageSize(params.imageSize)) reasons.push('imageSize must be 1K or 2K');
   if (reasons.length) throw new AdStudioBriefInvalidError(reasons);
   await requireProject(params.organizationId, params.projectId);
 
   const before = await getAdStudioSettings(params.organizationId, params.projectId);
   const dailyImages = params.dailyImages ?? before.dailyImages;
   const videoQa = params.videoQa ?? before.videoQa;
+  const imageSize = isAdStudioImageSize(params.imageSize) ? params.imageSize : before.imageSize;
   const existing = await AdStudioSettingsModel.init(SETTINGS_ID, { organization_id: params.organizationId, project_id: params.projectId });
   const settings = existing ?? new AdStudioSettingsModel();
   settings.organization_id = params.organizationId;
@@ -531,6 +542,7 @@ export async function setAdStudioSettings(params: {
   settings.daily_images = dailyImages;
   settings.video_qa_enabled = videoQa.enabled;
   settings.video_qa_retries = videoQa.retries;
+  settings.image_size = imageSize;
   settings.changed_by = params.actorId;
   settings.last_changed_on = nowIso(params.now);
   settings.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
@@ -545,8 +557,8 @@ export async function setAdStudioSettings(params: {
       targetType: 'ad_studio_settings',
       targetId: params.projectId,
       summary: `Set Ad Studio daily limits to ${params.dailyTextGenerations} AI text calls, ${params.dailyVideoSeconds}s of video and ${dailyImages} images`,
-      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages, video_qa: before.videoQa },
-      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages, video_qa: videoQa },
+      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages, video_qa: before.videoQa, image_size: before.imageSize },
+      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages, video_qa: videoQa, image_size: imageSize },
     });
   } catch {
     // Best-effort.

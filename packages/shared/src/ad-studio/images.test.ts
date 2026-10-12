@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   AD_STUDIO_IMAGE_HEADLINE_MAX,
   AD_STUDIO_MAX_IMAGE_CONCEPTS,
+  DEFAULT_AD_STUDIO_IMAGE_SIZE,
   buildImageConceptsPrompt,
+  imageTextHasHeadline,
+  isAdStudioImageSize,
   buildImagePrompt,
   fitAdStudioImageConcepts,
   imageConceptFingerprint,
@@ -75,6 +78,26 @@ describe('image concepts', () => {
     expect(imageConceptFingerprint(concept({ headline: 'New' }), 'square', 'he')).not.toBe(base);
     expect(imageConceptFingerprint(concept(), 'story', 'he')).not.toBe(base);
     expect(imageConceptFingerprint(concept(), 'square', 'en')).not.toBe(base);
+  });
+});
+
+describe('image headline check', () => {
+  it('finds the headline in the text read off the image, ignoring spacing, punctuation, case and vowel marks', () => {
+    expect(imageTextHasHeadline('Sign in 30 seconds!', 'EasySign\nSIGN IN 30  seconds')).toBe(true);
+    expect(imageTextHasHeadline('\u05d7\u05ea\u05de\u05d5 \u05de\u05d4\u05e8', '\u05d7\u05b8\u05ea\u05b0\u05de\u05d5\u05bc \u05de\u05b7\u05d4\u05b5\u05e8.')).toBe(true);
+  });
+
+  it('reports a misspelled or missing headline, and accepts any text when there is no headline', () => {
+    expect(imageTextHasHeadline('Sign in 30 seconds', 'Sing in 30 seconds')).toBe(false);
+    expect(imageTextHasHeadline('\u05d7\u05ea\u05de\u05d5 \u05de\u05d4\u05e8', '\u05d7\u05ea\u05de\u05d5 \u05de\u05d7\u05e8')).toBe(false);
+    expect(imageTextHasHeadline('Sign in 30 seconds', '')).toBe(false);
+    expect(imageTextHasHeadline('  ', 'anything')).toBe(true);
+  });
+
+  it('knows the image sizes, 2K by default', () => {
+    expect(DEFAULT_AD_STUDIO_IMAGE_SIZE).toBe('2K');
+    expect(isAdStudioImageSize('1K')).toBe(true);
+    expect(isAdStudioImageSize('4K')).toBe(false);
   });
 });
 
