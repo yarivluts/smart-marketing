@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import { AD_STUDIO_COPY_LIMITS, buildAdCopyPrompt, fitAdCopy, isAdCopyEmpty, planToScriptContext, type AdStudioAdCopy, type AdStudioCopyTarget } from '@growthos/shared';
-import { adStudioBriefInput, getAdStudioBrief, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { getAdStudioBrief, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { briefPromptInput } from './brand';
 import { ensureOrm } from './runtime';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { repairOverLength } from './length-repair';
@@ -38,7 +39,7 @@ export async function writeAdStudioCopy(ctx: AdStudioCallContext & { briefId: st
   }
   if (targets.length === 0) return brief;
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildAdCopyPrompt(adStudioBriefInput(brief), targets, context);
+  const prompt = buildAdCopyPrompt(await briefPromptInput(brief), targets, context);
   const written = await meteredCall(ctx, 'ad_copy', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: WrittenCopySchema }));
   // Over-long fields are rewritten to fit, not cut off mid-sentence; fitting stays as the last resort.
   const fields = ['headline', 'primaryText', 'description'] as const;
