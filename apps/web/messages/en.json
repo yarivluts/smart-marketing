@@ -4333,7 +4333,12 @@
       "ideasTitle": "Image ad ideas",
       "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan.",
       "editIdea": "Edit the idea (picture, text in the image, placements)",
-      "manageImages": "Manage the images ({count}): render again, change, download, send"
+      "manageImages": "Manage the images ({count}): render again, change, download, send",
+      "rewriteIdea": "Rewrite with AI",
+      "rewriteIdeaInstruction": "What should change in this idea?",
+      "rewriteIdeaPlaceholder": "e.g. warmer light, show the phone closer",
+      "rewriteIdeaRun": "Rewrite this idea",
+      "saveEditsFirst": "Save your edits first, so the rewrite starts from them."
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
-import { generateAdStudioImageConcepts, resolveAdStudioLlm } from '@/lib/ad-studio/engine';
+import { generateAdStudioImageConcepts, resolveAdStudioLlm, rewriteAdStudioImageConcept } from '@/lib/ad-studio/engine';
 import { parseAutopilotOptions } from '@/lib/ad-studio/parse';
 import { briefImagesPayload } from '@/lib/ad-studio/images-payload';
 
@@ -12,20 +12,27 @@ interface RouteParams {
 
 /**
  * Writes image ad ideas for the brief with the text model, building on its plan and video script,
- * and saves them (replacing the list). `imageFormats` narrows the placements. Counts toward the
- * daily AI text limit. Gated on `ai.use`.
+ * and saves them (replacing the list). `imageFormats` narrows the placements. With `conceptId` and
+ * `instruction`, rewrites only that idea, keeping the others, its id and its rendered images. Counts
+ * toward the daily AI text limit. Gated on `ai.use`.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, briefId } = await params;
   const { user, error } = await requireProjectPermission(orgId, projectId, 'ai.use');
   if (error) return error;
-  const parsed = await parseJsonBody<{ imageFormats?: unknown }>(request);
+  const parsed = await parseJsonBody<{ imageFormats?: unknown; conceptId?: unknown; instruction?: unknown }>(request);
   if (parsed.error) return parsed.error;
   const llm = resolveAdStudioLlm();
   if (!llm) return NextResponse.json({ error: 'provider_failed', code: 'not_configured' }, { status: 503 });
   try {
-    const { imageFormats } = parseAutopilotOptions(parsed.body ?? {});
-    await generateAdStudioImageConcepts({ organizationId: orgId, projectId, briefId, actorId: user.id, llm, formats: imageFormats });
+    const conceptId = typeof parsed.body?.conceptId === 'string' ? parsed.body.conceptId : null;
+    if (conceptId) {
+      const instruction = typeof parsed.body?.instruction === 'string' ? parsed.body.instruction.slice(0, 500) : '';
+      await rewriteAdStudioImageConcept({ organizationId: orgId, projectId, briefId, conceptId, instruction, actorId: user.id, llm });
+    } else {
+      const { imageFormats } = parseAutopilotOptions(parsed.body ?? {});
+      await generateAdStudioImageConcepts({ organizationId: orgId, projectId, briefId, actorId: user.id, llm, formats: imageFormats });
+    }
     return NextResponse.json(await briefImagesPayload(orgId, projectId, briefId));
   } catch (err) {
     return adStudioErrorResponse(err);

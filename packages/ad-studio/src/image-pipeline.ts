@@ -4,6 +4,7 @@ import {
   AD_STUDIO_IMAGE_HEADLINE_MAX,
   AD_STUDIO_IMAGE_ASPECT_RATIO,
   AD_STUDIO_IMAGE_INSTRUCTION_MAX,
+  buildImageConceptRewritePrompt,
   buildImageConceptsPrompt,
   buildImagePrompt,
   fitAdStudioImageConcepts,
@@ -100,6 +101,28 @@ const GeneratedConceptsSchema = z.object({
   ),
 });
 
+type GeneratedConcept = z.infer<typeof GeneratedConceptsSchema>['concepts'][number];
+
+/** Over-long image headlines and copy are rewritten to fit their limits, not cut mid-word. */
+async function repairConceptLengths(ctx: AdStudioCallContext, brief: AdStudioBriefModel, concepts: readonly GeneratedConcept[]): Promise<GeneratedConcept[]> {
+  const copyFields = ['headline', 'primaryText', 'description'] as const;
+  const repaired = await repairOverLength(
+    ctx,
+    'image_concepts',
+    brief.id,
+    brief.language,
+    concepts.flatMap((concept, index) => [
+      { id: `c${index}:image`, text: concept.headline, max: AD_STUDIO_IMAGE_HEADLINE_MAX },
+      ...copyFields.map((field) => ({ id: `c${index}:${field}`, text: concept.copy?.[field] ?? '', max: AD_STUDIO_COPY_LIMITS[field] })),
+    ]),
+  );
+  return concepts.map((concept, index) => ({
+    ...concept,
+    headline: repaired.get(`c${index}:image`) ?? concept.headline,
+    ...(concept.copy ? { copy: Object.fromEntries(copyFields.map((field) => [field, repaired.get(`c${index}:${field}`) ?? concept.copy?.[field] ?? ''])) as typeof concept.copy } : {}),
+  }));
+}
+
 /**
  * Writes image ad ideas for a brief with the text model (building on its plan and video script when
  * present) and saves them, replacing the earlier list. When the person chose placements (`formats`),
@@ -111,25 +134,7 @@ export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & {
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
   const prompt = buildImageConceptsPrompt(adStudioBriefInput(brief), { ...context, scenes: brief.scenes });
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
-  // The image headline and the copy are rewritten to fit when over their limits, not cut mid-word.
-  const copyFields = ['headline', 'primaryText', 'description'] as const;
-  const repaired = await repairOverLength(
-    ctx,
-    'image_concepts',
-    brief.id,
-    brief.language,
-    raw.concepts.flatMap((concept, index) => [
-      { id: `c${index}:image`, text: concept.headline, max: AD_STUDIO_IMAGE_HEADLINE_MAX },
-      ...copyFields.map((field) => ({ id: `c${index}:${field}`, text: concept.copy?.[field] ?? '', max: AD_STUDIO_COPY_LIMITS[field] })),
-    ]),
-  );
-  const generated = {
-    concepts: raw.concepts.map((concept, index) => ({
-      ...concept,
-      headline: repaired.get(`c${index}:image`) ?? concept.headline,
-      ...(concept.copy ? { copy: Object.fromEntries(copyFields.map((field) => [field, repaired.get(`c${index}:${field}`) ?? concept.copy?.[field] ?? ''])) as typeof concept.copy } : {}),
-    })),
-  };
+  const generated = { concepts: await repairConceptLengths(ctx, brief, raw.concepts) };
   const allowed = ctx.formats?.length ? ctx.formats.filter(isAdStudioImageFormat) : null;
   const concepts = fitAdStudioImageConcepts(
     // Placements the person chose apply to every idea; otherwise the model's own choice per idea stands.
@@ -143,6 +148,34 @@ export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & {
     projectId: ctx.projectId,
     briefId: brief.id,
     concepts,
+    generatedBy: { provider: ctx.llm.provider, model: ctx.llm.model, generated_at: (ctx.now ?? new Date()).toISOString() },
+    now: ctx.now,
+  });
+}
+
+/**
+ * Rewrites one image idea by the editor's instruction and saves it in place, leaving the other ideas
+ * untouched. The idea keeps its id and its placements, so its rendered images stay attached (and show
+ * as out of date once the picture or headline changed); its copy is replaced only when the model wrote new copy.
+ */
+export async function rewriteAdStudioImageConcept(ctx: AdStudioCallContext & { briefId: string; conceptId: string; instruction: string }): Promise<AdStudioBriefModel> {
+  await ensureOrm();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const concepts = brief.image_concepts ?? [];
+  const index = concepts.findIndex((concept) => concept.id === ctx.conceptId);
+  if (index < 0) throw new AdStudioImageRequestError('concept_not_found');
+  const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
+  const prompt = buildImageConceptRewritePrompt(adStudioBriefInput(brief), concepts, index, ctx.instruction, context);
+  const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
+  const [rewritten] = await repairConceptLengths(ctx, brief, raw.concepts.slice(0, 1));
+  const original = concepts[index];
+  const [fitted] = rewritten ? fitAdStudioImageConcepts([{ ...rewritten, formats: original.formats }], () => original.id, original.formats) : [];
+  if (!fitted) throw new AdStudioProviderError('invalid_output', 'The model returned no usable image idea.');
+  return saveAdStudioImageConcepts({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    briefId: brief.id,
+    concepts: concepts.map((concept, at) => (at === index ? { ...fitted, ...(fitted.copy ? {} : original.copy ? { copy: original.copy } : {}) } : concept)),
     generatedBy: { provider: ctx.llm.provider, model: ctx.llm.model, generated_at: (ctx.now ?? new Date()).toISOString() },
     now: ctx.now,
   });
