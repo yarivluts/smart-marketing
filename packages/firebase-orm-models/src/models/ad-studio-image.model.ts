@@ -7,6 +7,27 @@ export type AdStudioImageStatus = (typeof AD_STUDIO_IMAGE_STATUSES)[number];
 export const AD_STUDIO_IMAGE_KINDS = ['render', 'edit'] as const;
 export type AdStudioImageKind = (typeof AD_STUDIO_IMAGE_KINDS)[number];
 
+/** The AI check of a rendered image: `issues` when it found a major problem (a misspelled headline, gibberish letters, a deformed hand). */
+export const AD_STUDIO_IMAGE_QA_STATUSES = ['passed', 'issues', 'skipped', 'error'] as const;
+export type AdStudioImageQaStatus = (typeof AD_STUDIO_IMAGE_QA_STATUSES)[number];
+
+export interface AdStudioImageQaIssue {
+  severity: 'major' | 'minor';
+  /** Set when the issue was found in code rather than by the reviewer; `detail` then holds the text read off the image. */
+  code?: 'headline_mismatch';
+  detail: string;
+}
+
+export interface AdStudioImageQa {
+  status: AdStudioImageQaStatus;
+  issues: AdStudioImageQaIssue[];
+  /** Every word the reviewer read in the picture, as written there; null when nothing was checked. */
+  text: string | null;
+  /** How many images were rendered to reach this one (re-renders after a failed check count). */
+  renders: number;
+  model: string | null;
+}
+
 /**
  * One generated ad image: a concept rendered in one placement, or an edit of an earlier image
  * (`parent_image_id` + `instruction`). Every version is kept, so a person can compare and go back;
@@ -74,6 +95,14 @@ export class AdStudioImageModel extends BaseModel {
 
   @Field({ is_required: false })
   public byte_size?: number | null;
+
+  /** The size the image model was asked for (1K or 2K); absent on images made before it was a setting (1K). */
+  @Field({ is_required: false })
+  public image_size?: string | null;
+
+  /** The AI check of the finished image; absent on images made before the check existed. */
+  @Field({ is_required: false })
+  public qa?: AdStudioImageQa | null;
 
   @Field({ is_required: false })
   public failure_code?: string | null;

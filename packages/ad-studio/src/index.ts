@@ -21,6 +21,7 @@ export * from './video-pipeline';
 export * from './qa';
 export * from './gemini-image';
 export * from './image-pipeline';
+export * from './image-qa';
 export * from './autopilot';
 export * from './publish';
 export * from './export';

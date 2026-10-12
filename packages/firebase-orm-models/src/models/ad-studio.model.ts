@@ -148,6 +148,10 @@ export class AdStudioSettingsModel extends BaseModel {
   @Field({ is_required: false })
   public video_qa_retries?: number | null;
 
+  /** The size images are rendered at (1K or 2K); absent means the default, 2K. */
+  @Field({ is_required: false })
+  public image_size?: string | null;
+
   @Field({ is_required: true })
   public changed_by!: string;
 
@@ -166,7 +170,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**

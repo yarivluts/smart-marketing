@@ -1,0 +1,57 @@
+import { describe, expect, it } from 'vitest';
+import { betterImageVerdict, buildImageQaPrompt, imageQaVerdict } from './image-qa';
+
+describe('buildImageQaPrompt', () => {
+  it('asks for the exact headline, every word read as drawn, and details in the ad language', () => {
+    const prompt = buildImageQaPrompt({ headline: 'Sign in 30 seconds', visualPrompt: 'A lawyer at a desk', language: 'he' });
+    expect(prompt.system).toContain('Write every issue detail in Hebrew');
+    expect(prompt.user).toContain('spelled exactly: "Sign in 30 seconds"');
+    expect(prompt.user).toContain('misspellings included');
+    expect(prompt.user).toContain('Intended picture: A lawyer at a desk');
+  });
+
+  it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {
+    expect(buildImageQaPrompt({ headline: '', visualPrompt: 'v', language: 'en' }).user).toContain('No text, letters or logos should appear');
+    const edited = buildImageQaPrompt({ headline: null, visualPrompt: 'v', language: 'en' }).user;
+    expect(edited).toContain('Any text in the image must be correct English');
+    expect(edited).not.toContain('spelled exactly');
+  });
+});
+
+describe('imageQaVerdict', () => {
+  it('passes when the headline is in the picture and only minor problems were found', () => {
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', detail: ' Slight blur ' }] }, 'gemini')).toEqual({
+      status: 'passed',
+      issues: [{ severity: 'minor', detail: 'Slight blur' }],
+      text: 'SIGN IN 30 SECONDS',
+      model: 'gemini',
+    });
+  });
+
+  it('fails a misspelled headline even when the reviewer did not notice it', () => {
+    const verdict = imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'Sing in 30 seconds', issues: [] }, 'gemini');
+    expect(verdict.status).toBe('issues');
+    expect(verdict.issues).toEqual([{ severity: 'major', code: 'headline_mismatch', detail: 'Sing in 30 seconds' }]);
+  });
+
+  it('keeps the reviewer own major finding instead of adding a second one, and does not compare after an edit', () => {
+    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', detail: 'Misspelled headline' }] }, 'gemini');
+    expect(verdict.issues).toEqual([{ severity: 'major', detail: 'Misspelled headline' }]);
+    expect(imageQaVerdict({ headline: null }, { textInImage: 'Anything new', issues: [] }, 'gemini').status).toBe('passed');
+  });
+});
+
+describe('betterImageVerdict', () => {
+  const verdict = (majors: number, minors: number) => ({
+    status: majors ? ('issues' as const) : ('passed' as const),
+    issues: [...Array.from({ length: majors }, () => ({ severity: 'major' as const, detail: 'm' })), ...Array.from({ length: minors }, () => ({ severity: 'minor' as const, detail: 'n' }))],
+    text: null,
+    model: null,
+  });
+
+  it('prefers fewer major problems, then fewer problems', () => {
+    expect(betterImageVerdict(verdict(0, 3), verdict(1, 0))).toBe(true);
+    expect(betterImageVerdict(verdict(1, 0), verdict(1, 2))).toBe(true);
+    expect(betterImageVerdict(verdict(1, 2), verdict(1, 2))).toBe(false);
+  });
+});

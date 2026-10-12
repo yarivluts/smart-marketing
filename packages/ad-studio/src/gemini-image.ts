@@ -22,10 +22,12 @@ import { AD_STUDIO_TEST_OMNI_BASE_URL, adStudioTestOverride, isLoopbackHttpUrl }
 export const AD_STUDIO_IMAGE_MODEL = 'gemini-3.1-flash-image';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const CALL_TIMEOUT_MS = 150_000;
-/** A 1K PNG is ~1-2 MB; anything this large is not an ad image. */
+/** A 2K PNG is a few MB; anything this large is not an ad image. */
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export type AdStudioImageAspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
+/** The Interactions API's image_size: 1K is ~1024 px on the short side of a square, 2K twice that. */
+export type AdStudioImageModelSize = '1K' | '2K';
 
 export interface AdStudioGeneratedImage {
   bytes: Buffer;
@@ -35,8 +37,8 @@ export interface AdStudioGeneratedImage {
 export interface AdStudioImageGenerator {
   provider: 'gemini';
   model: string;
-  generate(params: { prompt: string; aspectRatio: AdStudioImageAspectRatio }): Promise<AdStudioGeneratedImage>;
-  edit(params: { instruction: string; image: AdStudioGeneratedImage; aspectRatio: AdStudioImageAspectRatio }): Promise<AdStudioGeneratedImage>;
+  generate(params: { prompt: string; aspectRatio: AdStudioImageAspectRatio; imageSize?: AdStudioImageModelSize }): Promise<AdStudioGeneratedImage>;
+  edit(params: { instruction: string; image: AdStudioGeneratedImage; aspectRatio: AdStudioImageAspectRatio; imageSize?: AdStudioImageModelSize }): Promise<AdStudioGeneratedImage>;
 }
 
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
@@ -98,10 +100,10 @@ export function createGeminiImageClient(apiKey: string, options: { fetchImpl?: F
     return response;
   }
 
-  async function interact(input: unknown[], aspectRatio: AdStudioImageAspectRatio): Promise<AdStudioGeneratedImage> {
+  async function interact(input: unknown[], aspectRatio: AdStudioImageAspectRatio, imageSize: AdStudioImageModelSize = '1K'): Promise<AdStudioGeneratedImage> {
     const response = await call('/interactions', {
       method: 'POST',
-      body: JSON.stringify({ model, input, response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: aspectRatio, image_size: '1K' } }),
+      body: JSON.stringify({ model, input, response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: aspectRatio, image_size: imageSize } }),
     });
     const body = asObject(await response.json().catch(() => ({}))) ?? {};
     const error = asObject(body.error);
@@ -126,14 +128,15 @@ export function createGeminiImageClient(apiKey: string, options: { fetchImpl?: F
   return {
     provider: 'gemini',
     model,
-    generate: ({ prompt, aspectRatio }) => interact([{ type: 'text', text: prompt }], aspectRatio),
-    edit: ({ instruction, image, aspectRatio }) =>
+    generate: ({ prompt, aspectRatio, imageSize }) => interact([{ type: 'text', text: prompt }], aspectRatio, imageSize),
+    edit: ({ instruction, image, aspectRatio, imageSize }) =>
       interact(
         [
           { type: 'text', text: instruction },
           { type: 'image', mime_type: image.mimeType, data: image.bytes.toString('base64') },
         ],
         aspectRatio,
+        imageSize,
       ),
   };
 }

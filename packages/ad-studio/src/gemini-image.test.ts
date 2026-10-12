@@ -31,9 +31,10 @@ describe('createGeminiImageClient', () => {
   it('sends the image being edited next to the instruction', async () => {
     const fetchMock = vi.fn(async () => json({ id: 'i2', output_image: { mime_type: 'image/jpeg', data: PNG.toString('base64') } }));
     const client = createGeminiImageClient('k', { fetchImpl: fetchMock });
-    const edited = await client.edit({ instruction: 'Warmer light', image: { bytes: PNG, mimeType: 'image/png' }, aspectRatio: '1:1' });
+    const edited = await client.edit({ instruction: 'Warmer light', image: { bytes: PNG, mimeType: 'image/png' }, aspectRatio: '1:1', imageSize: '2K' });
     expect(edited.mimeType).toBe('image/jpeg');
     const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.response_format.image_size).toBe('2K');
     expect(body.input).toEqual([
       { type: 'text', text: 'Warmer light' },
       { type: 'image', mime_type: 'image/png', data: PNG.toString('base64') },

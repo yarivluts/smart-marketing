@@ -900,6 +900,7 @@ export default async function AdStudioPage({
             dailyImages: settings.dailyImages,
           }}
           videoQa={settings.videoQa}
+          imageSize={settings.imageSize}
           usageToday={usageToday}
           recentUsage={recentUsage.map((row) => ({
             id: row.id,

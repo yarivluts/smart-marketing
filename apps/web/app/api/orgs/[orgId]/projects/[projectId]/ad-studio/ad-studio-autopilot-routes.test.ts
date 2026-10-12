@@ -18,6 +18,7 @@ import {
   inviteMemberToOrganization,
   listAdStudioExports,
   pushResourceAttachment,
+  setAdStudioSettings,
   setResourceAttachmentWriteTier,
   setSharedCredentialSecret,
 } from '@growthos/firebase-orm-models';
@@ -85,8 +86,9 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 9, 9]);
  * synchronous, inline PNG), Gemini Omni video (`interactions` in the background, polled, then a
  * Files API download), and Google Ads OAuth + `assets:mutate` for an image export.
  */
-function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown } = {}) {
+function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown; imageQa?: (n: number) => unknown } = {}) {
   let reviews = 0;
+  let imageReviews = 0;
   const calls: { url: string; body: Record<string, unknown> | null }[] = [];
   const fileReads = new Map<string, number>();
   let omniStarts = 0;
@@ -105,6 +107,11 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
         const prompt = (body?.contents as { parts: { text: string }[] }[])[0].parts[0].text;
         const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
+      }
+      if (schema.includes('"textInImage"')) {
+        imageReviews += 1;
+        const verdict = options.imageQa ? options.imageQa(imageReviews) : { textInImage: 'Sign in 30 seconds', issues: [] };
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] } }] });
       }
       if (schema.includes('"transcript"')) {
         reviews += 1;
@@ -145,7 +152,7 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
     return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { calls, fetchMock, reviews: () => reviews };
+  return { calls, fetchMock, reviews: () => reviews, imageReviews: () => imageReviews };
 }
 
 function unique(prefix: string): string {
@@ -258,7 +265,44 @@ describe('image ads routes', () => {
     expect(media.headers.get('content-type')).toBe('image/png');
     expect(Buffer.from(await media.arrayBuffer())).toEqual(PNG);
 
-    expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2, textGenerations: 1 });
+    // One AI text call for the ideas, and one AI check of each image.
+    expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2, textGenerations: 3 });
+    expect(first.qa).toMatchObject({ status: 'passed', renders: 1 });
+    expect(imageCall?.body).toMatchObject({ response_format: { image_size: '2K' } });
+  });
+
+  it('re-renders an image whose headline came out misspelled, and keeps the checked one', async () => {
+    const google = fakeGoogle({ imageQa: (n) => ({ textInImage: n === 1 ? 'Sing in 30 secnds' : 'Sign in 30 seconds', issues: [] }) });
+    const ctx = await setup();
+    const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
+    const rendered = (await (await renderImage(request('POST', { conceptId: ideas.concepts[0].id, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    expect(rendered.images).toHaveLength(1);
+    expect(rendered.images[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', renders: 2 } });
+    expect(google.calls.filter((call) => call.body?.model === 'gemini-3.1-flash-image')).toHaveLength(2);
+    expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2 });
+  });
+
+  it('stops after the retries and shows what is still wrong; the size and the check follow the project settings', async () => {
+    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', detail: 'Slight blur' }] }) });
+    const ctx = await setup();
+    const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
+    const conceptId = ideas.concepts[0].id;
+    const failing = (await (await renderImage(request('POST', { conceptId, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    expect(failing.images[0].qa).toEqual({
+      status: 'issues',
+      renders: 2,
+      issues: [
+        { severity: 'major', code: 'headline_mismatch', detail: 'Sing in 30 seconds' },
+        { severity: 'minor', detail: 'Slight blur' },
+      ],
+    });
+
+    await setAdStudioSettings({ organizationId: ctx.orgId, projectId: ctx.projectId, dailyTextGenerations: 50, dailyVideoSeconds: 60, videoQa: { enabled: false, retries: 1 }, imageSize: '1K', actorId: ctx.owner.id });
+    const google = fakeGoogle();
+    const plain = (await (await renderImage(request('POST', { conceptId, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    expect(plain.images.find((image) => image.version === 2)?.qa).toMatchObject({ status: 'skipped', renders: 1 });
+    expect(google.imageReviews()).toBe(0);
+    expect(google.calls.find((call) => call.body?.model === 'gemini-3.1-flash-image')?.body).toMatchObject({ response_format: { image_size: '1K' } });
   });
 
   it('saves edited ideas, refuses broken ones, and records a provider refusal on the image itself', async () => {

@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { AdCopyCard } from './ad-copy-card';
 import { useRefreshSafeDraft, useUnsavedChangesGuard } from './use-editor-draft';
 import { ServerChangedNotice } from './server-changed-notice';
+import { ImageQaNote } from './image-qa-note';
 import {
   adStudioImageSlots,
   type AdStudioImageSlot,
@@ -522,9 +523,14 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                 <details
                   className="rounded-lg border border-border/60 p-2"
                   data-testid="ad-studio-image-manage"
+                  // An image the AI check failed is shown, not left folded away.
+                  open={conceptSlots.some((slot) => slot.selected?.qa?.status === 'issues') || undefined}
                 >
                   <summary className="cursor-pointer text-xs font-medium text-primary">
                     {t('images.manageImages', { count: conceptSlots.length })}
+                    {conceptSlots.some((slot) => slot.selected?.qa?.status === 'issues') ? (
+                      <span className="ms-2 font-normal text-warning">{t('images.qa.issues')}</span>
+                    ) : null}
                   </summary>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     {conceptSlots.map((slot) => {
@@ -581,6 +587,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                               </div>
                             )}
                           </div>
+                          {shown ? <ImageQaNote qa={shown.qa} /> : null}
                           {latestFailed && !slot.generating ? (
                             <p className="text-[11px] text-destructive">
                               {failure.image(latestFailed.failureCode)}

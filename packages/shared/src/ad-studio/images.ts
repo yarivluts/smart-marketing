@@ -26,6 +26,38 @@ export const AD_STUDIO_IMAGE_ASPECT_RATIO: Record<AdStudioImageFormat, '1:1' | '
   landscape: '16:9',
 };
 
+/**
+ * The pixel size the image model renders at. 1K is ~1024 px on the long side of a square, below
+ * Meta's recommended 1080 px for feeds and 1080x1920 for Stories; 2K meets both, so it is the
+ * default. 1K stays as the cheaper choice for drafts.
+ */
+export const AD_STUDIO_IMAGE_SIZES = ['1K', '2K'] as const;
+export type AdStudioImageSize = (typeof AD_STUDIO_IMAGE_SIZES)[number];
+export const DEFAULT_AD_STUDIO_IMAGE_SIZE: AdStudioImageSize = '2K';
+
+export function isAdStudioImageSize(value: unknown): value is AdStudioImageSize {
+  return typeof value === 'string' && (AD_STUDIO_IMAGE_SIZES as readonly string[]).includes(value);
+}
+
+/** Letters and digits only, lower-cased, without Hebrew vowel marks: how a headline is compared with the text read off an image. */
+function comparableText(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[\u0591-\u05c7]/g, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+/**
+ * Whether the text read off a rendered image contains the headline exactly, ignoring spacing,
+ * punctuation, case and vowel marks. An image model can misspell words, especially in Hebrew; this
+ * is the check that does not depend on a model's judgment.
+ */
+export function imageTextHasHeadline(headline: string, textInImage: string): boolean {
+  const wanted = comparableText(headline);
+  return wanted.length === 0 || comparableText(textInImage).includes(wanted);
+}
+
 export function isAdStudioImageFormat(value: unknown): value is AdStudioImageFormat {
   return typeof value === 'string' && (AD_STUDIO_IMAGE_FORMATS as readonly string[]).includes(value);
 }

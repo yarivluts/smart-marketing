@@ -140,6 +140,7 @@ describe('Ad Studio limits and usage', () => {
       dailyVideoSeconds: AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
       dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
       videoQa: { enabled: true, retries: 1 },
+      imageSize: '2K',
       customized: false,
       lastChangedOn: null,
     });
@@ -148,6 +149,11 @@ describe('Ad Studio limits and usage', () => {
     const entries = await listAuditLogEntriesForOrg(orgId);
     expect(entries.find((entry) => entry.action === 'ad_studio.limits_changed')).toMatchObject({ after: { daily_text_generations: 2, daily_video_seconds: 20 } });
     await expect(setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: -1, dailyVideoSeconds: 999999, actorId: owner.id })).rejects.toBeInstanceOf(AdStudioBriefInvalidError);
+    // The image size: kept when omitted, saved when given, and only 1K or 2K.
+    expect(set.imageSize).toBe('2K');
+    expect(await setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 2, dailyVideoSeconds: 20, imageSize: '1K', actorId: owner.id })).toMatchObject({ imageSize: '1K' });
+    expect(await setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 3, dailyVideoSeconds: 20, actorId: owner.id })).toMatchObject({ imageSize: '1K' });
+    await expect(setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 3, dailyVideoSeconds: 20, imageSize: '4K', actorId: owner.id })).rejects.toBeInstanceOf(AdStudioBriefInvalidError);
   });
 
   it('counts today per UTC day, text and video apart, failures included, and refuses a call that would pass the limit', async () => {
@@ -157,11 +163,12 @@ describe('Ad Studio limits and usage', () => {
     const base = { organizationId: orgId, projectId, provider: 'gemini', model: 'm', actorId: owner.id, now: today };
     await recordAdStudioUsage({ ...base, kind: 'script', units: 1, outcome: 'succeeded' });
     await recordAdStudioUsage({ ...base, kind: 'scene_rewrite', units: 1, outcome: 'failed', failureReason: 'provider_billing' });
+    await recordAdStudioUsage({ ...base, kind: 'image_qa', units: 1, outcome: 'succeeded' });
     await recordAdStudioUsage({ ...base, kind: 'video_scene', units: 8, outcome: 'succeeded' });
     await recordAdStudioUsage({ ...base, kind: 'script', units: 1, outcome: 'succeeded', now: new Date('2026-09-26T23:59:00Z') });
 
-    expect(await getAdStudioUsageToday(orgId, projectId, today)).toEqual({ day: '2026-09-27', textGenerations: 2, videoSeconds: 8, images: 0 });
-    await expect(assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'plan', units: 1, now: today })).rejects.toMatchObject({ limitKind: 'text', used: 2, limit: 2 });
+    expect(await getAdStudioUsageToday(orgId, projectId, today)).toEqual({ day: '2026-09-27', textGenerations: 3, videoSeconds: 8, images: 0 });
+    await expect(assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'plan', units: 1, now: today })).rejects.toMatchObject({ limitKind: 'text', used: 3, limit: 2 });
     await expect(assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'video_scene', units: 12, now: today })).resolves.toBeUndefined();
     const refused = await assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'video_edit', units: 13, now: today }).catch((caught) => caught);
     expect(refused).toBeInstanceOf(AdStudioQuotaExceededError);

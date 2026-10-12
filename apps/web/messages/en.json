@@ -3890,7 +3890,8 @@
       "reference_image": "Scene illustration",
       "ad_copy": "Ad text",
       "search_ad": "Search ad",
-      "translate": "Translation for the model"
+      "translate": "Translation for the model",
+      "image_qa": "AI image check"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4348,7 +4349,16 @@
       "rewriteIdeaPlaceholder": "e.g. warmer light, show the phone closer",
       "rewriteIdeaRun": "Rewrite this idea",
       "saveEditsFirst": "Save your edits first, so the rewrite starts from them.",
-      "rewriteIdeasConfirm": "Replace every idea with new ones? Edits, copy and the link to rendered images will be lost."
+      "rewriteIdeasConfirm": "Replace every idea with new ones? Edits, copy and the link to rendered images will be lost.",
+      "qa": {
+        "passed": "AI check passed",
+        "passedRetried": "AI check passed after {renders} renders",
+        "issues": "AI check found problems",
+        "issuesHint": "Render it again, change it by an instruction, or edit the headline.",
+        "error": "The AI check could not run",
+        "headlineMismatch": "The headline in the image is not spelled as written. The image reads:",
+        "headlineMissing": "The headline does not appear in the image."
+      }
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
@@ -4447,12 +4457,18 @@
       "timed_out": "it took too long and was given up"
     },
     "admin": {
-      "qaTitle": "AI quality check of video clips",
-      "qaDescription": "Gemini watches every rendered clip, compares the narration with the script and looks for embarrassing mistakes. The autopilot re-renders a scene that fails.",
-      "qaEnabled": "Check every clip",
-      "qaRetries": "Automatic re-renders per scene",
+      "qaTitle": "AI quality check of clips and images",
+      "qaDescription": "Gemini checks every rendered clip and image: it compares the narration with the script, reads every word drawn into an image and looks for embarrassing mistakes. A scene or image that fails is rendered again automatically.",
+      "qaEnabled": "Check every clip and image",
+      "qaRetries": "Automatic re-renders per scene or image",
       "collapsed": "Studio settings and AI usage",
-      "customerDescription": "Your daily AI allowance and the latest AI calls. Daily limits come from your GrowthOS plan."
+      "customerDescription": "Your daily AI allowance and the latest AI calls. Daily limits come from your GrowthOS plan.",
+      "imageSize": "Image size",
+      "imageSizeHint": "2K meets Meta's recommended sizes (1080 px feeds, 1080x1920 Stories). 1K is cheaper, for drafts.",
+      "imageSizes": {
+        "1K": "1K - drafts",
+        "2K": "2K - recommended"
+      }
     },
     "pronunciation": "Pronunciation (with nikud)",
     "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
