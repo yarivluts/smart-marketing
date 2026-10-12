@@ -110,6 +110,7 @@ describe('image prompts', () => {
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
     // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
     expect(prompt).toContain('screen in the picture shows a simple, abstract interface');
+    expect(prompt).toContain('illegible abstract scribble');
   });
 
   it('keeps the subject and headline clear of what each placement covers or crops', () => {

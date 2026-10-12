@@ -16,10 +16,22 @@ export function ImageQaNote({ qa }: { qa: AdStudioImageQaView | null }): React.R
   if (qa.status === 'error') return <p className="text-[11px] text-muted-foreground">{t('error')}</p>;
   if (qa.status === 'passed') {
     return (
-      <p className="inline-flex items-center gap-1 text-[11px] text-success" data-testid="ad-studio-image-qa-passed">
-        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        {qa.renders > 1 ? t('passedRetried', { renders: qa.renders }) : t('passed')}
-      </p>
+      <div className="flex flex-col gap-0.5 text-[11px]" data-testid="ad-studio-image-qa-passed">
+        <p className="inline-flex items-center gap-1 text-success">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {qa.renders > 1 ? t('passedRetried', { renders: qa.renders }) : t('passed')}
+        </p>
+        {/* Small things the reviewer noticed are shown too, so a person decides, not the check. */}
+        {qa.issues.length ? (
+          <ul className="flex list-disc flex-col gap-0.5 ps-4 text-muted-foreground" data-testid="ad-studio-image-qa-minor">
+            {qa.issues.map((issue, index) => (
+              <li key={index}>
+                <bdi dir="auto">{issue.detail}</bdi>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     );
   }
   return (

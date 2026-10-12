@@ -239,6 +239,7 @@ export function buildImagePrompt(
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
     'Any phone, tablet, laptop or other screen in the picture shows a simple, abstract interface - shapes, a signature line, buttons - with no readable words or letters.',
+    'A handwritten signature, anywhere in the picture, is an illegible abstract scribble that spells no word.',
     'Clean composition with room for the subject; high quality; no watermarks or borders.',
   ]
     .filter((line): line is string => line !== null)
