@@ -4948,7 +4948,17 @@
         "avoid_word_too_long": "כל מילה עד 40 תווים.",
         "too_many_colors": "עד 5 צבעים.",
         "invalid_color": "צבעים בפורמט #rrggbb."
-      }
+      },
+      "logo": "לוגו",
+      "noLogo": "אין לוגו",
+      "logoHint": "PNG או JPEG, עד 2MB. מופיע כתמונת המפרסם בתצוגות המקדימות.",
+      "uploadLogo": "העלאת לוגו",
+      "replaceLogo": "החלפה",
+      "removeLogo": "הסרה",
+      "logoSaved": "הלוגו נשמר.",
+      "logoRemoved": "הלוגו הוסר.",
+      "logoTooLarge": "הלוגו גדול מ-2MB.",
+      "logoUnsupported": "הלוגו צריך להיות תמונת PNG או JPEG."
     }
   },
   "MetaConnect": {

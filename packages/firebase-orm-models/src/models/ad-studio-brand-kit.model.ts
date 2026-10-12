@@ -29,6 +29,13 @@ export class AdStudioBrandKitModel extends BaseModel {
   @Field({ is_required: true })
   public colors!: string[];
 
+  /** The logo in the private media bucket, and its type; absent without a logo. */
+  @Field({ is_required: false })
+  public logo_path?: string | null;
+
+  @Field({ is_required: false })
+  public logo_mime?: string | null;
+
   @Field({ is_required: true })
   public changed_by!: string;
 

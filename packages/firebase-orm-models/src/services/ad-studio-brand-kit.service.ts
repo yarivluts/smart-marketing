@@ -16,19 +16,68 @@ export class AdStudioBrandKitInvalidError extends Error {
 
 export interface AdStudioBrandKitView extends AdStudioBrandKit {
   lastChangedOn: string | null;
+  /** Where the logo is stored and its type; null without a logo. */
+  logo: { path: string; mimeType: string } | null;
 }
 
 /** The project's brand kit, or an empty one when none was saved. */
 export async function getAdStudioBrandKit(organizationId: string, projectId: string): Promise<AdStudioBrandKitView> {
   const kit = await AdStudioBrandKitModel.init(BRAND_KIT_ID, { organization_id: organizationId, project_id: projectId });
-  if (!kit) return { ...EMPTY_AD_STUDIO_BRAND_KIT, lastChangedOn: null };
+  if (!kit) return { ...EMPTY_AD_STUDIO_BRAND_KIT, lastChangedOn: null, logo: null };
   return {
     brandName: kit.brand_name,
     toneOfVoice: kit.tone_of_voice,
     avoidWords: kit.avoid_words ?? [],
     colors: kit.colors ?? [],
     lastChangedOn: kit.last_changed_on,
+    logo: kit.logo_path && kit.logo_mime ? { path: kit.logo_path, mimeType: kit.logo_mime } : null,
   };
+}
+
+/**
+ * Sets (or with null clears) the project's logo, already stored in the media bucket. Creates an
+ * empty brand kit when the project has none yet. Audited.
+ */
+export async function setAdStudioBrandLogo(params: {
+  organizationId: string;
+  projectId: string;
+  logo: { path: string; mimeType: string } | null;
+  actorId: string;
+  now?: Date;
+}): Promise<AdStudioBrandKitView> {
+  const project = await ProjectModel.init(params.projectId, { organization_id: params.organizationId });
+  if (!project || project.organization_id !== params.organizationId) throw new ProjectNotFoundError();
+  const existing = await AdStudioBrandKitModel.init(BRAND_KIT_ID, { organization_id: params.organizationId, project_id: params.projectId });
+  const kit = existing ?? new AdStudioBrandKitModel();
+  if (!existing) {
+    kit.organization_id = params.organizationId;
+    kit.project_id = params.projectId;
+    kit.brand_name = '';
+    kit.tone_of_voice = '';
+    kit.avoid_words = [];
+    kit.colors = [];
+  }
+  kit.logo_path = params.logo?.path ?? null;
+  kit.logo_mime = params.logo?.mimeType ?? null;
+  kit.changed_by = params.actorId;
+  kit.last_changed_on = (params.now ?? new Date()).toISOString();
+  kit.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await (existing ? kit.save() : kit.save(BRAND_KIT_ID));
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: params.logo ? 'ad_studio.brand_logo_set' : 'ad_studio.brand_logo_removed',
+      targetType: 'ad_studio_brand_kit',
+      targetId: params.projectId,
+      summary: params.logo ? 'Set the Ad Studio brand logo' : 'Removed the Ad Studio brand logo',
+    });
+  } catch {
+    // Best-effort, like every other audit write.
+  }
+  return getAdStudioBrandKit(params.organizationId, params.projectId);
 }
 
 /** Saves the project's brand kit (validated) and records the change in the audit log. */

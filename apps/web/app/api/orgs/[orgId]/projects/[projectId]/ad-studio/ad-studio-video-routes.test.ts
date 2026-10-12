@@ -27,6 +27,7 @@ import { POST as renderAll } from './briefs/[briefId]/render-all/route';
 import { GET as renderStatus } from './briefs/[briefId]/render-status/route';
 import { POST as assemble } from './briefs/[briefId]/assemble/route';
 import { GET as clipMedia } from './briefs/[briefId]/clips/[clipId]/media/route';
+import { DELETE as removeLogo, GET as brandLogo, POST as uploadLogo } from './brand-kit/logo/route';
 import { POST as chooseClip } from './briefs/[briefId]/clips/[clipId]/choose/route';
 import { GET as videoMedia } from './briefs/[briefId]/videos/[videoId]/media/route';
 import { PUT as putSettings } from './settings/route';
@@ -176,6 +177,35 @@ async function poll(p: ReturnType<Awaited<ReturnType<typeof setup>>['p']>): Prom
 }
 
 describe('Ad Studio video routes (KAN-231)', () => {
+  it('brand logo: a project admin uploads it, previews read it, a non-image or a viewer is refused, and it can be removed', async () => {
+    const ctx = await setup();
+    const pp = { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }) } as never;
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+    const upload = (bytes: Buffer) => {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(bytes)]), 'logo.png');
+      return new NextRequest('http://localhost/api/test', { method: 'POST', body: form });
+    };
+    expect((await uploadLogo(upload(Buffer.from('not an image')), pp)).status).toBe(400);
+    expect((await uploadLogo(upload(png), pp)).status).toBe(201);
+    const served = await brandLogo(request('GET'), pp);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toBe('image/png');
+    expect(Buffer.from(await served.arrayBuffer())).toEqual(png);
+
+    const email = `${unique('viewer')}@example.com`;
+    const invitation = await inviteMemberToOrganization({ organizationId: ctx.orgId, email, role: 'viewer', invitedByUserId: ctx.owner.id });
+    const viewerSession = await sessionFor(email);
+    const viewer = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email });
+    await acceptInvite({ organizationId: ctx.orgId, membershipId: invitation.id, userId: viewer.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    expect([403, 404]).toContain((await uploadLogo(upload(png), pp)).status);
+    getServerSessionMock.mockResolvedValue(ctx.ownerSession);
+
+    expect((await removeLogo(request('DELETE'), pp)).status).toBe(200);
+    expect((await brandLogo(request('GET'), pp)).status).toBe(404);
+  });
+
   it('sends a shot described in Hebrew to the video model in English, keeping the Hebrew in the script', async () => {
     const ctx = await setup();
     const { starts } = fakeOmni();

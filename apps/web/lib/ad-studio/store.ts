@@ -263,9 +263,15 @@ export async function getLatestAdStudioRunView(organizationId: string, projectId
   return run ? toAdStudioRunView(run) : null;
 }
 
-/** The project's brand kit as the page shows it (empty until saved). */
-export async function loadAdStudioBrandKit(organizationId: string, projectId: string): Promise<AdStudioBrandKit> {
+/**
+ * The project's brand kit as the page shows it (empty until saved), and a version for the logo URL
+ * when there is a logo (it changes when the logo does, so browsers never show a stale one).
+ */
+export async function loadAdStudioBrandKit(organizationId: string, projectId: string): Promise<{ kit: AdStudioBrandKit; logoVersion: string | null }> {
   await ensureFirestoreOrm();
   const kit = await getAdStudioBrandKit(organizationId, projectId);
-  return { brandName: kit.brandName, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors };
+  return {
+    kit: { brandName: kit.brandName, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors },
+    logoVersion: kit.logo ? (kit.lastChangedOn ?? 'logo') : null,
+  };
 }
