@@ -168,3 +168,14 @@ export function fitAdStudioScenes(scenes: readonly AdStudioScene[], makeId: () =
   }
   return fitted;
 }
+
+/**
+ * What a person wrote in a script, for telling whether two saves started from the same version.
+ * Leaves out what the server fills in on save (the vocalized pronunciation), so a save's own
+ * vocalizing never reads as someone else's change.
+ */
+export function scriptContentKey(scenes: readonly AdStudioScene[]): string {
+  return JSON.stringify(
+    scenes.map((scene) => [scene.id, scene.durationSeconds, scene.visualPrompt.trim(), scene.voiceover.trim(), scene.onScreenText.trim(), scene.delivery ?? null, scene.speaker ?? null, scene.references ?? []]),
+  );
+}

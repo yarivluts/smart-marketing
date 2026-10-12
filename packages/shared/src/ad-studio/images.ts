@@ -204,8 +204,21 @@ export function buildImagePrompt(
       ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". No other words or letters anywhere in the image.`
       : 'No words, letters, captions or logos anywhere in the image.',
     brandColorsLine(brief.brand),
+    IMAGE_SAFE_ZONES[format],
     'Clean composition with room for the subject; high quality; no watermarks or borders.',
   ]
     .filter((line): line is string => line !== null)
     .join('\n');
 }
+
+/**
+ * Where a placement covers or crops the picture, so the subject and the drawn headline stay visible:
+ * stories put the app's own interface over the top and bottom, and Google display crops the
+ * landscape render to 1.91:1.
+ */
+const IMAGE_SAFE_ZONES: Record<AdStudioImageFormat, string | null> = {
+  square: null,
+  portrait: null,
+  story: 'Full-screen story placement: the app covers about the top 14% and bottom 20% of the picture, so keep the subject and the headline in the middle band.',
+  landscape: 'This picture is cropped to 1.91:1 for Google display: keep the subject and the headline away from the top and bottom edges.',
+};

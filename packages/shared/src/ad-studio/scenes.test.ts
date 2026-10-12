@@ -73,3 +73,12 @@ describe('fitAdStudioScenes', () => {
     expect(new Set(fitted.map((s) => s.id)).size).toBe(3);
   });
 });
+
+describe('scriptContentKey', () => {
+  it('changes with what a person wrote, not with the pronunciation the server fills in', async () => {
+    const { scriptContentKey } = await import('./scenes');
+    const scene = { id: 'a', durationSeconds: 5, visualPrompt: 'A desk', voiceover: 'Sign fast', onScreenText: '' };
+    expect(scriptContentKey([scene])).toBe(scriptContentKey([{ ...scene, pronunciation: 'vocalized' }]));
+    expect(scriptContentKey([scene])).not.toBe(scriptContentKey([{ ...scene, voiceover: 'Sign faster' }]));
+  });
+});
