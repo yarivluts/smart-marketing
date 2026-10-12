@@ -4358,7 +4358,18 @@
         "error": "בדיקת ה-AI לא הצליחה לרוץ",
         "headlineMismatch": "הכותרת בתמונה לא כתובה כמו שצריך. בתמונה כתוב:",
         "headlineMissing": "הכותרת לא מופיעה בתמונה."
-      }
+      },
+      "filterLabel": "הצגת רעיונות",
+      "filterAll": "כל הרעיונות ({count})",
+      "kpi": {
+        "passed": "עברו בדיקת AI",
+        "attention": "דורשות בדיקה",
+        "ready": "תמונות מוכנות",
+        "left": "תמונות שנשארו היום",
+        "ofValue": "{count} מתוך {total}"
+      },
+      "imagesHeading": "תמונות ({count})",
+      "openFull": "פתיחה בגודל מלא"
     },
     "dailyImages": "תמונות ביום",
     "usageTodayImages": "תמונות היום",

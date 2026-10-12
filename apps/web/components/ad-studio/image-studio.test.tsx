@@ -30,6 +30,7 @@ function image(overrides: Partial<AdStudioImageView> = {}): AdStudioImageView {
     requestedOn: '2026-09-28T10:00:00.000Z',
     completedOn: '2026-09-28T10:00:05.000Z',
     qa: null,
+    imageSize: '2K',
     ...overrides,
   };
 }
@@ -66,7 +67,7 @@ afterEach(() => {
 });
 
 describe('ImageStudio', () => {
-  it('shows the AI check of each image: passed after re-renders, or what is wrong with a misspelled headline, unfolded', () => {
+  it('shows the AI check of each image: passed after re-renders, or what is wrong with a misspelled headline', () => {
     renderStudio({
       initialImages: [
         image({ qa: { status: 'passed', issues: [{ severity: 'minor', detail: 'A little blur in the corner' }], renders: 2 } }),
@@ -78,7 +79,11 @@ describe('ImageStudio', () => {
         }),
       ],
     });
-    expect(screen.getByTestId('ad-studio-image-manage')).toHaveAttribute('open');
+    // The summary counts real images only: one of the two checked images passed, one needs a look.
+    expect(screen.getByTestId('ad-studio-image-summary-passed')).toHaveTextContent('1 of 2');
+    expect(screen.getByTestId('ad-studio-image-summary-attention')).toHaveTextContent('1');
+    expect(screen.getByTestId('ad-studio-image-summary-ready')).toHaveTextContent('2 of 2');
+    expect(screen.getByTestId('ad-studio-image-summary-left')).toHaveTextContent('38');
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-passed')).toHaveTextContent('AI check passed after 2 renders');
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-minor')).toHaveTextContent('A little blur in the corner');
     const issues = within(screen.getByTestId('ad-studio-image-slot-story')).getByTestId('ad-studio-image-qa-issues');
@@ -86,11 +91,23 @@ describe('ImageStudio', () => {
     expect(issues).toHaveTextContent('Slight blur');
   });
 
-  it('keeps the images folded and quiet when the check passed or did not run', () => {
+  it('stays quiet about the check when it did not run, and shows the image size and version', () => {
     renderStudio({ initialImages: [image({ qa: { status: 'skipped', issues: [], renders: 1 } })] });
-    expect(screen.getByTestId('ad-studio-image-manage')).not.toHaveAttribute('open');
+    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByText('v1 · 2K')).toBeInTheDocument();
     expect(screen.queryByTestId('ad-studio-image-qa-issues')).toBeNull();
     expect(screen.queryByTestId('ad-studio-image-qa-passed')).toBeNull();
+  });
+
+  it('filters the ideas to one, and back to all', () => {
+    const second = { ...CONCEPT, id: 'c2', headline: 'No printing' };
+    renderStudio({ initialConcepts: [CONCEPT, second] });
+    const filterBar = screen.getByTestId('ad-studio-idea-filter');
+    expect(within(filterBar).getByRole('button', { name: 'All ideas (2)' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(filterBar).getByRole('button', { name: 'Idea 2' }));
+    expect(screen.getByTestId('ad-studio-image-concept-1')).toHaveClass('hidden');
+    expect(screen.getByTestId('ad-studio-image-concept-2')).not.toHaveClass('hidden');
+    fireEvent.click(within(filterBar).getByRole('button', { name: 'All ideas (2)' }));
+    expect(screen.getByTestId('ad-studio-image-concept-1')).not.toHaveClass('hidden');
   });
 
   it('shows each placement of an idea with its image and state, and renders a missing one', async () => {
