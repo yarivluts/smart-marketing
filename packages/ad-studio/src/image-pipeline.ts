@@ -223,12 +223,10 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
   if (!concept) throw new AdStudioImageRequestError('concept_not_found');
   if (!concept.formats.includes(ctx.format)) throw new AdStudioImageRequestError('format_not_in_concept');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image', units: 1, now: deps.now?.() });
-  const input = adStudioBriefInput(brief);
+  const input = await briefPromptInput(brief);
   // A picture described in Hebrew reaches the image model in English; the fingerprint keeps the words as written.
   const visualPrompt = await englishForModel(concept.visualPrompt, { ...ctx, llm: deps.llm, now: deps.now?.() });
   const prompt = buildImagePrompt({ ...concept, visualPrompt }, ctx.format, input);
-  const input = await briefPromptInput(brief);
-  const prompt = buildImagePrompt(concept, ctx.format, input);
   const record = await createAdStudioImage({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
