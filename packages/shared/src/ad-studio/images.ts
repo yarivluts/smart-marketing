@@ -1,6 +1,5 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
 import type { AdStudioScene } from './scenes';
-import { UNTRUSTED_INPUT_RULE, adWritingRules } from './writing-rules';
 import { brandColorsLine, brandKitRules } from './brand-kit';
 import { UNTRUSTED_INPUT_RULE, adWritingRules, wrapUntrusted } from './writing-rules';
 import { AD_COPY_RULES, adCopyIssues, fitAdCopy, type AdStudioAdCopy, type AdStudioAdCopyIssueCode } from './copy';

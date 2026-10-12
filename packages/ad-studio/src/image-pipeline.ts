@@ -165,7 +165,7 @@ export async function rewriteAdStudioImageConcept(ctx: AdStudioCallContext & { b
   const index = concepts.findIndex((concept) => concept.id === ctx.conceptId);
   if (index < 0) throw new AdStudioImageRequestError('concept_not_found');
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildImageConceptRewritePrompt(adStudioBriefInput(brief), concepts, index, ctx.instruction, context);
+  const prompt = buildImageConceptRewritePrompt(await briefPromptInput(brief), concepts, index, ctx.instruction, context);
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   const [rewritten] = await repairConceptLengths(ctx, brief, raw.concepts.slice(0, 1));
   const original = concepts[index];
