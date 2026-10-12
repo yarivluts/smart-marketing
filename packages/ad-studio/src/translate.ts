@@ -3,7 +3,7 @@ import { wrapUntrusted } from '@growthos/shared';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import type { AdStudioLlm } from './llm';
 
-const HEBREW = /[֐-׿]/u;
+const HEBREW = /[\u0590-\u05ff]/u;
 
 const TranslatedSchema = z.object({ english: z.string().describe('The description in English, every visual detail kept.') });
 

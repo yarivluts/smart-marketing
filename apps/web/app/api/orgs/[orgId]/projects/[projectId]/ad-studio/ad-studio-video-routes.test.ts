@@ -177,11 +177,11 @@ describe('Ad Studio video routes (KAN-231)', () => {
   it('sends a shot described in Hebrew to the video model in English, keeping the Hebrew in the script', async () => {
     const ctx = await setup();
     const { starts } = fakeOmni();
-    const hebrewShot = 'עורך דין חותם ליד חלון';
+    const hebrewShot = '\u05e2\u05d5\u05e8\u05da \u05d3\u05d9\u05df \u05d7\u05d5\u05ea\u05dd \u05dc\u05d9\u05d3 \u05d7\u05dc\u05d5\u05df';
     expect((await saveScript(request('PUT', { scenes: [{ ...SCENES[0], visualPrompt: hebrewShot }, SCENES[1]] }), ctx.p())).status).toBe(200);
     expect((await renderScene(request('POST'), ctx.p({ sceneId: 's1' }))).status).toBe(200);
     expect(String(starts[0].input)).toContain('A lawyer signing at a desk by the window');
-    expect(String(starts[0].input)).not.toMatch(/[֐-׿]{4}/);
+    expect(String(starts[0].input)).not.toMatch(/[\u0590-\u05ff]{4}/);
     const brief = await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId);
     expect(brief.scenes[0].visualPrompt).toBe(hebrewShot);
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).some((row) => row.kind === 'translate')).toBe(true);
