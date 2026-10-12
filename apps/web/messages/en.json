@@ -3976,6 +3976,8 @@
           "error": "Check failed"
         }
       },
+      "assembleFlagged": "The AI check found problems in scene {scenes}. Assemble the video anyway?",
+      "assembleAnyway": "Assemble anyway",
       "inVideo": "In the video",
       "useInVideo": "Use in the video",
       "chosen": "This version will be used in the video. Assemble again to apply it."
@@ -4889,6 +4891,13 @@
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
     "formatVerticalHint": "For Reels, Stories and Shorts.",
     "formatHorizontalHint": "For YouTube and in-stream video.",
+    "voiceoverWords": "{words}/{budget} words",
+    "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene.",
+    "editing": {
+      "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
+      "loadSaved": "Load the saved version",
+      "leaveUnsaved": "You have unsaved changes. Leave without saving?"
+    },
     "gallery": {
       "title": "Made so far",
       "scene": "Scene {number}",
@@ -4898,13 +4907,6 @@
         "failed": "Failed",
         "waiting": "Waiting"
       }
-    },
-    "voiceoverWords": "{words}/{budget} words",
-    "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene.",
-    "editing": {
-      "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
-      "loadSaved": "Load the saved version",
-      "leaveUnsaved": "You have unsaved changes. Leave without saving?"
     },
     "planSections": {
       "keywords": "Search keywords",

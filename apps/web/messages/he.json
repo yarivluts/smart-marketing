@@ -3976,6 +3976,8 @@
           "error": "הבדיקה נכשלה"
         }
       },
+      "assembleFlagged": "בדיקת ה-AI מצאה בעיות בסצנה {scenes}. להרכיב את הסרטון בכל זאת?",
+      "assembleAnyway": "להרכיב בכל זאת",
       "inVideo": "בסרטון",
       "useInVideo": "להשתמש בסרטון",
       "chosen": "הגרסה הזו תשמש בסרטון. הרכיבו שוב כדי להחיל אותה."
@@ -4889,6 +4891,13 @@
     "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
     "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
     "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream.",
+    "voiceoverWords": "{words}/{budget} מילים",
+    "voiceoverTooLong": "ארוך ממה שנכנס בסצנה: הקריין ימהר או ייקטע. קצרו את הטקסט או האריכו את הסצנה.",
+    "editing": {
+      "changedElsewhere": "הגרסה השמורה שונתה במקום אחר. השינויים שלכם שלא נשמרו נשארים כאן.",
+      "loadSaved": "טעינת הגרסה השמורה",
+      "leaveUnsaved": "יש שינויים שלא נשמרו. לצאת בלי לשמור?"
+    },
     "gallery": {
       "title": "מה שנוצר עד עכשיו",
       "scene": "סצנה {number}",
@@ -4898,13 +4907,6 @@
         "failed": "נכשל",
         "waiting": "ממתין"
       }
-    },
-    "voiceoverWords": "{words}/{budget} מילים",
-    "voiceoverTooLong": "ארוך ממה שנכנס בסצנה: הקריין ימהר או ייקטע. קצרו את הטקסט או האריכו את הסצנה.",
-    "editing": {
-      "changedElsewhere": "הגרסה השמורה שונתה במקום אחר. השינויים שלכם שלא נשמרו נשארים כאן.",
-      "loadSaved": "טעינת הגרסה השמורה",
-      "leaveUnsaved": "יש שינויים שלא נשמרו. לצאת בלי לשמור?"
     },
     "planSections": {
       "keywords": "מילות מפתח לחיפוש",

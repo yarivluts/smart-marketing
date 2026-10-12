@@ -171,6 +171,9 @@ export function VideoStudio({
     (state) => state.usable?.status === 'ready' && !state.usable.qa,
   );
   const assembling = pending === 'assemble' || newestVideo?.status === 'assembling';
+  // Scenes whose clip in the video failed the AI check: assembling asks first instead of shipping them silently.
+  const flaggedScenes = states.flatMap((state, index) => (state.usable?.qa?.status === 'issues' ? [index + 1] : []));
+  const [confirmAssemble, setConfirmAssemble] = React.useState(false);
 
   const apply = React.useCallback((listing: Listing) => {
     if (listing.clips) setClips(listing.clips);
@@ -723,9 +726,28 @@ export function VideoStudio({
               <p className="text-xs text-muted-foreground">{t('video.assembleHint')}</p>
             ) : null}
           </div>
+          {confirmAssemble ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm" role="alertdialog" aria-label={t('video.assembleFlagged', { scenes: flaggedScenes.join(', ') })}>
+              <span>{t('video.assembleFlagged', { scenes: flaggedScenes.join(', ') })}</span>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => {
+                  setConfirmAssemble(false);
+                  void act('assemble', '/assemble', undefined, t('video.assembled'));
+                }}
+                className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"
+              >
+                {t('video.assembleAnyway')}
+              </button>
+              <button type="button" onClick={() => setConfirmAssemble(false)} className="rounded-lg border border-border px-2.5 py-1 text-xs">
+                {t('cancel')}
+              </button>
+            </div>
+          ) : (
           <button
             type="button"
-            onClick={() => act('assemble', '/assemble', undefined, t('video.assembled'))}
+            onClick={() => (flaggedScenes.length ? setConfirmAssemble(true) : void act('assemble', '/assemble', undefined, t('video.assembled')))}
             disabled={!progress.canAssemble || pending !== null || assembling || generating}
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
           >
@@ -736,6 +758,7 @@ export function VideoStudio({
             )}
             {assembling ? t('video.assembling') : t('video.assemble')}
           </button>
+          )}
         </div>
         {newestVideo?.status === 'failed' ? (
           <p className="text-sm text-destructive">
