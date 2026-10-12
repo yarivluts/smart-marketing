@@ -1,5 +1,6 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
 import { UNTRUSTED_INPUT_RULE, adWritingRules } from './writing-rules';
+import { brandKitRules } from './brand-kit';
 
 /**
  * Ad copy (KAN-278): the words that run next to a creative in the feed - a headline, the primary
@@ -96,7 +97,7 @@ export function buildAdCopyPrompt(brief: AdStudioBriefInput, targets: readonly A
       'You write the ad copy for Facebook, Instagram and Google display ads.',
       'Rules:',
       ...AD_COPY_RULES.map((rule) => `- ${rule}`),
-      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
       `- ${UNTRUSTED_INPUT_RULE}`,
       '- Give each creative its own angle: no two creatives may share a headline or open their primary text the same way.',
       '- Return one entry per creative with its key unchanged.',
