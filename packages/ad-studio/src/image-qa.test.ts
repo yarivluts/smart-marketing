@@ -8,6 +8,8 @@ describe('buildImageQaPrompt', () => {
     expect(prompt.user).toContain('spelled exactly: "Sign in 30 seconds"');
     expect(prompt.user).toContain('misspellings included');
     expect(prompt.user).toContain('Intended picture: A lawyer at a desk');
+    // A readable word in another language - an English UI label, a legible signature - fails a Hebrew ad.
+    expect(prompt.user).toContain('any readable word in a language other than Hebrew');
   });
 
   it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {
