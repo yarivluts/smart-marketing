@@ -13,6 +13,8 @@ describe('buildImageQaPrompt', () => {
     // Wrong proportions and impossible objects are major, so they trigger a re-render.
     expect(prompt.user).toContain('an object at a clearly wrong size or proportion');
     expect(prompt.user).toContain('something physically impossible');
+    expect(prompt.user).toContain('extra hands or limbs that belong to no one');
+    expect(prompt.user).toContain('the picture drawn as a phone screen or app');
   });
 
   it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {

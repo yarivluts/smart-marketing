@@ -256,6 +256,7 @@ export function buildImagePrompt(
 const IMAGE_SAFE_ZONES: Record<AdStudioImageFormat, string | null> = {
   square: null,
   portrait: null,
-  story: 'Full-screen story placement: the app covers about the top 14% and bottom 20% of the picture, so keep the subject and the headline in the middle band.',
+  // Naming "the app" made the model draw a phone status bar and app bars around the picture; describe only what to keep empty.
+  story: 'Vertical full-screen picture: keep only plain background in the top 14% and bottom 20%, with the subject and the headline in the middle band. Do not draw any phone frame, status bar, app interface, buttons or navigation icons around the picture.',
   landscape: 'This picture is cropped to 1.91:1 for Google display: keep the subject and the headline away from the top and bottom edges.',
 };
