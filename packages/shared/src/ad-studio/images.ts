@@ -238,7 +238,7 @@ export function buildImagePrompt(
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
-    'Any phone, tablet, laptop or other screen in the picture shows a simple, abstract interface - shapes, a signature line, buttons - with no readable words or letters.',
+    'Any phone, tablet, laptop or other screen in the picture shows a simple, abstract interface - large flat shapes, a signature line, plain coloured buttons without labels - with no words, letters or small text-like lines anywhere on it.',
     // Worded as a condition: "a signature anywhere in the picture" made the model add one, floating on a desk.
     'If the scene shows something being signed, the signature is an illegible scribble on that document or screen only; do not add signatures or writing anywhere else.',
     'Every object has its real-world size and proportions (a phone fits in a hand) and sits where it physically could.',
@@ -257,6 +257,7 @@ const IMAGE_SAFE_ZONES: Record<AdStudioImageFormat, string | null> = {
   square: null,
   portrait: null,
   // Naming "the app" made the model draw a phone status bar and app bars around the picture; describe only what to keep empty.
-  story: 'Vertical full-screen picture: keep only plain background in the top 14% and bottom 20%, with the subject and the headline in the middle band. Do not draw any phone frame, status bar, app interface, buttons or navigation icons around the picture.',
+  // "Plain background in the top 14%" produced literal empty grey bands; ask for scenery that runs to the edges instead.
+  story: 'Vertical full-screen picture: the scene runs naturally to all four edges, with no empty bands, borders or frames. Place the subject and the headline in the middle of the height; the top 14% and bottom 20% show only scenery (wall, ceiling, floor, sky). Do not draw any phone frame, status bar, app interface or navigation icons around the picture.',
   landscape: 'This picture is cropped to 1.91:1 for Google display: keep the subject and the headline away from the top and bottom edges.',
 };
