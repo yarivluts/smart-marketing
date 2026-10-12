@@ -3975,7 +3975,10 @@
           "skipped": "Not checked",
           "error": "Check failed"
         }
-      }
+      },
+      "inVideo": "In the video",
+      "useInVideo": "Use in the video",
+      "chosen": "This version will be used in the video. Assemble again to apply it."
     },
     "clipFailure": {
       "not_configured": "no video model is configured",

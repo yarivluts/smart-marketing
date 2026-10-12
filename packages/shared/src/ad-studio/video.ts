@@ -154,6 +154,8 @@ export interface AdStudioClipSummary {
   status: AdStudioClipStatus;
   sceneFingerprint: string;
   durationSeconds: number;
+  /** The version the person chose for the video over newer ones. */
+  chosen?: boolean;
 }
 
 /** Every clip of each scene, newest version first. */
@@ -174,7 +176,7 @@ export interface AdStudioSceneVideo<T extends AdStudioClipSummary = AdStudioClip
   sceneId: string;
   /** The newest clip of any status - what the scene's panel shows first. */
   latest: T | null;
-  /** The newest ready clip made from the scene as it is now - what the assembled video uses. */
+  /** What the assembled video uses: the version the person chose, else the newest ready clip of the scene as it is now. */
   usable: T | null;
   state: AdStudioSceneVideoState;
 }
@@ -194,7 +196,9 @@ export function sceneVideoStates<T extends AdStudioClipSummary>(
     const list = grouped.get(scene.id) ?? [];
     const fingerprint = sceneFingerprint(scene, context);
     const latest = list[0] ?? null;
-    const usable = list.find((candidate) => candidate.status === 'ready' && candidate.sceneFingerprint === fingerprint) ?? null;
+    const current = (candidate: T) => candidate.status === 'ready' && candidate.sceneFingerprint === fingerprint;
+    // A chosen version wins while it is still current; a changed scene falls back to the newest current clip.
+    const usable = list.find((candidate) => candidate.chosen && current(candidate)) ?? list.find(current) ?? null;
     let state: AdStudioSceneVideoState;
     if (list.some((candidate) => candidate.status === 'generating')) state = 'generating';
     else if (usable) state = 'ready';
