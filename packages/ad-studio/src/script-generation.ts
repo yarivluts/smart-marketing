@@ -79,12 +79,23 @@ export async function generateAdStudioScript(
  * without saving it: the editor shows it in place and the person keeps or discards it, so an AI
  * rewrite never silently replaces work. The proposal keeps the scene's id and is fitted on its own.
  */
-export async function proposeAdStudioSceneRewrite(ctx: AdStudioCallContext & { briefId: string; sceneId: string; instruction: string }): Promise<AdStudioScene> {
+export async function proposeAdStudioSceneRewrite(
+  ctx: AdStudioCallContext & {
+    briefId: string;
+    sceneId: string;
+    instruction: string;
+    /** The editor's current scenes, unsaved edits and new scenes included; the saved script when absent. */
+    draftScenes?: readonly AdStudioScene[];
+  },
+): Promise<AdStudioScene> {
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
-  const index = brief.scenes.findIndex((scene) => scene.id === ctx.sceneId);
+  // Rewrite what the person is looking at, so a new or edited scene is rewritten as it stands.
+  const scenes = ctx.draftScenes?.length ? ctx.draftScenes : brief.scenes;
+  const index = scenes.findIndex((scene) => scene.id === ctx.sceneId);
   if (index < 0) throw new AdStudioProviderError('invalid_output', 'That scene is no longer in the script.');
-  const prompt = buildSceneRewritePrompt(adStudioBriefInput(brief), brief.scenes, index, ctx.instruction);
+  const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
+  const prompt = buildSceneRewritePrompt(adStudioBriefInput(brief), scenes, index, ctx.instruction, context);
   const generated = await meteredCall(ctx, 'scene_rewrite', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedSceneSchema }));
   const [fitted] = fitAdStudioScenes([{ id: ctx.sceneId, ...generated }], newAdStudioSceneId);
   if (!fitted || fitted.visualPrompt.length === 0) throw new AdStudioProviderError('invalid_output', 'The model returned a scene without a visual description.');

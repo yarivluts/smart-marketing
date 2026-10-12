@@ -9,7 +9,7 @@ import { AD_STUDIO_TEST_OMNI_BASE_URL, adStudioTestOverride, isLoopbackHttpUrl }
  * JSON validated against the same zod schema, so callers never see an unvalidated shape.
  */
 
-export const AD_STUDIO_CLAUDE_MODEL = 'claude-opus-5';
+export const AD_STUDIO_CLAUDE_MODEL = 'claude-opus-5-5';
 export const AD_STUDIO_GEMINI_TEXT_MODEL = 'gemini-3.8-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -34,10 +34,18 @@ export class AdStudioProviderError extends Error {
   }
 }
 
+/**
+ * How hard the model should think. Opus 5.5 defaults to `medium`; the studio sets it per call so a
+ * plan gets deep analysis while vowel marks and length repairs stay fast and cheap.
+ */
+export type AdStudioEffort = 'low' | 'medium' | 'high';
+
 export interface AdStudioJsonRequest<T> {
   system: string;
   user: string;
   schema: z.ZodType<T>;
+  /** Defaults to `medium`. Gemini ignores it. */
+  effort?: AdStudioEffort;
 }
 
 export interface AdStudioLlm {
@@ -52,9 +60,10 @@ export function createClaudeLlm(apiKey: string, client: Anthropic = new Anthropi
   return {
     provider: 'anthropic',
     model: AD_STUDIO_CLAUDE_MODEL,
-    async generateJson<T>({ system, user, schema }: AdStudioJsonRequest<T>): Promise<T> {
+    async generateJson<T>({ system, user, schema, effort = 'medium' }: AdStudioJsonRequest<T>): Promise<T> {
       try {
-        const response = await client.beta.messages.parse({
+        // Streamed, so a long plan never hits the HTTP request timeout; finalMessage() still returns the parsed output.
+        const response = await client.beta.messages.stream({
           model: AD_STUDIO_CLAUDE_MODEL,
           max_tokens: 16000,
           // Server-side refusal fallback: a policy decline is retried on the fallback model in the same call.
@@ -62,10 +71,13 @@ export function createClaudeLlm(apiKey: string, client: Anthropic = new Anthropi
           fallbacks: 'default',
           system,
           messages: [{ role: 'user', content: user }],
-          output_config: { format: betaZodOutputFormat(schema) },
-        });
+          output_config: { effort, format: betaZodOutputFormat(schema) },
+        }).finalMessage();
         if (response.stop_reason === 'refusal') {
           throw new AdStudioProviderError('refused', response.stop_details?.explanation ?? 'The model declined this request.');
+        }
+        if (response.stop_reason === 'max_tokens') {
+          throw new AdStudioProviderError('invalid_output', 'The answer was cut off at the output limit before it was complete.');
         }
         if (response.parsed_output === null || response.parsed_output === undefined) {
           throw new AdStudioProviderError('invalid_output', `Output did not match the schema (stop reason ${response.stop_reason}).`);
@@ -94,44 +106,88 @@ function geminiErrorCode(status: number, message: string): AdStudioProviderError
   return 'provider_error';
 }
 
-/** One Gemini generateContent call that must answer JSON matching `schema`; `media` rides along as inline bytes, in order, before the prompt. */
+/** How a Gemini call waits and retries. Injectable so tests don't sleep. */
+export interface GeminiCallOptions {
+  /** Abort one attempt after this long. Text calls default to 90s; the video reviewer to 180s. */
+  timeoutMs?: number;
+  /** Attempts in all, for network errors, timeouts, 429 and 5xx. Default 3. */
+  attempts?: number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Backoff before retry `n` (1-based): about 0.5s, 1s, 2s with jitter, or the server's Retry-After when it gives one. */
+function retryDelayMs(retry: number, retryAfter: string | null): number {
+  const seconds = retryAfter ? Number(retryAfter) : Number.NaN;
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 30_000);
+  return 500 * 2 ** (retry - 1) + Math.floor(Math.random() * 250);
+}
+
+type GeminiBody = {
+  error?: { message?: string };
+  promptFeedback?: { blockReason?: string };
+  candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+};
+
+/**
+ * One Gemini generateContent call that must answer JSON matching `schema`; `media` rides along as
+ * inline bytes, in order, before the prompt. Each attempt has a timeout; network errors, timeouts,
+ * rate limits and server errors are retried with backoff. Billing, auth and safety refusals are not.
+ */
 async function geminiJson<T>(
   apiKey: string,
   fetchImpl: FetchLike,
   baseUrl: string,
   model: string,
   request: AdStudioJsonRequest<T> & { media?: AdStudioMediaInput | readonly AdStudioMediaInput[] },
+  options: GeminiCallOptions = {},
 ): Promise<T> {
+  const { timeoutMs = 90_000, attempts = 3, sleep = defaultSleep } = options;
   const parts: Record<string, unknown>[] = [];
   const media = request.media === undefined ? [] : Array.isArray(request.media) ? request.media : [request.media as AdStudioMediaInput];
   for (const item of media) parts.push({ inlineData: { mimeType: item.mimeType, data: Buffer.from(item.data).toString('base64') } });
   parts.push({ text: request.user });
-  let response: Response;
-  try {
-    response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models/${model}:generateContent`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: request.system }] },
-        contents: [{ role: 'user', parts }],
-        generationConfig: { responseMimeType: 'application/json', responseJsonSchema: z.toJSONSchema(request.schema) },
-      }),
-    });
-  } catch (error) {
-    throw new AdStudioProviderError('provider_error', error instanceof Error ? error.message : String(error));
-  }
-  const body = (await response.json().catch(() => ({}))) as {
-    error?: { message?: string };
-    promptFeedback?: { blockReason?: string };
-    candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
-  };
-  if (!response.ok) {
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: request.system }] },
+    contents: [{ role: 'user', parts }],
+    generationConfig: { responseMimeType: 'application/json', responseJsonSchema: z.toJSONSchema(request.schema), maxOutputTokens: 16_384 },
+  });
+  let body: GeminiBody = {};
+  for (let attempt = 1; ; attempt += 1) {
+    let response: Response;
+    try {
+      response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models/${model}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+        body: payload,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (error) {
+      if (attempt < attempts) {
+        await sleep(retryDelayMs(attempt, null));
+        continue;
+      }
+      const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+      throw new AdStudioProviderError('provider_error', timedOut ? `No answer within ${Math.round(timeoutMs / 1000)}s.` : error instanceof Error ? error.message : String(error));
+    }
+    body = (await response.json().catch(() => ({}))) as GeminiBody;
+    if (response.ok) break;
     const message = body.error?.message ?? `HTTP ${response.status}`;
-    throw new AdStudioProviderError(geminiErrorCode(response.status, message), message);
+    const code = geminiErrorCode(response.status, message);
+    if (attempt < attempts && RETRYABLE_STATUSES.has(response.status) && code !== 'provider_billing') {
+      await sleep(retryDelayMs(attempt, response.headers.get('retry-after')));
+      continue;
+    }
+    throw new AdStudioProviderError(code, message);
   }
   const candidate = body.candidates?.[0];
   if (body.promptFeedback?.blockReason || candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'PROHIBITED_CONTENT') {
     throw new AdStudioProviderError('refused', `The model declined this request (${body.promptFeedback?.blockReason ?? candidate?.finishReason}).`);
+  }
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    throw new AdStudioProviderError('invalid_output', 'The answer was cut off at the output limit before it was complete.');
   }
   const text = candidate?.content?.parts?.map((part) => part.text ?? '').join('') ?? '';
   let parsed: unknown;
@@ -145,11 +201,11 @@ async function geminiJson<T>(
   return result.data;
 }
 
-export function createGeminiLlm(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE): AdStudioLlm {
+export function createGeminiLlm(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE, options: GeminiCallOptions = {}): AdStudioLlm {
   return {
     provider: 'gemini',
     model: AD_STUDIO_GEMINI_TEXT_MODEL,
-    generateJson: (request) => geminiJson(apiKey, fetchImpl, baseUrl, AD_STUDIO_GEMINI_TEXT_MODEL, request),
+    generateJson: (request) => geminiJson(apiKey, fetchImpl, baseUrl, AD_STUDIO_GEMINI_TEXT_MODEL, request, options),
   };
 }
 
@@ -170,11 +226,12 @@ export interface AdStudioReviewer {
   reviewJson<T>(request: AdStudioJsonRequest<T> & { media: AdStudioMediaInput | readonly AdStudioMediaInput[] }): Promise<T>;
 }
 
-export function createGeminiReviewer(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE): AdStudioReviewer {
+export function createGeminiReviewer(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE, options: GeminiCallOptions = {}): AdStudioReviewer {
   return {
     provider: 'gemini',
     model: AD_STUDIO_GEMINI_TEXT_MODEL,
-    reviewJson: (request) => geminiJson(apiKey, fetchImpl, baseUrl, AD_STUDIO_GEMINI_TEXT_MODEL, request),
+    // Watching a clip takes longer than writing text.
+    reviewJson: (request) => geminiJson(apiKey, fetchImpl, baseUrl, AD_STUDIO_GEMINI_TEXT_MODEL, request, { timeoutMs: 180_000, ...options }),
   };
 }
 
