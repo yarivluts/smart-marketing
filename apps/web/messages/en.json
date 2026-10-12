@@ -4431,7 +4431,10 @@
       "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step.",
       "addCountry": "Add a country",
       "otherCountry": "Other (code)",
-      "removeCountry": "Remove {country}"
+      "removeCountry": "Remove {country}",
+      "variantsTitle": "Test more variants in the same ad set",
+      "variantsHint": "Each one becomes another paused ad in the same campaign and ad set, with its own saved copy, so Meta can compare them.",
+      "doneVariants": "Created {count} paused ads in one ad set on {destination}.{failed, plural, =0 {} one { # variant could not be created.} other { # variants could not be created.}}"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",

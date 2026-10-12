@@ -61,6 +61,12 @@ export interface PublishAdStudioAdParams {
   metaTargeting?: AdStudioMetaTargeting | null;
   /** Google only: the advertiser's EU political advertising self-declaration - never defaulted. */
   containsEuPoliticalAdvertising?: boolean;
+  /**
+   * Meta only: add this ad to the campaign and ad set of an ad already created from this brief (its
+   * export row id), so several variants are tested side by side in one ad set instead of each in its
+   * own campaign. The ids come from that row, never from the caller.
+   */
+  addToAdSetOf?: string;
   kms: KmsProvider;
   actorId: string;
   actorType?: 'user' | 'api_key';
@@ -140,10 +146,19 @@ function b64(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString('base64');
 }
 
-async function publishToMeta(params: PublishAdStudioAdParams, secretJson: string): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
+async function publishToMeta(
+  params: PublishAdStudioAdParams,
+  secretJson: string,
+  existing: { campaignId: string; adSetId: string; adAccountId: string } | null,
+): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
   const secret = parseMetaAdsCredentialSecret(secretJson);
   const client = params.clients?.meta?.(secret.accessToken) ?? new MetaAdsHttpApiClient({ accessToken: secret.accessToken });
   const account = secret.adAccountId;
+  if (existing) {
+    if (existing.adAccountId !== account) throw new AdStudioExportInvalidError(['the ad set belongs to a different ad account']);
+    // Another variant in the same paused ad set: its campaign holds other ads, so nothing is deleted on failure.
+    return buildMetaAd(params, secret, client, existing.campaignId, existing.adSetId);
+  }
   const { campaignId } = await client.createCampaign(account, { name: params.campaignName.trim(), objective: 'OUTCOME_TRAFFIC', dailyBudgetCents: Math.round(params.dailyBudget * 100) });
   try {
     return await buildMetaAd(params, secret, client, campaignId);
@@ -159,9 +174,10 @@ async function buildMetaAd(
   secret: MetaAdsCredentialSecret,
   client: MetaAdsApiClient,
   campaignId: string,
+  existingAdSetId?: string,
 ): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
   const account = secret.adAccountId;
-  const { adSetId } = await client.createAdSet(account, { campaignId, name: `${params.campaignName.trim()} - ad set`, targeting: params.metaTargeting ? { ...metaAdSetTargeting(params.metaTargeting), countries: params.countries } : { countries: params.countries, ageMin: 18, ageMax: 65 } });
+  const { adSetId } = existingAdSetId ? { adSetId: existingAdSetId } : await client.createAdSet(account, { campaignId, name: `${params.campaignName.trim()} - ad set`, targeting: params.metaTargeting ? { ...metaAdSetTargeting(params.metaTargeting), countries: params.countries } : { countries: params.countries, ageMin: 18, ageMax: 65 } });
   let creativeId: string;
   const refs: Record<string, string> = { campaign_id: campaignId, ad_set_id: adSetId };
   if (params.media.kind === 'image') {
@@ -297,11 +313,31 @@ async function publishToGoogle(params: PublishAdStudioAdParams, secretJson: stri
   };
 }
 
+/** The campaign and ad set of an earlier, finished Meta ad of the same brief, to add another variant to. */
+async function adSetToJoin(params: PublishAdStudioAdParams): Promise<{ campaignId: string; adSetId: string; adAccountId: string }> {
+  const earlier = await AdStudioExportModel.init(params.addToAdSetOf as string, { organization_id: params.organizationId, project_id: params.projectId });
+  const refs = earlier?.platform_refs ?? {};
+  if (
+    params.destination !== 'meta' ||
+    !earlier ||
+    earlier.brief_id !== params.briefId ||
+    earlier.destination !== 'meta' ||
+    earlier.status !== 'done' ||
+    !refs.campaign_id ||
+    !refs.ad_set_id ||
+    !refs.ad_account_id
+  ) {
+    throw new AdStudioExportInvalidError(['the ad set to add to is not a finished Meta ad of this ad']);
+  }
+  return { campaignId: refs.campaign_id, adSetId: refs.ad_set_id, adAccountId: refs.ad_account_id };
+}
+
 /** Creates the paused ad on the platform and records it (done with the link, or failed with a code), audited either way. */
 export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promise<AdStudioExportModel> {
   const now = params.now ?? (() => new Date());
   const reasons = validate(params);
   if (reasons.length) throw new AdStudioExportInvalidError(reasons);
+  const existing = params.addToAdSetOf ? await adSetToJoin(params) : null;
   const destinations = await resolveAdStudioExportDestinations(params.organizationId, params.projectId);
   const target = destinations[params.destination];
   if (!target.available) throw new AdStudioExportUnavailableError(params.destination, target.reason);
@@ -327,7 +363,7 @@ export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promis
 
   try {
     const secretJson = await revealSharedCredentialSecret({ organizationId: params.organizationId, credentialId: target.credentialId, kms: params.kms });
-    const result = params.destination === 'meta' ? await publishToMeta(params, secretJson) : await publishToGoogle(params, secretJson);
+    const result = params.destination === 'meta' ? await publishToMeta(params, secretJson, existing) : await publishToGoogle(params, secretJson);
     row.status = 'done';
     row.external_id = result.externalId;
     row.external_url = result.url;

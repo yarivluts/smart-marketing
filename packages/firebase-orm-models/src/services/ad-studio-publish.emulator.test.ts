@@ -51,6 +51,42 @@ function fakeMeta() {
 }
 
 describe('publishAdStudioAd', () => {
+  it('tests variants side by side: a second ad joins the paused campaign and ad set of the first', async () => {
+    const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
+    const meta = fakeMeta();
+    const base = {
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: 'b1',
+      destination: 'meta' as const,
+      copy: COPY,
+      campaignName: 'Sign fast - test',
+      dailyBudget: 20,
+      countries: ['IL'],
+      kms,
+      actorId: ctx.owner.id,
+      clients: { meta: () => meta },
+    };
+    const first = await publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i1', primary: IMG, square: null, landscape: null } });
+    const second = await publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i2', primary: IMG, square: null, landscape: null }, addToAdSetOf: first.id });
+    expect(second.status).toBe('done');
+    expect(meta.createCampaign).toHaveBeenCalledTimes(1);
+    expect(meta.createAdSet).toHaveBeenCalledTimes(1);
+    expect(meta.createAd).toHaveBeenCalledTimes(2);
+    expect(meta.createAd).toHaveBeenLastCalledWith('99', expect.objectContaining({ adSetId: 's1' }));
+    expect(second.platform_refs).toMatchObject({ campaign_id: 'c1', ad_set_id: 's1' });
+
+    // Only a finished Meta ad of the same ad can be joined - before anything is called.
+    meta.createAd.mockClear();
+    await expect(publishAdStudioAd({ ...base, briefId: 'other', media: { kind: 'image', imageId: 'i3', primary: IMG, square: null, landscape: null }, addToAdSetOf: first.id })).rejects.toMatchObject({
+      name: 'AdStudioExportInvalidError',
+    });
+    await expect(publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i3', primary: IMG, square: null, landscape: null }, addToAdSetOf: 'missing' })).rejects.toMatchObject({
+      name: 'AdStudioExportInvalidError',
+    });
+    expect(meta.createAd).not.toHaveBeenCalled();
+  });
+
   it('creates a paused Meta image ad (campaign, ad set, image, creative, ad) and records the link', async () => {
     const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '1646897415410557', pageId: 'p1' });
     const meta = fakeMeta();
