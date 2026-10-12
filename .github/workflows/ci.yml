@@ -85,6 +85,10 @@ jobs:
         run: pnpm test
 
       - name: Build
+        # The web app's production build passed the default ~4GB Node heap once the Ad Studio grew
+        # (one main build died "JavaScript heap out of memory"); the runner has 16GB.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm build
 
   terraform:

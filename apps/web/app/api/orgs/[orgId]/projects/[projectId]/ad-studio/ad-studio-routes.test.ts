@@ -378,4 +378,21 @@ describe('Ad Studio routes', () => {
     expect(sent).toContain('Never use these words or phrases: \\"cheap\\"');
     expect(sent).toContain('#5b4fe9');
   });
+
+  it('script saves from two places: a save from an older version is refused, then can overwrite on purpose', async () => {
+    const { ownerSession, orgId, projectId } = await setup();
+    const briefId = await createBriefAs(ownerSession, orgId, projectId);
+    const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
+    const v1 = [{ id: 's1', durationSeconds: 5, visualPrompt: 'A desk', voiceover: '', onScreenText: '' }];
+    expect((await saveScript(request('PUT', { scenes: v1 }), params)).status).toBe(200);
+    // Tab A saves on top of v1.
+    const v2 = [{ ...v1[0], visualPrompt: 'A desk by the window' }];
+    expect((await saveScript(request('PUT', { scenes: v2, base: v1 }), params)).status).toBe(200);
+    // Tab B still started from v1: refused, with what is saved now.
+    const stale = await saveScript(request('PUT', { scenes: [{ ...v1[0], visualPrompt: 'A phone' }], base: v1 }), params);
+    expect(stale.status).toBe(409);
+    expect(await stale.json()).toMatchObject({ error: 'script_conflict', brief: { scenes: [{ visualPrompt: 'A desk by the window' }] } });
+    // Saving again without a base overwrites on purpose.
+    expect((await saveScript(request('PUT', { scenes: [{ ...v1[0], visualPrompt: 'A phone' }] }), params)).status).toBe(200);
+  });
 });
