@@ -154,6 +154,7 @@ async function setup() {
 type ClipJson = {
   id: string;
   sceneId: string;
+  chosen?: boolean;
   status: string;
   version: number;
   kind: string;
