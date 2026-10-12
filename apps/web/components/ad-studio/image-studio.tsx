@@ -296,7 +296,8 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       {draft.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('images.noIdeas')}</p>
       ) : null}
-      <ol className="flex flex-col gap-4">
+      {/* Review compares the ideas side by side on wide screens; editing them in Plan stays one column. */}
+      <ol className={cn('grid grid-cols-1 gap-4', !ideasOnly && 'xl:grid-cols-2')}>
         {draft.map((concept, index) => {
           const savedConcept = saved.find((entry) => entry.id === concept.id);
           const conceptSlots = slots.filter((slot) => slot.conceptId === concept.id);
