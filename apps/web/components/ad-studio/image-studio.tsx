@@ -535,10 +535,10 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           {summary.map((item) => (
             <div key={item.key} className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background p-3 shadow-soft" data-testid={`ad-studio-image-summary-${item.key}`}>
               <div className="flex min-w-0 flex-col">
-                <dt className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</dt>
-                <dd className="font-pp-display text-xl font-semibold tabular-nums">{item.value}</dd>
+                <dt className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground">{item.label}</dt>
+                <dd className="whitespace-nowrap font-pp-display text-lg font-semibold tabular-nums sm:text-xl">{item.value}</dd>
               </div>
-              <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full', item.tone)}>
+              <span className={cn('hidden h-9 w-9 shrink-0 items-center justify-center rounded-full sm:flex', item.tone)}>
                 <item.icon className="h-4 w-4" aria-hidden="true" />
               </span>
             </div>
