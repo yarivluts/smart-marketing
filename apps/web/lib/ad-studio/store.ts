@@ -28,6 +28,8 @@ import {
   type AdStudioExportModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { getAdStudioBrandKit } from '@growthos/firebase-orm-models';
+import type { AdStudioBrandKit } from '@growthos/shared';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
 import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage, toAdStudioRunView, type AdStudioRunView } from './engine';
 
@@ -259,4 +261,11 @@ export async function getLatestAdStudioRunView(organizationId: string, projectId
   await ensureFirestoreOrm();
   const run = await getLatestAdStudioRunInOrganization(organizationId, projectId, briefId);
   return run ? toAdStudioRunView(run) : null;
+}
+
+/** The project's brand kit as the page shows it (empty until saved). */
+export async function loadAdStudioBrandKit(organizationId: string, projectId: string): Promise<AdStudioBrandKit> {
+  await ensureFirestoreOrm();
+  const kit = await getAdStudioBrandKit(organizationId, projectId);
+  return { brandName: kit.brandName, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors };
 }

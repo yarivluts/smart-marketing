@@ -13,7 +13,6 @@ import {
   type AdStudioSearchTargeting,
 } from '@growthos/shared';
 import {
-  adStudioBriefInput,
   generateGoogleAdsKeywordIdeas,
   getAdStudioBrief,
   GoogleAdsKeywordIdeasError,
@@ -22,6 +21,7 @@ import {
   type AdStudioBriefModel,
   type KmsProvider,
 } from '@growthos/firebase-orm-models';
+import { briefPromptInput } from './brand';
 import { ensureOrm } from './runtime';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { repairOverLength } from './length-repair';
@@ -124,7 +124,7 @@ export async function writeAdStudioSearchAd(ctx: AdStudioCallContext & { briefId
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildSearchAdPrompt(adStudioBriefInput(brief), brief.search_keywords?.keywords ?? [], context);
+  const prompt = buildSearchAdPrompt(await briefPromptInput(brief), brief.search_keywords?.keywords ?? [], context);
   const written = await meteredCall(ctx, 'search_ad', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: SearchAdSchema }));
   // Over-long headlines and descriptions are rewritten to fit rather than dropped or cut.
   const repaired = await repairOverLength(ctx, 'search_ad', brief.id, brief.language, [

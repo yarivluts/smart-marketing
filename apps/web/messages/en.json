@@ -4898,6 +4898,33 @@
       "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
       "loadSaved": "Load the saved version",
       "leaveUnsaved": "You have unsaved changes. Leave without saving?"
+    },
+    "brand": {
+      "title": "Brand kit",
+      "description": "Every script, copy, image idea and search ad follows it: the name as it must be written, the tone, words to avoid and the colours.",
+      "brandName": "Brand name",
+      "brandNameHint": "Written exactly like this in ads and shown as the advertiser in previews.",
+      "toneOfVoice": "Tone of voice",
+      "toneOfVoicePlaceholder": "e.g. warm and plain-spoken, a little playful, never pushy",
+      "avoidWords": "Words and phrases never to use",
+      "add": "Add",
+      "remove": "Remove {item}",
+      "colors": "Brand colours",
+      "colorLabel": "Colour {index}",
+      "addColor": "Add a colour",
+      "save": "Save brand kit",
+      "saved": "Brand kit saved. New AI writing follows it.",
+      "saveFailed": "The brand kit could not be saved. Please try again.",
+      "readOnly": "Only project admins can change the brand kit.",
+      "leaveUnsaved": "You have unsaved changes to the brand kit. Leave without saving?",
+      "issue": {
+        "brand_name_too_long": "The brand name is too long (60 characters at most).",
+        "tone_too_long": "The tone of voice is too long (400 characters at most).",
+        "too_many_avoid_words": "At most 20 words to avoid.",
+        "avoid_word_too_long": "Each word to avoid is at most 40 characters.",
+        "too_many_colors": "At most 5 colours.",
+        "invalid_color": "Colours must be #rrggbb."
+      }
     }
   },
   "MetaConnect": {
