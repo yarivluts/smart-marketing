@@ -87,6 +87,12 @@ describe('image prompts', () => {
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
   });
 
+  it('keeps the subject and headline clear of what each placement covers or crops', () => {
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('top 14% and bottom 20%');
+    expect(buildImagePrompt(concept(), 'landscape', BRIEF)).toContain('cropped to 1.91:1');
+    expect(buildImagePrompt(concept(), 'square', BRIEF)).not.toMatch(/14%|1\.91:1/);
+  });
+
   it('builds the concept request from the brief, the plan context and the video scenes', () => {
     const prompt = buildImageConceptsPrompt(BRIEF, {
       audience: 'Solo lawyers',

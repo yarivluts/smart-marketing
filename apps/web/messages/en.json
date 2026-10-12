@@ -4897,7 +4897,9 @@
     "editing": {
       "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
       "loadSaved": "Load the saved version",
-      "leaveUnsaved": "You have unsaved changes. Leave without saving?"
+      "leaveUnsaved": "You have unsaved changes. Leave without saving?",
+      "saveConflict": "The script was changed elsewhere since you started editing (another tab or the narration editor).",
+      "saveMineAnyway": "Save mine anyway"
     },
     "gallery": {
       "title": "Made so far",

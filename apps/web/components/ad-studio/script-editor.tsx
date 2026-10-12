@@ -120,16 +120,26 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
     });
   }
 
-  async function save(): Promise<void> {
+  // The saved script when someone else changed it while this editor had edits (another tab, the narration editor).
+  const [conflict, setConflict] = React.useState<AdStudioScene[] | null>(null);
+
+  async function save(overwrite = false): Promise<void> {
     setPending('save');
     setMessage(null);
     try {
-      const response = await fetch(`${base}/script`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenes }) });
+      // `base` is the script these edits started from, so a newer save elsewhere is not silently overwritten.
+      const payload = overwrite ? { scenes } : { scenes, base: JSON.parse(savedJson) as AdStudioScene[] };
+      const response = await fetch(`${base}/script`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError & { brief?: { scenes: AdStudioScene[] } };
+      if (response.status === 409 && body.error === 'script_conflict' && body.brief) {
+        setConflict(body.brief.scenes);
+        return;
+      }
       if (!response.ok) {
         setMessage({ tone: 'error', text: errorMessage(body) });
         return;
       }
+      setConflict(null);
       // The saved script can differ from what was sent: Hebrew narration comes back vocalized.
       if (body.brief?.scenes) setScenes(body.brief.scenes);
       setSavedJson(JSON.stringify(body.brief?.scenes ?? scenes));
@@ -521,7 +531,7 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
         </button>
         <button
           type="button"
-          onClick={save}
+          onClick={() => void save()}
           disabled={!dirty || issues.length > 0 || pending !== null}
           className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
         >
@@ -535,6 +545,25 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
           </span>
         ) : null}
       </div>
+      {conflict ? (
+        <div role="alertdialog" aria-label={t('editing.saveConflict')} className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2 text-sm" data-testid="ad-studio-script-conflict">
+          <span>{t('editing.saveConflict')}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setScenes(conflict);
+              setSavedJson(JSON.stringify(conflict));
+              setConflict(null);
+            }}
+            className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-semibold"
+          >
+            {t('editing.loadSaved')}
+          </button>
+          <button type="button" onClick={() => void save(true)} className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
+            {t('editing.saveMineAnyway')}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
