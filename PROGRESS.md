@@ -17,6 +17,22 @@ Template for each entry:
 
 ---
 
+## 2026-10-12 - Ad Studio images: AI check with auto re-render, 2K, MCP limits locked to operators (KAN-389, KAN-390)
+
+- **Last completed:** closed the items the previous Ad Studio run left open.
+  - **Image check (#633):** every rendered or edited image is read by Gemini (every word drawn in it, plus deformed hands, invented logos). The headline is also compared with the read text in code (`imageTextHasHeadline`), so a misspelling fails even when the reviewer misses it. A failing image is rendered again (the project's QA retry count) and the best render is kept. The result shows on the image card, opens the folded image section, and is returned by MCP. Usage kind `image_qa` counts as a text call.
+  - **2K images (#633):** 2K is now the default (1K is below Meta's 1080 px); an operator setting in the admin panel and MCP, with 1K kept for drafts. A code-drawn headline overlay is no longer needed: verified on prod, the model spells the Hebrew headline exactly at 2K, and the check catches the cases where it does not.
+  - **KAN-390 (#634):** MCP `set_ad_studio_limits` only required `project.configure`, so a customer API key could raise its own spend caps. It now needs an OAuth user on `GROWTHOS_PLATFORM_OPERATORS`. `isPlatformOperator` moved to `@growthos/shared`.
+  - **Screens and cards (#635):** a real prod render drew English UI text ("Sign Here") on the phone screen, which the check rightly failed. The image prompt now asks for screens with no readable words, and the image cards use an auto-fill grid instead of a squeezed 4-column one.
+- **Verification:**
+  - A real 2K render on prod as the QA org admin: 2048x2048, the Hebrew headline exact, the check flagged the stray English text after two renders, and the card showed the finding in Hebrew.
+  - The unverified-claims warning was verified on prod with a temporary brief ("50%, guaranteed" flagged). Temporary briefs were deleted.
+  - Main CI green before each deploy.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** Ad Studio is complete for this round. `GROWTHOS_PLATFORM_OPERATORS` is not set on api-prod, so no one can change limits over MCP (operators use the web panel). Set it if MCP access is wanted.
+- **Waiting on human:** nothing.
+
 ## 2026-10-12 - Ad Studio made right: AI quality, safe editing, UX, brand kit (KAN-342/343/363/371, KAN-379..388)
 
 - **Last completed:** Yariv asked to make the AI ad editor perfect. Three reviews (product/UX on prod screenshots, AI output quality, editing workflow) produced ~45 findings; all but a few are shipped:
