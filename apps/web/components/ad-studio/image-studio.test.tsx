@@ -137,10 +137,10 @@ describe('ImageStudio', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderStudio({}, 'he');
     const square = screen.getByTestId('ad-studio-image-slot-square');
-    const meta = within(square).getByRole('button', { name: `שליחה ל${heMessages.AdStudio.images.destination.meta}` });
+    const meta = within(square).getByRole('button', { name: `\u05e9\u05dc\u05d9\u05d7\u05d4 \u05dc${heMessages.AdStudio.images.destination.meta}` });
     expect(meta).toBeDisabled();
-    fireEvent.click(within(square).getByRole('button', { name: `שליחה ל${heMessages.AdStudio.images.destination.google_ads}` }));
-    await waitFor(() => expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByRole('button', { name: `נשלח ל${heMessages.AdStudio.images.destination.google_ads}` })).toBeInTheDocument());
+    fireEvent.click(within(square).getByRole('button', { name: `\u05e9\u05dc\u05d9\u05d7\u05d4 \u05dc${heMessages.AdStudio.images.destination.google_ads}` }));
+    await waitFor(() => expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByRole('button', { name: `\u05e0\u05e9\u05dc\u05d7 \u05dc${heMessages.AdStudio.images.destination.google_ads}` })).toBeInTheDocument());
     const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body).toEqual({ destination: 'google_ads', title: `Sign fast - Sign fast - ${heMessages.AdStudio.images.format.square}` });
   });
