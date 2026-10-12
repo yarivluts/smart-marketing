@@ -239,7 +239,9 @@ export function buildImagePrompt(
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
     'Any phone, tablet, laptop or other screen in the picture shows a simple, abstract interface - shapes, a signature line, buttons - with no readable words or letters.',
-    'A handwritten signature, anywhere in the picture, is an illegible abstract scribble that spells no word.',
+    // Worded as a condition: "a signature anywhere in the picture" made the model add one, floating on a desk.
+    'If the scene shows something being signed, the signature is an illegible scribble on that document or screen only; do not add signatures or writing anywhere else.',
+    'Every object has its real-world size and proportions (a phone fits in a hand) and sits where it physically could.',
     'Clean composition with room for the subject; high quality; no watermarks or borders.',
   ]
     .filter((line): line is string => line !== null)
@@ -254,6 +256,7 @@ export function buildImagePrompt(
 const IMAGE_SAFE_ZONES: Record<AdStudioImageFormat, string | null> = {
   square: null,
   portrait: null,
-  story: 'Full-screen story placement: the app covers about the top 14% and bottom 20% of the picture, so keep the subject and the headline in the middle band.',
+  // Naming "the app" made the model draw a phone status bar and app bars around the picture; describe only what to keep empty.
+  story: 'Vertical full-screen picture: keep only plain background in the top 14% and bottom 20%, with the subject and the headline in the middle band. Do not draw any phone frame, status bar, app interface, buttons or navigation icons around the picture.',
   landscape: 'This picture is cropped to 1.91:1 for Google display: keep the subject and the headline away from the top and bottom edges.',
 };

@@ -110,11 +110,16 @@ describe('image prompts', () => {
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
     // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
     expect(prompt).toContain('screen in the picture shows a simple, abstract interface');
-    expect(prompt).toContain('illegible abstract scribble');
+    expect(prompt).toContain('illegible scribble on that document or screen only');
+    expect(prompt).not.toContain('anywhere in the picture, is');
+    expect(prompt).toContain('real-world size and proportions');
   });
 
   it('keeps the subject and headline clear of what each placement covers or crops', () => {
     expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('top 14% and bottom 20%');
+    // The story safe zone must not read as a request to draw the phone app around the picture.
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('Do not draw any phone frame, status bar, app interface');
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toContain('the app covers');
     expect(buildImagePrompt(concept(), 'landscape', BRIEF)).toContain('cropped to 1.91:1');
     expect(buildImagePrompt(concept(), 'square', BRIEF)).not.toMatch(/14%|1\.91:1/);
   });
