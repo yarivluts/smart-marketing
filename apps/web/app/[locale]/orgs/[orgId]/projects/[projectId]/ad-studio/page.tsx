@@ -92,6 +92,7 @@ import {
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
+import { PlanSection } from '@/components/ad-studio/plan-section';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
@@ -518,7 +519,12 @@ export default async function AdStudioPage({
                 generatedBy={selected.planGeneratedBy}
                 aiAvailable={providers.text !== null}
               />
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              {/* Research tools fold away behind one line each; the plan, script and ideas stay in front. */}
+              <PlanSection
+                title={t('planSections.keywords')}
+                state={selected.searchKeywords?.keywords.length ? t('planSections.keywordsChosen', { count: selected.searchKeywords.keywords.length }) : t('planSections.notSet')}
+                testId="ad-studio-plan-keywords"
+              >
                 <KeywordResearch
                   orgId={orgId}
                   projectId={projectId}
@@ -528,8 +534,12 @@ export default async function AdStudioPage({
                   initial={selected.searchKeywords}
                   suggestedSeeds={keywordSeedsFor(selected)}
                 />
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              </PlanSection>
+              <PlanSection
+                title={t('planSections.audience')}
+                state={selected.metaTargeting ? t('planSections.audienceSet') : t('planSections.notSet')}
+                testId="ad-studio-plan-audience"
+              >
                 <AudiencePanel
                   orgId={orgId}
                   projectId={projectId}
@@ -537,8 +547,12 @@ export default async function AdStudioPage({
                   language={selected.language}
                   initial={selected.metaTargeting}
                 />
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              </PlanSection>
+              <PlanSection
+                title={t('planSections.references')}
+                state={references.length ? t('planSections.referencesCount', { count: references.length }) : t('planSections.notSet')}
+                testId="ad-studio-plan-references"
+              >
                 <ReferenceLibrary
                   orgId={orgId}
                   projectId={projectId}
@@ -546,7 +560,7 @@ export default async function AdStudioPage({
                   initialReferences={references}
                   illustrationAvailable={imagesAvailable}
                 />
-              </div>
+              </PlanSection>
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <ScriptEditor
                   orgId={orgId}

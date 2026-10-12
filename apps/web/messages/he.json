@@ -4871,7 +4871,16 @@
     },
     "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
     "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
-    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream."
+    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream.",
+    "planSections": {
+      "keywords": "מילות מפתח לחיפוש",
+      "keywordsChosen": "{count, plural, one {מילת מפתח אחת נבחרה} other {# מילות מפתח נבחרו}}",
+      "audience": "קהל (Meta)",
+      "audienceSet": "הקהל הוגדר",
+      "references": "תמונות רפרנס",
+      "referencesCount": "{count, plural, one {תמונה אחת} other {# תמונות}}",
+      "notSet": "עדיין לא הוגדר - לא חובה"
+    }
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

@@ -4871,7 +4871,16 @@
     },
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
     "formatVerticalHint": "For Reels, Stories and Shorts.",
-    "formatHorizontalHint": "For YouTube and in-stream video."
+    "formatHorizontalHint": "For YouTube and in-stream video.",
+    "planSections": {
+      "keywords": "Search keywords",
+      "keywordsChosen": "{count, plural, one {# keyword chosen} other {# keywords chosen}}",
+      "audience": "Audience (Meta)",
+      "audienceSet": "Audience set",
+      "references": "Reference images",
+      "referencesCount": "{count, plural, one {# image} other {# images}}",
+      "notSet": "Not set yet - optional"
+    }
   },
   "MetaConnect": {
     "title": "Connect with Facebook",
