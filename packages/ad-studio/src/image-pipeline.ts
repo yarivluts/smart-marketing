@@ -13,7 +13,6 @@ import {
   type AdStudioImageFormat,
 } from '@growthos/shared';
 import {
-  adStudioBriefInput,
   assertAdStudioQuota,
   createAdStudioImage,
   exportAdStudioImage,
@@ -31,6 +30,7 @@ import {
   type AdStudioImageExportDestination,
   type AdStudioImageModel,
 } from '@growthos/firebase-orm-models';
+import { briefPromptInput } from './brand';
 import { ensureOrm, getServerKmsProvider } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
@@ -109,7 +109,7 @@ export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & {
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildImageConceptsPrompt(adStudioBriefInput(brief), { ...context, scenes: brief.scenes });
+  const prompt = buildImageConceptsPrompt(await briefPromptInput(brief), { ...context, scenes: brief.scenes });
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   // The image headline and the copy are rewritten to fit when over their limits, not cut mid-word.
   const copyFields = ['headline', 'primaryText', 'description'] as const;
@@ -187,7 +187,7 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
   if (!concept) throw new AdStudioImageRequestError('concept_not_found');
   if (!concept.formats.includes(ctx.format)) throw new AdStudioImageRequestError('format_not_in_concept');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image', units: 1, now: deps.now?.() });
-  const input = adStudioBriefInput(brief);
+  const input = await briefPromptInput(brief);
   const prompt = buildImagePrompt(concept, ctx.format, input);
   const record = await createAdStudioImage({
     organizationId: ctx.organizationId,

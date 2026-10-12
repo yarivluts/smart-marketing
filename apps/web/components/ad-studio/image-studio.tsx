@@ -54,6 +54,8 @@ export interface ImageStudioProps {
   projectId: string;
   briefId: string;
   briefName: string;
+  /** The advertiser shown in previews: the brand kit's name, else the ad's. */
+  advertiser?: string;
   language: string;
   initialConcepts: AdStudioImageConcept[];
   initialImages: AdStudioImageView[];
@@ -107,6 +109,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
     projectId,
     briefId,
     briefName,
+    advertiser,
     language,
     imagesAvailable,
     textAvailable,
@@ -391,7 +394,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                     briefId={briefId}
                     copyKey={savedConcept.id}
                     copy={savedConcept.copy ?? null}
-                    advertiser={briefName}
+                    advertiser={advertiser ?? briefName}
                     aiAvailable={textAvailable}
                     onSaved={(copy) => {
                       const apply = (list: AdStudioImageConcept[]) =>

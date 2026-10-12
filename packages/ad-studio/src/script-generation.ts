@@ -10,7 +10,8 @@ import {
   type AdStudioScene,
   type AdStudioScriptContext,
 } from '@growthos/shared';
-import { adStudioBriefInput, getAdStudioBrief, newAdStudioSceneId, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { getAdStudioBrief, newAdStudioSceneId, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { briefPromptInput } from './brand';
 import { ensureOrm } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
@@ -52,7 +53,7 @@ export async function generateAdStudioScript(
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = ctx.context ?? (brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : undefined);
-  const prompt = buildScriptPrompt(adStudioBriefInput(brief), context);
+  const prompt = buildScriptPrompt(await briefPromptInput(brief), context);
   const generated = await meteredCall(ctx, 'script', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedScriptSchema }));
   const scenes = fitAdStudioScenes(toScenes(generated.scenes), newAdStudioSceneId);
   if (scenes.length === 0 || scenes.some((scene) => scene.visualPrompt.length === 0)) {
@@ -95,7 +96,7 @@ export async function proposeAdStudioSceneRewrite(
   const index = scenes.findIndex((scene) => scene.id === ctx.sceneId);
   if (index < 0) throw new AdStudioProviderError('invalid_output', 'That scene is no longer in the script.');
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildSceneRewritePrompt(adStudioBriefInput(brief), scenes, index, ctx.instruction, context);
+  const prompt = buildSceneRewritePrompt(await briefPromptInput(brief), scenes, index, ctx.instruction, context);
   const generated = await meteredCall(ctx, 'scene_rewrite', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedSceneSchema }));
   const [fitted] = fitAdStudioScenes([{ id: ctx.sceneId, ...generated }], newAdStudioSceneId);
   if (!fitted || fitted.visualPrompt.length === 0) throw new AdStudioProviderError('invalid_output', 'The model returned a scene without a visual description.');
