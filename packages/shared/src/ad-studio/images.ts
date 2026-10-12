@@ -1,6 +1,6 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
 import type { AdStudioScene } from './scenes';
-import { UNTRUSTED_INPUT_RULE, adWritingRules } from './writing-rules';
+import { UNTRUSTED_INPUT_RULE, adWritingRules, wrapUntrusted } from './writing-rules';
 import { AD_COPY_RULES, adCopyIssues, fitAdCopy, type AdStudioAdCopy, type AdStudioAdCopyIssueCode } from './copy';
 
 /**
@@ -156,6 +156,36 @@ export function buildImageConceptsPrompt(
     ]
       .filter((line): line is string => line !== null)
       .join('\n'),
+  };
+}
+
+/**
+ * The instructions for rewriting one image idea by the editor's request ("warmer light", "show the
+ * phone closer"), seeing the other ideas so it stays distinct from them. Returns one idea.
+ */
+export function buildImageConceptRewritePrompt(
+  brief: AdStudioBriefInput,
+  concepts: readonly Pick<AdStudioImageConcept, 'visualPrompt' | 'headline' | 'copy'>[],
+  index: number,
+  instruction: string,
+  context: AdStudioScriptContext = {},
+): AdStudioPrompt {
+  const base = buildImageConceptsPrompt(brief, context);
+  const ideas = concepts.map((concept, at) => ({ idea: at + 1, visualPrompt: concept.visualPrompt, headline: concept.headline, copy: concept.copy ?? null }));
+  return {
+    system: [
+      base.system,
+      `- Rewrite only idea ${index + 1}, as the editor asks, and return exactly one idea. Keep what the request does not touch; stay distinct from the other ideas.`,
+    ].join('\n'),
+    user: [
+      base.user.replace(/\nPropose the image ideas\.$/, ''),
+      '',
+      'Current ideas (JSON):',
+      JSON.stringify(ideas),
+      '',
+      `Rewrite idea ${index + 1} as the editor asks:`,
+      wrapUntrusted('editor_request', instruction.trim() || 'Make it stronger.'),
+    ].join('\n'),
   };
 }
 

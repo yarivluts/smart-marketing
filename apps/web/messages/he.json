@@ -4337,6 +4337,11 @@
       "ideasDescription": "מה כל תמונה תראה, הכותרת שלה והמיקומים. הן מרונדרות אחרי שמאשרים את התכנון.",
       "editIdea": "עריכת הרעיון (התמונה, הטקסט שבתמונה, המיקומים)",
       "manageImages": "ניהול התמונות ({count}): רינדור מחדש, שינוי, הורדה, שליחה",
+      "rewriteIdea": "שכתוב עם AI",
+      "rewriteIdeaInstruction": "מה לשנות ברעיון הזה?",
+      "rewriteIdeaPlaceholder": "למשל: תאורה חמה יותר, לקרב את הטלפון",
+      "rewriteIdeaRun": "שכתוב הרעיון הזה",
+      "saveEditsFirst": "שמרו קודם את העריכות, כדי שהשכתוב יתחיל מהן.",
       "rewriteIdeasConfirm": "להחליף את כל הרעיונות בחדשים? עריכות, הטקסטים והקישור לתמונות שנוצרו יאבדו."
     },
     "dailyImages": "תמונות ביום",
@@ -4524,6 +4529,7 @@
         "copy_primary_text_too_long": "הטקסט הראשי ארוך מ-90 תווים.",
         "copy_description_too_long": "התיאור ארוך מ-90 תווים."
       },
+      "claimsToCheck": "בדקו לפני פרסום - לא מופיע בבריף או בדף הנחיתה: {claims}",
       "undoRewrite": "ביטול השכתוב"
     },
     "preview": {
@@ -4877,6 +4883,8 @@
     "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
     "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
     "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream.",
+    "voiceoverWords": "{words}/{budget} מילים",
+    "voiceoverTooLong": "ארוך ממה שנכנס בסצנה: הקריין ימהר או ייקטע. קצרו את הטקסט או האריכו את הסצנה.",
     "editing": {
       "changedElsewhere": "הגרסה השמורה שונתה במקום אחר. השינויים שלכם שלא נשמרו נשארים כאן.",
       "loadSaved": "טעינת הגרסה השמורה",

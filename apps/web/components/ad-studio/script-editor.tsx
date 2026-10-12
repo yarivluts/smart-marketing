@@ -9,7 +9,9 @@ import {
   AD_STUDIO_REFERENCE_USES,
   AD_STUDIO_SCENE_MAX_SECONDS,
   AD_STUDIO_SCENE_MIN_SECONDS,
+  countSpokenWords,
   isHebrewLanguage,
+  voiceoverWordBudget,
   validateAdStudioScenes,
   type AdStudioReferenceUse,
   type AdStudioScene,
@@ -325,16 +327,31 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                   </label>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    {t('voiceover')}
+                  <div className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    {/* The word count sits beside the label, not in it, so the field's name stays "Voiceover". */}
+                    <div className="flex justify-between gap-2">
+                      <label htmlFor={`voiceover-${scene.id}`}>{t('voiceover')}</label>
+                      {countSpokenWords(scene.voiceover) > 0 ? (
+                        <span
+                          className={cn('tabular-nums', countSpokenWords(scene.voiceover) > voiceoverWordBudget(scene.durationSeconds, language) && 'text-warning')}
+                          data-testid={`ad-studio-voiceover-words-${scene.id}`}
+                        >
+                          {t('voiceoverWords', { words: countSpokenWords(scene.voiceover), budget: voiceoverWordBudget(scene.durationSeconds, language) })}
+                        </span>
+                      ) : null}
+                    </div>
                     <textarea
+                      id={`voiceover-${scene.id}`}
                       value={scene.voiceover}
                       onChange={(event) => update(scene.id, { voiceover: event.target.value })}
                       rows={2}
                       dir="auto"
                       className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
-                  </label>
+                    {countSpokenWords(scene.voiceover) > voiceoverWordBudget(scene.durationSeconds, language) ? (
+                      <span className="font-normal text-warning">{t('voiceoverTooLong')}</span>
+                    ) : null}
+                  </div>
                   <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     {t('onScreenText')}
                     <input

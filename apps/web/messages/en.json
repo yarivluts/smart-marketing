@@ -4337,6 +4337,11 @@
       "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan.",
       "editIdea": "Edit the idea (picture, text in the image, placements)",
       "manageImages": "Manage the images ({count}): render again, change, download, send",
+      "rewriteIdea": "Rewrite with AI",
+      "rewriteIdeaInstruction": "What should change in this idea?",
+      "rewriteIdeaPlaceholder": "e.g. warmer light, show the phone closer",
+      "rewriteIdeaRun": "Rewrite this idea",
+      "saveEditsFirst": "Save your edits first, so the rewrite starts from them.",
       "rewriteIdeasConfirm": "Replace every idea with new ones? Edits, copy and the link to rendered images will be lost."
     },
     "dailyImages": "Images per day",
@@ -4524,6 +4529,7 @@
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
       },
+      "claimsToCheck": "Check before publishing - not in the brief or the landing page: {claims}",
       "undoRewrite": "Undo rewrite"
     },
     "preview": {
@@ -4877,6 +4883,8 @@
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
     "formatVerticalHint": "For Reels, Stories and Shorts.",
     "formatHorizontalHint": "For YouTube and in-stream video.",
+    "voiceoverWords": "{words}/{budget} words",
+    "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene.",
     "editing": {
       "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
       "loadSaved": "Load the saved version",
