@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
+import { useUnsavedChangesGuard } from './use-editor-draft';
 
 export interface BriefFormValues {
   name: string;
@@ -37,14 +38,21 @@ export function BriefForm({ orgId, projectId, briefId, initial = EMPTY, studioHr
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
   const [values, setValues] = React.useState<BriefFormValues>(initial);
+  const [savedValues, setSavedValues] = React.useState<BriefFormValues>(initial);
   const [pending, setPending] = React.useState(false);
+  // Editing an existing ad: leaving with unsaved details asks first.
+  useUnsavedChangesGuard(Boolean(briefId) && JSON.stringify(values) !== JSON.stringify(savedValues), t('editing.leaveUnsaved'));
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const set = <K extends keyof BriefFormValues>(key: K, value: BriefFormValues[K]) => setValues((current) => ({ ...current, [key]: value }));
 
   async function submit(event: React.FormEvent): Promise<void> {
     event.preventDefault();
+    if (pending) return;
     setPending(true);
     setMessage(null);
+    // A new ad navigates to itself on success; the button stays disabled until the page changes, so a
+    // second click during the navigation cannot create a second ad.
+    let navigating = false;
     try {
       const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs`;
       const response = await fetch(briefId ? `${base}/${briefId}` : base, {
@@ -58,13 +66,17 @@ export function BriefForm({ orgId, projectId, briefId, initial = EMPTY, studioHr
         return;
       }
       if (!briefId && studioHref) {
+        navigating = true;
         router.push(`${studioHref}?brief=${body.brief.id}`);
         return;
       }
+      setSavedValues(values);
       setMessage({ tone: 'ok', text: t('detailsSaved') });
       router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
-      setPending(false);
+      if (!navigating) setPending(false);
     }
   }
 

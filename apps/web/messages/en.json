@@ -4256,7 +4256,10 @@
       "awaitingTitle": "The plan is ready for your review",
       "awaitingDescription": "Read the plan, the scenes and the image ideas below and change anything you want. When it looks right, confirm to create the images and the video.",
       "confirmPlan": "Confirm plan and create ads",
-      "discardPlan": "Stop without creating"
+      "discardPlan": "Stop without creating",
+      "resume": "Resume",
+      "pausedHint": "Paused after repeated errors. Resume to try again.",
+      "keepOpen": "The autopilot runs while this page is open."
     },
     "images": {
       "title": "Image ads",
@@ -4333,7 +4336,13 @@
       "ideasTitle": "Image ad ideas",
       "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan.",
       "editIdea": "Edit the idea (picture, text in the image, placements)",
-      "manageImages": "Manage the images ({count}): render again, change, download, send"
+      "manageImages": "Manage the images ({count}): render again, change, download, send",
+      "rewriteIdea": "Rewrite with AI",
+      "rewriteIdeaInstruction": "What should change in this idea?",
+      "rewriteIdeaPlaceholder": "e.g. warmer light, show the phone closer",
+      "rewriteIdeaRun": "Rewrite this idea",
+      "saveEditsFirst": "Save your edits first, so the rewrite starts from them.",
+      "rewriteIdeasConfirm": "Replace every idea with new ones? Edits, copy and the link to rendered images will be lost."
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
@@ -4519,7 +4528,9 @@
         "copy_headline_too_long": "The headline is longer than 30 characters.",
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
-      }
+      },
+      "claimsToCheck": "Check before publishing - not in the brief or the landing page: {claims}",
+      "undoRewrite": "Undo rewrite"
     },
     "preview": {
       "placementsLabel": "Where the ad runs",
@@ -4881,6 +4892,13 @@
         "failed": "Failed",
         "waiting": "Waiting"
       }
+    },
+    "voiceoverWords": "{words}/{budget} words",
+    "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene.",
+    "editing": {
+      "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
+      "loadSaved": "Load the saved version",
+      "leaveUnsaved": "You have unsaved changes. Leave without saving?"
     }
   },
   "MetaConnect": {

@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import type { AdStudioScene } from '@growthos/shared';
+import { NextIntlClientProvider } from 'next-intl';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
+import enMessages from '@/messages/en.json';
 import { ScriptEditor } from './script-editor';
 
 const refresh = vi.fn();
@@ -17,6 +19,15 @@ function renderEditor(props: Partial<React.ComponentProps<typeof ScriptEditor>> 
   return renderWithIntl(
     <ScriptEditor orgId="o" projectId="p" briefId="b1" initialScenes={SCENES} generatedByModel="gemini-3.8-flash" aiAvailable {...props} />,
     { locale: 'en' },
+  );
+}
+
+/** Re-renders keep the translations: renderWithIntl wraps only the first render. */
+function intl(ui: React.ReactElement): React.ReactElement {
+  return (
+    <NextIntlClientProvider locale="en" messages={enMessages}>
+      {ui}
+    </NextIntlClientProvider>
   );
 }
 
@@ -150,5 +161,49 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     expect(scene.getByText(/the pronunciation will be redone when you save/)).toBeInTheDocument();
     fireEvent.change(scene.getByLabelText(/Pronunciation/), { target: { value: `${vocalized}!` } });
     expect(scene.queryByText(/will be redone/)).toBeNull();
+  });
+
+  it('counts narration words against what fits in the scene and warns when it runs long', () => {
+    renderEditor({
+      initialScenes: [{ id: 'a', durationSeconds: 3, visualPrompt: 'A desk', voiceover: 'Too much paper on your desk every single day?', onScreenText: '' }],
+    });
+    expect(screen.getByTestId('ad-studio-voiceover-words-a')).toHaveTextContent('9/7 words');
+    expect(screen.getByText(/Longer than fits in this scene/)).toBeInTheDocument();
+  });
+
+  it('keeps unsaved edits when another panel refreshes the page, and offers the saved version when it changed', () => {
+    const view = renderEditor();
+    const scene1 = within(screen.getByTestId('ad-studio-scene-1'));
+    fireEvent.change(scene1.getByLabelText(/What the camera shows/), { target: { value: 'A lawyer signing on a phone' } });
+    // A refresh sends the same saved script as a new array: the edit stays.
+    view.rerender(intl(<ScriptEditor orgId="o" projectId="p" briefId="b1" initialScenes={SCENES.map((scene) => ({ ...scene }))} generatedByModel="gemini-3.8-flash" aiAvailable />));
+    expect(scene1.getByLabelText(/What the camera shows/)).toHaveValue('A lawyer signing on a phone');
+    expect(screen.queryByTestId('ad-studio-server-changed')).toBeNull();
+    // The saved script moved on (the autopilot rewrote it): the edit still stays, with a way to load it.
+    const changed = [{ ...SCENES[0], visualPrompt: 'Autopilot version' }, SCENES[1]];
+    view.rerender(intl(<ScriptEditor orgId="o" projectId="p" briefId="b1" initialScenes={changed} generatedByModel="gemini-3.8-flash" aiAvailable />));
+    expect(scene1.getByLabelText(/What the camera shows/)).toHaveValue('A lawyer signing on a phone');
+    fireEvent.click(within(screen.getByTestId('ad-studio-server-changed')).getByRole('button'));
+    expect(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText(/What the camera shows/)).toHaveValue('Autopilot version');
+  });
+
+  it('says so when saving fails because the connection dropped', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    renderEditor();
+    fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText(/What the camera shows/), { target: { value: 'Edited' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save script' }));
+    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+  });
+
+  it('rewrites a scene from the scenes as they stand in the editor, unsaved ones included', async () => {
+    const fetchMock = vi.fn(async () => json({ scene: { ...SCENES[0], visualPrompt: 'Proposal' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderEditor();
+    fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText(/What the camera shows/), { target: { value: 'Unsaved edit' } });
+    fireEvent.click(within(screen.getByTestId('ad-studio-scene-1')).getByRole('button', { name: /Rewrite with AI/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Rewrite$|Suggest/ }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const sent = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body));
+    expect(sent.scenes[0].visualPrompt).toBe('Unsaved edit');
   });
 });
