@@ -54,7 +54,7 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
       '1) textInImage: copy every word, letter and number visible in the image exactly as drawn, misspellings included (empty when there is none). Do not correct anything.',
       `2) issues: every problem, each with severity and a short detail a person can act on, in ${language}.`,
       majorText,
-      `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); a watermark or border; an invented brand logo.`,
+      `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); a watermark or border; an invented brand logo.`,
       'Minor problems: slight blur, small background artifacts, text a little small for a phone screen.',
       'If you find nothing, return an empty issues list.',
     ].join('\n'),
