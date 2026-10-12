@@ -183,7 +183,7 @@ describe('Ad Studio video routes (KAN-231)', () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
     const upload = (bytes: Buffer) => {
       const form = new FormData();
-      form.append('file', new Blob([bytes]), 'logo.png');
+      form.append('file', new Blob([new Uint8Array(bytes)]), 'logo.png');
       return new NextRequest('http://localhost/api/test', { method: 'POST', body: form });
     };
     expect((await uploadLogo(upload(Buffer.from('not an image')), pp)).status).toBe(400);
