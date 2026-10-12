@@ -15,6 +15,7 @@ describe('buildImageQaPrompt', () => {
     expect(prompt.user).toContain('something physically impossible');
     expect(prompt.user).toContain('extra hands or limbs that belong to no one');
     expect(prompt.user).toContain('the picture drawn as a phone screen or app');
+    expect(prompt.user).toContain('empty bands, borders or letterboxing');
   });
 
   it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {
