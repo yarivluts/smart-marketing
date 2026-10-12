@@ -4871,7 +4871,17 @@
     },
     "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
     "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
-    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream."
+    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream.",
+    "gallery": {
+      "title": "מה שנוצר עד עכשיו",
+      "scene": "סצנה {number}",
+      "status": {
+        "generating": "ביצירה",
+        "ready": "מוכן",
+        "failed": "נכשל",
+        "waiting": "ממתין"
+      }
+    }
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

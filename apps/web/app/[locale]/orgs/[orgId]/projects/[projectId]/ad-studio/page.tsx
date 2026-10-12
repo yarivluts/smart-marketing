@@ -92,6 +92,7 @@ import {
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
+import { CreateGallery } from '@/components/ad-studio/create-gallery';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
@@ -601,6 +602,17 @@ export default async function AdStudioPage({
                   video: videoAvailable,
                 }}
                 stepHrefs={{ create: stepHref('create'), review: stepHref('review') }}
+              />
+              <CreateGallery
+                mediaBase={mediaBase}
+                images={imageSlots.flatMap((slot) => {
+                  const latest = slot.selected ?? slot.versions[0];
+                  return latest ? [{ id: latest.id, status: latest.status, label: `${t('images.ideaLabel', { index: conceptIndex(slot.conceptId) })} · ${t(`images.format.${slot.format}`)}` }] : [];
+                })}
+                scenes={selected.scenes.map((scene, index) => {
+                  const latest = clips.filter((clip) => clip.sceneId === scene.id).sort((a, b) => b.version - a.version)[0];
+                  return { id: scene.id, number: index + 1, clip: latest ? { id: latest.id, status: latest.status } : null };
+                })}
               />
               <ChartCard
                 title={t('pipelineTitle')}

@@ -4871,7 +4871,17 @@
     },
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
     "formatVerticalHint": "For Reels, Stories and Shorts.",
-    "formatHorizontalHint": "For YouTube and in-stream video."
+    "formatHorizontalHint": "For YouTube and in-stream video.",
+    "gallery": {
+      "title": "Made so far",
+      "scene": "Scene {number}",
+      "status": {
+        "generating": "Being made",
+        "ready": "Ready",
+        "failed": "Failed",
+        "waiting": "Waiting"
+      }
+    }
   },
   "MetaConnect": {
     "title": "Connect with Facebook",
