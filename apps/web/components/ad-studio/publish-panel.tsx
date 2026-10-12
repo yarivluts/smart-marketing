@@ -18,6 +18,7 @@ import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 import { withFirstFrame } from './media-src';
+import { CountryPicker } from './country-picker';
 
 type Destination = 'meta' | 'google_ads';
 
@@ -144,8 +145,8 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const [linkUrl, setLinkUrl] = React.useState(props.defaultLink);
   const [businessName, setBusinessName] = React.useState('');
   const [dailyBudget, setDailyBudget] = React.useState('20');
-  const [countries, setCountries] = React.useState(
-    props.metaTargeting?.countries.join(', ') || 'IL',
+  const [countries, setCountries] = React.useState<string[]>(
+    props.metaTargeting?.countries.length ? [...props.metaTargeting.countries] : ['IL'],
   );
   const [euPolitical, setEuPolitical] = React.useState<'' | 'yes' | 'no'>('');
   const [pending, setPending] = React.useState(false);
@@ -197,10 +198,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
             campaignName,
             copy: { headline, primaryText, description, linkUrl, businessName },
             dailyBudget: Number(dailyBudget),
-            countries: countries
-              .split(/[\s,]+/)
-              .map((code) => code.trim().toUpperCase())
-              .filter(Boolean),
+            countries,
             ...(destination === 'google_ads' && euPolitical
               ? { containsEuPoliticalAdvertising: euPolitical === 'yes' }
               : {}),
@@ -459,15 +457,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
               />
             </label>
           ) : (
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-              {t('publish.countries')}
-              <input
-                value={countries}
-                onChange={(event) => setCountries(event.target.value)}
-                dir="ltr"
-                className={input}
-              />
-            </label>
+            <CountryPicker value={countries} onChange={setCountries} label={t('publish.countries')} />
           )}
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('publish.dailyBudget')}

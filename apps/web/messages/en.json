@@ -4389,7 +4389,7 @@
       "primaryText": "Main text",
       "descriptionLabel": "Description",
       "businessName": "Business name",
-      "countries": "Countries (e.g. IL, US)",
+      "countries": "Countries",
       "dailyBudget": "Daily budget (account currency)",
       "euLegend": "Does this campaign contain political advertising aimed at the European Union?",
       "euNo": "No, it does not",
@@ -4399,7 +4399,7 @@
       "done": "Created a paused ad on {destination}.",
       "invalid": "Check the ad details: {reasons}",
       "openAd": "Open the ad",
-      "history": "Published ads",
+      "history": "Ads created - paused on the platform until you turn them on",
       "historyEmpty": "No ads published yet.",
       "kindVideo": "Video",
       "kindImage": "Image",
@@ -4413,7 +4413,10 @@
       "searchNote": "Creates a paused Google Search campaign (Google Search only, no Display) in the country and language its keywords were researched in, with the search ad, the keywords and the negative keywords. The max CPC starts from the keywords' top-of-page bids.",
       "kindSearch": "Search ad",
       "audiencePlanned": "Audience from the plan: ages {ages}, {genders}, {audiences} audiences, {interests} interests - in the countries below.",
-      "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step."
+      "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step.",
+      "addCountry": "Add a country",
+      "otherCountry": "Other (code)",
+      "removeCountry": "Remove {country}"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
