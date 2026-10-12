@@ -92,6 +92,8 @@ import {
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
+import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
+import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
@@ -278,9 +280,8 @@ export default async function AdStudioPage({
   const hasMedia =
     images.some((image) => image.status === 'ready') ||
     clips.some((clip) => clip.status === 'ready');
-  const planConfirmed =
-    Boolean(latestRun && (latestRun.planApprovedOn || latestRun.status === 'done')) || hasMedia;
-  const rendering = latestRun?.status === 'running' && Boolean(latestRun.planApprovedOn);
+  // A saved script or saved ideas count as a plan: writing by hand must not depend on the autopilot.
+  const hasContent = Boolean(selected && (selected.scenes.length > 0 || selected.imageConcepts.length > 0));
   const conceptIndex = (conceptId: string) =>
     (selected?.imageConcepts.findIndex((concept) => concept.id === conceptId) ?? 0) + 1;
   const mediaBase = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${selected?.id}`;
@@ -330,6 +331,14 @@ export default async function AdStudioPage({
       : []),
   ];
   const publishedAds = exportsView.filter((row) => row.resultKind === 'ad');
+  const steps = planAdStudioSteps({
+    hasMedia,
+    hasContent,
+    run: latestRun ? { status: latestRun.status, planApproved: Boolean(latestRun.planApprovedOn) } : null,
+    publishable: publishCreatives.length,
+    published: publishedAds.length,
+  });
+  const { planConfirmed } = steps;
   const stepHref = (id: AdStudioStepId) => `${base}?brief=${selected?.id}&step=${id}`;
   const stepNav: AdStudioStepNav[] | null = selected
     ? [
@@ -344,21 +353,21 @@ export default async function AdStudioPage({
           id: 'plan',
           label: t('stepper.plan.label'),
           hint: planConfirmed ? t('stepper.plan.hintDone') : t('stepper.plan.hint'),
-          state: planConfirmed ? 'done' : 'current',
+          state: steps.states.plan,
           href: stepHref('plan'),
         },
         {
           id: 'create',
           label: t('stepper.create.label'),
           hint: planConfirmed ? t('stepper.create.hint') : t('stepper.create.hintLocked'),
-          state: !planConfirmed ? 'locked' : rendering ? 'current' : hasMedia ? 'done' : 'next',
+          state: steps.states.create,
           href: stepHref('create'),
         },
         {
           id: 'review',
           label: t('stepper.review.label'),
-          hint: hasMedia ? t('stepper.review.hint') : t('stepper.review.hintLocked'),
-          state: hasMedia ? (publishedAds.length ? 'done' : 'next') : 'locked',
+          hint: steps.states.review !== 'locked' ? t('stepper.review.hint') : t('stepper.review.hintLocked'),
+          state: steps.states.review,
           href: stepHref('review'),
         },
         {
@@ -367,22 +376,12 @@ export default async function AdStudioPage({
           hint: publishCreatives.length
             ? t('stepper.publish.hint')
             : t('stepper.publish.hintLocked'),
-          state: publishCreatives.length === 0 ? 'locked' : publishedAds.length ? 'done' : 'next',
+          state: steps.states.publish,
           href: stepHref('publish'),
         },
       ]
     : null;
-  const defaultStep: AdStudioStepId = !planConfirmed
-    ? 'plan'
-    : rendering
-      ? 'create'
-      : hasMedia
-        ? 'review'
-        : 'create';
-  const requested = stepNav?.find(
-    (entry) => entry.id === requestedStep && entry.state !== 'locked',
-  );
-  const activeStep: AdStudioStepId = requested?.id ?? defaultStep;
+  const activeStep: AdStudioStepId = resolveAdStudioStep(steps, requestedStep);
   const activeIndex = stepNav?.findIndex((entry) => entry.id === activeStep) ?? 0;
   const previousStep = stepNav && activeIndex > 0 ? stepNav[activeIndex - 1] : null;
   const nextStep = stepNav && activeIndex < stepNav.length - 1 ? stepNav[activeIndex + 1] : null;
@@ -439,7 +438,7 @@ export default async function AdStudioPage({
       ) : null}
 
       {selected && stepNav ? (
-        <>
+        <ClaimSourcesProvider sources={[selected.name, selected.objective, selected.productDescription, selected.plan?.landingPageSummary ?? '']}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
               <Link
@@ -770,7 +769,7 @@ export default async function AdStudioPage({
               <span className="text-xs text-muted-foreground">{nextStep.hint}</span>
             ) : null}
           </nav>
-        </>
+        </ClaimSourcesProvider>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <ChartCard title={t('newAdTitle')} description={t('newAdDescription')} icon={Plus}>

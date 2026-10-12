@@ -4,7 +4,7 @@ import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
 import type { AdStudioRunView } from '@/lib/ad-studio/view';
-import { AutopilotPanel } from './autopilot-panel';
+import { AutopilotPanel , autopilotRetryDelay } from './autopilot-panel';
 
 const refresh = vi.fn();
 const push = vi.fn();
@@ -116,5 +116,20 @@ describe('AutopilotPanel', () => {
     fireEvent.click(screen.getByLabelText(heMessages.AdStudio.autopilot.optionImages));
     fireEvent.click(screen.getByLabelText(heMessages.AdStudio.autopilot.optionVideo));
     expect(screen.getByRole('button', { name: heMessages.AdStudio.autopilot.prepare })).toBeDisabled();
+  });
+
+  it('backs off after failures instead of hammering the server, and caps the wait', () => {
+    expect(autopilotRetryDelay(0)).toBe(1500);
+    expect(autopilotRetryDelay(1)).toBe(3000);
+    expect(autopilotRetryDelay(3)).toBe(12000);
+    expect(autopilotRetryDelay(10)).toBe(30000);
+  });
+
+  it('stops on a refusal and offers to resume, instead of retrying it forever', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'not_found' }), { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel({ initialRun: run() });
+    expect(await screen.findByTestId('ad-studio-autopilot-resume')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
