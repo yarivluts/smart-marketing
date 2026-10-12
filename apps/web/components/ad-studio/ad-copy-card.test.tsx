@@ -149,4 +149,24 @@ describe('PublishPanel live preview', () => {
     renderCard({ copy });
     expect(screen.queryByTestId('ad-studio-copy-claims')).toBeNull();
   });
+
+  it('can undo an AI rewrite of existing copy in one click', async () => {
+    const rewritten = { headline: 'Signed by lunch', primaryText: 'Contracts signed before noon.', description: '' };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) =>
+      url.endsWith('/copy/generate')
+        ? json({ brief: { videoCopy: null, imageConcepts: [{ id: 'c1', copy: rewritten }] } })
+        : json({ brief: { videoCopy: null, imageConcepts: [{ id: 'c1', copy: JSON.parse(String(init?.body)).conceptCopies.c1 }] } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderCard();
+    expect(screen.queryByTestId('ad-studio-copy-undo')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Rewrite with AI' }));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-copy-headline')).toHaveTextContent('Signed by lunch'));
+    fireEvent.click(screen.getByTestId('ad-studio-copy-undo'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-copy-headline')).toHaveTextContent('Sign in 30 seconds'));
+    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(url).toBe(`${BASE}/copy`);
+    expect(JSON.parse(String(init.body))).toEqual({ conceptCopies: { c1: COPY } });
+    expect(screen.queryByTestId('ad-studio-copy-undo')).toBeNull();
+  });
 });

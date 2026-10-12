@@ -27,6 +27,8 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { AdCopyCard } from './ad-copy-card';
+import { useRefreshSafeDraft, useUnsavedChangesGuard } from './use-editor-draft';
+import { ServerChangedNotice } from './server-changed-notice';
 import {
   adStudioImageSlots,
   type AdStudioImageSlot,
@@ -132,14 +134,21 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
   const [ideaRewrite, setIdeaRewrite] = React.useState<{ id: string; instruction: string } | null>(null);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
 
-  React.useEffect(() => {
-    setSaved(props.initialConcepts);
-    setDraft(props.initialConcepts);
-  }, [props.initialConcepts]);
   React.useEffect(() => setImages(props.initialImages), [props.initialImages]);
   React.useEffect(() => setExports(props.exports), [props.exports]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  // Saving copy or anything else refreshes the page: keep unsaved idea edits through it.
+  const { serverChanged, reload } = useRefreshSafeDraft(props.initialConcepts, {
+    savedJson: JSON.stringify(saved),
+    dirty,
+    reset: (value) => {
+      setSaved(value);
+      setDraft(value);
+    },
+  });
+  useUnsavedChangesGuard(dirty, t('editing.leaveUnsaved'));
+  const [confirmIdeas, setConfirmIdeas] = React.useState(false);
   const issues = validateAdStudioImageConcepts(draft);
   const slots = adStudioImageSlots(saved, images, language);
 
@@ -166,6 +175,9 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       onOk?.(body);
       router.refresh();
       return true;
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
+      return false;
     } finally {
       setPending(null);
     }
@@ -235,6 +247,8 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -277,9 +291,29 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
             )}
           </div>
         </div>
+        {confirmIdeas ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm" role="alertdialog" aria-label={t('images.rewriteIdeasConfirm')}>
+            <span>{t('images.rewriteIdeasConfirm')}</span>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => {
+                setConfirmIdeas(false);
+                void call('ideas', '/image-concepts/generate', json('POST', {}));
+              }}
+              className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"
+            >
+              {t('confirmReplace')}
+            </button>
+            <button type="button" onClick={() => setConfirmIdeas(false)} className="rounded-lg border border-border px-2.5 py-1 text-xs">
+              {t('cancel')}
+            </button>
+          </div>
+        ) : (
         <button
           type="button"
-          onClick={() => void call('ideas', '/image-concepts/generate', json('POST', {}))}
+          // Rewriting replaces every idea, its copy and the link to its rendered images: ask first.
+          onClick={() => (saved.length ? setConfirmIdeas(true) : void call('ideas', '/image-concepts/generate', json('POST', {})))}
           disabled={pending !== null || !textAvailable}
           className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
         >
@@ -290,7 +324,9 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           )}
           {saved.length ? t('images.rewriteIdeas') : t('images.writeIdeas')}
         </button>
+        )}
       </header>
+      {serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
       {!imagesAvailable ? (
         <p className="text-xs text-warning">{t('images.notConfigured')}</p>
       ) : null}

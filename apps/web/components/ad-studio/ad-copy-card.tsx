@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2, Pencil, Sparkles } from 'lucide-react';
+import { Loader2, Pencil, Sparkles, Undo2 } from 'lucide-react';
 import {
   AD_STUDIO_COPY_FIELDS,
   AD_STUDIO_COPY_LIMITS,
@@ -62,6 +62,8 @@ export function AdCopyCard({
   const [draft, setDraft] = React.useState<AdStudioAdCopy | null>(null);
   const [pending, setPending] = React.useState<'save' | 'write' | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
+  // The copy an AI rewrite replaced, so one click can put it back (undefined: nothing to undo).
+  const [replaced, setReplaced] = React.useState<AdStudioAdCopy | null | undefined>(undefined);
   React.useEffect(() => setCopy(initialCopy), [initialCopy]);
 
   /** The copy of this creative in a returned brief. */
@@ -77,6 +79,7 @@ export function AdCopyCard({
   async function send(kind: 'save' | 'write', path: string, body: unknown): Promise<void> {
     setPending(kind);
     setMessage(null);
+    const before = copy;
     try {
       const response = await fetch(`${base}${path}`, {
         method: kind === 'save' ? 'PUT' : 'POST',
@@ -96,11 +99,20 @@ export function AdCopyCard({
       const saved = copyIn(result.brief);
       setCopy(saved);
       setDraft(null);
+      // An AI rewrite of existing copy can be undone; a save (including the undo itself) ends that.
+      setReplaced(kind === 'write' && !isAdCopyEmpty(before) ? before : undefined);
       onSaved?.(saved);
       router.refresh();
+    } catch {
+      setMessage(errorMessage({}));
     } finally {
       setPending(null);
     }
+  }
+
+  function undoRewrite(): void {
+    if (replaced === undefined) return;
+    void send('save', '/copy', copyKey === 'video' ? { videoCopy: replaced } : { conceptCopies: { [copyKey]: replaced } });
   }
 
   function save(): void {
@@ -289,6 +301,18 @@ export function AdCopyCard({
             )}
             {copy ? t('rewrite') : t('write')}
           </button>
+          {replaced !== undefined ? (
+            <button
+              type="button"
+              onClick={undoRewrite}
+              disabled={pending !== null}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              data-testid="ad-studio-copy-undo"
+            >
+              <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('undoRewrite')}
+            </button>
+          ) : null}
         </div>
       )}
       {message ? (
