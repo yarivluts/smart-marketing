@@ -108,6 +108,8 @@ describe('image prompts', () => {
     expect(prompt).toContain('E-signatures for lawyers');
     expect(prompt).toContain('in Hebrew: "Sign in 30 seconds"');
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
+    // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
+    expect(prompt).toContain('screen in the picture shows a simple, abstract interface');
   });
 
   it('keeps the subject and headline clear of what each placement covers or crops', () => {

@@ -237,6 +237,8 @@ export function buildImagePrompt(
       : 'No words, letters, captions or logos anywhere in the image.',
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],
+    // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
+    'Any phone, tablet, laptop or other screen in the picture shows a simple, abstract interface - shapes, a signature line, buttons - with no readable words or letters.',
     'Clean composition with room for the subject; high quality; no watermarks or borders.',
   ]
     .filter((line): line is string => line !== null)

@@ -532,7 +532,8 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                       <span className="ms-2 font-normal text-warning">{t('images.qa.issues')}</span>
                     ) : null}
                   </summary>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {/* Columns at least 11rem wide: the idea card is narrow, so a fixed 4-column grid squeezed each image to a sliver. */}
+                  <div className="mt-3 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,11rem),1fr))]">
                     {conceptSlots.map((slot) => {
                       const badge = slotBadge(slot);
                       const shown =
