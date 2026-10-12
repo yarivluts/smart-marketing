@@ -120,6 +120,10 @@ describe('image prompts', () => {
     // The story safe zone must not read as a request to draw the phone app around the picture.
     expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('Do not draw any phone frame, status bar, app interface');
     expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toContain('the app covers');
+    // Nor as a request for empty bands: the scene runs to the edges.
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('no empty bands, borders or frames');
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toContain('plain background');
+    expect(buildImagePrompt(concept(), 'square', BRIEF)).toContain('plain coloured buttons without labels');
     expect(buildImagePrompt(concept(), 'landscape', BRIEF)).toContain('cropped to 1.91:1');
     expect(buildImagePrompt(concept(), 'square', BRIEF)).not.toMatch(/14%|1\.91:1/);
   });
