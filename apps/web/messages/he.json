@@ -3846,8 +3846,6 @@
     "fieldLandingPage": "דף נחיתה (לא חובה)",
     "landingPagePlaceholder": "https://",
     "fieldFormat": "פורמט",
-    "formatVertical": "אנכי 9:16 - Reels, סטוריז, Shorts",
-    "formatHorizontal": "אופקי 16:9 - יוטיוב, in-stream",
     "fieldLanguage": "שפת המודעה",
     "languageEn": "אנגלית",
     "languageHe": "עברית",
@@ -3871,7 +3869,7 @@
     "dailyVideo": "שניות וידאו ביום",
     "saveLimits": "שמירת המגבלות",
     "limitsSaved": "המגבלות נשמרו.",
-    "readOnlyLimits": "רק מנהלי פרויקט יכולים לשנות את המגבלות האלה.",
+    "readOnlyLimits": "המגבלות היומיות נקבעות לפי התוכנית שלכם ב-GrowthOS. כדי לשנות אותן, פנו אלינו.",
     "recentUsage": "קריאות AI אחרונות",
     "usageEmpty": "עדיין לא היו קריאות AI.",
     "usageWhen": "מתי",
@@ -4431,7 +4429,8 @@
       "qaDescription": "Gemini צופה בכל קליפ שמרונדר, משווה את הקריינות לתסריט ומחפש טעויות מביכות. הטייס האוטומטי מרנדר מחדש סצנה שנכשלה.",
       "qaEnabled": "לבדוק כל קליפ",
       "qaRetries": "רינדורים חוזרים אוטומטיים לסצנה",
-      "collapsed": "הגדרות הסטודיו ושימוש ב-AI"
+      "collapsed": "הגדרות הסטודיו ושימוש ב-AI",
+      "customerDescription": "המכסה היומית שלכם ל-AI וקריאות ה-AI האחרונות. המגבלות היומיות נקבעות לפי התוכנית שלכם ב-GrowthOS."
     },
     "pronunciation": "הגייה (עם ניקוד)",
     "pronunciationAuto": "יתווסף אוטומטית בשמירה: אותן מילים עם ניקוד מלא ומספרים כתובים במילים, כדי שקריין ה-AI יקרא נכון.",
@@ -4868,7 +4867,10 @@
         "invalid_audience": "קהל או תחום עניין שאינו של מטא",
         "unknown": "הופר אחד הכללים"
       }
-    }
+    },
+    "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
+    "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
+    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream."
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",

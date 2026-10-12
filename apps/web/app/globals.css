@@ -118,6 +118,16 @@
   }
 }
 
+/*
+ * A native dropdown draws its chevron at the inline end. Utility padding like px-2 leaves the value
+ * running under it - on the start side in RTL (KAN-342). Reserve the chevron's room on every
+ * single-line select; the selector outranks a single padding utility.
+ */
+select:not([multiple]):not([size]) {
+  padding-inline-end: 2rem;
+  text-overflow: ellipsis;
+}
+
 @layer utilities {
   .bg-brand-gradient {
     background-image: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));

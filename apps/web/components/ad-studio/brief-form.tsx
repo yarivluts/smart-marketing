@@ -89,10 +89,14 @@ export function BriefForm({ orgId, projectId, briefId, initial = EMPTY, studioHr
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           {t('fieldFormat')}
-          <select value={values.format} onChange={(event) => set('format', event.target.value as AdStudioFormat)} className={inputClass}>
-            <option value="vertical">{t('formatVertical')}</option>
-            <option value="horizontal">{t('formatHorizontal')}</option>
+          {/* Short option labels; the placements go in the hint below, so nothing hides under the chevron (KAN-342). */}
+          <select value={values.format} onChange={(event) => set('format', event.target.value as AdStudioFormat)} className={inputClass} aria-describedby="ad-studio-format-hint">
+            <option value="vertical">{t('formatVerticalShort')}</option>
+            <option value="horizontal">{t('formatHorizontalShort')}</option>
           </select>
+          <span id="ad-studio-format-hint" className="font-normal">
+            {t(values.format === 'horizontal' ? 'formatHorizontalHint' : 'formatVerticalHint')}
+          </span>
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           {t('fieldLanguage')}

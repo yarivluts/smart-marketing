@@ -59,6 +59,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.GEMINI_API_KEY;
+  delete process.env.GROWTHOS_PLATFORM_OPERATORS;
 });
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -137,6 +138,8 @@ async function setup() {
   const orgId = organization.id;
   const projectId = project.id;
   getServerSessionMock.mockResolvedValue(ownerSession);
+  // Daily limits are set by a platform operator (KAN-363); here the owner is one.
+  process.env.GROWTHOS_PLATFORM_OPERATORS = ownerSession.email as string;
   const created = await createBrief(
     request('POST', { name: 'Sign fast', objective: 'Trial signups', productDescription: 'E-signatures for lawyers', landingPageUrl: '', format: 'vertical', language: 'en', targetSeconds: 13 }),
     { params: Promise.resolve({ orgId, projectId }) },

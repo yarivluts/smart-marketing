@@ -297,7 +297,17 @@ describe('Ad Studio routes', () => {
     expect((await listAdStudioUsage(orgId, projectId))[0]).toMatchObject({ outcome: 'failed', failure_reason: 'provider_billing' });
 
     getServerSessionMock.mockResolvedValue(ownerSession);
-    expect((await putSettings(request('PUT', { dailyTextGenerations: 1, dailyVideoSeconds: 60 }), { params: Promise.resolve({ orgId, projectId }) })).status).toBe(200);
+    // KAN-363: the limits cap platform spend, so even the project owner cannot raise them...
+    const ownerAttempt = await putSettings(request('PUT', { dailyTextGenerations: 1000, dailyVideoSeconds: 3600 }), { params: Promise.resolve({ orgId, projectId }) });
+    expect(ownerAttempt.status).toBe(403);
+    expect(await ownerAttempt.json()).toEqual({ error: 'platform_operator_required' });
+    // ...only a GrowthOS platform operator can.
+    process.env.GROWTHOS_PLATFORM_OPERATORS = ownerSession.email as string;
+    try {
+      expect((await putSettings(request('PUT', { dailyTextGenerations: 1, dailyVideoSeconds: 60 }), { params: Promise.resolve({ orgId, projectId }) })).status).toBe(200);
+    } finally {
+      delete process.env.GROWTHOS_PLATFORM_OPERATORS;
+    }
     const fetchMock = geminiReplies('{}');
     const refused = await generateScript(request('POST'), params);
     expect(refused.status).toBe(429);
