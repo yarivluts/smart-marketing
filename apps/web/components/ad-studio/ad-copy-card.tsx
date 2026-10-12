@@ -2,16 +2,18 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { Loader2, Pencil, Sparkles } from 'lucide-react';
+import { Loader2, Pencil, Sparkles, Undo2 } from 'lucide-react';
 import {
   AD_STUDIO_COPY_FIELDS,
   AD_STUDIO_COPY_LIMITS,
   adCopyIssues,
+  findUnverifiedClaims,
   isAdCopyEmpty,
   type AdStudioAdCopy,
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
+import { useClaimSources } from './claim-sources';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 import { AdPlacementPreview, type AdPreviewMedia } from './ad-placement-preview';
 
@@ -60,6 +62,8 @@ export function AdCopyCard({
   const [draft, setDraft] = React.useState<AdStudioAdCopy | null>(null);
   const [pending, setPending] = React.useState<'save' | 'write' | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
+  // The copy an AI rewrite replaced, so one click can put it back (undefined: nothing to undo).
+  const [replaced, setReplaced] = React.useState<AdStudioAdCopy | null | undefined>(undefined);
   React.useEffect(() => setCopy(initialCopy), [initialCopy]);
 
   /** The copy of this creative in a returned brief. */
@@ -75,6 +79,7 @@ export function AdCopyCard({
   async function send(kind: 'save' | 'write', path: string, body: unknown): Promise<void> {
     setPending(kind);
     setMessage(null);
+    const before = copy;
     try {
       const response = await fetch(`${base}${path}`, {
         method: kind === 'save' ? 'PUT' : 'POST',
@@ -94,11 +99,20 @@ export function AdCopyCard({
       const saved = copyIn(result.brief);
       setCopy(saved);
       setDraft(null);
+      // An AI rewrite of existing copy can be undone; a save (including the undo itself) ends that.
+      setReplaced(kind === 'write' && !isAdCopyEmpty(before) ? before : undefined);
       onSaved?.(saved);
       router.refresh();
+    } catch {
+      setMessage(errorMessage({}));
     } finally {
       setPending(null);
     }
+  }
+
+  function undoRewrite(): void {
+    if (replaced === undefined) return;
+    void send('save', '/copy', copyKey === 'video' ? { videoCopy: replaced } : { conceptCopies: { [copyKey]: replaced } });
   }
 
   function save(): void {
@@ -112,6 +126,9 @@ export function AdCopyCard({
   }
 
   const issues = draft ? adCopyIssues(draft) : [];
+  // Numbers, prices and promises the brief and landing page never stated: flagged for a person to check.
+  const claimSources = useClaimSources();
+  const claims = claimSources && copy ? findUnverifiedClaims([copy.headline, copy.primaryText, copy.description].join('\n'), claimSources) : [];
   const fieldLabel = {
     headline: t('headline'),
     primaryText: t('primaryText'),
@@ -191,6 +208,11 @@ export function AdCopyCard({
         </div>
       )}
 
+      {claims.length ? (
+        <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning" data-testid="ad-studio-copy-claims">
+          {t('claimsToCheck', { claims: claims.join(', ') })}
+        </p>
+      ) : null}
       {draft ? (
         <div
           className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3"
@@ -279,6 +301,18 @@ export function AdCopyCard({
             )}
             {copy ? t('rewrite') : t('write')}
           </button>
+          {replaced !== undefined ? (
+            <button
+              type="button"
+              onClick={undoRewrite}
+              disabled={pending !== null}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50"
+              data-testid="ad-studio-copy-undo"
+            >
+              <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('undoRewrite')}
+            </button>
+          ) : null}
         </div>
       )}
       {message ? (
