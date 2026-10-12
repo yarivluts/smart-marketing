@@ -14,7 +14,6 @@ import {
   type AdStudioImageFormat,
 } from '@growthos/shared';
 import {
-  adStudioBriefInput,
   assertAdStudioQuota,
   createAdStudioImage,
   exportAdStudioImage,
@@ -32,6 +31,7 @@ import {
   type AdStudioImageExportDestination,
   type AdStudioImageModel,
 } from '@growthos/firebase-orm-models';
+import { briefPromptInput } from './brand';
 import { ensureOrm, getServerKmsProvider } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
@@ -132,7 +132,7 @@ export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & {
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildImageConceptsPrompt(adStudioBriefInput(brief), { ...context, scenes: brief.scenes });
+  const prompt = buildImageConceptsPrompt(await briefPromptInput(brief), { ...context, scenes: brief.scenes });
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   const generated = { concepts: await repairConceptLengths(ctx, brief, raw.concepts) };
   const allowed = ctx.formats?.length ? ctx.formats.filter(isAdStudioImageFormat) : null;
@@ -165,7 +165,7 @@ export async function rewriteAdStudioImageConcept(ctx: AdStudioCallContext & { b
   const index = concepts.findIndex((concept) => concept.id === ctx.conceptId);
   if (index < 0) throw new AdStudioImageRequestError('concept_not_found');
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildImageConceptRewritePrompt(adStudioBriefInput(brief), concepts, index, ctx.instruction, context);
+  const prompt = buildImageConceptRewritePrompt(await briefPromptInput(brief), concepts, index, ctx.instruction, context);
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   const [rewritten] = await repairConceptLengths(ctx, brief, raw.concepts.slice(0, 1));
   const original = concepts[index];
@@ -220,7 +220,7 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
   if (!concept) throw new AdStudioImageRequestError('concept_not_found');
   if (!concept.formats.includes(ctx.format)) throw new AdStudioImageRequestError('format_not_in_concept');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image', units: 1, now: deps.now?.() });
-  const input = adStudioBriefInput(brief);
+  const input = await briefPromptInput(brief);
   const prompt = buildImagePrompt(concept, ctx.format, input);
   const record = await createAdStudioImage({
     organizationId: ctx.organizationId,

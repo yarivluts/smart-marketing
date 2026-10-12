@@ -39,6 +39,7 @@ import {
   toAdStudioExportView,
   toAdStudioBriefView,
   getLatestAdStudioRunView,
+  loadAdStudioBrandKit,
 } from '@/lib/ad-studio/store';
 import {
   describeAdStudioProviders,
@@ -78,6 +79,7 @@ import { VideoStudio } from '@/components/ad-studio/video-studio';
 import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
+import { BrandKitPanel } from '@/components/ad-studio/brand-kit-panel';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { KeywordResearch } from '@/components/ad-studio/keyword-research';
 import { SearchAdEditor } from '@/components/ad-studio/search-ad-editor';
@@ -93,6 +95,7 @@ import {
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
 import { CreateGallery } from '@/components/ad-studio/create-gallery';
+import { PlanSection } from '@/components/ad-studio/plan-section';
 import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
@@ -152,7 +155,8 @@ export default async function AdStudioPage({
   const canConnectAccounts =
     can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
 
-  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable] =
+  const canEditBrand = can(bindings, principal, 'project.configure', { orgId, projectId });
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandKit] =
     await Promise.all([
       listOrgProjects(orgId),
       listAdStudioBriefs(orgId, projectId),
@@ -161,6 +165,7 @@ export default async function AdStudioPage({
       listAdStudioUsage(orgId, projectId, 25),
       getAdStudioKeywordDataStatus(orgId, projectId),
       isFfmpegAvailable(),
+      loadAdStudioBrandKit(orgId, projectId),
     ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) notFound();
@@ -518,7 +523,12 @@ export default async function AdStudioPage({
                 generatedBy={selected.planGeneratedBy}
                 aiAvailable={providers.text !== null}
               />
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              {/* Research tools fold away behind one line each; the plan, script and ideas stay in front. */}
+              <PlanSection
+                title={t('planSections.keywords')}
+                state={selected.searchKeywords?.keywords.length ? t('planSections.keywordsChosen', { count: selected.searchKeywords.keywords.length }) : t('planSections.notSet')}
+                testId="ad-studio-plan-keywords"
+              >
                 <KeywordResearch
                   orgId={orgId}
                   projectId={projectId}
@@ -528,8 +538,12 @@ export default async function AdStudioPage({
                   initial={selected.searchKeywords}
                   suggestedSeeds={keywordSeedsFor(selected)}
                 />
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              </PlanSection>
+              <PlanSection
+                title={t('planSections.audience')}
+                state={selected.metaTargeting ? t('planSections.audienceSet') : t('planSections.notSet')}
+                testId="ad-studio-plan-audience"
+              >
                 <AudiencePanel
                   orgId={orgId}
                   projectId={projectId}
@@ -537,8 +551,12 @@ export default async function AdStudioPage({
                   language={selected.language}
                   initial={selected.metaTargeting}
                 />
-              </div>
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              </PlanSection>
+              <PlanSection
+                title={t('planSections.references')}
+                state={references.length ? t('planSections.referencesCount', { count: references.length }) : t('planSections.notSet')}
+                testId="ad-studio-plan-references"
+              >
                 <ReferenceLibrary
                   orgId={orgId}
                   projectId={projectId}
@@ -546,7 +564,7 @@ export default async function AdStudioPage({
                   initialReferences={references}
                   illustrationAvailable={imagesAvailable}
                 />
-              </div>
+              </PlanSection>
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <ScriptEditor
                   orgId={orgId}
@@ -565,6 +583,7 @@ export default async function AdStudioPage({
                 projectId={projectId}
                 briefId={selected.id}
                 briefName={selected.name}
+                advertiser={brandKit.brandName || selected.name}
                 language={selected.language}
                 initialConcepts={selected.imageConcepts}
                 initialImages={images}
@@ -635,6 +654,7 @@ export default async function AdStudioPage({
                 projectId={projectId}
                 briefId={selected.id}
                 briefName={selected.name}
+                advertiser={brandKit.brandName || selected.name}
                 language={selected.language}
                 initialConcepts={selected.imageConcepts}
                 initialImages={images}
@@ -667,7 +687,7 @@ export default async function AdStudioPage({
                   videoCopy={selected.videoCopy}
                   voice={selected.voice}
                   videoSettings={selected.videoSettings}
-                  advertiser={selected.name}
+                  advertiser={brandKit.brandName || selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}
                 />
@@ -680,7 +700,7 @@ export default async function AdStudioPage({
                   initial={selected.searchAd}
                   keywordCount={selected.searchKeywords?.keywords.length ?? 0}
                   linkUrl={selected.landingPageUrl}
-                  advertiser={selected.name}
+                  advertiser={brandKit.brandName || selected.name}
                   aiAvailable={providers.text !== null}
                 />
               </div>
@@ -859,6 +879,7 @@ export default async function AdStudioPage({
         >
           {t('admin.collapsed')}
         </summary>
+        <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} />
         <AdStudioAdminPanel
           orgId={orgId}
           projectId={projectId}

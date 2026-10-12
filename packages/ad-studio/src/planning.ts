@@ -1,6 +1,7 @@
 import { z } from 'zod/v4';
 import { AD_STUDIO_CITATION_SOURCES, availableEvidenceSources, buildPlanPrompt, sanitizeAdStudioPlan, toAdStudioPlanSources } from '@growthos/shared';
-import { adStudioBriefInput, assertAdStudioQuota, getAdStudioBrief, saveAdStudioPlan, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { assertAdStudioQuota, getAdStudioBrief, saveAdStudioPlan, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { briefPromptInput } from './brand';
 import { ensureOrm } from './runtime';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { gatherAdStudioEvidence, type PlanningSourceDeps } from './planning-sources';
@@ -45,7 +46,7 @@ export async function planAdStudioBrief(
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'plan', units: 1, now: ctx.now });
-  const input = adStudioBriefInput(brief);
+  const input = await briefPromptInput(brief);
   const evidence = await gatherAdStudioEvidence({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
