@@ -8,6 +8,7 @@ import {
   type AdStudioScene,
 } from './scenes';
 import { AD_COPY_RULES } from './copy';
+import { UNTRUSTED_INPUT_RULE, adWritingRules, voiceoverWordBudget, voiceoverWordsPerSecond, wrapUntrusted } from './writing-rules';
 
 /** What a person tells the studio about the ad they want. */
 export interface AdStudioBriefInput {
@@ -50,8 +51,12 @@ const SCRIPT_RULES = [
   'visualPrompt describes only what the camera sees - subject, setting, action, camera movement, lighting, mood - in English, concretely enough for a video model. Never ask for readable text inside the footage; put words in onScreenText instead.',
   'voiceover and onScreenText are written in the ad language. Keep voiceover short enough to be spoken within the scene length. Leave a field empty rather than padding it.',
   'In voiceover, write numbers, prices, percentages and symbols out as words, in the form that agrees grammatically with the noun they count - a narrator model reads digits badly and gets their gender wrong.',
-  'Do not invent facts about the product, prices, discounts, awards, statistics or testimonials. Use only what the brief and context state.',
 ];
+
+/** The narration budget in words, so a voiceover can be spoken unhurried within its scene. */
+function voiceoverBudgetRule(language: string): string {
+  return `Voiceover budget: about ${voiceoverWordsPerSecond(language)} spoken words per second of scene - at most ${voiceoverWordBudget(5, language)} words in a 5-second scene, ${voiceoverWordBudget(8, language)} in an 8-second one.`;
+}
 
 /** The instructions for writing a full script from a brief. */
 export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioScriptContext = {}): AdStudioPrompt {
@@ -67,6 +72,9 @@ export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioSc
       'You write scripts for short video ads that are generated scene by scene with an AI video model.',
       'Rules:',
       ...SCRIPT_RULES.map((rule) => `- ${rule}`),
+      `- ${voiceoverBudgetRule(brief.language)}`,
+      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      `- ${UNTRUSTED_INPUT_RULE}`,
       // Read at call time, not at module load: copy.ts imports this module (KAN-278).
       '- copy is the ad text that runs next to the finished video in the feed.',
       ...AD_COPY_RULES.map((rule) => `- ${rule}`),
@@ -94,7 +102,14 @@ export function buildSceneRewritePrompt(
   scenes: readonly AdStudioScene[],
   sceneIndex: number,
   instruction: string,
+  context: AdStudioScriptContext = {},
 ): AdStudioPrompt {
+  // The plan's audience and angles, so a rewrite stays on the strategy the full script was written for.
+  const contextLines = [
+    context.audience ? `Audience: ${context.audience}` : null,
+    context.messagingAngles?.length ? `Messaging angles: ${context.messagingAngles.join('; ')}` : null,
+    context.landingPageSummary ? `Landing page summary: ${context.landingPageSummary}` : null,
+  ].filter((line): line is string => line !== null);
   const target = scenes[sceneIndex];
   const outline = scenes
     .map((scene, index) => `${index + 1}. [${scene.durationSeconds}s] ${scene.visualPrompt}${scene.voiceover ? ` | VO: ${scene.voiceover}` : ''}${scene.onScreenText ? ` | Text: ${scene.onScreenText}` : ''}`)
@@ -104,17 +119,22 @@ export function buildSceneRewritePrompt(
       'You rewrite one scene of a short video ad script. Keep it consistent with the scenes around it.',
       'Rules:',
       ...SCRIPT_RULES.slice(1).map((rule) => `- ${rule}`),
+      `- ${voiceoverBudgetRule(brief.language)}`,
+      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      `- ${UNTRUSTED_INPUT_RULE}`,
       `- Keep the scene at ${target.durationSeconds} seconds unless the instruction asks otherwise.`,
     ].join('\n'),
     user: [
       `Ad: ${brief.name} - ${brief.objective}`,
       `Product: ${brief.productDescription}`,
       `Ad language: ${languageName(brief.language)}`,
+      ...(contextLines.length ? ['', 'Context from the planning stage:', ...contextLines] : []),
       '',
       'Current script:',
       outline,
       '',
-      `Rewrite scene ${sceneIndex + 1}. Instruction: ${instruction.trim() || 'Make it stronger.'}`,
+      `Rewrite scene ${sceneIndex + 1} as the editor asks:`,
+      wrapUntrusted('editor_request', instruction.trim() || 'Make it stronger.'),
     ].join('\n'),
   };
 }

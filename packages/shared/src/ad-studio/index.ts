@@ -11,3 +11,5 @@ export * from './voice';
 export * from './video-settings';
 export * from './search-ads';
 export * from './audiences';
+export * from './writing-rules';
+export * from './length-repair';

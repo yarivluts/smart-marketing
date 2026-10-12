@@ -1,4 +1,5 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
+import { UNTRUSTED_INPUT_RULE, adWritingRules } from './writing-rules';
 
 /**
  * Ad copy (KAN-278): the words that run next to a creative in the feed - a headline, the primary
@@ -69,9 +70,9 @@ export function fitAdCopy(raw: Partial<Record<keyof AdStudioAdCopy, unknown>> | 
 
 /** The copy rules every prompt that writes copy repeats, so ideas, scripts and rewrites agree. */
 export const AD_COPY_RULES = [
-  `Ad copy runs next to the creative in the feed, in the ad language: headline (at most ${AD_STUDIO_COPY_LIMITS.headline} characters, the benefit in a few words), primaryText (at most ${AD_STUDIO_COPY_LIMITS.primaryText} characters, the message and a reason to act, shown above the media) and description (at most ${AD_STUDIO_COPY_LIMITS.description} characters, a short supporting line or the call to action).`,
+  `Ad copy runs next to the creative in the feed, in the ad language: headline (at most ${AD_STUDIO_COPY_LIMITS.headline} characters, the benefit in a few words), primaryText (at most ${AD_STUDIO_COPY_LIMITS.primaryText} characters, the message and why it matters to the reader, shown above the media) and description (at most ${AD_STUDIO_COPY_LIMITS.description} characters, a short supporting line or the call to action).`,
   'The copy must carry the message on its own: someone who only glances at the image or the first second of the video must still understand what is offered and why to click. Match the objective; do not repeat the same words in all three fields.',
-  'Write numbers as digits in copy (it is read, not spoken). Do not invent prices, discounts, statistics, awards or testimonials.',
+  'Write numbers as digits in copy (it is read, not spoken). Urgency (an offer, a deadline) only when the brief or context states one.',
 ];
 
 /** One creative to write copy for. */
@@ -91,7 +92,15 @@ export function buildAdCopyPrompt(brief: AdStudioBriefInput, targets: readonly A
     context.messagingAngles?.length ? `Messaging angles: ${context.messagingAngles.join('; ')}` : null,
   ].filter((line): line is string => line !== null);
   return {
-    system: ['You write the ad copy for Facebook, Instagram and Google display ads.', 'Rules:', ...AD_COPY_RULES.map((rule) => `- ${rule}`), '- Return one entry per creative with its key unchanged.'].join('\n'),
+    system: [
+      'You write the ad copy for Facebook, Instagram and Google display ads.',
+      'Rules:',
+      ...AD_COPY_RULES.map((rule) => `- ${rule}`),
+      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      `- ${UNTRUSTED_INPUT_RULE}`,
+      '- Give each creative its own angle: no two creatives may share a headline or open their primary text the same way.',
+      '- Return one entry per creative with its key unchanged.',
+    ].join('\n'),
     user: [
       `Ad name: ${brief.name}`,
       `Objective: ${brief.objective}`,
