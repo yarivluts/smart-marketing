@@ -79,11 +79,6 @@ function SourcesChecklist({ sources }: { sources: AdStudioPlanSources }): React.
   );
 }
 
-function Unavailable({ source, reason }: { source: string; reason: string }): React.ReactElement {
-  const t = useTranslations('AdStudio');
-  return <EmptyState compact title={t(`plan.source.${source}`)} description={t('plan.unavailableChart', { reason: reasonText(t, source, reason) })} />;
-}
-
 function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -94,8 +89,11 @@ function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.Re
   const more = (count: number) => t('plan.more', { count });
   const { results, keywords, campaigns } = sources;
 
+  // Sources without data are explained once, in the sources list; their charts would only repeat it.
+  if (results.status !== 'ok' && keywords.status !== 'ok' && campaigns.status !== 'ok') return <></>;
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
+      {results.status === 'ok' ? (
       <ChartCard
         title={t('plan.pagesChartTitle')}
         description={results.status === 'ok' ? t('plan.pagesChartDescription', { days: results.days, environment: results.environmentName }) : undefined}
@@ -118,11 +116,11 @@ function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.Re
               sublabel: t('plan.pageSublabel', { conversions: number.format(row.conversions), rate: rate(row.conversionRate) }),
             }))}
           />
-        ) : (
-          <Unavailable source="results" reason={results.reason} />
-        )}
+        ) : null}
       </ChartCard>
+      ) : null}
 
+      {results.status === 'ok' ? (
       <ChartCard title={t('plan.campaignsRateTitle')} description={results.status === 'ok' ? t('plan.campaignsRateDescription') : undefined} icon={Percent}>
         {results.status === 'ok' ? (
           <BarList
@@ -139,11 +137,11 @@ function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.Re
                 sublabel: t('plan.campaignRateSublabel', { visitors: number.format(row.visitors), conversions: number.format(row.conversions) }),
               }))}
           />
-        ) : (
-          <Unavailable source="results" reason={results.reason} />
-        )}
+        ) : null}
       </ChartCard>
+      ) : null}
 
+      {keywords.status === 'ok' ? (
       <ChartCard title={t('plan.keywordsChartTitle')} description={keywords.status === 'ok' ? t('plan.keywordsChartDescription') : undefined} icon={Search}>
         {keywords.status === 'ok' ? (
           <div className="flex flex-col gap-3">
@@ -176,11 +174,11 @@ function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.Re
               })}
             />
           </div>
-        ) : (
-          <Unavailable source="keywords" reason={keywords.reason} />
-        )}
+        ) : null}
       </ChartCard>
+      ) : null}
 
+      {campaigns.status === 'ok' ? (
       <ChartCard title={t('plan.campaignsTitle')} description={campaigns.status === 'ok' ? t('plan.campaignsDescription') : undefined} icon={Megaphone}>
         {campaigns.status === 'ok' ? (
           <BarList
@@ -199,10 +197,9 @@ function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.Re
               }),
             }))}
           />
-        ) : (
-          <Unavailable source="campaigns" reason={campaigns.reason} />
-        )}
+        ) : null}
       </ChartCard>
+      ) : null}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Play, Send, ThumbsUp } from 'lucide-react';
 import type { AdStudioAdCopy, AdStudioImageFormat } from '@growthos/shared';
 import { cn } from '@/lib/utils';
+import { withFirstFrame } from './media-src';
 
 /** Where the ad will run; each is drawn the way the platform shows a sponsored post. */
 export type AdPlacement =
@@ -123,7 +124,7 @@ export function AdPlacementPreview({
     if (media.kind === 'video') {
       return (
         <video
-          src={media.src}
+          src={withFirstFrame(media.src)}
           controls
           playsInline
           preload="metadata"

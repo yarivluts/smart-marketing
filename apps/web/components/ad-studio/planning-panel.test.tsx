@@ -65,15 +65,17 @@ describe('PlanningPanel', () => {
     expect(within(rows[4]).getByText('General knowledge from the AI model. Not measured.')).toBeInTheDocument();
   });
 
-  it('charts the measured results and says why a chart has no data', () => {
+  it('charts the measured results and explains a source without data once, in the sources list', () => {
     renderPanel();
     expect(screen.getByText('Last 90 days in the prod environment. Visitors are summed daily landings; conversions are last-touch.')).toBeInTheDocument();
     expect(screen.getByText('example.com/lawyers')).toBeInTheDocument();
     expect(screen.getByText('48 conversions · 6% conversion rate')).toBeInTheDocument();
     expect(screen.getByText('1,200 visitors · 60 conversions · 5% overall')).toBeInTheDocument();
     expect(screen.getByText('cmp-lawyers')).toBeInTheDocument();
-    expect(screen.getByText('Not available: No Google Ads credential is attached to the project.')).toBeInTheDocument();
-    expect(screen.getByText('Not available: The project has no campaigns yet.')).toBeInTheDocument();
+    // No empty chart repeats the reason: it is said once, next to the source.
+    expect(screen.queryByText(/^Not available:/)).toBeNull();
+    expect(screen.getAllByText('No Google Ads credential is attached to the project.')).toHaveLength(1);
+    expect(within(screen.getByTestId('ad-studio-plan-sources')).getByText('The project has no campaigns yet.')).toBeInTheDocument();
   });
 
   it('shows recommendations high priority first with the evidence they cite, flags unsupported ones, and labels market notes as not measured', () => {

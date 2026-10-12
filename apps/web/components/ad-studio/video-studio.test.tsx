@@ -73,7 +73,7 @@ describe('VideoStudio', () => {
     expect(screen.getByRole('button', { name: 'Render all scenes (8s)' })).toBeEnabled();
     expect(screen.getByTestId('ad-studio-render-all-cost')).toHaveTextContent('Uses 8s of the 20s of video left today.');
     const scene1 = within(screen.getByTestId('ad-studio-video-scene-1'));
-    expect(scene1.getByTestId('ad-studio-clip-player')).toHaveAttribute('src', `${BASE}/clips/c1/media`);
+    expect(scene1.getByTestId('ad-studio-clip-player')).toHaveAttribute('src', `${BASE}/clips/c1/media#t=0.1`);
     expect(scene1.getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Ready');
     expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByText('Not rendered yet.')).toBeInTheDocument();
     expect(screen.getByText(/On-screen text is not drawn into the video/)).toBeInTheDocument();
@@ -155,7 +155,7 @@ describe('VideoStudio', () => {
     renderStudio({ initialClips: clips });
     expect(screen.getByText('No assembled video yet.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Assemble video' }));
-    await waitFor(() => expect(screen.getByTestId('ad-studio-final-player')).toHaveAttribute('src', `${BASE}/videos/v1/media`));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-final-player')).toHaveAttribute('src', `${BASE}/videos/v1/media#t=0.1`));
     expect(fetchMock).toHaveBeenCalledWith(`${BASE}/assemble`, { method: 'POST' });
     expect(screen.getByTestId('ad-studio-final-meta')).toHaveTextContent('13s · assembled');
     expect(screen.queryByText(/Assemble again to include them/)).not.toBeInTheDocument();

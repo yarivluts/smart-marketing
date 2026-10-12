@@ -241,9 +241,25 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
   );
 }
 
-export async function listBriefImages(ctx: Omit<BriefContext, 'actorId'>): Promise<AdStudioImageView[]> {
+/**
+ * How long an image may stay "generating" before it is given up. A render request takes at most a
+ * few minutes (gemini-image's own timeout); one still generating long after that died with its
+ * request (a deploy, a crash) and would otherwise spin forever and block its slot.
+ */
+export const IMAGE_TIMEOUT_MS = 10 * 60_000;
+
+export async function listBriefImages(ctx: Omit<BriefContext, 'actorId'> & { now?: Date }): Promise<AdStudioImageView[]> {
   await ensureOrm();
-  return (await listAdStudioImages(ctx.organizationId, ctx.projectId, ctx.briefId)).map(toAdStudioImageView);
+  const now = ctx.now ?? new Date();
+  const images = await listAdStudioImages(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const swept = await Promise.all(
+    images.map((image) =>
+      image.status === 'generating' && now.getTime() - new Date(image.requested_on).getTime() > IMAGE_TIMEOUT_MS
+        ? markAdStudioImageFailed(image, { code: 'timed_out', message: `Still generating after ${IMAGE_TIMEOUT_MS / 60_000} minutes; given up.`, now })
+        : image,
+    ),
+  );
+  return swept.map(toAdStudioImageView);
 }
 
 export async function selectBriefImage(ctx: Omit<BriefContext, 'actorId'> & { imageId: string }): Promise<AdStudioImageView> {

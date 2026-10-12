@@ -67,9 +67,13 @@ export function buildClipQaPrompt(
   const languageName = LANGUAGE_NAMES[language.toLowerCase()] ?? language;
   const narration = scene.voiceover.trim();
   const pronunciation = narration ? (scene.pronunciation ?? '').trim() : '';
+  // Lip sync only matters when someone speaks on camera; with a narrator, a closed mouth is correct.
+  const onCamera = Boolean(narration) && scene.delivery === 'on_screen';
   return {
-    system:
+    system: [
       'You check short AI-generated video clips for a video ad before a person sees them. Be strict about anything that would embarrass the brand in an ad, and never invent a problem you did not see or hear.',
+      `Write every issue detail in ${languageName}, for the people making this ad - never in another language.`,
+    ].join('\n'),
     user: [
       `Language of the ad: ${languageName}.`,
       narration ? `Intended narration, word for word: "${narration}"` : 'Intended narration: none (no one should speak).',
@@ -86,7 +90,8 @@ export function buildClipQaPrompt(
       `2) issues: every problem, each with kind (audio or visual), severity, a short detail a person can act on, and atSeconds when you can tell. Write each detail in ${languageName}, the language of the people making this ad.`,
       'Major audio problems: a missing, extra or different word compared with the intended narration; a word mispronounced so that a native speaker would notice; a stutter or a cut-off word; a grammar error (for example the wrong gender of a number); speech in another language.',
       'Minor audio problems: odd pacing or intonation, music too loud.',
-      'Major visual problems: letters, words or numbers drawn in the picture that are gibberish or misspelled; a deformed face, hand or body (extra or missing fingers, melting features); objects that morph or appear from nowhere; a speaking mouth clearly out of sync with the narration.',
+      `Major visual problems: letters, words or numbers drawn in the picture that are gibberish or misspelled; a deformed face, hand or body (extra or missing fingers, melting features); objects that morph or appear from nowhere${onCamera ? '; a speaking mouth clearly out of sync with the narration' : ''}.`,
+      onCamera ? null : 'Do not report lip sync or a closed mouth: the narration is not spoken by anyone in the shot.',
       'Minor visual problems: slight blur, small background artifacts, a small continuity slip.',
       'If you find nothing, return an empty issues list.',
     ]

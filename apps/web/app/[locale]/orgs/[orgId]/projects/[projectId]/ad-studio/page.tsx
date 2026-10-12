@@ -777,7 +777,8 @@ export default async function AdStudioPage({
             <BriefForm orgId={orgId} projectId={projectId} studioHref={base} />
           </ChartCard>
 
-          <section className="flex flex-col gap-3" aria-labelledby="ad-studio-ads-heading">
+          {/* On phones the person's existing ads come first; the new-ad form follows. */}
+          <section className="order-first flex flex-col gap-3 lg:order-none" aria-labelledby="ad-studio-ads-heading">
             <h2 id="ad-studio-ads-heading" className="text-lg font-semibold">
               {t('adsListTitle')}
             </h2>

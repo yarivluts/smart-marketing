@@ -27,6 +27,19 @@ describe('the clip quality check prompt', () => {
     expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '' }, 'en').user).not.toContain('Who speaks');
   });
 
+  it('never counts a closed mouth as a lip-sync problem when a narrator speaks off screen', () => {
+    const voiceover = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast' }, 'en').user;
+    expect(voiceover).not.toContain('a speaking mouth clearly out of sync');
+    expect(voiceover).toContain('Do not report lip sync or a closed mouth');
+    const onScreen = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast', delivery: 'on_screen' }, 'en').user;
+    expect(onScreen).toContain('a speaking mouth clearly out of sync with the narration');
+    expect(onScreen).not.toContain('Do not report lip sync');
+  });
+
+  it('requires every issue detail in the ad language, in the system instruction too', () => {
+    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '' }, 'he').system).toContain('Write every issue detail in Hebrew');
+  });
+
   it('says no one should speak when the scene has no narration', () => {
     expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '  ' }, 'en').user).toContain('Intended narration: none (no one should speak).');
   });
