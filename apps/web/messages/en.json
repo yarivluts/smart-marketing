@@ -4943,7 +4943,17 @@
         "avoid_word_too_long": "Each word to avoid is at most 40 characters.",
         "too_many_colors": "At most 5 colours.",
         "invalid_color": "Colours must be #rrggbb."
-      }
+      },
+      "logo": "Logo",
+      "noLogo": "No logo",
+      "logoHint": "PNG or JPEG, up to 2MB. Shown as the advertiser picture in ad previews.",
+      "uploadLogo": "Upload a logo",
+      "replaceLogo": "Replace",
+      "removeLogo": "Remove",
+      "logoSaved": "Logo saved.",
+      "logoRemoved": "Logo removed.",
+      "logoTooLarge": "The logo is larger than 2MB.",
+      "logoUnsupported": "The logo must be a PNG or JPEG image."
     }
   },
   "MetaConnect": {

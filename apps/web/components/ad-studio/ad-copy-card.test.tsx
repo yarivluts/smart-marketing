@@ -4,6 +4,7 @@ import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
 import { AdCopyCard } from './ad-copy-card';
+import { BrandLogoProvider } from './brand-logo';
 import { ClaimSourcesProvider } from './claim-sources';
 import { PublishPanel, type PublishCreative } from './publish-panel';
 
@@ -168,5 +169,18 @@ describe('PublishPanel live preview', () => {
     expect(url).toBe(`${BASE}/copy`);
     expect(JSON.parse(String(init.body))).toEqual({ conceptCopies: { c1: COPY } });
     expect(screen.queryByTestId('ad-studio-copy-undo')).toBeNull();
+  });
+
+  it('shows the brand logo as the advertiser picture in the previews when the project has one', () => {
+    const { unmount } = renderWithIntl(
+      <BrandLogoProvider url="/logo.png">
+        <AdCopyCard orgId="o" projectId="p" briefId="b1" copyKey="c1" copy={COPY} advertiser="EasySign" aiAvailable preview={IMAGES} />
+      </BrandLogoProvider>,
+      { locale: 'en' },
+    );
+    expect(screen.getAllByTestId('ad-studio-brand-avatar')[0]).toHaveAttribute('src', '/logo.png');
+    unmount();
+    renderCard({ preview: IMAGES });
+    expect(screen.queryByTestId('ad-studio-brand-avatar')).toBeNull();
   });
 });

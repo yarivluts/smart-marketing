@@ -80,6 +80,7 @@ import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { BrandKitPanel } from '@/components/ad-studio/brand-kit-panel';
+import { BrandLogoProvider } from '@/components/ad-studio/brand-logo';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { KeywordResearch } from '@/components/ad-studio/keyword-research';
 import { SearchAdEditor } from '@/components/ad-studio/search-ad-editor';
@@ -156,7 +157,7 @@ export default async function AdStudioPage({
     can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
 
   const canEditBrand = can(bindings, principal, 'project.configure', { orgId, projectId });
-  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandKit] =
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded] =
     await Promise.all([
       listOrgProjects(orgId),
       listAdStudioBriefs(orgId, projectId),
@@ -167,6 +168,8 @@ export default async function AdStudioPage({
       isFfmpegAvailable(),
       loadAdStudioBrandKit(orgId, projectId),
     ]);
+  const brandKit = brandLoaded.kit;
+  const logoUrl = brandLoaded.logoVersion ? `/api/orgs/${orgId}/projects/${projectId}/ad-studio/brand-kit/logo?v=${encodeURIComponent(brandLoaded.logoVersion)}` : null;
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) notFound();
 
@@ -444,6 +447,7 @@ export default async function AdStudioPage({
       ) : null}
 
       {selected && stepNav ? (
+        <BrandLogoProvider url={logoUrl}>
         <ClaimSourcesProvider sources={[selected.name, selected.objective, selected.productDescription, selected.plan?.landingPageSummary ?? '']}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
@@ -802,6 +806,7 @@ export default async function AdStudioPage({
             ) : null}
           </nav>
         </ClaimSourcesProvider>
+        </BrandLogoProvider>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <ChartCard title={t('newAdTitle')} description={t('newAdDescription')} icon={Plus}>
@@ -879,7 +884,7 @@ export default async function AdStudioPage({
         >
           {t('admin.collapsed')}
         </summary>
-        <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} />
+        <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} logoUrl={logoUrl} />
         <AdStudioAdminPanel
           orgId={orgId}
           projectId={projectId}

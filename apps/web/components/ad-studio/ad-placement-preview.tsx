@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Bookmark, Heart, MessageCircle, MoreHorizontal, Play, Send, ThumbsUp } from 'lucide-react';
 import type { AdStudioAdCopy, AdStudioImageFormat } from '@growthos/shared';
 import { cn } from '@/lib/utils';
+import { useBrandLogo } from './brand-logo';
 import { withFirstFrame } from './media-src';
 
 /** Where the ad will run; each is drawn the way the platform shows a sponsored post. */
@@ -79,6 +80,11 @@ const ASPECT: Record<AdStudioImageFormat, string> = {
 };
 
 function Avatar({ name, className }: { name: string; className?: string }): React.ReactElement {
+  // The brand logo when the project has one, like the page picture on the real placement.
+  const logo = useBrandLogo();
+  if (logo) {
+    return <img src={logo} alt="" aria-hidden="true" className={cn('shrink-0 rounded-full bg-white object-contain', className)} data-testid="ad-studio-brand-avatar" />;
+  }
   return (
     <span
       className={cn(

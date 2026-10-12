@@ -13,7 +13,20 @@ const inputClass = 'rounded-lg border border-input bg-background px-3 py-2 text-
  * the brand colours. Every Ad Studio prompt follows it. Editable with `project.configure`; everyone
  * else who can use the studio sees what the ads follow.
  */
-export function BrandKitPanel({ orgId, projectId, initial, canEdit }: { orgId: string; projectId: string; initial: AdStudioBrandKit; canEdit: boolean }): React.ReactElement {
+export function BrandKitPanel({
+  orgId,
+  projectId,
+  initial,
+  canEdit,
+  logoUrl = null,
+}: {
+  orgId: string;
+  projectId: string;
+  initial: AdStudioBrandKit;
+  canEdit: boolean;
+  /** The current logo, or null without one. */
+  logoUrl?: string | null;
+}): React.ReactElement {
   const t = useTranslations('AdStudio.brand');
   const router = useRouter();
   const [kit, setKit] = React.useState<AdStudioBrandKit>(initial);
@@ -23,6 +36,29 @@ export function BrandKitPanel({ orgId, projectId, initial, canEdit }: { orgId: s
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const dirty = JSON.stringify(kit) !== saved;
   const issues = validateAdStudioBrandKit(kit);
+  const logoEndpoint = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/brand-kit/logo`;
+  const [logoPending, setLogoPending] = React.useState(false);
+
+  async function changeLogo(file: File | null): Promise<void> {
+    setLogoPending(true);
+    setMessage(null);
+    try {
+      const form = new FormData();
+      if (file) form.append('file', file);
+      const response = await fetch(logoEndpoint, file ? { method: 'POST', body: form } : { method: 'DELETE' });
+      const body = (await response.json().catch(() => ({}))) as { code?: string };
+      if (!response.ok) {
+        setMessage({ tone: 'error', text: body.code === 'image_too_large' ? t('logoTooLarge') : body.code === 'unsupported_image' ? t('logoUnsupported') : t('saveFailed') });
+        return;
+      }
+      setMessage({ tone: 'ok', text: file ? t('logoSaved') : t('logoRemoved') });
+      router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('saveFailed') });
+    } finally {
+      setLogoPending(false);
+    }
+  }
 
   function addWord(): void {
     const word = wordDraft.trim();
@@ -71,6 +107,40 @@ export function BrandKitPanel({ orgId, projectId, initial, canEdit }: { orgId: s
           <p className="text-xs text-muted-foreground">{t('description')}</p>
         </div>
       </header>
+
+      <div className="flex flex-wrap items-center gap-3" data-testid="ad-studio-brand-logo">
+        <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-border bg-white">
+          {logoUrl ? <img src={logoUrl} alt={t('logo')} className="h-full w-full object-contain" /> : <span className="text-xs text-muted-foreground">{t('noLogo')}</span>}
+        </span>
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{t('logo')}</span>
+          <span>{t('logoHint')}</span>
+          {canEdit ? (
+            <span className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border px-2.5 py-1 font-medium text-foreground hover:bg-muted">
+                {logoPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+                {logoUrl ? t('replaceLogo') : t('uploadLogo')}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className="sr-only"
+                  disabled={logoPending}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    event.target.value = '';
+                    if (file) void changeLogo(file);
+                  }}
+                />
+              </label>
+              {logoUrl ? (
+                <button type="button" onClick={() => void changeLogo(null)} disabled={logoPending} className="rounded-lg border border-border px-2.5 py-1 font-medium text-foreground hover:bg-muted disabled:opacity-50">
+                  {t('removeLogo')}
+                </button>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
+      </div>
 
       <form onSubmit={save} className="flex flex-col gap-3">
         <fieldset disabled={!canEdit} className="grid gap-3 md:grid-cols-2">
