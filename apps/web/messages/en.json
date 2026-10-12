@@ -4422,7 +4422,8 @@
       "refused": "the image model declined this picture",
       "invalid_output": "the image model returned no usable image",
       "provider_error": "the image model failed",
-      "storage_error": "the image could not be saved"
+      "storage_error": "the image could not be saved",
+      "timed_out": "it took too long and was given up"
     },
     "admin": {
       "qaTitle": "AI quality check of video clips",
