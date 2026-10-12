@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
@@ -117,9 +117,10 @@ describe('PublishPanel', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderPanel();
 
-    fireEvent.change(screen.getByLabelText('Countries (e.g. IL, US)'), {
-      target: { value: 'il, us' },
-    });
+    // Israel is preselected; the United States is added from the list, by name.
+    expect(within(screen.getByTestId('ad-studio-countries')).getByText('Israel')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Add a country' }), { target: { value: 'US' } });
+    expect(within(screen.getByTestId('ad-studio-countries')).getByText('United States')).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', { name: 'Create paused ad on Facebook & Instagram' }),
     );
