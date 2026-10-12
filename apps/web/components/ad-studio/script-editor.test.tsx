@@ -206,4 +206,21 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     const sent = JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body));
     expect(sent.scenes[0].visualPrompt).toBe('Unsaved edit');
   });
+
+  it('does not overwrite a script saved elsewhere: offers the saved one, or saving on purpose', async () => {
+    const saved = [{ ...SCENES[0], visualPrompt: 'Saved in another tab' }, SCENES[1]];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json({ error: 'script_conflict', brief: { scenes: saved } }, 409))
+      .mockResolvedValueOnce(json({ brief: { scenes: [{ ...SCENES[0], visualPrompt: 'Mine' }, SCENES[1]] } }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderEditor();
+    fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText(/What the camera shows/), { target: { value: 'Mine' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save script' }));
+    expect(await screen.findByTestId('ad-studio-script-conflict')).toBeInTheDocument();
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).base).toEqual(SCENES);
+    fireEvent.click(screen.getByRole('button', { name: 'Save mine anyway' }));
+    await waitFor(() => expect(screen.queryByTestId('ad-studio-script-conflict')).toBeNull());
+    expect(JSON.parse(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body)).base).toBeUndefined();
+  });
 });

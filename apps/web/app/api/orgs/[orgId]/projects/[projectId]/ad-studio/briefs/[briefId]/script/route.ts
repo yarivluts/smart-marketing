@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
-import { toAdStudioBriefView } from '@/lib/ad-studio/store';
+import { scriptContentKey } from '@growthos/shared';
+import { getAdStudioBrief, toAdStudioBriefView } from '@/lib/ad-studio/store';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
 import { parseScenes } from '@/lib/ad-studio/parse';
 import { resolveAdStudioLlm, saveAdStudioScriptWithPronunciation } from '@/lib/ad-studio/engine';
@@ -14,17 +15,26 @@ interface RouteParams {
  * Saves a person's edit of the whole script. It must pass every scene rule (3-10 seconds each, 60
  * seconds total, a visual description per scene); otherwise 400 with each broken rule. Hebrew
  * narration without a pronunciation is vocalized first when a text model is configured (one call
- * toward the daily text limit, best effort). Gated on `ai.use`.
+ * toward the daily text limit, best effort). With `base` (the script the editor started from), a
+ * script someone else saved in the meantime - another tab, the narration editor - is not overwritten:
+ * 409 `script_conflict` with the saved brief; sending again without `base` overwrites. Gated on `ai.use`.
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, briefId } = await params;
   const { user, error } = await requireProjectPermission(orgId, projectId, 'ai.use');
   if (error) return error;
-  const parsed = await parseJsonBody<{ scenes?: unknown }>(request);
+  const parsed = await parseJsonBody<{ scenes?: unknown; base?: unknown }>(request);
   if (parsed.error) return parsed.error;
   const scenes = parseScenes(parsed.body?.scenes);
   if (!scenes) return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+  const base = parsed.body?.base === undefined ? null : parseScenes(parsed.body.base);
   try {
+    if (base) {
+      const current = await getAdStudioBrief(orgId, projectId, briefId);
+      if (scriptContentKey(current.scenes) !== scriptContentKey(base)) {
+        return NextResponse.json({ error: 'script_conflict', brief: toAdStudioBriefView(current) }, { status: 409 });
+      }
+    }
     const brief = await saveAdStudioScriptWithPronunciation({ organizationId: orgId, projectId, briefId, scenes, actorId: user.id, llm: resolveAdStudioLlm() });
     return NextResponse.json({ brief: toAdStudioBriefView(brief) });
   } catch (err) {
