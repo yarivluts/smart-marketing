@@ -9,6 +9,7 @@ import {
 } from './scenes';
 import { AD_COPY_RULES } from './copy';
 import { UNTRUSTED_INPUT_RULE, adWritingRules, voiceoverWordBudget, voiceoverWordsPerSecond, wrapUntrusted } from './writing-rules';
+import { brandKitRules, type AdStudioBrandKit } from './brand-kit';
 
 /** What a person tells the studio about the ad they want. */
 export interface AdStudioBriefInput {
@@ -23,6 +24,8 @@ export interface AdStudioBriefInput {
   language: string;
   /** The length the person asked for, at most 60 seconds. */
   targetSeconds: number;
+  /** The project's brand kit; absent when none is set. */
+  brand?: AdStudioBrandKit | null;
 }
 
 /** Findings from the planning stage that the script should build on (KAN-230); absent before planning runs. */
@@ -73,7 +76,7 @@ export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioSc
       'Rules:',
       ...SCRIPT_RULES.map((rule) => `- ${rule}`),
       `- ${voiceoverBudgetRule(brief.language)}`,
-      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
       `- ${UNTRUSTED_INPUT_RULE}`,
       // Read at call time, not at module load: copy.ts imports this module (KAN-278).
       '- copy is the ad text that runs next to the finished video in the feed.',
@@ -120,7 +123,7 @@ export function buildSceneRewritePrompt(
       'Rules:',
       ...SCRIPT_RULES.slice(1).map((rule) => `- ${rule}`),
       `- ${voiceoverBudgetRule(brief.language)}`,
-      ...adWritingRules(brief.language).map((rule) => `- ${rule}`),
+      ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
       `- ${UNTRUSTED_INPUT_RULE}`,
       `- Keep the scene at ${target.durationSeconds} seconds unless the instruction asks otherwise.`,
     ].join('\n'),
