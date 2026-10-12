@@ -430,7 +430,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                       value={concept.visualPrompt}
                       onChange={(event) => update(index, { visualPrompt: event.target.value })}
                       rows={3}
-                      dir="ltr"
+                      dir="auto"
                       className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
                     />
                     <span className="font-normal">{t('images.visualPromptHint')}</span>

@@ -27,4 +27,5 @@ export * from './export';
 export * from './test-overrides';
 export * from './parse';
 export * from './view';
+export * from './translate';
 export * from './brand';

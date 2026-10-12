@@ -9,6 +9,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  getAdStudioBrief,
   getAdStudioClip,
   inviteMemberToOrganization,
   listAdStudioClips,
@@ -83,6 +84,10 @@ function fakeOmni(options: { startStatus?: number; startMessage?: string; qa?: (
       if (options.startStatus) return new Response(JSON.stringify({ error: { message: options.startMessage ?? 'failed' } }), { status: options.startStatus });
       starts.push(JSON.parse(String(init.body)));
       return Response.json({ id: `v1_${starts.length}`, status: 'in_progress' });
+    }
+    if (url.endsWith(':generateContent') && JSON.stringify(JSON.parse(String(init?.body)).generationConfig?.responseJsonSchema ?? {}).includes('"english"')) {
+      // The translator: a Hebrew shot description comes back in English.
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ english: 'A lawyer signing at a desk by the window' }) }] } }] });
     }
     if (url.endsWith(':generateContent') && options.qa) {
       const body = JSON.parse(String(init?.body)) as { contents: { parts: Record<string, unknown>[] }[] };
@@ -171,6 +176,19 @@ async function poll(p: ReturnType<Awaited<ReturnType<typeof setup>>['p']>): Prom
 }
 
 describe('Ad Studio video routes (KAN-231)', () => {
+  it('sends a shot described in Hebrew to the video model in English, keeping the Hebrew in the script', async () => {
+    const ctx = await setup();
+    const { starts } = fakeOmni();
+    const hebrewShot = '\u05e2\u05d5\u05e8\u05da \u05d3\u05d9\u05df \u05d7\u05d5\u05ea\u05dd \u05dc\u05d9\u05d3 \u05d7\u05dc\u05d5\u05df';
+    expect((await saveScript(request('PUT', { scenes: [{ ...SCENES[0], visualPrompt: hebrewShot }, SCENES[1]] }), ctx.p())).status).toBe(200);
+    expect((await renderScene(request('POST'), ctx.p({ sceneId: 's1' }))).status).toBe(200);
+    expect(String(starts[0].input)).toContain('A lawyer signing at a desk by the window');
+    expect(String(starts[0].input)).not.toMatch(/[\u0590-\u05ff]{4}/);
+    const brief = await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId);
+    expect(brief.scenes[0].visualPrompt).toBe(hebrewShot);
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).some((row) => row.kind === 'translate')).toBe(true);
+  });
+
   it('uses an older version the person chose in the video, until the scene is rendered again', async () => {
     const ctx = await setup();
     fakeOmni();

@@ -320,7 +320,7 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                       value={scene.visualPrompt}
                       onChange={(event) => update(scene.id, { visualPrompt: event.target.value })}
                       rows={2}
-                      dir="ltr"
+                      dir="auto"
                       className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                     <span className="font-normal">{t('visualPromptHint')}</span>
@@ -473,7 +473,7 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                     {rewriting.proposal ? (
                       <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-3 text-sm" data-testid="ad-studio-proposal">
                         <p className="text-xs font-semibold text-primary">{t('proposalTitle')}</p>
-                        <p dir="ltr">{rewriting.proposal.visualPrompt}</p>
+                        <p dir="auto">{rewriting.proposal.visualPrompt}</p>
                         {rewriting.proposal.voiceover ? <p className="text-muted-foreground" dir="auto">{rewriting.proposal.voiceover}</p> : null}
                         {rewriting.proposal.onScreenText ? <p className="font-medium" dir="auto">{rewriting.proposal.onScreenText}</p> : null}
                         <div className="flex gap-2">

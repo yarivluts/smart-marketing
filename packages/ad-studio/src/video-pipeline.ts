@@ -42,6 +42,7 @@ import { AdStudioProviderError, resolveAdStudioLlm, resolveAdStudioReviewer, typ
 import { saveAdStudioScriptWithPronunciation } from './vocalize';
 import { checkAdStudioClip } from './qa';
 import { loadSceneReferences } from './references';
+import { englishForModel } from './translate';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioClipView, AdStudioVideoView } from './view';
@@ -295,7 +296,9 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
   const context = videoContext(brief);
   // The scene's reference images (app screens, illustrations) go to the model with the prompt (KAN-243).
   const references = await loadSceneReferences(ctx, scene, deps.storage);
-  const prompt = buildScenePrompt(scene, context, references.map((reference) => reference.prompt));
+  // A shot described in Hebrew reaches the video model in English; the fingerprint keeps the words as written.
+  const visualPrompt = await englishForModel(scene.visualPrompt, { ...ctx, llm: deps.llm, now: deps.now?.() });
+  const prompt = buildScenePrompt({ ...scene, visualPrompt }, context, references.map((reference) => reference.prompt));
   const images = references.map((reference) => reference.image);
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   const { resolution } = normalizeVideoSettings(brief.video_settings);
@@ -331,6 +334,8 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
     .sort((a, b) => b.version - a.version)[0];
   if (!parent?.interaction_id) throw new AdStudioVideoRequestError('clip_not_editable');
   const text = buildSceneEditInstruction(instruction);
+  // The person's words are kept on the clip; the video model gets them in English.
+  const modelText = buildSceneEditInstruction(await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() }));
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   const previousInteractionId = parent.interaction_id;
   // An edit continues its clip, so it keeps that clip's resolution (720p for clips made before the setting).
@@ -345,7 +350,7 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
     aspectRatio,
     resolution,
     durationSeconds: parent.duration_seconds,
-    call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: text, aspectRatio, resolution }),
+    call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: modelText, aspectRatio, resolution }),
   });
 }
 
