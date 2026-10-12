@@ -47,6 +47,7 @@ import { AdCopyCard } from './ad-copy-card';
 import { NarrationEditor } from './narration-editor';
 import { VoicePicker } from './voice-picker';
 import { AdvancedVideoSettings } from './advanced-video-settings';
+import { withFirstFrame } from './media-src';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -647,7 +648,7 @@ export function VideoStudio({
                   <div className="relative">
                     <video
                       key={shownClip.id}
-                      src={clipUrl(shownClip.id)}
+                      src={withFirstFrame(clipUrl(shownClip.id))}
                       controls
                       playsInline
                       preload="metadata"
