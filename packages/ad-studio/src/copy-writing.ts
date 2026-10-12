@@ -1,8 +1,9 @@
 import { z } from 'zod/v4';
-import { buildAdCopyPrompt, fitAdCopy, isAdCopyEmpty, planToScriptContext, type AdStudioAdCopy, type AdStudioCopyTarget } from '@growthos/shared';
+import { AD_STUDIO_COPY_LIMITS, buildAdCopyPrompt, fitAdCopy, isAdCopyEmpty, planToScriptContext, type AdStudioAdCopy, type AdStudioCopyTarget } from '@growthos/shared';
 import { adStudioBriefInput, getAdStudioBrief, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
 import { ensureOrm } from './runtime';
 import { meteredCall, type AdStudioCallContext } from './metering';
+import { repairOverLength } from './length-repair';
 
 /** The ad copy a model writes for a creative (KAN-278); `fitAdCopy` enforces the limits afterwards. */
 export const AdCopySchema = z.object({
@@ -39,7 +40,18 @@ export async function writeAdStudioCopy(ctx: AdStudioCallContext & { briefId: st
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
   const prompt = buildAdCopyPrompt(adStudioBriefInput(brief), targets, context);
   const written = await meteredCall(ctx, 'ad_copy', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: WrittenCopySchema }));
-  const byKey = new Map(written.items.map((item) => [item.key, fitAdCopy(item)]));
+  // Over-long fields are rewritten to fit, not cut off mid-sentence; fitting stays as the last resort.
+  const fields = ['headline', 'primaryText', 'description'] as const;
+  const repaired = await repairOverLength(
+    ctx,
+    'ad_copy',
+    brief.id,
+    brief.language,
+    written.items.flatMap((item) => fields.map((field) => ({ id: `${item.key}:${field}`, text: item[field] ?? '', max: AD_STUDIO_COPY_LIMITS[field] }))),
+  );
+  const byKey = new Map(
+    written.items.map((item) => [item.key, fitAdCopy(Object.fromEntries(fields.map((field) => [field, repaired.get(`${item.key}:${field}`) ?? item[field] ?? ''])))]),
+  );
   const video = targets.some((target) => target.key === 'video') ? byKey.get('video') : undefined;
   const conceptCopies = Object.fromEntries(
     targets.filter((target) => target.kind === 'image' && byKey.get(target.key)).map((target) => [target.key, byKey.get(target.key) as AdStudioAdCopy]),
