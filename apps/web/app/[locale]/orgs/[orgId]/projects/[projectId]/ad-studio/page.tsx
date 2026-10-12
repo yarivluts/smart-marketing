@@ -92,6 +92,7 @@ import {
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
+import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
@@ -439,7 +440,7 @@ export default async function AdStudioPage({
       ) : null}
 
       {selected && stepNav ? (
-        <>
+        <ClaimSourcesProvider sources={[selected.name, selected.objective, selected.productDescription, selected.plan?.landingPageSummary ?? '']}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
               <Link
@@ -770,7 +771,7 @@ export default async function AdStudioPage({
               <span className="text-xs text-muted-foreground">{nextStep.hint}</span>
             ) : null}
           </nav>
-        </>
+        </ClaimSourcesProvider>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <ChartCard title={t('newAdTitle')} description={t('newAdDescription')} icon={Plus}>

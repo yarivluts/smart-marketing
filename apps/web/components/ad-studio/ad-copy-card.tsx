@@ -7,11 +7,13 @@ import {
   AD_STUDIO_COPY_FIELDS,
   AD_STUDIO_COPY_LIMITS,
   adCopyIssues,
+  findUnverifiedClaims,
   isAdCopyEmpty,
   type AdStudioAdCopy,
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
+import { useClaimSources } from './claim-sources';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 import { AdPlacementPreview, type AdPreviewMedia } from './ad-placement-preview';
 
@@ -112,6 +114,9 @@ export function AdCopyCard({
   }
 
   const issues = draft ? adCopyIssues(draft) : [];
+  // Numbers, prices and promises the brief and landing page never stated: flagged for a person to check.
+  const claimSources = useClaimSources();
+  const claims = claimSources && copy ? findUnverifiedClaims([copy.headline, copy.primaryText, copy.description].join('\n'), claimSources) : [];
   const fieldLabel = {
     headline: t('headline'),
     primaryText: t('primaryText'),
@@ -191,6 +196,11 @@ export function AdCopyCard({
         </div>
       )}
 
+      {claims.length ? (
+        <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning" data-testid="ad-studio-copy-claims">
+          {t('claimsToCheck', { claims: claims.join(', ') })}
+        </p>
+      ) : null}
       {draft ? (
         <div
           className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3"

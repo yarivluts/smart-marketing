@@ -151,4 +151,12 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     fireEvent.change(scene.getByLabelText(/Pronunciation/), { target: { value: `${vocalized}!` } });
     expect(scene.queryByText(/will be redone/)).toBeNull();
   });
+
+  it('counts narration words against what fits in the scene and warns when it runs long', () => {
+    renderEditor({
+      initialScenes: [{ id: 'a', durationSeconds: 3, visualPrompt: 'A desk', voiceover: 'Too much paper on your desk every single day?', onScreenText: '' }],
+    });
+    expect(screen.getByTestId('ad-studio-voiceover-words-a')).toHaveTextContent('9/7 words');
+    expect(screen.getByText(/Longer than fits in this scene/)).toBeInTheDocument();
+  });
 });

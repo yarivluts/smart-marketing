@@ -4523,7 +4523,8 @@
         "copy_headline_too_long": "The headline is longer than 30 characters.",
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
-      }
+      },
+      "claimsToCheck": "Check before publishing - not in the brief or the landing page: {claims}"
     },
     "preview": {
       "placementsLabel": "Where the ad runs",
@@ -4875,7 +4876,9 @@
     },
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
     "formatVerticalHint": "For Reels, Stories and Shorts.",
-    "formatHorizontalHint": "For YouTube and in-stream video."
+    "formatHorizontalHint": "For YouTube and in-stream video.",
+    "voiceoverWords": "{words}/{budget} words",
+    "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene."
   },
   "MetaConnect": {
     "title": "Connect with Facebook",

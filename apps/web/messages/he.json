@@ -4523,7 +4523,8 @@
         "copy_headline_too_long": "הכותרת ארוכה מ-30 תווים.",
         "copy_primary_text_too_long": "הטקסט הראשי ארוך מ-90 תווים.",
         "copy_description_too_long": "התיאור ארוך מ-90 תווים."
-      }
+      },
+      "claimsToCheck": "בדקו לפני פרסום - לא מופיע בבריף או בדף הנחיתה: {claims}"
     },
     "preview": {
       "placementsLabel": "איפה המודעה תופיע",
@@ -4875,7 +4876,9 @@
     },
     "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
     "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
-    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream."
+    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream.",
+    "voiceoverWords": "{words}/{budget} מילים",
+    "voiceoverTooLong": "ארוך ממה שנכנס בסצנה: הקריין ימהר או ייקטע. קצרו את הטקסט או האריכו את הסצנה."
   },
   "MetaConnect": {
     "title": "התחברות עם פייסבוק",
