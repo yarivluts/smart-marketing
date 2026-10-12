@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   acceptInvite,
+  createAdStudioImage,
   createOrganizationWithOwner,
   createProject,
   createSharedCredential,
@@ -213,6 +214,16 @@ describe('image ads routes', () => {
     expect(prompt).toContain('warmer light');
 
     expect((await generateConcepts(request('POST', { conceptId: 'missing', instruction: 'x' }), ctx.p())).status).toBe(404);
+  });
+
+  it('gives up an image still generating long after its request died, so its slot stops spinning', async () => {
+    const ctx = await setup();
+    const base = { organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, kind: 'render' as const, conceptFingerprint: 'f', prompt: 'p', provider: 'gemini', model: 'm', actorId: ctx.owner.id };
+    const stale = await createAdStudioImage({ ...base, conceptId: 'c1', format: 'square', now: new Date(Date.now() - 11 * 60_000) });
+    const fresh = await createAdStudioImage({ ...base, conceptId: 'c2', format: 'square', now: new Date(Date.now() - 60_000) });
+    const { images } = (await (await listImages(request('GET'), ctx.p())).json()) as ImagesPayload;
+    expect(images.find((image) => image.id === stale.id)).toMatchObject({ status: 'failed', failureCode: 'timed_out' });
+    expect(images.find((image) => image.id === fresh.id)).toMatchObject({ status: 'generating' });
   });
 
   it('writes ideas with AI, renders one, changes it by an instruction, picks the older version and serves it', async () => {

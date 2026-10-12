@@ -4052,8 +4052,8 @@
         },
         "results": {
           "no_environment": "אין לפרויקט סביבה לקריאה.",
-          "warehouse_not_configured": "מחסן הנתונים עדיין לא מחובר.",
-          "warehouse_error": "השאילתה למחסן הנתונים נכשלה.",
+          "warehouse_not_configured": "תוצאות האתר עדיין לא מחוברות לפרויקט הזה.",
+          "warehouse_error": "תוצאות האתר לא נטענו כרגע, והתכנון נעשה בלעדיהן.",
           "query_quota_exceeded": "מכסת השאילתות היומית של הפרויקט נוצלה.",
           "no_traffic": "לא היו כניסות לדפי נחיתה ב-90 הימים האחרונים."
         },
@@ -4066,7 +4066,7 @@
           "credential_not_configured": "חיבור Google Ads המצורף אינו שלם.",
           "no_seeds": "לא היה ממה להתחיל חיפוש מילות מפתח.",
           "google_ads_auth_failed": "Google דחתה את ההתחברות ל-Google Ads.",
-          "developer_token_not_approved": "טוקן המפתח של Google Ads לא אושר לתכנון מילות מפתח.",
+          "developer_token_not_approved": "נפחי חיפוש של מילות מפתח דורשים גישה לתכנון מילות מפתח ב-Google Ads, שעדיין לא הופעלה.",
           "google_ads_error": "Google Ads החזיר שגיאה.",
           "no_ideas": "ל-Google Ads לא היו רעיונות למילות מפתח למודעה הזו."
         }
@@ -4111,7 +4111,7 @@
       "platform": {
         "google_ads": "Google Ads",
         "meta_ads": "Meta",
-        "unknown": "פלטפורמה לא ידועה"
+        "unknown": "פלטפורמה אחרת"
       },
       "campaignStatus": {
         "enabled": "פעיל",
@@ -4427,7 +4427,8 @@
       "refused": "מודל התמונה סירב לתמונה הזו",
       "invalid_output": "מודל התמונה לא החזיר תמונה שמישה",
       "provider_error": "מודל התמונה נכשל",
-      "storage_error": "לא הצלחנו לשמור את התמונה"
+      "storage_error": "לא הצלחנו לשמור את התמונה",
+      "timed_out": "זה לקח יותר מדי זמן והופסק"
     },
     "admin": {
       "qaTitle": "בדיקת איכות AI לקליפים",
