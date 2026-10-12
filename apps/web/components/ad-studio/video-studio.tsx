@@ -641,6 +641,23 @@ export function VideoStudio({
                                 </button>
                               )
                             ) : null}
+                            {/* Any ready version of the scene as it is now can be the one the final video uses. */}
+                            {clip.status === 'ready' && state.usable && clip.sceneFingerprint === state.usable.sceneFingerprint ? (
+                              state.usable.id === clip.id ? (
+                                <span className="font-medium text-success" data-testid={`ad-studio-clip-in-video-${clip.id}`}>
+                                  {t('video.inVideo')}
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={pending !== null}
+                                  onClick={() => void act(`choose:${clip.id}`, `/clips/${clip.id}/choose`, undefined, t('video.chosen'))}
+                                  className="inline-flex items-center gap-1 font-medium text-primary hover:underline disabled:opacity-50"
+                                >
+                                  {t('video.useInVideo')}
+                                </button>
+                              )
+                            ) : null}
                           </span>
                         </li>
                       ))}

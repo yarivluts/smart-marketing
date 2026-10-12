@@ -26,6 +26,7 @@ import { POST as renderAll } from './briefs/[briefId]/render-all/route';
 import { GET as renderStatus } from './briefs/[briefId]/render-status/route';
 import { POST as assemble } from './briefs/[briefId]/assemble/route';
 import { GET as clipMedia } from './briefs/[briefId]/clips/[clipId]/media/route';
+import { POST as chooseClip } from './briefs/[briefId]/clips/[clipId]/choose/route';
 import { GET as videoMedia } from './briefs/[briefId]/videos/[videoId]/media/route';
 import { PUT as putSettings } from './settings/route';
 import { PUT as putVideoSettings } from './briefs/[briefId]/video-settings/route';
@@ -153,6 +154,7 @@ async function setup() {
 type ClipJson = {
   id: string;
   sceneId: string;
+  chosen?: boolean;
   status: string;
   version: number;
   kind: string;
@@ -169,6 +171,31 @@ async function poll(p: ReturnType<Awaited<ReturnType<typeof setup>>['p']>): Prom
 }
 
 describe('Ad Studio video routes (KAN-231)', () => {
+  it('uses an older version the person chose in the video, until the scene is rendered again', async () => {
+    const ctx = await setup();
+    fakeOmni();
+    const readyClip = async () => {
+      const started = (await (await renderScene(request('POST'), ctx.p({ sceneId: 's1' }))).json()) as Listing;
+      const id = started.clips.filter((clip) => clip.sceneId === 's1').sort((a, b) => b.version - a.version)[0].id;
+      for (let i = 0; i < 4; i += 1) if ((await poll(ctx.p())).clips.find((clip) => clip.id === id)?.status === 'ready') break;
+      return id;
+    };
+    const first = await readyClip();
+    await readyClip();
+    // A clip still generating cannot be chosen.
+    const third = ((await (await renderScene(request('POST'), ctx.p({ sceneId: 's1' }))).json()) as Listing).clips.find((clip) => clip.version === 3);
+    expect((await chooseClip(request('POST'), ctx.p({ clipId: third!.id }))).status).toBe(409);
+    for (let i = 0; i < 4; i += 1) if ((await poll(ctx.p())).clips.find((clip) => clip.id === third!.id)?.status === 'ready') break;
+
+    const chosen = (await (await chooseClip(request('POST'), ctx.p({ clipId: first }))).json()) as Listing & { clips: { id: string; chosen?: boolean }[] };
+    expect(chosen.clips.filter((clip) => clip.chosen).map((clip) => clip.id)).toEqual([first]);
+
+    // Rendering the scene again is what the person wants next: the choice is cleared.
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    const after = (await poll(ctx.p())) as Listing & { clips: { chosen?: boolean }[] };
+    expect(after.clips.some((clip) => clip.chosen)).toBe(false);
+  });
+
   it('renders a scene: meters it, advances generating -> ready over polls, stores it privately and streams it with ranges', async () => {
     const ctx = await setup();
     const { starts } = fakeOmni();

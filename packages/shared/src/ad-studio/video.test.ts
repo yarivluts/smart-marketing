@@ -103,6 +103,15 @@ describe('scene video states, progress and the assembly plan', () => {
     expect(onlyFailed[0].state).toBe('failed');
   });
 
+  it('uses the version the person chose over a newer one, while it still matches the scene', () => {
+    const chosen = { ...clip('a1', 'a', 1, 'ready', fp(0)), chosen: true };
+    const states = sceneVideoStates([scenes[0]], [chosen, clip('a2', 'a', 2, 'ready', fp(0))], CONTEXT);
+    expect(states[0].usable?.id).toBe('a1');
+    // Once the scene changed, the choice no longer fits: the newest current clip is used.
+    const stale = { ...clip('a1', 'a', 1, 'ready', 'old'), chosen: true };
+    expect(sceneVideoStates([scenes[0]], [stale, clip('a2', 'a', 2, 'ready', fp(0))], CONTEXT)[0].usable?.id).toBe('a2');
+  });
+
   it('counts progress and allows assembly only when every scene has a current ready clip', () => {
     const partial = sceneVideoStates(scenes, [clip('a1', 'a', 1, 'ready', fp(0)), clip('b1', 'b', 1, 'ready', 'old')], CONTEXT);
     expect(summarizeVideoProgress(partial, scenes)).toEqual({ scenes: 3, rendered: 1, generating: 0, failed: 0, outOfDate: 1, canAssemble: false, totalSeconds: 17 });

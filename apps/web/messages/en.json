@@ -3977,7 +3977,10 @@
         }
       },
       "assembleFlagged": "The AI check found problems in scene {scenes}. Assemble the video anyway?",
-      "assembleAnyway": "Assemble anyway"
+      "assembleAnyway": "Assemble anyway",
+      "inVideo": "In the video",
+      "useInVideo": "Use in the video",
+      "chosen": "This version will be used in the video. Assemble again to apply it."
     },
     "clipFailure": {
       "not_configured": "no video model is configured",
@@ -4400,7 +4403,7 @@
       "primaryText": "Main text",
       "descriptionLabel": "Description",
       "businessName": "Business name",
-      "countries": "Countries (e.g. IL, US)",
+      "countries": "Countries",
       "dailyBudget": "Daily budget (account currency)",
       "euLegend": "Does this campaign contain political advertising aimed at the European Union?",
       "euNo": "No, it does not",
@@ -4410,7 +4413,7 @@
       "done": "Created a paused ad on {destination}.",
       "invalid": "Check the ad details: {reasons}",
       "openAd": "Open the ad",
-      "history": "Published ads",
+      "history": "Ads created - paused on the platform until you turn them on",
       "historyEmpty": "No ads published yet.",
       "kindVideo": "Video",
       "kindImage": "Image",
@@ -4424,7 +4427,10 @@
       "searchNote": "Creates a paused Google Search campaign (Google Search only, no Display) in the country and language its keywords were researched in, with the search ad, the keywords and the negative keywords. The max CPC starts from the keywords' top-of-page bids.",
       "kindSearch": "Search ad",
       "audiencePlanned": "Audience from the plan: ages {ages}, {genders}, {audiences} audiences, {interests} interests - in the countries below.",
-      "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step."
+      "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step.",
+      "addCountry": "Add a country",
+      "otherCountry": "Other (code)",
+      "removeCountry": "Remove {country}"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
@@ -4891,6 +4897,52 @@
       "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
       "loadSaved": "Load the saved version",
       "leaveUnsaved": "You have unsaved changes. Leave without saving?"
+    },
+    "gallery": {
+      "title": "Made so far",
+      "scene": "Scene {number}",
+      "status": {
+        "generating": "Being made",
+        "ready": "Ready",
+        "failed": "Failed",
+        "waiting": "Waiting"
+      }
+    },
+    "planSections": {
+      "keywords": "Search keywords",
+      "keywordsChosen": "{count, plural, one {# keyword chosen} other {# keywords chosen}}",
+      "audience": "Audience (Meta)",
+      "audienceSet": "Audience set",
+      "references": "Reference images",
+      "referencesCount": "{count, plural, one {# image} other {# images}}",
+      "notSet": "Not set yet - optional"
+    },
+    "brand": {
+      "title": "Brand kit",
+      "description": "Every script, copy, image idea and search ad follows it: the name as it must be written, the tone, words to avoid and the colours.",
+      "brandName": "Brand name",
+      "brandNameHint": "Written exactly like this in ads and shown as the advertiser in previews.",
+      "toneOfVoice": "Tone of voice",
+      "toneOfVoicePlaceholder": "e.g. warm and plain-spoken, a little playful, never pushy",
+      "avoidWords": "Words and phrases never to use",
+      "add": "Add",
+      "remove": "Remove {item}",
+      "colors": "Brand colours",
+      "colorLabel": "Colour {index}",
+      "addColor": "Add a colour",
+      "save": "Save brand kit",
+      "saved": "Brand kit saved. New AI writing follows it.",
+      "saveFailed": "The brand kit could not be saved. Please try again.",
+      "readOnly": "Only project admins can change the brand kit.",
+      "leaveUnsaved": "You have unsaved changes to the brand kit. Leave without saving?",
+      "issue": {
+        "brand_name_too_long": "The brand name is too long (60 characters at most).",
+        "tone_too_long": "The tone of voice is too long (400 characters at most).",
+        "too_many_avoid_words": "At most 20 words to avoid.",
+        "avoid_word_too_long": "Each word to avoid is at most 40 characters.",
+        "too_many_colors": "At most 5 colours.",
+        "invalid_color": "Colours must be #rrggbb."
+      }
     }
   },
   "MetaConnect": {

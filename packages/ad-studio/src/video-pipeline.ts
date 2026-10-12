@@ -22,6 +22,7 @@ import {
   createAdStudioVideo,
   getAdStudioBrief,
   getAdStudioSettings,
+  chooseAdStudioClip,
   listAdStudioClips,
   listAdStudioVideos,
   markAdStudioClipFailed,
@@ -128,6 +129,7 @@ export function toAdStudioClipView(clip: AdStudioClipModel): AdStudioClipView {
     instruction: clip.kind === 'edit' ? clip.prompt.replace(EDIT_SUFFIX, '') : null,
     requestedOn: clip.requested_on,
     completedOn: clip.completed_on ?? null,
+    chosen: clip.chosen === true,
     qa: clip.qa_status
       ? {
           status: clip.qa_status,
@@ -152,7 +154,7 @@ export function toAdStudioVideoView(video: AdStudioVideoModel): AdStudioVideoVie
 }
 
 function summary(clip: AdStudioClipModel): AdStudioClipSummary & { model: AdStudioClipModel } {
-  return { id: clip.id, sceneId: clip.scene_id, version: clip.version, status: clip.status, sceneFingerprint: clip.scene_fingerprint, durationSeconds: clip.duration_seconds, model: clip };
+  return { id: clip.id, sceneId: clip.scene_id, version: clip.version, status: clip.status, sceneFingerprint: clip.scene_fingerprint, durationSeconds: clip.duration_seconds, chosen: clip.chosen === true, model: clip };
 }
 
 function videoContext(brief: AdStudioBriefModel): AdStudioVideoContext {
@@ -456,6 +458,13 @@ async function checkNextClip(ctx: Omit<BriefContext, 'actorId'>, deps: Pick<AdSt
     references: references.map((reference) => ({ use: reference.use, label: reference.label, description: reference.prompt.description, image: reference.image })),
     now: clock(deps),
   });
+}
+
+/** Uses one ready version of a scene in the assembled video, over newer ones; returns the brief's clips and videos. */
+export async function chooseBriefClip(ctx: Omit<BriefContext, 'actorId'> & { clipId: string }): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {
+  await ensureOrm();
+  await chooseAdStudioClip(ctx.organizationId, ctx.projectId, ctx.briefId, ctx.clipId);
+  return listBriefVideo(ctx);
 }
 
 export async function listBriefVideo(ctx: Omit<BriefContext, 'actorId'>): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {
