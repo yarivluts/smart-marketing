@@ -51,6 +51,8 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       dailyBudget: typeof body.dailyBudget === 'number' ? body.dailyBudget : Number.NaN,
       countries: Array.isArray(body.countries) ? body.countries.filter((entry): entry is string => typeof entry === 'string') : [],
       ...(typeof body.containsEuPoliticalAdvertising === 'boolean' ? { containsEuPoliticalAdvertising: body.containsEuPoliticalAdvertising } : {}),
+      // Another variant in the paused ad set of an ad already created from this brief (validated server-side).
+      ...(typeof body.addToAdSetOf === 'string' && body.addToAdSetOf ? { addToAdSetOf: body.addToAdSetOf } : {}),
       actorId: user.id,
     });
     return NextResponse.json({ ad: toAdStudioExportView(row) }, { status: row.status === 'done' ? 201 : 502 });

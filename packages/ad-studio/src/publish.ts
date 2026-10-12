@@ -61,6 +61,8 @@ export async function publishBriefAd(params: {
   dailyBudget: number;
   countries: string[];
   containsEuPoliticalAdvertising?: boolean;
+  /** Meta: join the paused campaign and ad set of an earlier ad of this brief (its export id) to test variants together. */
+  addToAdSetOf?: string;
   actorId: string;
   actorType?: 'user' | 'api_key';
   storage?: AdStudioMediaStorage;
@@ -118,6 +120,7 @@ export async function publishBriefAd(params: {
     campaignName: params.campaignName,
     dailyBudget: params.dailyBudget,
     countries: params.countries,
+    ...(params.addToAdSetOf ? { addToAdSetOf: params.addToAdSetOf } : {}),
     metaTargeting: brief.meta_targeting ?? null,
     ...(params.containsEuPoliticalAdvertising !== undefined ? { containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising } : {}),
     kms: getServerKmsProvider(),

@@ -4431,7 +4431,10 @@
       "audienceBroad": "לא תוכנן קהל: כל המבוגרים במדינות שלמטה. תכננו קהל בשלב התוכנית.",
       "addCountry": "הוספת מדינה",
       "otherCountry": "אחרת (קוד)",
-      "removeCountry": "הסרת {country}"
+      "removeCountry": "הסרת {country}",
+      "variantsTitle": "לבדוק גרסאות נוספות באותה קבוצת מודעות",
+      "variantsHint": "כל אחת תהיה מודעה מושהית נוספת באותו קמפיין ובאותה קבוצת מודעות, עם הטקסט שנשמר לה, כדי ש-Meta תשווה ביניהן.",
+      "doneVariants": "נוצרו {count} מודעות מושהות בקבוצת מודעות אחת ב-{destination}.{failed, plural, =0 {} one { גרסה אחת לא נוצרה.} other { # גרסאות לא נוצרו.}}"
     },
     "imageFailure": {
       "not_configured": "לא הוגדר מודל תמונה",

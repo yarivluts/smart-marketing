@@ -258,4 +258,21 @@ describe('PublishPanel', () => {
     expect(screen.queryByTestId('ad-studio-connect-meta')).toBeNull();
     expect(screen.getByRole('link', { name: /resources/i })).toHaveAttribute('href', '/resources');
   });
+
+  it('tests a second creative in the same Meta ad set as the first, with its own copy', async () => {
+    const second: PublishCreative = { key: 'img2', kind: 'image', id: 'img2', label: 'Idea 2 · Square', previewSrc: '/i2', copy: { headline: 'No more paper', primaryText: 'Contracts signed online.', description: '' } };
+    const ad = (id: string) => ({ id, destination: 'meta', mediaKind: 'image', title: 'Sign fast', status: 'done', externalUrl: 'https://adsmanager.facebook.com/x', failureCode: null, failureDetail: null, resultKind: 'ad' });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ad: ad('e1') }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ad: ad('e2') }), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel({ creatives: [...CREATIVES, second] });
+    fireEvent.click(within(screen.getByTestId('ad-studio-publish-variants')).getByRole('checkbox', { name: 'Idea 2 · Square' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create paused ad on Facebook & Instagram' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Created 2 paused ads in one ad set on Facebook & Instagram.'));
+    const variant = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
+    expect(variant).toMatchObject({ source: { kind: 'image', imageId: 'img2' }, addToAdSetOf: 'e1', copy: { headline: 'No more paper' } });
+    expect(JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string).addToAdSetOf).toBeUndefined();
+  });
 });

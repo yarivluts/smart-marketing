@@ -176,65 +176,74 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const metaBlocked = destination === 'meta' && isSearch;
   const missingEu = destination === 'google_ads' && euPolitical === '';
 
+  // Other creatives to test side by side in the same paused Meta ad set as the chosen one.
+  const [variants, setVariants] = React.useState<string[]>([]);
+  const variantChoices =
+    destination === 'meta' && creative && creative.kind !== 'search'
+      ? creatives.filter((entry) => entry.kind !== 'search' && entry.key !== creative.key)
+      : [];
+
+  type PublishBody = { ad?: PublishedAdRow; reason?: string; reasons?: string[] } & AdStudioApiError;
+
+  async function postAd(entry: PublishCreative, copy: { headline: string; primaryText: string; description: string }, addToAdSetOf?: string): Promise<PublishBody> {
+    const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        destination,
+        source: entry.kind === 'search' ? { kind: 'search' } : entry.kind === 'image' ? { kind: 'image', imageId: entry.id } : { kind: 'video', videoId: entry.id },
+        campaignName,
+        copy: { ...copy, linkUrl, businessName },
+        dailyBudget: Number(dailyBudget),
+        countries,
+        ...(destination === 'google_ads' && euPolitical ? { containsEuPoliticalAdvertising: euPolitical === 'yes' } : {}),
+        ...(addToAdSetOf ? { addToAdSetOf } : {}),
+      }),
+    });
+    return (await response.json().catch(() => ({}))) as PublishBody;
+  }
+
   async function publish(event: React.FormEvent): Promise<void> {
     event.preventDefault();
     if (!creative) return;
     setPending(true);
     setMessage(null);
     try {
-      const response = await fetch(
-        `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}/publish`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            destination,
-            source:
-              creative.kind === 'search'
-                ? { kind: 'search' }
-                : creative.kind === 'image'
-                  ? { kind: 'image', imageId: creative.id }
-                  : { kind: 'video', videoId: creative.id },
-            campaignName,
-            copy: { headline, primaryText, description, linkUrl, businessName },
-            dailyBudget: Number(dailyBudget),
-            countries,
-            ...(destination === 'google_ads' && euPolitical
-              ? { containsEuPoliticalAdvertising: euPolitical === 'yes' }
-              : {}),
-          }),
-        },
-      );
-      const body = (await response.json().catch(() => ({}))) as {
-        ad?: PublishedAdRow;
-        reason?: string;
-        reasons?: string[];
-      } & AdStudioApiError;
+      const body = await postAd(creative, { headline, primaryText, description });
       if (body.ad) {
         setPublished((current) => [body.ad as PublishedAdRow, ...current]);
+        let added = 0;
+        let failedVariants = 0;
+        // Each further variant joins the first ad's campaign and ad set, with its own saved copy.
+        if (body.ad.status === 'done' && variantChoices.length) {
+          for (const entry of variantChoices.filter((choice) => variants.includes(choice.key))) {
+            const variant = await postAd(entry, entry.copy ?? { headline, primaryText, description }, body.ad.id);
+            if (variant.ad) setPublished((current) => [variant.ad as PublishedAdRow, ...current]);
+            if (variant.ad?.status === 'done') added += 1;
+            else failedVariants += 1;
+          }
+        }
         setMessage(
           body.ad.status === 'done'
             ? {
-                tone: 'ok',
-                text: t('publish.done', { destination: t(`publish.destination.${destination}`) }),
+                tone: failedVariants ? 'error' : 'ok',
+                text: added || failedVariants
+                  ? t('publish.doneVariants', { destination: t(`publish.destination.${destination}`), count: added + 1, failed: failedVariants })
+                  : t('publish.done', { destination: t(`publish.destination.${destination}`) }),
                 href: body.ad.externalUrl ?? undefined,
               }
             : {
                 tone: 'error',
-                text: t(
-                  `exportFailure.${body.ad.failureCode && FAILURES.has(body.ad.failureCode) ? body.ad.failureCode : 'upload_failed'}`,
-                ),
+                text: t(`exportFailure.${body.ad.failureCode && FAILURES.has(body.ad.failureCode) ? body.ad.failureCode : 'upload_failed'}`),
                 detail: body.ad.failureDetail ?? null,
               },
         );
+        setVariants([]);
         router.refresh();
       } else if (body.error === 'export_unavailable' && body.reason) {
         setMessage({ tone: 'error', text: t(`exportUnavailable.${body.reason}`) });
       } else if (body.error === 'invalid_export') {
-        setMessage({
-          tone: 'error',
-          text: t('publish.invalid', { reasons: (body.reasons ?? []).join('; ') }),
-        });
+        setMessage({ tone: 'error', text: t('publish.invalid', { reasons: (body.reasons ?? []).join('; ') }) });
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }
@@ -326,6 +335,24 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
           ))}
         </div>
       </fieldset>
+      {variantChoices.length ? (
+        <fieldset className="flex flex-col gap-2 rounded-xl border border-border p-3" data-testid="ad-studio-publish-variants">
+          <legend className="px-1 text-sm font-semibold">{t('publish.variantsTitle')}</legend>
+          <p className="text-xs text-muted-foreground">{t('publish.variantsHint')}</p>
+          <div className="flex flex-wrap gap-3">
+            {variantChoices.map((entry) => (
+              <label key={entry.key} className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={variants.includes(entry.key)}
+                  onChange={(event) => setVariants((current) => (event.target.checked ? [...current, entry.key] : current.filter((key) => key !== entry.key)))}
+                />
+                <span dir="auto">{entry.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
 
       <form className="flex flex-col gap-4" onSubmit={(event) => void publish(event)}>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('publish.platform')}>
