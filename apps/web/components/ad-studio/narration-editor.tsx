@@ -107,6 +107,8 @@ export function NarrationEditor({
       setMessage({ tone: 'ok', text: t('saved') });
       onSaved?.(body.brief.scenes);
       router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: errorMessage({}) });
     } finally {
       setPending(false);
     }
@@ -151,6 +153,7 @@ export function NarrationEditor({
         current ? { ...current, pending: false, proposal: body.scene ?? null } : current,
       );
     } catch {
+      setMessage({ tone: 'error', text: errorMessage({}) });
       setSuggestion((current) => (current ? { ...current, pending: false } : current));
     }
   }

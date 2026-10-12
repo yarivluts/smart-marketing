@@ -9,7 +9,9 @@ import {
   AD_STUDIO_REFERENCE_USES,
   AD_STUDIO_SCENE_MAX_SECONDS,
   AD_STUDIO_SCENE_MIN_SECONDS,
+  countSpokenWords,
   isHebrewLanguage,
+  voiceoverWordBudget,
   validateAdStudioScenes,
   type AdStudioReferenceUse,
   type AdStudioScene,
@@ -19,6 +21,8 @@ import type { AdStudioReferenceView } from '@/lib/ad-studio/engine';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { SceneTimeline } from './scene-timeline';
+import { useRefreshSafeDraft, useUnsavedChangesGuard } from './use-editor-draft';
+import { ServerChangedNotice } from './server-changed-notice';
 import { MobileAccordionItem } from './mobile-accordion';
 import { AddNikudButton } from './add-nikud-button';
 import { SpeakerControl } from './speaker-control';
@@ -67,13 +71,18 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
   const [rewrite, setRewrite] = React.useState<{ sceneId: string; instruction: string; pending: boolean; proposal: AdStudioScene | null } | null>(null);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
 
-  React.useEffect(() => {
-    setScenes(initialScenes);
-    setSavedJson(JSON.stringify(initialScenes));
-  }, [initialScenes]);
-
   const issues = validateAdStudioScenes(scenes);
   const dirty = JSON.stringify(scenes) !== savedJson;
+  // Another panel's save refreshes the page: keep unsaved scenes, and say when the saved script moved on.
+  const { serverChanged, reload } = useRefreshSafeDraft(initialScenes, {
+    savedJson,
+    dirty,
+    reset: (value) => {
+      setScenes(value);
+      setSavedJson(JSON.stringify(value));
+    },
+  });
+  useUnsavedChangesGuard(dirty, t('editing.leaveUnsaved'));
   const hebrew = isHebrewLanguage(language);
   const readyReferences = references.filter((reference) => reference.status === 'ready');
   const referenceById = new Map(references.map((reference) => [reference.id, reference]));
@@ -126,6 +135,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       setSavedJson(JSON.stringify(body.brief?.scenes ?? scenes));
       setMessage({ tone: 'ok', text: t('scriptSaved') });
       router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -145,6 +156,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       setScenes(body.brief.scenes);
       setSavedJson(JSON.stringify(body.brief.scenes));
       router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -217,6 +230,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
           )}
         </div>
       </div>
+
+      {serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
 
       <SceneTimeline scenes={scenes} activeSceneId={activeSceneId} />
 
@@ -312,16 +327,31 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                   </label>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                    {t('voiceover')}
+                  <div className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    {/* The word count sits beside the label, not in it, so the field's name stays "Voiceover". */}
+                    <div className="flex justify-between gap-2">
+                      <label htmlFor={`voiceover-${scene.id}`}>{t('voiceover')}</label>
+                      {countSpokenWords(scene.voiceover) > 0 ? (
+                        <span
+                          className={cn('tabular-nums', countSpokenWords(scene.voiceover) > voiceoverWordBudget(scene.durationSeconds, language) && 'text-warning')}
+                          data-testid={`ad-studio-voiceover-words-${scene.id}`}
+                        >
+                          {t('voiceoverWords', { words: countSpokenWords(scene.voiceover), budget: voiceoverWordBudget(scene.durationSeconds, language) })}
+                        </span>
+                      ) : null}
+                    </div>
                     <textarea
+                      id={`voiceover-${scene.id}`}
                       value={scene.voiceover}
                       onChange={(event) => update(scene.id, { voiceover: event.target.value })}
                       rows={2}
                       dir="auto"
                       className="rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     />
-                  </label>
+                    {countSpokenWords(scene.voiceover) > voiceoverWordBudget(scene.durationSeconds, language) ? (
+                      <span className="font-normal text-warning">{t('voiceoverTooLong')}</span>
+                    ) : null}
+                  </div>
                   <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
                     {t('onScreenText')}
                     <input
