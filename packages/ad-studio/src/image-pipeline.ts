@@ -32,7 +32,8 @@ import {
   type AdStudioImageModel,
 } from '@growthos/firebase-orm-models';
 import { ensureOrm, getServerKmsProvider } from './runtime';
-import { AdStudioProviderError } from './llm';
+import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './llm';
+import { englishForModel } from './translate';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { repairOverLength } from './length-repair';
 import { AdCopySchema } from './copy-writing';
@@ -56,11 +57,13 @@ export interface AdStudioImageDeps {
   /** Null when no image model is configured (no GEMINI_API_KEY). */
   images: AdStudioImageGenerator | null;
   storage: AdStudioMediaStorage;
+  /** Translates a picture described in Hebrew into English for the image model; absent or null sends it as written. */
+  llm?: AdStudioLlm | null;
   now?: () => Date;
 }
 
 export function resolveAdStudioImageDeps(env: NodeJS.ProcessEnv = process.env): AdStudioImageDeps {
-  return { images: resolveAdStudioImageGenerator(env), storage: resolveAdStudioMediaStorage(env) };
+  return { images: resolveAdStudioImageGenerator(env), storage: resolveAdStudioMediaStorage(env), llm: resolveAdStudioLlm(env) };
 }
 
 interface BriefContext {
@@ -188,7 +191,9 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
   if (!concept.formats.includes(ctx.format)) throw new AdStudioImageRequestError('format_not_in_concept');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image', units: 1, now: deps.now?.() });
   const input = adStudioBriefInput(brief);
-  const prompt = buildImagePrompt(concept, ctx.format, input);
+  // A picture described in Hebrew reaches the image model in English; the fingerprint keeps the words as written.
+  const visualPrompt = await englishForModel(concept.visualPrompt, { ...ctx, llm: deps.llm, now: deps.now?.() });
+  const prompt = buildImagePrompt({ ...concept, visualPrompt }, ctx.format, input);
   const record = await createAdStudioImage({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -220,6 +225,8 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
   if (parent.status !== 'ready' || !parent.gcs_path) throw new AdStudioImageRequestError('image_not_editable');
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image_edit', units: 1, now: deps.now?.() });
   const bytes = await readAdStudioObject(deps.storage, parent.gcs_path, MAX_STORED_IMAGE_BYTES);
+  // The person's words are kept on the image; the image model gets them in English.
+  const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
   const record = await createAdStudioImage({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -237,7 +244,7 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
     now: deps.now?.(),
   });
   return produceImage(ctx, deps, record, 'image_edit', (generator) =>
-    generator.edit({ instruction, image: { bytes, mimeType: parent.mime_type ?? 'image/png' }, aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format] }),
+    generator.edit({ instruction: modelInstruction, image: { bytes, mimeType: parent.mime_type ?? 'image/png' }, aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format] }),
   );
 }
 

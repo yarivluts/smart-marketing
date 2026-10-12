@@ -3792,7 +3792,7 @@
     "removeScene": "Remove scene",
     "duration": "Length",
     "visualPrompt": "What the camera shows",
-    "visualPromptHint": "Describe the shot in English. This is what the video model receives.",
+    "visualPromptHint": "Describe the shot: what the camera sees. Any language works; a Hebrew description is translated to English for the video model.",
     "voiceover": "Voiceover",
     "onScreenText": "On-screen text",
     "rewriteInstruction": "How should this scene change?",
@@ -3889,7 +3889,8 @@
       "vocalize": "Narration nikud",
       "reference_image": "Scene illustration",
       "ad_copy": "Ad text",
-      "search_ad": "Search ad"
+      "search_ad": "Search ad",
+      "translate": "Translation for the model"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4269,7 +4270,7 @@
       "ideaLabel": "Idea {index}",
       "removeIdea": "Remove",
       "visualPrompt": "What the picture shows",
-      "visualPromptHint": "In English, for the image model: subject, setting, light, style. No text here.",
+      "visualPromptHint": "What the picture shows: subject, setting, light, style. Any language works; it is translated for the image model. No text here.",
       "headline": "Headline in the image (optional)",
       "placements": "Placements",
       "addIdea": "Add an idea",
