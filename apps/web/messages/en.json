@@ -4052,8 +4052,8 @@
         },
         "results": {
           "no_environment": "The project has no environment to read.",
-          "warehouse_not_configured": "The data warehouse is not connected yet.",
-          "warehouse_error": "The warehouse query failed.",
+          "warehouse_not_configured": "Site results are not connected to this project yet.",
+          "warehouse_error": "Site results could not be loaded right now; the plan was made without them.",
           "query_quota_exceeded": "The project's daily query limit is reached.",
           "no_traffic": "No landing page visits in the last 90 days."
         },
@@ -4066,7 +4066,7 @@
           "credential_not_configured": "The attached Google Ads credential is incomplete.",
           "no_seeds": "There was nothing to seed a keyword search with.",
           "google_ads_auth_failed": "Google refused the Google Ads sign-in.",
-          "developer_token_not_approved": "The Google Ads developer token is not approved for keyword planning.",
+          "developer_token_not_approved": "Keyword volumes need Google Ads keyword-planning access, which is not enabled yet.",
           "google_ads_error": "Google Ads returned an error.",
           "no_ideas": "Google Ads had no keyword ideas for this ad."
         }
@@ -4111,7 +4111,7 @@
       "platform": {
         "google_ads": "Google Ads",
         "meta_ads": "Meta",
-        "unknown": "Platform unknown"
+        "unknown": "Other platform"
       },
       "campaignStatus": {
         "enabled": "Live",
@@ -4256,7 +4256,10 @@
       "awaitingTitle": "The plan is ready for your review",
       "awaitingDescription": "Read the plan, the scenes and the image ideas below and change anything you want. When it looks right, confirm to create the images and the video.",
       "confirmPlan": "Confirm plan and create ads",
-      "discardPlan": "Stop without creating"
+      "discardPlan": "Stop without creating",
+      "resume": "Resume",
+      "pausedHint": "Paused after repeated errors. Resume to try again.",
+      "keepOpen": "The autopilot runs while this page is open."
     },
     "images": {
       "title": "Image ads",
@@ -4333,7 +4336,13 @@
       "ideasTitle": "Image ad ideas",
       "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan.",
       "editIdea": "Edit the idea (picture, text in the image, placements)",
-      "manageImages": "Manage the images ({count}): render again, change, download, send"
+      "manageImages": "Manage the images ({count}): render again, change, download, send",
+      "rewriteIdea": "Rewrite with AI",
+      "rewriteIdeaInstruction": "What should change in this idea?",
+      "rewriteIdeaPlaceholder": "e.g. warmer light, show the phone closer",
+      "rewriteIdeaRun": "Rewrite this idea",
+      "saveEditsFirst": "Save your edits first, so the rewrite starts from them.",
+      "rewriteIdeasConfirm": "Replace every idea with new ones? Edits, copy and the link to rendered images will be lost."
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
@@ -4422,7 +4431,8 @@
       "refused": "the image model declined this picture",
       "invalid_output": "the image model returned no usable image",
       "provider_error": "the image model failed",
-      "storage_error": "the image could not be saved"
+      "storage_error": "the image could not be saved",
+      "timed_out": "it took too long and was given up"
     },
     "admin": {
       "qaTitle": "AI quality check of video clips",
@@ -4518,7 +4528,9 @@
         "copy_headline_too_long": "The headline is longer than 30 characters.",
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
-      }
+      },
+      "claimsToCheck": "Check before publishing - not in the brief or the landing page: {claims}",
+      "undoRewrite": "Undo rewrite"
     },
     "preview": {
       "placementsLabel": "Where the ad runs",
@@ -4897,6 +4909,13 @@
         "too_many_colors": "At most 5 colours.",
         "invalid_color": "Colours must be #rrggbb."
       }
+    },
+    "voiceoverWords": "{words}/{budget} words",
+    "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene.",
+    "editing": {
+      "changedElsewhere": "The saved version changed elsewhere. Your unsaved edits are kept here.",
+      "loadSaved": "Load the saved version",
+      "leaveUnsaved": "You have unsaved changes. Leave without saving?"
     }
   },
   "MetaConnect": {

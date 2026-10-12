@@ -27,6 +27,8 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { AdCopyCard } from './ad-copy-card';
+import { useRefreshSafeDraft, useUnsavedChangesGuard } from './use-editor-draft';
+import { ServerChangedNotice } from './server-changed-notice';
 import {
   adStudioImageSlots,
   type AdStudioImageSlot,
@@ -131,16 +133,25 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [instructions, setInstructions] = React.useState<Record<string, string>>({});
   const [editing, setEditing] = React.useState<string | null>(null);
+  // The one idea being rewritten by an instruction, and that instruction.
+  const [ideaRewrite, setIdeaRewrite] = React.useState<{ id: string; instruction: string } | null>(null);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
 
-  React.useEffect(() => {
-    setSaved(props.initialConcepts);
-    setDraft(props.initialConcepts);
-  }, [props.initialConcepts]);
   React.useEffect(() => setImages(props.initialImages), [props.initialImages]);
   React.useEffect(() => setExports(props.exports), [props.exports]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  // Saving copy or anything else refreshes the page: keep unsaved idea edits through it.
+  const { serverChanged, reload } = useRefreshSafeDraft(props.initialConcepts, {
+    savedJson: JSON.stringify(saved),
+    dirty,
+    reset: (value) => {
+      setSaved(value);
+      setDraft(value);
+    },
+  });
+  useUnsavedChangesGuard(dirty, t('editing.leaveUnsaved'));
+  const [confirmIdeas, setConfirmIdeas] = React.useState(false);
   const issues = validateAdStudioImageConcepts(draft);
   const slots = adStudioImageSlots(saved, images, language);
 
@@ -167,6 +178,9 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       onOk?.(body);
       router.refresh();
       return true;
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
+      return false;
     } finally {
       setPending(null);
     }
@@ -236,6 +250,8 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -278,9 +294,29 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
             )}
           </div>
         </div>
+        {confirmIdeas ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm" role="alertdialog" aria-label={t('images.rewriteIdeasConfirm')}>
+            <span>{t('images.rewriteIdeasConfirm')}</span>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => {
+                setConfirmIdeas(false);
+                void call('ideas', '/image-concepts/generate', json('POST', {}));
+              }}
+              className="rounded-lg bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"
+            >
+              {t('confirmReplace')}
+            </button>
+            <button type="button" onClick={() => setConfirmIdeas(false)} className="rounded-lg border border-border px-2.5 py-1 text-xs">
+              {t('cancel')}
+            </button>
+          </div>
+        ) : (
         <button
           type="button"
-          onClick={() => void call('ideas', '/image-concepts/generate', json('POST', {}))}
+          // Rewriting replaces every idea, its copy and the link to its rendered images: ask first.
+          onClick={() => (saved.length ? setConfirmIdeas(true) : void call('ideas', '/image-concepts/generate', json('POST', {})))}
           disabled={pending !== null || !textAvailable}
           className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
         >
@@ -291,7 +327,9 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           )}
           {saved.length ? t('images.rewriteIdeas') : t('images.writeIdeas')}
         </button>
+        )}
       </header>
+      {serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
       {!imagesAvailable ? (
         <p className="text-xs text-warning">{t('images.notConfigured')}</p>
       ) : null}
@@ -299,7 +337,8 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       {draft.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t('images.noIdeas')}</p>
       ) : null}
-      <ol className="flex flex-col gap-4">
+      {/* Review compares the ideas side by side on wide screens; editing them in Plan stays one column. */}
+      <ol className={cn('grid grid-cols-1 gap-4', !ideasOnly && 'xl:grid-cols-2')}>
         {draft.map((concept, index) => {
           const savedConcept = saved.find((entry) => entry.id === concept.id);
           const conceptSlots = slots.filter((slot) => slot.conceptId === concept.id);
@@ -314,6 +353,19 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                 <span className="text-sm font-semibold">
                   {t('images.ideaLabel', { index: index + 1 })}
                 </span>
+                <span className="flex flex-wrap items-center gap-1">
+                {savedConcept ? (
+                  <button
+                    type="button"
+                    onClick={() => setIdeaRewrite(ideaRewrite?.id === concept.id ? null : { id: concept.id, instruction: '' })}
+                    disabled={!textAvailable || pending !== null}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
+                    aria-expanded={ideaRewrite?.id === concept.id}
+                  >
+                    <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('images.rewriteIdea')}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setDraft((current) => current.filter((_, at) => at !== index))}
@@ -322,7 +374,45 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   {t('images.removeIdea')}
                 </button>
+                </span>
               </div>
+              {ideaRewrite?.id === concept.id ? (
+                <form
+                  className="flex flex-col gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3"
+                  data-testid="ad-studio-idea-rewrite"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void call(`rewrite-${concept.id}`, '/image-concepts/generate', json('POST', { conceptId: concept.id, instruction: ideaRewrite.instruction }), () => setIdeaRewrite(null));
+                  }}
+                >
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    {t('images.rewriteIdeaInstruction')}
+                    <input
+                      autoFocus
+                      value={ideaRewrite.instruction}
+                      onChange={(event) => setIdeaRewrite({ id: concept.id, instruction: event.target.value })}
+                      maxLength={500}
+                      dir="auto"
+                      placeholder={t('images.rewriteIdeaPlaceholder')}
+                      className="h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+                    />
+                  </label>
+                  {dirty ? <p className="text-xs text-warning">{t('images.saveEditsFirst')}</p> : null}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={dirty || pending !== null || ideaRewrite.instruction.trim().length === 0}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+                    >
+                      {pending === `rewrite-${concept.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+                      {t('images.rewriteIdeaRun')}
+                    </button>
+                    <button type="button" onClick={() => setIdeaRewrite(null)} className="rounded-lg border border-border px-3 py-1.5 text-xs">
+                      {t('cancel')}
+                    </button>
+                  </div>
+                </form>
+              ) : null}
               {/* In Review the idea's fields fold away behind one line; in Plan they are the point and stay open. */}
               <details open={ideasOnly} className="rounded-lg" data-testid="ad-studio-idea-fields">
                 <summary

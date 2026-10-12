@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   acceptInvite,
+  createAdStudioImage,
   createOrganizationWithOwner,
   createProject,
   createSharedCredential,
@@ -185,6 +186,46 @@ async function setup() {
 type ImagesPayload = { concepts: { id: string; formats: string[] }[]; images: AdStudioImageView[] };
 
 describe('image ads routes', () => {
+  it('rewrites one idea by an instruction, keeping the others, its id and its placements', async () => {
+    const google = fakeGoogle();
+    const ctx = await setup();
+    const saved = (await (
+      await saveConcepts(
+        request('PUT', {
+          concepts: [
+            { id: 'keep', visualPrompt: 'A desk without paper', headline: 'No more paper', formats: ['square'] },
+            { id: 'redo', visualPrompt: 'A grey office', headline: 'Sign online', formats: ['portrait', 'story'] },
+          ],
+        }),
+        ctx.p(),
+      )
+    ).json()) as ImagesPayload;
+    expect(saved.concepts.map((concept) => concept.id)).toEqual(['keep', 'redo']);
+
+    const rewritten = (await (await generateConcepts(request('POST', { conceptId: 'redo', instruction: 'warmer light' }), ctx.p())).json()) as ImagesPayload & {
+      concepts: { id: string; visualPrompt: string; formats: string[] }[];
+    };
+    expect(rewritten.concepts.map((concept) => concept.id)).toEqual(['keep', 'redo']);
+    expect(rewritten.concepts[0]).toMatchObject({ visualPrompt: 'A desk without paper', formats: ['square'] });
+    expect(rewritten.concepts[1]).toMatchObject({ visualPrompt: 'A lawyer signing on a phone in a bright office', formats: ['portrait', 'story'] });
+    const ask = google.calls.find((call) => call.url.endsWith(':generateContent'));
+    const prompt = JSON.stringify(ask?.body);
+    expect(prompt).toContain('Rewrite only idea 2');
+    expect(prompt).toContain('warmer light');
+
+    expect((await generateConcepts(request('POST', { conceptId: 'missing', instruction: 'x' }), ctx.p())).status).toBe(404);
+  });
+
+  it('gives up an image still generating long after its request died, so its slot stops spinning', async () => {
+    const ctx = await setup();
+    const base = { organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, kind: 'render' as const, conceptFingerprint: 'f', prompt: 'p', provider: 'gemini', model: 'm', actorId: ctx.owner.id };
+    const stale = await createAdStudioImage({ ...base, conceptId: 'c1', format: 'square', now: new Date(Date.now() - 11 * 60_000) });
+    const fresh = await createAdStudioImage({ ...base, conceptId: 'c2', format: 'square', now: new Date(Date.now() - 60_000) });
+    const { images } = (await (await listImages(request('GET'), ctx.p())).json()) as ImagesPayload;
+    expect(images.find((image) => image.id === stale.id)).toMatchObject({ status: 'failed', failureCode: 'timed_out' });
+    expect(images.find((image) => image.id === fresh.id)).toMatchObject({ status: 'generating' });
+  });
+
   it('writes ideas with AI, renders one, changes it by an instruction, picks the older version and serves it', async () => {
     const google = fakeGoogle();
     const ctx = await setup();

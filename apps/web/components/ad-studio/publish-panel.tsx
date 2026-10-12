@@ -17,6 +17,7 @@ import { SearchResultPreview } from './search-result-preview';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
+import { withFirstFrame } from './media-src';
 
 type Destination = 'meta' | 'google_ads';
 
@@ -239,6 +240,8 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }
+    } catch {
+      setMessage({ tone: 'error', text: errorMessage({}) });
     } finally {
       setPending(false);
     }
@@ -297,18 +300,19 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                   </span>
                 ) : entry.kind === 'image' ? (
                   // A plain img: private media served by our own authenticated route.
-                  <img src={entry.previewSrc} alt="" className="h-full w-full object-cover" />
+                  // Contained, not cropped: the headline drawn into the image stays readable.
+                  <img src={entry.previewSrc} alt="" className="h-full w-full object-contain" />
                 ) : (
                   <video
-                    src={entry.previewSrc}
+                    src={withFirstFrame(entry.previewSrc)}
                     muted
                     playsInline
                     preload="metadata"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 )}
               </span>
-              <span className="flex min-w-0 items-center gap-1 font-medium">
+              <span className="flex min-w-0 items-start gap-1 font-medium">
                 {entry.kind === 'search' ? (
                   <Search className="h-3 w-3 shrink-0" aria-hidden="true" />
                 ) : entry.kind === 'image' ? (
@@ -316,7 +320,9 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                 ) : (
                   <Film className="h-3 w-3 shrink-0" aria-hidden="true" />
                 )}
-                <span className="truncate">{entry.label}</span>
+                <span className="line-clamp-2 break-words" title={entry.label}>
+                  {entry.label}
+                </span>
               </span>
             </label>
           ))}

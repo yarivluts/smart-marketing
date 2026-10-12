@@ -11,12 +11,20 @@ export function DeleteBriefButton({ orgId, projectId, briefId, afterDeleteHref }
   const router = useRouter();
   const [confirming, setConfirming] = React.useState(false);
   const [pending, setPending] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
 
   async function remove(): Promise<void> {
     setPending(true);
+    setFailed(false);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`, { method: 'DELETE' });
-      if (response.ok) router.push(afterDeleteHref);
+      if (response.ok) {
+        router.push(afterDeleteHref);
+        return;
+      }
+      setFailed(true);
+    } catch {
+      setFailed(true);
     } finally {
       setPending(false);
     }
@@ -26,12 +34,18 @@ export function DeleteBriefButton({ orgId, projectId, briefId, afterDeleteHref }
     return (
       <span className="flex items-center gap-2 text-sm" role="alertdialog" aria-label={t('deleteConfirm')}>
         <span>{t('deleteConfirm')}</span>
-        <button type="button" onClick={remove} disabled={pending} className="rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground disabled:opacity-60">
+        {/* Focus moves to the confirm button so a keyboard user lands on the choice, not the page top. */}
+        <button type="button" autoFocus onClick={remove} disabled={pending} className="rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground disabled:opacity-60">
           {t('deleteAd')}
         </button>
         <button type="button" onClick={() => setConfirming(false)} className="rounded-lg border border-border px-2.5 py-1 text-xs">
           {t('cancel')}
         </button>
+        {failed ? (
+          <span role="alert" className="text-xs text-destructive">
+            {t('errorGeneric')}
+          </span>
+        ) : null}
       </span>
     );
   }

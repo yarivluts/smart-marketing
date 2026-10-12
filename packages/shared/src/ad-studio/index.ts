@@ -14,3 +14,4 @@ export * from './audiences';
 export * from './writing-rules';
 export * from './length-repair';
 export * from './brand-kit';
+export * from './claims';

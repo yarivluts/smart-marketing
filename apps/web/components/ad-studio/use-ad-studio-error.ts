@@ -81,7 +81,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
 
 const CLIP_FAILURES = new Set([...PROVIDER_CODES, 'timed_out']);
 const VIDEO_FAILURES = new Set([...ASSEMBLY_CODES, 'timed_out']);
-const IMAGE_FAILURES = new Set([...PROVIDER_CODES, 'storage_error']);
+const IMAGE_FAILURES = new Set([...PROVIDER_CODES, 'storage_error', 'timed_out']);
 
 /** A clip's, an assembled video's or an image's stored failure reason as a translated phrase. */
 export function useAdStudioFailureReason(): { clip: (reason: string | null) => string; video: (reason: string | null) => string; image: (reason: string | null) => string } {
