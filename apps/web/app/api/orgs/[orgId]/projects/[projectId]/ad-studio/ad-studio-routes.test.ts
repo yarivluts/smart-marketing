@@ -215,15 +215,31 @@ describe('Ad Studio routes', () => {
           { key: second, headline: 'No more paper', primaryText: 'Every contract signed online.', description: 'Try it free' },
         ],
       }),
+      // The over-long headline is rewritten to fit in one cheap repair call, not cut mid-phrase.
+      JSON.stringify({ items: [{ id: 'video:headline', text: 'E-sign built for lawyers' }] }),
     );
     const written = (await (await writeCopy(request('POST', {}), params)).json()) as { brief: Brief };
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const repairAsk = String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body);
+    expect(repairAsk).toContain('video:headline');
+    expect(repairAsk).not.toContain('No more paper');
     const sent = String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body);
     expect(sent).toContain('\\"key\\":\\"video\\"');
     expect(sent).not.toContain(first);
-    expect(written.brief.videoCopy).toEqual({ headline: 'E-sign for lawyers, a much', primaryText: 'Clients sign from WhatsApp.', description: '' });
+    expect(written.brief.videoCopy).toEqual({ headline: 'E-sign built for lawyers', primaryText: 'Clients sign from WhatsApp.', description: '' });
     expect(written.brief.imageConcepts.map((concept) => (concept.copy as { headline: string } | undefined)?.headline)).toEqual(['Sign in 30 seconds', 'No more paper']);
-    expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'ad_copy')).toHaveLength(1);
+    // The repair is metered like the call it repairs.
+    expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'ad_copy')).toHaveLength(2);
+
+    // When the repair itself fails, the field is still fitted at a word boundary rather than lost.
+    geminiReplies(
+      JSON.stringify({ items: [{ key: 'video', headline: 'E-sign for lawyers, a much longer headline than allowed', primaryText: 'Clients sign from WhatsApp.', description: '' }] }),
+      { status: 500, message: 'Internal' },
+      { status: 500, message: 'Internal' },
+      { status: 500, message: 'Internal' },
+    );
+    const fallback = (await (await writeCopy(request('POST', { rewrite: true, keys: ['video'] }), params)).json()) as { brief: Brief };
+    expect(fallback.brief.videoCopy).toEqual({ headline: 'E-sign for lawyers, a much', primaryText: 'Clients sign from WhatsApp.', description: '' });
 
     // Nothing missing: no call.
     const idle = geminiReplies();

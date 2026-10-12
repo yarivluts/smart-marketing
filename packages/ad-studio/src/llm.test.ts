@@ -34,9 +34,54 @@ describe('createGeminiLlm', () => {
       [500, 'Internal', 'provider_error'],
     ];
     for (const [status, message, code] of cases) {
-      const llm = createGeminiLlm('k', async () => geminiResponse(status, { error: { message } }));
+      const llm = createGeminiLlm('k', async () => geminiResponse(status, { error: { message } }), undefined, { sleep: async () => {} });
       await expect(llm.generateJson({ system: '', user: '', schema: Schema })).rejects.toMatchObject({ code, message });
     }
+  });
+
+  it('retries rate limits, server errors and network failures with backoff, honouring Retry-After', async () => {
+    const sleeps: number[] = [];
+    const replies = [
+      () => geminiResponse(429, { error: { message: 'Resource exhausted' } }),
+      () => {
+        throw new TypeError('fetch failed');
+      },
+      () => geminiResponse(200, { candidates: [{ content: { parts: [{ text: '{"title":"Ad","count":1}' }] } }] }),
+    ];
+    const fetchImpl = vi.fn(async () => {
+      const reply = replies.shift()!;
+      const response = reply();
+      if (response.status === 429) response.headers.set('retry-after', '2');
+      return response;
+    });
+    const llm = createGeminiLlm('k', fetchImpl, undefined, { sleep: async (ms) => void sleeps.push(ms) });
+    await expect(llm.generateJson({ system: '', user: '', schema: Schema })).resolves.toEqual({ title: 'Ad', count: 1 });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(sleeps[0]).toBe(2000);
+    expect(sleeps[1]).toBeGreaterThanOrEqual(1000);
+    // Each attempt is bounded by a timeout.
+    expect((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('does not retry billing, auth or safety answers, and gives up after the last attempt', async () => {
+    const billing = vi.fn(async () => geminiResponse(402, { error: { message: 'Your prepayment credits are depleted.' } }));
+    await expect(createGeminiLlm('k', billing, undefined, { sleep: async () => {} }).generateJson({ system: '', user: '', schema: Schema })).rejects.toMatchObject({ code: 'provider_billing' });
+    expect(billing).toHaveBeenCalledTimes(1);
+    const down = vi.fn(async () => geminiResponse(503, { error: { message: 'Unavailable' } }));
+    await expect(createGeminiLlm('k', down, undefined, { sleep: async () => {}, attempts: 2 }).generateJson({ system: '', user: '', schema: Schema })).rejects.toMatchObject({ code: 'provider_error' });
+    expect(down).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports a timeout plainly and an answer cut off at the output limit as invalid_output', async () => {
+    const hang = vi.fn(async () => {
+      throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+    });
+    await expect(createGeminiLlm('k', hang, undefined, { sleep: async () => {}, attempts: 1, timeoutMs: 5000 }).generateJson({ system: '', user: '', schema: Schema })).rejects.toMatchObject({
+      code: 'provider_error',
+      message: 'No answer within 5s.',
+    });
+    const cut = createGeminiLlm('k', async () => geminiResponse(200, { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '{"title":"A' }] } }] }));
+    await expect(cut.generateJson({ system: '', user: '', schema: Schema })).rejects.toMatchObject({ code: 'invalid_output', message: expect.stringContaining('cut off') });
   });
 
   it('reports a safety block as refused, and non-JSON or schema-mismatched output as invalid_output', async () => {
@@ -51,25 +96,32 @@ describe('createGeminiLlm', () => {
 
 describe('createClaudeLlm', () => {
   function fakeClient(result: unknown) {
-    const parse = vi.fn(async () => result);
-    return { client: { beta: { messages: { parse } } } as unknown as Anthropic, parse };
+    // The studio streams (long plans must not hit the HTTP timeout) and reads the parsed final message.
+    const stream = vi.fn(() => ({ finalMessage: async () => result }));
+    return { client: { beta: { messages: { stream } } } as unknown as Anthropic, parse: stream };
   }
 
-  it('asks Claude Opus 5 for schema-bound output with server-side refusal fallbacks, and returns the parsed object', async () => {
+  it('asks Claude Opus 5.5 for schema-bound output at medium effort with server-side refusal fallbacks, and returns the parsed object', async () => {
     const { client, parse } = fakeClient({ stop_reason: 'end_turn', parsed_output: { title: 'Ad', count: 2 } });
     const llm = createClaudeLlm('k', client);
     expect(llm).toMatchObject({ provider: 'anthropic', model: AD_STUDIO_CLAUDE_MODEL });
     await expect(llm.generateJson({ system: 'SYS', user: 'USER', schema: Schema })).resolves.toEqual({ title: 'Ad', count: 2 });
     expect(parse).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'claude-opus-5',
+        model: 'claude-opus-5-5',
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
         system: 'SYS',
         messages: [{ role: 'user', content: 'USER' }],
-        output_config: { format: expect.anything() },
+        output_config: { effort: 'medium', format: expect.anything() },
       }),
     );
+  });
+
+  it('passes the effort a call asks for', async () => {
+    const { client, parse } = fakeClient({ stop_reason: 'end_turn', parsed_output: { title: 'Ad', count: 1 } });
+    await createClaudeLlm('k', client).generateJson({ system: '', user: '', schema: Schema, effort: 'high' });
+    expect(parse).toHaveBeenCalledWith(expect.objectContaining({ output_config: { effort: 'high', format: expect.anything() } }));
   });
 
   it('treats a refusal as refused and a missing parsed_output as invalid_output', async () => {
@@ -78,6 +130,10 @@ describe('createClaudeLlm', () => {
     ).rejects.toMatchObject({ code: 'refused', message: 'declined' });
     await expect(
       createClaudeLlm('k', fakeClient({ stop_reason: 'max_tokens', parsed_output: null }).client).generateJson({ system: '', user: '', schema: Schema }),
+    ).rejects.toMatchObject({ code: 'invalid_output', message: expect.stringContaining('cut off') });
+    // A truncated answer is refused even if it happened to parse.
+    await expect(
+      createClaudeLlm('k', fakeClient({ stop_reason: 'max_tokens', parsed_output: { title: 'A', count: 1 } }).client).generateJson({ system: '', user: '', schema: Schema }),
     ).rejects.toMatchObject({ code: 'invalid_output' });
   });
 });

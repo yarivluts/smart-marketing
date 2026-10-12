@@ -1,5 +1,7 @@
 import { z } from 'zod/v4';
 import {
+  AD_STUDIO_COPY_LIMITS,
+  AD_STUDIO_IMAGE_HEADLINE_MAX,
   AD_STUDIO_IMAGE_ASPECT_RATIO,
   AD_STUDIO_IMAGE_INSTRUCTION_MAX,
   buildImageConceptsPrompt,
@@ -32,6 +34,7 @@ import {
 import { ensureOrm, getServerKmsProvider } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
+import { repairOverLength } from './length-repair';
 import { AdCopySchema } from './copy-writing';
 import { resolveAdStudioImageGenerator, type AdStudioGeneratedImage, type AdStudioImageGenerator } from './gemini-image';
 import { adStudioImageObjectPath, readAdStudioObject, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
@@ -107,7 +110,26 @@ export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & {
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
   const prompt = buildImageConceptsPrompt(adStudioBriefInput(brief), { ...context, scenes: brief.scenes });
-  const generated = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
+  const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
+  // The image headline and the copy are rewritten to fit when over their limits, not cut mid-word.
+  const copyFields = ['headline', 'primaryText', 'description'] as const;
+  const repaired = await repairOverLength(
+    ctx,
+    'image_concepts',
+    brief.id,
+    brief.language,
+    raw.concepts.flatMap((concept, index) => [
+      { id: `c${index}:image`, text: concept.headline, max: AD_STUDIO_IMAGE_HEADLINE_MAX },
+      ...copyFields.map((field) => ({ id: `c${index}:${field}`, text: concept.copy?.[field] ?? '', max: AD_STUDIO_COPY_LIMITS[field] })),
+    ]),
+  );
+  const generated = {
+    concepts: raw.concepts.map((concept, index) => ({
+      ...concept,
+      headline: repaired.get(`c${index}:image`) ?? concept.headline,
+      ...(concept.copy ? { copy: Object.fromEntries(copyFields.map((field) => [field, repaired.get(`c${index}:${field}`) ?? concept.copy?.[field] ?? ''])) as typeof concept.copy } : {}),
+    })),
+  };
   const allowed = ctx.formats?.length ? ctx.formats.filter(isAdStudioImageFormat) : null;
   const concepts = fitAdStudioImageConcepts(
     // Placements the person chose apply to every idea; otherwise the model's own choice per idea stands.

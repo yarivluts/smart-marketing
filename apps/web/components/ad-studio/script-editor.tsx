@@ -158,7 +158,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       const response = await fetch(`${base}/scenes/${rewrite.sceneId}/rewrite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instruction: rewrite.instruction }),
+        // The scenes as they stand in the editor, so unsaved and new scenes are rewritten correctly.
+        body: JSON.stringify({ instruction: rewrite.instruction, scenes }),
       });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError & { scene?: AdStudioScene };
       if (!response.ok || !body.scene) {
@@ -168,6 +169,8 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
       }
       setRewrite((current) => (current ? { ...current, pending: false, proposal: body.scene ?? null } : current));
     } catch {
+      // A dropped connection says so instead of silently stopping the spinner.
+      setMessage({ tone: 'error', text: t('errorGeneric') });
       setRewrite((current) => (current ? { ...current, pending: false } : current));
     }
   }

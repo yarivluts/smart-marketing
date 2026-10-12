@@ -1,4 +1,5 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
+import { UNTRUSTED_INPUT_RULE, wrapUntrusted } from './writing-rules';
 
 /**
  * Ad Studio deep planning (KAN-230): the evidence a plan is built from, the plan's shape, and the
@@ -264,14 +265,14 @@ function sourceHeader(source: AdStudioEvidenceSource, state: { status: string; r
 
 function landingPageSection(state: AdStudioEvidence['landingPage']): string[] {
   if (state.status !== 'ok') return [sourceHeader('landing_page', state)];
-  return [
-    sourceHeader('landing_page', state),
-    `URL: ${state.url}`,
+  // The page is someone else's text: it goes in as data the model is told never to obey.
+  const page = [
     state.title ? `Title: ${state.title}` : null,
     state.description ? `Meta description: ${state.description}` : null,
     state.headings.length ? `Headings: ${state.headings.join(' | ')}` : null,
     `Visible text${state.truncated ? ' (truncated)' : ''}: ${state.text}`,
   ].filter((line): line is string => line !== null);
+  return [sourceHeader('landing_page', state), `URL: ${state.url}`, wrapUntrusted('landing_page', page.join('\n'))];
 }
 
 function resultsSection(state: AdStudioEvidence['results']): string[] {
@@ -322,7 +323,8 @@ const PLAN_RULES = [
   'Every recommendation cites the evidence it rests on: source is one of landing_page, results, campaigns, keywords (only sources marked available) or market, and detail says which fact it uses.',
   'Anything that is not in the evidence - how the market or the audience usually behaves, platform best practice, seasonality - is general knowledge: cite it as market and also list it in marketNotes. Never present it as measured.',
   'If a source is unavailable, do not cite it and do not guess what it would have shown.',
-  'landingPageSummary summarizes what the landing page says; leave it empty if the landing page is unavailable.',
+  'landingPageSummary summarizes what the landing page says, and keeps every concrete offer, price, guarantee and deadline it states word for word, so later copy can use them without inventing any; leave it empty if the landing page is unavailable.',
+  UNTRUSTED_INPUT_RULE,
   'keywordThemes group related search terms; take keywords from the keyword evidence when it is available, and say in evidence where each theme comes from.',
   'Write summary, audience, messagingAngles, recommendations and marketNotes in the ad language. Keep keywords exactly as they appear in the evidence.',
   'Give 3 to 6 recommendations, most important first, focused on what the video ad should say and to whom.',

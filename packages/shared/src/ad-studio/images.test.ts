@@ -93,7 +93,8 @@ describe('image prompts', () => {
       messagingAngles: ['No printing'],
       scenes: [{ visualPrompt: 'A lawyer at a desk', onScreenText: 'Sign faster' }],
     });
-    expect(prompt.system).toContain('Do not invent facts');
+    expect(prompt.system).toContain('Never invent facts');
+    expect(prompt.system).toContain('plural imperative');
     expect(prompt.user).toContain('Ad language: Hebrew');
     expect(prompt.user).toContain('Audience: Solo lawyers');
     expect(prompt.user).toContain('A lawyer at a desk [text: Sign faster]');

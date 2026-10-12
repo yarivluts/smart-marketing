@@ -42,7 +42,7 @@ export async function vocalizeAdStudioScenes(
   const pending = ctx.scenes.filter(wanted);
   if (pending.length === 0) return { scenes: [...ctx.scenes], vocalized: 0 };
   const prompt = buildVocalizePrompt(pending.map((scene) => ({ id: scene.id, text: scene.voiceover })));
-  const result = await meteredCall(ctx, 'vocalize', ctx.briefId, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioVocalizeSchema }));
+  const result = await meteredCall(ctx, 'vocalize', ctx.briefId, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioVocalizeSchema, effort: 'low' }));
   const byId = new Map(result.lines.map((line) => [line.id, line.pronunciation.trim()]));
   let vocalized = 0;
   const scenes = ctx.scenes.map((scene) => {
@@ -65,7 +65,7 @@ export async function vocalizeNarrationText(ctx: AdStudioCallContext & { briefId
   const text = ctx.text.replace(/\s+/g, ' ').trim();
   if (!text || !isHebrewLanguage(brief.language)) throw new AdStudioProviderError('invalid_output', 'Only Hebrew narration is vocalized.');
   const prompt = buildVocalizePrompt([{ id: 'line', text }]);
-  const result = await meteredCall(ctx, 'vocalize', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioVocalizeSchema }));
+  const result = await meteredCall(ctx, 'vocalize', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: AdStudioVocalizeSchema, effort: 'low' }));
   const pronunciation = result.lines.find((line) => line.id === 'line')?.pronunciation.trim() ?? '';
   if (!isUsablePronunciation(pronunciation)) throw new AdStudioProviderError('invalid_output', 'The model returned no usable nikud.');
   return pronunciation;
