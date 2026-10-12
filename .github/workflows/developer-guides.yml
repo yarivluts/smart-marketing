@@ -1,0 +1,59 @@
+name: Developer guides
+
+# Daily: does every sample in the public developer area (/developers) still work against a
+# deployed GrowthOS? (KAN-378) It runs the guides exactly as rendered - curl, the Node SDK
+# from the published tarball, the relay, the browser snippet in Chromium, MCP and the
+# metrics API - against the Developer Sandbox's TEST environment.
+#
+# It holds only the sandbox's test keys (gos_test_ / gos_pk_test_), which can write to that
+# one sandbox environment and nothing else. The script refuses live keys.
+
+on:
+  schedule:
+    - cron: '41 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: developer-guides
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Guides vs production (test environment)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GROWTHOS_GUIDE_SERVER_KEY: ${{ secrets.GROWTHOS_GUIDE_SERVER_KEY }}
+      GROWTHOS_GUIDE_BROWSER_KEY: ${{ secrets.GROWTHOS_GUIDE_BROWSER_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Build the samples and the browser SDK
+        run: |
+          pnpm install --frozen-lockfile --filter @growthos/web...
+          pnpm --filter @growthos/shared build
+          pnpm --filter @growthos/browser build
+          pnpm --filter @growthos/web exec playwright install --with-deps chromium
+
+      - name: Run every guide sample
+        run: |
+          if [ -z "$GROWTHOS_GUIDE_SERVER_KEY" ] || [ -z "$GROWTHOS_GUIDE_BROWSER_KEY" ]; then
+            echo "::notice::Skipped: add the GROWTHOS_GUIDE_SERVER_KEY and GROWTHOS_GUIDE_BROWSER_KEY repository secrets (the sandbox test keys) to enable this check"
+            exit 0
+          fi
+          pnpm --filter @growthos/web validate:guides

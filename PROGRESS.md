@@ -17,6 +17,26 @@ Template for each entry:
 
 ---
 
+## 2026-10-12 - Developer area: integration guides, verified against a test environment (KAN-378)
+
+- **Last completed:** Yariv asked for a developer area with guides for connecting to GrowthOS (API, MCP, event setup on the server or client side), and for proof that it works against a test environment.
+  - **Public area at `/developers`** (no sign-in), en + he. Seven guides: overview, quick start, client side, server side, REST API, MCP, testing.
+    - Every code sample comes from one module, `packages/shared/src/developer-guides/samples.ts`. The samples render with the deployment's real API and app URLs.
+    - Server samples read `$GROWTHOS_API_KEY`; no key is ever inlined.
+  - **Linked** from the app header, the mobile menu and the Installation page. `docs/integrations/quick-start.md` and `docs/mcp/README.md` point at it.
+  - **Test environment:** a "GrowthOS Developer Sandbox" org (`zoIwdzQ3cdtLWC0dPOQX`) holds the project "Developer guides" and its `dev` environment. Its test keys are in Secret Manager: `growthos-dev-sandbox-server-key` and `growthos-dev-sandbox-browser-key`.
+  - **Validator:** `pnpm --filter @growthos/web validate:guides` runs every sample as rendered: curl, the Node SDK from the tarball, the relay, the browser snippet in Chromium, MCP, verify, and metrics. It refuses live keys and redacts key prefixes. Result against prod `c3fbfeb`: 15/15 passed.
+  - **Deployed:** PR #608, `c3fbfeb`, on api-prod, api-preprod, web-prod and web-preprod.
+    - All 14 guide pages return 200 publicly on desktop and mobile.
+    - No console errors and no sideways scroll.
+  - **Daily check:** `.github/workflows/developer-guides.yml` runs the validator daily.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** the daily workflow skips with a notice until the repository secrets `GROWTHOS_GUIDE_SERVER_KEY` and `GROWTHOS_GUIDE_BROWSER_KEY` exist. The repo is public, and keys go only to Secret Manager or the app's form, so they were not copied to GitHub automatically.
+- **Next step:**
+  - optional `llms.txt` plus `search_docs`/`get_doc` MCP tools from the same guide content;
+  - then the remaining QA bugs (KAN-319..323 first).
+- **Waiting on human:** add the two GitHub secrets above, or approve copying them from Secret Manager.
+
 ## 2026-10-11 - Only true data on every page; Stitch branch merged (KAN-324, KAN-350..356)
 
 - **Last completed:** Yariv asked to make sure no page shows invented data, to fix what was needed, and to merge what was needed.
