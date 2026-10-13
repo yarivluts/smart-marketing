@@ -255,7 +255,7 @@ async function renderChecked(
       await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind, units: 1, now: deps.now?.() });
       renders += 1;
       const image = await fallback(fixes);
-      const verdict = await reviewAdStudioImage({ ...ctx, image, subject, reviewer, now: deps.now?.() });
+      const verdict = await reviewAdStudioImage({ ...ctx, image, subject: { ...subject, headlineSetByCode: true }, reviewer, now: deps.now?.() });
       if (betterImageVerdict(verdict, best.verdict)) {
         best = { image, verdict };
         overlay = true;

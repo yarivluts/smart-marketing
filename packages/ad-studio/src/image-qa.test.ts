@@ -108,6 +108,26 @@ describe('right-to-left headlines', () => {
   });
 });
 
+describe('a headline the studio set itself', () => {
+  it('asks only about its placement, and drops any finding about its words', () => {
+    expect(buildImageQaPrompt({ headline: 'Sign fast', visualPrompt: 'v', language: 'he', headlineSetByCode: true }).user).toContain('judge only where it sits');
+    const verdict = imageQaVerdict(
+      { headline: 'Sign in 30 seconds', language: 'he', headlineSetByCode: true },
+      {
+        textInImage: 'seconds 30 in Sign',
+        issues: [
+          { severity: 'major', about: 'headline_text', detail: 'The words are reversed', fix: 'Write it right to left.' },
+          { severity: 'major', about: 'headline_placement', detail: 'Over her face', fix: 'Move it to the wall.' },
+        ],
+      },
+      'gemini',
+    );
+    // No mismatch from the read-back text either: the code drew exactly these words.
+    expect(verdict.issues).toEqual([{ severity: 'major', detail: 'Over her face' }]);
+    expect(imageQaVerdict({ headline: 'Sign', language: 'he', headlineSetByCode: true }, { textInImage: 'nqiS', issues: [] }, 'gemini').status).toBe('passed');
+  });
+});
+
 describe('severity by kind', () => {
   it('fails any real defect the reviewer under-rated, keeps blur minor, and trusts it only for other', () => {
     const verdict = imageQaVerdict(

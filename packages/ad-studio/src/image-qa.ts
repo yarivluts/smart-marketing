@@ -61,6 +61,8 @@ export interface ImageQaSubject {
   headline: string | null;
   visualPrompt: string;
   language: string;
+  /** The headline was set by the studio in code, so its words are exact by construction: only its placement is judged. */
+  headlineSetByCode?: boolean;
 }
 
 export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; user: string } {
@@ -70,7 +72,9 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
     headline === null
       ? `Any text in the image must be correct ${language}: spelled right and written in the right direction.`
       : headline
-        ? `The only text that should appear in the image, spelled exactly: "${headline}".`
+        ? subject.headlineSetByCode
+          ? `The only text that should appear in the image is the headline "${headline}", set by the studio in a font: its words are exact, so judge only where it sits and whether it is legible.`
+          : `The only text that should appear in the image, spelled exactly: "${headline}".`
         : 'No text, letters or logos should appear in the image.';
   const majorText =
     headline === null
@@ -118,7 +122,7 @@ export interface ImageQaVerdict {
  * headline and the reviewer reported no major problem itself, a `headline_mismatch` issue is added
  * (the UI words it, showing what was read). Pure.
  */
-export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'> & { language?: string }, review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
+export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'> & { language?: string; headlineSetByCode?: boolean }, review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
   const text = review.textInImage.trim().slice(0, 500);
   const headline = subject.headline?.trim() ?? '';
   // The code's comparison outranks the reviewer on the headline's text: when the text read off the image
@@ -129,10 +133,11 @@ export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'> & { lan
   const rtl = RTL_LANGUAGES.has((subject.language ?? '').toLowerCase());
   const kept = review.issues
     .map((issue) => ({ ...issue, severity: kindSeverity(issue.about, issue.severity) }))
-    .filter((issue) => !(headlineConfirmed && rtl && issue.about === 'headline_text'))
+    // A headline the studio set itself is right by construction: a finding about its words is always a false alarm.
+    .filter((issue) => !(issue.about === 'headline_text' && (subject.headlineSetByCode || (headlineConfirmed && rtl))))
     .map((issue) => (headlineConfirmed && issue.about === 'headline_text' ? { ...issue, severity: 'minor' as const } : issue));
   const issues: AdStudioImageQaIssue[] = kept.slice(0, MAX_ISSUES).map((issue) => ({ severity: issue.severity, detail: issue.detail.trim().slice(0, 300) }));
-  if (headline && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
+  if (headline && !subject.headlineSetByCode && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
     issues.unshift({ severity: 'major', code: 'headline_mismatch', detail: text.slice(0, 300) });
   }
   const fixes = kept
