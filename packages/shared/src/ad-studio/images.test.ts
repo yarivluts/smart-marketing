@@ -138,6 +138,8 @@ describe('image prompts', () => {
       scenes: [{ visualPrompt: 'A lawyer at a desk', onScreenText: 'Sign faster' }],
     });
     expect(prompt.system).toContain('Never invent facts');
+    // Ideas are not built around a screen, which image models draw badly.
+    expect(prompt.system).toContain('never a close-up of a phone or computer screen');
     expect(prompt.system).toContain('plural imperative');
     expect(prompt.user).toContain('Ad language: Hebrew');
     expect(prompt.user).toContain('Audience: Solo lawyers');

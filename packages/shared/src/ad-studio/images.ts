@@ -149,6 +149,8 @@ export function imageConceptFingerprint(concept: Pick<AdStudioImageConcept, 'vis
 const CONCEPT_RULES = [
   `Propose between 2 and ${Math.min(4, AD_STUDIO_MAX_IMAGE_CONCEPTS)} distinct image ideas; each tests a different angle (benefit, problem, social setting, product close-up) rather than repeating one.`,
   'visualPrompt describes only the picture - subject, setting, composition, lighting, colour, photographic or illustration style - in English, concretely enough for an image model. Do not ask for any text in the picture there.',
+  // Image models draw device screens badly (text, giant phones, floating screens): ideas should not hinge on one.
+  'Build each picture around people, places and the result they get, not around a device: never a close-up of a phone or computer screen, and never a picture whose point is what a screen shows. A device, if any, is a small, natural part of the scene.',
   `headline is the only text drawn into the image: at most ${AD_STUDIO_IMAGE_HEADLINE_MAX} characters, in the ad language, or empty. Prefer short, concrete benefit statements.`,
   'formats lists the placements the idea suits: square and portrait for feeds, story for full-screen vertical, landscape for Google display.',
   'copy is the ad text that runs next to this idea in the feed (not drawn into the image); write it for every idea.',

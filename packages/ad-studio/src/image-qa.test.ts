@@ -31,7 +31,7 @@ describe('buildImageQaPrompt', () => {
 
 describe('imageQaVerdict', () => {
   it('passes when the headline is in the picture and only minor problems were found', () => {
-    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', about: 'picture', detail: ' Slight blur ', fix: 'Sharper focus' }] }, 'gemini')).toEqual({
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', about: 'quality', detail: ' Slight blur ', fix: 'Sharper focus' }] }, 'gemini')).toEqual({
       status: 'passed',
       issues: [{ severity: 'minor', detail: 'Slight blur' }],
       text: 'SIGN IN 30 SECONDS',
@@ -55,9 +55,9 @@ describe('imageQaVerdict', () => {
       {
         textInImage: '',
         issues: [
-          { severity: 'major', about: 'picture', detail: 'phone too big', fix: '  The phone fits in one hand. ' },
-          { severity: 'major', about: 'picture', detail: 'legs merge into a box', fix: 'Show the whole person seated, legs under the table.' },
-          { severity: 'minor', about: 'picture', detail: 'slight blur', fix: 'Sharper.' },
+          { severity: 'major', about: 'proportion', detail: 'phone too big', fix: '  The phone fits in one hand. ' },
+          { severity: 'major', about: 'proportion', detail: 'legs merge into a box', fix: 'Show the whole person seated, legs under the table.' },
+          { severity: 'minor', about: 'quality', detail: 'slight blur', fix: 'Sharper.' },
         ],
       },
       'gemini',
@@ -105,6 +105,27 @@ describe('right-to-left headlines', () => {
     expect(verdict.status).toBe('passed');
     expect(verdict.issues).toEqual([{ severity: 'minor', detail: 'The words are reversed' }]);
     expect(verdict.fixes).toEqual([]);
+  });
+});
+
+describe('severity by kind', () => {
+  it('fails any real defect the reviewer under-rated, keeps blur minor, and trusts it only for other', () => {
+    const verdict = imageQaVerdict(
+      { headline: '' },
+      {
+        textInImage: '',
+        issues: [
+          { severity: 'minor', about: 'duplicate', detail: 'a pen in each hand', fix: 'One pen, in one hand.' },
+          { severity: 'minor', about: 'overlay', detail: 'a plain band across the top', fix: 'The scene runs to the top edge.' },
+          { severity: 'major', about: 'quality', detail: 'slight blur', fix: 'Sharper.' },
+          { severity: 'minor', about: 'other', detail: 'cup a little too shiny', fix: 'Matte cup.' },
+        ],
+      },
+      'gemini',
+    );
+    expect(verdict.status).toBe('issues');
+    expect(verdict.issues.map((issue) => issue.severity)).toEqual(['major', 'major', 'minor', 'minor']);
+    expect(verdict.fixes).toEqual(['One pen, in one hand.', 'The scene runs to the top edge.']);
   });
 });
 
