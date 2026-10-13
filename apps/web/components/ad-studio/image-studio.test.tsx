@@ -94,6 +94,8 @@ describe('ImageStudio', () => {
   it('stays quiet about the check when it did not run, and shows the image size and version', () => {
     renderStudio({ initialImages: [image({ qa: { status: 'skipped', issues: [], renders: 1 } })] });
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByText('v1 · 2K')).toBeInTheDocument();
+    // Images made before the check, or with it off, are not counted as failing it.
+    expect(screen.getByTestId('ad-studio-image-summary-passed')).toHaveTextContent('Not checked');
     expect(screen.queryByTestId('ad-studio-image-qa-issues')).toBeNull();
     expect(screen.queryByTestId('ad-studio-image-qa-passed')).toBeNull();
   });

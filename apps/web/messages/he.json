@@ -4366,7 +4366,8 @@
         "attention": "דורשות בדיקה",
         "ready": "תמונות מוכנות",
         "left": "תמונות שנשארו היום",
-        "ofValue": "{count} מתוך {total}"
+        "ofValue": "{count} מתוך {total}",
+        "notChecked": "לא נבדקו"
       },
       "imagesHeading": "תמונות ({count})",
       "openFull": "פתיחה בגודל מלא"
