@@ -254,7 +254,7 @@ export function AdStudioAdminPanel({
         ) : (
           <>
           {/* Phones: one card per call, so dates and model ids don't wrap mid-value (KAN-343). */}
-          <ul className="flex max-h-80 flex-col gap-2 overflow-auto sm:hidden" data-testid="ad-studio-usage-cards">
+          <ul className="flex max-h-80 flex-col gap-2 overflow-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:hidden" tabIndex={0} aria-labelledby="ad-studio-recent-usage" data-testid="ad-studio-usage-cards">
             {recentUsage.map((row) => (
               <li key={row.id} className="flex flex-col gap-0.5 rounded-xl border border-border px-3 py-2 text-xs">
                 <div className="flex items-baseline justify-between gap-2">
