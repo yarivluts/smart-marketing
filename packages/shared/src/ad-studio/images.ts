@@ -233,7 +233,7 @@ export function buildImagePrompt(
     `An advertising image, ${AD_STUDIO_IMAGE_ASPECT_RATIO[format]} aspect ratio, for: ${brief.productDescription}.`,
     concept.visualPrompt.trim(),
     headline
-      ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". No other words or letters anywhere in the image.`
+      ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
       : 'No words, letters, captions or logos anywhere in the image.',
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],

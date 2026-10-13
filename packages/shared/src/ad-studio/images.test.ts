@@ -107,6 +107,7 @@ describe('image prompts', () => {
     expect(prompt).toContain('4:5 aspect ratio');
     expect(prompt).toContain('E-signatures for lawyers');
     expect(prompt).toContain('in Hebrew: "Sign in 30 seconds"');
+    expect(prompt).toContain('never over a face, a person or the subject');
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
     // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
     // Devices stay secondary and out of focus, so screens carry no text and never float toward the camera.

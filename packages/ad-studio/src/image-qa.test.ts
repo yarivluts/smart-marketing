@@ -18,6 +18,7 @@ describe('buildImageQaPrompt', () => {
     expect(prompt.user).toContain('the picture drawn as a phone screen or app');
     expect(prompt.user).toContain('empty bands, borders or letterboxing');
     expect(prompt.user).toContain('a floating card, label, badge, icon, checkmark or other graphic overlay');
+    expect(prompt.user).toContain('the headline over a face, a person or the subject');
   });
 
   it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {
@@ -65,7 +66,7 @@ describe('imageQaVerdict', () => {
   });
 
   it('keeps the reviewer own major finding instead of adding a second one, and does not compare after an edit', () => {
-    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', about: 'headline', detail: 'Misspelled headline', fix: 'Spell it right.' }] }, 'gemini');
+    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', about: 'headline_text', detail: 'Misspelled headline', fix: 'Spell it right.' }] }, 'gemini');
     expect(verdict.issues).toEqual([{ severity: 'major', detail: 'Misspelled headline' }]);
     expect(imageQaVerdict({ headline: null }, { textInImage: 'Anything new', issues: [] }, 'gemini').status).toBe('passed');
   });
@@ -77,10 +78,28 @@ describe('right-to-left headlines', () => {
     expect(buildImageQaPrompt({ headline: 'x', visualPrompt: 'v', language: 'en' }).user).not.toContain('right to left');
   });
 
+  it('drops the reviewer "reversed" finding on a headline the code confirmed in a right-to-left ad', () => {
+    const verdict = imageQaVerdict(
+      { headline: 'Sign in 30 seconds', language: 'he' },
+      {
+        textInImage: 'Sign in 30 seconds',
+        issues: [
+          { severity: 'major', about: 'headline_text', detail: 'The words are reversed', fix: 'Write it right to left.' },
+          { severity: 'major', about: 'headline_placement', detail: 'The headline covers her face', fix: 'Put the headline on the plain wall.' },
+        ],
+      },
+      'gemini',
+    );
+    // Where the headline sits still counts: only the false text finding goes.
+    expect(verdict.status).toBe('issues');
+    expect(verdict.issues).toEqual([{ severity: 'major', detail: 'The headline covers her face' }]);
+    expect(verdict.fixes).toEqual(['Put the headline on the plain wall.']);
+  });
+
   it('keeps a headline the code confirmed, showing a reviewer "reversed" finding only as minor', () => {
     const verdict = imageQaVerdict(
       { headline: 'Sign in 30 seconds' },
-      { textInImage: 'Sign in 30 seconds', issues: [{ severity: 'major', about: 'headline', detail: 'The words are reversed', fix: 'Write it right to left.' }] },
+      { textInImage: 'Sign in 30 seconds', issues: [{ severity: 'major', about: 'headline_text', detail: 'The words are reversed', fix: 'Write it right to left.' }] },
       'gemini',
     );
     expect(verdict.status).toBe('passed');
