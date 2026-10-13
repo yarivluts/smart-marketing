@@ -118,6 +118,8 @@ describe('image prompts', () => {
     expect(prompt).toContain('screen softly out of focus - no readable words');
     expect(prompt).toContain('Never show a device held toward the camera');
     expect(prompt).toContain('At most one phone or tablet appears in the whole scene');
+    // Documents tend to come out titled in English ("CONTRACT"): they carry no words at all.
+    expect(prompt).toContain('shows only soft grey lines - no title, heading or readable word');
     expect(prompt).toContain('no floating cards, labels, badges, icons');
     expect(prompt).toContain('illegible scribble on that document or screen only');
     expect(prompt).not.toContain('anywhere in the picture, is');
