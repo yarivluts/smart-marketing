@@ -109,6 +109,10 @@ describe('image prompts', () => {
     expect(prompt).toContain('in Hebrew: "Sign in 30 seconds"');
     expect(prompt).toContain('never over a face, a person or the subject');
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
+    // A text-free picture for the studio's own headline keeps a calm area for it, below the story app bar.
+    expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF, { headlineSpace: true })).toContain('Keep the top quarter of the picture calm and plain');
+    expect(buildImagePrompt(concept({ headline: '' }), 'story', BRIEF, { headlineSpace: true })).toContain('band just below the top 14%');
+    expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).not.toContain('a headline will be set on it');
     // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
     // Devices stay secondary and out of focus, so screens carry no text and never float toward the camera.
     expect(prompt).toContain('screen softly out of focus - no readable words');

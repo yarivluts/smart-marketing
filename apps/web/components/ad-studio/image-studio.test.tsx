@@ -70,7 +70,7 @@ describe('ImageStudio', () => {
   it('shows the AI check of each image: passed after re-renders, or what is wrong with a misspelled headline', () => {
     renderStudio({
       initialImages: [
-        image({ qa: { status: 'passed', issues: [{ severity: 'minor', detail: 'A little blur in the corner' }], renders: 2 } }),
+        image({ qa: { status: 'passed', issues: [{ severity: 'minor', detail: 'A little blur in the corner' }], renders: 2, overlay: true } }),
         image({
           id: 'i2',
           format: 'story',
@@ -86,6 +86,7 @@ describe('ImageStudio', () => {
     expect(screen.getByTestId('ad-studio-image-summary-left')).toHaveTextContent('38');
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-passed')).toHaveTextContent('AI check passed after 2 renders');
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-minor')).toHaveTextContent('A little blur in the corner');
+    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-overlay')).toHaveTextContent('The headline was set by the studio');
     const issues = within(screen.getByTestId('ad-studio-image-slot-story')).getByTestId('ad-studio-image-qa-issues');
     expect(issues).toHaveTextContent('The headline in the image is not spelled as written. The image reads: "Sing fast"');
     expect(issues).toHaveTextContent('Slight blur');

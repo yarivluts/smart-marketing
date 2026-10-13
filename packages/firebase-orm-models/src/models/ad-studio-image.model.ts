@@ -26,6 +26,8 @@ export interface AdStudioImageQa {
   /** How many images were rendered to reach this one (re-renders after a failed check count). */
   renders: number;
   model: string | null;
+  /** True when the headline was set by the studio in code over a text-free picture (the last resort after failed renders). */
+  overlay?: boolean;
 }
 
 /**

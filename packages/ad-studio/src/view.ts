@@ -124,6 +124,8 @@ export interface AdStudioImageQaView {
   issues: { severity: 'major' | 'minor'; code?: 'headline_mismatch'; detail: string }[];
   /** How many renders it took to reach this image. */
   renders: number;
+  /** The headline was set by the studio, not drawn by the image model. */
+  overlay?: boolean;
 }
 
 /** One concept in one placement: its versions, the chosen one, and whether that one still matches the concept. */

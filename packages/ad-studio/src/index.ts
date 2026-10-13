@@ -22,6 +22,7 @@ export * from './qa';
 export * from './gemini-image';
 export * from './image-pipeline';
 export * from './image-qa';
+export * from './headline-overlay';
 export * from './autopilot';
 export * from './publish';
 export * from './export';

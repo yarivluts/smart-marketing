@@ -229,6 +229,8 @@ export function buildImagePrompt(
   concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline'>,
   format: AdStudioImageFormat,
   brief: Pick<AdStudioBriefInput, 'productDescription' | 'language' | 'brand'>,
+  /** A text-free picture the studio will set the headline on itself: keep a calm area for it. */
+  options: { headlineSpace?: boolean } = {},
 ): string {
   const headline = concept.headline.trim();
   return [
@@ -237,6 +239,9 @@ export function buildImagePrompt(
     headline
       ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
       : 'No words, letters, captions or logos anywhere in the image.',
+    !headline && options.headlineSpace
+      ? `Keep the ${format === 'story' ? 'band just below the top 14%' : 'top quarter'} of the picture calm and plain - wall, sky or soft background, with no face, person or important object there: a headline will be set on it afterwards.`
+      : null,
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
