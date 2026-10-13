@@ -96,6 +96,8 @@ import {
 } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
 import { CreateGallery } from '@/components/ad-studio/create-gallery';
+import { ReviewOverview } from '@/components/ad-studio/review-overview';
+import { parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative, type ReviewItem } from '@/lib/ad-studio/review-overview';
 import { PlanSection } from '@/components/ad-studio/plan-section';
 import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
@@ -103,7 +105,7 @@ import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
-  searchParams: Promise<{ brief?: string; step?: string }>;
+  searchParams: Promise<{ brief?: string; step?: string; item?: string }>;
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
@@ -136,7 +138,7 @@ export default async function AdStudioPage({
   searchParams,
 }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
-  const { brief: selectedBriefId, step: requestedStep } = await searchParams;
+  const { brief: selectedBriefId, step: requestedStep, item: requestedItem } = await searchParams;
   setRequestLocale(locale);
 
   const session = await getServerSession();
@@ -349,6 +351,9 @@ export default async function AdStudioPage({
   });
   const { planConfirmed } = steps;
   const stepHref = (id: AdStudioStepId) => `${base}?brief=${selected?.id}&step=${id}`;
+  // Review opens on an overview of the creatives; ?item= opens one of them (or all image ideas).
+  const reviewItem = parseReviewItem(requestedItem);
+  const reviewHref = (item: ReviewItem) => `${stepHref('review')}&item=${encodeURIComponent(reviewItemParam(item))}`;
   const stepNav: AdStudioStepNav[] | null = selected
     ? [
         {
@@ -652,9 +657,42 @@ export default async function AdStudioPage({
             </>
           ) : null}
 
-          {activeStep === 'review' ? (
+          {activeStep === 'review' && !reviewItem ? (
+            <ReviewOverview
+              mediaBase={mediaBase}
+              videoFormat={selected.format}
+              hrefs={{
+                image: Object.fromEntries(selected.imageConcepts.map((concept) => [concept.id, reviewHref({ kind: 'image', conceptId: concept.id })])),
+                images: reviewHref({ kind: 'images' }),
+                video: reviewHref({ kind: 'video' }),
+                search: reviewHref({ kind: 'search' }),
+              }}
+              images={summarizeImageCreatives(selected.imageConcepts, imageSlots)}
+              video={summarizeVideoCreative({
+                scenes: selected.scenes,
+                clips,
+                assembled: Boolean(videoStage?.assembled),
+                assembledSeconds: videoStage?.assembledSeconds ?? 0,
+                hasCopy: Boolean(selected.videoCopy && (selected.videoCopy.headline.trim() || selected.videoCopy.primaryText.trim())),
+              })}
+              search={summarizeSearchCreative(selected.searchAd, selected.searchKeywords?.keywords.length ?? 0)}
+            />
+          ) : null}
+
+          {activeStep === 'review' && reviewItem ? (
             <>
+              {/* One creative's own page: everything about it, editable, and the way back to all of them. */}
+              <Link
+                href={stepHref('review')}
+                className="inline-flex items-center gap-1.5 self-start text-sm font-medium text-primary hover:underline"
+                data-testid="ad-studio-review-back"
+              >
+                <ArrowRight className="h-4 w-4 ltr:rotate-180" aria-hidden="true" />
+                {t('review.back')}
+              </Link>
+              {reviewItem.kind === 'image' || reviewItem.kind === 'images' ? (
               <ImageStudio
+                focusConceptId={reviewItem.kind === 'image' ? reviewItem.conceptId : undefined}
                 orgId={orgId}
                 projectId={projectId}
                 briefId={selected.id}
@@ -674,6 +712,8 @@ export default async function AdStudioPage({
                 exports={imageExports}
                 linkUrl={selected.landingPageUrl}
               />
+              ) : null}
+              {reviewItem.kind === 'video' ? (
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <VideoStudio
                   orgId={orgId}
@@ -697,6 +737,8 @@ export default async function AdStudioPage({
                   linkUrl={selected.landingPageUrl}
                 />
               </div>
+              ) : null}
+              {reviewItem.kind === 'search' ? (
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <SearchAdEditor
                   orgId={orgId}
@@ -709,6 +751,7 @@ export default async function AdStudioPage({
                   aiAvailable={providers.text !== null}
                 />
               </div>
+              ) : null}
             </>
           ) : null}
 

@@ -76,6 +76,8 @@ export interface ImageStudioProps {
   exports: ImageExportRow[];
   /** The Plan step: only the ideas are shown and edited; images are rendered after the plan is confirmed. */
   ideasOnly?: boolean;
+  /** Review, one idea's own page: only that idea is shown, without the actions on all ideas (they live on the overview). */
+  focusConceptId?: string;
   /** The landing page, shown as its domain in the ad previews. */
   linkUrl?: string | null;
 }
@@ -126,6 +128,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
     canExport,
     destinations,
     ideasOnly = false,
+    focusConceptId,
     linkUrl = null,
   } = props;
   const t = useTranslations('AdStudio');
@@ -143,7 +146,8 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
   // The one idea being rewritten by an instruction, and that instruction.
   const [ideaRewrite, setIdeaRewrite] = React.useState<{ id: string; instruction: string } | null>(null);
   // Review: show one idea or all of them.
-  const [filter, setFilter] = React.useState<string | null>(null);
+  const [filter, setFilter] = React.useState<string | null>(focusConceptId ?? null);
+  const focused = Boolean(focusConceptId);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
 
   React.useEffect(() => setImages(props.initialImages), [props.initialImages]);
@@ -503,7 +507,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!ideasOnly && saved.length > 1 ? (
+          {!ideasOnly && !focused && saved.length > 1 ? (
             <div className="flex flex-wrap items-center gap-1 rounded-full bg-muted p-1" role="group" aria-label={t('images.filterLabel')} data-testid="ad-studio-idea-filter">
               {[null, ...saved.map((concept) => concept.id)].map((id) => {
                 const at = id ? saved.findIndex((concept) => concept.id === id) : -1;
@@ -524,13 +528,13 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
               })}
             </div>
           ) : null}
-          {writeIdeasButton}
+          {focused ? null : writeIdeasButton}
         </div>
       </header>
       {serverChanged ? <ServerChangedNotice onReload={reload} /> : null}
       {!imagesAvailable ? <p className="text-xs text-warning">{t('images.notConfigured')}</p> : null}
 
-      {!ideasOnly && slots.length ? (
+      {!ideasOnly && !focused && slots.length ? (
         <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="ad-studio-image-summary">
           {summary.map((item) => (
             <div key={item.key} className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background p-3 shadow-soft" data-testid={`ad-studio-image-summary-${item.key}`}>
@@ -548,7 +552,11 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
 
       {draft.length === 0 ? <p className="text-sm text-muted-foreground">{t('images.noIdeas')}</p> : null}
       {/* Review compares the ideas side by side; editing them in Plan stays one column. */}
-      <ol className={cn('grid grid-cols-1 items-start gap-4', !ideasOnly && 'md:grid-cols-2 2xl:grid-cols-3')}>
+      {focused && !draft.some((concept) => concept.id === focusConceptId) ? (
+        <p className="text-sm text-muted-foreground" data-testid="ad-studio-idea-missing">{t('images.ideaMissing')}</p>
+      ) : null}
+      {/* One idea's page gives it the full width; the list compares ideas side by side. */}
+      <ol className={cn('grid grid-cols-1 items-start gap-4', !ideasOnly && !focused && 'md:grid-cols-2 2xl:grid-cols-3')}>
         {draft.map((concept, index) => {
           const savedConcept = saved.find((entry) => entry.id === concept.id);
           const conceptSlots = slots.filter((slot) => slot.conceptId === concept.id);
@@ -722,7 +730,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                     <Images className="h-4 w-4 text-primary" aria-hidden="true" />
                     {t('images.imagesHeading', { count: conceptSlots.length })}
                   </h3>
-                  {conceptSlots.map((slot) => renderSlot(slot, index))}
+                  <div className={cn('grid grid-cols-1 gap-2', focused && 'gap-3 sm:grid-cols-2 xl:grid-cols-4')}>{conceptSlots.map((slot) => renderSlot(slot, index))}</div>
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">{t('images.saveToRender')}</p>
@@ -743,6 +751,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {focused ? null : (
           <button
             type="button"
             onClick={() => setDraft((current) => [...current, newConcept()])}
@@ -752,6 +761,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
             <Plus className="h-4 w-4" aria-hidden="true" />
             {t('images.addIdea')}
           </button>
+          )}
           <button
             type="button"
             onClick={() => void call('save', '/image-concepts', json('PUT', { concepts: draft }), () => setMessage({ tone: 'ok', text: t('images.ideasSaved') }))}
