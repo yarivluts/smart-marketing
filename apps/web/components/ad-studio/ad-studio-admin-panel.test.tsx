@@ -38,6 +38,14 @@ describe('AdStudioAdminPanel audiences (KAN-363)', () => {
     // Every call is still listed, with a failure explained.
     expect(within(screen.getByTestId('ad-studio-usage-cards')).getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getByTestId('ad-studio-keyword-data')).toBeInTheDocument();
+    // Both usage lists scroll on their own, so each takes keyboard focus and is named by the heading.
+    const heading = screen.getByRole('heading', { name: 'Recent AI calls' });
+    const cards = screen.getByTestId('ad-studio-usage-cards');
+    const table = screen.getByRole('region', { name: heading.textContent ?? '' });
+    for (const scroller of [cards, table]) {
+      expect(scroller).toHaveAttribute('tabindex', '0');
+      expect(scroller).toHaveAttribute('aria-labelledby', heading.id);
+    }
   });
 
   it('shows a platform operator the internals, today against the limits, and the form', () => {
