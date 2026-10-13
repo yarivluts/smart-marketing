@@ -19,6 +19,7 @@ describe('buildImageQaPrompt', () => {
     expect(prompt.user).toContain('empty bands, borders or letterboxing');
     expect(prompt.user).toContain('a floating card, label, badge, icon, checkmark or other graphic overlay');
     expect(prompt.user).toContain('the headline over a face, a person or the subject');
+    expect(prompt.user).toContain('two phones or tablets at once');
   });
 
   it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {
