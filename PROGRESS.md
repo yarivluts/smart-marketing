@@ -17,6 +17,27 @@ Template for each entry:
 
 ---
 
+## 2026-10-13 - Ad Studio image quality loop: guided retries, severity by defect kind (KAN-389)
+
+- **Last completed (#644-#646, live on prod):**
+  - **Guided retries:** the image check writes an English `fix` for every major problem, and each retry carries the fixes found so far.
+  - **Retry budget:** images get at least 2 retries, with no new attempt after 170 s.
+  - **Image prompt:**
+    - devices are small and out of focus, never held toward the camera;
+    - no floating cards, badges or graphic overlays;
+    - the headline sits on a calm part of the background, never over a face.
+  - **Severity:** findings carry a fixed kind (headline text or placement, other text, body, proportion, impossible, duplicate, overlay, quality, other), and the **code** sets severity from it. Everything fails except `quality`; `other` keeps the reviewer's rating.
+  - **Right-to-left headlines:** a reviewer "reversed" note on a right-to-left headline the code confirmed exactly is dropped.
+  - **Idea writing:** ideas are built around people and outcomes, never around a screen.
+- **Verification (real renders on a no-traffic preview):**
+  - AI-written ideas for a fresh brief: **12 of 12 passed** in all four formats.
+  - Hand-written, screen-centred stress ideas: 9 of 12. Every failure was a genuine defect shown to the person: English text on a screen, word order broken around "30" in right-to-left text, and a backwards signature.
+  - The project's daily limits were raised for the runs through the audited settings service, then restored to 40 images and 50 text calls.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** none planned.
+- **Waiting on human:** rotate the Stitch API key (see below).
+
 ## 2026-10-13 - Ad Studio image check hardened on real renders; image review in the Stitch layout (KAN-389, KAN-391)
 
 - **Last completed:**
