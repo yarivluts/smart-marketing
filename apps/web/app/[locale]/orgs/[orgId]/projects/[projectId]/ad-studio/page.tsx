@@ -97,7 +97,8 @@ import {
 import { cn } from '@/lib/utils';
 import { CreateGallery } from '@/components/ad-studio/create-gallery';
 import { ReviewOverview } from '@/components/ad-studio/review-overview';
-import { adTextDirection, parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative, type ReviewItem } from '@/lib/ad-studio/review-overview';
+import { AdHeader } from '@/components/ad-studio/ad-header';
+import { adTextDirection, displayHost, parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative, type ReviewItem } from '@/lib/ad-studio/review-overview';
 import { PlanSection } from '@/components/ad-studio/plan-section';
 import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
@@ -402,14 +403,31 @@ export default async function AdStudioPage({
 
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
+      {selected ? (
+        <AdHeader
+          studioLabel={t('eyebrow')}
+          allAds={{ label: t('backToAds'), href: base }}
+          name={selected.name}
+          objective={selected.objective}
+          actions={<DeleteBriefButton orgId={orgId} projectId={projectId} briefId={selected.id} afterDeleteHref={base} />}
+          usage={{
+            label: t('adHeader.usageLabel'),
+            limitReached: t('adHeader.limitReached'),
+            meters: [
+              { key: 'images', label: t('usageTodayImages'), used: usageToday.images, limit: settings.dailyImages, icon: ImageIcon },
+              { key: 'text', label: t('kpiTextToday'), used: usageToday.textGenerations, limit: settings.dailyTextGenerations, icon: Sparkles },
+              { key: 'video', label: t('kpiVideoToday'), used: usageToday.videoSeconds, limit: settings.dailyVideoSeconds, icon: Clock },
+            ],
+          }}
+        />
+      ) : (
       <PageHero
         icon={Clapperboard}
         eyebrow={t('eyebrow')}
         title={t('title', { project: project.name })}
         description={t('description')}
       >
-        {/* With an ad open, a phone goes straight to the ad: the studio-wide figures stay on wider screens. */}
-        <div className={cn('grid grid-cols-2 gap-3 lg:grid-cols-5', selected && 'max-md:hidden')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <StatCard title={t('kpiAds')} value={overview.briefs} icon={FileText} />
           <StatCard
             title={t('kpiScripted')}
@@ -440,6 +458,7 @@ export default async function AdStudioPage({
           />
         </div>
       </PageHero>
+      )}
 
       {!providers.text ? (
         <p
@@ -454,30 +473,6 @@ export default async function AdStudioPage({
       {selected && stepNav ? (
         <BrandLogoProvider url={logoUrl}>
         <ClaimSourcesProvider sources={[selected.name, selected.objective, selected.productDescription, selected.plan?.landingPageSummary ?? '']}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <Link
-                href={base}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
-              >
-                <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
-                {t('backToAds')}
-              </Link>
-              <h2 className="text-xl font-semibold" dir="auto">
-                {selected.name}
-              </h2>
-              <p className="max-w-3xl text-sm text-muted-foreground" dir="auto">
-                {selected.objective}
-              </p>
-            </div>
-            <DeleteBriefButton
-              orgId={orgId}
-              projectId={projectId}
-              briefId={selected.id}
-              afterDeleteHref={base}
-            />
-          </div>
-
           <AdStudioStepper steps={stepNav} active={activeStep} label={t('stepper.label')} />
 
           {activeStep === 'brief' ? (
@@ -677,6 +672,8 @@ export default async function AdStudioPage({
                 hasCopy: Boolean(selected.videoCopy && (selected.videoCopy.headline.trim() || selected.videoCopy.primaryText.trim())),
               })}
               search={summarizeSearchCreative(selected.searchAd, selected.searchKeywords?.keywords.length ?? 0)}
+              publishHref={steps.states.publish !== 'locked' ? stepHref('publish') : null}
+              searchHost={displayHost(selected.landingPageUrl)}
             />
           ) : null}
 
@@ -823,14 +820,14 @@ export default async function AdStudioPage({
           ) : null}
 
           <nav
-            className="flex flex-wrap items-center justify-between gap-3"
+            className="z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-card/95 p-2 shadow-soft backdrop-blur md:sticky md:bottom-3"
             aria-label={t('stepper.footerLabel')}
             data-testid="ad-studio-step-footer"
           >
             {previousStep ? (
               <Link
                 href={stepHref(previousStep.id)}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+                className="inline-flex h-11 items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-5 text-sm font-semibold text-primary hover:bg-primary/10"
               >
                 <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
                 {t('stepper.back', { step: previousStep.label })}
@@ -841,13 +838,13 @@ export default async function AdStudioPage({
             {nextStep && nextStep.state !== 'locked' ? (
               <Link
                 href={stepHref(nextStep.id)}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                className="inline-flex h-11 items-center gap-1.5 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-glow hover:bg-primary/90"
               >
                 {t('stepper.next', { step: nextStep.label })}
                 <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
               </Link>
             ) : nextStep ? (
-              <span className="text-xs text-muted-foreground">{nextStep.hint}</span>
+              <span className="px-3 text-xs text-muted-foreground">{nextStep.hint}</span>
             ) : null}
           </nav>
         </ClaimSourcesProvider>

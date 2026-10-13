@@ -5021,7 +5021,41 @@
       "searchCounts": "{headlines} headlines, {descriptions} descriptions",
       "searchKeywords": "{count, plural, =0 {No keywords chosen} one {# keyword} other {# keywords}}",
       "back": "All creatives",
-      "videoNotAssembled": "Every scene is ready - assemble the video"
+      "videoNotAssembled": "Every scene is ready - assemble the video",
+      "videoVertical": "Vertical 9:16",
+      "videoHorizontal": "Horizontal 16:9",
+      "next": {
+        "eyebrow": "Next step",
+        "continuePublish": "Continue to publish",
+        "attention": {
+          "title": "{count, plural, one {One creative needs} other {# creatives need}} a look",
+          "description": "Open it to see what the check found and fix it before publishing.",
+          "action": "Open and fix"
+        },
+        "assemble": {
+          "title": "Every scene is ready - assemble the video",
+          "description": "Put the rendered scenes together into one video, and it is ready to publish.",
+          "action": "Assemble the video"
+        },
+        "working": {
+          "title": "{count, plural, one {One creative is} other {# creatives are}} still being made",
+          "description": "Refresh in a minute to see them. Meanwhile you can open and edit the ready ones."
+        },
+        "publish": {
+          "title": "Ready to publish",
+          "description": "{count, plural, one {One creative is} other {# creatives are}} ready. Choose what to publish on the next step.",
+          "action": "Continue to publish"
+        },
+        "start": {
+          "title": "Nothing has been created yet",
+          "description": "Write image ideas with AI or add your own to get started.",
+          "action": "Open image ideas"
+        }
+      }
+    },
+    "adHeader": {
+      "usageLabel": "Today's AI usage",
+      "limitReached": "Limit reached"
     }
   },
   "MetaConnect": {

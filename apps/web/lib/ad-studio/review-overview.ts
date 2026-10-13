@@ -43,6 +43,10 @@ export interface SearchCreativeSummary {
   keywords: number;
   /** The first headline, for the card's preview. */
   sample: string | null;
+  /** The second headline, which Google often shows after the first. */
+  sampleSecond: string | null;
+  /** The first description, for the card's preview. */
+  sampleDescription: string | null;
 }
 
 function placementState(slot: AdStudioImageSlot): CreativeState {
@@ -119,7 +123,41 @@ export function summarizeSearchCreative(ad: AdStudioSearchAd | null, keywords: n
   const headlines = ad?.headlines.filter((line) => line.trim()).length ?? 0;
   const descriptions = ad?.descriptions.filter((line) => line.trim()).length ?? 0;
   const state: CreativeState = !ad || (headlines === 0 && descriptions === 0) ? 'empty' : headlines >= 3 && descriptions >= 2 ? 'ready' : 'attention';
-  return { kind: 'search', state, headlines, descriptions, keywords, sample: ad?.headlines.find((line) => line.trim())?.trim() ?? null };
+  const filled = (lines: readonly string[] | undefined) => (lines ?? []).map((line) => line.trim()).filter(Boolean);
+  const [sample = null, sampleSecond = null] = filled(ad?.headlines);
+  return { kind: 'search', state, headlines, descriptions, keywords, sample, sampleSecond, sampleDescription: filled(ad?.descriptions)[0] ?? null };
+}
+
+/**
+ * The one thing to do next on the Review overview, from where the creatives stand: fix what needs a
+ * look first, then assemble a video whose scenes are all rendered, then wait for work in progress,
+ * then publish what is ready. With nothing made yet, start with the image ideas.
+ */
+export type ReviewNextStep =
+  | { kind: 'attention'; count: number; item: ReviewItem }
+  | { kind: 'assemble' }
+  | { kind: 'working'; count: number }
+  | { kind: 'publish'; ready: number }
+  | { kind: 'start' };
+
+export function reviewNextStep(images: readonly ImageCreativeSummary[], video: VideoCreativeSummary, search: SearchCreativeSummary): ReviewNextStep {
+  const flagged: ReviewItem[] = [
+    ...images.filter((image) => image.state === 'attention').map((image): ReviewItem => ({ kind: 'image', conceptId: image.conceptId })),
+    ...(video.state === 'attention' ? [{ kind: 'video' } as const] : []),
+    ...(search.state === 'attention' ? [{ kind: 'search' } as const] : []),
+  ];
+  if (flagged.length) return { kind: 'attention', count: flagged.length, item: flagged[0] };
+  if (videoNeedsAssembly(video)) return { kind: 'assemble' };
+  const states = [...images.map((image) => image.state), video.state, search.state];
+  const working = states.filter((state) => state === 'working').length;
+  if (working) return { kind: 'working', count: working };
+  const ready = states.filter((state) => state === 'ready').length;
+  return ready ? { kind: 'publish', ready } : { kind: 'start' };
+}
+
+/** Every scene rendered and nothing flagged, but not yet put together into one video. */
+export function videoNeedsAssembly(video: VideoCreativeSummary): boolean {
+  return video.state === 'working' && video.scenes > 0 && video.rendered === video.scenes && !video.assembled;
 }
 
 /** The review detail a URL asks for: one image idea, all of them, the video or the search ad; null for the overview. */
@@ -134,6 +172,16 @@ export function parseReviewItem(value: string | undefined): ReviewItem | null {
 
 export function reviewItemParam(item: ReviewItem): string {
   return item.kind === 'image' ? `image:${item.conceptId}` : item.kind;
+}
+
+/** A landing page's host the way a search result shows it ("example.com"); null when there is none. */
+export function displayHost(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null;
+  try {
+    return new URL(/^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`).hostname.replace(/^www\./, '') || null;
+  } catch {
+    return null;
+  }
 }
 
 /** The writing direction of the ad's language, for previews of its text. */

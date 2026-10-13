@@ -22,7 +22,7 @@ const PROPS: ReviewOverviewProps = {
     { kind: 'image', conceptId: 'c2', index: 2, headline: '', state: 'attention', preview: null, placements: [{ format: 'story', state: 'attention' }], hasCopy: false },
   ],
   video: { kind: 'video', state: 'working', scenes: 3, rendered: 2, previewClipId: 'k1', assembled: false, assembledSeconds: 0, hasCopy: false },
-  search: { kind: 'search', state: 'empty', headlines: 0, descriptions: 0, keywords: 0, sample: null },
+  search: { kind: 'search', state: 'empty', headlines: 0, descriptions: 0, keywords: 0, sample: null, sampleSecond: null, sampleDescription: null },
 };
 
 describe('ReviewOverview', () => {
@@ -63,11 +63,44 @@ describe('ReviewOverview', () => {
 
   it('says when every scene is ready but the video is not assembled, and reads the search ad in the ad direction', () => {
     renderWithIntl(
-      <ReviewOverview {...PROPS} adDirection="rtl" video={{ ...PROPS.video, rendered: 3 }} search={{ ...PROPS.search, state: 'ready', headlines: 3, descriptions: 2, sample: 'Sign fast' }} />,
+      <ReviewOverview {...PROPS} adDirection="rtl" video={{ ...PROPS.video, rendered: 3 }} search={{ ...PROPS.search, state: 'ready', headlines: 3, descriptions: 2, sample: 'Sign fast', sampleSecond: 'Free trial', sampleDescription: 'Contracts signed on WhatsApp.' }} searchHost="easysign.co.il" />,
       { locale: 'en' },
     );
     expect(screen.getByTestId('ad-studio-creative-video')).toHaveTextContent('Every scene is ready - assemble the video');
-    expect(screen.getByTestId('ad-studio-search-preview')).toHaveAttribute('dir', 'rtl');
+    const preview = screen.getByTestId('ad-studio-search-preview');
+    expect(preview).toHaveAttribute('dir', 'rtl');
+    expect(preview).toHaveTextContent('Sign fast | Free trial');
+    expect(preview).toHaveTextContent('Contracts signed on WhatsApp.');
+    expect(preview).toHaveTextContent('easysign.co.il');
+  });
+
+  it('leads with the next step: the first creative that needs a look, highlighted, with the way to publish', () => {
+    renderWithIntl(<ReviewOverview {...PROPS} publishHref="/r?step=publish" />, { locale: 'en' });
+    const next = screen.getByTestId('ad-studio-review-next');
+    expect(next).toHaveAttribute('data-next', 'attention');
+    expect(next).toHaveTextContent('One creative needs a look');
+    expect(screen.getByTestId('ad-studio-review-next-action')).toHaveAttribute('href', '/r?item=image:c2');
+    expect(screen.getByTestId('ad-studio-review-next-publish')).toHaveAttribute('href', '/r?step=publish');
+    expect(screen.getByTestId('ad-studio-creative-image-2')).toHaveAttribute('data-highlight', 'attention');
+    expect(screen.getByTestId('ad-studio-creative-image-1')).not.toHaveAttribute('data-highlight');
+  });
+
+  it('asks to assemble the video once every scene is rendered, and offers publishing when all is ready', () => {
+    const ready = { ...PROPS.images[1], state: 'ready' as const };
+    const { unmount } = renderWithIntl(<ReviewOverview {...PROPS} images={[PROPS.images[0], ready]} video={{ ...PROPS.video, rendered: 3 }} />, { locale: 'he' });
+    expect(screen.getByTestId('ad-studio-review-next')).toHaveTextContent(heMessages.AdStudio.review.next.assemble.title);
+    expect(screen.getByTestId('ad-studio-review-next-action')).toHaveAttribute('href', '/r?item=video');
+    expect(screen.getByTestId('ad-studio-creative-video')).toHaveAttribute('data-highlight', 'action');
+    expect(screen.queryByTestId('ad-studio-review-next-publish')).toBeNull();
+    unmount();
+
+    renderWithIntl(
+      <ReviewOverview {...PROPS} images={[PROPS.images[0], ready]} video={{ ...PROPS.video, state: 'ready', rendered: 3, assembled: true, assembledSeconds: 15 }} publishHref="/r?step=publish" />,
+      { locale: 'en' },
+    );
+    expect(screen.getByTestId('ad-studio-review-next')).toHaveTextContent('3 creatives are ready');
+    expect(screen.getByTestId('ad-studio-review-next-action')).toHaveAttribute('href', '/r?step=publish');
+    expect(screen.queryByTestId('ad-studio-review-next-publish')).toBeNull();
   });
 
   it('offers to start image ideas when there are none, in Hebrew', () => {

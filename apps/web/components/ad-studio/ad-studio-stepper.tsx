@@ -30,55 +30,56 @@ export function AdStudioStepper({
   return (
     <nav
       aria-label={label}
-      className="sticky top-2 z-10 rounded-2xl border border-border bg-card/95 p-2 shadow-sm backdrop-blur"
+      className="z-10 rounded-3xl border border-border/60 bg-card/95 px-2 py-4 shadow-soft backdrop-blur md:sticky md:top-2 sm:px-4"
       data-testid="ad-studio-stepper"
     >
-      <ol className="grid grid-cols-5 gap-1">
+      <ol className="grid grid-cols-5">
         {steps.map((step, index) => {
           const isActive = step.id === active;
+          const next = steps[index + 1];
           const content = (
             <>
               <span
                 className={cn(
-                  'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                  step.state === 'done'
-                    ? 'bg-success text-white'
-                    : isActive
+                  'relative z-[1] flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition',
+                  isActive
+                    ? 'bg-primary text-primary-foreground shadow-glow ring-4 ring-primary/15'
+                    : step.state === 'done'
                       ? 'bg-primary text-primary-foreground'
                       : step.state === 'locked'
                         ? 'bg-muted text-muted-foreground'
-                        : 'border border-primary/50 text-primary',
+                        : 'border-2 border-primary/40 bg-card text-primary',
                 )}
                 aria-hidden="true"
               >
-                {step.state === 'done' ? (
-                  <Check className="h-3.5 w-3.5" />
+                {step.state === 'done' && !isActive ? (
+                  <Check className="h-4 w-4" />
                 ) : step.state === 'locked' ? (
-                  <Lock className="h-3 w-3" />
+                  <Lock className="h-3.5 w-3.5" />
                 ) : (
                   index + 1
                 )}
               </span>
-              {/* On a phone each step keeps a short name under its number, so the bar is not five bare icons. */}
-              <span className="max-w-full truncate text-[10px] font-medium sm:hidden">
+              <span className={cn('max-w-full truncate text-center text-[11px] font-medium sm:text-xs', isActive ? 'font-semibold text-primary' : 'text-muted-foreground')}>
+                <span className="hidden sm:inline">{index + 1}. </span>
                 {step.label}
               </span>
-              <span className="hidden min-w-0 flex-col sm:flex">
-                <span className="truncate text-sm font-semibold">{step.label}</span>
-                <span className="truncate text-[11px] text-muted-foreground">{step.hint}</span>
-              </span>
+              <span className="hidden max-w-full truncate text-center text-[11px] text-muted-foreground/80 lg:block">{step.hint}</span>
             </>
           );
           const className = cn(
-            'flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 sm:flex-row sm:justify-start sm:gap-2 sm:px-2 sm:py-2',
-            isActive
-              ? 'bg-primary/10 ring-1 ring-primary/40'
-              : step.state === 'locked'
-                ? 'opacity-60'
-                : 'hover:bg-muted',
+            'relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary',
+            step.state === 'locked' ? 'opacity-60' : !isActive && 'hover:bg-muted/60',
           );
           return (
-            <li key={step.id} data-testid={`ad-studio-step-${step.id}`} data-state={step.state}>
+            <li key={step.id} className="relative min-w-0" data-testid={`ad-studio-step-${step.id}`} data-state={step.state}>
+              {/* The line to the next step: filled once this step is done. */}
+              {next ? (
+                <span
+                  className={cn('absolute start-1/2 top-[1.375rem] h-0.5 w-full', step.state === 'done' ? 'bg-primary' : 'bg-border')}
+                  aria-hidden="true"
+                />
+              ) : null}
               {step.state === 'locked' ? (
                 <span className={className} aria-disabled="true" title={step.hint}>
                   {content}
@@ -88,7 +89,7 @@ export function AdStudioStepper({
                   href={step.href}
                   className={className}
                   aria-current={isActive ? 'step' : undefined}
-                  title={step.label}
+                  title={step.hint}
                 >
                   {content}
                 </Link>

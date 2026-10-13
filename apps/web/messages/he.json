@@ -5021,7 +5021,41 @@
       "searchCounts": "{headlines} כותרות, {descriptions} תיאורים",
       "searchKeywords": "{count, plural, =0 {לא נבחרו מילות מפתח} one {מילת מפתח אחת} other {# מילות מפתח}}",
       "back": "כל הקריאייטיבים",
-      "videoNotAssembled": "כל הסצנות מוכנות - נשאר להרכיב את הסרטון"
+      "videoNotAssembled": "כל הסצנות מוכנות - נשאר להרכיב את הסרטון",
+      "videoVertical": "לאורך 9:16",
+      "videoHorizontal": "לרוחב 16:9",
+      "next": {
+        "eyebrow": "הצעד הבא",
+        "continuePublish": "המשך לפרסום",
+        "attention": {
+          "title": "{count, plural, one {קריאייטיב אחד דורש בדיקה} other {# קריאייטיבים דורשים בדיקה}}",
+          "description": "פתחו אותו כדי לראות מה הבדיקה מצאה ולתקן לפני הפרסום.",
+          "action": "פתיחה ותיקון"
+        },
+        "assemble": {
+          "title": "כל הסצנות מוכנות - נשאר להרכיב את הסרטון",
+          "description": "חברו את הסצנות שנוצרו לסרטון אחד, והוא מוכן לפרסום.",
+          "action": "הרכבת הסרטון"
+        },
+        "working": {
+          "title": "{count, plural, one {קריאייטיב אחד עדיין בהכנה} other {# קריאייטיבים עדיין בהכנה}}",
+          "description": "רעננו בעוד דקה כדי לראות אותם. בינתיים אפשר לפתוח ולערוך את המוכנים."
+        },
+        "publish": {
+          "title": "מוכן לפרסום",
+          "description": "{count, plural, one {קריאייטיב אחד מוכן} other {# קריאייטיבים מוכנים}}. בשלב הבא בוחרים מה לפרסם.",
+          "action": "המשך לפרסום"
+        },
+        "start": {
+          "title": "עוד לא נוצר כלום",
+          "description": "כתבו רעיונות לתמונות עם AI או הוסיפו רעיון משלכם כדי להתחיל.",
+          "action": "לרעיונות התמונה"
+        }
+      }
+    },
+    "adHeader": {
+      "usageLabel": "שימוש ב-AI היום",
+      "limitReached": "מכסה מלאה"
     }
   },
   "MetaConnect": {

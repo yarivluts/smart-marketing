@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { AdStudioImageConcept } from '@growthos/shared';
 import type { AdStudioClipView, AdStudioImageSlot, AdStudioImageView } from './view';
-import { parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative } from './review-overview';
+import {
+  displayHost,
+  parseReviewItem,
+  reviewItemParam,
+  reviewNextStep,
+  summarizeImageCreatives,
+  summarizeSearchCreative,
+  summarizeVideoCreative,
+  videoNeedsAssembly,
+  type CreativeState,
+  type ImageCreativeSummary,
+  type SearchCreativeSummary,
+  type VideoCreativeSummary,
+} from './review-overview';
 
 const concept = (id: string, extra: Partial<AdStudioImageConcept> = {}): AdStudioImageConcept => ({ id, visualPrompt: 'A lawyer', headline: ' Sign fast ', formats: ['square', 'story'], ...extra });
 
@@ -56,9 +69,33 @@ describe('summarizeVideoCreative', () => {
 
 describe('summarizeSearchCreative', () => {
   it('is ready at 3 headlines and 2 descriptions, needs a look below, empty without an ad', () => {
-    expect(summarizeSearchCreative({ headlines: ['A', 'B', 'C', ' '], descriptions: ['D', 'E'], path1: '', path2: '' }, 12)).toEqual({ kind: 'search', state: 'ready', headlines: 3, descriptions: 2, keywords: 12, sample: 'A' });
-    expect(summarizeSearchCreative({ headlines: ['A'], descriptions: [], path1: '', path2: '' }, 0).state).toBe('attention');
-    expect(summarizeSearchCreative(null, 4)).toMatchObject({ state: 'empty', sample: null });
+    expect(summarizeSearchCreative({ headlines: [' ', 'A', 'B', 'C'], descriptions: ['D ', 'E'], path1: '', path2: '' }, 12)).toEqual({ kind: 'search', state: 'ready', headlines: 3, descriptions: 2, keywords: 12, sample: 'A', sampleSecond: 'B', sampleDescription: 'D' });
+    expect(summarizeSearchCreative({ headlines: ['A'], descriptions: [], path1: '', path2: '' }, 0)).toMatchObject({ state: 'attention', sample: 'A', sampleSecond: null, sampleDescription: null });
+    expect(summarizeSearchCreative(null, 4)).toMatchObject({ state: 'empty', sample: null, sampleSecond: null, sampleDescription: null });
+  });
+});
+
+describe('reviewNextStep', () => {
+  const img = (conceptId: string, state: CreativeState): ImageCreativeSummary => ({ kind: 'image', conceptId, index: 1, headline: '', state, preview: null, placements: [], hasCopy: true });
+  const video = (extra: Partial<VideoCreativeSummary> = {}): VideoCreativeSummary => ({ kind: 'video', state: 'ready', scenes: 3, rendered: 3, previewClipId: null, assembled: true, assembledSeconds: 15, hasCopy: true, ...extra });
+  const search = (state: CreativeState): SearchCreativeSummary => ({ kind: 'search', state, headlines: 0, descriptions: 0, keywords: 0, sample: null, sampleSecond: null, sampleDescription: null });
+  const unassembled = video({ state: 'working', assembled: false, assembledSeconds: 0 });
+
+  it('sends the person to the first creative that needs a look before anything else', () => {
+    expect(reviewNextStep([img('c1', 'ready'), img('c2', 'attention')], unassembled, search('attention'))).toEqual({ kind: 'attention', count: 2, item: { kind: 'image', conceptId: 'c2' } });
+    expect(reviewNextStep([img('c1', 'ready')], video({ state: 'attention' }), search('ready'))).toEqual({ kind: 'attention', count: 1, item: { kind: 'video' } });
+  });
+
+  it('asks to assemble a video whose scenes are all rendered, then waits on work in progress', () => {
+    expect(reviewNextStep([img('c1', 'working')], unassembled, search('ready'))).toEqual({ kind: 'assemble' });
+    expect(videoNeedsAssembly(unassembled)).toBe(true);
+    expect(videoNeedsAssembly(video({ state: 'working', rendered: 2, assembled: false }))).toBe(false);
+    expect(reviewNextStep([img('c1', 'working')], video({ state: 'working', rendered: 2, assembled: false }), search('ready'))).toEqual({ kind: 'working', count: 2 });
+  });
+
+  it('moves on to publishing once nothing is pending, and starts from the ideas when nothing is made', () => {
+    expect(reviewNextStep([img('c1', 'ready'), img('c2', 'empty')], video(), search('empty'))).toEqual({ kind: 'publish', ready: 2 });
+    expect(reviewNextStep([], video({ state: 'empty', scenes: 0, rendered: 0, assembled: false }), search('empty'))).toEqual({ kind: 'start' });
   });
 });
 
@@ -70,5 +107,15 @@ describe('review items in the URL', () => {
     expect(parseReviewItem(undefined)).toBeNull();
     expect(parseReviewItem('image:')).toBeNull();
     expect(parseReviewItem('other')).toBeNull();
+  });
+});
+
+describe('displayHost', () => {
+  it('shows the landing page host without the scheme or www, and nothing for a missing or broken URL', () => {
+    expect(displayHost('https://www.easysign.co.il/legal?utm=1')).toBe('easysign.co.il');
+    expect(displayHost('easysign.co.il/legal')).toBe('easysign.co.il');
+    expect(displayHost(null)).toBeNull();
+    expect(displayHost('  ')).toBeNull();
+    expect(displayHost('http://')).toBeNull();
   });
 });
