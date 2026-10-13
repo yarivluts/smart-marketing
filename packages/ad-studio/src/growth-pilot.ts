@@ -29,7 +29,7 @@ import {
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { fetchHtmlPage, type PlanningSourceDeps } from './planning-sources';
-import { ensureOrm } from './runtime';
+import { adStudioRuntime, ensureOrm } from './runtime';
 
 /**
  * Growth Pilot engine: reads the person's website (the home page and the few pages that say what is
@@ -113,7 +113,7 @@ export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: s
   if (pilot.status !== 'analyzing') return pilot;
   const token = await acquireGrowthPilotLease(pilot, { now: ctx.now });
   if (!token) return pilot;
-  const site = await readGrowthSite(pilot.site_url, ctx.deps);
+  const site = await readGrowthSite(pilot.site_url, ctx.deps ?? adStudioRuntime().siteReader);
   if (site.status !== 'ok') return (await failGrowthPilotAnalysis({ pilot, token, code: `site_${site.reason}`, now: ctx.now })) ?? pilot;
   try {
     const prompt = buildSiteAnalysisPrompt(site.pages);
