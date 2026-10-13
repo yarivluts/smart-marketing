@@ -308,7 +308,16 @@ describe('image ads routes', () => {
   });
 
   it('stops after the retries and shows what is still wrong; the size and the check follow the project settings', async () => {
-    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', about: 'quality', detail: 'Slight blur', fix: 'Sharper focus.' }] }) });
+    // A picture defect every render repeats: setting the headline in code does not cure it.
+    fakeGoogle({
+      imageQa: () => ({
+        textInImage: 'Sign in 30 seconds',
+        issues: [
+          { severity: 'minor', about: 'body', detail: 'A sixth finger', fix: 'Five fingers on each hand.' },
+          { severity: 'minor', about: 'quality', detail: 'Slight blur', fix: 'Sharper focus.' },
+        ],
+      }),
+    });
     const ctx = await setup();
     const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
     const conceptId = ideas.concepts[0].id;
@@ -318,8 +327,9 @@ describe('image ads routes', () => {
     expect(failing.images[0].qa).toEqual({
       status: 'issues',
       renders: 4,
+      // The reviewer called the sixth finger minor; the code makes a body defect major.
       issues: [
-        { severity: 'major', code: 'headline_mismatch', detail: 'Sing in 30 seconds' },
+        { severity: 'major', detail: 'A sixth finger' },
         { severity: 'minor', detail: 'Slight blur' },
       ],
     });
@@ -348,7 +358,7 @@ describe('image ads routes', () => {
   });
 
   it('exports a ready image as a Google Ads image asset through the attached credential, and needs automation.execute', async () => {
-    const google = fakeGoogle();
+    const google = fakeGoogle({ imageQa: () => ({ textInImage: 'Sign fast', issues: [] }) });
     const ctx = await setup();
     await saveConcepts(request('PUT', { concepts: [{ id: 'c1', visualPrompt: 'A phone', headline: 'Sign fast', formats: ['square'] }] }), ctx.p());
     const image = ((await (await renderImage(request('POST', { conceptId: 'c1', format: 'square' }), ctx.p())).json()) as ImagesPayload).images[0];
