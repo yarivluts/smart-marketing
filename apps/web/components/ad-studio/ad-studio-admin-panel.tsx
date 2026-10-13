@@ -232,6 +232,7 @@ export function AdStudioAdminPanel({
                 </select>
               </label>
             </div>
+            <p className="text-[11px] text-muted-foreground">{t('admin.qaRetriesImagesHint')}</p>
           </fieldset>
           <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}

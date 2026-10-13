@@ -212,12 +212,17 @@ async function renderChecked(
   render: (fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
 ): Promise<{ image: AdStudioGeneratedImage; renders: number; qa: AdStudioImageQa }> {
   const reviewer = check.enabled ? (deps.reviewer ?? null) : null;
-  const attempts = reviewer ? 1 + check.retries : 1;
+  // An image costs a fraction of a clip, so with re-renders on it gets at least AD_STUDIO_MIN_IMAGE_RETRIES; 0 stays 0.
+  const retries = check.retries > 0 ? Math.max(check.retries, AD_STUDIO_MIN_IMAGE_RETRIES) : 0;
+  const attempts = reviewer ? 1 + retries : 1;
+  const started = Date.now();
   let best: { image: AdStudioGeneratedImage; verdict: ImageQaVerdict } | null = null;
   let renders = 0;
   const fixes: string[] = [];
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) {
+      // No new attempt late in the request: it must end well inside the server timeout.
+      if (Date.now() - started > IMAGE_ATTEMPT_BUDGET_MS) break;
       try {
         await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind, units: 1, now: deps.now?.() });
       } catch {
@@ -243,6 +248,11 @@ async function renderChecked(
   const { status, issues, text, model } = chosen.verdict;
   return { image: chosen.image, renders, qa: { status, issues, text, model, renders } };
 }
+
+/** Images are cheap next to video: with re-renders on, an image gets at least this many guided re-renders. */
+export const AD_STUDIO_MIN_IMAGE_RETRIES = 2;
+/** No new attempt starts after this long, so a render request ends well inside Cloud Run's 300 s timeout. */
+const IMAGE_ATTEMPT_BUDGET_MS = 170_000;
 
 /** The prompt for a retry: the original request, then what the check found wrong in the earlier render and how to draw it instead. */
 export function withFixes(prompt: string, fixes: readonly string[]): string {

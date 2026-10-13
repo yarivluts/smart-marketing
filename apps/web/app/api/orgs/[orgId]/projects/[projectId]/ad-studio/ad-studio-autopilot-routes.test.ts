@@ -292,9 +292,10 @@ describe('image ads routes', () => {
     const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
     const conceptId = ideas.concepts[0].id;
     const failing = (await (await renderImage(request('POST', { conceptId, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    // With one re-render set, an image still gets the minimum of two guided re-renders: three renders in all.
     expect(failing.images[0].qa).toEqual({
       status: 'issues',
-      renders: 2,
+      renders: 3,
       issues: [
         { severity: 'major', code: 'headline_mismatch', detail: 'Sing in 30 seconds' },
         { severity: 'minor', detail: 'Slight blur' },

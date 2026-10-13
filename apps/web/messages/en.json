@@ -4480,7 +4480,8 @@
       "imageSizes": {
         "1K": "1K - drafts",
         "2K": "2K - recommended"
-      }
+      },
+      "qaRetriesImagesHint": "Images get at least 2 guided re-renders when re-renders are on: an image costs a fraction of a clip, and each retry is told what to fix."
     },
     "pronunciation": "Pronunciation (with nikud)",
     "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
