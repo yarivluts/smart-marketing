@@ -29,7 +29,7 @@ describe('buildImageQaPrompt', () => {
 
 describe('imageQaVerdict', () => {
   it('passes when the headline is in the picture and only minor problems were found', () => {
-    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', detail: ' Slight blur ', fix: 'Sharper focus' }] }, 'gemini')).toEqual({
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', about: 'picture', detail: ' Slight blur ', fix: 'Sharper focus' }] }, 'gemini')).toEqual({
       status: 'passed',
       issues: [{ severity: 'minor', detail: 'Slight blur' }],
       text: 'SIGN IN 30 SECONDS',
@@ -53,9 +53,9 @@ describe('imageQaVerdict', () => {
       {
         textInImage: '',
         issues: [
-          { severity: 'major', detail: 'phone too big', fix: '  The phone fits in one hand. ' },
-          { severity: 'major', detail: 'legs merge into a box', fix: 'Show the whole person seated, legs under the table.' },
-          { severity: 'minor', detail: 'slight blur', fix: 'Sharper.' },
+          { severity: 'major', about: 'picture', detail: 'phone too big', fix: '  The phone fits in one hand. ' },
+          { severity: 'major', about: 'picture', detail: 'legs merge into a box', fix: 'Show the whole person seated, legs under the table.' },
+          { severity: 'minor', about: 'picture', detail: 'slight blur', fix: 'Sharper.' },
         ],
       },
       'gemini',
@@ -64,9 +64,27 @@ describe('imageQaVerdict', () => {
   });
 
   it('keeps the reviewer own major finding instead of adding a second one, and does not compare after an edit', () => {
-    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', detail: 'Misspelled headline', fix: 'Spell it right.' }] }, 'gemini');
+    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', about: 'headline', detail: 'Misspelled headline', fix: 'Spell it right.' }] }, 'gemini');
     expect(verdict.issues).toEqual([{ severity: 'major', detail: 'Misspelled headline' }]);
     expect(imageQaVerdict({ headline: null }, { textInImage: 'Anything new', issues: [] }, 'gemini').status).toBe('passed');
+  });
+});
+
+describe('right-to-left headlines', () => {
+  it('tells the reviewer that digits inside Hebrew read left to right', () => {
+    expect(buildImageQaPrompt({ headline: 'x', visualPrompt: 'v', language: 'he' }).user).toContain('a number inside it keeps its digits left to right');
+    expect(buildImageQaPrompt({ headline: 'x', visualPrompt: 'v', language: 'en' }).user).not.toContain('right to left');
+  });
+
+  it('keeps a headline the code confirmed, showing a reviewer "reversed" finding only as minor', () => {
+    const verdict = imageQaVerdict(
+      { headline: 'Sign in 30 seconds' },
+      { textInImage: 'Sign in 30 seconds', issues: [{ severity: 'major', about: 'headline', detail: 'The words are reversed', fix: 'Write it right to left.' }] },
+      'gemini',
+    );
+    expect(verdict.status).toBe('passed');
+    expect(verdict.issues).toEqual([{ severity: 'minor', detail: 'The words are reversed' }]);
+    expect(verdict.fixes).toEqual([]);
   });
 });
 
