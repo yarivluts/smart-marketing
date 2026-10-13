@@ -17,6 +17,31 @@ Template for each entry:
 
 ---
 
+## 2026-10-14 - Growth Pilot: enter the website, approve what the AI proposes, get ads (KAN-393..395)
+
+- **New top-level Growth Pilot** (first in the project nav, `ai.use`):
+  - One input, the website. The AI reads up to 6 same-site pages and proposes targets (products, services, audiences), each with why.
+  - The person approves, rejects or asks the AI to change each proposal (human in the middle).
+  - Supports new targets in the person's own words, pause/resume, an activity feed, and an audit trail.
+- **Ads from approved targets (#661):**
+  - An approved target becomes an Ad Studio brief.
+  - The autopilot (plan, image ideas, checked images, no video) produces an ads proposal with previews and an Ad Studio link.
+  - Asking for a change rewrites the ideas and re-renders them.
+- **Live:** foundation #660 (web-prod-00162) and ads #661 (web-prod-00163).
+- **Verified on prod with easy-sign.co.il:**
+  - The AI found the real Free / Pro 20 ILS / Unlimited 50 ILS plans and two audiences.
+  - Approving "Free plan" produced 6 checked image ads with Hebrew headlines in about 10 minutes.
+  - No errors, no overflow at 390.
+- **Tests:** full web suite 489 files / 3310 tests, green locally (emulator via a portable JRE) and in CI.
+- **Limits:** daily limits were raised temporarily for the run (audited) and restored to 40 images / 50 text.
+- **Next:**
+  - KAN-396: landing pages.
+  - KAN-397: audiences.
+  - KAN-398: publish paused + monitoring (real KPIs, no invented numbers).
+  - KAN-399: scheduler, so it runs without an open tab, plus admin.
+  - KAN-400: one-click Google Ads connect. **Needs human:** a Google Ads developer token and OAuth verification for the adwords scope.
+- **Stitch:** the start screen and command center are in project 748986387566122661. The target-page screen keeps returning "service unavailable"; retry it later.
+
 ## 2026-10-13 - Ad Studio editor sweep on prod: hydration error and favicon fixed (KAN-392)
 
 - **Sweep:** every Ad Studio step (list, brief, plan, create, review, publish), plus the review detail pages (image idea, video, search), in en and he, at 1440 and 390, in real Chrome, signed in as the QA user.
