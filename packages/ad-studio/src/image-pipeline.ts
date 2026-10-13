@@ -270,13 +270,18 @@ async function renderChecked(
   return { image: chosen.image, renders, qa: { status, issues, text, model, renders, ...(overlay ? { overlay: true } : {}) } };
 }
 
+/**
+ * The web and api services allow a request 600 s (infra/terraform/cloud_run.tf). A slow image call takes
+ * up to ~2 minutes plus ~15 s of checking, so attempts start only while one more still fits: on prod a
+ * 300 s limit (budgets of 170/210 s) cut slow landscape renders off after two tries, before the last resort.
+ */
 /** The text-free last resort starts only while it can still finish inside the server timeout. */
-const IMAGE_FALLBACK_BUDGET_MS = 210_000;
+const IMAGE_FALLBACK_BUDGET_MS = 430_000;
 
 /** Images are cheap next to video: with re-renders on, an image gets at least this many guided re-renders. */
 export const AD_STUDIO_MIN_IMAGE_RETRIES = 2;
-/** No new attempt starts after this long, so a render request ends well inside Cloud Run's 300 s timeout. */
-const IMAGE_ATTEMPT_BUDGET_MS = 170_000;
+/** No new guided attempt starts after this long, leaving room for the last resort. */
+const IMAGE_ATTEMPT_BUDGET_MS = 380_000;
 
 /** The prompt for a retry: the original request, then what the check found wrong in the earlier render and how to draw it instead. */
 export function withFixes(prompt: string, fixes: readonly string[]): string {

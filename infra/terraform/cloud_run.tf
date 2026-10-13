@@ -42,6 +42,10 @@ resource "google_cloud_run_v2_service" "services" {
   }
 
   template {
+    # An Ad Studio image render runs its guided retries and a last resort inside one request; 600 s
+    # (set live on 2026-10-13) leaves room for slow image calls. packages/ad-studio's budgets assume it.
+    timeout = "600s"
+
     containers {
       # Placeholder only — see the ignore_changes note above for why this
       # never actually drives a real deploy.
