@@ -36,6 +36,7 @@ import {
 import { briefPromptInput } from './brand';
 import { ensureOrm, getServerKmsProvider } from './runtime';
 import { AdStudioProviderError, resolveAdStudioLlm, resolveAdStudioReviewer, type AdStudioLlm, type AdStudioReviewer } from './llm';
+import { canOverlayHeadline, overlayHeadline } from './headline-overlay';
 import { betterImageVerdict, reviewAdStudioImage, type ImageQaSubject, type ImageQaVerdict } from './image-qa';
 import { englishForModel } from './translate';
 import { meteredCall, type AdStudioCallContext } from './metering';
@@ -96,7 +97,7 @@ export function toAdStudioImageView(image: AdStudioImageModel): AdStudioImageVie
     requestedOn: image.requested_on,
     completedOn: image.completed_on ?? null,
     imageSize: image.image_size ?? null,
-    qa: image.qa ? { status: image.qa.status, issues: image.qa.issues, renders: image.qa.renders } : null,
+    qa: image.qa ? { status: image.qa.status, issues: image.qa.issues, renders: image.qa.renders, ...(image.qa.overlay ? { overlay: true } : {}) } : null,
   };
 }
 
@@ -210,6 +211,8 @@ async function renderChecked(
   check: ImageCheckPlan,
   subject: ImageQaSubject,
   render: (fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
+  /** The last resort when every guided render still fails: a text-free picture with the headline drawn in code. */
+  fallback?: (fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
 ): Promise<{ image: AdStudioGeneratedImage; renders: number; qa: AdStudioImageQa }> {
   const reviewer = check.enabled ? (deps.reviewer ?? null) : null;
   // An image costs a fraction of a clip, so with re-renders on it gets at least AD_STUDIO_MIN_IMAGE_RETRIES; 0 stays 0.
@@ -244,10 +247,31 @@ async function renderChecked(
     if (verdict.status !== 'issues') break;
     for (const fix of verdict.fixes ?? []) if (!fixes.includes(fix)) fixes.push(fix);
   }
+  let overlay = false;
+  // Still failing after the guided renders: one text-free render with the headline set in code, so the words
+  // are always right, checked like any other image and kept only when it is better.
+  if (reviewer && fallback && best?.verdict.status === 'issues' && Date.now() - started <= IMAGE_FALLBACK_BUDGET_MS) {
+    try {
+      await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind, units: 1, now: deps.now?.() });
+      renders += 1;
+      const image = await fallback(fixes);
+      const verdict = await reviewAdStudioImage({ ...ctx, image, subject: { ...subject, headlineSetByCode: true }, reviewer, now: deps.now?.() });
+      if (betterImageVerdict(verdict, best.verdict)) {
+        best = { image, verdict };
+        overlay = true;
+      }
+    } catch (error) {
+      // The images made so far stand; the last resort failing (limit, provider, font) changes nothing.
+      console.error('[ad-studio] headline fallback failed', { briefId: ctx.briefId, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
   const chosen = best as { image: AdStudioGeneratedImage; verdict: ImageQaVerdict };
   const { status, issues, text, model } = chosen.verdict;
-  return { image: chosen.image, renders, qa: { status, issues, text, model, renders } };
+  return { image: chosen.image, renders, qa: { status, issues, text, model, renders, ...(overlay ? { overlay: true } : {}) } };
 }
+
+/** The text-free last resort starts only while it can still finish inside the server timeout. */
+const IMAGE_FALLBACK_BUDGET_MS = 210_000;
 
 /** Images are cheap next to video: with re-renders on, an image gets at least this many guided re-renders. */
 export const AD_STUDIO_MIN_IMAGE_RETRIES = 2;
@@ -268,13 +292,14 @@ async function produceImage(
   check: ImageCheckPlan,
   subject: ImageQaSubject,
   call: (generator: AdStudioImageGenerator, fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
+  fallback?: (generator: AdStudioImageGenerator, fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
 ): Promise<AdStudioImageModel> {
   const now = deps.now ?? (() => new Date());
   const usage = { organizationId: ctx.organizationId, projectId: ctx.projectId, kind, provider: 'gemini', model: record.model, briefId: ctx.briefId, actorId: ctx.actorId };
   try {
     const generator = deps.images;
     if (!generator) throw new AdStudioProviderError('not_configured', 'No image model is configured.');
-    const { image, renders, qa } = await renderChecked(ctx, deps, kind, check, subject, (fixes) => call(generator, fixes));
+    const { image, renders, qa } = await renderChecked(ctx, deps, kind, check, subject, (fixes) => call(generator, fixes), fallback ? (fixes) => fallback(generator, fixes) : undefined);
     const objectPath = adStudioImageObjectPath({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: ctx.briefId, imageId: record.id, mimeType: image.mimeType });
     await deps.storage.upload(objectPath, image.bytes, image.mimeType);
     await recordAdStudioUsage({ ...usage, units: renders, outcome: 'succeeded', now: now() });
@@ -322,8 +347,25 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
     now: deps.now?.(),
   });
   const subject = { headline: concept.headline, visualPrompt: concept.visualPrompt, language: input.language };
-  return produceImage(ctx, deps, record, 'image', settings.videoQa, subject, (generator, fixes) =>
-    generator.generate({ prompt: withFixes(prompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize }),
+  const headline = concept.headline.trim();
+  // A text-free picture with room kept for the headline, which is then set in code: the words are always exact.
+  const fallback =
+    headline && canOverlayHeadline(input.language)
+      ? async (generator: AdStudioImageGenerator, fixes: readonly string[]) => {
+          const cleanPrompt = buildImagePrompt({ ...concept, visualPrompt, headline: '' }, ctx.format, input, { headlineSpace: true });
+          const clean = await generator.generate({ prompt: withFixes(cleanPrompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize });
+          return overlayHeadline({ image: clean, headline, format: ctx.format });
+        }
+      : undefined;
+  return produceImage(
+    ctx,
+    deps,
+    record,
+    'image',
+    settings.videoQa,
+    subject,
+    (generator, fixes) => generator.generate({ prompt: withFixes(prompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize }),
+    fallback,
   );
 }
 

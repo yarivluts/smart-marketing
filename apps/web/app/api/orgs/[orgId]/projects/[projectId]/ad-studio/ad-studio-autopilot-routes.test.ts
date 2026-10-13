@@ -78,7 +78,11 @@ afterEach(() => {
 });
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 9, 9]);
+// A real 64x64 PNG: the studio decodes it when it sets a headline itself.
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAoElEQVR4nO2SQQkAQRDDKr8WzkJUroh7hIFCBSSh6cfpRSfoBNArdhfi7qITdALoFbsLcXfRCToB9Irdhbi76ASdAHrF7kLcXXSCTgC9Ynch7i46QSeAXrG7EHcXnaATQK/YXYi7i07QCaBX7C7E3UUn6ATQK3YX4u6iE3QC6BW7C3F30Qk6AfSK3YW4u+gEnQB6xe5C3F10gk4AveKfCz2fxLGlfbPmmAAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 /**
  * A stand-in for the Google APIs the studio calls, with their documented shapes: Gemini text
@@ -86,7 +90,7 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 9, 9]);
  * synchronous, inline PNG), Gemini Omni video (`interactions` in the background, polled, then a
  * Files API download), and Google Ads OAuth + `assets:mutate` for an image export.
  */
-function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown; imageQa?: (n: number) => unknown } = {}) {
+function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown; imageQa?: (n: number) => unknown; headlineRead?: string[] } = {}) {
   let reviews = 0;
   let imageReviews = 0;
   const calls: { url: string; body: Record<string, unknown> | null }[] = [];
@@ -112,6 +116,10 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
         imageReviews += 1;
         const verdict = options.imageQa ? options.imageQa(imageReviews) : { textInImage: 'Sign in 30 seconds', issues: [] };
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] } }] });
+      }
+      if (schema.includes('"words"')) {
+        // The separate headline reading: none unless the test gives one, so it confirms nothing by default.
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ words: options.headlineRead ?? [] }) }] } }] });
       }
       if (schema.includes('"transcript"')) {
         reviews += 1;
@@ -286,18 +294,58 @@ describe('image ads routes', () => {
     expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2 });
   });
 
+  it('clears a correct headline the reviewer copied reversed, with a separate reading, without a re-render', async () => {
+    const google = fakeGoogle({
+      imageQa: () => ({ textInImage: 'seconds 30 in Sign', issues: [{ severity: 'major', about: 'headline_text', detail: 'The words are reversed', fix: 'Write it in reading order.' }] }),
+      headlineRead: ['Sign', 'in', '30', 'seconds'],
+    });
+    const ctx = await setup();
+    const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
+    const rendered = (await (await renderImage(request('POST', { conceptId: ideas.concepts[0].id, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    expect(rendered.images[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', renders: 1, issues: [] } });
+    expect(google.calls.filter((call) => call.body?.model === 'gemini-3.1-flash-image')).toHaveLength(1);
+  });
+
+  it('as a last resort renders the picture without text and sets the headline in code, keeping it when it passes', async () => {
+    const google = fakeGoogle({ imageQa: (n) => ({ textInImage: n <= 3 ? 'Sing in 30 secnds' : 'Sign in 30 seconds', issues: [] }) });
+    const ctx = await setup();
+    const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
+    const rendered = (await (await renderImage(request('POST', { conceptId: ideas.concepts[0].id, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    expect(rendered.images[0]).toMatchObject({ status: 'ready', mimeType: 'image/jpeg', qa: { status: 'passed', renders: 4, overlay: true } });
+    const imageCalls = google.calls.filter((call) => call.body?.model === 'gemini-3.1-flash-image');
+    expect(imageCalls).toHaveLength(4);
+    // The last call asks for no text and room for the headline; the studio sets the words itself.
+    const last = JSON.stringify(imageCalls[3].body);
+    expect(last).toContain('No words, letters, captions or logos');
+    expect(last).toContain('a headline will be set on it afterwards');
+    expect(last).not.toContain('Draw exactly this headline');
+    const media = await imageMedia(new NextRequest('http://localhost/api/test'), ctx.p({ imageId: rendered.images[0].id }));
+    expect(media.headers.get('content-type')).toBe('image/jpeg');
+  });
+
   it('stops after the retries and shows what is still wrong; the size and the check follow the project settings', async () => {
-    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', about: 'quality', detail: 'Slight blur', fix: 'Sharper focus.' }] }) });
+    // A picture defect every render repeats: setting the headline in code does not cure it.
+    fakeGoogle({
+      imageQa: () => ({
+        textInImage: 'Sign in 30 seconds',
+        issues: [
+          { severity: 'minor', about: 'body', detail: 'A sixth finger', fix: 'Five fingers on each hand.' },
+          { severity: 'minor', about: 'quality', detail: 'Slight blur', fix: 'Sharper focus.' },
+        ],
+      }),
+    });
     const ctx = await setup();
     const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
     const conceptId = ideas.concepts[0].id;
     const failing = (await (await renderImage(request('POST', { conceptId, format: 'square' }), ctx.p())).json()) as ImagesPayload;
-    // With one re-render set, an image still gets the minimum of two guided re-renders: three renders in all.
+    // With one re-render set, an image still gets the minimum of two guided re-renders, then the text-free last
+    // resort: four renders in all. Nothing passed, so the best guided render stays, with what is wrong.
     expect(failing.images[0].qa).toEqual({
       status: 'issues',
-      renders: 3,
+      renders: 4,
+      // The reviewer called the sixth finger minor; the code makes a body defect major.
       issues: [
-        { severity: 'major', code: 'headline_mismatch', detail: 'Sing in 30 seconds' },
+        { severity: 'major', detail: 'A sixth finger' },
         { severity: 'minor', detail: 'Slight blur' },
       ],
     });
@@ -326,7 +374,7 @@ describe('image ads routes', () => {
   });
 
   it('exports a ready image as a Google Ads image asset through the attached credential, and needs automation.execute', async () => {
-    const google = fakeGoogle();
+    const google = fakeGoogle({ imageQa: () => ({ textInImage: 'Sign fast', issues: [] }) });
     const ctx = await setup();
     await saveConcepts(request('PUT', { concepts: [{ id: 'c1', visualPrompt: 'A phone', headline: 'Sign fast', formats: ['square'] }] }), ctx.p());
     const image = ((await (await renderImage(request('POST', { conceptId: 'c1', format: 'square' }), ctx.p())).json()) as ImagesPayload).images[0];

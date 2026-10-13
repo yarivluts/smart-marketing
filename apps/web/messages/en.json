@@ -4357,7 +4357,8 @@
         "issuesHint": "Render it again, change it by an instruction, or edit the headline.",
         "error": "The AI check could not run",
         "headlineMismatch": "The headline in the image is not spelled as written. The image reads:",
-        "headlineMissing": "The headline does not appear in the image."
+        "headlineMissing": "The headline does not appear in the image.",
+        "overlay": "The headline was set by the studio, so its words are exactly as written."
       },
       "filterLabel": "Show ideas",
       "filterAll": "All ideas ({count})",

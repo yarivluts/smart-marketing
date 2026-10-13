@@ -61,6 +61,8 @@ export interface ImageQaSubject {
   headline: string | null;
   visualPrompt: string;
   language: string;
+  /** The headline was set by the studio in code, so its words are exact by construction: only its placement is judged. */
+  headlineSetByCode?: boolean;
 }
 
 export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; user: string } {
@@ -70,7 +72,9 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
     headline === null
       ? `Any text in the image must be correct ${language}: spelled right and written in the right direction.`
       : headline
-        ? `The only text that should appear in the image, spelled exactly: "${headline}".`
+        ? subject.headlineSetByCode
+          ? `The only text that should appear in the image is the headline "${headline}", set by the studio in a font: its words are exact, so judge only where it sits and whether it is legible.`
+          : `The only text that should appear in the image, spelled exactly: "${headline}".`
         : 'No text, letters or logos should appear in the image.';
   const majorText =
     headline === null
@@ -93,9 +97,9 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
       `Intended picture: ${subject.visualPrompt}`,
       '',
       '1) textInImage: copy every word, letter and number visible in the image exactly as drawn, misspellings included (empty when there is none). Do not correct anything.',
-      `2) issues: every problem, each with severity, about (one kind: headline_text - its spelling, letters, word order or direction; headline_placement - where it sits, e.g. over a face; other_text - any other, foreign or gibberish text; body - a deformed face, hand or body, extra limbs; proportion - an object at a wrong size; impossible - floating, merged or physically impossible things; duplicate - the same object twice where one belongs; overlay - floating cards, badges, icons, app frames, empty bands, borders, watermarks, invented logos; quality - slight blur or a tiny artifact; other), a short detail a person can act on, in ${language}, and fix: one short instruction in English telling an image model how to draw it right instead (for example "show the whole person seated, legs under the table", "the phone fits in one hand").`,
+      `2) issues: every problem, each with severity, about (one kind: headline_text - its spelling, letters, word order or direction; headline_placement - where it sits, e.g. over a face; other_text - any other, foreign or gibberish text; body - a deformed face, hand or body, extra limbs; proportion - an object at a wrong size; impossible - floating, merged or physically impossible things; duplicate - the same object twice where one belongs, such as two phones or tablets in use at once; overlay - floating cards, badges, icons, app frames, empty bands, panels or a split layout, borders, watermarks, invented logos; quality - slight blur or a tiny artifact; other), a short detail a person can act on, in ${language}, and fix: one short instruction in English telling an image model how to draw it right instead (for example "show the whole person seated, legs under the table", "the phone fits in one hand").`,
       majorText,
-      `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); extra hands or limbs that belong to no one in the picture; the picture drawn as a phone screen or app (a status bar, app bars, buttons or navigation icons around it); a floating card, label, badge, icon, checkmark or other graphic overlay that is not the headline; the headline over a face, a person or the subject; the same object twice where one belongs (a pen in each hand); empty bands, borders or letterboxing at the edges instead of the scene; a watermark or border; an invented brand logo.`,
+      `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); extra hands or limbs that belong to no one in the picture; the picture drawn as a phone screen or app (a status bar, app bars, buttons or navigation icons around it); a floating card, label, badge, icon, checkmark or other graphic overlay that is not the headline; the headline over a face, a person or the subject; the same object twice where one belongs (a pen in each hand, two phones or tablets at once); empty bands, borders or letterboxing at the edges instead of the scene; the picture split into panels, a collage or a plain band laid across the scene; a watermark or border; an invented brand logo.`,
       'Minor problems: slight blur, small background artifacts, text a little small for a phone screen.',
       'If you find nothing, return an empty issues list.',
     ]
@@ -118,7 +122,9 @@ export interface ImageQaVerdict {
  * headline and the reviewer reported no major problem itself, a `headline_mismatch` issue is added
  * (the UI words it, showing what was read). Pure.
  */
-export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'> & { language?: string }, review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
+export function imageQaVerdict(
+  subject: Pick<ImageQaSubject, 'headline'> & { language?: string; headlineSetByCode?: boolean; /** A separate reading found the headline exactly. */ headlineConfirmedByReading?: boolean },
+  review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
   const text = review.textInImage.trim().slice(0, 500);
   const headline = subject.headline?.trim() ?? '';
   // The code's comparison outranks the reviewer on the headline's text: when the text read off the image
@@ -126,13 +132,16 @@ export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'> & { lan
   // always the same false alarm ("reversed", from digits inside RTL text), so it is dropped; elsewhere it
   // is kept as minor. Where the headline sits (over a face) is judged by the reviewer as usual.
   const headlineConfirmed = Boolean(headline) && imageTextHasHeadline(headline, text);
+  // Words known right - drawn by the studio, or read back exactly by a separate reading: findings about them go.
+  const wordsKnownRight = Boolean(subject.headlineSetByCode || subject.headlineConfirmedByReading);
   const rtl = RTL_LANGUAGES.has((subject.language ?? '').toLowerCase());
   const kept = review.issues
     .map((issue) => ({ ...issue, severity: kindSeverity(issue.about, issue.severity) }))
-    .filter((issue) => !(headlineConfirmed && rtl && issue.about === 'headline_text'))
+    // A headline the studio set itself is right by construction: a finding about its words is always a false alarm.
+    .filter((issue) => !(issue.about === 'headline_text' && (wordsKnownRight || (headlineConfirmed && rtl))))
     .map((issue) => (headlineConfirmed && issue.about === 'headline_text' ? { ...issue, severity: 'minor' as const } : issue));
   const issues: AdStudioImageQaIssue[] = kept.slice(0, MAX_ISSUES).map((issue) => ({ severity: issue.severity, detail: issue.detail.trim().slice(0, 300) }));
-  if (headline && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
+  if (headline && !wordsKnownRight && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
     issues.unshift({ severity: 'major', code: 'headline_mismatch', detail: text.slice(0, 300) });
   }
   const fixes = kept
@@ -189,13 +198,57 @@ export async function reviewAdStudioImage(params: ReviewAdStudioImageParams): Pr
       media: [{ mimeType: params.image.mimeType, data: params.image.bytes }],
     });
     await usage('succeeded');
-    return imageQaVerdict(params.subject, review, reviewer.model);
+    const verdict = imageQaVerdict(params.subject, review, reviewer.model);
+    if (!headlineDoubted(params.subject, review, verdict)) return verdict;
+    // The reviewer doubts the headline's words. A reviewer convinced a Hebrew line is reversed also copies it
+    // reversed, so its own transcript cannot settle it: one short, separate reading does.
+    const confirmed = await readHeadlineBack(params, reviewer, usage).catch(() => false);
+    return confirmed ? imageQaVerdict({ ...params.subject, headlineConfirmedByReading: true }, review, reviewer.model) : verdict;
   } catch (error) {
     const reason = error instanceof AdStudioProviderError ? error.code : 'error';
     await usage('failed', reason).catch(() => undefined);
     console.error('[ad-studio] image quality check failed', { briefId: params.briefId, reason, error: error instanceof Error ? error.message : String(error) });
     return { status: 'error', issues: [], text: null, model: reviewer.model };
   }
+}
+
+export const AdStudioHeadlineReadSchema = z.object({ words: z.array(z.string()) });
+
+/** One narrow question: the big headline's words in reading order, nothing else to judge. */
+export function buildHeadlineReadPrompt(language: string): { system: string; user: string } {
+  const name = languageName(language);
+  const rtl = RTL_LANGUAGES.has(language.toLowerCase());
+  return {
+    system: `You read text in images exactly, as a native ${name} reader would. You never correct or reorder anything.`,
+    user: [
+      'Find the large headline in this image.',
+      rtl
+        ? `Read it as a native ${name} reader does: start from the word furthest to the right and move left; a number inside keeps its own digits in order (for example "30").`
+        : 'Read it in normal reading order, left to right.',
+      'words: the headline words in the order you read them, each exactly as drawn.',
+    ].join('\n'),
+  };
+}
+
+/** Whether the verdict rests on doubts about the headline's words that a careful reading could clear. */
+function headlineDoubted(subject: ImageQaSubject, review: z.infer<typeof AdStudioImageQaSchema>, verdict: ImageQaVerdict): boolean {
+  if (!subject.headline?.trim() || subject.headlineSetByCode) return false;
+  return verdict.issues.some((issue) => issue.code === 'headline_mismatch') || review.issues.some((issue) => issue.about === 'headline_text' && kindSeverity(issue.about, issue.severity) === 'major');
+}
+
+async function readHeadlineBack(
+  params: ReviewAdStudioImageParams,
+  reviewer: AdStudioReviewer,
+  usage: (outcome: 'succeeded' | 'failed', failureReason?: string) => Promise<unknown>,
+): Promise<boolean> {
+  await assertAdStudioQuota({ organizationId: params.organizationId, projectId: params.projectId, kind: 'image_qa', units: 1, now: params.now });
+  const read = await reviewer.reviewJson({
+    ...buildHeadlineReadPrompt(params.subject.language),
+    schema: AdStudioHeadlineReadSchema,
+    media: [{ mimeType: params.image.mimeType, data: params.image.bytes }],
+  });
+  await usage('succeeded');
+  return imageTextHasHeadline(params.subject.headline ?? '', read.words.join(' '));
 }
 
 /** Fewer major problems first, then fewer problems: which of several renders of one concept to keep. */

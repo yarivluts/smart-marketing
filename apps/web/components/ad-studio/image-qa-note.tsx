@@ -21,6 +21,11 @@ export function ImageQaNote({ qa }: { qa: AdStudioImageQaView | null }): React.R
           <CheckCircle2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {qa.renders > 1 ? t('passedRetried', { renders: qa.renders }) : t('passed')}
         </p>
+        {qa.overlay ? (
+          <p className="text-muted-foreground" data-testid="ad-studio-image-qa-overlay">
+            {t('overlay')}
+          </p>
+        ) : null}
         {/* Small things the reviewer noticed are shown too, so a person decides, not the check. */}
         {qa.issues.length ? (
           <ul className="flex list-disc flex-col gap-0.5 ps-4 text-muted-foreground" data-testid="ad-studio-image-qa-minor">

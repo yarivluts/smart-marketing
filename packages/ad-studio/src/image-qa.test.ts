@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { betterImageVerdict, buildImageQaPrompt, imageQaVerdict } from './image-qa';
+import { betterImageVerdict, buildHeadlineReadPrompt, buildImageQaPrompt, imageQaVerdict } from './image-qa';
 import { withFixes } from './image-pipeline';
 
 describe('buildImageQaPrompt', () => {
@@ -19,6 +19,8 @@ describe('buildImageQaPrompt', () => {
     expect(prompt.user).toContain('empty bands, borders or letterboxing');
     expect(prompt.user).toContain('a floating card, label, badge, icon, checkmark or other graphic overlay');
     expect(prompt.user).toContain('the headline over a face, a person or the subject');
+    expect(prompt.user).toContain('two phones or tablets at once');
+    expect(prompt.user).toContain('the picture split into panels, a collage or a plain band');
   });
 
   it('treats any text as a problem when there is no headline, and checks spelling only after an edit', () => {
@@ -105,6 +107,39 @@ describe('right-to-left headlines', () => {
     expect(verdict.status).toBe('passed');
     expect(verdict.issues).toEqual([{ severity: 'minor', detail: 'The words are reversed' }]);
     expect(verdict.fixes).toEqual([]);
+  });
+});
+
+describe('a separate reading of the headline', () => {
+  it('reads right-to-left text from the right, digits kept in order', () => {
+    expect(buildHeadlineReadPrompt('he').user).toContain('start from the word furthest to the right');
+    expect(buildHeadlineReadPrompt('en').user).toContain('left to right');
+  });
+
+  it('clears a reviewer that copied a correct headline reversed', () => {
+    const review = { textInImage: 'seconds 30 in Sign', issues: [{ severity: 'major' as const, about: 'headline_text' as const, detail: 'Reversed', fix: 'Right to left.' }] };
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds', language: 'he' }, review, 'gemini').status).toBe('issues');
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds', language: 'he', headlineConfirmedByReading: true }, review, 'gemini')).toMatchObject({ status: 'passed', issues: [] });
+  });
+});
+
+describe('a headline the studio set itself', () => {
+  it('asks only about its placement, and drops any finding about its words', () => {
+    expect(buildImageQaPrompt({ headline: 'Sign fast', visualPrompt: 'v', language: 'he', headlineSetByCode: true }).user).toContain('judge only where it sits');
+    const verdict = imageQaVerdict(
+      { headline: 'Sign in 30 seconds', language: 'he', headlineSetByCode: true },
+      {
+        textInImage: 'seconds 30 in Sign',
+        issues: [
+          { severity: 'major', about: 'headline_text', detail: 'The words are reversed', fix: 'Write it right to left.' },
+          { severity: 'major', about: 'headline_placement', detail: 'Over her face', fix: 'Move it to the wall.' },
+        ],
+      },
+      'gemini',
+    );
+    // No mismatch from the read-back text either: the code drew exactly these words.
+    expect(verdict.issues).toEqual([{ severity: 'major', detail: 'Over her face' }]);
+    expect(imageQaVerdict({ headline: 'Sign', language: 'he', headlineSetByCode: true }, { textInImage: 'nqiS', issues: [] }, 'gemini').status).toBe('passed');
   });
 });
 

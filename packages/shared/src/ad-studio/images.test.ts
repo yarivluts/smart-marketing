@@ -109,10 +109,19 @@ describe('image prompts', () => {
     expect(prompt).toContain('in Hebrew: "Sign in 30 seconds"');
     expect(prompt).toContain('never over a face, a person or the subject');
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
+    // A text-free picture for the studio's own headline keeps a calm area for it, below the story app bar.
+    expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF, { headlineSpace: true })).toContain('Leave the top quarter of the scene uncluttered');
+    expect(buildImagePrompt(concept({ headline: '' }), 'story', BRIEF, { headlineSpace: true })).toContain('Leave the upper third of the scene uncluttered');
+    expect(buildImagePrompt(concept({ headline: '' }), 'story', BRIEF, { headlineSpace: true })).not.toMatch(/band just below|14%/);
+    expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).not.toContain('a headline will be set on it');
     // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
     // Devices stay secondary and out of focus, so screens carry no text and never float toward the camera.
     expect(prompt).toContain('screen softly out of focus - no readable words');
     expect(prompt).toContain('Never show a device held toward the camera');
+    expect(prompt).toContain('At most one phone or tablet appears in the whole scene');
+    expect(prompt).toContain('its screen faces the person using it');
+    // Documents tend to come out titled in English ("CONTRACT"): they carry no words at all.
+    expect(prompt).toContain('shows only soft grey lines - no title, heading or readable word');
     expect(prompt).toContain('no floating cards, labels, badges, icons');
     expect(prompt).toContain('illegible scribble on that document or screen only');
     expect(prompt).not.toContain('anywhere in the picture, is');
@@ -120,12 +129,14 @@ describe('image prompts', () => {
   });
 
   it('keeps the subject and headline clear of what each placement covers or crops', () => {
-    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('top 14% and bottom 20%');
+    // No percentages or zones: they made the model cut a story into panels.
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('One continuous vertical photograph from edge to edge');
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toMatch(/14%|20%/);
     // The story safe zone must not read as a request to draw the phone app around the picture.
     expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('Do not draw any phone frame, status bar, app interface');
     expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toContain('the app covers');
     // Nor as a request for empty bands: the scene runs to the edges.
-    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('no empty bands, borders or frames');
+    expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('never panels, a collage, a split layout, bands or borders');
     expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toContain('plain background');
     expect(buildImagePrompt(concept(), 'landscape', BRIEF)).toContain('cropped to 1.91:1');
     expect(buildImagePrompt(concept(), 'square', BRIEF)).not.toMatch(/14%|1\.91:1/);

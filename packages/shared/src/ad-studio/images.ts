@@ -229,6 +229,8 @@ export function buildImagePrompt(
   concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline'>,
   format: AdStudioImageFormat,
   brief: Pick<AdStudioBriefInput, 'productDescription' | 'language' | 'brand'>,
+  /** A text-free picture the studio will set the headline on itself: keep a calm area for it. */
+  options: { headlineSpace?: boolean } = {},
 ): string {
   const headline = concept.headline.trim();
   return [
@@ -237,11 +239,14 @@ export function buildImagePrompt(
     headline
       ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
       : 'No words, letters, captions or logos anywhere in the image.',
+    !headline && options.headlineSpace
+      ? `Leave the ${format === 'story' ? 'upper third' : 'top quarter'} of the scene uncluttered - wall, ceiling, sky or soft background, part of the same continuous photograph - with no face, person or important object there: a headline will be set on it afterwards.`
+      : null,
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
     // Making the screen's interface the point ("large flat shapes") turned screens into floating mock-ups held at the camera.
-    'Photograph it as a candid, natural moment: the person and the place are the subject. A phone, tablet or laptop is a small, secondary part of the scene, held or placed naturally, seen at an angle with its screen softly out of focus - no readable words, letters or text-like lines on it. Never show a device held toward the camera, a hand or object close to the lens, or a screen outside its device.',
+    'Photograph it as a candid, natural moment: the person and the place are the subject. Any paper, document, sign or label in the scene shows only soft grey lines - no title, heading or readable word (never "CONTRACT" or similar). At most one phone or tablet appears in the whole scene. A phone, tablet or laptop is a small, secondary part of the scene, held or placed naturally and the right way round - its screen faces the person using it, who touches the screen, not the back -, seen at an angle with its screen softly out of focus - no readable words, letters or text-like lines on it. Never show a device held toward the camera, a hand or object close to the lens, or a screen outside its device.',
     // A render added a floating "Signed" card above the phone: no interface element may leave its device.
     'It is a photograph, not a design: no floating cards, labels, badges, icons, checkmarks, speech bubbles or graphic overlays anywhere - the only added element is the headline.',
     // Worded as a condition: "a signature anywhere in the picture" made the model add one, floating on a desk.
@@ -263,6 +268,7 @@ const IMAGE_SAFE_ZONES: Record<AdStudioImageFormat, string | null> = {
   portrait: null,
   // Naming "the app" made the model draw a phone status bar and app bars around the picture; describe only what to keep empty.
   // "Plain background in the top 14%" produced literal empty grey bands; ask for scenery that runs to the edges instead.
-  story: 'Vertical full-screen picture: the scene runs naturally to all four edges, with no empty bands, borders or frames. Place the subject and the headline in the middle of the height; the top 14% and bottom 20% show only scenery (wall, ceiling, floor, sky). Do not draw any phone frame, status bar, app interface or navigation icons around the picture.',
+  // Percentages ("the top 14%") made the model cut the frame into panels with a plain band for the headline.
+  story: 'One continuous vertical photograph from edge to edge - never panels, a collage, a split layout, bands or borders. Frame the shot so the person and the key objects sit around the middle of the height, with natural ceiling, wall or sky above and floor or table below. Do not draw any phone frame, status bar, app interface or navigation icons around the picture.',
   landscape: 'This picture is cropped to 1.91:1 for Google display: keep the subject and the headline away from the top and bottom edges.',
 };
