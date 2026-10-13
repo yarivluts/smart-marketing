@@ -139,7 +139,7 @@ describe('GrowthPilotApp', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
     expect(screen.getByTestId('growth-pilot-status')).toHaveTextContent(heMessages.GrowthPilot.header.active);
     // "Proposed one target", worded by the Hebrew plural rule.
-    expect(screen.getByTestId('growth-pilot-activity')).toHaveTextContent('הציע יעד אחד');
+    expect(screen.getByTestId('growth-pilot-activity')).toHaveTextContent('\u05d4\u05e6\u05d9\u05e2 \u05d9\u05e2\u05d3 \u05d0\u05d7\u05d3');
     fireEvent.click(screen.getByTestId('growth-pilot-pause'));
     await waitFor(() => expect(sent(fetchMock)).toEqual({ url: `${BASE}/pause`, body: { paused: true } }));
     expect(await screen.findByText(heMessages.GrowthPilot.header.paused)).toBeInTheDocument();
