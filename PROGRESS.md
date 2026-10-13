@@ -17,6 +17,27 @@ Template for each entry:
 
 ---
 
+## 2026-10-13 - Ad Studio: creative overview + code-set headlines; 24/24 real images pass on prod (KAN-389, KAN-392)
+
+- **Last completed (all live on prod):**
+  - **Review overview (#649, KAN-392):** Yariv found the ad page crowded. Review now opens on cards, one per image idea plus the video and the search ad. Each card shows a preview, its state, its placements and the ad-text status. A card opens that creative's own page (`?item=`) with full editing. Work on all image ideas lives at `item=images`. The layout follows the Stitch "Master Overview" screen.
+  - **Code-set headline (#648):** when an image still fails after the guided renders, a text-free render gets the headline set in code. It uses sharp/Pango with an embedded Heebo ExtraBold font, so bidi is correct. That composite is judged only on placement.
+  - **Separate headline reading:** a short second call clears a correct right-to-left headline that the reviewer copied reversed.
+  - **Further prompt rules:** at most one phone or tablet; documents carry no words; stories are one continuous photograph (no panels or percentages); a device is held with its screen toward its user.
+  - **Request time (#650):** the Cloud Run request timeout is now 600 s on web and api, prod and preprod (set live and recorded in Terraform). The image budgets are 380 s for guided attempts and 430 s for the last resort.
+  - **Stitch MCP:** connected through a `headersHelper` that reads the `stitch-api-key` secret.
+- **Verification on prod (as the QA org admin):**
+  - Hand-written, screen-centred stress ideas in all four formats: **12/12**, one through the code-set headline.
+  - AI-written ideas for a fresh brief: **12/12**.
+  - No sideways scroll at 1440 or 390 px.
+  - The overview was checked on desktop and mobile in Hebrew and English.
+  - The daily limits were raised for the runs through the audited settings service and restored to 40 images / 50 text calls. Temporary briefs were deleted.
+- **Learned:** the QA user's password reset ends the other sessions of that user, so QA runs must be strictly sequential (one stress run was lost to a parallel screenshot run).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** none planned.
+- **Waiting on human:** rotate the Stitch API key that was pasted in chat (add a new version of `stitch-api-key`).
+
 ## 2026-10-13 - Ad Studio image quality loop: guided retries, severity by defect kind (KAN-389)
 
 - **Last completed (#644-#646, live on prod):**
