@@ -17,6 +17,34 @@ Template for each entry:
 
 ---
 
+## 2026-10-13 - Ad Studio image check hardened on real renders; image review in the Stitch layout (KAN-389, KAN-391)
+
+- **Last completed:**
+  - **Image check hardened (#637-#640):** each round of real prod renders showed a flaw the check rated too low, and each one is now a major problem that triggers a re-render:
+    - foreign-language words and legible signatures;
+    - wrong proportions and physically impossible objects;
+    - extra limbs;
+    - a picture drawn as an app screen;
+    - empty bands at the edges.
+
+    The prompts no longer invite signatures, fake app UI or empty bands (the story safe zone is worded as scenery to the edges). Minor findings now show under a passed check.
+  - **Stitch design (#641, KAN-391):** the Review image section follows the "Ad Creative Review & Variant Studio" screen in Stitch project 748986387566122661:
+    - an idea filter;
+    - a summary of real counts;
+    - idea cards side by side;
+    - compact placement cards with a thumbnail, findings, version and size.
+
+    The mockup's invented metrics are left out.
+  - **Create gallery (#641, #642):** rows of one height, each image in its own shape.
+  - **Stitch MCP:** registered at user scope. Its key is only in Secret Manager (`stitch-api-key`) and is read by `~/.claude/mcp-helpers/stitch-headers.cjs` as a `headersHelper`.
+- **Verification:**
+  - A preview run with 5 real renders across all formats: 4 clean passes and 1 correctly flagged.
+  - On prod as the QA org admin, every step loads with no sideways scroll at 1440 and 390 px.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** none planned for the Ad Studio.
+- **Waiting on human:** rotate the Stitch API key. It was pasted in chat; once a new key exists, add it as a new version of `stitch-api-key`.
+
 ## 2026-10-12 - Ad Studio images: AI check with auto re-render, 2K, MCP limits locked to operators (KAN-389, KAN-390)
 
 - **Last completed:** closed the items the previous Ad Studio run left open.
