@@ -199,7 +199,8 @@ interface ImageCheckPlan {
 
 /**
  * Renders, checks and - while the check finds a major problem and retries remain - renders again,
- * keeping the best image. Every render counts toward the daily image limit; a retry the limit no
+ * keeping the best image. Each retry is guided, not a blind re-roll: the check's English fix for every
+ * major problem so far ("the phone fits in one hand") goes to the image model with the next render. Every render counts toward the daily image limit; a retry the limit no
  * longer allows, or one the provider refuses, ends the loop with the best image so far.
  */
 async function renderChecked(
@@ -208,14 +209,20 @@ async function renderChecked(
   kind: 'image' | 'image_edit',
   check: ImageCheckPlan,
   subject: ImageQaSubject,
-  render: () => Promise<AdStudioGeneratedImage>,
+  render: (fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
 ): Promise<{ image: AdStudioGeneratedImage; renders: number; qa: AdStudioImageQa }> {
   const reviewer = check.enabled ? (deps.reviewer ?? null) : null;
-  const attempts = reviewer ? 1 + check.retries : 1;
+  // An image costs a fraction of a clip, so with re-renders on it gets at least AD_STUDIO_MIN_IMAGE_RETRIES; 0 stays 0.
+  const retries = check.retries > 0 ? Math.max(check.retries, AD_STUDIO_MIN_IMAGE_RETRIES) : 0;
+  const attempts = reviewer ? 1 + retries : 1;
+  const started = Date.now();
   let best: { image: AdStudioGeneratedImage; verdict: ImageQaVerdict } | null = null;
   let renders = 0;
+  const fixes: string[] = [];
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) {
+      // No new attempt late in the request: it must end well inside the server timeout.
+      if (Date.now() - started > IMAGE_ATTEMPT_BUDGET_MS) break;
       try {
         await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind, units: 1, now: deps.now?.() });
       } catch {
@@ -225,7 +232,7 @@ async function renderChecked(
     let image: AdStudioGeneratedImage;
     try {
       renders += 1;
-      image = await render();
+      image = await render(fixes);
     } catch (error) {
       if (!best) throw Object.assign(error instanceof Error ? error : new Error(String(error)), { renders });
       break;
@@ -235,9 +242,21 @@ async function renderChecked(
       : { status: 'skipped', issues: [], text: null, model: null };
     if (!best || betterImageVerdict(verdict, best.verdict)) best = { image, verdict };
     if (verdict.status !== 'issues') break;
+    for (const fix of verdict.fixes ?? []) if (!fixes.includes(fix)) fixes.push(fix);
   }
   const chosen = best as { image: AdStudioGeneratedImage; verdict: ImageQaVerdict };
-  return { image: chosen.image, renders, qa: { ...chosen.verdict, renders } };
+  const { status, issues, text, model } = chosen.verdict;
+  return { image: chosen.image, renders, qa: { status, issues, text, model, renders } };
+}
+
+/** Images are cheap next to video: with re-renders on, an image gets at least this many guided re-renders. */
+export const AD_STUDIO_MIN_IMAGE_RETRIES = 2;
+/** No new attempt starts after this long, so a render request ends well inside Cloud Run's 300 s timeout. */
+const IMAGE_ATTEMPT_BUDGET_MS = 170_000;
+
+/** The prompt for a retry: the original request, then what the check found wrong in the earlier render and how to draw it instead. */
+export function withFixes(prompt: string, fixes: readonly string[]): string {
+  return fixes.length ? `${prompt}\nAn earlier render of this picture had problems. This time: ${fixes.join(' ')}` : prompt;
 }
 
 /** Runs the image calls inside the daily image limit, stores the kept image and records the usage either way. */
@@ -248,14 +267,14 @@ async function produceImage(
   kind: 'image' | 'image_edit',
   check: ImageCheckPlan,
   subject: ImageQaSubject,
-  call: (generator: AdStudioImageGenerator) => Promise<AdStudioGeneratedImage>,
+  call: (generator: AdStudioImageGenerator, fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
 ): Promise<AdStudioImageModel> {
   const now = deps.now ?? (() => new Date());
   const usage = { organizationId: ctx.organizationId, projectId: ctx.projectId, kind, provider: 'gemini', model: record.model, briefId: ctx.briefId, actorId: ctx.actorId };
   try {
     const generator = deps.images;
     if (!generator) throw new AdStudioProviderError('not_configured', 'No image model is configured.');
-    const { image, renders, qa } = await renderChecked(ctx, deps, kind, check, subject, () => call(generator));
+    const { image, renders, qa } = await renderChecked(ctx, deps, kind, check, subject, (fixes) => call(generator, fixes));
     const objectPath = adStudioImageObjectPath({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: ctx.briefId, imageId: record.id, mimeType: image.mimeType });
     await deps.storage.upload(objectPath, image.bytes, image.mimeType);
     await recordAdStudioUsage({ ...usage, units: renders, outcome: 'succeeded', now: now() });
@@ -303,8 +322,8 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
     now: deps.now?.(),
   });
   const subject = { headline: concept.headline, visualPrompt: concept.visualPrompt, language: input.language };
-  return produceImage(ctx, deps, record, 'image', settings.videoQa, subject, (generator) =>
-    generator.generate({ prompt, aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize }),
+  return produceImage(ctx, deps, record, 'image', settings.videoQa, subject, (generator, fixes) =>
+    generator.generate({ prompt: withFixes(prompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize }),
   );
 }
 
@@ -345,9 +364,9 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
   });
   // The edit may change the words on purpose, so the check looks for misspellings, not for the original headline.
   const subject = { headline: null, visualPrompt: `${concept?.visualPrompt ?? ''}\nEdited as asked: ${instruction}`.trim(), language: brief.language };
-  return produceImage(ctx, deps, record, 'image_edit', settings.videoQa, subject, (generator) =>
+  return produceImage(ctx, deps, record, 'image_edit', settings.videoQa, subject, (generator, fixes) =>
     generator.edit({
-      instruction: modelInstruction,
+      instruction: withFixes(modelInstruction, fixes),
       image: { bytes, mimeType: parent.mime_type ?? 'image/png' },
       aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format],
       imageSize: settings.imageSize,

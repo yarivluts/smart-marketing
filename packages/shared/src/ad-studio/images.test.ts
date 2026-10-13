@@ -109,7 +109,9 @@ describe('image prompts', () => {
     expect(prompt).toContain('in Hebrew: "Sign in 30 seconds"');
     expect(buildImagePrompt(concept({ headline: '' }), 'square', BRIEF)).toContain('No words, letters, captions or logos');
     // Device screens carry no readable text: image models otherwise draw English UI words into a Hebrew ad.
-    expect(prompt).toContain('screen in the picture shows a simple, abstract interface');
+    // Devices stay secondary and out of focus, so screens carry no text and never float toward the camera.
+    expect(prompt).toContain('screen softly out of focus - no readable words');
+    expect(prompt).toContain('Never show a device held toward the camera');
     expect(prompt).toContain('illegible scribble on that document or screen only');
     expect(prompt).not.toContain('anywhere in the picture, is');
     expect(prompt).toContain('real-world size and proportions');
@@ -123,7 +125,6 @@ describe('image prompts', () => {
     // Nor as a request for empty bands: the scene runs to the edges.
     expect(buildImagePrompt(concept(), 'story', BRIEF)).toContain('no empty bands, borders or frames');
     expect(buildImagePrompt(concept(), 'story', BRIEF)).not.toContain('plain background');
-    expect(buildImagePrompt(concept(), 'square', BRIEF)).toContain('plain coloured buttons without labels');
     expect(buildImagePrompt(concept(), 'landscape', BRIEF)).toContain('cropped to 1.91:1');
     expect(buildImagePrompt(concept(), 'square', BRIEF)).not.toMatch(/14%|1\.91:1/);
   });

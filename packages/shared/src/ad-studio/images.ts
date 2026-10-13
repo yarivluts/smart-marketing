@@ -238,7 +238,8 @@ export function buildImagePrompt(
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
-    'Any phone, tablet, laptop or other screen in the picture shows a simple, abstract interface - large flat shapes, a signature line, plain coloured buttons without labels - with no words, letters or small text-like lines anywhere on it.',
+    // Making the screen's interface the point ("large flat shapes") turned screens into floating mock-ups held at the camera.
+    'Photograph it as a candid, natural moment: the person and the place are the subject. A phone, tablet or laptop is a small, secondary part of the scene, held or placed naturally, seen at an angle with its screen softly out of focus - no readable words, letters or text-like lines on it. Never show a device held toward the camera, a hand or object close to the lens, or a screen outside its device.',
     // Worded as a condition: "a signature anywhere in the picture" made the model add one, floating on a desk.
     'If the scene shows something being signed, the signature is an illegible scribble on that document or screen only; do not add signatures or writing anywhere else.',
     'Every object has its real-world size and proportions (a phone fits in a hand) and sits where it physically could.',

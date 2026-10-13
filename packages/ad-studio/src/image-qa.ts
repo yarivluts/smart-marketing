@@ -13,10 +13,21 @@ import { AdStudioProviderError, type AdStudioReviewer } from './llm';
  */
 
 const MAX_ISSUES = 8;
+/** Languages written right to left, where digits inside the text still read left to right. */
+const RTL_LANGUAGES: ReadonlySet<string> = new Set(['he', 'ar', 'fa', 'ur']);
 
 export const AdStudioImageQaSchema = z.object({
   textInImage: z.string(),
-  issues: z.array(z.object({ severity: z.enum(['major', 'minor']), detail: z.string() })),
+  issues: z.array(
+    z.object({
+      severity: z.enum(['major', 'minor']),
+      /** What the problem is about: the headline itself, other text in the picture, or the picture. */
+      about: z.enum(['headline', 'other_text', 'picture']),
+      detail: z.string(),
+      /** In English, for the image model: how to draw it instead. The next render gets it as an instruction. */
+      fix: z.string(),
+    }),
+  ),
 });
 
 export interface ImageQaSubject {
@@ -48,16 +59,22 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
     ].join('\n'),
     user: [
       `Language of the ad: ${language}.`,
+      // A reviewer once called a perfect Hebrew headline with "30" in it reversed: digits inside RTL text read left to right.
+      RTL_LANGUAGES.has(subject.language.toLowerCase())
+        ? `${language} is written right to left, but a number inside it keeps its digits left to right (for example "30"); that is correct, not reversed. Judge the word order only from right to left.`
+        : null,
       expectedText,
       `Intended picture: ${subject.visualPrompt}`,
       '',
       '1) textInImage: copy every word, letter and number visible in the image exactly as drawn, misspellings included (empty when there is none). Do not correct anything.',
-      `2) issues: every problem, each with severity and a short detail a person can act on, in ${language}.`,
+      `2) issues: every problem, each with severity, about (headline, other_text or picture), a short detail a person can act on, in ${language}, and fix: one short instruction in English telling an image model how to draw it right instead (for example "show the whole person seated, legs under the table", "the phone fits in one hand").`,
       majorText,
       `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); extra hands or limbs that belong to no one in the picture; the picture drawn as a phone screen or app (a status bar, app bars, buttons or navigation icons around it); empty bands, borders or letterboxing at the edges instead of the scene; a watermark or border; an invented brand logo.`,
       'Minor problems: slight blur, small background artifacts, text a little small for a phone screen.',
       'If you find nothing, return an empty issues list.',
-    ].join('\n'),
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n'),
   };
 }
 
@@ -66,6 +83,8 @@ export interface ImageQaVerdict {
   issues: AdStudioImageQaIssue[];
   text: string | null;
   model: string | null;
+  /** English instructions for the next render, from the major problems; empty when there are none. */
+  fixes?: string[];
 }
 
 /**
@@ -74,13 +93,23 @@ export interface ImageQaVerdict {
  * (the UI words it, showing what was read). Pure.
  */
 export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'>, review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
-  const issues: AdStudioImageQaIssue[] = review.issues.slice(0, MAX_ISSUES).map((issue) => ({ severity: issue.severity, detail: issue.detail.trim().slice(0, 300) }));
   const text = review.textInImage.trim().slice(0, 500);
   const headline = subject.headline?.trim() ?? '';
+  // The code's comparison outranks the reviewer on the headline: when the text read off the image holds it
+  // exactly, a reviewer finding about the headline (typically "reversed" for a number in RTL text) is shown
+  // as minor - the person can still see it - but does not fail the image or steer a re-render.
+  const headlineConfirmed = Boolean(headline) && imageTextHasHeadline(headline, text);
+  const kept = review.issues.map((issue) => (headlineConfirmed && issue.about === 'headline' ? { ...issue, severity: 'minor' as const } : issue));
+  const issues: AdStudioImageQaIssue[] = kept.slice(0, MAX_ISSUES).map((issue) => ({ severity: issue.severity, detail: issue.detail.trim().slice(0, 300) }));
   if (headline && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
     issues.unshift({ severity: 'major', code: 'headline_mismatch', detail: text.slice(0, 300) });
   }
-  return { status: issues.some((issue) => issue.severity === 'major') ? 'issues' : 'passed', issues, text: text || null, model };
+  const fixes = kept
+    .filter((issue) => issue.severity === 'major')
+    .map((issue) => issue.fix.replace(/\s+/g, ' ').trim().slice(0, 200))
+    .filter(Boolean);
+  if (issues[0]?.code === 'headline_mismatch') fixes.unshift(`Spell the headline exactly as given, letter by letter: "${headline}".`);
+  return { status: issues.some((issue) => issue.severity === 'major') ? 'issues' : 'passed', issues, text: text || null, model, fixes: fixes.slice(0, MAX_ISSUES) };
 }
 
 export interface ReviewAdStudioImageParams {

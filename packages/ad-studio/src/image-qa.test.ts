@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { betterImageVerdict, buildImageQaPrompt, imageQaVerdict } from './image-qa';
+import { withFixes } from './image-pipeline';
 
 describe('buildImageQaPrompt', () => {
   it('asks for the exact headline, every word read as drawn, and details in the ad language', () => {
@@ -28,11 +29,13 @@ describe('buildImageQaPrompt', () => {
 
 describe('imageQaVerdict', () => {
   it('passes when the headline is in the picture and only minor problems were found', () => {
-    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', detail: ' Slight blur ' }] }, 'gemini')).toEqual({
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'SIGN IN 30 SECONDS', issues: [{ severity: 'minor', about: 'picture', detail: ' Slight blur ', fix: 'Sharper focus' }] }, 'gemini')).toEqual({
       status: 'passed',
       issues: [{ severity: 'minor', detail: 'Slight blur' }],
       text: 'SIGN IN 30 SECONDS',
       model: 'gemini',
+      // A minor problem does not steer a re-render.
+      fixes: [],
     });
   });
 
@@ -40,12 +43,48 @@ describe('imageQaVerdict', () => {
     const verdict = imageQaVerdict({ headline: 'Sign in 30 seconds' }, { textInImage: 'Sing in 30 seconds', issues: [] }, 'gemini');
     expect(verdict.status).toBe('issues');
     expect(verdict.issues).toEqual([{ severity: 'major', code: 'headline_mismatch', detail: 'Sing in 30 seconds' }]);
+    // The next render is told to spell it exactly.
+    expect(verdict.fixes).toEqual(['Spell the headline exactly as given, letter by letter: "Sign in 30 seconds".']);
+  });
+
+  it('turns each major problem into an English fix for the next render', () => {
+    const verdict = imageQaVerdict(
+      { headline: '' },
+      {
+        textInImage: '',
+        issues: [
+          { severity: 'major', about: 'picture', detail: 'phone too big', fix: '  The phone fits in one hand. ' },
+          { severity: 'major', about: 'picture', detail: 'legs merge into a box', fix: 'Show the whole person seated, legs under the table.' },
+          { severity: 'minor', about: 'picture', detail: 'slight blur', fix: 'Sharper.' },
+        ],
+      },
+      'gemini',
+    );
+    expect(verdict.fixes).toEqual(['The phone fits in one hand.', 'Show the whole person seated, legs under the table.']);
   });
 
   it('keeps the reviewer own major finding instead of adding a second one, and does not compare after an edit', () => {
-    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', detail: 'Misspelled headline' }] }, 'gemini');
+    const verdict = imageQaVerdict({ headline: 'Sign' }, { textInImage: 'Sgin', issues: [{ severity: 'major', about: 'headline', detail: 'Misspelled headline', fix: 'Spell it right.' }] }, 'gemini');
     expect(verdict.issues).toEqual([{ severity: 'major', detail: 'Misspelled headline' }]);
     expect(imageQaVerdict({ headline: null }, { textInImage: 'Anything new', issues: [] }, 'gemini').status).toBe('passed');
+  });
+});
+
+describe('right-to-left headlines', () => {
+  it('tells the reviewer that digits inside Hebrew read left to right', () => {
+    expect(buildImageQaPrompt({ headline: 'x', visualPrompt: 'v', language: 'he' }).user).toContain('a number inside it keeps its digits left to right');
+    expect(buildImageQaPrompt({ headline: 'x', visualPrompt: 'v', language: 'en' }).user).not.toContain('right to left');
+  });
+
+  it('keeps a headline the code confirmed, showing a reviewer "reversed" finding only as minor', () => {
+    const verdict = imageQaVerdict(
+      { headline: 'Sign in 30 seconds' },
+      { textInImage: 'Sign in 30 seconds', issues: [{ severity: 'major', about: 'headline', detail: 'The words are reversed', fix: 'Write it right to left.' }] },
+      'gemini',
+    );
+    expect(verdict.status).toBe('passed');
+    expect(verdict.issues).toEqual([{ severity: 'minor', detail: 'The words are reversed' }]);
+    expect(verdict.fixes).toEqual([]);
   });
 });
 
@@ -61,5 +100,14 @@ describe('betterImageVerdict', () => {
     expect(betterImageVerdict(verdict(0, 3), verdict(1, 0))).toBe(true);
     expect(betterImageVerdict(verdict(1, 0), verdict(1, 2))).toBe(true);
     expect(betterImageVerdict(verdict(1, 2), verdict(1, 2))).toBe(false);
+  });
+});
+
+describe('withFixes', () => {
+  it('leaves the first render alone and tells a retry what to do differently', () => {
+    expect(withFixes('A lawyer at a desk', [])).toBe('A lawyer at a desk');
+    expect(withFixes('A lawyer at a desk', ['The phone fits in one hand.', 'Legs under the table.'])).toBe(
+      ['A lawyer at a desk', 'An earlier render of this picture had problems. This time: The phone fits in one hand. Legs under the table.'].join('\n'),
+    );
   });
 });
