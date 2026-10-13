@@ -627,9 +627,10 @@ export default async function AdStudioPage({
               />
               <CreateGallery
                 mediaBase={mediaBase}
+                videoFormat={selected.format}
                 images={imageSlots.flatMap((slot) => {
                   const latest = slot.selected ?? slot.versions[0];
-                  return latest ? [{ id: latest.id, status: latest.status, label: `${t('images.ideaLabel', { index: conceptIndex(slot.conceptId) })} · ${t(`images.format.${slot.format}`)}` }] : [];
+                  return latest ? [{ id: latest.id, status: latest.status, format: slot.format, label: `${t('images.ideaLabel', { index: conceptIndex(slot.conceptId) })} · ${t(`images.format.${slot.format}`)}` }] : [];
                 })}
                 scenes={selected.scenes.map((scene, index) => {
                   const latest = clips.filter((clip) => clip.sceneId === scene.id).sort((a, b) => b.version - a.version)[0];
