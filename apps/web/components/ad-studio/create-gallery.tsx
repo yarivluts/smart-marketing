@@ -69,7 +69,7 @@ export function CreateGallery({
               <span className={cn('relative flex h-36 max-w-full items-center justify-center overflow-hidden rounded-2xl bg-muted sm:h-44', IMAGE_ASPECT[image.format])}>
                 {image.status === 'ready' ? (
                   // A plain img: private media served by our own authenticated route.
-                  <img src={`${mediaBase}/images/${image.id}/media`} alt={image.label} className="h-full w-full object-cover" />
+                  <img src={`${mediaBase}/images/${image.id}/media`} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-xs text-muted-foreground">{t(`status.${image.status}`)}</span>
                 )}

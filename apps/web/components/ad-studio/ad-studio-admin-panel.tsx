@@ -175,7 +175,7 @@ export function AdStudioAdminPanel({
           <dd className={cn('text-sm font-medium', !keywordData.available && 'text-warning')}>
             {keywordData.available ? t('keywordDataValue', { credential: keywordData.credentialName }) : t(`keywordDataMissing.${keywordData.reason}`)}
           </dd>
-          <p className="mt-1 text-xs text-muted-foreground">{t('planningAdminHint')}</p>
+          <dd className="mt-1 text-xs text-muted-foreground">{t('planningAdminHint')}</dd>
         </div>
       </dl>
 
@@ -248,7 +248,7 @@ export function AdStudioAdminPanel({
       )}
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">{t('recentUsage')}</h3>
+        <h3 id="ad-studio-recent-usage" className="text-sm font-semibold">{t('recentUsage')}</h3>
         {recentUsage.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t('usageEmpty')}</p>
         ) : (
@@ -277,7 +277,8 @@ export function AdStudioAdminPanel({
               </li>
             ))}
           </ul>
-          <div className="hidden max-h-64 overflow-auto rounded-xl border border-border sm:block">
+          {/* Scrolls on its own, so it takes keyboard focus to scroll without a mouse. */}
+          <div className="hidden max-h-64 overflow-auto rounded-xl border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:block" tabIndex={0} role="region" aria-labelledby="ad-studio-recent-usage">
             <table className="w-full text-start text-xs">
               <thead>
                 <tr className="bg-muted/50 text-muted-foreground">
