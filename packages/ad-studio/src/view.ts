@@ -113,6 +113,8 @@ export interface AdStudioImageView {
   mimeType: string | null;
   requestedOn: string;
   completedOn: string | null;
+  /** The size the image model was asked for (1K, 2K); null on images made before sizes existed. */
+  imageSize: string | null;
   /** The AI check of the image (headline spelling, stray text, deformed hands); null on images made before it existed. */
   qa: AdStudioImageQaView | null;
 }

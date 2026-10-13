@@ -9,6 +9,8 @@ import { withFirstFrame } from './media-src';
 export interface CreateGalleryImage {
   id: string;
   label: string;
+  /** The placement, so the tile has the image's own shape (and a pending one keeps its place). */
+  format: 'square' | 'portrait' | 'story' | 'landscape';
   status: 'generating' | 'ready' | 'failed';
 }
 
@@ -24,7 +26,25 @@ export interface CreateGalleryScene {
  * renders, so the person watches the ads appear instead of reading a checklist. Read-only; editing
  * happens in Review.
  */
-export function CreateGallery({ mediaBase, images, scenes }: { mediaBase: string; images: CreateGalleryImage[]; scenes: CreateGalleryScene[] }): React.ReactElement | null {
+const IMAGE_ASPECT: Record<CreateGalleryImage['format'], string> = {
+  square: 'aspect-square',
+  portrait: 'aspect-[4/5]',
+  story: 'aspect-[9/16]',
+  landscape: 'aspect-video',
+};
+
+export function CreateGallery({
+  mediaBase,
+  images,
+  scenes,
+  videoFormat = 'vertical',
+}: {
+  mediaBase: string;
+  images: CreateGalleryImage[];
+  scenes: CreateGalleryScene[];
+  /** The video's shape: vertical clips are 9:16, horizontal ones 16:9. */
+  videoFormat?: 'vertical' | 'horizontal';
+}): React.ReactElement | null {
   const t = useTranslations('AdStudio.gallery');
   if (images.length === 0 && scenes.length === 0) return null;
   const StatusIcon = ({ status }: { status: 'generating' | 'ready' | 'failed' }) =>
@@ -37,18 +57,19 @@ export function CreateGallery({ mediaBase, images, scenes }: { mediaBase: string
     );
 
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm" aria-labelledby="ad-studio-gallery-heading" data-testid="ad-studio-create-gallery">
-      <h2 id="ad-studio-gallery-heading" className="text-base font-semibold">
+    <section className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" aria-labelledby="ad-studio-gallery-heading" data-testid="ad-studio-create-gallery">
+      <h2 id="ad-studio-gallery-heading" className="font-pp-display text-lg font-semibold">
         {t('title')}
       </h2>
       {images.length ? (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        // Masonry columns: every image keeps its own shape and no row is left with gaps.
+        <ul className="columns-2 gap-3 sm:columns-3 lg:columns-4">
           {images.map((image) => (
-            <li key={image.id} className="flex flex-col gap-1" data-testid="ad-studio-gallery-image">
-              <span className="relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted">
+            <li key={image.id} className="mb-3 flex break-inside-avoid flex-col gap-1" data-testid="ad-studio-gallery-image">
+              <span className={cn('relative flex items-center justify-center overflow-hidden rounded-2xl bg-muted', IMAGE_ASPECT[image.format])}>
                 {image.status === 'ready' ? (
                   // A plain img: private media served by our own authenticated route.
-                  <img src={`${mediaBase}/images/${image.id}/media`} alt={image.label} className="h-full w-full object-contain" />
+                  <img src={`${mediaBase}/images/${image.id}/media`} alt={image.label} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-xs text-muted-foreground">{t(`status.${image.status}`)}</span>
                 )}
@@ -62,10 +83,10 @@ export function CreateGallery({ mediaBase, images, scenes }: { mediaBase: string
         </ul>
       ) : null}
       {scenes.length ? (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <ul className={cn('grid gap-3', videoFormat === 'vertical' ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3')}>
           {scenes.map((scene) => (
             <li key={scene.id} className="flex flex-col gap-1" data-testid="ad-studio-gallery-scene">
-              <span className={cn('relative flex aspect-[9/16] max-h-64 items-center justify-center overflow-hidden rounded-xl bg-muted')}>
+              <span className={cn('relative flex items-center justify-center overflow-hidden rounded-2xl bg-muted', videoFormat === 'vertical' ? 'aspect-[9/16]' : 'aspect-video')}>
                 {scene.clip?.status === 'ready' ? (
                   <video src={withFirstFrame(`${mediaBase}/clips/${scene.clip.id}/media`)} muted playsInline preload="metadata" controls className="h-full w-full object-contain" />
                 ) : (

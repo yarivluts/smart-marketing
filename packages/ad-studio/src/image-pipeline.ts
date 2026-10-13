@@ -95,6 +95,7 @@ export function toAdStudioImageView(image: AdStudioImageModel): AdStudioImageVie
     mimeType: image.mime_type ?? null,
     requestedOn: image.requested_on,
     completedOn: image.completed_on ?? null,
+    imageSize: image.image_size ?? null,
     qa: image.qa ? { status: image.qa.status, issues: image.qa.issues, renders: image.qa.renders } : null,
   };
 }

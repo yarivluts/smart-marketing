@@ -4358,7 +4358,18 @@
         "error": "The AI check could not run",
         "headlineMismatch": "The headline in the image is not spelled as written. The image reads:",
         "headlineMissing": "The headline does not appear in the image."
-      }
+      },
+      "filterLabel": "Show ideas",
+      "filterAll": "All ideas ({count})",
+      "kpi": {
+        "passed": "Passed the AI check",
+        "attention": "Need a look",
+        "ready": "Images ready",
+        "left": "Images left today",
+        "ofValue": "{count} of {total}"
+      },
+      "imagesHeading": "Images ({count})",
+      "openFull": "Open full size"
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
