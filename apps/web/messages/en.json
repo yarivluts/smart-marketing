@@ -5039,7 +5039,7 @@
         },
         "working": {
           "title": "{count, plural, one {One creative is} other {# creatives are}} still being made",
-          "description": "Refresh in a minute to see them. Meanwhile you can open and edit the ready ones."
+          "description": "This page updates by itself as they finish. Meanwhile you can open and edit the ready ones."
         },
         "publish": {
           "title": "Ready to publish",

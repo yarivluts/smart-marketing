@@ -1,11 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
-import { ReviewOverview, type ReviewOverviewProps } from './review-overview';
+import { REVIEW_POLL_MS, ReviewOverview, type ReviewOverviewProps } from './review-overview';
 
+const refresh = vi.fn();
 vi.mock('@/i18n/navigation', () => ({
+  useRouter: () => ({ refresh }),
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>
       {children}
@@ -21,7 +23,7 @@ const PROPS: ReviewOverviewProps = {
     { kind: 'image', conceptId: 'c1', index: 1, headline: 'Sign in 30 seconds', state: 'ready', preview: { imageId: 'i1', format: 'square' }, placements: [{ format: 'square', state: 'ready' }], hasCopy: true },
     { kind: 'image', conceptId: 'c2', index: 2, headline: '', state: 'attention', preview: null, placements: [{ format: 'story', state: 'attention' }], hasCopy: false },
   ],
-  video: { kind: 'video', state: 'working', scenes: 3, rendered: 2, previewClipId: 'k1', assembled: false, assembledSeconds: 0, hasCopy: false },
+  video: { kind: 'video', state: 'working', scenes: 3, rendered: 2, previewClipId: 'k1', assembled: false, assembledSeconds: 0, hasCopy: false, generating: false },
   search: { kind: 'search', state: 'empty', headlines: 0, descriptions: 0, keywords: 0, sample: null, sampleSecond: null, sampleDescription: null },
 };
 
@@ -108,5 +110,41 @@ describe('ReviewOverview', () => {
     const empty = screen.getByTestId('ad-studio-creative-images-empty');
     expect(empty).toHaveAttribute('href', '/r?item=images');
     expect(empty).toHaveTextContent(heMessages.AdStudio.review.imagesEmpty);
+  });
+
+  describe('while something is still being made', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+      refresh.mockClear();
+    });
+
+    it('keeps the page current, asking for clip status first while a clip renders', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi.fn().mockResolvedValue(new Response('{}'));
+      vi.stubGlobal('fetch', fetchMock);
+      renderWithIntl(<ReviewOverview {...PROPS} images={[PROPS.images[0]]} video={{ ...PROPS.video, generating: true }} />, { locale: 'en' });
+      expect(refresh).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(REVIEW_POLL_MS);
+      expect(fetchMock).toHaveBeenCalledWith('/m/render-status', { cache: 'no-store' });
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes for an image still rendering without asking for clip status, and stays still when nothing is', async () => {
+      vi.useFakeTimers();
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const rendering = { ...PROPS.images[0], state: 'working' as const, placements: [{ format: 'square' as const, state: 'working' as const }] };
+      const { unmount } = renderWithIntl(<ReviewOverview {...PROPS} images={[rendering]} />, { locale: 'en' });
+      await vi.advanceTimersByTimeAsync(REVIEW_POLL_MS);
+      expect(refresh).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalled();
+      unmount();
+      refresh.mockClear();
+
+      renderWithIntl(<ReviewOverview {...PROPS} images={[PROPS.images[0]]} />, { locale: 'en' });
+      await vi.advanceTimersByTimeAsync(REVIEW_POLL_MS * 3);
+      expect(refresh).not.toHaveBeenCalled();
+    });
   });
 });

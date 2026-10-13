@@ -33,6 +33,8 @@ export interface VideoCreativeSummary {
   assembled: boolean;
   assembledSeconds: number;
   hasCopy: boolean;
+  /** A scene's newest clip is still rendering. */
+  generating: boolean;
 }
 
 export interface SearchCreativeSummary {
@@ -115,6 +117,7 @@ export function summarizeVideoCreative(params: {
     assembled: params.assembled,
     assembledSeconds: params.assembledSeconds,
     hasCopy: params.hasCopy,
+    generating,
   };
 }
 
@@ -153,6 +156,11 @@ export function reviewNextStep(images: readonly ImageCreativeSummary[], video: V
   if (working) return { kind: 'working', count: working };
   const ready = states.filter((state) => state === 'ready').length;
   return ready ? { kind: 'publish', ready } : { kind: 'start' };
+}
+
+/** Something is still being made, so the overview keeps itself current: an image or a clip rendering. */
+export function reviewHasWorkInProgress(images: readonly ImageCreativeSummary[], video: VideoCreativeSummary): boolean {
+  return video.generating || images.some((image) => image.placements.some((placement) => placement.state === 'working'));
 }
 
 /** Every scene rendered and nothing flagged, but not yet put together into one video. */

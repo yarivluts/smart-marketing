@@ -3,9 +3,10 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, CheckCircle2, ChevronLeft, CircleDashed, Clapperboard, ImageIcon, Images, Loader2, Play, Search, Sparkles, Wand2 } from 'lucide-react';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import {
+  reviewHasWorkInProgress,
   reviewNextStep,
   videoNeedsAssembly,
   type CreativeState,
@@ -30,6 +31,9 @@ const STATE_DOT: Record<CreativeState, string> = {
   working: 'bg-primary',
   empty: 'bg-muted-foreground/40',
 };
+
+/** How often the overview checks on work in progress. */
+export const REVIEW_POLL_MS = 8000;
 
 const PREVIEW_ASPECT = { square: 'aspect-square', portrait: 'aspect-[4/5]', story: 'aspect-[9/16]', landscape: 'aspect-video' } as const;
 
@@ -231,6 +235,27 @@ export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoF
   const tf = useTranslations('AdStudio.images.format');
   const counts = [...images.map((image) => image.state), video.state, search.state];
   const next = reviewNextStep(images, video, search);
+  const router = useRouter();
+  const inProgress = reviewHasWorkInProgress(images, video);
+  const videoGenerating = video.generating;
+  // While an image or a clip is still being made, keep the page current. Clips advance only when
+  // their status is asked for, so that is asked first; then the server parts of the page re-render.
+  React.useEffect(() => {
+    if (!inProgress) return;
+    const poll = setInterval(() => {
+      void (async () => {
+        if (videoGenerating) {
+          try {
+            await fetch(`${mediaBase}/render-status`, { cache: 'no-store' });
+          } catch {
+            // The next poll tries again.
+          }
+        }
+        router.refresh();
+      })();
+    }, REVIEW_POLL_MS);
+    return () => clearInterval(poll);
+  }, [inProgress, videoGenerating, mediaBase, router]);
   const hrefFor = (item: ReviewItem) => (item.kind === 'image' ? hrefs.image[item.conceptId] : hrefs[item.kind]);
   const highlightOf = (item: ReviewItem): 'attention' | 'action' | undefined => {
     if (next.kind === 'assemble') return item.kind === 'video' ? 'action' : undefined;
