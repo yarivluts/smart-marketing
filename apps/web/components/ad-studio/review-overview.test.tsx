@@ -44,6 +44,7 @@ describe('ReviewOverview', () => {
     expect(video).toHaveAttribute('href', '/r?item=video');
     expect(video.querySelector('video')).toHaveAttribute('src', '/m/clips/k1/media#t=0.1');
     expect(video).toHaveTextContent('2 of 3 scenes rendered');
+    expect(video).not.toHaveTextContent('assemble the video');
 
     const search = screen.getByTestId('ad-studio-creative-search');
     expect(search).toHaveAttribute('href', '/r?item=search');
@@ -58,6 +59,15 @@ describe('ReviewOverview', () => {
     expect(counts).toHaveTextContent('1 need a look');
     expect(counts).toHaveTextContent('1 in progress');
     expect(screen.getByTestId('ad-studio-review-manage-ideas')).toHaveAttribute('href', '/r?item=images');
+  });
+
+  it('says when every scene is ready but the video is not assembled, and reads the search ad in the ad direction', () => {
+    renderWithIntl(
+      <ReviewOverview {...PROPS} adDirection="rtl" video={{ ...PROPS.video, rendered: 3 }} search={{ ...PROPS.search, state: 'ready', headlines: 3, descriptions: 2, sample: 'Sign fast' }} />,
+      { locale: 'en' },
+    );
+    expect(screen.getByTestId('ad-studio-creative-video')).toHaveTextContent('Every scene is ready - assemble the video');
+    expect(screen.getByTestId('ad-studio-search-preview')).toHaveAttribute('dir', 'rtl');
   });
 
   it('offers to start image ideas when there are none, in Hebrew', () => {

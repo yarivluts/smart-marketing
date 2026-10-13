@@ -5019,7 +5019,8 @@
       "searchSponsored": "ממומן",
       "searchCounts": "{headlines} כותרות, {descriptions} תיאורים",
       "searchKeywords": "{count, plural, =0 {לא נבחרו מילות מפתח} one {מילת מפתח אחת} other {# מילות מפתח}}",
-      "back": "כל הקריאייטיבים"
+      "back": "כל הקריאייטיבים",
+      "videoNotAssembled": "כל הסצנות מוכנות - נשאר להרכיב את הסרטון"
     }
   },
   "MetaConnect": {

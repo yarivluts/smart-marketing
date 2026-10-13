@@ -90,6 +90,8 @@ export interface ReviewOverviewProps {
   video: VideoCreativeSummary;
   search: SearchCreativeSummary;
   videoFormat: 'vertical' | 'horizontal';
+  /** The ad's writing direction: the search ad preview reads like the ad, not like the page. */
+  adDirection?: 'rtl' | 'ltr';
 }
 
 /**
@@ -98,7 +100,7 @@ export interface ReviewOverviewProps {
  * own page, where all of it is shown and edited. Work on all ideas at once (new ideas with AI, add an
  * idea) lives on the image ideas page.
  */
-export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoFormat }: ReviewOverviewProps): React.ReactElement {
+export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoFormat, adDirection = 'ltr' }: ReviewOverviewProps): React.ReactElement {
   const t = useTranslations('AdStudio.review');
   const tf = useTranslations('AdStudio.images.format');
   const counts = [...images.map((image) => image.state), video.state, search.state];
@@ -193,7 +195,11 @@ export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoF
           facts={
             <>
               <span>{video.scenes ? t('videoScenes', { rendered: video.rendered, scenes: video.scenes }) : t('videoNoScript')}</span>
-              {video.assembled ? <span>{t('videoAssembled', { seconds: video.assembledSeconds })}</span> : null}
+              {video.assembled ? (
+                <span>{t('videoAssembled', { seconds: video.assembledSeconds })}</span>
+              ) : video.scenes > 0 && video.rendered === video.scenes ? (
+                <span className="font-medium text-foreground">{t('videoNotAssembled')}</span>
+              ) : null}
               {video.scenes ? <span>{video.hasCopy ? t('copyReady') : t('copyMissing')}</span> : null}
             </>
           }
@@ -205,9 +211,9 @@ export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoF
           state={search.state}
           preview={
             search.sample ? (
-              <div className="flex w-full flex-col gap-1 p-6 text-start">
+              <div className="flex w-full flex-col gap-1 p-6 text-start" dir={adDirection} data-testid="ad-studio-search-preview">
                 <span className="text-[11px] font-semibold text-foreground">{t('searchSponsored')}</span>
-                <span className="text-lg font-medium text-primary" dir="auto">
+                <span className="text-lg font-medium text-primary">
                   {search.sample}
                 </span>
               </div>

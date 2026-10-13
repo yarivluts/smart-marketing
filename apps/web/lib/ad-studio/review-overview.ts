@@ -135,3 +135,8 @@ export function parseReviewItem(value: string | undefined): ReviewItem | null {
 export function reviewItemParam(item: ReviewItem): string {
   return item.kind === 'image' ? `image:${item.conceptId}` : item.kind;
 }
+
+/** The writing direction of the ad's language, for previews of its text. */
+export function adTextDirection(language: string): 'rtl' | 'ltr' {
+  return ['he', 'ar', 'fa', 'ur'].includes(language.toLowerCase()) ? 'rtl' : 'ltr';
+}

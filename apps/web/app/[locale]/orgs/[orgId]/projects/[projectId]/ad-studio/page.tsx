@@ -97,7 +97,7 @@ import {
 import { cn } from '@/lib/utils';
 import { CreateGallery } from '@/components/ad-studio/create-gallery';
 import { ReviewOverview } from '@/components/ad-studio/review-overview';
-import { parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative, type ReviewItem } from '@/lib/ad-studio/review-overview';
+import { adTextDirection, parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative, type ReviewItem } from '@/lib/ad-studio/review-overview';
 import { PlanSection } from '@/components/ad-studio/plan-section';
 import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
@@ -661,6 +661,7 @@ export default async function AdStudioPage({
             <ReviewOverview
               mediaBase={mediaBase}
               videoFormat={selected.format}
+              adDirection={adTextDirection(selected.language)}
               hrefs={{
                 image: Object.fromEntries(selected.imageConcepts.map((concept) => [concept.id, reviewHref({ kind: 'image', conceptId: concept.id })])),
                 images: reviewHref({ kind: 'images' }),
