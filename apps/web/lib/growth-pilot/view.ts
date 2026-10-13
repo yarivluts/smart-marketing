@@ -1,4 +1,4 @@
-import type { GrowthActivityKind, GrowthPilotStatus, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
+import type { GrowthActivityKind, GrowthAdsStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
 import type { GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
 
 /** What the Growth Pilot page shows: plain, serializable, no model classes. */
@@ -20,11 +20,16 @@ export interface GrowthTargetView {
   audience: string;
   status: GrowthTargetStatus;
   origin: 'site' | 'request';
+  briefId: string | null;
+  adsStatus: GrowthAdsStatus;
+  adsFailure: string | null;
 }
 
 export interface GrowthProposalView {
   id: string;
-  kind: 'target';
+  kind: GrowthProposalKind;
+  briefId: string | null;
+  previewImageIds: string[];
   targetId: string | null;
   status: GrowthProposalStatus;
   draft: GrowthTargetDraft | null;
@@ -71,13 +76,37 @@ export function toGrowthPilotView(row: PilotRow): GrowthPilotView {
   };
 }
 
-export function toGrowthTargetView(row: { id: string; kind: GrowthTargetKind; name: string; description: string; audience: string; status: GrowthTargetStatus; origin: 'site' | 'request' }): GrowthTargetView {
-  return { id: row.id, kind: row.kind, name: row.name, description: row.description, audience: row.audience, status: row.status, origin: row.origin };
+export function toGrowthTargetView(row: {
+  id: string;
+  kind: GrowthTargetKind;
+  name: string;
+  description: string;
+  audience: string;
+  status: GrowthTargetStatus;
+  origin: 'site' | 'request';
+  brief_id?: string | null;
+  ads_status?: GrowthAdsStatus | null;
+  ads_failure?: string | null;
+}): GrowthTargetView {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    description: row.description,
+    audience: row.audience,
+    status: row.status,
+    origin: row.origin,
+    briefId: row.brief_id ?? null,
+    adsStatus: row.ads_status ?? 'none',
+    adsFailure: row.ads_failure ?? null,
+  };
 }
 
 export function toGrowthProposalView(row: {
   id: string;
-  kind: 'target';
+  kind: GrowthProposalKind;
+  brief_id?: string | null;
+  preview_image_ids?: string[] | null;
   target_id?: string | null;
   status: GrowthProposalStatus;
   draft?: GrowthTargetDraft | null;
@@ -87,6 +116,8 @@ export function toGrowthProposalView(row: {
   return {
     id: row.id,
     kind: row.kind,
+    briefId: row.brief_id ?? null,
+    previewImageIds: row.preview_image_ids ?? [],
     targetId: row.target_id ?? null,
     status: row.status,
     draft: row.draft ?? null,
@@ -97,6 +128,16 @@ export function toGrowthProposalView(row: {
 
 export function toGrowthActivityView(row: { id: string; kind: GrowthActivityKind; actor: string; subject?: string | null; count?: number | null; created_on: string }): GrowthActivityView {
   return { id: row.id, kind: row.kind, byPilot: row.actor === 'pilot', subject: row.subject ?? null, count: row.count ?? null, on: row.created_on };
+}
+
+/**
+ * Whether the pilot has work the page should keep asking for: ads being made, an approved target
+ * without ads yet, or an ads proposal being redone on the person's request.
+ */
+export function growthPilotHasPendingWork(data: GrowthPilotPageData): boolean {
+  if (data.pilot.status !== 'active') return false;
+  if (data.targets.some((target) => target.adsStatus === 'building' || (target.status === 'active' && !target.briefId && target.adsStatus === 'none'))) return true;
+  return data.proposals.some((proposal) => proposal.kind === 'ads' && proposal.status === 'revising');
 }
 
 /** Proposals waiting for the person first (oldest first, the order they arrived), then the rest. */

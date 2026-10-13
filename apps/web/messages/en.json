@@ -5538,7 +5538,10 @@
         "proposal_revised": "Updated {subject} as you asked",
         "revision_failed": "Could not update {subject}",
         "pilot_paused": "You paused the pilot",
-        "pilot_resumed": "You resumed the pilot"
+        "pilot_resumed": "You resumed the pilot",
+        "ads_building": "Started making ads for {subject}",
+        "ads_ready": "{count, plural, one {Made # ad image} other {Made # ad images}} for {subject}",
+        "ads_failed": "Could not make ads for {subject}"
       }
     },
     "errors": {
@@ -5550,6 +5553,20 @@
       "not_ready": "The site is still being read.",
       "not_found": "Not found. Refresh the page.",
       "generic": "Something went wrong. Try again."
+    },
+    "ads": {
+      "title": "Ads for {name}",
+      "description": "Image ads written and designed by the AI for this target. Approve them, ask for a change, or open them in the Ad Studio to edit anything.",
+      "open": "Open in the Ad Studio",
+      "revising": "The AI is rewriting the ideas and making new images...",
+      "changePlaceholder": "What should change in the ads? For example: brighter photos, mention the free plan",
+      "status": {
+        "building": "The AI is making ads for this target...",
+        "ready": "Ads are waiting for your approval",
+        "approved": "Ads approved - publishing comes next",
+        "rejected": "You rejected the ads",
+        "failed": "The ads could not be made ({reason})"
+      }
     }
   }
 }
