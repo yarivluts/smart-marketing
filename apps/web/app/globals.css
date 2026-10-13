@@ -30,6 +30,10 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    /* Status colours as text: the fills above are too light for small text (WCAG AA 4.5:1 on white and on their own 10-15% tints). */
+    --success-text: 162 90% 24%;
+    --warning-text: 24 92% 32%;
+    --destructive-text: 345 83% 41%;
     --alert: 350 89% 60%;
     --alert-foreground: 0 0% 100%;
     --info: 199 89% 48%;
@@ -65,6 +69,9 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    --success-text: 158 64% 52%;
+    --warning-text: 43 96% 56%;
+    --destructive-text: 351 95% 71%;
     --alert: 350 89% 60%;
     --alert-foreground: 0 0% 100%;
     --info: 199 89% 55%;

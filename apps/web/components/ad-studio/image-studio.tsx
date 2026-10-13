@@ -685,7 +685,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                             concept.formats.includes(format) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted',
                           )}
                         >
-                          {t(`images.format.${format}`)} <span className="opacity-70">{AD_STUDIO_IMAGE_ASPECT_RATIO[format]}</span>
+                          {t(`images.format.${format}`)} <span className="font-normal tabular-nums">{AD_STUDIO_IMAGE_ASPECT_RATIO[format]}</span>
                         </button>
                       ))}
                     </fieldset>

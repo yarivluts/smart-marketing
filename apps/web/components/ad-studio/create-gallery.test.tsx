@@ -20,7 +20,11 @@ describe('CreateGallery', () => {
       />,
       { locale: 'en' },
     );
-    expect(screen.getByRole('img', { name: 'Idea 1 · Square' })).toHaveAttribute('src', '/m/images/i1/media');
+    // The caption names the image, so the picture itself has empty alt text instead of repeating it.
+    const first = screen.getAllByTestId('ad-studio-gallery-image')[0];
+    expect(first).toHaveTextContent('Idea 1 · Square');
+    expect(first.querySelector('img')).toHaveAttribute('src', '/m/images/i1/media');
+    expect(first.querySelector('img')).toHaveAttribute('alt', '');
     expect(screen.getAllByTestId('ad-studio-gallery-image')[1]).toHaveTextContent('Being made');
     const scenes = screen.getAllByTestId('ad-studio-gallery-scene');
     expect(scenes[0].querySelector('video')).toHaveAttribute('src', '/m/clips/c1/media#t=0.1');

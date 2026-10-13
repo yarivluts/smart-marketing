@@ -69,6 +69,12 @@ const config: Config = {
         'pp-candy-hover': '0 16px 36px -6px rgba(112, 100, 244, 0.14), 0 4px 12px -2px rgba(30, 30, 36, 0.04)',
         'pp-dock': '0 18px 40px -12px rgba(30, 30, 36, 0.45)',
       },
+      // Status colours used as text read on light surfaces; fills (bg-success, bars, dots) keep the brighter tone.
+      textColor: {
+        success: { DEFAULT: 'hsl(var(--success-text))' },
+        warning: { DEFAULT: 'hsl(var(--warning-text))' },
+        destructive: { DEFAULT: 'hsl(var(--destructive-text))' },
+      },
       colors: {
         // Stitch Pastel Pulse palette (Material 3 roles), prefixed `pp-`.
         pp: {
@@ -119,7 +125,7 @@ const config: Config = {
           'on-surface-variant': '#474554',
           'inverse-surface': '#303036',
           'inverse-on-surface': '#f2eff8',
-          outline: '#787586',
+          outline: '#747182',
           'outline-variant': '#c8c4d7',
           obsidian: '#1e1e24',
           mint: '#55efc4',

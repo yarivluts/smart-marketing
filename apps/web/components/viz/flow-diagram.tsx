@@ -167,10 +167,22 @@ export function FlowDiagram({ nodes, edges, label, height = 320, className }: Fl
     };
   });
   const byId = new Map(nodes.map((node) => [node.id, node]));
+  // The drawing is hidden from assistive tech (the list below says the same in words), so nothing
+  // inside it may take keyboard focus either: zoom buttons and nodes stay mouse-only.
+  const canvas = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const root = canvas.current;
+    if (!root) return;
+    const unfocus = () => root.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]').forEach((el) => el.setAttribute('tabindex', '-1'));
+    unfocus();
+    const observer = new MutationObserver(unfocus);
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <figure className={cn('w-full', className)} aria-label={label} data-testid="flow-diagram">
-      <div style={{ height }} className="overflow-hidden rounded-xl border border-border bg-muted/20" aria-hidden="true">
+      <div ref={canvas} style={{ height }} className="overflow-hidden rounded-xl border border-border bg-muted/20" aria-hidden="true">
         <ReactFlow
           nodes={flowNodes}
           edges={flowEdges}
