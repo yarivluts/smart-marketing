@@ -16,7 +16,14 @@ const MAX_ISSUES = 8;
 
 export const AdStudioImageQaSchema = z.object({
   textInImage: z.string(),
-  issues: z.array(z.object({ severity: z.enum(['major', 'minor']), detail: z.string() })),
+  issues: z.array(
+    z.object({
+      severity: z.enum(['major', 'minor']),
+      detail: z.string(),
+      /** In English, for the image model: how to draw it instead. The next render gets it as an instruction. */
+      fix: z.string(),
+    }),
+  ),
 });
 
 export interface ImageQaSubject {
@@ -52,7 +59,7 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
       `Intended picture: ${subject.visualPrompt}`,
       '',
       '1) textInImage: copy every word, letter and number visible in the image exactly as drawn, misspellings included (empty when there is none). Do not correct anything.',
-      `2) issues: every problem, each with severity and a short detail a person can act on, in ${language}.`,
+      `2) issues: every problem, each with severity, a short detail a person can act on, in ${language}, and fix: one short instruction in English telling an image model how to draw it right instead (for example "show the whole person seated, legs under the table", "the phone fits in one hand").`,
       majorText,
       `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); extra hands or limbs that belong to no one in the picture; the picture drawn as a phone screen or app (a status bar, app bars, buttons or navigation icons around it); empty bands, borders or letterboxing at the edges instead of the scene; a watermark or border; an invented brand logo.`,
       'Minor problems: slight blur, small background artifacts, text a little small for a phone screen.',
@@ -66,6 +73,8 @@ export interface ImageQaVerdict {
   issues: AdStudioImageQaIssue[];
   text: string | null;
   model: string | null;
+  /** English instructions for the next render, from the major problems; empty when there are none. */
+  fixes?: string[];
 }
 
 /**
@@ -80,7 +89,12 @@ export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'>, review
   if (headline && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
     issues.unshift({ severity: 'major', code: 'headline_mismatch', detail: text.slice(0, 300) });
   }
-  return { status: issues.some((issue) => issue.severity === 'major') ? 'issues' : 'passed', issues, text: text || null, model };
+  const fixes = review.issues
+    .filter((issue) => issue.severity === 'major')
+    .map((issue) => issue.fix.replace(/\s+/g, ' ').trim().slice(0, 200))
+    .filter(Boolean);
+  if (issues[0]?.code === 'headline_mismatch') fixes.unshift(`Spell the headline exactly as given, letter by letter: "${headline}".`);
+  return { status: issues.some((issue) => issue.severity === 'major') ? 'issues' : 'passed', issues, text: text || null, model, fixes: fixes.slice(0, MAX_ISSUES) };
 }
 
 export interface ReviewAdStudioImageParams {

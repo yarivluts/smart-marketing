@@ -278,12 +278,16 @@ describe('image ads routes', () => {
     const rendered = (await (await renderImage(request('POST', { conceptId: ideas.concepts[0].id, format: 'square' }), ctx.p())).json()) as ImagesPayload;
     expect(rendered.images).toHaveLength(1);
     expect(rendered.images[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', renders: 2 } });
-    expect(google.calls.filter((call) => call.body?.model === 'gemini-3.1-flash-image')).toHaveLength(2);
+    const imageCalls = google.calls.filter((call) => call.body?.model === 'gemini-3.1-flash-image');
+    expect(imageCalls).toHaveLength(2);
+    // The retry is guided: the second render is told what went wrong and how to draw it instead.
+    expect(JSON.stringify(imageCalls[0].body)).not.toContain('An earlier render');
+    expect(JSON.stringify(imageCalls[1].body)).toContain('An earlier render of this picture had problems. This time: Spell the headline exactly as given');
     expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2 });
   });
 
   it('stops after the retries and shows what is still wrong; the size and the check follow the project settings', async () => {
-    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', detail: 'Slight blur' }] }) });
+    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', detail: 'Slight blur', fix: 'Sharper focus.' }] }) });
     const ctx = await setup();
     const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
     const conceptId = ideas.concepts[0].id;
