@@ -3894,7 +3894,8 @@
       "translate": "Translation for the model",
       "image_qa": "AI image check",
       "site_analysis": "Site reading",
-      "target_writing": "Target writing"
+      "target_writing": "Target writing",
+      "landing_page": "Landing page writing"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -5541,7 +5542,10 @@
         "pilot_resumed": "You resumed the pilot",
         "ads_building": "Started making ads for {subject}",
         "ads_ready": "{count, plural, one {Made # ad image} other {Made # ad images}} for {subject}",
-        "ads_failed": "Could not make ads for {subject}"
+        "ads_failed": "Could not make ads for {subject}",
+        "landing_ready": "Wrote a landing page for {subject}",
+        "landing_published": "You published the landing page for {subject}",
+        "landing_failed": "Could not write a landing page for {subject}"
       }
     },
     "errors": {
@@ -5566,6 +5570,20 @@
         "approved": "Ads approved - publishing comes next",
         "rejected": "You rejected the ads",
         "failed": "The ads could not be made ({reason})"
+      }
+    },
+    "landing": {
+      "title": "Landing page for {name}",
+      "preview": "Show the page",
+      "hidePreview": "Hide the page",
+      "revising": "The AI is rewriting the page...",
+      "changePlaceholder": "What should change on the page? For example: a shorter headline, mention the free plan first",
+      "status": {
+        "ready": "Landing page waiting for your approval",
+        "published": "Landing page live",
+        "rejected": "You rejected the landing page",
+        "failed": "The landing page could not be written ({reason})",
+        "open": "Open"
       }
     }
   }

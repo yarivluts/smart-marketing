@@ -3,11 +3,12 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { siteHost } from '@growthos/shared';
-import { AlertTriangle, ArrowLeft, Check, Globe, ImageIcon, Loader2, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Eye, FileText, Globe, ImageIcon, Loader2, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
-import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
+import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthLandingPageView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
 import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
+import { GrowthLandingView } from './landing-view';
 
 const KIND_ICON = { product: Package, service: Megaphone, audience: Users } as const;
 const SHORT = { dateStyle: 'short', timeStyle: 'short' } as const;
@@ -196,6 +197,8 @@ function ProposalCard({
   onDecide,
   onRevise,
   studio,
+  landing,
+  host,
 }: {
   proposal: GrowthProposalView;
   busy: boolean;
@@ -203,10 +206,16 @@ function ProposalCard({
   onRevise: (text: string) => void;
   /** Where the Ad Studio lives for this project: ads previews and the link to edit them. */
   studio: { media: string; page: string };
+  /** The landing page a `landing_page` proposal is about. */
+  landing?: GrowthLandingPageView | null;
+  host: string;
 }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.waiting');
   const ta = useTranslations('GrowthPilot.ads');
   const ads = proposal.kind === 'ads';
+  const page = proposal.kind === 'landing_page' ? (landing ?? null) : null;
+  const tl = useTranslations('GrowthPilot.landing');
+  const [previewing, setPreviewing] = React.useState(false);
   const [changing, setChanging] = React.useState(false);
   const [text, setText] = React.useState('');
   const draft = proposal.draft;
@@ -217,22 +226,27 @@ function ProposalCard({
     <li className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-proposal" aria-busy={revising || busy}>
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          {ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
+          {ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : page ? <FileText className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-pp-display text-base font-semibold" dir="auto">
-              {ads ? ta('title', { name: draft.name }) : draft.name}
+              {ads ? ta('title', { name: draft.name }) : page ? tl('title', { name: draft.name }) : draft.name}
             </h3>
             <KindChip kind={draft.kind} />
           </div>
           {ads ? <p className="text-sm text-muted-foreground">{ta('description')}</p> : null}
-          {!ads && draft.description ? (
+          {page ? (
+            <p className="text-sm text-muted-foreground" dir={page.dir}>
+              <span className="font-semibold text-foreground">{page.content.headline}</span> - {page.content.subheadline}
+            </p>
+          ) : null}
+          {!ads && !page && draft.description ? (
             <p className="text-sm text-muted-foreground" dir="auto">
               {draft.description}
             </p>
           ) : null}
-          {!ads && draft.audience ? (
+          {!ads && !page && draft.audience ? (
             <p className="text-xs text-muted-foreground" dir="auto">
               <span className="font-semibold text-foreground">{t('for')}: </span>
               {draft.audience}
@@ -262,6 +276,27 @@ function ProposalCard({
           <ArrowLeft className="h-3.5 w-3.5 ltr:rotate-180" aria-hidden="true" />
         </Link>
       ) : null}
+      {page ? (
+        <div className="flex flex-col gap-2">
+          <button type="button" onClick={() => setPreviewing(!previewing)} aria-expanded={previewing} className="inline-flex items-center gap-1.5 self-start text-xs font-semibold text-primary hover:underline" data-testid="growth-pilot-landing-toggle">
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+            {tl(previewing ? 'hidePreview' : 'preview')}
+          </button>
+          {previewing ? (
+            <div className="overflow-hidden rounded-2xl border border-border" data-testid="growth-pilot-landing-preview">
+              <div className="flex items-center gap-1.5 border-b border-border bg-muted/60 px-3 py-1.5" aria-hidden="true">
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                <span className="ms-2 truncate text-[11px] text-muted-foreground" dir="ltr">/lp/{page.slug}</span>
+              </div>
+              <div className="max-h-[32rem] overflow-y-auto">
+                <GrowthLandingView content={page.content} ctaUrl={page.ctaUrl} dir={page.dir} host={host} />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {last ? (
         <p className={cn('rounded-xl px-3 py-2 text-xs', last.outcome === 'failed' ? 'bg-warning/10 text-warning' : 'bg-muted/60 text-muted-foreground')} dir="auto">
           {last.outcome === 'failed' ? t('changeFailed', { reason: last.failureCode ?? '' }) : t('asked', { text: last.text })}
@@ -270,7 +305,7 @@ function ProposalCard({
       {revising ? (
         <p className="flex items-center gap-2 text-sm font-medium text-primary" role="status">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          {ads ? ta('revising') : t('revising')}
+          {ads ? ta('revising') : page ? tl('revising') : t('revising')}
         </p>
       ) : changing ? (
         <form
@@ -285,7 +320,7 @@ function ProposalCard({
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
-            placeholder={ads ? ta('changePlaceholder') : t('changePlaceholder')}
+            placeholder={ads ? ta('changePlaceholder') : page ? tl('changePlaceholder') : t('changePlaceholder')}
             rows={2}
             dir="auto"
             className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm"
@@ -322,7 +357,7 @@ function ProposalCard({
   );
 }
 
-function TargetCard({ target }: { target: GrowthTargetView }): React.ReactElement {
+function TargetCard({ target, landingSlug }: { target: GrowthTargetView; landingSlug: string | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.targets');
   return (
     <li className="flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-target">
@@ -339,8 +374,28 @@ function TargetCard({ target }: { target: GrowthTargetView }): React.ReactElemen
         </p>
       ) : null}
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
+      <TargetLandingLine target={target} slug={landingSlug} />
       <TargetAdsLine target={target} />
     </li>
+  );
+}
+
+/** Where the target's landing page stands; once published, its public address. */
+function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: string | null }): React.ReactElement | null {
+  const t = useTranslations('GrowthPilot.landing.status');
+  if (target.status !== 'active' || target.landingStatus === 'none') return null;
+  const status = target.landingStatus;
+  return (
+    <p className={cn('mt-auto flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'published' ? 'text-success' : status === 'failed' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-landing" data-landing={status}>
+      <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+      {status === 'failed' ? t('failed', { reason: target.landingFailure ?? '' }) : t(status)}
+      {status === 'published' && slug ? (
+        <a href={`/lp/${slug}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" data-testid="growth-pilot-landing-link">
+          {t('open')}
+          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+        </a>
+      ) : null}
+    </p>
   );
 }
 
@@ -555,6 +610,8 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
                     onDecide={(action) => void run(proposal.id, `/proposals/${proposal.id}`, { action })}
                     onRevise={(text) => void run(proposal.id, `/proposals/${proposal.id}`, { action: 'revise', request: text })}
                     studio={studio}
+                    host={host}
+                    landing={proposal.landingPageId ? data.landingPages.find((page) => page.id === proposal.landingPageId) : null}
                   />
                 ))}
               </ul>
@@ -570,7 +627,7 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {targets.map((target) => (
-                  <TargetCard key={target.id} target={target} />
+                  <TargetCard key={target.id} target={target} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
                 ))}
               </ul>
             )}

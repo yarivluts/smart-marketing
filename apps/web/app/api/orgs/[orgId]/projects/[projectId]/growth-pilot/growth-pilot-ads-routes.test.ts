@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, getAdStudioBrief } from '@growthos/firebase-orm-models';
+import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, getAdStudioBrief, getPublishedGrowthLanding } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { configureAdStudioRuntime, createMemoryMediaStorage, resetAdStudioRuntime } from '@/lib/ad-studio/engine';
 import type { GrowthPilotPageData } from '@/lib/growth-pilot/view';
@@ -30,6 +30,7 @@ const ANALYSIS = {
   offerings: [{ kind: 'service', name: 'Pro plan', description: '20 documents a month', forWhom: 'Small offices', why: 'Offices sign every day' }],
   audiences: [],
 };
+const LANDING = { eyebrow: 'For small offices', headline: 'Sign 20 documents a month', subheadline: 'On WhatsApp.', benefits: [{ title: 'Fast', text: 'Seconds' }], steps: [], faq: [], ctaText: 'Start now', closingHeadline: 'Ready?' };
 const PLAN = { summary: 'Show how fast signing is.', audience: 'Small offices', landingPageSummary: '', messagingAngles: ['Speed'], keywordThemes: [], recommendations: [], marketNotes: [] };
 
 /** Gemini as the pilot and the Ad Studio call it: text by the schema asked for, images, and the image checks. */
@@ -48,6 +49,8 @@ function fakeGemini() {
       const schema = JSON.stringify((body.generationConfig as { responseJsonSchema?: unknown } | undefined)?.responseJsonSchema ?? {});
       const answer = schema.includes('"offerings"')
         ? (kinds.push('analysis'), ANALYSIS)
+        : schema.includes('"closingHeadline"')
+          ? (kinds.push('landing'), LANDING)
         : schema.includes('"messagingAngles"')
           ? (kinds.push('plan'), PLAN)
           : schema.includes('"concepts"')
@@ -108,7 +111,7 @@ describe('Growth Pilot ads', () => {
     let data = read;
     for (let call = 0; call < 12; call += 1) {
       data = await json(await advancePilot(request(), p()));
-      if (data.targets[0].adsStatus !== 'building' && data.targets[0].briefId) break;
+      if (data.targets[0].adsStatus !== 'building' && data.targets[0].briefId && data.targets[0].landingStatus !== 'none') break;
     }
     const target = data.targets[0];
     expect(target).toMatchObject({ status: 'active', adsStatus: 'ready' });
@@ -124,6 +127,17 @@ describe('Growth Pilot ads', () => {
 
     const approved = await json(await decide(request({ action: 'approve' }), p({ proposalId: ads!.id })));
     expect(approved.targets[0].adsStatus).toBe('approved');
+
+    // The landing page was written before the ads started; it is private until the person approves it.
+    expect(kinds.indexOf('landing')).toBeLessThan(kinds.indexOf('plan'));
+    const page = approved.landingPages[0];
+    expect(page).toMatchObject({ status: 'draft', content: { headline: 'Sign 20 documents a month' } });
+    expect(page.ctaUrl).toBe(`https://easysign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=${page.slug}`);
+    expect(await getPublishedGrowthLanding(page.slug)).toBeNull();
+    const landingProposal = approved.proposals.find((proposal) => proposal.kind === 'landing_page');
+    const published = await json(await decide(request({ action: 'approve' }), p({ proposalId: landingProposal!.id })));
+    expect(published.targets[0].landingStatus).toBe('published');
+    expect(await getPublishedGrowthLanding(page.slug)).toMatchObject({ status: 'published' });
     // Nothing left to do: another advance changes nothing.
     const after = await json(await advancePilot(request(), p()));
     expect(after.targets[0].adsStatus).toBe('approved');

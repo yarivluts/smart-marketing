@@ -1,7 +1,9 @@
-import { randomUUID } from 'node:crypto';
-import { normalizeSiteUrl, siteHost, type GrowthSiteAnalysis, type GrowthTargetDraft } from '@growthos/shared';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { landingCtaUrl, normalizeSiteUrl, siteHost, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft } from '@growthos/shared';
 import {
   GrowthActivityModel,
+  GrowthLandingPageModel,
+  GrowthLandingSlugModel,
   GrowthPilotModel,
   GrowthProposalModel,
   GrowthTargetModel,
@@ -170,6 +172,9 @@ function newTarget(scope: Scope, pilotId: string, draft: GrowthTargetDraft, orig
   target.run_id = null;
   target.ads_status = 'none';
   target.ads_failure = null;
+  target.landing_page_id = null;
+  target.landing_status = 'none';
+  target.landing_failure = null;
   target.created_on = now;
   target.updated_on = now;
   target.setPathParams(pathParams(scope.organizationId, scope.projectId));
@@ -186,6 +191,7 @@ function newTargetProposal(scope: Scope, pilotId: string, targetId: string, draf
   proposal.status = 'pending';
   proposal.draft = draft;
   proposal.brief_id = null;
+  proposal.landing_page_id = null;
   proposal.preview_image_ids = null;
   proposal.change_requests = [];
   proposal.decided_by = null;
@@ -297,6 +303,19 @@ export async function decideGrowthProposal(params: Scope & { proposalId: string;
     target.status = params.decision === 'approve' ? 'active' : 'rejected';
     target.updated_on = now;
     await target.save();
+  }
+  if (target && proposal.kind === 'landing_page' && proposal.landing_page_id) {
+    const page = await GrowthLandingPageModel.init(proposal.landing_page_id, pathParams(params.organizationId, params.projectId));
+    if (page) {
+      page.status = params.decision === 'approve' ? 'published' : 'rejected';
+      page.published_on = params.decision === 'approve' ? now : (page.published_on ?? null);
+      page.updated_on = now;
+      await page.save();
+    }
+    target.landing_status = params.decision === 'approve' ? 'published' : 'rejected';
+    target.updated_on = now;
+    await target.save();
+    if (params.decision === 'approve') await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: 'landing_published', actor: params.actorId, subject: target.name, now: params.now });
   }
   if (target && proposal.kind === 'ads') {
     target.ads_status = params.decision === 'approve' ? 'approved' : 'rejected';
@@ -439,4 +458,107 @@ export async function finishGrowthTargetAds(params: Scope & { targetId: string; 
   await proposal.save();
   await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'ads_ready', actor: 'pilot', subject: target.name, count: params.previewImageIds.length, now: params.now });
   return target;
+}
+
+/** A random, unguessable public address part: 12 characters, letters, digits, - and _. */
+export function newLandingSlug(): string {
+  return randomBytes(9).toString('base64url');
+}
+
+export async function getGrowthLandingPage(organizationId: string, projectId: string, pageId: string): Promise<GrowthLandingPageModel> {
+  const page = await GrowthLandingPageModel.init(pageId, pathParams(organizationId, projectId));
+  if (!page || page.organization_id !== organizationId || page.project_id !== projectId) throw new GrowthPilotNotFoundError();
+  return page;
+}
+
+/**
+ * The pilot wrote a landing page for a target: it is saved as a draft with its public address
+ * reserved, and put in front of the person as a proposal. Nothing is public until they approve it.
+ */
+export async function saveGrowthLandingDraft(params: Scope & { targetId: string; content: GrowthLandingContent; language: string; siteUrl: string; now?: Date }): Promise<GrowthLandingPageModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  const now = (params.now ?? new Date()).toISOString();
+  const slug = newLandingSlug();
+  const page = new GrowthLandingPageModel();
+  page.organization_id = params.organizationId;
+  page.project_id = params.projectId;
+  page.pilot_id = target.pilot_id;
+  page.target_id = target.id;
+  page.slug = slug;
+  page.status = 'draft';
+  page.content = params.content;
+  page.language = params.language;
+  page.cta_url = landingCtaUrl(params.siteUrl, slug);
+  page.published_on = null;
+  page.created_on = now;
+  page.updated_on = now;
+  page.setPathParams(pathParams(params.organizationId, params.projectId));
+  await page.save();
+  const index = new GrowthLandingSlugModel();
+  index.organization_id = params.organizationId;
+  index.project_id = params.projectId;
+  index.landing_page_id = page.id;
+  // Saved under the slug itself, so the public route finds the page in one read.
+  await index.save(slug);
+
+  const proposal = new GrowthProposalModel();
+  proposal.organization_id = params.organizationId;
+  proposal.project_id = params.projectId;
+  proposal.pilot_id = target.pilot_id;
+  proposal.target_id = target.id;
+  proposal.kind = 'landing_page';
+  proposal.status = 'pending';
+  proposal.draft = { kind: target.kind, name: target.name, description: target.description, audience: target.audience, reason: '' };
+  proposal.brief_id = null;
+  proposal.landing_page_id = page.id;
+  proposal.preview_image_ids = null;
+  proposal.change_requests = [];
+  proposal.decided_by = null;
+  proposal.decided_on = null;
+  proposal.created_on = now;
+  proposal.updated_on = now;
+  proposal.setPathParams(pathParams(params.organizationId, params.projectId));
+  await proposal.save();
+
+  target.landing_page_id = page.id;
+  target.landing_status = 'ready';
+  target.landing_failure = null;
+  target.updated_on = now;
+  await target.save();
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'landing_ready', actor: 'pilot', subject: target.name, now: params.now });
+  return page;
+}
+
+/** The page could not be written: the target says why (and is not retried until the person asks). */
+export async function failGrowthLanding(params: Scope & { targetId: string; failureCode: string; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  target.landing_status = 'failed';
+  target.landing_failure = params.failureCode;
+  target.updated_on = (params.now ?? new Date()).toISOString();
+  await target.save();
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'landing_failed', actor: 'pilot', subject: target.name, now: params.now });
+  return target;
+}
+
+/** Replaces a draft's content with the AI's revision (the proposal is completed by the caller). */
+export async function updateGrowthLandingContent(params: Scope & { pageId: string; content: GrowthLandingContent; now?: Date }): Promise<GrowthLandingPageModel> {
+  const page = await getGrowthLandingPage(params.organizationId, params.projectId, params.pageId);
+  page.content = params.content;
+  page.updated_on = (params.now ?? new Date()).toISOString();
+  await page.save();
+  return page;
+}
+
+/** The page a public address shows: only a published one; null for anything else, so drafts never leak. */
+export async function getPublishedGrowthLanding(slug: string): Promise<GrowthLandingPageModel | null> {
+  if (!/^[A-Za-z0-9_-]{8,32}$/.test(slug)) return null;
+  const index = await GrowthLandingSlugModel.init(slug);
+  if (!index) return null;
+  const page = await GrowthLandingPageModel.init(index.landing_page_id, pathParams(index.organization_id, index.project_id));
+  return page && page.status === 'published' && page.slug === slug ? page : null;
+}
+
+export async function listGrowthLandingPages(organizationId: string, projectId: string, pilotId: string): Promise<GrowthLandingPageModel[]> {
+  const rows = await GrowthLandingPageModel.initPath(pathParams(organizationId, projectId)).where('pilot_id', '==', pilotId).get();
+  return rows.sort((a, b) => a.created_on.localeCompare(b.created_on));
 }

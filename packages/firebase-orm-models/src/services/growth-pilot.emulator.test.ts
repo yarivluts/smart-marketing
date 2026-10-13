@@ -8,6 +8,10 @@ import {
   createOrganizationWithOwner,
   createProject,
   decideGrowthProposal,
+  failGrowthLanding,
+  getPublishedGrowthLanding,
+  saveGrowthLandingDraft,
+  updateGrowthLandingContent,
   finishGrowthTargetAds,
   linkGrowthTargetAds,
   ensureUserForFirebaseSession,
@@ -201,5 +205,47 @@ describe('Growth Pilot', () => {
     const failed = await finishGrowthTargetAds({ ...scope, targetId: proposal.target_id!, previewImageIds: [], failureCode: 'provider_billing' });
     expect(failed).toMatchObject({ ads_status: 'failed', ads_failure: 'provider_billing' });
     expect((await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).some((row) => row.kind === 'ads')).toBe(false);
+  });
+
+  const CONTENT = { eyebrow: 'For offices', headline: 'Sign fast', subheadline: 'On WhatsApp', benefits: [{ title: 'Fast', text: 'Seconds' }], steps: [], faq: [], ctaText: 'Start', closingHeadline: 'Ready?' };
+
+  it('keeps a written landing page private until the person approves it, then serves it at its address', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const [proposal] = await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id);
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'approve' });
+    const page = await saveGrowthLandingDraft({ ...scope, targetId: proposal.target_id!, content: CONTENT, language: 'he', siteUrl: 'https://easy-sign.co.il/' });
+    expect(page.slug).toMatch(/^[A-Za-z0-9_-]{12}$/);
+    expect(page).toMatchObject({ status: 'draft', cta_url: `https://easy-sign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=${page.slug}` });
+    expect(await getPublishedGrowthLanding(page.slug)).toBeNull();
+
+    const landing = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'landing_page')!;
+    expect(landing).toMatchObject({ status: 'pending', landing_page_id: page.id });
+    await requestGrowthProposalChange({ ...scope, proposalId: landing.id, text: 'Shorter' });
+    await updateGrowthLandingContent({ ...scope, pageId: page.id, content: { ...CONTENT, headline: 'Sign' } });
+    await completeGrowthProposalRevision({ ...scope, proposalId: landing.id, draft: landing.draft ?? null });
+    await decideGrowthProposal({ ...scope, proposalId: landing.id, decision: 'approve' });
+
+    const live = await getPublishedGrowthLanding(page.slug);
+    expect(live).toMatchObject({ status: 'published', content: { headline: 'Sign' } });
+    expect(live?.published_on).toBeTruthy();
+    const target = (await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === proposal.target_id);
+    expect(target).toMatchObject({ landing_status: 'published', landing_page_id: page.id });
+    const kinds = (await listGrowthActivity(scope.organizationId, scope.projectId, pilot.id)).map((row) => row.kind);
+    expect(kinds).toEqual(expect.arrayContaining(['landing_ready', 'landing_published']));
+  });
+
+  it('a rejected page never goes public, a failure says why, and a bad address finds nothing', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const [first, second] = await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id);
+    await decideGrowthProposal({ ...scope, proposalId: first.id, decision: 'approve' });
+    const page = await saveGrowthLandingDraft({ ...scope, targetId: first.target_id!, content: CONTENT, language: 'en', siteUrl: 'https://a.co/' });
+    const landing = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'landing_page')!;
+    await decideGrowthProposal({ ...scope, proposalId: landing.id, decision: 'reject' });
+    expect(await getPublishedGrowthLanding(page.slug)).toBeNull();
+
+    const failed = await failGrowthLanding({ ...scope, targetId: second.target_id!, failureCode: 'quota_exceeded' });
+    expect(failed).toMatchObject({ landing_status: 'failed', landing_failure: 'quota_exceeded' });
+    expect(await getPublishedGrowthLanding('../../etc')).toBeNull();
+    expect(await getPublishedGrowthLanding('nosuchslug123')).toBeNull();
   });
 });

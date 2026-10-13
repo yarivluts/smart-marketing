@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
+import type { GrowthLandingContent, GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
 
 /**
  * Growth Pilot: the person gives their website and the AI does the marketing work - reads the site,
@@ -76,6 +76,10 @@ export type GrowthTargetStatus = (typeof GROWTH_TARGET_STATUSES)[number];
 export const GROWTH_ADS_STATUSES = ['none', 'building', 'ready', 'approved', 'rejected', 'failed'] as const;
 export type GrowthAdsStatus = (typeof GROWTH_ADS_STATUSES)[number];
 
+/** Where a target's landing page stands. */
+export const GROWTH_LANDING_STATUSES = ['none', 'ready', 'published', 'rejected', 'failed'] as const;
+export type GrowthLandingStatus = (typeof GROWTH_LANDING_STATUSES)[number];
+
 /** One thing to grow: a product, a service or an audience. */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/growth_targets',
@@ -124,6 +128,16 @@ export class GrowthTargetModel extends BaseModel {
   @Field({ is_required: false })
   public ads_failure?: string | null;
 
+  /** The landing page written for this target, once there is one. */
+  @Field({ is_required: false })
+  public landing_page_id?: string | null;
+
+  @Field({ is_required: false })
+  public landing_status?: GrowthLandingStatus | null;
+
+  @Field({ is_required: false })
+  public landing_failure?: string | null;
+
   @Field({ is_required: true })
   public created_on!: string;
 
@@ -132,7 +146,7 @@ export class GrowthTargetModel extends BaseModel {
 }
 
 /** What a proposal asks the person to decide. Later stories add creatives, landing pages, audiences and publishing. */
-export const GROWTH_PROPOSAL_KINDS = ['target', 'ads'] as const;
+export const GROWTH_PROPOSAL_KINDS = ['target', 'ads', 'landing_page'] as const;
 export type GrowthProposalKind = (typeof GROWTH_PROPOSAL_KINDS)[number];
 
 /** `revising`: the person asked for a change and the AI is rewriting it; it comes back `pending`. */
@@ -180,6 +194,10 @@ export class GrowthProposalModel extends BaseModel {
   @Field({ is_required: false })
   public brief_id?: string | null;
 
+  /** The landing page to approve (kind `landing_page`). */
+  @Field({ is_required: false })
+  public landing_page_id?: string | null;
+
   /** The chosen images to preview on the card (kind `ads`). */
   @Field({ is_required: false })
   public preview_image_ids?: string[] | null;
@@ -216,6 +234,9 @@ export const GROWTH_ACTIVITY_KINDS = [
   'ads_building',
   'ads_ready',
   'ads_failed',
+  'landing_ready',
+  'landing_published',
+  'landing_failed',
 ] as const;
 export type GrowthActivityKind = (typeof GROWTH_ACTIVITY_KINDS)[number];
 
@@ -249,4 +270,72 @@ export class GrowthActivityModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_on!: string;
+}
+
+/** `draft`: waiting for the person; `published`: live at its public address; `rejected`: the person said no. */
+export const GROWTH_LANDING_PAGE_STATUSES = ['draft', 'published', 'rejected'] as const;
+export type GrowthLandingPageStatus = (typeof GROWTH_LANDING_PAGE_STATUSES)[number];
+
+/** A landing page the pilot wrote for a target; served publicly at /lp/<slug> once the person approves it. */
+@Model({
+  reference_path: 'organizations/:organization_id/projects/:project_id/growth_landing_pages',
+  path_id: 'growth_landing_page_id',
+})
+export class GrowthLandingPageModel extends BaseModel {
+  @Field({ is_required: true })
+  public organization_id!: string;
+
+  @Field({ is_required: true })
+  public project_id!: string;
+
+  @Field({ is_required: true })
+  public pilot_id!: string;
+
+  @Field({ is_required: true })
+  public target_id!: string;
+
+  /** The public address part: random, unguessable, stable for the page's life. */
+  @Field({ is_required: true })
+  public slug!: string;
+
+  @Field({ is_required: true })
+  public status!: GrowthLandingPageStatus;
+
+  @Field({ is_required: true })
+  public content!: GrowthLandingContent;
+
+  @Field({ is_required: true })
+  public language!: string;
+
+  /** Where its buttons lead (the site, tagged). */
+  @Field({ is_required: true })
+  public cta_url!: string;
+
+  @Field({ is_required: false })
+  public published_on?: string | null;
+
+  @Field({ is_required: true })
+  public created_on!: string;
+
+  @Field({ is_required: true })
+  public updated_on!: string;
+}
+
+/**
+ * The public address book: slug -> the page it shows. The public route knows only the slug, and a
+ * page lives under its organization and project; this one top-level lookup connects them.
+ */
+@Model({
+  reference_path: 'growth_landing_slugs',
+  path_id: 'growth_landing_slug_id',
+})
+export class GrowthLandingSlugModel extends BaseModel {
+  @Field({ is_required: true })
+  public organization_id!: string;
+
+  @Field({ is_required: true })
+  public project_id!: string;
+
+  @Field({ is_required: true })
+  public landing_page_id!: string;
 }

@@ -111,6 +111,12 @@ describe('middleware matcher', () => {
     expect(unstable_doesMiddlewareMatch({ config, url: '/api/health' })).toBe(false);
   });
 
+  it('never runs on the public landing pages a visitor reaches from an ad', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/lp/abcDEF123_-x' })).toBe(false);
+    // Only the /lp/ folder: a locale page that merely starts with "lp" still goes through the gate.
+    expect(unstable_doesMiddlewareMatch({ config, url: '/en/lpx' })).toBe(true);
+  });
+
   it('still runs on locale-prefixed pages, so skipping /api did not switch the gate off', () => {
     expect(unstable_doesMiddlewareMatch({ config, url: '/en/dashboard' })).toBe(true);
   });
