@@ -80,7 +80,7 @@ export function AdHeader({
                     <span className="truncate">{meter.label}</span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5">
-                    {reached ? <span className="rounded-full bg-warning px-1.5 py-px text-[10px] font-semibold text-white">{usage.limitReached}</span> : null}
+                    {reached ? <span className="rounded-full border border-warning/50 bg-card px-1.5 py-px text-[10px] font-semibold text-warning">{usage.limitReached}</span> : null}
                     <span className={cn('font-semibold tabular-nums', reached ? 'text-warning' : 'text-foreground')} dir="ltr">
                       {meter.used}/{meter.limit}
                     </span>

@@ -60,7 +60,7 @@ export function AdStudioStepper({
                   index + 1
                 )}
               </span>
-              <span className={cn('max-w-full truncate text-center text-[11px] font-medium sm:text-xs', isActive ? 'font-semibold text-primary' : 'text-muted-foreground')}>
+              <span className={cn('max-w-full text-center text-[11px] font-medium leading-tight sm:truncate sm:text-xs', isActive ? 'font-semibold text-primary' : 'text-muted-foreground')}>
                 <span className="hidden sm:inline">{index + 1}. </span>
                 {step.label}
               </span>
