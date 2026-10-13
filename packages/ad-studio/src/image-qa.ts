@@ -16,13 +16,39 @@ const MAX_ISSUES = 8;
 /** Languages written right to left, where digits inside the text still read left to right. */
 const RTL_LANGUAGES: ReadonlySet<string> = new Set(['he', 'ar', 'fa', 'ur']);
 
+/**
+ * The kinds of problem the reviewer sorts each finding into. Reviewers name defects well but rate them
+ * unevenly - a pen in each hand, a band pasted over the scene, a headline across a face all came back
+ * "minor" - so severity follows the kind: everything fails the image except `quality` (slight blur,
+ * a tiny artifact); `other` keeps the reviewer's own rating.
+ */
+export const IMAGE_ISSUE_KINDS = [
+  'headline_text',
+  'headline_placement',
+  'other_text',
+  'body',
+  'proportion',
+  'impossible',
+  'duplicate',
+  'overlay',
+  'quality',
+  'other',
+] as const;
+export type ImageIssueKind = (typeof IMAGE_ISSUE_KINDS)[number];
+
+function kindSeverity(kind: ImageIssueKind, reviewerSeverity: 'major' | 'minor'): 'major' | 'minor' {
+  if (kind === 'quality') return 'minor';
+  if (kind === 'other') return reviewerSeverity;
+  return 'major';
+}
+
 export const AdStudioImageQaSchema = z.object({
   textInImage: z.string(),
   issues: z.array(
     z.object({
       severity: z.enum(['major', 'minor']),
-      /** What the problem is about: the headline itself, other text in the picture, or the picture. */
-      about: z.enum(['headline', 'other_text', 'picture']),
+      /** The kind of problem; the code, not the reviewer, decides from it whether it fails the image (see `KIND_SEVERITY`). */
+      about: z.enum(IMAGE_ISSUE_KINDS),
       detail: z.string(),
       /** In English, for the image model: how to draw it instead. The next render gets it as an instruction. */
       fix: z.string(),
@@ -67,9 +93,9 @@ export function buildImageQaPrompt(subject: ImageQaSubject): { system: string; u
       `Intended picture: ${subject.visualPrompt}`,
       '',
       '1) textInImage: copy every word, letter and number visible in the image exactly as drawn, misspellings included (empty when there is none). Do not correct anything.',
-      `2) issues: every problem, each with severity, about (headline, other_text or picture), a short detail a person can act on, in ${language}, and fix: one short instruction in English telling an image model how to draw it right instead (for example "show the whole person seated, legs under the table", "the phone fits in one hand").`,
+      `2) issues: every problem, each with severity, about (one kind: headline_text - its spelling, letters, word order or direction; headline_placement - where it sits, e.g. over a face; other_text - any other, foreign or gibberish text; body - a deformed face, hand or body, extra limbs; proportion - an object at a wrong size; impossible - floating, merged or physically impossible things; duplicate - the same object twice where one belongs; overlay - floating cards, badges, icons, app frames, empty bands, borders, watermarks, invented logos; quality - slight blur or a tiny artifact; other), a short detail a person can act on, in ${language}, and fix: one short instruction in English telling an image model how to draw it right instead (for example "show the whole person seated, legs under the table", "the phone fits in one hand").`,
       majorText,
-      `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); extra hands or limbs that belong to no one in the picture; the picture drawn as a phone screen or app (a status bar, app bars, buttons or navigation icons around it); a floating card, label, badge, icon, checkmark or other graphic overlay that is not the headline; empty bands, borders or letterboxing at the edges instead of the scene; a watermark or border; an invented brand logo.`,
+      `Also major: any readable word in a language other than ${language} anywhere in the picture - on a screen, a sign, a document or as a legible signature (an illegible scribble is fine); a deformed face, hand or body (extra or missing fingers, melted features); an object at a clearly wrong size or proportion (a phone as big as a tablet, a cup bigger than a head); something physically impossible (writing floating on a table, an object merged into another); extra hands or limbs that belong to no one in the picture; the picture drawn as a phone screen or app (a status bar, app bars, buttons or navigation icons around it); a floating card, label, badge, icon, checkmark or other graphic overlay that is not the headline; the headline over a face, a person or the subject; the same object twice where one belongs (a pen in each hand); empty bands, borders or letterboxing at the edges instead of the scene; a watermark or border; an invented brand logo.`,
       'Minor problems: slight blur, small background artifacts, text a little small for a phone screen.',
       'If you find nothing, return an empty issues list.',
     ]
@@ -92,14 +118,19 @@ export interface ImageQaVerdict {
  * headline and the reviewer reported no major problem itself, a `headline_mismatch` issue is added
  * (the UI words it, showing what was read). Pure.
  */
-export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'>, review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
+export function imageQaVerdict(subject: Pick<ImageQaSubject, 'headline'> & { language?: string }, review: z.infer<typeof AdStudioImageQaSchema>, model: string): ImageQaVerdict {
   const text = review.textInImage.trim().slice(0, 500);
   const headline = subject.headline?.trim() ?? '';
-  // The code's comparison outranks the reviewer on the headline: when the text read off the image holds it
-  // exactly, a reviewer finding about the headline (typically "reversed" for a number in RTL text) is shown
-  // as minor - the person can still see it - but does not fail the image or steer a re-render.
+  // The code's comparison outranks the reviewer on the headline's text: when the text read off the image
+  // holds it exactly, a reviewer finding about its spelling or order is wrong. In right-to-left ads it is
+  // always the same false alarm ("reversed", from digits inside RTL text), so it is dropped; elsewhere it
+  // is kept as minor. Where the headline sits (over a face) is judged by the reviewer as usual.
   const headlineConfirmed = Boolean(headline) && imageTextHasHeadline(headline, text);
-  const kept = review.issues.map((issue) => (headlineConfirmed && issue.about === 'headline' ? { ...issue, severity: 'minor' as const } : issue));
+  const rtl = RTL_LANGUAGES.has((subject.language ?? '').toLowerCase());
+  const kept = review.issues
+    .map((issue) => ({ ...issue, severity: kindSeverity(issue.about, issue.severity) }))
+    .filter((issue) => !(headlineConfirmed && rtl && issue.about === 'headline_text'))
+    .map((issue) => (headlineConfirmed && issue.about === 'headline_text' ? { ...issue, severity: 'minor' as const } : issue));
   const issues: AdStudioImageQaIssue[] = kept.slice(0, MAX_ISSUES).map((issue) => ({ severity: issue.severity, detail: issue.detail.trim().slice(0, 300) }));
   if (headline && !imageTextHasHeadline(headline, text) && !issues.some((issue) => issue.severity === 'major')) {
     issues.unshift({ severity: 'major', code: 'headline_mismatch', detail: text.slice(0, 300) });

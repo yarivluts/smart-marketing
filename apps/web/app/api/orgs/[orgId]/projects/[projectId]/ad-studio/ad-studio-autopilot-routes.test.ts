@@ -287,7 +287,7 @@ describe('image ads routes', () => {
   });
 
   it('stops after the retries and shows what is still wrong; the size and the check follow the project settings', async () => {
-    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', about: 'picture', detail: 'Slight blur', fix: 'Sharper focus.' }] }) });
+    fakeGoogle({ imageQa: () => ({ textInImage: 'Sing in 30 seconds', issues: [{ severity: 'minor', about: 'quality', detail: 'Slight blur', fix: 'Sharper focus.' }] }) });
     const ctx = await setup();
     const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
     const conceptId = ideas.concepts[0].id;
