@@ -90,7 +90,7 @@ const PNG = Buffer.from(
  * synchronous, inline PNG), Gemini Omni video (`interactions` in the background, polled, then a
  * Files API download), and Google Ads OAuth + `assets:mutate` for an image export.
  */
-function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown; imageQa?: (n: number) => unknown } = {}) {
+function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?: (n: number) => unknown; imageQa?: (n: number) => unknown; headlineRead?: string[] } = {}) {
   let reviews = 0;
   let imageReviews = 0;
   const calls: { url: string; body: Record<string, unknown> | null }[] = [];
@@ -116,6 +116,10 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
         imageReviews += 1;
         const verdict = options.imageQa ? options.imageQa(imageReviews) : { textInImage: 'Sign in 30 seconds', issues: [] };
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(verdict) }] } }] });
+      }
+      if (schema.includes('"words"')) {
+        // The separate headline reading: none unless the test gives one, so it confirms nothing by default.
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ words: options.headlineRead ?? [] }) }] } }] });
       }
       if (schema.includes('"transcript"')) {
         reviews += 1;
@@ -288,6 +292,18 @@ describe('image ads routes', () => {
     expect(JSON.stringify(imageCalls[0].body)).not.toContain('An earlier render');
     expect(JSON.stringify(imageCalls[1].body)).toContain('An earlier render of this picture had problems. This time: Spell the headline exactly as given');
     expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2 });
+  });
+
+  it('clears a correct headline the reviewer copied reversed, with a separate reading, without a re-render', async () => {
+    const google = fakeGoogle({
+      imageQa: () => ({ textInImage: 'seconds 30 in Sign', issues: [{ severity: 'major', about: 'headline_text', detail: 'The words are reversed', fix: 'Write it in reading order.' }] }),
+      headlineRead: ['Sign', 'in', '30', 'seconds'],
+    });
+    const ctx = await setup();
+    const ideas = (await (await generateConcepts(request('POST', { imageFormats: ['square'] }), ctx.p())).json()) as ImagesPayload;
+    const rendered = (await (await renderImage(request('POST', { conceptId: ideas.concepts[0].id, format: 'square' }), ctx.p())).json()) as ImagesPayload;
+    expect(rendered.images[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', renders: 1, issues: [] } });
+    expect(google.calls.filter((call) => call.body?.model === 'gemini-3.1-flash-image')).toHaveLength(1);
   });
 
   it('as a last resort renders the picture without text and sets the headline in code, keeping it when it passes', async () => {

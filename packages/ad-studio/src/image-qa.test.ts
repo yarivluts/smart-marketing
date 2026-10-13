@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { betterImageVerdict, buildImageQaPrompt, imageQaVerdict } from './image-qa';
+import { betterImageVerdict, buildHeadlineReadPrompt, buildImageQaPrompt, imageQaVerdict } from './image-qa';
 import { withFixes } from './image-pipeline';
 
 describe('buildImageQaPrompt', () => {
@@ -105,6 +105,19 @@ describe('right-to-left headlines', () => {
     expect(verdict.status).toBe('passed');
     expect(verdict.issues).toEqual([{ severity: 'minor', detail: 'The words are reversed' }]);
     expect(verdict.fixes).toEqual([]);
+  });
+});
+
+describe('a separate reading of the headline', () => {
+  it('reads right-to-left text from the right, digits kept in order', () => {
+    expect(buildHeadlineReadPrompt('he').user).toContain('start from the word furthest to the right');
+    expect(buildHeadlineReadPrompt('en').user).toContain('left to right');
+  });
+
+  it('clears a reviewer that copied a correct headline reversed', () => {
+    const review = { textInImage: 'seconds 30 in Sign', issues: [{ severity: 'major' as const, about: 'headline_text' as const, detail: 'Reversed', fix: 'Right to left.' }] };
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds', language: 'he' }, review, 'gemini').status).toBe('issues');
+    expect(imageQaVerdict({ headline: 'Sign in 30 seconds', language: 'he', headlineConfirmedByReading: true }, review, 'gemini')).toMatchObject({ status: 'passed', issues: [] });
   });
 });
 
