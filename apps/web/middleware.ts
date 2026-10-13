@@ -53,6 +53,7 @@ export default function middleware(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  // Skip API routes, Next internals, and files with an extension (static assets).
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  // Skip API routes, Next internals, files with an extension (static assets), and the public
+  // Growth Pilot landing pages (/lp/<slug>): no locale prefix and no sign-in for a visitor from an ad.
+  matcher: ['/((?!api|_next|_vercel|lp/|.*\\..*).*)'],
 };

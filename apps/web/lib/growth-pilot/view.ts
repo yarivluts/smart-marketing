@@ -1,5 +1,5 @@
-import type { GrowthActivityKind, GrowthAdsStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
-import type { GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
+import type { GrowthActivityKind, GrowthAdsStatus, GrowthLandingPageStatus, GrowthLandingStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
+import { isRtlLanguage, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft, type GrowthTargetKind } from '@growthos/shared';
 
 /** What the Growth Pilot page shows: plain, serializable, no model classes. */
 export interface GrowthPilotView {
@@ -23,12 +23,26 @@ export interface GrowthTargetView {
   briefId: string | null;
   adsStatus: GrowthAdsStatus;
   adsFailure: string | null;
+  landingPageId: string | null;
+  landingStatus: GrowthLandingStatus;
+  landingFailure: string | null;
+}
+
+export interface GrowthLandingPageView {
+  id: string;
+  targetId: string;
+  slug: string;
+  status: GrowthLandingPageStatus;
+  content: GrowthLandingContent;
+  dir: 'rtl' | 'ltr';
+  ctaUrl: string;
 }
 
 export interface GrowthProposalView {
   id: string;
   kind: GrowthProposalKind;
   briefId: string | null;
+  landingPageId: string | null;
   previewImageIds: string[];
   targetId: string | null;
   status: GrowthProposalStatus;
@@ -52,6 +66,7 @@ export interface GrowthPilotPageData {
   targets: GrowthTargetView[];
   proposals: GrowthProposalView[];
   activity: GrowthActivityView[];
+  landingPages: GrowthLandingPageView[];
 }
 
 interface PilotRow {
@@ -87,6 +102,9 @@ export function toGrowthTargetView(row: {
   brief_id?: string | null;
   ads_status?: GrowthAdsStatus | null;
   ads_failure?: string | null;
+  landing_page_id?: string | null;
+  landing_status?: GrowthLandingStatus | null;
+  landing_failure?: string | null;
 }): GrowthTargetView {
   return {
     id: row.id,
@@ -99,6 +117,9 @@ export function toGrowthTargetView(row: {
     briefId: row.brief_id ?? null,
     adsStatus: row.ads_status ?? 'none',
     adsFailure: row.ads_failure ?? null,
+    landingPageId: row.landing_page_id ?? null,
+    landingStatus: row.landing_status ?? 'none',
+    landingFailure: row.landing_failure ?? null,
   };
 }
 
@@ -106,6 +127,7 @@ export function toGrowthProposalView(row: {
   id: string;
   kind: GrowthProposalKind;
   brief_id?: string | null;
+  landing_page_id?: string | null;
   preview_image_ids?: string[] | null;
   target_id?: string | null;
   status: GrowthProposalStatus;
@@ -117,6 +139,7 @@ export function toGrowthProposalView(row: {
     id: row.id,
     kind: row.kind,
     briefId: row.brief_id ?? null,
+    landingPageId: row.landing_page_id ?? null,
     previewImageIds: row.preview_image_ids ?? [],
     targetId: row.target_id ?? null,
     status: row.status,
@@ -124,6 +147,10 @@ export function toGrowthProposalView(row: {
     changes: row.change_requests.map((change) => ({ text: change.text, on: change.on, outcome: change.outcome, failureCode: change.failure_code ?? null })),
     createdOn: row.created_on,
   };
+}
+
+export function toGrowthLandingPageView(row: { id: string; target_id: string; slug: string; status: GrowthLandingPageStatus; content: GrowthLandingContent; language: string; cta_url: string }): GrowthLandingPageView {
+  return { id: row.id, targetId: row.target_id, slug: row.slug, status: row.status, content: row.content, dir: isRtlLanguage(row.language) ? 'rtl' : 'ltr', ctaUrl: row.cta_url };
 }
 
 export function toGrowthActivityView(row: { id: string; kind: GrowthActivityKind; actor: string; subject?: string | null; count?: number | null; created_on: string }): GrowthActivityView {
@@ -136,7 +163,8 @@ export function toGrowthActivityView(row: { id: string; kind: GrowthActivityKind
  */
 export function growthPilotHasPendingWork(data: GrowthPilotPageData): boolean {
   if (data.pilot.status !== 'active') return false;
-  if (data.targets.some((target) => target.adsStatus === 'building' || (target.status === 'active' && !target.briefId && target.adsStatus === 'none'))) return true;
+  const active = data.targets.filter((target) => target.status === 'active');
+  if (active.some((target) => target.adsStatus === 'building' || (!target.briefId && target.adsStatus === 'none') || target.landingStatus === 'none')) return true;
   return data.proposals.some((proposal) => proposal.kind === 'ads' && proposal.status === 'revising');
 }
 

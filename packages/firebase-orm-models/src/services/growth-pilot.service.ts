@@ -557,3 +557,8 @@ export async function getPublishedGrowthLanding(slug: string): Promise<GrowthLan
   const page = await GrowthLandingPageModel.init(index.landing_page_id, pathParams(index.organization_id, index.project_id));
   return page && page.status === 'published' && page.slug === slug ? page : null;
 }
+
+export async function listGrowthLandingPages(organizationId: string, projectId: string, pilotId: string): Promise<GrowthLandingPageModel[]> {
+  const rows = await GrowthLandingPageModel.initPath(pathParams(organizationId, projectId)).where('pilot_id', '==', pilotId).get();
+  return rows.sort((a, b) => a.created_on.localeCompare(b.created_on));
+}

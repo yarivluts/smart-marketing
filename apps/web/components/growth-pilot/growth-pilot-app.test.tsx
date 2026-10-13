@@ -20,6 +20,7 @@ const PROPOSAL: GrowthProposalView = {
   id: 'pr1',
   kind: 'target',
   briefId: null,
+  landingPageId: null,
   previewImageIds: [],
   targetId: 't1',
   status: 'pending',
@@ -39,9 +40,10 @@ function page(extra: Partial<GrowthPilotPageData> & { status?: GrowthPilotPageDa
       pagesRead: [{ url: 'https://easysign.co.il/', title: 'EasySign' }],
       createdOn: '2026-10-13T10:00:00Z',
     },
-    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null }],
+    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null }],
     proposals: extra.proposals ?? [PROPOSAL],
     activity: extra.activity ?? [{ id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 1, on: '2026-10-13T10:00:00Z' }],
+    landingPages: extra.landingPages ?? [],
   };
 }
 
@@ -156,7 +158,7 @@ describe('GrowthPilotApp', () => {
   });
 
   describe('ads', () => {
-    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null };
+    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null };
     const ADS: GrowthProposalView = { ...PROPOSAL, id: 'ad1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
     it('shows the ads with previews, a way into the Ad Studio, and the same approve / change / reject', async () => {
@@ -195,6 +197,42 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={waiting} />, { locale: 'en' });
       await waitFor(() => expect(sent(fetchMock).url).toBe(BASE + '/advance'));
       expect(await screen.findByText('The ads could not be made (quota_exceeded)')).toBeInTheDocument();
+    });
+  });
+
+  describe('landing pages', () => {
+    const CONTENT = { eyebrow: 'For small offices', headline: 'Sign 20 documents a month', subheadline: 'On WhatsApp, for 20 ILS.', benefits: [{ title: 'Fast', text: 'Signed in seconds' }], steps: ['Upload', 'Send'], faq: [{ question: 'Price?', answer: '20 ILS a month' }], ctaText: 'Start now', closingHeadline: 'Ready to sign?' };
+    const PAGE = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'draft' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://easy-sign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=abcDEF123456' };
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: 'lp1', landingStatus: 'ready' as const, landingFailure: null };
+    const PROPOSAL_LP: GrowthProposalView = { ...PROPOSAL, id: 'p-lp', kind: 'landing_page', landingPageId: 'lp1', draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
+
+    it('shows the page it proposes, as visitors will see it, with the button leading to the tagged site', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PROPOSAL_LP], targets: [TARGET], landingPages: [PAGE] })} />, { locale: 'en' });
+      const card = screen.getByTestId('growth-pilot-proposal');
+      expect(card).toHaveTextContent('Landing page for Pro plan');
+      expect(card).toHaveTextContent('Sign 20 documents a month - On WhatsApp, for 20 ILS.');
+      expect(screen.queryByTestId('growth-pilot-landing-preview')).toBeNull();
+      fireEvent.click(screen.getByTestId('growth-pilot-landing-toggle'));
+      const preview = screen.getByTestId('growth-pilot-landing-preview');
+      expect(within(preview).getByRole('heading', { level: 1 })).toHaveTextContent('Sign 20 documents a month');
+      expect(within(preview).getByTestId('growth-landing-cta')).toHaveAttribute('href', PAGE.ctaUrl);
+      expect(preview).toHaveTextContent('/lp/abcDEF123456');
+      expect(screen.getByTestId('growth-pilot-target-landing')).toHaveTextContent('Landing page waiting for your approval');
+    });
+
+    it('links a published page from its target, and says why one could not be written', () => {
+      renderWithIntl(
+        <GrowthPilotApp
+          orgId="o"
+          projectId="p"
+          initial={page({ proposals: [], targets: [{ ...TARGET, landingStatus: 'published' }, { ...TARGET, id: 't2', landingPageId: null, landingStatus: 'failed', landingFailure: 'quota_exceeded' }], landingPages: [{ ...PAGE, status: 'published' }] })}
+        />,
+        { locale: 'en' },
+      );
+      const [live, failed] = screen.getAllByTestId('growth-pilot-target-landing');
+      expect(live).toHaveTextContent('Landing page live');
+      expect(within(live).getByTestId('growth-pilot-landing-link')).toHaveAttribute('href', '/lp/abcDEF123456');
+      expect(failed).toHaveTextContent('The landing page could not be written (quota_exceeded)');
     });
   });
 });

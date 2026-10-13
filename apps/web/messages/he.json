@@ -3894,7 +3894,8 @@
       "translate": "תרגום למודל",
       "image_qa": "בדיקת AI לתמונה",
       "site_analysis": "קריאת אתר",
-      "target_writing": "ניסוח יעד"
+      "target_writing": "ניסוח יעד",
+      "landing_page": "כתיבת דף נחיתה"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -5541,7 +5542,10 @@
         "pilot_resumed": "חידשתם את הטייס",
         "ads_building": "התחיל להכין מודעות ל{subject}",
         "ads_ready": "{count, plural, one {הכין תמונת מודעה אחת} other {הכין # תמונות מודעה}} ל{subject}",
-        "ads_failed": "לא הצליח להכין מודעות ל{subject}"
+        "ads_failed": "לא הצליח להכין מודעות ל{subject}",
+        "landing_ready": "כתב דף נחיתה ל{subject}",
+        "landing_published": "פרסמתם את דף הנחיתה ל{subject}",
+        "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}"
       }
     },
     "errors": {
@@ -5566,6 +5570,20 @@
         "approved": "המודעות אושרו - בהמשך: פרסום",
         "rejected": "דחיתם את המודעות",
         "failed": "לא הצלחנו להכין את המודעות ({reason})"
+      }
+    },
+    "landing": {
+      "title": "דף נחיתה ל{name}",
+      "preview": "הצגת הדף",
+      "hidePreview": "הסתרת הדף",
+      "revising": "ה-AI כותב מחדש את הדף...",
+      "changePlaceholder": "מה לשנות בדף? למשל: כותרת קצרה יותר, להזכיר קודם את המסלול החינמי",
+      "status": {
+        "ready": "דף נחיתה מחכה לאישור שלכם",
+        "published": "דף הנחיתה באוויר",
+        "rejected": "דחיתם את דף הנחיתה",
+        "failed": "לא הצלחנו לכתוב את דף הנחיתה ({reason})",
+        "open": "פתיחה"
       }
     }
   }
