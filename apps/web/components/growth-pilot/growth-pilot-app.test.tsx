@@ -6,11 +6,21 @@ import heMessages from '@/messages/he.json';
 import type { GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { GrowthPilotApp } from './growth-pilot-app';
 
+vi.mock('@/i18n/navigation', () => ({
+  Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
 const BASE = '/api/orgs/o/projects/p/growth-pilot';
 
 const PROPOSAL: GrowthProposalView = {
   id: 'pr1',
   kind: 'target',
+  briefId: null,
+  previewImageIds: [],
   targetId: 't1',
   status: 'pending',
   draft: { kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', reason: 'The main service' },
@@ -29,7 +39,7 @@ function page(extra: Partial<GrowthPilotPageData> & { status?: GrowthPilotPageDa
       pagesRead: [{ url: 'https://easysign.co.il/', title: 'EasySign' }],
       createdOn: '2026-10-13T10:00:00Z',
     },
-    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site' }],
+    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null }],
     proposals: extra.proposals ?? [PROPOSAL],
     activity: extra.activity ?? [{ id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 1, on: '2026-10-13T10:00:00Z' }],
   };
@@ -143,5 +153,48 @@ describe('GrowthPilotApp', () => {
     fireEvent.click(screen.getByTestId('growth-pilot-pause'));
     await waitFor(() => expect(sent(fetchMock)).toEqual({ url: `${BASE}/pause`, body: { paused: true } }));
     expect(await screen.findByText(heMessages.GrowthPilot.header.paused)).toBeInTheDocument();
+  });
+
+  describe('ads', () => {
+    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null };
+    const ADS: GrowthProposalView = { ...PROPOSAL, id: 'ad1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
+
+    it('shows the ads with previews, a way into the Ad Studio, and the same approve / change / reject', async () => {
+      const fetchMock = stubFetch({ body: page({ proposals: [{ ...ADS, status: 'revising', changes: [{ text: 'Brighter', on: 'x', outcome: 'pending', failureCode: null }] }], targets: [ACTIVE_TARGET] }) });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ADS], targets: [ACTIVE_TARGET] })} />, { locale: 'en' });
+      const card = screen.getByTestId('growth-pilot-proposal');
+      expect(card).toHaveTextContent('Ads for Pro plan');
+      const images = within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true });
+      expect(images.map((image) => image.getAttribute('src'))).toEqual(['/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i1/media', '/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i2/media']);
+      expect(screen.getByTestId('growth-pilot-open-studio')).toHaveAttribute('href', '/orgs/o/projects/p/ad-studio?brief=b1&step=review');
+      expect(screen.getByTestId('growth-pilot-target-ads')).toHaveTextContent('Ads are waiting for your approval');
+
+      fireEvent.click(screen.getByTestId('growth-pilot-change'));
+      expect(screen.getByTestId('growth-pilot-change-input')).toHaveAttribute('placeholder', expect.stringContaining('brighter photos'));
+      fireEvent.change(screen.getByTestId('growth-pilot-change-input'), { target: { value: 'Brighter' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Send to the AI' }));
+      await waitFor(() => expect(sent(fetchMock)).toEqual({ url: BASE + '/proposals/ad1', body: { action: 'revise', request: 'Brighter' } }));
+      expect(await screen.findByText('The AI is rewriting the ideas and making new images...')).toBeInTheDocument();
+    });
+
+    it('keeps advancing while ads are being made, one unit per call, and stops when they are ready', async () => {
+      const building = page({ proposals: [], targets: [{ ...ACTIVE_TARGET, adsStatus: 'building' }] });
+      const fetchMock = stubFetch({ body: building }, { body: page({ proposals: [ADS], targets: [ACTIVE_TARGET] }) });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={building} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-target-ads')).toHaveAttribute('data-ads', 'building');
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 });
+      expect(fetchMock.mock.calls.every((call) => call[0] === BASE + '/advance')).toBe(true);
+      expect(await screen.findByText('Ads for Pro plan')).toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('says why ads failed, and starts them for an approved target that has none yet', async () => {
+      const waiting = page({ proposals: [], targets: [{ ...ACTIVE_TARGET, briefId: null, adsStatus: 'none' }] });
+      const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...ACTIVE_TARGET, adsStatus: 'failed', adsFailure: 'quota_exceeded' }] }) });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={waiting} />, { locale: 'en' });
+      await waitFor(() => expect(sent(fetchMock).url).toBe(BASE + '/advance'));
+      expect(await screen.findByText('The ads could not be made (quota_exceeded)')).toBeInTheDocument();
+    });
   });
 });

@@ -3,15 +3,18 @@
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { siteHost } from '@growthos/shared';
-import { AlertTriangle, ArrowLeft, Check, Globe, Loader2, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Globe, ImageIcon, Loader2, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { waitingProposals, type GrowthActivityView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
+import { Link } from '@/i18n/navigation';
+import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
 import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
 
 const KIND_ICON = { product: Package, service: Megaphone, audience: Users } as const;
 const SHORT = { dateStyle: 'short', timeStyle: 'short' } as const;
 /** While the site is read in another tab or request, how often this page looks again. */
 export const GROWTH_PILOT_POLL_MS = 5000;
+/** Between units of ads work (each call already takes as long as one step). */
+export const GROWTH_PILOT_STEP_MS = 1500;
 
 type ApiResult = { ok: true; data: GrowthPilotPageData | null } | { ok: false; error: string };
 
@@ -187,8 +190,23 @@ function KindChip({ kind }: { kind: GrowthTargetView['kind'] }): React.ReactElem
 }
 
 /** One proposal waiting for the person: approve, reject, or tell the AI what to change. */
-function ProposalCard({ proposal, busy, onDecide, onRevise }: { proposal: GrowthProposalView; busy: boolean; onDecide: (action: 'approve' | 'reject') => void; onRevise: (text: string) => void }): React.ReactElement | null {
+function ProposalCard({
+  proposal,
+  busy,
+  onDecide,
+  onRevise,
+  studio,
+}: {
+  proposal: GrowthProposalView;
+  busy: boolean;
+  onDecide: (action: 'approve' | 'reject') => void;
+  onRevise: (text: string) => void;
+  /** Where the Ad Studio lives for this project: ads previews and the link to edit them. */
+  studio: { media: string; page: string };
+}): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.waiting');
+  const ta = useTranslations('GrowthPilot.ads');
+  const ads = proposal.kind === 'ads';
   const [changing, setChanging] = React.useState(false);
   const [text, setText] = React.useState('');
   const draft = proposal.draft;
@@ -199,21 +217,22 @@ function ProposalCard({ proposal, busy, onDecide, onRevise }: { proposal: Growth
     <li className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-proposal" aria-busy={revising || busy}>
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          {React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
+          {ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-pp-display text-base font-semibold" dir="auto">
-              {draft.name}
+              {ads ? ta('title', { name: draft.name }) : draft.name}
             </h3>
             <KindChip kind={draft.kind} />
           </div>
-          {draft.description ? (
+          {ads ? <p className="text-sm text-muted-foreground">{ta('description')}</p> : null}
+          {!ads && draft.description ? (
             <p className="text-sm text-muted-foreground" dir="auto">
               {draft.description}
             </p>
           ) : null}
-          {draft.audience ? (
+          {!ads && draft.audience ? (
             <p className="text-xs text-muted-foreground" dir="auto">
               <span className="font-semibold text-foreground">{t('for')}: </span>
               {draft.audience}
@@ -227,6 +246,22 @@ function ProposalCard({ proposal, busy, onDecide, onRevise }: { proposal: Growth
           ) : null}
         </div>
       </div>
+      {ads && proposal.briefId && proposal.previewImageIds.length ? (
+        <ul className="flex flex-wrap gap-2" data-testid="growth-pilot-ads-preview">
+          {proposal.previewImageIds.map((imageId) => (
+            <li key={imageId} className="h-28 overflow-hidden rounded-2xl bg-muted">
+              {/* A plain img: private media from our own authenticated route, in its own shape. */}
+              <img src={`${studio.media}/briefs/${proposal.briefId}/images/${imageId}/media`} alt="" className="h-full w-auto object-contain" />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {ads && proposal.briefId ? (
+        <Link href={`${studio.page}?brief=${proposal.briefId}&step=review`} className="inline-flex items-center gap-1 self-start text-xs font-semibold text-primary hover:underline" data-testid="growth-pilot-open-studio">
+          {ta('open')}
+          <ArrowLeft className="h-3.5 w-3.5 ltr:rotate-180" aria-hidden="true" />
+        </Link>
+      ) : null}
       {last ? (
         <p className={cn('rounded-xl px-3 py-2 text-xs', last.outcome === 'failed' ? 'bg-warning/10 text-warning' : 'bg-muted/60 text-muted-foreground')} dir="auto">
           {last.outcome === 'failed' ? t('changeFailed', { reason: last.failureCode ?? '' }) : t('asked', { text: last.text })}
@@ -235,7 +270,7 @@ function ProposalCard({ proposal, busy, onDecide, onRevise }: { proposal: Growth
       {revising ? (
         <p className="flex items-center gap-2 text-sm font-medium text-primary" role="status">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          {t('revising')}
+          {ads ? ta('revising') : t('revising')}
         </p>
       ) : changing ? (
         <form
@@ -250,7 +285,7 @@ function ProposalCard({ proposal, busy, onDecide, onRevise }: { proposal: Growth
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
-            placeholder={t('changePlaceholder')}
+            placeholder={ads ? ta('changePlaceholder') : t('changePlaceholder')}
             rows={2}
             dir="auto"
             className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm"
@@ -304,8 +339,22 @@ function TargetCard({ target }: { target: GrowthTargetView }): React.ReactElemen
         </p>
       ) : null}
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
-      <p className="mt-auto border-t border-border/60 pt-2 text-xs text-muted-foreground">{t('next')}</p>
+      <TargetAdsLine target={target} />
     </li>
+  );
+}
+
+/** Where the target's ads stand, at the foot of its card. */
+function TargetAdsLine({ target }: { target: GrowthTargetView }): React.ReactElement {
+  const t = useTranslations('GrowthPilot.targets');
+  const ta = useTranslations('GrowthPilot.ads.status');
+  const status = target.status === 'active' ? target.adsStatus : 'none';
+  const tone = status === 'failed' ? 'text-warning' : status === 'approved' ? 'text-success' : status === 'building' ? 'text-primary' : 'text-muted-foreground';
+  return (
+    <p className={cn('mt-auto flex items-center gap-1.5 border-t border-border/60 pt-2 text-xs', tone)} data-testid="growth-pilot-target-ads" data-ads={status}>
+      {status === 'building' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+      {status === 'none' ? t('next') : status === 'failed' ? ta('failed', { reason: target.adsFailure ?? '' }) : ta(status)}
+    </p>
   );
 }
 
@@ -350,6 +399,7 @@ export interface GrowthPilotAppProps {
 export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProps): React.ReactElement {
   const t = useTranslations('GrowthPilot');
   const base = `/api/orgs/${orgId}/projects/${projectId}/growth-pilot`;
+  const studio = { media: `/api/orgs/${orgId}/projects/${projectId}/ad-studio`, page: `/orgs/${orgId}/projects/${projectId}/ad-studio` };
   const [data, setData] = React.useState<GrowthPilotPageData | null>(initial);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
@@ -372,10 +422,12 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
     [base],
   );
 
-  const status = data?.pilot.status;
-  // While the site is read: ask the server to do it (or, when another caller is on it, look again shortly).
+  const working = data ? data.pilot.status === 'analyzing' || growthPilotHasPendingWork(data) : false;
+  // While there is work - the site being read, ads being made - ask the server to do the next unit of
+  // it; each call does one, so the page keeps asking until nothing is left. When another caller holds
+  // the work (another tab), or a call fails, it looks again a little later.
   React.useEffect(() => {
-    if (status !== 'analyzing') return;
+    if (!working) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
@@ -383,14 +435,15 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
       if (cancelled) return;
       if (result.ok) setData(result.data);
       else setError(result.error);
-      if (!result.ok || result.data?.pilot.status === 'analyzing') timer = setTimeout(() => void tick(), GROWTH_PILOT_POLL_MS);
+      const more = result.ok && result.data !== null && (result.data.pilot.status === 'analyzing' || growthPilotHasPendingWork(result.data));
+      if (!result.ok || more) timer = setTimeout(() => void tick(), result.ok && result.data?.pilot.status !== 'analyzing' ? GROWTH_PILOT_STEP_MS : GROWTH_PILOT_POLL_MS);
     };
     void tick();
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [status, base]);
+  }, [working, base]);
 
   const start = async (url: string) => {
     if (await run('start', '', { siteUrl: url })) setStartingOver(false);
@@ -501,6 +554,7 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
                     busy={busy === proposal.id}
                     onDecide={(action) => void run(proposal.id, `/proposals/${proposal.id}`, { action })}
                     onRevise={(text) => void run(proposal.id, `/proposals/${proposal.id}`, { action: 'revise', request: text })}
+                    studio={studio}
                   />
                 ))}
               </ul>

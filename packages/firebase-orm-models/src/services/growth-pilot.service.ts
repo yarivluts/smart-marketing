@@ -167,6 +167,9 @@ function newTarget(scope: Scope, pilotId: string, draft: GrowthTargetDraft, orig
   target.status = 'proposed';
   target.origin = origin;
   target.brief_id = null;
+  target.run_id = null;
+  target.ads_status = 'none';
+  target.ads_failure = null;
   target.created_on = now;
   target.updated_on = now;
   target.setPathParams(pathParams(scope.organizationId, scope.projectId));
@@ -182,6 +185,8 @@ function newTargetProposal(scope: Scope, pilotId: string, targetId: string, draf
   proposal.kind = 'target';
   proposal.status = 'pending';
   proposal.draft = draft;
+  proposal.brief_id = null;
+  proposal.preview_image_ids = null;
   proposal.change_requests = [];
   proposal.decided_by = null;
   proposal.decided_on = null;
@@ -293,6 +298,11 @@ export async function decideGrowthProposal(params: Scope & { proposalId: string;
     target.updated_on = now;
     await target.save();
   }
+  if (target && proposal.kind === 'ads') {
+    target.ads_status = params.decision === 'approve' ? 'approved' : 'rejected';
+    target.updated_on = now;
+    await target.save();
+  }
   const name = proposal.draft?.name ?? '';
   await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: params.decision === 'approve' ? 'proposal_approved' : 'proposal_rejected', actor: params.actorId, subject: name, now: params.now });
   await audit(params, params.actorId, `growth_pilot.proposal_${params.decision === 'approve' ? 'approved' : 'rejected'}`, 'growth_proposal', proposal.id, `${params.decision === 'approve' ? 'Approved' : 'Rejected'} "${name}"`, { kind: proposal.kind, target_id: proposal.target_id ?? null });
@@ -354,4 +364,79 @@ export async function setGrowthPilotPaused(params: Scope & { pilotId: string; pa
   await recordGrowthActivity({ ...params, pilotId: pilot.id, kind: params.paused ? 'pilot_paused' : 'pilot_resumed', actor: params.actorId, now: params.now });
   await audit(params, params.actorId, params.paused ? 'growth_pilot.paused' : 'growth_pilot.resumed', 'growth_pilot', pilot.id, `${params.paused ? 'Paused' : 'Resumed'} Growth Pilot for ${siteHost(pilot.site_url)}`);
   return pilot;
+}
+
+export async function getGrowthTarget(organizationId: string, projectId: string, targetId: string): Promise<GrowthTargetModel> {
+  const target = await GrowthTargetModel.init(targetId, pathParams(organizationId, projectId));
+  if (!target || target.organization_id !== organizationId || target.project_id !== projectId) throw new GrowthPilotNotFoundError();
+  return target;
+}
+
+/** The target's ads are being made: its brief and the autopilot run making them. */
+export async function linkGrowthTargetAds(params: Scope & { targetId: string; briefId: string; runId: string; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  const now = (params.now ?? new Date()).toISOString();
+  const first = !target.brief_id;
+  target.brief_id = params.briefId;
+  target.run_id = params.runId;
+  target.ads_status = 'building';
+  target.ads_failure = null;
+  target.updated_on = now;
+  await target.save();
+  if (first) await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'ads_building', actor: 'pilot', subject: target.name, now: params.now });
+  return target;
+}
+
+async function revisingAdsProposal(scope: Scope, target: GrowthTargetModel): Promise<GrowthProposalModel | null> {
+  const rows = await GrowthProposalModel.initPath(pathParams(scope.organizationId, scope.projectId)).where('target_id', '==', target.id).get();
+  return rows.find((row) => row.kind === 'ads' && row.status === 'revising') ?? null;
+}
+
+/**
+ * The autopilot finished a target's ads. Ready: they go in front of the person as a proposal with
+ * previews - or, when the person had asked for a change, the same proposal comes back with the new
+ * ones. Failed: the target says why, and a pending change request is closed as failed.
+ */
+export async function finishGrowthTargetAds(params: Scope & { targetId: string; previewImageIds: string[]; failureCode?: string | null; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  const now = (params.now ?? new Date()).toISOString();
+  const revising = await revisingAdsProposal(params, target);
+  if (params.failureCode) {
+    target.ads_status = revising ? 'ready' : 'failed';
+    target.ads_failure = params.failureCode;
+    target.updated_on = now;
+    await target.save();
+    if (revising) await completeGrowthProposalRevision({ organizationId: params.organizationId, projectId: params.projectId, proposalId: revising.id, draft: null, failureCode: params.failureCode, now: params.now });
+    else await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'ads_failed', actor: 'pilot', subject: target.name, now: params.now });
+    return target;
+  }
+  target.ads_status = 'ready';
+  target.ads_failure = null;
+  target.updated_on = now;
+  await target.save();
+  if (revising) {
+    revising.preview_image_ids = params.previewImageIds;
+    await revising.save();
+    await completeGrowthProposalRevision({ organizationId: params.organizationId, projectId: params.projectId, proposalId: revising.id, draft: revising.draft ?? null, now: params.now });
+    return target;
+  }
+  const proposal = new GrowthProposalModel();
+  proposal.organization_id = params.organizationId;
+  proposal.project_id = params.projectId;
+  proposal.pilot_id = target.pilot_id;
+  proposal.target_id = target.id;
+  proposal.kind = 'ads';
+  proposal.status = 'pending';
+  proposal.draft = { kind: target.kind, name: target.name, description: target.description, audience: target.audience, reason: '' };
+  proposal.brief_id = target.brief_id ?? null;
+  proposal.preview_image_ids = params.previewImageIds;
+  proposal.change_requests = [];
+  proposal.decided_by = null;
+  proposal.decided_on = null;
+  proposal.created_on = now;
+  proposal.updated_on = now;
+  proposal.setPathParams(pathParams(params.organizationId, params.projectId));
+  await proposal.save();
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'ads_ready', actor: 'pilot', subject: target.name, count: params.previewImageIds.length, now: params.now });
+  return target;
 }
