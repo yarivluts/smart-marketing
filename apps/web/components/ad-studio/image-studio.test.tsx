@@ -101,6 +101,23 @@ describe('ImageStudio', () => {
     expect(screen.queryByTestId('ad-studio-image-qa-passed')).toBeNull();
   });
 
+  it("on one idea's own page shows only that idea, without the actions on all ideas", () => {
+    const second = { ...CONCEPT, id: 'c2', headline: 'No printing' };
+    renderStudio({ initialConcepts: [CONCEPT, second], focusConceptId: 'c2' });
+    expect(screen.getByTestId('ad-studio-image-concept-1')).toHaveClass('hidden');
+    expect(screen.getByTestId('ad-studio-image-concept-2')).not.toHaveClass('hidden');
+    expect(screen.queryByTestId('ad-studio-idea-filter')).toBeNull();
+    expect(screen.queryByTestId('ad-studio-image-summary')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Write new ideas with AI' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add an idea' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Save ideas' })).toBeInTheDocument();
+  });
+
+  it('says so when the idea asked for is no longer in the ad', () => {
+    renderStudio({ focusConceptId: 'gone' });
+    expect(screen.getByTestId('ad-studio-idea-missing')).toBeInTheDocument();
+  });
+
   it('filters the ideas to one, and back to all', () => {
     const second = { ...CONCEPT, id: 'c2', headline: 'No printing' };
     renderStudio({ initialConcepts: [CONCEPT, second] });
