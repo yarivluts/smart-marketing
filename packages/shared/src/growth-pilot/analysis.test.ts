@@ -14,13 +14,13 @@ const ANALYSIS: GrowthSiteAnalysis = {
   summary: 'Digital signatures over WhatsApp.',
   language: 'he',
   offerings: [
-    { kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', forWhom: 'Small law firms' },
-    { kind: 'product', name: 'Templates', description: 'Ready contracts', forWhom: 'Freelancers' },
+    { kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', forWhom: 'Small law firms', why: 'Firms lose clients to paperwork' },
+    { kind: 'product', name: 'Templates', description: 'Ready contracts', forWhom: 'Freelancers', why: 'Ready contracts' },
   ],
   audiences: [
-    { name: 'Law firms', description: 'Small firms', needs: 'Faster client signatures' },
-    { name: 'Accountants', description: 'Bookkeeping offices', needs: 'Signed forms' },
-    { name: 'digital signature', description: 'duplicate by name', needs: '' },
+    { name: 'Law firms', description: 'Small firms', needs: 'Faster client signatures', why: 'They sign daily' },
+    { name: 'Accountants', description: 'Bookkeeping offices', needs: 'Signed forms', why: '' },
+    { name: 'digital signature', description: 'duplicate by name', needs: '', why: '' },
   ],
 };
 
@@ -55,10 +55,10 @@ describe('sanitizing what the model returned', () => {
       businessName: '  EasySign  ',
       summary: 's',
       language: 'HE',
-      offerings: [{ kind: 'other' as 'service', name: ' Sign ', description: 'd', forWhom: 'f' }, { kind: 'product', name: ' ', description: '', forWhom: '' }],
-      audiences: [{ name: 'A\n group', description: 'd', needs: 'n' }],
+      offerings: [{ kind: 'other' as 'service', name: ' Sign ', description: 'd', forWhom: 'f', why: ' w ' }, { kind: 'product', name: ' ', description: '', forWhom: '', why: '' }],
+      audiences: [{ name: 'A\n group', description: 'd', needs: 'n', why: 'y' }],
     });
-    expect(clean).toEqual({ businessName: 'EasySign', summary: 's', language: 'he', offerings: [{ kind: 'service', name: 'Sign', description: 'd', forWhom: 'f' }], audiences: [{ name: 'A group', description: 'd', needs: 'n' }] });
+    expect(clean).toEqual({ businessName: 'EasySign', summary: 's', language: 'he', offerings: [{ kind: 'service', name: 'Sign', description: 'd', forWhom: 'f', why: 'w' }], audiences: [{ name: 'A group', description: 'd', needs: 'n', why: 'y' }] });
     expect(sanitizeSiteAnalysis({ ...clean, language: '' }).language).toBe('en');
   });
 
@@ -73,11 +73,13 @@ describe('proposedTargetsFromAnalysis', () => {
   it('proposes offerings then audiences, without repeating a name', () => {
     const targets = proposedTargetsFromAnalysis(ANALYSIS);
     expect(targets.map((target) => `${target.kind}:${target.name}`)).toEqual(['service:Digital signature', 'product:Templates', 'audience:Law firms', 'audience:Accountants']);
-    expect(targets[0].reason).toBe('Small law firms');
+    expect(targets[0].reason).toBe('Firms lose clients to paperwork');
+    // A reason that only repeats the description is dropped, so the card never says the same thing twice.
+    expect(targets[1].reason).toBe('');
   });
 
   it('keeps room for audiences when offerings alone would fill the limit', () => {
-    const many: GrowthSiteAnalysis = { ...ANALYSIS, offerings: Array.from({ length: 8 }, (_, index) => ({ kind: 'product' as const, name: `P${index}`, description: '', forWhom: '' })) };
+    const many: GrowthSiteAnalysis = { ...ANALYSIS, offerings: Array.from({ length: 8 }, (_, index) => ({ kind: 'product' as const, name: `P${index}`, description: '', forWhom: '', why: '' })) };
     const targets = proposedTargetsFromAnalysis(many, 6);
     expect(targets).toHaveLength(6);
     expect(targets.filter((target) => target.kind === 'audience')).toHaveLength(2);

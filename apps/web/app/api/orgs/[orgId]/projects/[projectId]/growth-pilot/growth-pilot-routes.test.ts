@@ -32,8 +32,8 @@ const ANALYSIS = {
   businessName: 'EasySign',
   summary: 'Signatures on WhatsApp.',
   language: 'en',
-  offerings: [{ kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', forWhom: 'Small law firms' }],
-  audiences: [{ name: 'Law firms', description: 'Small firms', needs: 'Faster signatures' }],
+  offerings: [{ kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', forWhom: 'Small law firms', why: 'Worth it' }],
+  audiences: [{ name: 'Law firms', description: 'Small firms', needs: 'Faster signatures', why: 'Worth it' }],
 };
 
 /** Gemini text: the site analysis or a target, by the schema it was asked for. */

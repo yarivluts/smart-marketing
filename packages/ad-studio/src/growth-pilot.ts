@@ -48,6 +48,7 @@ export const GrowthSiteAnalysisSchema = z.object({
       name: z.string(),
       description: z.string(),
       forWhom: z.string().describe('Who this offering is for.'),
+      why: z.string().describe('One sentence: why this offering is worth advertising.'),
     }),
   ),
   audiences: z.array(
@@ -55,6 +56,7 @@ export const GrowthSiteAnalysisSchema = z.object({
       name: z.string(),
       description: z.string(),
       needs: z.string().describe('What this group needs that the business answers.'),
+      why: z.string().describe('One sentence: why this group is worth reaching.'),
     }),
   ),
 });

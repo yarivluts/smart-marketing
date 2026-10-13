@@ -27,8 +27,8 @@ export interface GrowthSiteAnalysis {
   summary: string;
   /** The site's language as a two-letter code ("he", "en"). */
   language: string;
-  offerings: { kind: 'product' | 'service'; name: string; description: string; forWhom: string }[];
-  audiences: { name: string; description: string; needs: string }[];
+  offerings: { kind: 'product' | 'service'; name: string; description: string; forWhom: string; why: string }[];
+  audiences: { name: string; description: string; needs: string; why: string }[];
 }
 
 /** A target as the AI drafts it, before the person decides. */
@@ -76,6 +76,7 @@ export function buildSiteAnalysisPrompt(pages: readonly GrowthSitePage[]): { sys
       LANGUAGE_RULE,
       'Offerings: the distinct products or services a customer can buy, each with who it is for. Merge near-duplicates; skip generic pages (contact, blog posts).',
       'Audiences: the distinct customer groups the site speaks to, each with what they need. Prefer concrete groups ("small law firms") over vague ones ("businesses").',
+      'For each offering and audience, "why" is one sentence a marketer would say to the owner: why it is worth advertising - the opportunity, not a repeat of the description or of who it is for.',
     ].join('\n'),
     user: `The website pages:\n\n${body}\n\nReturn the business name, a short summary, the site language code, the offerings and the audiences.`,
   };
@@ -128,11 +129,11 @@ export function sanitizeSiteAnalysis(raw: GrowthSiteAnalysis): GrowthSiteAnalysi
     summary: clean(raw.summary, TEXT_CHARS),
     language: clean(raw.language, 5).toLowerCase() || 'en',
     offerings: (raw.offerings ?? [])
-      .map((offering) => ({ kind: offering.kind === 'product' ? ('product' as const) : ('service' as const), name: clean(offering.name, NAME_CHARS), description: clean(offering.description, TEXT_CHARS), forWhom: clean(offering.forWhom, TEXT_CHARS) }))
+      .map((offering) => ({ kind: offering.kind === 'product' ? ('product' as const) : ('service' as const), name: clean(offering.name, NAME_CHARS), description: clean(offering.description, TEXT_CHARS), forWhom: clean(offering.forWhom, TEXT_CHARS), why: clean(offering.why, TEXT_CHARS) }))
       .filter((offering) => offering.name)
       .slice(0, 12),
     audiences: (raw.audiences ?? [])
-      .map((audience) => ({ name: clean(audience.name, NAME_CHARS), description: clean(audience.description, TEXT_CHARS), needs: clean(audience.needs, TEXT_CHARS) }))
+      .map((audience) => ({ name: clean(audience.name, NAME_CHARS), description: clean(audience.description, TEXT_CHARS), needs: clean(audience.needs, TEXT_CHARS), why: clean(audience.why, TEXT_CHARS) }))
       .filter((audience) => audience.name)
       .slice(0, 12),
   };
@@ -144,14 +145,20 @@ export function sanitizeTargetDraft(raw: GrowthTargetDraft): GrowthTargetDraft |
   return { kind: raw.kind, name, description: clean(raw.description, TEXT_CHARS), audience: clean(raw.audience, TEXT_CHARS), reason: clean(raw.reason, TEXT_CHARS) };
 }
 
+/** A reason only when it says something the card does not already say. */
+function distinctReason(reason: string, others: readonly string[]): string {
+  const key = reason.trim().toLowerCase();
+  return key && !others.some((other) => other.trim().toLowerCase() === key) ? reason.trim() : '';
+}
+
 /**
  * The first targets to propose from an analysis: the offerings first (what is sold), then the
  * audiences, so a business with few offerings still gets audience targets. Names are not repeated.
  */
 export function proposedTargetsFromAnalysis(analysis: GrowthSiteAnalysis, limit: number = GROWTH_PILOT_MAX_PROPOSED_TARGETS): GrowthTargetDraft[] {
   const drafts: GrowthTargetDraft[] = [
-    ...analysis.offerings.map((offering) => ({ kind: offering.kind, name: offering.name, description: offering.description, audience: offering.forWhom, reason: offering.forWhom || offering.description })),
-    ...analysis.audiences.map((audience) => ({ kind: 'audience' as const, name: audience.name, description: audience.description, audience: audience.needs, reason: audience.needs || audience.description })),
+    ...analysis.offerings.map((offering) => ({ kind: offering.kind, name: offering.name, description: offering.description, audience: offering.forWhom, reason: distinctReason(offering.why, [offering.description, offering.forWhom]) })),
+    ...analysis.audiences.map((audience) => ({ kind: 'audience' as const, name: audience.name, description: audience.description, audience: audience.needs, reason: distinctReason(audience.why, [audience.description, audience.needs]) })),
   ];
   const seen = new Set<string>();
   const unique = drafts.filter((draft) => {

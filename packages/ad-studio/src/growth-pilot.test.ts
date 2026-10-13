@@ -37,8 +37,8 @@ const ANALYSIS = {
   businessName: 'EasySign',
   summary: 'Signatures on WhatsApp.',
   language: 'en',
-  offerings: [{ kind: 'service' as const, name: 'Digital signature', description: 'Fast', forWhom: 'Lawyers' }],
-  audiences: [{ name: 'Law firms', description: 'Small firms', needs: 'Speed' }],
+  offerings: [{ kind: 'service' as const, name: 'Digital signature', description: 'Fast', forWhom: 'Lawyers', why: 'Worth it' }],
+  audiences: [{ name: 'Law firms', description: 'Small firms', needs: 'Speed', why: 'Worth it' }],
 };
 
 function llm(result: unknown | Error): AdStudioLlm & { generateJson: ReturnType<typeof vi.fn> } {

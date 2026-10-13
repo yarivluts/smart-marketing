@@ -36,8 +36,8 @@ const ANALYSIS: GrowthSiteAnalysis = {
   businessName: 'EasySign',
   summary: 'Digital signatures over WhatsApp.',
   language: 'en',
-  offerings: [{ kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', forWhom: 'Small law firms' }],
-  audiences: [{ name: 'Law firms', description: 'Small firms', needs: 'Faster signatures' }],
+  offerings: [{ kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', forWhom: 'Small law firms', why: 'Worth it' }],
+  audiences: [{ name: 'Law firms', description: 'Small firms', needs: 'Faster signatures', why: 'Worth it' }],
 };
 const DRAFTS: GrowthTargetDraft[] = [
   { kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', reason: 'The main service' },
