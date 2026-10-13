@@ -4,12 +4,21 @@ import {
   acquireGrowthPilotLease,
   addRequestedGrowthTarget,
   completeGrowthProposalRevision,
+  createAdStudioBrief,
+  finishGrowthTargetAds,
+  getAdStudioBrief,
+  getAdStudioRun,
+  getGrowthTarget,
+  linkGrowthTargetAds,
+  listGrowthTargets,
   failGrowthPilotAnalysis,
   getCurrentGrowthPilot,
   getGrowthPilot,
   requestGrowthProposalChange,
   saveGrowthPilotAnalysis,
+  type AdStudioRunModel,
   type GrowthPilotModel,
+  type GrowthTargetModel,
   type GrowthProposalModel,
 } from '@growthos/firebase-orm-models';
 import {
@@ -19,6 +28,7 @@ import {
   extractLandingPageContent,
   GROWTH_PILOT_MAX_PAGES,
   GROWTH_TARGET_KINDS,
+  growthBriefInput,
   pickSiteLinks,
   proposedTargetsFromAnalysis,
   sanitizeSiteAnalysis,
@@ -26,6 +36,8 @@ import {
   type GrowthSitePage,
   type GrowthTargetDraft,
 } from '@growthos/shared';
+import { advanceAdStudioAutopilot, startAdStudioAutopilot, type AdStudioAutopilotDeps } from './autopilot';
+import { listBriefImages, rewriteAdStudioImageConcept } from './image-pipeline';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { fetchHtmlPage, type PlanningSourceDeps } from './planning-sources';
@@ -109,9 +121,13 @@ export function growthFailureCode(error: unknown): string {
  * the site and proposes targets. Returns the pilot as it stands (untouched when there was nothing to
  * do or another caller is on it). Safe to call repeatedly - the page polls it.
  */
-export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: string; deps?: PlanningSourceDeps }): Promise<GrowthPilotModel> {
+export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: string; deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps }): Promise<GrowthPilotModel> {
   await ensureOrm();
   const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, ctx.pilotId);
+  if (pilot.status === 'active' && ctx.autopilot) {
+    await progressGrowthAds({ ...ctx, autopilot: ctx.autopilot }, pilot);
+    return pilot;
+  }
   if (pilot.status !== 'analyzing') return pilot;
   const token = await acquireGrowthPilotLease(pilot, { now: ctx.now });
   if (!token) return pilot;
@@ -139,7 +155,7 @@ export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: s
 }
 
 /** The project's current pilot, advanced if it has pending work; null when none was started. */
-export async function advanceCurrentGrowthPilot(ctx: AdStudioCallContext & { deps?: PlanningSourceDeps }): Promise<GrowthPilotModel | null> {
+export async function advanceCurrentGrowthPilot(ctx: AdStudioCallContext & { deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps }): Promise<GrowthPilotModel | null> {
   await ensureOrm();
   const pilot = await getCurrentGrowthPilot(ctx.organizationId, ctx.projectId);
   return pilot ? advanceGrowthPilot({ ...ctx, pilotId: pilot.id }) : null;
@@ -153,6 +169,7 @@ export async function reviseGrowthProposal(ctx: AdStudioCallContext & { proposal
   await ensureOrm();
   const held = await requestGrowthProposalChange({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: ctx.proposalId, text: ctx.request, actorId: ctx.actorId, now: ctx.now });
   const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, now: ctx.now };
+  if (held.kind === 'ads') return reviseGrowthAds(ctx, held, scope);
   try {
     const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id);
     if (!held.draft || !pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
@@ -192,4 +209,79 @@ export async function requestGrowthTarget(ctx: AdStudioCallContext & { pilotId: 
   const draft = sanitizeTargetDraft(raw as GrowthTargetDraft);
   if (!draft) throw new AdStudioProviderError('invalid_output', 'The AI did not return a usable target.');
   return addRequestedGrowthTarget({ organizationId: ctx.organizationId, projectId: ctx.projectId, pilotId: pilot.id, draft, actorId: ctx.actorId, now: ctx.now });
+}
+
+/** How the pilot makes ads: image ads in the Ad Studio's default placements, no video (the costly part is the person's call). */
+export const GROWTH_ADS_RUN_OPTIONS = { plan: true, images: true, video: false, confirmPlan: false } as const;
+/** How many images an ads proposal previews. */
+const PREVIEW_IMAGES = 6;
+
+type AdsContext = AdStudioCallContext & { autopilot: AdStudioAutopilotDeps };
+
+/** Why a finished run left no usable images: the run's own failure, the images step's reason, or none rendered. */
+function runFailureCode(run: AdStudioRunModel): string {
+  if (run.status === 'failed' || run.status === 'cancelled') return run.failure_code ?? run.status;
+  return run.steps.find((step) => step.id === 'images')?.reason ?? 'no_images';
+}
+
+async function finishAds(ctx: AdsContext, target: GrowthTargetModel, run: AdStudioRunModel): Promise<void> {
+  const images = run.status === 'done' && target.brief_id ? await listBriefImages({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: target.brief_id }) : [];
+  const preview = images.filter((image) => image.selected && image.status === 'ready').slice(0, PREVIEW_IMAGES).map((image) => image.id);
+  await finishGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, previewImageIds: preview, failureCode: preview.length ? null : runFailureCode(run), now: ctx.now });
+}
+
+/**
+ * One unit of ads work, so each call stays short: advance a running autopilot by a step (and finish
+ * the target when it is done), or else open a brief and start the autopilot for the next approved
+ * target that has no ads yet. A paused pilot does none of this.
+ */
+async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Promise<void> {
+  const targets = await listGrowthTargets(ctx.organizationId, ctx.projectId, pilot.id);
+  const building = targets.find((target) => target.ads_status === 'building' && target.brief_id && target.run_id);
+  if (building?.brief_id && building.run_id) {
+    let run = await getAdStudioRun(ctx.organizationId, ctx.projectId, building.brief_id, building.run_id);
+    if (run.status === 'running') run = await advanceAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: building.brief_id, actorId: ctx.actorId, runId: run.id }, ctx.autopilot);
+    if (run.status !== 'running' && run.status !== 'awaiting_approval') await finishAds(ctx, building, run);
+    return;
+  }
+  const next = targets.find((target) => target.status === 'active' && !target.brief_id && (target.ads_status ?? 'none') === 'none');
+  if (!next || !pilot.analysis) return;
+  const brief = await createAdStudioBrief({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    input: growthBriefInput({ analysis: pilot.analysis, target: next, siteUrl: pilot.site_url }),
+    createdByUserId: ctx.actorId,
+    now: ctx.now,
+  });
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: next.id, now: ctx.now };
+  try {
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
+    await linkGrowthTargetAds({ ...scope, briefId: brief.id, runId: run.id });
+  } catch (error) {
+    // The brief stays linked so the person can open it; the target says why its ads did not start.
+    await linkGrowthTargetAds({ ...scope, briefId: brief.id, runId: '' });
+    await finishGrowthTargetAds({ ...scope, previewImageIds: [], failureCode: growthFailureCode(error) });
+  }
+}
+
+/**
+ * The person asked for a change to a target's ads: every image idea is rewritten by their request
+ * and the autopilot renders what changed. The proposal stays held until the new images are ready,
+ * then comes back with them (see finishGrowthTargetAds).
+ */
+async function reviseGrowthAds(ctx: AdStudioCallContext, held: GrowthProposalModel, scope: { organizationId: string; projectId: string; proposalId: string; now?: Date }): Promise<GrowthProposalModel> {
+  try {
+    if (!held.brief_id || !held.target_id) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
+    const request = held.change_requests[held.change_requests.length - 1].text;
+    const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, held.brief_id);
+    for (const concept of brief.image_concepts ?? []) {
+      await rewriteAdStudioImageConcept({ ...ctx, briefId: brief.id, conceptId: concept.id, instruction: request });
+    }
+    const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id);
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
+    await linkGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, briefId: brief.id, runId: run.id, now: ctx.now });
+    return held;
+  } catch (error) {
+    return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
+  }
 }

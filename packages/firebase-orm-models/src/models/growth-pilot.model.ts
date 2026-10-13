@@ -69,6 +69,13 @@ export class GrowthPilotModel extends BaseModel {
 export const GROWTH_TARGET_STATUSES = ['proposed', 'active', 'paused', 'rejected'] as const;
 export type GrowthTargetStatus = (typeof GROWTH_TARGET_STATUSES)[number];
 
+/**
+ * Where a target's ads stand: none yet, being made by the Ad Studio autopilot, ready for the person,
+ * approved, rejected, or failed (with a reason).
+ */
+export const GROWTH_ADS_STATUSES = ['none', 'building', 'ready', 'approved', 'rejected', 'failed'] as const;
+export type GrowthAdsStatus = (typeof GROWTH_ADS_STATUSES)[number];
+
 /** One thing to grow: a product, a service or an audience. */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/growth_targets',
@@ -107,6 +114,16 @@ export class GrowthTargetModel extends BaseModel {
   @Field({ is_required: false })
   public brief_id?: string | null;
 
+  /** The Ad Studio autopilot run making (or last made) its ads. */
+  @Field({ is_required: false })
+  public run_id?: string | null;
+
+  @Field({ is_required: false })
+  public ads_status?: GrowthAdsStatus | null;
+
+  @Field({ is_required: false })
+  public ads_failure?: string | null;
+
   @Field({ is_required: true })
   public created_on!: string;
 
@@ -115,7 +132,7 @@ export class GrowthTargetModel extends BaseModel {
 }
 
 /** What a proposal asks the person to decide. Later stories add creatives, landing pages, audiences and publishing. */
-export const GROWTH_PROPOSAL_KINDS = ['target'] as const;
+export const GROWTH_PROPOSAL_KINDS = ['target', 'ads'] as const;
 export type GrowthProposalKind = (typeof GROWTH_PROPOSAL_KINDS)[number];
 
 /** `revising`: the person asked for a change and the AI is rewriting it; it comes back `pending`. */
@@ -155,9 +172,17 @@ export class GrowthProposalModel extends BaseModel {
   @Field({ is_required: true })
   public status!: GrowthProposalStatus;
 
-  /** The target as proposed (kind `target`). */
+  /** The target as proposed (kind `target`), or the target the ads are for (kind `ads`). */
   @Field({ is_required: false })
   public draft?: GrowthTargetDraft | null;
+
+  /** The Ad Studio brief holding the ads (kind `ads`). */
+  @Field({ is_required: false })
+  public brief_id?: string | null;
+
+  /** The chosen images to preview on the card (kind `ads`). */
+  @Field({ is_required: false })
+  public preview_image_ids?: string[] | null;
 
   @Field({ is_required: true })
   public change_requests!: GrowthChangeRequest[];
@@ -188,6 +213,9 @@ export const GROWTH_ACTIVITY_KINDS = [
   'revision_failed',
   'pilot_paused',
   'pilot_resumed',
+  'ads_building',
+  'ads_ready',
+  'ads_failed',
 ] as const;
 export type GrowthActivityKind = (typeof GROWTH_ACTIVITY_KINDS)[number];
 

@@ -10,15 +10,25 @@ const orm = vi.hoisted(() => ({
   requestGrowthProposalChange: vi.fn(),
   completeGrowthProposalRevision: vi.fn(),
   addRequestedGrowthTarget: vi.fn(),
+  listGrowthTargets: vi.fn(),
+  getGrowthTarget: vi.fn(),
+  linkGrowthTargetAds: vi.fn(),
+  finishGrowthTargetAds: vi.fn(),
+  createAdStudioBrief: vi.fn(),
+  getAdStudioBrief: vi.fn(),
+  getAdStudioRun: vi.fn(),
   assertAdStudioQuota: vi.fn(),
   recordAdStudioUsage: vi.fn(),
 }));
 
 vi.mock('@growthos/firebase-orm-models', async (importOriginal) => ({ ...(await importOriginal<object>()), ...orm }));
 vi.mock('./runtime', () => ({ ensureOrm: vi.fn(async () => undefined) }));
+const studio = vi.hoisted(() => ({ startAdStudioAutopilot: vi.fn(), advanceAdStudioAutopilot: vi.fn(), listBriefImages: vi.fn(), rewriteAdStudioImageConcept: vi.fn() }));
+vi.mock('./autopilot', () => ({ startAdStudioAutopilot: studio.startAdStudioAutopilot, advanceAdStudioAutopilot: studio.advanceAdStudioAutopilot }));
+vi.mock('./image-pipeline', () => ({ listBriefImages: studio.listBriefImages, rewriteAdStudioImageConcept: studio.rewriteAdStudioImageConcept }));
 
 import { AdStudioQuotaExceededError } from '@growthos/firebase-orm-models';
-import { advanceGrowthPilot, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
+import { advanceGrowthPilot, GROWTH_ADS_RUN_OPTIONS, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
 import { AdStudioProviderError, type AdStudioLlm } from './llm';
 
 const publicResolver = vi.fn(async () => ['93.184.215.14']);
@@ -50,6 +60,7 @@ const PILOT = { id: 'g1', organization_id: 'o', project_id: 'p', site_url: 'http
 
 beforeEach(() => {
   for (const fn of Object.values(orm)) fn.mockReset();
+  for (const fn of Object.values(studio)) fn.mockReset();
   orm.getGrowthPilot.mockResolvedValue(PILOT);
   orm.acquireGrowthPilotLease.mockResolvedValue('lease');
   orm.saveGrowthPilotAnalysis.mockImplementation(async (params: { drafts: unknown[] }) => ({ ...PILOT, status: 'active', drafts: params.drafts }));
@@ -131,5 +142,89 @@ describe('revising and requesting targets', () => {
     expect(growthFailureCode(new AdStudioQuotaExceededError('text', 1, 1))).toBe('quota_exceeded');
     expect(growthFailureCode(new AdStudioProviderError('provider_billing', 'x'))).toBe('provider_billing');
     expect(growthFailureCode(new Error('boom'))).toBe('provider_error');
+  });
+});
+
+describe('making ads for approved targets', () => {
+  const ACTIVE = { ...PILOT, status: 'active', analysis: { ...ANALYSIS, offerings: [{ ...ANALYSIS.offerings[0], why: 'w' }], audiences: [] } };
+  const TARGET = { id: 't1', pilot_id: 'g1', kind: 'service', name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active', brief_id: null, run_id: null, ads_status: 'none' };
+  const autopilot = {} as never;
+  const run = (extra: object) => ({ id: 'r1', status: 'running', failure_code: null, steps: [{ id: 'images', reason: null }], ...extra });
+
+  beforeEach(() => {
+    orm.getGrowthPilot.mockResolvedValue(ACTIVE);
+  });
+
+  it('opens a brief for the next approved target, in the site language and sending people to the site, and starts image ads without video', async () => {
+    orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, status: 'proposed' }, TARGET]);
+    orm.createAdStudioBrief.mockResolvedValue({ id: 'b1' });
+    studio.startAdStudioAutopilot.mockResolvedValue(run({}));
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    const input = orm.createAdStudioBrief.mock.calls[0][0].input;
+    expect(input).toMatchObject({ name: 'Pro plan', landingPageUrl: 'https://easysign.co.il/', language: 'en' });
+    expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_ADS_RUN_OPTIONS }));
+    expect(GROWTH_ADS_RUN_OPTIONS).toMatchObject({ images: true, video: false, confirmPlan: false });
+    expect(orm.linkGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', briefId: 'b1', runId: 'r1' }));
+  });
+
+  it('advances a running autopilot one step, then puts the chosen ready images up for approval', async () => {
+    orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, ads_status: 'building', brief_id: 'b1', run_id: 'r1' }]);
+    orm.getAdStudioRun.mockResolvedValue(run({}));
+    studio.advanceAdStudioAutopilot.mockResolvedValueOnce(run({}));
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    expect(studio.advanceAdStudioAutopilot).toHaveBeenCalledTimes(1);
+    expect(orm.finishGrowthTargetAds).not.toHaveBeenCalled();
+
+    studio.advanceAdStudioAutopilot.mockResolvedValueOnce(run({ status: 'done' }));
+    studio.listBriefImages.mockResolvedValue([
+      { id: 'i1', selected: true, status: 'ready' },
+      { id: 'i2', selected: false, status: 'ready' },
+      { id: 'i3', selected: true, status: 'failed' },
+    ]);
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    expect(orm.finishGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', previewImageIds: ['i1'], failureCode: null }));
+    expect(orm.createAdStudioBrief).not.toHaveBeenCalled();
+  });
+
+  it('says why when a run ends without images, and does nothing while the pilot is paused', async () => {
+    orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, ads_status: 'building', brief_id: 'b1', run_id: 'r1' }]);
+    orm.getAdStudioRun.mockResolvedValue(run({ status: 'done', steps: [{ id: 'images', reason: 'quota_exceeded' }] }));
+    studio.listBriefImages.mockResolvedValue([]);
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    expect(orm.finishGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ previewImageIds: [], failureCode: 'quota_exceeded' }));
+
+    orm.finishGrowthTargetAds.mockClear();
+    orm.getGrowthPilot.mockResolvedValue({ ...ACTIVE, status: 'paused' });
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    expect(orm.listGrowthTargets).toHaveBeenCalledTimes(1);
+    expect(orm.finishGrowthTargetAds).not.toHaveBeenCalled();
+  });
+
+  it('records why the ads did not start when the autopilot cannot start', async () => {
+    orm.listGrowthTargets.mockResolvedValue([TARGET]);
+    orm.createAdStudioBrief.mockResolvedValue({ id: 'b1' });
+    studio.startAdStudioAutopilot.mockRejectedValue(new AdStudioProviderError('not_configured', 'no model'));
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    expect(orm.finishGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', failureCode: 'not_configured' }));
+  });
+
+  it('rewrites every image idea by the request and renders again, keeping the proposal held', async () => {
+    const held = { id: 'p9', kind: 'ads', pilot_id: 'g1', target_id: 't1', brief_id: 'b1', change_requests: [{ text: 'Brighter photos' }] };
+    orm.requestGrowthProposalChange.mockResolvedValue(held);
+    orm.getAdStudioBrief.mockResolvedValue({ id: 'b1', image_concepts: [{ id: 'c1' }, { id: 'c2' }] });
+    orm.getGrowthTarget.mockResolvedValue(TARGET);
+    studio.startAdStudioAutopilot.mockResolvedValue(run({ id: 'r2' }));
+    const result = await reviseGrowthProposal({ ...ctx(llm(ANALYSIS)), proposalId: 'p9', request: 'Brighter photos' });
+    expect(result).toBe(held);
+    expect(studio.rewriteAdStudioImageConcept.mock.calls.map((call) => [call[0].conceptId, call[0].instruction])).toEqual([
+      ['c1', 'Brighter photos'],
+      ['c2', 'Brighter photos'],
+    ]);
+    expect(orm.linkGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', runId: 'r2' }));
+    expect(orm.completeGrowthProposalRevision).not.toHaveBeenCalled();
+
+    studio.rewriteAdStudioImageConcept.mockRejectedValueOnce(new AdStudioQuotaExceededError('text', 50, 50));
+    await reviseGrowthProposal({ ...ctx(llm(ANALYSIS)), proposalId: 'p9', request: 'Brighter photos' });
+    expect(orm.completeGrowthProposalRevision).toHaveBeenCalledWith(expect.objectContaining({ draft: null, failureCode: 'quota_exceeded' }));
   });
 });

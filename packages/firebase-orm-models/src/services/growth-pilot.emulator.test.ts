@@ -8,6 +8,8 @@ import {
   createOrganizationWithOwner,
   createProject,
   decideGrowthProposal,
+  finishGrowthTargetAds,
+  linkGrowthTargetAds,
   ensureUserForFirebaseSession,
   failGrowthPilotAnalysis,
   getCurrentGrowthPilot,
@@ -148,5 +150,56 @@ describe('Growth Pilot', () => {
     expect((await setGrowthPilotPaused({ ...scope, pilotId: pilot.id, paused: false })).status).toBe('active');
     const kinds = (await listGrowthActivity(scope.organizationId, scope.projectId, pilot.id)).map((row) => row.kind);
     expect(kinds).toEqual(expect.arrayContaining(['target_requested', 'pilot_paused', 'pilot_resumed']));
+  });
+
+  it('makes ads for an approved target, puts them up for approval with previews, and approves them', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const [proposal] = await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id);
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'approve' });
+    const linked = await linkGrowthTargetAds({ ...scope, targetId: proposal.target_id!, briefId: 'brief-1', runId: 'run-1' });
+    expect(linked).toMatchObject({ brief_id: 'brief-1', run_id: 'run-1', ads_status: 'building' });
+    await finishGrowthTargetAds({ ...scope, targetId: proposal.target_id!, previewImageIds: ['i1', 'i2'] });
+    const ads = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'ads');
+    expect(ads).toMatchObject({ status: 'pending', brief_id: 'brief-1', preview_image_ids: ['i1', 'i2'], target_id: proposal.target_id, draft: { name: 'Digital signature' } });
+    await decideGrowthProposal({ ...scope, proposalId: ads!.id, decision: 'approve' });
+    const target = (await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === proposal.target_id);
+    expect(target?.ads_status).toBe('approved');
+    const kinds = (await listGrowthActivity(scope.organizationId, scope.projectId, pilot.id)).map((row) => row.kind);
+    expect(kinds).toEqual(expect.arrayContaining(['ads_building', 'ads_ready']));
+  });
+
+  it('brings the same ads proposal back with new images after a change, or unchanged with the reason when the rebuild fails', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const [proposal] = await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id);
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'approve' });
+    const targetId = proposal.target_id!;
+    await linkGrowthTargetAds({ ...scope, targetId, briefId: 'b', runId: 'r1' });
+    await finishGrowthTargetAds({ ...scope, targetId, previewImageIds: ['old'] });
+    const ads = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'ads')!;
+
+    await requestGrowthProposalChange({ ...scope, proposalId: ads.id, text: 'Brighter photos' });
+    await linkGrowthTargetAds({ ...scope, targetId, briefId: 'b', runId: 'r2' });
+    await finishGrowthTargetAds({ ...scope, targetId, previewImageIds: ['new'] });
+    const back = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).filter((row) => row.kind === 'ads');
+    expect(back).toHaveLength(1);
+    expect(back[0]).toMatchObject({ status: 'pending', preview_image_ids: ['new'] });
+    expect(back[0].change_requests[0].outcome).toBe('done');
+
+    await requestGrowthProposalChange({ ...scope, proposalId: ads.id, text: 'Darker' });
+    const failed = await finishGrowthTargetAds({ ...scope, targetId, previewImageIds: [], failureCode: 'quota_exceeded' });
+    expect(failed.ads_status).toBe('ready');
+    const after = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'ads')!;
+    expect(after).toMatchObject({ status: 'pending', preview_image_ids: ['new'] });
+    expect(after.change_requests[1]).toMatchObject({ outcome: 'failed', failure_code: 'quota_exceeded' });
+  });
+
+  it('says why a first build of ads failed', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const [proposal] = await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id);
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'approve' });
+    await linkGrowthTargetAds({ ...scope, targetId: proposal.target_id!, briefId: 'b', runId: 'r' });
+    const failed = await finishGrowthTargetAds({ ...scope, targetId: proposal.target_id!, previewImageIds: [], failureCode: 'provider_billing' });
+    expect(failed).toMatchObject({ ads_status: 'failed', ads_failure: 'provider_billing' });
+    expect((await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).some((row) => row.kind === 'ads')).toBe(false);
   });
 });
