@@ -17,6 +17,16 @@ Template for each entry:
 
 ---
 
+## 2026-10-13 - Ad Studio editor sweep on prod: hydration error and favicon fixed (KAN-392)
+
+- **Sweep:** every Ad Studio step (list, brief, plan, create, review, publish), plus the review detail pages (image idea, video, search), in en and he, at 1440 and 390, in real Chrome, signed in as the QA user.
+- **Found and fixed:**
+  - React #418 on every plan step load (#655, web-prod-00157). PlanningPanel formatted the generated-at time on the server (UTC) and again in the browser (local zone). A shared `useLocalDateTime` hook now replaces four copies of that guard.
+  - No site icon (#654): every page got a /favicon.ico 404. Added app/icon.svg.
+- **After the fixes:** 0 console errors, 0 horizontal overflow, 0 clipped text on all 24 pages.
+- **Local tests:** the full web suite now runs locally with the Firebase emulator using a portable JRE (in the session scratchpad): 484 files / 3288 tests green.
+- **Note:** black video frames in screenshots come from Playwright's bundled Chromium, which has no H.264. Use `channel: 'chrome'`.
+
 ## 2026-10-13 - Ad Studio review page redesigned from Stitch (KAN-392)
 
 - **Done (#652, live as web-prod-00155, buildSha a87b93c):**
