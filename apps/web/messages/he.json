@@ -4370,7 +4370,8 @@
         "notChecked": "לא נבדקו"
       },
       "imagesHeading": "תמונות ({count})",
-      "openFull": "פתיחה בגודל מלא"
+      "openFull": "פתיחה בגודל מלא",
+      "ideaMissing": "הרעיון הזה כבר לא במודעה. חזרו לכל הקריאייטיבים ובחרו אחר."
     },
     "dailyImages": "תמונות ביום",
     "usageTodayImages": "תמונות היום",
@@ -4988,6 +4989,38 @@
       "logoRemoved": "הלוגו הוסר.",
       "logoTooLarge": "הלוגו גדול מ-2MB.",
       "logoUnsupported": "הלוגו צריך להיות תמונת PNG או JPEG."
+    },
+    "review": {
+      "title": "הקריאייטיבים שלכם",
+      "description": "כל רעיונות התמונה, הסרטון ומודעת החיפוש במבט אחד. פתחו אחד כדי לראות הכל ולערוך.",
+      "count": {
+        "ready": "{count} מוכנים",
+        "attention": "{count} דורשים בדיקה",
+        "working": "{count} בתהליך"
+      },
+      "manageIdeas": "כל רעיונות התמונה: כתיבה עם AI, הוספת רעיון",
+      "open": "פתיחה ועריכה",
+      "state": {
+        "ready": "מוכן",
+        "attention": "דורש בדיקה",
+        "working": "בתהליך",
+        "empty": "עוד לא התחיל"
+      },
+      "imageTitle": "רעיון תמונה {index}",
+      "copyReady": "טקסט המודעה נכתב",
+      "copyMissing": "עדיין אין טקסט למודעה",
+      "imagesEmptyTitle": "רעיונות לתמונות",
+      "imagesEmpty": "עדיין אין רעיונות לתמונות - כתבו אותם עם AI או הוסיפו בעצמכם.",
+      "videoTitle": "סרטון",
+      "videoScenes": "{rendered} מתוך {scenes} סצנות נוצרו",
+      "videoNoScript": "עדיין אין תסריט",
+      "videoAssembled": "הורכב, {seconds} שניות",
+      "searchTitle": "מודעת חיפוש בגוגל",
+      "searchSponsored": "ממומן",
+      "searchCounts": "{headlines} כותרות, {descriptions} תיאורים",
+      "searchKeywords": "{count, plural, =0 {לא נבחרו מילות מפתח} one {מילת מפתח אחת} other {# מילות מפתח}}",
+      "back": "כל הקריאייטיבים",
+      "videoNotAssembled": "כל הסצנות מוכנות - נשאר להרכיב את הסרטון"
     }
   },
   "MetaConnect": {

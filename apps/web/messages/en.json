@@ -4370,7 +4370,8 @@
         "notChecked": "Not checked"
       },
       "imagesHeading": "Images ({count})",
-      "openFull": "Open full size"
+      "openFull": "Open full size",
+      "ideaMissing": "This idea is no longer in the ad. Go back to all creatives to pick another."
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
@@ -4988,6 +4989,38 @@
       "logoRemoved": "Logo removed.",
       "logoTooLarge": "The logo is larger than 2MB.",
       "logoUnsupported": "The logo must be a PNG or JPEG image."
+    },
+    "review": {
+      "title": "Your creatives",
+      "description": "Every image idea, the video and the search ad at a glance. Open one to see all of it and edit it.",
+      "count": {
+        "ready": "{count} ready",
+        "attention": "{count} need a look",
+        "working": "{count} in progress"
+      },
+      "manageIdeas": "All image ideas: write with AI, add an idea",
+      "open": "Open and edit",
+      "state": {
+        "ready": "Ready",
+        "attention": "Needs a look",
+        "working": "In progress",
+        "empty": "Not started"
+      },
+      "imageTitle": "Image idea {index}",
+      "copyReady": "Ad text written",
+      "copyMissing": "No ad text yet",
+      "imagesEmptyTitle": "Image ideas",
+      "imagesEmpty": "No image ideas yet - write them with AI or add your own.",
+      "videoTitle": "Video",
+      "videoScenes": "{rendered} of {scenes} scenes rendered",
+      "videoNoScript": "No script yet",
+      "videoAssembled": "Assembled, {seconds} seconds",
+      "searchTitle": "Google search ad",
+      "searchSponsored": "Sponsored",
+      "searchCounts": "{headlines} headlines, {descriptions} descriptions",
+      "searchKeywords": "{count, plural, =0 {No keywords chosen} one {# keyword} other {# keywords}}",
+      "back": "All creatives",
+      "videoNotAssembled": "Every scene is ready - assemble the video"
     }
   },
   "MetaConnect": {
