@@ -5,6 +5,7 @@ import {
   displayHost,
   parseReviewItem,
   reviewItemParam,
+  reviewHasWorkInProgress,
   reviewNextStep,
   summarizeImageCreatives,
   summarizeSearchCreative,
@@ -64,6 +65,8 @@ describe('summarizeVideoCreative', () => {
     expect(summarizeVideoCreative({ scenes, clips: [clip({ qa: { status: 'issues' } as AdStudioClipView['qa'] })], assembled: false, assembledSeconds: 0, hasCopy: false }).state).toBe('attention');
     expect(summarizeVideoCreative({ scenes, clips: [], assembled: false, assembledSeconds: 0, hasCopy: false })).toMatchObject({ state: 'empty', previewClipId: null });
     expect(summarizeVideoCreative({ scenes: [], clips: [], assembled: false, assembledSeconds: 0, hasCopy: false }).state).toBe('empty');
+    expect(summarizeVideoCreative({ scenes, clips: [clip({}), clip({ id: 'k9', version: 2, status: 'generating' })], assembled: false, assembledSeconds: 0, hasCopy: false })).toMatchObject({ state: 'working', generating: true });
+    expect(summarizeVideoCreative({ scenes, clips: [clip({})], assembled: false, assembledSeconds: 0, hasCopy: false }).generating).toBe(false);
   });
 });
 
@@ -77,7 +80,7 @@ describe('summarizeSearchCreative', () => {
 
 describe('reviewNextStep', () => {
   const img = (conceptId: string, state: CreativeState): ImageCreativeSummary => ({ kind: 'image', conceptId, index: 1, headline: '', state, preview: null, placements: [], hasCopy: true });
-  const video = (extra: Partial<VideoCreativeSummary> = {}): VideoCreativeSummary => ({ kind: 'video', state: 'ready', scenes: 3, rendered: 3, previewClipId: null, assembled: true, assembledSeconds: 15, hasCopy: true, ...extra });
+  const video = (extra: Partial<VideoCreativeSummary> = {}): VideoCreativeSummary => ({ kind: 'video', state: 'ready', scenes: 3, rendered: 3, previewClipId: null, assembled: true, assembledSeconds: 15, hasCopy: true, generating: false, ...extra });
   const search = (state: CreativeState): SearchCreativeSummary => ({ kind: 'search', state, headlines: 0, descriptions: 0, keywords: 0, sample: null, sampleSecond: null, sampleDescription: null });
   const unassembled = video({ state: 'working', assembled: false, assembledSeconds: 0 });
 
@@ -91,6 +94,12 @@ describe('reviewNextStep', () => {
     expect(videoNeedsAssembly(unassembled)).toBe(true);
     expect(videoNeedsAssembly(video({ state: 'working', rendered: 2, assembled: false }))).toBe(false);
     expect(reviewNextStep([img('c1', 'working')], video({ state: 'working', rendered: 2, assembled: false }), search('ready'))).toEqual({ kind: 'working', count: 2 });
+  });
+
+  it('counts a rendering clip or image as work in progress', () => {
+    expect(reviewHasWorkInProgress([img('c1', 'ready')], video())).toBe(false);
+    expect(reviewHasWorkInProgress([img('c1', 'ready')], video({ generating: true }))).toBe(true);
+    expect(reviewHasWorkInProgress([{ ...img('c1', 'working'), placements: [{ format: 'square', state: 'working' }] }], video())).toBe(true);
   });
 
   it('moves on to publishing once nothing is pending, and starts from the ideas when nothing is made', () => {
