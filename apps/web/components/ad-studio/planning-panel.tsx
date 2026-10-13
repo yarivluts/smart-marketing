@@ -8,6 +8,9 @@ import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { planningSourceChecklist, shortUrl, sortRecommendations } from '@/lib/ad-studio/view';
 import { BarList, ChartCard, EmptyState, SERIES_COLORS } from '@/components/viz';
+import { useLocalDateTime } from './use-local-date-time';
+
+const MEDIUM = { dateStyle: 'medium', timeStyle: 'short' } as const;
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface PlanningPanelProps {
@@ -344,7 +347,7 @@ export function PlanningPanel({ orgId, projectId, briefId, plan, sources, genera
   const errorMessage = useAdStudioErrorMessage();
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const dateTime = new Intl.DateTimeFormat(useLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+  const formatWhen = useLocalDateTime(MEDIUM);
 
   async function run(): Promise<void> {
     setPending(true);
@@ -378,7 +381,7 @@ export function PlanningPanel({ orgId, projectId, briefId, plan, sources, genera
             </h2>
             <p className="max-w-2xl text-xs text-muted-foreground">{t('plan.description')}</p>
             {generatedBy ? (
-              <p className="mt-1 text-xs text-muted-foreground">{t('plan.generatedBy', { model: generatedBy.model, date: dateTime.format(new Date(generatedBy.generatedAt)) })}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('plan.generatedBy', { model: generatedBy.model, date: formatWhen(generatedBy.generatedAt) })}</p>
             ) : null}
             {!aiAvailable ? <p className="mt-1 text-xs text-warning">{t('plan.noProvider')}</p> : null}
             {pending ? (

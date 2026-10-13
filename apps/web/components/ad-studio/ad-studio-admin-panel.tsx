@@ -1,11 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Loader2, Settings2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { limitUsedPercent } from '@/lib/ad-studio/view';
+import { useLocalDateTime } from './use-local-date-time';
+
+const SHORT = { dateStyle: 'short', timeStyle: 'short' } as const;
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface AdStudioUsageRow {
@@ -94,11 +97,7 @@ export function AdStudioAdminPanel({
   const [size, setSize] = React.useState<'1K' | '2K'>(imageSize);
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const locale = useLocale();
-  // Formatted in the browser only, in the viewer's own time zone, so server and client markup agree.
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-  const formatWhen = (iso: string) => (mounted ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso)) : '');
+  const formatWhen = useLocalDateTime(SHORT);
 
   async function save(event: React.FormEvent): Promise<void> {
     event.preventDefault();
