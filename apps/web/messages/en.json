@@ -30,7 +30,8 @@
     "signedInAs": "Signed in as",
     "myAccount": "My account",
     "signOut": "Sign out",
-    "developersLink": "Developers"
+    "developersLink": "Developers",
+    "growthPilot": "Growth Pilot"
   },
   "OmniSearch": {
     "trigger": "Search...",
@@ -3891,7 +3892,9 @@
       "ad_copy": "Ad text",
       "search_ad": "Search ad",
       "translate": "Translation for the model",
-      "image_qa": "AI image check"
+      "image_qa": "AI image check",
+      "site_analysis": "Site reading",
+      "target_writing": "Target writing"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -5430,6 +5433,123 @@
       "quarantineBody": "A quarantined record keeps its reason, for example <code>missing_required_field:plan</code> or <code>unregistered_field:coupon</code>. Fix the sender or add the field to the schema, then send again. The <strong>Ingest health</strong> page lists what is waiting, and a record can be replayed once the schema accepts it.",
       "liveTitle": "Going live",
       "liveBody": "Create live keys in <strong>prod</strong>, swap them into your configuration (and your site's domains on the browser key), and run the same verify call against prod. Keep the test keys for your staging site and your CI."
+    }
+  },
+  "GrowthPilot": {
+    "title": "Growth Pilot",
+    "start": {
+      "eyebrow": "Growth Pilot",
+      "title": "Enter the website you want to grow",
+      "subtitle": "The AI learns the business, proposes what to grow, and builds ads, landing pages and audiences for it - you only approve.",
+      "placeholder": "your-site.com",
+      "label": "Website address",
+      "submit": "Start",
+      "steps": {
+        "read": "Reads the site",
+        "propose": "Proposes targets",
+        "build": "Builds ads and landing pages",
+        "watch": "Watches and improves"
+      },
+      "safe": "Nothing goes live without your approval. Every ad is created paused."
+    },
+    "analyzing": {
+      "title": "Reading {host}",
+      "subtitle": "Usually under a minute. You can leave this page - the results wait here.",
+      "items": {
+        "pages": "Reading the home page and the pages about what you sell",
+        "offerings": "Finding your products and services",
+        "audiences": "Finding who you sell to",
+        "proposals": "Preparing proposals for you to approve"
+      }
+    },
+    "failed": {
+      "title": "We could not finish reading {host}",
+      "retry": "Try again",
+      "other": "Use another address",
+      "back": "Back to the pilot"
+    },
+    "failure": {
+      "site": "The site did not open for us (it may block automated readers, or the address is wrong).",
+      "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
+      "nothing_found": "We read the site but found nothing to promote. Try the page that lists what you sell.",
+      "provider": "The AI service did not answer. Try again in a minute."
+    },
+    "header": {
+      "active": "Pilot on",
+      "paused": "Paused",
+      "pause": "Pause",
+      "resume": "Resume",
+      "newTarget": "New target",
+      "startOver": "Start over with another site"
+    },
+    "summary": {
+      "title": "What we learned about {business}",
+      "pages": "{count, plural, one {# page read} other {# pages read}}"
+    },
+    "waiting": {
+      "title": "Waiting for your approval",
+      "empty": "Nothing waits for you right now.",
+      "approve": "Approve",
+      "reject": "Reject",
+      "change": "Ask for a change",
+      "changePlaceholder": "What should change? For example: only small offices in Tel Aviv",
+      "send": "Send to the AI",
+      "cancel": "Cancel",
+      "revising": "The AI is updating this proposal...",
+      "asked": "You asked: {text}",
+      "changeFailed": "The AI could not make that change ({reason}). The proposal is unchanged.",
+      "for": "For"
+    },
+    "kind": {
+      "product": "Product",
+      "service": "Service",
+      "audience": "Audience"
+    },
+    "targets": {
+      "title": "Your targets",
+      "empty": "Approve a proposal and it becomes a target the pilot works on.",
+      "status": {
+        "proposed": "Waiting for approval",
+        "active": "Active",
+        "paused": "Paused",
+        "rejected": "Rejected"
+      },
+      "requested": "You asked for it",
+      "next": "Next: ads, a landing page and audiences for this target."
+    },
+    "newTarget": {
+      "title": "What else should we grow?",
+      "hint": "A product, a service or an audience, in your words. The AI defines it and asks you to approve.",
+      "placeholder": "For example: accountants in the north",
+      "submit": "Propose it"
+    },
+    "activity": {
+      "title": "What the pilot did",
+      "empty": "Nothing yet.",
+      "kind": {
+        "pilot_started": "Started on {subject}",
+        "site_read": "{count, plural, one {Read # page} other {Read # pages}} of {subject}",
+        "analysis_failed": "Could not read the site",
+        "targets_proposed": "{count, plural, one {Proposed # target} other {Proposed # targets}}",
+        "target_requested": "You asked for a new target: {subject}",
+        "proposal_approved": "You approved {subject}",
+        "proposal_rejected": "You rejected {subject}",
+        "change_requested": "You asked for a change to {subject}",
+        "proposal_revised": "Updated {subject} as you asked",
+        "revision_failed": "Could not update {subject}",
+        "pilot_paused": "You paused the pilot",
+        "pilot_resumed": "You resumed the pilot"
+      }
+    },
+    "errors": {
+      "invalid_site": "Enter a website address, like example.com.",
+      "empty_request": "Write what you want first.",
+      "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
+      "provider_failed": "The AI service did not answer. Try again in a minute.",
+      "not_pending": "This proposal was already decided.",
+      "not_ready": "The site is still being read.",
+      "not_found": "Not found. Refresh the page.",
+      "generic": "Something went wrong. Try again."
     }
   }
 }

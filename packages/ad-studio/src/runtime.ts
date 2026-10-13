@@ -1,6 +1,7 @@
 import { LocalKmsProvider, loadLocalKmsKeyRingFromEnv, type KmsProvider } from '@growthos/firebase-orm-models';
 import type { AdStudioMediaStorage } from './media-storage';
 import type { concatClips } from './ffmpeg';
+import type { PlanningSourceDeps } from './planning-sources';
 
 /**
  * How the host app plugs into the Ad Studio engine. The engine is shared by the web app (routes and
@@ -17,6 +18,8 @@ export interface AdStudioRuntime {
    */
   mediaStorage?: () => AdStudioMediaStorage;
   concatClips?: typeof concatClips;
+  /** How Growth Pilot reads websites (a fake fetch and resolver); production reads the real site. */
+  siteReader?: PlanningSourceDeps;
 }
 
 let runtime: AdStudioRuntime = { ensureOrm: async () => undefined };

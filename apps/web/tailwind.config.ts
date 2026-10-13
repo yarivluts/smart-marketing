@@ -192,6 +192,7 @@ const config: Config = {
         'pp-xl': '3rem',
       },
       keyframes: {
+        'growth-pilot-scan': { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(300%)' } },
         'confetti-fall': {
           '0%': { transform: 'translateY(-10vh) rotate(0deg)', opacity: '1' },
           '100%': { transform: 'translateY(110vh) rotate(720deg)', opacity: '0.3' },
@@ -218,6 +219,7 @@ const config: Config = {
         },
       },
       animation: {
+        'growth-pilot-scan': 'growth-pilot-scan 1.6s ease-in-out infinite',
         'confetti-fall': 'confetti-fall linear forwards',
         'fade-in': 'fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         'fade-out': 'fade-out 0.2s cubic-bezier(0.16, 1, 0.3, 1)',

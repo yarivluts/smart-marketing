@@ -16,7 +16,7 @@ export interface AdStudioCallContext {
  * failed, since a failed provider call can still be billed. Shared by planning, scripts and scene
  * rewrites so every text call counts toward the same limit the same way.
  */
-export async function meteredCall<T>(ctx: AdStudioCallContext, kind: AdStudioUsageKind, briefId: string, run: () => Promise<T>): Promise<T> {
+export async function meteredCall<T>(ctx: AdStudioCallContext, kind: AdStudioUsageKind, briefId: string | null, run: () => Promise<T>): Promise<T> {
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind, units: 1, now: ctx.now });
   const base = {
     organizationId: ctx.organizationId,

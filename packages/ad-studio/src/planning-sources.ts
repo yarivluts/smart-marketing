@@ -92,6 +92,18 @@ function decode(bytes: Uint8Array, contentType: string): string {
  * and stops at {@link LANDING_PAGE_MAX_BYTES}.
  */
 export async function fetchLandingPage(rawUrl: string | null, deps: PlanningSourceDeps = {}): Promise<LandingPageState> {
+  const fetched = await fetchHtmlPage(rawUrl, deps);
+  if (fetched.status !== 'ok') return fetched;
+  const page = extractLandingPageContent(fetched.html);
+  if (!page.title && !page.description && page.headings.length === 0 && !page.text) return { status: 'unavailable', reason: 'empty_page' };
+  return { status: 'ok', url: fetched.url, ...page };
+}
+
+/** One public HTML page, read with the same guards as {@link fetchLandingPage}, as raw HTML (for links). */
+export type HtmlPageState = { status: 'ok'; url: string; html: string } | { status: 'unavailable'; reason: Extract<LandingPageState, { status: 'unavailable' }>['reason'] };
+
+/** Reads a public page with the landing page guards (SSRF, https, redirects, time and size caps) and returns its HTML. */
+export async function fetchHtmlPage(rawUrl: string | null, deps: PlanningSourceDeps = {}): Promise<HtmlPageState> {
   if (!rawUrl) return { status: 'unavailable', reason: 'no_url' };
   const fetchImpl = deps.fetchImpl ?? fetch;
   let url: URL;
@@ -148,9 +160,7 @@ export async function fetchLandingPage(rawUrl: string | null, deps: PlanningSour
     } catch {
       return { status: 'unavailable', reason: signal.aborted ? 'timeout' : 'fetch_failed' };
     }
-    const page = extractLandingPageContent(html);
-    if (!page.title && !page.description && page.headings.length === 0 && !page.text) return { status: 'unavailable', reason: 'empty_page' };
-    return { status: 'ok', url: url.toString(), ...page };
+    return { status: 'ok', url: url.toString(), html };
   }
   return { status: 'unavailable', reason: 'too_many_redirects' };
 }

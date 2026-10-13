@@ -30,7 +30,8 @@
     "signedInAs": "מחובר כ־",
     "myAccount": "החשבון שלי",
     "signOut": "התנתקות",
-    "developersLink": "מפתחים"
+    "developersLink": "מפתחים",
+    "growthPilot": "טייס צמיחה"
   },
   "OmniSearch": {
     "trigger": "חיפוש...",
@@ -3891,7 +3892,9 @@
       "ad_copy": "טקסט מודעה",
       "search_ad": "מודעת חיפוש",
       "translate": "תרגום למודל",
-      "image_qa": "בדיקת AI לתמונה"
+      "image_qa": "בדיקת AI לתמונה",
+      "site_analysis": "קריאת אתר",
+      "target_writing": "ניסוח יעד"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -5430,6 +5433,123 @@
       "quarantineBody": "רשומה שעברה להסגר שומרת את הסיבה, למשל <code>missing_required_field:plan</code> או <code>unregistered_field:coupon</code>. תקנו את השולח או הוסיפו את השדה לסכמה, ושלחו שוב. עמוד <strong>בריאות הקליטה</strong> מציג את מה שממתין, ואפשר להריץ שוב רשומה ברגע שהסכמה מקבלת אותה.",
       "liveTitle": "עלייה לאוויר",
       "liveBody": "צרו מפתחות חיים ב-<strong>prod</strong>, החליפו אותם בהגדרות שלכם (ואת הדומיינים של האתר במפתח הדפדפן), והריצו את אותה קריאת אימות מול prod. שמרו את מפתחות הבדיקה לאתר ה-staging ול-CI."
+    }
+  },
+  "GrowthPilot": {
+    "title": "טייס צמיחה",
+    "start": {
+      "eyebrow": "טייס צמיחה",
+      "title": "הכניסו את האתר שאתם רוצים לקדם",
+      "subtitle": "ה-AI לומד את העסק, מציע מה לקדם ובונה לזה מודעות, דפי נחיתה וקהלים - ואתם רק מאשרים.",
+      "placeholder": "your-site.co.il",
+      "label": "כתובת האתר",
+      "submit": "התחילו",
+      "steps": {
+        "read": "קורא את האתר",
+        "propose": "מציע יעדים",
+        "build": "בונה מודעות ודפי נחיתה",
+        "watch": "עוקב ומשפר"
+      },
+      "safe": "שום דבר לא עולה לאוויר בלי האישור שלכם. כל מודעה נוצרת מושהית."
+    },
+    "analyzing": {
+      "title": "קוראים את {host}",
+      "subtitle": "בדרך כלל פחות מדקה. אפשר לצאת מהדף - התוצאות יחכו כאן.",
+      "items": {
+        "pages": "קוראים את דף הבית ואת הדפים על מה שאתם מוכרים",
+        "offerings": "מזהים את המוצרים והשירותים",
+        "audiences": "מזהים למי אתם מוכרים",
+        "proposals": "מכינים הצעות לאישור שלכם"
+      }
+    },
+    "failed": {
+      "title": "לא הצלחנו לסיים לקרוא את {host}",
+      "retry": "לנסות שוב",
+      "other": "כתובת אחרת",
+      "back": "חזרה לטייס"
+    },
+    "failure": {
+      "site": "האתר לא נפתח לנו (אולי הוא חוסם קוראים אוטומטיים, או שהכתובת שגויה).",
+      "quota_exceeded": "מכסת ה-AI של היום נגמרה. היא מתחדשת מחר.",
+      "nothing_found": "קראנו את האתר אבל לא מצאנו מה לקדם. נסו את הדף שמציג את מה שאתם מוכרים.",
+      "provider": "שירות ה-AI לא ענה. נסו שוב בעוד דקה."
+    },
+    "header": {
+      "active": "הטייס פעיל",
+      "paused": "מושהה",
+      "pause": "השהיה",
+      "resume": "המשך",
+      "newTarget": "יעד חדש",
+      "startOver": "להתחיל מחדש עם אתר אחר"
+    },
+    "summary": {
+      "title": "מה למדנו על {business}",
+      "pages": "{count, plural, one {נקרא דף אחד} other {נקראו # דפים}}"
+    },
+    "waiting": {
+      "title": "מחכה לאישור שלכם",
+      "empty": "כרגע שום דבר לא מחכה לכם.",
+      "approve": "אישור",
+      "reject": "דחייה",
+      "change": "בקשת שינוי",
+      "changePlaceholder": "מה לשנות? למשל: רק משרדים קטנים בתל אביב",
+      "send": "שליחה ל-AI",
+      "cancel": "ביטול",
+      "revising": "ה-AI מעדכן את ההצעה...",
+      "asked": "ביקשתם: {text}",
+      "changeFailed": "ה-AI לא הצליח לבצע את השינוי ({reason}). ההצעה לא השתנתה.",
+      "for": "למי"
+    },
+    "kind": {
+      "product": "מוצר",
+      "service": "שירות",
+      "audience": "קהל"
+    },
+    "targets": {
+      "title": "היעדים שלכם",
+      "empty": "אשרו הצעה והיא תהפוך ליעד שהטייס עובד עליו.",
+      "status": {
+        "proposed": "מחכה לאישור",
+        "active": "פעיל",
+        "paused": "מושהה",
+        "rejected": "נדחה"
+      },
+      "requested": "ביקשתם אותו",
+      "next": "בהמשך: מודעות, דף נחיתה וקהלים ליעד הזה."
+    },
+    "newTarget": {
+      "title": "מה עוד לקדם?",
+      "hint": "מוצר, שירות או קהל, במילים שלכם. ה-AI יגדיר אותו ויבקש את אישורכם.",
+      "placeholder": "למשל: רואי חשבון בצפון",
+      "submit": "להציע"
+    },
+    "activity": {
+      "title": "מה הטייס עשה",
+      "empty": "עדיין כלום.",
+      "kind": {
+        "pilot_started": "התחיל לעבוד על {subject}",
+        "site_read": "{count, plural, one {קרא דף אחד} other {קרא # דפים}} ב-{subject}",
+        "analysis_failed": "לא הצליח לקרוא את האתר",
+        "targets_proposed": "{count, plural, one {הציע יעד אחד} other {הציע # יעדים}}",
+        "target_requested": "ביקשתם יעד חדש: {subject}",
+        "proposal_approved": "אישרתם את {subject}",
+        "proposal_rejected": "דחיתם את {subject}",
+        "change_requested": "ביקשתם שינוי ב{subject}",
+        "proposal_revised": "עדכן את {subject} כמו שביקשתם",
+        "revision_failed": "לא הצליח לעדכן את {subject}",
+        "pilot_paused": "השהיתם את הטייס",
+        "pilot_resumed": "חידשתם את הטייס"
+      }
+    },
+    "errors": {
+      "invalid_site": "הכניסו כתובת אתר, למשל example.co.il.",
+      "empty_request": "כתבו קודם מה אתם רוצים.",
+      "quota_exceeded": "מכסת ה-AI של היום נגמרה. היא מתחדשת מחר.",
+      "provider_failed": "שירות ה-AI לא ענה. נסו שוב בעוד דקה.",
+      "not_pending": "כבר החליטו על ההצעה הזו.",
+      "not_ready": "האתר עדיין נקרא.",
+      "not_found": "לא נמצא. רעננו את הדף.",
+      "generic": "משהו השתבש. נסו שוב."
     }
   }
 }
