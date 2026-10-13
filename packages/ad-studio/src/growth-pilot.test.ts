@@ -15,6 +15,10 @@ const orm = vi.hoisted(() => ({
   linkGrowthTargetAds: vi.fn(),
   finishGrowthTargetAds: vi.fn(),
   createAdStudioBrief: vi.fn(),
+  failGrowthLanding: vi.fn(),
+  getGrowthLandingPage: vi.fn(),
+  saveGrowthLandingDraft: vi.fn(),
+  updateGrowthLandingContent: vi.fn(),
   getAdStudioBrief: vi.fn(),
   getAdStudioRun: vi.fn(),
   assertAdStudioQuota: vi.fn(),
@@ -147,7 +151,7 @@ describe('revising and requesting targets', () => {
 
 describe('making ads for approved targets', () => {
   const ACTIVE = { ...PILOT, status: 'active', analysis: { ...ANALYSIS, offerings: [{ ...ANALYSIS.offerings[0], why: 'w' }], audiences: [] } };
-  const TARGET = { id: 't1', pilot_id: 'g1', kind: 'service', name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active', brief_id: null, run_id: null, ads_status: 'none' };
+  const TARGET = { id: 't1', pilot_id: 'g1', kind: 'service', name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active', brief_id: null, run_id: null, ads_status: 'none', landing_status: 'ready' };
   const autopilot = {} as never;
   const run = (extra: object) => ({ id: 'r1', status: 'running', failure_code: null, steps: [{ id: 'images', reason: null }], ...extra });
 
@@ -226,5 +230,47 @@ describe('making ads for approved targets', () => {
     studio.rewriteAdStudioImageConcept.mockRejectedValueOnce(new AdStudioQuotaExceededError('text', 50, 50));
     await reviseGrowthProposal({ ...ctx(llm(ANALYSIS)), proposalId: 'p9', request: 'Brighter photos' });
     expect(orm.completeGrowthProposalRevision).toHaveBeenCalledWith(expect.objectContaining({ draft: null, failureCode: 'quota_exceeded' }));
+  });
+});
+
+describe('landing pages for approved targets', () => {
+  const ACTIVE = { ...PILOT, status: 'active', site_url: 'https://easy-sign.co.il/', analysis: { ...ANALYSIS, language: 'he', offerings: [{ ...ANALYSIS.offerings[0], why: 'w' }], audiences: [] } };
+  const TARGET = { id: 't1', pilot_id: 'g1', kind: 'service', name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active', brief_id: null, ads_status: 'none', landing_status: 'none' };
+  const PAGE = { eyebrow: 'For offices', headline: 'Sign 20 documents', subheadline: 'On WhatsApp', benefits: [{ title: 'Fast', text: 'Seconds' }], steps: [], faq: [], ctaText: 'Start now', closingHeadline: 'Ready?' };
+
+  beforeEach(() => {
+    orm.getGrowthPilot.mockResolvedValue(ACTIVE);
+  });
+
+  it('writes the page for an approved target before starting its ads, in the site language, with the tagged site as the button', async () => {
+    orm.listGrowthTargets.mockResolvedValue([TARGET]);
+    const model = llm(PAGE);
+    await advanceGrowthPilot({ ...ctx(model), pilotId: 'g1', autopilot: {} as never });
+    expect(model.generateJson.mock.calls[0][0].user).toContain('This page is for: Pro plan (service)');
+    expect(orm.saveGrowthLandingDraft).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', content: PAGE, language: 'he', siteUrl: 'https://easy-sign.co.il/' }));
+    expect(orm.recordAdStudioUsage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'landing_page', outcome: 'succeeded' }));
+    expect(orm.createAdStudioBrief).not.toHaveBeenCalled();
+  });
+
+  it('records why when the page could not be written: the limit, or a page without a headline', async () => {
+    orm.listGrowthTargets.mockResolvedValue([TARGET]);
+    orm.assertAdStudioQuota.mockRejectedValueOnce(new AdStudioQuotaExceededError('text', 50, 50));
+    await advanceGrowthPilot({ ...ctx(llm(PAGE)), pilotId: 'g1', autopilot: {} as never });
+    expect(orm.failGrowthLanding).toHaveBeenLastCalledWith(expect.objectContaining({ targetId: 't1', failureCode: 'quota_exceeded' }));
+    await advanceGrowthPilot({ ...ctx(llm({ ...PAGE, headline: '' })), pilotId: 'g1', autopilot: {} as never });
+    expect(orm.failGrowthLanding).toHaveBeenLastCalledWith(expect.objectContaining({ failureCode: 'invalid_output' }));
+    expect(orm.saveGrowthLandingDraft).not.toHaveBeenCalled();
+  });
+
+  it('revises the page by the request and puts it back for a decision', async () => {
+    const held = { id: 'lp1', kind: 'landing_page', pilot_id: 'g1', target_id: 't1', landing_page_id: 'page1', draft: { name: 'Pro plan' }, change_requests: [{ text: 'Shorter headline' }] };
+    orm.requestGrowthProposalChange.mockResolvedValue(held);
+    orm.getGrowthLandingPage.mockResolvedValue({ id: 'page1', content: PAGE });
+    orm.getGrowthTarget.mockResolvedValue(TARGET);
+    const model = llm({ ...PAGE, headline: 'Sign fast' });
+    await reviseGrowthProposal({ ...ctx(model), proposalId: 'lp1', request: 'Shorter headline' });
+    expect(model.generateJson.mock.calls[0][0].user).toContain('"headline": "Sign 20 documents"');
+    expect(orm.updateGrowthLandingContent).toHaveBeenCalledWith(expect.objectContaining({ pageId: 'page1', content: expect.objectContaining({ headline: 'Sign fast' }) }));
+    expect(orm.completeGrowthProposalRevision).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'lp1', draft: { name: 'Pro plan' } }));
   });
 });

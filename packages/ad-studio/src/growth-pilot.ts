@@ -5,6 +5,10 @@ import {
   addRequestedGrowthTarget,
   completeGrowthProposalRevision,
   createAdStudioBrief,
+  failGrowthLanding,
+  getGrowthLandingPage,
+  saveGrowthLandingDraft,
+  updateGrowthLandingContent,
   finishGrowthTargetAds,
   getAdStudioBrief,
   getAdStudioRun,
@@ -22,6 +26,7 @@ import {
   type GrowthProposalModel,
 } from '@growthos/firebase-orm-models';
 import {
+  buildLandingPagePrompt,
   buildSiteAnalysisPrompt,
   buildTargetFromRequestPrompt,
   buildTargetRevisionPrompt,
@@ -31,8 +36,10 @@ import {
   growthBriefInput,
   pickSiteLinks,
   proposedTargetsFromAnalysis,
+  sanitizeLandingContent,
   sanitizeSiteAnalysis,
   sanitizeTargetDraft,
+  type GrowthLandingContent,
   type GrowthSitePage,
   type GrowthTargetDraft,
 } from '@growthos/shared';
@@ -79,6 +86,17 @@ export const GrowthTargetDraftSchema = z.object({
   description: z.string(),
   audience: z.string().describe('Who it is for (a product or service) or what they need (an audience).'),
   reason: z.string().describe('One sentence: why this target is worth growing.'),
+});
+
+export const GrowthLandingContentSchema = z.object({
+  eyebrow: z.string().describe('A short line above the headline: who the page is for.'),
+  headline: z.string(),
+  subheadline: z.string(),
+  benefits: z.array(z.object({ title: z.string(), text: z.string() })),
+  steps: z.array(z.string()).describe('How it works, in order; may be empty.'),
+  faq: z.array(z.object({ question: z.string(), answer: z.string() })),
+  ctaText: z.string().describe('The button: 2-4 words.'),
+  closingHeadline: z.string(),
 });
 
 export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[] } | { status: 'unavailable'; reason: string };
@@ -170,6 +188,7 @@ export async function reviseGrowthProposal(ctx: AdStudioCallContext & { proposal
   const held = await requestGrowthProposalChange({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: ctx.proposalId, text: ctx.request, actorId: ctx.actorId, now: ctx.now });
   const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, now: ctx.now };
   if (held.kind === 'ads') return reviseGrowthAds(ctx, held, scope);
+  if (held.kind === 'landing_page') return reviseGrowthLanding(ctx, held, scope);
   try {
     const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id);
     if (!held.draft || !pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
@@ -244,8 +263,14 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
     if (run.status !== 'running' && run.status !== 'awaiting_approval') await finishAds(ctx, building, run);
     return;
   }
+  if (!pilot.analysis) return;
+  const needsPage = targets.find((target) => target.status === 'active' && (target.landing_status ?? 'none') === 'none');
+  if (needsPage) {
+    await writeGrowthLanding(ctx, pilot, needsPage);
+    return;
+  }
   const next = targets.find((target) => target.status === 'active' && !target.brief_id && (target.ads_status ?? 'none') === 'none');
-  if (!next || !pilot.analysis) return;
+  if (!next) return;
   const brief = await createAdStudioBrief({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -281,6 +306,45 @@ async function reviseGrowthAds(ctx: AdStudioCallContext, held: GrowthProposalMod
     const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
     await linkGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, briefId: brief.id, runId: run.id, now: ctx.now });
     return held;
+  } catch (error) {
+    return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
+  }
+}
+
+/** Writes the landing page for an approved target (one text call) and puts it up for approval. */
+async function writeGrowthLanding(ctx: AdStudioCallContext, pilot: GrowthPilotModel, target: GrowthTargetModel): Promise<void> {
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
+  try {
+    const prompt = buildLandingPagePrompt({ analysis: pilot.analysis!, target });
+    const raw = await meteredCall(ctx, 'landing_page', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthLandingContentSchema, effort: 'high' }));
+    const content = sanitizeLandingContent(raw as GrowthLandingContent);
+    if (!content) {
+      await failGrowthLanding({ ...scope, failureCode: 'invalid_output' });
+      return;
+    }
+    await saveGrowthLandingDraft({ ...scope, content, language: pilot.analysis!.language || 'en', siteUrl: pilot.site_url });
+  } catch (error) {
+    await failGrowthLanding({ ...scope, failureCode: growthFailureCode(error) });
+  }
+}
+
+/** The person asked for a change to a landing page: the AI revises it and it comes back for a decision. */
+async function reviseGrowthLanding(ctx: AdStudioCallContext, held: GrowthProposalModel, scope: { organizationId: string; projectId: string; proposalId: string; now?: Date }): Promise<GrowthProposalModel> {
+  try {
+    if (!held.landing_page_id || !held.target_id) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
+    const [pilot, page, target] = await Promise.all([
+      getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id),
+      getGrowthLandingPage(ctx.organizationId, ctx.projectId, held.landing_page_id),
+      getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id),
+    ]);
+    if (!pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
+    const request = held.change_requests[held.change_requests.length - 1].text;
+    const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current: page.content, request });
+    const raw = await meteredCall(ctx, 'landing_page', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthLandingContentSchema, effort: 'high' }));
+    const content = sanitizeLandingContent(raw as GrowthLandingContent);
+    if (!content) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'invalid_output' });
+    await updateGrowthLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, pageId: page.id, content, now: ctx.now });
+    return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
   } catch (error) {
     return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
   }
