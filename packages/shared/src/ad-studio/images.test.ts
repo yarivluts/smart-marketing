@@ -112,6 +112,7 @@ describe('image prompts', () => {
     // Devices stay secondary and out of focus, so screens carry no text and never float toward the camera.
     expect(prompt).toContain('screen softly out of focus - no readable words');
     expect(prompt).toContain('Never show a device held toward the camera');
+    expect(prompt).toContain('no floating cards, labels, badges, icons');
     expect(prompt).toContain('illegible scribble on that document or screen only');
     expect(prompt).not.toContain('anywhere in the picture, is');
     expect(prompt).toContain('real-world size and proportions');

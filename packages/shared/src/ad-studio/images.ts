@@ -240,6 +240,8 @@ export function buildImagePrompt(
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
     // Making the screen's interface the point ("large flat shapes") turned screens into floating mock-ups held at the camera.
     'Photograph it as a candid, natural moment: the person and the place are the subject. A phone, tablet or laptop is a small, secondary part of the scene, held or placed naturally, seen at an angle with its screen softly out of focus - no readable words, letters or text-like lines on it. Never show a device held toward the camera, a hand or object close to the lens, or a screen outside its device.',
+    // A render added a floating "Signed" card above the phone: no interface element may leave its device.
+    'It is a photograph, not a design: no floating cards, labels, badges, icons, checkmarks, speech bubbles or graphic overlays anywhere - the only added element is the headline.',
     // Worded as a condition: "a signature anywhere in the picture" made the model add one, floating on a desk.
     'If the scene shows something being signed, the signature is an illegible scribble on that document or screen only; do not add signatures or writing anywhere else.',
     'Every object has its real-world size and proportions (a phone fits in a hand) and sits where it physically could.',
