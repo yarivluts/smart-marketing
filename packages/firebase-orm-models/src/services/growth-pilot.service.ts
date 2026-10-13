@@ -1,0 +1,357 @@
+import { randomUUID } from 'node:crypto';
+import { normalizeSiteUrl, siteHost, type GrowthSiteAnalysis, type GrowthTargetDraft } from '@growthos/shared';
+import {
+  GrowthActivityModel,
+  GrowthPilotModel,
+  GrowthProposalModel,
+  GrowthTargetModel,
+  type GrowthActivityKind,
+  type GrowthPilotPage,
+} from '../models/growth-pilot.model';
+import { recordAuditLogEntry } from './audit-log.service';
+
+/**
+ * Growth Pilot state: the pilot (one website), its targets, the proposals waiting for the person,
+ * and the activity feed. The engine (`@growthos/ad-studio`) reads the site and writes with the AI;
+ * this keeps the records, the lease that stops two callers from reading the same site at once, and
+ * the audit trail of every human decision.
+ */
+
+export class GrowthPilotNotFoundError extends Error {
+  constructor() {
+    super('Growth Pilot not found.');
+    this.name = 'GrowthPilotNotFoundError';
+  }
+}
+
+export class GrowthPilotSiteInvalidError extends Error {
+  constructor() {
+    super('Enter a website address, like example.com.');
+    this.name = 'GrowthPilotSiteInvalidError';
+  }
+}
+
+export class GrowthChangeRequestEmptyError extends Error {
+  constructor() {
+    super('Say what to change.');
+    this.name = 'GrowthChangeRequestEmptyError';
+  }
+}
+
+export class GrowthProposalNotFoundError extends Error {
+  constructor() {
+    super('Proposal not found.');
+    this.name = 'GrowthProposalNotFoundError';
+  }
+}
+
+export class GrowthProposalNotPendingError extends Error {
+  constructor(public readonly status: string) {
+    super('This proposal is not waiting for a decision.');
+    this.name = 'GrowthProposalNotPendingError';
+  }
+}
+
+/** How long one site read may hold the pilot before another caller may try again. */
+export const GROWTH_PILOT_LEASE_MS = 5 * 60_000;
+/** The longest change request a person can send. */
+export const GROWTH_CHANGE_REQUEST_MAX_CHARS = 1_000;
+
+function pathParams(organizationId: string, projectId: string) {
+  return { organization_id: organizationId, project_id: projectId };
+}
+
+interface Scope {
+  organizationId: string;
+  projectId: string;
+}
+
+async function audit(scope: Scope, actorId: string, action: string, targetType: string, targetId: string, summary: string, after?: Record<string, unknown>): Promise<void> {
+  try {
+    await recordAuditLogEntry({ organizationId: scope.organizationId, projectId: scope.projectId, actorType: 'user', actorId, action, targetType, targetId, summary, after });
+  } catch {
+    // Best-effort: the decision itself is saved either way.
+  }
+}
+
+export async function recordGrowthActivity(params: Scope & { pilotId: string; kind: GrowthActivityKind; actor: string; subject?: string | null; count?: number | null; now?: Date }): Promise<GrowthActivityModel> {
+  const row = new GrowthActivityModel();
+  row.organization_id = params.organizationId;
+  row.project_id = params.projectId;
+  row.pilot_id = params.pilotId;
+  row.kind = params.kind;
+  row.actor = params.actor;
+  row.subject = params.subject ?? null;
+  row.count = params.count ?? null;
+  row.created_on = (params.now ?? new Date()).toISOString();
+  row.setPathParams(pathParams(params.organizationId, params.projectId));
+  await row.save();
+  return row;
+}
+
+/** The project's current pilot: the newest one that is not archived; null before the person starts one. */
+export async function getCurrentGrowthPilot(organizationId: string, projectId: string): Promise<GrowthPilotModel | null> {
+  const rows = await GrowthPilotModel.initPath(pathParams(organizationId, projectId)).where('project_id', '==', projectId).get();
+  return rows.filter((row) => row.status !== 'archived').sort((a, b) => b.created_on.localeCompare(a.created_on))[0] ?? null;
+}
+
+export async function getGrowthPilot(organizationId: string, projectId: string, pilotId: string): Promise<GrowthPilotModel> {
+  const pilot = await GrowthPilotModel.init(pilotId, pathParams(organizationId, projectId));
+  if (!pilot || pilot.organization_id !== organizationId || pilot.project_id !== projectId) throw new GrowthPilotNotFoundError();
+  return pilot;
+}
+
+/**
+ * Starts a pilot for a website. A project has one current pilot: starting over (a new address, or
+ * after a failed read) archives the previous one, whose targets and history stay readable.
+ */
+export async function startGrowthPilot(params: Scope & { siteUrl: string; actorId: string; now?: Date }): Promise<GrowthPilotModel> {
+  const siteUrl = normalizeSiteUrl(params.siteUrl);
+  if (!siteUrl) throw new GrowthPilotSiteInvalidError();
+  const now = (params.now ?? new Date()).toISOString();
+  const current = await getCurrentGrowthPilot(params.organizationId, params.projectId);
+  if (current) {
+    current.status = 'archived';
+    current.updated_on = now;
+    await current.save();
+  }
+  const pilot = new GrowthPilotModel();
+  pilot.organization_id = params.organizationId;
+  pilot.project_id = params.projectId;
+  pilot.site_url = siteUrl;
+  pilot.status = 'analyzing';
+  pilot.analysis = null;
+  pilot.pages_read = null;
+  pilot.failure_code = null;
+  pilot.generated_by = null;
+  pilot.lease_until = null;
+  pilot.lease_token = null;
+  pilot.started_by = params.actorId;
+  pilot.created_on = now;
+  pilot.updated_on = now;
+  pilot.setPathParams(pathParams(params.organizationId, params.projectId));
+  await pilot.save();
+  await recordGrowthActivity({ ...params, pilotId: pilot.id, kind: 'pilot_started', actor: params.actorId, subject: siteHost(siteUrl), now: params.now });
+  await audit(params, params.actorId, 'growth_pilot.started', 'growth_pilot', pilot.id, `Started Growth Pilot for ${siteHost(siteUrl)}`, { site_url: siteUrl, archived: current?.id ?? null });
+  return pilot;
+}
+
+/** Takes the pilot's lease while it is being analyzed; null when someone else holds it or there is nothing to analyze. */
+export async function acquireGrowthPilotLease(pilot: Pick<GrowthPilotModel, 'id' | 'organization_id' | 'project_id'>, params: { ttlMs?: number; now?: Date } = {}): Promise<string | null> {
+  const now = params.now ?? new Date();
+  const fresh = await GrowthPilotModel.init(pilot.id, pathParams(pilot.organization_id, pilot.project_id));
+  if (!fresh || fresh.status !== 'analyzing') return null;
+  if (fresh.lease_until && fresh.lease_until > now.toISOString()) return null;
+  const token = randomUUID();
+  fresh.lease_token = token;
+  fresh.lease_until = new Date(now.getTime() + (params.ttlMs ?? GROWTH_PILOT_LEASE_MS)).toISOString();
+  await fresh.save();
+  const check = await GrowthPilotModel.init(pilot.id, pathParams(pilot.organization_id, pilot.project_id));
+  return check?.lease_token === token ? token : null;
+}
+
+async function heldPilot(pilot: Pick<GrowthPilotModel, 'id' | 'organization_id' | 'project_id'>, token: string): Promise<GrowthPilotModel | null> {
+  const fresh = await GrowthPilotModel.init(pilot.id, pathParams(pilot.organization_id, pilot.project_id));
+  return fresh && fresh.lease_token === token && fresh.status === 'analyzing' ? fresh : null;
+}
+
+function newTarget(scope: Scope, pilotId: string, draft: GrowthTargetDraft, origin: 'site' | 'request', now: string): GrowthTargetModel {
+  const target = new GrowthTargetModel();
+  target.organization_id = scope.organizationId;
+  target.project_id = scope.projectId;
+  target.pilot_id = pilotId;
+  target.kind = draft.kind;
+  target.name = draft.name;
+  target.description = draft.description;
+  target.audience = draft.audience;
+  target.status = 'proposed';
+  target.origin = origin;
+  target.brief_id = null;
+  target.created_on = now;
+  target.updated_on = now;
+  target.setPathParams(pathParams(scope.organizationId, scope.projectId));
+  return target;
+}
+
+function newTargetProposal(scope: Scope, pilotId: string, targetId: string, draft: GrowthTargetDraft, now: string): GrowthProposalModel {
+  const proposal = new GrowthProposalModel();
+  proposal.organization_id = scope.organizationId;
+  proposal.project_id = scope.projectId;
+  proposal.pilot_id = pilotId;
+  proposal.target_id = targetId;
+  proposal.kind = 'target';
+  proposal.status = 'pending';
+  proposal.draft = draft;
+  proposal.change_requests = [];
+  proposal.decided_by = null;
+  proposal.decided_on = null;
+  proposal.created_on = now;
+  proposal.updated_on = now;
+  proposal.setPathParams(pathParams(scope.organizationId, scope.projectId));
+  return proposal;
+}
+
+/**
+ * Saves what the site read learned and proposes the first targets, each as a proposal waiting for
+ * the person. Only the lease holder may save, and only once: a second caller finds it done.
+ */
+export async function saveGrowthPilotAnalysis(params: {
+  pilot: Pick<GrowthPilotModel, 'id' | 'organization_id' | 'project_id'>;
+  token: string;
+  analysis: GrowthSiteAnalysis;
+  pages: GrowthPilotPage[];
+  drafts: GrowthTargetDraft[];
+  generatedBy: { provider: string; model: string };
+  now?: Date;
+}): Promise<GrowthPilotModel | null> {
+  const fresh = await heldPilot(params.pilot, params.token);
+  if (!fresh) return null;
+  const now = (params.now ?? new Date()).toISOString();
+  const scope = { organizationId: fresh.organization_id, projectId: fresh.project_id };
+  // One millisecond apart, so the lists keep the order the AI proposed them in.
+  const base = new Date(now).getTime();
+  for (const [index, draft] of params.drafts.entries()) {
+    const at = new Date(base + index).toISOString();
+    const target = newTarget(scope, fresh.id, draft, 'site', at);
+    await target.save();
+    await newTargetProposal(scope, fresh.id, target.id, draft, at).save();
+  }
+  fresh.analysis = params.analysis;
+  fresh.pages_read = params.pages;
+  fresh.status = 'active';
+  fresh.failure_code = null;
+  fresh.generated_by = { ...params.generatedBy, generated_at: now };
+  fresh.lease_token = null;
+  fresh.lease_until = null;
+  fresh.updated_on = now;
+  await fresh.save();
+  await recordGrowthActivity({ ...scope, pilotId: fresh.id, kind: 'site_read', actor: 'pilot', subject: siteHost(fresh.site_url), count: params.pages.length, now: params.now });
+  await recordGrowthActivity({ ...scope, pilotId: fresh.id, kind: 'targets_proposed', actor: 'pilot', count: params.drafts.length, now: params.now });
+  return fresh;
+}
+
+/** Records a failed site read; the person can try again (a new pilot). */
+export async function failGrowthPilotAnalysis(params: { pilot: Pick<GrowthPilotModel, 'id' | 'organization_id' | 'project_id'>; token: string; code: string; now?: Date }): Promise<GrowthPilotModel | null> {
+  const fresh = await heldPilot(params.pilot, params.token);
+  if (!fresh) return null;
+  const now = (params.now ?? new Date()).toISOString();
+  fresh.status = 'failed';
+  fresh.failure_code = params.code;
+  fresh.lease_token = null;
+  fresh.lease_until = null;
+  fresh.updated_on = now;
+  await fresh.save();
+  await recordGrowthActivity({ organizationId: fresh.organization_id, projectId: fresh.project_id, pilotId: fresh.id, kind: 'analysis_failed', actor: 'pilot', subject: params.code, now: params.now });
+  return fresh;
+}
+
+export async function listGrowthTargets(organizationId: string, projectId: string, pilotId: string): Promise<GrowthTargetModel[]> {
+  const rows = await GrowthTargetModel.initPath(pathParams(organizationId, projectId)).where('pilot_id', '==', pilotId).get();
+  return rows.sort((a, b) => a.created_on.localeCompare(b.created_on));
+}
+
+export async function listGrowthProposals(organizationId: string, projectId: string, pilotId: string): Promise<GrowthProposalModel[]> {
+  const rows = await GrowthProposalModel.initPath(pathParams(organizationId, projectId)).where('pilot_id', '==', pilotId).get();
+  return rows.sort((a, b) => a.created_on.localeCompare(b.created_on));
+}
+
+export async function listGrowthActivity(organizationId: string, projectId: string, pilotId: string, limit = 30): Promise<GrowthActivityModel[]> {
+  const rows = await GrowthActivityModel.initPath(pathParams(organizationId, projectId)).where('pilot_id', '==', pilotId).get();
+  return rows.sort((a, b) => b.created_on.localeCompare(a.created_on)).slice(0, limit);
+}
+
+export async function getGrowthProposal(organizationId: string, projectId: string, proposalId: string): Promise<GrowthProposalModel> {
+  const proposal = await GrowthProposalModel.init(proposalId, pathParams(organizationId, projectId));
+  if (!proposal || proposal.organization_id !== organizationId || proposal.project_id !== projectId) throw new GrowthProposalNotFoundError();
+  return proposal;
+}
+
+async function proposalTarget(proposal: GrowthProposalModel): Promise<GrowthTargetModel | null> {
+  if (!proposal.target_id) return null;
+  return GrowthTargetModel.init(proposal.target_id, pathParams(proposal.organization_id, proposal.project_id));
+}
+
+/** The person approves or rejects a pending proposal. Approving a target makes it active as proposed. */
+export async function decideGrowthProposal(params: Scope & { proposalId: string; decision: 'approve' | 'reject'; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
+  const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
+  if (proposal.status !== 'pending') throw new GrowthProposalNotPendingError(proposal.status);
+  const now = (params.now ?? new Date()).toISOString();
+  proposal.status = params.decision === 'approve' ? 'approved' : 'rejected';
+  proposal.decided_by = params.actorId;
+  proposal.decided_on = now;
+  proposal.updated_on = now;
+  await proposal.save();
+  const target = await proposalTarget(proposal);
+  if (target && proposal.kind === 'target') {
+    if (params.decision === 'approve' && proposal.draft) {
+      target.kind = proposal.draft.kind;
+      target.name = proposal.draft.name;
+      target.description = proposal.draft.description;
+      target.audience = proposal.draft.audience;
+    }
+    target.status = params.decision === 'approve' ? 'active' : 'rejected';
+    target.updated_on = now;
+    await target.save();
+  }
+  const name = proposal.draft?.name ?? '';
+  await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: params.decision === 'approve' ? 'proposal_approved' : 'proposal_rejected', actor: params.actorId, subject: name, now: params.now });
+  await audit(params, params.actorId, `growth_pilot.proposal_${params.decision === 'approve' ? 'approved' : 'rejected'}`, 'growth_proposal', proposal.id, `${params.decision === 'approve' ? 'Approved' : 'Rejected'} "${name}"`, { kind: proposal.kind, target_id: proposal.target_id ?? null });
+  return proposal;
+}
+
+/** The person asks the AI to change a pending proposal: it is held as `revising` until the rewrite lands. */
+export async function requestGrowthProposalChange(params: Scope & { proposalId: string; text: string; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
+  const text = params.text.replace(/\s+/g, ' ').trim().slice(0, GROWTH_CHANGE_REQUEST_MAX_CHARS);
+  if (!text) throw new GrowthChangeRequestEmptyError();
+  const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
+  if (proposal.status !== 'pending') throw new GrowthProposalNotPendingError(proposal.status);
+  const now = (params.now ?? new Date()).toISOString();
+  proposal.status = 'revising';
+  proposal.change_requests = [...proposal.change_requests, { text, by: params.actorId, on: now, outcome: 'pending', failure_code: null }];
+  proposal.updated_on = now;
+  await proposal.save();
+  await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: 'change_requested', actor: params.actorId, subject: proposal.draft?.name ?? '', now: params.now });
+  return proposal;
+}
+
+/** Saves the AI's rewrite of a proposal under revision (or, with no draft, that it failed) and puts it back in front of the person. */
+export async function completeGrowthProposalRevision(params: Scope & { proposalId: string; draft: GrowthTargetDraft | null; failureCode?: string; now?: Date }): Promise<GrowthProposalModel> {
+  const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
+  if (proposal.status !== 'revising') throw new GrowthProposalNotPendingError(proposal.status);
+  const now = (params.now ?? new Date()).toISOString();
+  const last = proposal.change_requests.length - 1;
+  proposal.change_requests = proposal.change_requests.map((request, index) =>
+    index === last ? { ...request, outcome: params.draft ? 'done' : 'failed', failure_code: params.draft ? null : (params.failureCode ?? 'provider_error') } : request,
+  );
+  if (params.draft) proposal.draft = params.draft;
+  proposal.status = 'pending';
+  proposal.updated_on = now;
+  await proposal.save();
+  await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: params.draft ? 'proposal_revised' : 'revision_failed', actor: 'pilot', subject: proposal.draft?.name ?? '', now: params.now });
+  return proposal;
+}
+
+/** A target the person asked for, as the AI defined it: proposed, so they confirm the AI understood them. */
+export async function addRequestedGrowthTarget(params: Scope & { pilotId: string; draft: GrowthTargetDraft; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
+  const pilot = await getGrowthPilot(params.organizationId, params.projectId, params.pilotId);
+  const now = (params.now ?? new Date()).toISOString();
+  const target = newTarget(params, pilot.id, params.draft, 'request', now);
+  await target.save();
+  const proposal = newTargetProposal(params, pilot.id, target.id, params.draft, now);
+  await proposal.save();
+  await recordGrowthActivity({ ...params, pilotId: pilot.id, kind: 'target_requested', actor: params.actorId, subject: params.draft.name, now: params.now });
+  return proposal;
+}
+
+/** Pauses or resumes the pilot. A paused pilot proposes and runs nothing; decisions the person makes still apply. */
+export async function setGrowthPilotPaused(params: Scope & { pilotId: string; paused: boolean; actorId: string; now?: Date }): Promise<GrowthPilotModel> {
+  const pilot = await getGrowthPilot(params.organizationId, params.projectId, params.pilotId);
+  if (params.paused ? pilot.status !== 'active' : pilot.status !== 'paused') return pilot;
+  const now = (params.now ?? new Date()).toISOString();
+  pilot.status = params.paused ? 'paused' : 'active';
+  pilot.updated_on = now;
+  await pilot.save();
+  await recordGrowthActivity({ ...params, pilotId: pilot.id, kind: params.paused ? 'pilot_paused' : 'pilot_resumed', actor: params.actorId, now: params.now });
+  await audit(params, params.actorId, params.paused ? 'growth_pilot.paused' : 'growth_pilot.resumed', 'growth_pilot', pilot.id, `${params.paused ? 'Paused' : 'Resumed'} Growth Pilot for ${siteHost(pilot.site_url)}`);
+  return pilot;
+}
