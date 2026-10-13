@@ -1,9 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { CheckCircle2, CircleAlert, ExternalLink, Loader2, Send, Upload } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
+import { useLocalDateTime } from './use-local-date-time';
+
+const MEDIUM = { dateStyle: 'medium', timeStyle: 'short' } as const;
 import { cn } from '@/lib/utils';
 
 export type ExportDestinationId = 'meta' | 'youtube';
@@ -53,11 +56,8 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
   const [privacy, setPrivacy] = React.useState<'private' | 'unlisted' | 'public'>('unlisted');
   const [pending, setPending] = React.useState<ExportDestinationId | null>(null);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const locale = useLocale();
-  // Formatted in the browser only, in the viewer's own time zone, so server and client markup agree.
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-  const formatWhen = (iso: string) => (mounted ? ` · ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))}` : '');
+  const localTime = useLocalDateTime(MEDIUM);
+  const formatWhen = (iso: string) => (localTime(iso) ? ` · ${localTime(iso)}` : '');
 
   async function exportTo(destination: ExportDestinationId): Promise<void> {
     if (!video) return;

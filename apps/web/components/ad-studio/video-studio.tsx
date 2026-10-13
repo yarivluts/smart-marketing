@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   AlertTriangle,
   Clapperboard,
@@ -47,6 +47,9 @@ import { AdCopyCard } from './ad-copy-card';
 import { NarrationEditor } from './narration-editor';
 import { VoicePicker } from './voice-picker';
 import { AdvancedVideoSettings } from './advanced-video-settings';
+import { useLocalDateTime } from './use-local-date-time';
+
+const MEDIUM = { dateStyle: 'medium', timeStyle: 'short' } as const;
 import { withFirstFrame } from './media-src';
 
 export interface VideoStudioProps {
@@ -123,19 +126,10 @@ export function VideoStudio({
   videoSettings = null,
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
-  const locale = useLocale();
   // The script as saved: a narration edit here comes back vocalized before the page refreshes.
   const [scenes, setScenes] = React.useState(sceneProp);
   React.useEffect(() => setScenes(sceneProp), [sceneProp]);
-  // Formatted in the browser only, in the viewer's own time zone, so server and client markup agree.
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-  const formatWhen = (iso: string | null) =>
-    iso && mounted
-      ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-          new Date(iso),
-        )
-      : '';
+  const formatWhen = useLocalDateTime(MEDIUM);
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
   const failure = useAdStudioFailureReason();
