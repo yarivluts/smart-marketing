@@ -17,6 +17,19 @@ Template for each entry:
 
 ---
 
+## 2026-10-13 - Ad Studio review page redesigned from Stitch (KAN-392)
+
+- **Done (#652, live as web-prod-00155, buildSha a87b93c):**
+  - An open ad now has a compact header (breadcrumb, name as h1, objective, delete, one row of daily usage meters with "limit reached") in place of the five studio-wide StatCards, which stay on the ad list.
+  - Connected stepper.
+  - Next-step banner from `reviewNextStep` (attention > assemble video > working > publish > start).
+  - Creative cards with the status on top and a whole preview.
+  - The banner's target card is highlighted.
+  - Google-result search preview using `displayHost`.
+  - Sticky step footer (md+).
+- **Verified:** Hebrew screenshots of the review and publish steps on the preview, at 1440 and 390, with no overflow.
+- **Leftovers:** probe screens remain in Stitch project 748986387566122661. The MCP has no delete-screen tool, so they need manual removal if wanted.
+
 ## 2026-10-13 - Ad Studio: creative overview + code-set headlines; 24/24 real images pass on prod (KAN-389, KAN-392)
 
 - **Last completed (all live on prod):**
