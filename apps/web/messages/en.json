@@ -4366,7 +4366,8 @@
         "attention": "Need a look",
         "ready": "Images ready",
         "left": "Images left today",
-        "ofValue": "{count} of {total}"
+        "ofValue": "{count} of {total}",
+        "notChecked": "Not checked"
       },
       "imagesHeading": "Images ({count})",
       "openFull": "Open full size"

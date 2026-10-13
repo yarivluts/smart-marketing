@@ -62,11 +62,11 @@ export function CreateGallery({
         {t('title')}
       </h2>
       {images.length ? (
-        // Masonry columns: every image keeps its own shape and no row is left with gaps.
-        <ul className="columns-2 gap-3 sm:columns-3 lg:columns-4">
+        // Rows of one height, each image as wide as its own shape: nothing is cropped or boxed, and no column is left empty.
+        <ul className="flex flex-wrap gap-3">
           {images.map((image) => (
-            <li key={image.id} className="mb-3 flex break-inside-avoid flex-col gap-1" data-testid="ad-studio-gallery-image">
-              <span className={cn('relative flex items-center justify-center overflow-hidden rounded-2xl bg-muted', IMAGE_ASPECT[image.format])}>
+            <li key={image.id} className="flex max-w-full flex-col gap-1" data-testid="ad-studio-gallery-image">
+              <span className={cn('relative flex h-36 max-w-full items-center justify-center overflow-hidden rounded-2xl bg-muted sm:h-44', IMAGE_ASPECT[image.format])}>
                 {image.status === 'ready' ? (
                   // A plain img: private media served by our own authenticated route.
                   <img src={`${mediaBase}/images/${image.id}/media`} alt={image.label} className="h-full w-full object-cover" />
@@ -74,7 +74,8 @@ export function CreateGallery({
                   <span className="text-xs text-muted-foreground">{t(`status.${image.status}`)}</span>
                 )}
               </span>
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              {/* w-0 + min-w-full: the caption takes the image width instead of widening the tile. */}
+              <span className="flex w-0 min-w-full items-center gap-1 text-xs text-muted-foreground">
                 <StatusIcon status={image.status} />
                 <span className="truncate">{image.label}</span>
               </span>

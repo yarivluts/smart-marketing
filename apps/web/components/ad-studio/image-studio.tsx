@@ -288,7 +288,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
       (slot.selected?.qa?.status === 'issues' || (slot.selected && !slot.current) || (!slot.selected && slot.versions[0]?.status === 'failed')),
   ).length;
   const summary = [
-    { key: 'passed', icon: ShieldCheck, label: t('images.kpi.passed'), value: t('images.kpi.ofValue', { count: passedCount, total: checked.length }), tone: 'bg-success/10 text-success' },
+    { key: 'passed', icon: ShieldCheck, label: t('images.kpi.passed'), value: checked.length ? t('images.kpi.ofValue', { count: passedCount, total: checked.length }) : t('images.kpi.notChecked'), tone: 'bg-success/10 text-success' },
     { key: 'attention', icon: AlertTriangle, label: t('images.kpi.attention'), value: String(attentionCount), tone: attentionCount ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground' },
     { key: 'ready', icon: ImageIcon, label: t('images.kpi.ready'), value: t('images.kpi.ofValue', { count: readyCount, total: slots.length }), tone: 'bg-primary/10 text-primary' },
     { key: 'left', icon: Zap, label: t('images.kpi.left'), value: String(imagesLeftToday), tone: 'bg-muted text-muted-foreground' },
