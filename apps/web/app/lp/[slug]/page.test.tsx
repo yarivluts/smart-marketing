@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 
 const { loadPublicLanding } = vi.hoisted(() => ({ loadPublicLanding: vi.fn() }));
 vi.mock('@/lib/growth-pilot/public', () => ({ loadPublicLanding }));
