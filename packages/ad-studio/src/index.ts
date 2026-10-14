@@ -25,6 +25,7 @@ export * from './image-qa';
 export * from './headline-overlay';
 export * from './autopilot';
 export * from './growth-pilot';
+export * from './brief-from-site';
 export * from './publish';
 export * from './export';
 export * from './test-overrides';

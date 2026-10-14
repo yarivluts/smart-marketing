@@ -5075,6 +5075,21 @@
     "adHeader": {
       "usageLabel": "Today's AI usage",
       "limitReached": "Limit reached"
+    },
+    "fromSite": {
+      "title": "New here? Just enter your website",
+      "description": "The AI reads your site, writes the ad for what you sell and prepares it. You only confirm the plan and the result - nothing is published without you.",
+      "label": "Your website",
+      "submit": "Make an ad for me",
+      "working": "Reading your site and writing the ad - this takes about half a minute...",
+      "or": "Or write the ad yourself",
+      "reasons": {
+        "invalid_url": "Enter your website address, for example easysign.co.il.",
+        "nothing_found": "The site was read, but the AI could not tell what it sells. Try the page that describes your product, or write the ad yourself.",
+        "blocked": "This address cannot be read from here (a private or local address).",
+        "unreachable": "The site did not answer. Check the address and try again.",
+        "unreadable": "The page has no readable text (it may be built only with images or scripts). Try another page of the site."
+      }
     }
   },
   "Connections": {
