@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
-import { PublishPanel, type PublishCreative } from './publish-panel';
+import { defaultPublishStart, PublishPanel, type PublishCreative } from './publish-panel';
 
 const refresh = vi.fn();
 vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh }) }));
@@ -154,13 +154,13 @@ describe('PublishPanel', () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it('needs the EU declaration for Google and blocks a Google video ad', () => {
+  it('answers the EU declaration "no" up front but still needs one, and blocks a Google video ad', () => {
     vi.stubGlobal('fetch', vi.fn());
     renderPanel();
     fireEvent.click(screen.getByRole('radio', { name: /Google Ads/ }));
     const create = screen.getByRole('button', { name: 'Create paused ad on Google Ads' });
-    expect(create).toBeDisabled();
-    fireEvent.click(screen.getByLabelText('No, it does not'));
+    // Nothing to choose: "No, it does not" is already selected, and can be changed.
+    expect(screen.getByLabelText('No, it does not')).toBeChecked();
     expect(create).toBeEnabled();
 
     fireEvent.click(
@@ -245,6 +245,9 @@ describe('PublishPanel', () => {
       destinations: { meta: false, google_ads: true },
       metaConnectHref: '/api/integrations/meta/start?orgId=o',
     });
+    // It starts on the connected platform; picking Facebook offers to connect it.
+    expect(screen.getByRole('radio', { name: /Google Ads/ })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: /Facebook/ }));
     expect(screen.getByTestId('ad-studio-connect-meta')).toHaveAttribute(
       'href',
       '/api/integrations/meta/start?orgId=o',
@@ -255,6 +258,7 @@ describe('PublishPanel', () => {
     unmount();
     // Without the right (or with no Meta app configured) it points to the resources page instead.
     renderPanel({ destinations: { meta: false, google_ads: true }, metaConnectHref: null });
+    fireEvent.click(screen.getByRole('radio', { name: /Facebook/ }));
     expect(screen.queryByTestId('ad-studio-connect-meta')).toBeNull();
     expect(screen.getByRole('link', { name: /resources/i })).toHaveAttribute('href', '/resources');
   });
@@ -274,5 +278,28 @@ describe('PublishPanel', () => {
     const variant = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
     expect(variant).toMatchObject({ source: { kind: 'image', imageId: 'img2' }, addToAdSetOf: 'e1', copy: { headline: 'No more paper' } });
     expect(JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string).addToAdSetOf).toBeUndefined();
+  });
+
+  it('starts on the first creative a connected platform takes, so nothing has to be picked', () => {
+    const search: PublishCreative = { key: 'search', kind: 'search', id: 'search', label: 'Search', previewSrc: '' };
+    expect(defaultPublishStart(CREATIVES, { meta: true, google_ads: true })).toMatchObject({ creative: { key: 'c1-square' }, destination: 'meta' });
+    expect(defaultPublishStart([search, ...CREATIVES], { meta: true, google_ads: false })).toMatchObject({ creative: { key: 'c1-square' }, destination: 'meta' });
+    expect(defaultPublishStart([CREATIVES[1]!, search], { meta: false, google_ads: true })).toMatchObject({ creative: { key: 'search' }, destination: 'google_ads' });
+    // Nothing connected: the first creative, on the platform that takes it.
+    expect(defaultPublishStart([search], { meta: false, google_ads: false })).toMatchObject({ creative: { key: 'search' }, destination: 'google_ads' });
+    expect(defaultPublishStart([], { meta: true, google_ads: true })).toEqual({ creative: null, destination: 'meta' });
+  });
+
+  it('fills the business name from the brand and the country from the ad language, and sends them', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ad: { id: 'e1', destination: 'google_ads', mediaKind: 'image', title: 'x', status: 'done', externalUrl: null, failureCode: null } }), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel({ destinations: { meta: false, google_ads: true }, language: 'en', businessName: 'EasySign Digital Signatures Ltd' });
+    fireEvent.click(screen.getByRole('button', { name: 'Create paused ad on Google Ads' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body));
+    // 27 characters: cut to Google's 25 at a word boundary.
+    expect(body.copy.businessName).toBe('EasySign Digital');
+    expect(body.countries).toEqual(['US']);
+    expect(body.containsEuPoliticalAdvertising).toBe(false);
   });
 });
