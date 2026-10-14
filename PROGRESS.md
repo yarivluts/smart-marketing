@@ -19,6 +19,7 @@ Template for each entry:
 
 ## UX hourly
 
+- 2026-10-14 - (b) approval cards: failed ads / landing page / audience / publish / change requests no longer print raw codes like `quota_exceeded` in the sentence; known causes now read in plain words (en + he) and unknown codes fall back to a generic sentence. PR #672. Next candidates: (1) approval cards: explain "audience", "ad set" and "paused" in one line; (2) project home for a newcomer: point to Growth Pilot first; (3) start screen: accept pasted full URLs/emails with a clearer hint.
 - 2026-10-14 - (a) first visit to Growth Pilot: a failed read no longer offers "Try again" when it cannot help (nothing found, daily AI limit used up) and shows no buttons at all when the limit is gone. PR #671. Next candidates: (1) approval cards: explain jargon like "audience" and "paused" in one line; (2) project home for a newcomer: point to Growth Pilot first; (3) start screen: accept pasted full URLs/emails with a clearer hint.
 
 ## 2026-10-14 - Growth Pilot landing pages (KAN-396)

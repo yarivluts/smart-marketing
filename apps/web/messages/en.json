@@ -5678,6 +5678,14 @@
         "failed": "Failed",
         "archived": "Archived"
       }
+    },
+    "reasons": {
+      "quota_exceeded": "today's AI limit is used up, it resets tomorrow",
+      "provider_error": "the AI service did not answer, try again in a minute",
+      "invalid_output": "the AI's answer was not usable, ask for a change to try again",
+      "no_images": "no image passed the quality check",
+      "publish_failed": "Meta did not accept it, check the Meta connection",
+      "generic": "something went wrong, try again in a minute"
     }
   }
 }
