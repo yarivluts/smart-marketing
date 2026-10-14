@@ -197,6 +197,7 @@
     "noProjects": "This organization has no projects yet.",
     "membersHeading": "Members",
     "resourceLibraryLink": "Resource library",
+    "connectionsLink": "Ad platform connections",
     "auditLogLink": "Audit log",
     "pluginRegistryLink": "Plugin registry",
     "projectResourcesLink": "Project resources",
@@ -519,7 +520,7 @@
     "mixCenter": "resources",
     "platformsTitle": "Connected platforms",
     "platformsDescription": "Live credentials per platform.",
-    "connectMeta": "Connect with Facebook"
+    "connectMeta": "Connect Facebook, Google Ads or TikTok"
   },
   "ProjectResources": {
     "metaTitle": "Project resources",
@@ -4185,7 +4186,7 @@
     "exportNeedsPermission": "Exporting needs permission to make changes on the ad platforms. Ask a project admin.",
     "exportDone": "Uploaded to {destination}.",
     "exportFailure": {
-      "auth_failed": "The platform rejected the saved credentials. Reconnect the account in project resources.",
+      "auth_failed": "The platform rejected the saved credentials. Reconnect the account in Ad platform connections.",
       "quota_exceeded": "The platform upload quota is used up for today.",
       "rejected": "The platform refused the request. Check the ad details and the connected account.",
       "upload_failed": "The upload failed. Try again.",
@@ -4313,7 +4314,7 @@
       "exportTo": "Send to {destination}",
       "exportedTo": "Sent to {destination}",
       "exportDone": "Sent to {destination}.",
-      "destinationNotConnected": "Not connected to this project - see project resources.",
+      "destinationNotConnected": "Not connected to this project - see Ad platform connections.",
       "errorInvalidConcepts": "Some ideas break the rules - fix the highlighted ones.",
       "quotaExceeded": "The daily image limit is reached ({used} of {limit}).",
       "destination": {
@@ -4433,6 +4434,7 @@
       },
       "notConnected": "not connected",
       "connectFirst": "Connect this platform with write access first.",
+      "openConnections": "Set up the connection",
       "googleVideo": "Google video ads run from YouTube; pick an image for Google Ads.",
       "campaignName": "Campaign name",
       "link": "Link (landing page)",
@@ -4757,11 +4759,11 @@
       "aiChosenNoVolumes": "{count, plural, one {The AI chose # keyword} other {The AI chose # keywords}} from your plan. Google's monthly searches are not available for this project, so there are no volumes. Review them below and save.",
       "noIdeas": "Google returned no keyword ideas for these words. Try broader words or another country.",
       "unavailable": {
-        "no_google_ads_credential": "No Google Ads account is connected to this project, so there are no search volumes. Connect one in Resources.",
-        "credential_not_configured": "The Google Ads account attached to this project has no working credential. Update it in Resources.",
+        "no_google_ads_credential": "No Google Ads account is connected to this project, so there are no search volumes. Connect one in Ad platform connections.",
+        "credential_not_configured": "The Google Ads account attached to this project has no working credential. Update it in Ad platform connections.",
         "vault_not_configured": "This deployment cannot read stored credentials (no vault configured).",
         "no_seeds": "Enter at least one word, or use the landing page.",
-        "google_ads_auth_failed": "Google Ads refused the connection - the credential may have expired. Reconnect it in Resources.",
+        "google_ads_auth_failed": "Google Ads refused the connection - the credential may have expired. Reconnect it in Ad platform connections.",
         "developer_token_not_approved": "The Google Ads developer token is not approved for live data yet, so Google gives no search volumes.",
         "google_ads_error": "Google Ads could not answer right now. Try again in a minute."
       },
@@ -5073,6 +5075,128 @@
     "adHeader": {
       "usageLabel": "Today's AI usage",
       "limitReached": "Limit reached"
+    }
+  },
+  "Connections": {
+    "eyebrow": "Organization",
+    "title": "Ad platform connections",
+    "description": "Connect your Facebook & Instagram, Google Ads and TikTok accounts once. Every connection is checked with the platform before it is saved, and you can see here whether it still works and which projects use it.",
+    "readOnly": "Only organization owners and admins can connect accounts. You can see what is connected; ask an admin to add an account.",
+    "connect": "Connect an account",
+    "addAnother": "Connect another account",
+    "none": "Nothing connected yet.",
+    "status": {
+      "ok": "Working",
+      "failed": "Not working",
+      "unchecked": "Not checked yet"
+    },
+    "checkedOn": "Checked {when}",
+    "neverChecked": "Never checked",
+    "usedIn": "Used in: {projects}",
+    "notInProject": "Not used in any project yet",
+    "checkAgain": "Check again",
+    "stillWorks": "Works - the platform answered.",
+    "connected": "Connected to {account}. The connection was checked with the platform and saved.",
+    "backToWork": "Back to where you were",
+    "guideTitle": "How to get the details",
+    "open": "Open",
+    "optional": "(optional)",
+    "fixFields": "Some details are missing or look wrong - they are marked below.",
+    "projectLabel": "Use it in project",
+    "projectNone": "Not now - only save it to the organization",
+    "projectHelp": "The project can then create ads in this account (they are always created paused).",
+    "saveAndCheck": "Save and check",
+    "cancel": "Cancel",
+    "privacy": "Details are encrypted in your organization's vault and are never shown again. Nothing is saved unless the platform accepts them.",
+    "reasons": {
+      "invalid_details": "Some details are missing or malformed. Enter them again.",
+      "auth_failed": "The platform refused the sign-in: the token is wrong, expired or was revoked. Create a new one and save it again.",
+      "developer_token_not_approved": "Google has not approved this developer token for real accounts yet. Apply for Basic access in the Google Ads API Center, then check again.",
+      "account_not_found": "The platform did not find this account, or the token has no access to it. Check the account ID and that the user who created the token can open the account.",
+      "permission_denied": "The token reaches the account but lacks a permission to manage ads. Give the user or system user full control of the account and create the token again.",
+      "account_disabled": "The account exists but cannot run ads right now (disabled, closed or unpaid). Fix it on the platform, then check again.",
+      "page_not_accessible": "The ad account works, but the Facebook Page ads post as is not reachable with this token. Assign the Page to the same user or system user.",
+      "rate_limited": "The platform asked to slow down. Wait a minute and try again.",
+      "api_error": "The platform did not answer as expected. Try again in a moment.",
+      "vault_not_configured": "Secure storage is not set up on this server, so nothing can be saved. Contact support."
+    },
+    "fields": {
+      "accessToken": {
+        "label": "Access token",
+        "help": "A long-lived token from the platform (see the steps above)."
+      },
+      "adAccountId": {
+        "label": "Ad account ID",
+        "help": "The number after act_ in Ads Manager, e.g. 1646897415410557."
+      },
+      "pageId": {
+        "label": "Facebook Page ID",
+        "help": "The Page your ads post as: Page settings, About, Page ID."
+      },
+      "developerToken": {
+        "label": "Developer token",
+        "help": "From the API Center of your Google Ads manager account."
+      },
+      "clientId": {
+        "label": "OAuth client ID",
+        "help": "Ends with .apps.googleusercontent.com."
+      },
+      "clientSecret": {
+        "label": "OAuth client secret",
+        "help": "Shown next to the client ID in Google Cloud."
+      },
+      "refreshToken": {
+        "label": "Refresh token",
+        "help": "From the OAuth Playground with the Google Ads scope."
+      },
+      "customerId": {
+        "label": "Customer ID",
+        "help": "The 10-digit ID at the top of Google Ads, e.g. 123-456-7890."
+      },
+      "loginCustomerId": {
+        "label": "Manager account ID",
+        "help": "Only if you reach the account through a manager (MCC) account."
+      },
+      "advertiserId": {
+        "label": "Advertiser ID",
+        "help": "In TikTok Ads Manager: the account menu at the top shows it."
+      }
+    },
+    "platforms": {
+      "meta_ads": {
+        "name": "Facebook & Instagram (Meta)",
+        "why": "Publish image and video ads to Facebook and Instagram, and plan audiences with Meta's reach numbers.",
+        "oauth": "Connect with Facebook",
+        "oauthHint": "The easiest way: sign in to Facebook, then pick the ad account and the Page.",
+        "manual": "Or enter the details by hand",
+        "steps": {
+          "1": "In Meta Business Settings, open System users, add a system user (admin) and give it full control of your ad account and your Page.",
+          "2": "Click \"Generate new token\" for your app with the permissions ads_management, ads_read, business_management, pages_show_list and pages_read_engagement, and set it to never expire.",
+          "3": "Copy the ad account ID from Ads Manager (the number after act_).",
+          "4": "Copy the Page ID from your Facebook Page: Settings, About, Page ID."
+        }
+      },
+      "google_ads": {
+        "name": "Google Ads",
+        "why": "Publish search and image ads to Google, and see real monthly searches when the AI chooses keywords.",
+        "steps": {
+          "1": "In your Google Ads manager (MCC) account, open Tools, API Center, and copy the developer token. For real accounts it needs Basic access - apply there if it says Test.",
+          "2": "In Google Cloud, enable the Google Ads API and create an OAuth client ID (type: Web application, with https://developers.google.com/oauthplayground as a redirect URI). Copy the client ID and secret.",
+          "3": "In the OAuth Playground, open the settings, tick \"Use your own OAuth credentials\", enter them, authorize the scope https://www.googleapis.com/auth/adwords with the Google user that manages the account, and exchange the code for a refresh token.",
+          "4": "Copy the customer ID from the top of Google Ads. If you reach the account through a manager account, also copy the manager's ID."
+        }
+      },
+      "tiktok_ads": {
+        "name": "TikTok",
+        "why": "Connect your TikTok advertiser account now; it is checked and saved, ready for TikTok ads.",
+        "note": "GrowthOS publishes to Facebook, Instagram and Google today; TikTok publishing comes next and will use this connection.",
+        "steps": {
+          "1": "In TikTok API for Business, create a developer app with access to the Marketing API (Ads Management) and wait for approval.",
+          "2": "Open your app's advertiser authorization link, approve it for your advertiser account, and exchange the auth_code for a long-term access token.",
+          "3": "Copy your advertiser ID from TikTok Ads Manager.",
+          "4": "Paste both below and save: GrowthOS checks them with TikTok before saving."
+        }
+      }
     }
   },
   "MetaConnect": {

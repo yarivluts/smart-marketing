@@ -107,7 +107,7 @@ describe('PublishPanel with ad copy', () => {
       { key: 'video', kind: 'video', id: 'vid1', label: 'The video', previewSrc: '/vid1', copy: { headline: 'Watch it', primaryText: 'See a contract signed.', description: '' } },
     ];
     renderWithIntl(
-      <PublishPanel orgId="o" projectId="p" briefId="b1" briefName="Sign fast" defaultLink="https://x.example" defaultPrimaryText="Objective" creatives={creatives} destinations={{ meta: true, google_ads: true }} canPublish published={[]} resourcesHref="/r" />,
+      <PublishPanel orgId="o" projectId="p" briefId="b1" briefName="Sign fast" defaultLink="https://x.example" defaultPrimaryText="Objective" creatives={creatives} destinations={{ meta: true, google_ads: true }} canPublish published={[]} connectionsHref="/c" />,
       { locale: 'en' },
     );
     expect(screen.getByDisplayValue(COPY.headline)).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('PublishPanel live preview', () => {
   it('shows the ad being created with the typed words, on the chosen platform placements', () => {
     const creatives: PublishCreative[] = [{ key: 'c1-story', kind: 'image', id: 'img1', label: 'Idea 1 · Story', previewSrc: '/story.jpg', format: 'story', copy: COPY }];
     renderWithIntl(
-      <PublishPanel orgId="o" projectId="p" briefId="b1" briefName="Sign fast" defaultLink="https://easy-sign.example/x" defaultPrimaryText="Objective" creatives={creatives} destinations={{ meta: true, google_ads: true }} canPublish published={[]} resourcesHref="/r" />,
+      <PublishPanel orgId="o" projectId="p" briefId="b1" briefName="Sign fast" defaultLink="https://easy-sign.example/x" defaultPrimaryText="Objective" creatives={creatives} destinations={{ meta: true, google_ads: true }} canPublish published={[]} connectionsHref="/c" />,
       { locale: 'en' },
     );
     const preview = within(screen.getByTestId('ad-studio-publish-preview'));

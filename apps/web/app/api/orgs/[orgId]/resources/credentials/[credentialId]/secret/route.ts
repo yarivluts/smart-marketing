@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { CredentialSecretNotSetError, SharedCredentialNotFoundError } from '@growthos/firebase-orm-models';
+import { CredentialSecretNotSetError, isAdPlatformProvider, parseAdPlatformSecret, SharedCredentialNotFoundError } from '@growthos/firebase-orm-models';
+import { listSharedCredentials } from '@/lib/orgs/queries';
 import { clearSharedCredentialSecret, setSharedCredentialSecret } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
@@ -40,6 +41,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
       return NextResponse.json({ error: 'vault_not_configured' }, { status: 500 });
     }
     throw err;
+  }
+
+  // An ad platform's secret has a known shape: refuse a malformed one now, not when an ad fails later.
+  const credential = (await listSharedCredentials(orgId)).find((entry) => entry.id === credentialId);
+  if (credential && isAdPlatformProvider(credential.provider)) {
+    try {
+      parseAdPlatformSecret(credential.provider, secret.trim());
+    } catch {
+      return NextResponse.json({ error: 'invalid_secret' }, { status: 400 });
+    }
   }
 
   try {

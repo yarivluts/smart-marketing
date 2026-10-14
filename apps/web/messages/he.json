@@ -197,6 +197,7 @@
     "noProjects": "לארגון זה אין עדיין פרויקטים.",
     "membersHeading": "חברים",
     "resourceLibraryLink": "ספריית משאבים",
+    "connectionsLink": "חיבורים לפלטפורמות פרסום",
     "auditLogLink": "יומן ביקורת",
     "pluginRegistryLink": "מרשם תוספים",
     "projectResourcesLink": "משאבי הפרויקט",
@@ -519,7 +520,7 @@
     "mixCenter": "משאבים",
     "platformsTitle": "פלטפורמות מחוברות",
     "platformsDescription": "פרטי התחברות פעילים לכל פלטפורמה.",
-    "connectMeta": "התחברות עם פייסבוק"
+    "connectMeta": "חיבור פייסבוק, Google Ads או TikTok"
   },
   "ProjectResources": {
     "metaTitle": "משאבי הפרויקט",
@@ -4185,7 +4186,7 @@
     "exportNeedsPermission": "ייצוא דורש הרשאה לבצע שינויים בפלטפורמות המודעות. פנו למנהל הפרויקט.",
     "exportDone": "הועלה ל{destination}.",
     "exportFailure": {
-      "auth_failed": "הפלטפורמה דחתה את פרטי הגישה השמורים. חברו מחדש את החשבון במשאבי הפרויקט.",
+      "auth_failed": "הפלטפורמה דחתה את פרטי הגישה השמורים. חברו מחדש את החשבון בחיבורים לפלטפורמות פרסום.",
       "quota_exceeded": "מכסת ההעלאות של הפלטפורמה נוצלה להיום.",
       "rejected": "הפלטפורמה דחתה את הבקשה. בדקו את פרטי המודעה ואת החשבון המחובר.",
       "upload_failed": "ההעלאה נכשלה. נסו שוב.",
@@ -4313,7 +4314,7 @@
       "exportTo": "שליחה ל{destination}",
       "exportedTo": "נשלח ל{destination}",
       "exportDone": "נשלח ל{destination}.",
-      "destinationNotConnected": "לא מחובר לפרויקט הזה - ראו את משאבי הפרויקט.",
+      "destinationNotConnected": "לא מחובר לפרויקט הזה - ראו חיבורים לפלטפורמות פרסום.",
       "errorInvalidConcepts": "חלק מהרעיונות לא עומדים בכללים - תקנו את המסומנים.",
       "quotaExceeded": "מכסת התמונות היומית נוצלה ({used} מתוך {limit}).",
       "destination": {
@@ -4433,6 +4434,7 @@
       },
       "notConnected": "לא מחובר",
       "connectFirst": "חברו קודם את הפלטפורמה עם הרשאת כתיבה.",
+      "openConnections": "הגדרת החיבור",
       "googleVideo": "מודעות וידאו בגוגל רצות מיוטיוב; בחרו תמונה לגוגל אדס.",
       "campaignName": "שם הקמפיין",
       "link": "קישור (דף נחיתה)",
@@ -4757,11 +4759,11 @@
       "aiChosenNoVolumes": "{count, plural, one {ה-AI בחר מילת מפתח אחת} other {ה-AI בחר # מילות מפתח}} לפי התוכנית שלכם. נתוני החיפושים החודשיים של גוגל לא זמינים בפרויקט הזה, ולכן אין נפחי חיפוש. עברו עליהן למטה ושמרו.",
       "noIdeas": "גוגל לא החזירה רעיונות למילים האלה. נסו מילים רחבות יותר או מדינה אחרת.",
       "unavailable": {
-        "no_google_ads_credential": "לא מחובר חשבון Google Ads לפרויקט, ולכן אין נתוני חיפוש. חברו חשבון במשאבים.",
-        "credential_not_configured": "לחשבון Google Ads שמחובר לפרויקט אין פרטי גישה תקינים. עדכנו אותם במשאבים.",
+        "no_google_ads_credential": "לא מחובר חשבון Google Ads לפרויקט, ולכן אין נתוני חיפוש. חברו חשבון בחיבורים לפלטפורמות פרסום.",
+        "credential_not_configured": "לחשבון Google Ads שמחובר לפרויקט אין פרטי גישה תקינים. עדכנו אותם בחיבורים לפלטפורמות פרסום.",
         "vault_not_configured": "הסביבה הזו לא יכולה לקרוא פרטי גישה שמורים (לא הוגדר כספת).",
         "no_seeds": "הזינו לפחות מילה אחת, או השתמשו בדף הנחיתה.",
-        "google_ads_auth_failed": "Google Ads סירבה לחיבור - ייתכן שפרטי הגישה פגו. חברו מחדש במשאבים.",
+        "google_ads_auth_failed": "Google Ads סירבה לחיבור - ייתכן שפרטי הגישה פגו. חברו מחדש בחיבורים לפלטפורמות פרסום.",
         "developer_token_not_approved": "ה-Developer token של Google Ads עדיין לא אושר לנתונים אמיתיים, ולכן גוגל לא מחזירה נפחי חיפוש.",
         "google_ads_error": "Google Ads לא הצליחה לענות כרגע. נסו שוב בעוד דקה."
       },
@@ -5073,6 +5075,128 @@
     "adHeader": {
       "usageLabel": "שימוש ב-AI היום",
       "limitReached": "מכסה מלאה"
+    }
+  },
+  "Connections": {
+    "eyebrow": "ארגון",
+    "title": "חיבורים לפלטפורמות פרסום",
+    "description": "מחברים פעם אחת את חשבונות פייסבוק ואינסטגרם, Google Ads ו-TikTok. כל חיבור נבדק מול הפלטפורמה לפני שהוא נשמר, וכאן רואים אם הוא עדיין עובד ובאילו פרויקטים הוא בשימוש.",
+    "readOnly": "רק בעלים ומנהלים של הארגון יכולים לחבר חשבונות. אפשר לראות מה מחובר; כדי להוסיף חשבון פנו למנהל.",
+    "connect": "חיבור חשבון",
+    "addAnother": "חיבור חשבון נוסף",
+    "none": "עדיין לא חובר כלום.",
+    "status": {
+      "ok": "עובד",
+      "failed": "לא עובד",
+      "unchecked": "עדיין לא נבדק"
+    },
+    "checkedOn": "נבדק {when}",
+    "neverChecked": "לא נבדק אף פעם",
+    "usedIn": "בשימוש ב: {projects}",
+    "notInProject": "עדיין לא בשימוש באף פרויקט",
+    "checkAgain": "בדיקה חוזרת",
+    "stillWorks": "עובד - הפלטפורמה ענתה.",
+    "connected": "מחובר ל-{account}. החיבור נבדק מול הפלטפורמה ונשמר.",
+    "backToWork": "חזרה למקום שבו הייתם",
+    "guideTitle": "איך משיגים את הפרטים",
+    "open": "פתיחה",
+    "optional": "(לא חובה)",
+    "fixFields": "חלק מהפרטים חסרים או נראים שגויים - הם מסומנים למטה.",
+    "projectLabel": "שימוש בפרויקט",
+    "projectNone": "לא עכשיו - רק לשמור בארגון",
+    "projectHelp": "הפרויקט יוכל ליצור מודעות בחשבון הזה (הן תמיד נוצרות מושהות).",
+    "saveAndCheck": "שמירה ובדיקה",
+    "cancel": "ביטול",
+    "privacy": "הפרטים מוצפנים בכספת של הארגון ולא מוצגים שוב. שום דבר לא נשמר אם הפלטפורמה לא מאשרת אותם.",
+    "reasons": {
+      "invalid_details": "חלק מהפרטים חסרים או לא תקינים. הזינו אותם שוב.",
+      "auth_failed": "הפלטפורמה סירבה להתחברות: הטוקן שגוי, פג תוקף או בוטל. צרו טוקן חדש ושמרו שוב.",
+      "developer_token_not_approved": "גוגל עדיין לא אישרה את ה-Developer token הזה לחשבונות אמיתיים. הגישו בקשה ל-Basic access ב-API Center של Google Ads, ואז בדקו שוב.",
+      "account_not_found": "הפלטפורמה לא מצאה את החשבון, או שלטוקן אין גישה אליו. בדקו את מזהה החשבון ושהמשתמש שיצר את הטוקן יכול לפתוח את החשבון.",
+      "permission_denied": "הטוקן מגיע לחשבון אבל חסרה לו הרשאה לנהל מודעות. תנו למשתמש או ל-System user שליטה מלאה בחשבון וצרו את הטוקן מחדש.",
+      "account_disabled": "החשבון קיים אבל לא יכול להריץ מודעות כרגע (מושבת, סגור או שלא שולם). תקנו את זה בפלטפורמה ואז בדקו שוב.",
+      "page_not_accessible": "חשבון המודעות עובד, אבל עמוד הפייסבוק שהמודעות מתפרסמות בשמו לא נגיש עם הטוקן הזה. שייכו את העמוד לאותו משתמש או System user.",
+      "rate_limited": "הפלטפורמה ביקשה להאט. חכו דקה ונסו שוב.",
+      "api_error": "הפלטפורמה לא ענתה כמצופה. נסו שוב בעוד רגע.",
+      "vault_not_configured": "האחסון המאובטח לא מוגדר בשרת הזה, ולכן אי אפשר לשמור. פנו לתמיכה."
+    },
+    "fields": {
+      "accessToken": {
+        "label": "Access token",
+        "help": "טוקן לטווח ארוך מהפלטפורמה (ראו את השלבים למעלה)."
+      },
+      "adAccountId": {
+        "label": "מזהה חשבון מודעות",
+        "help": "המספר שאחרי act_ במנהל המודעות, למשל 1646897415410557."
+      },
+      "pageId": {
+        "label": "מזהה עמוד פייסבוק",
+        "help": "העמוד שהמודעות מתפרסמות בשמו: הגדרות העמוד, אודות, מזהה עמוד."
+      },
+      "developerToken": {
+        "label": "Developer token",
+        "help": "מה-API Center של חשבון הניהול (MCC) ב-Google Ads."
+      },
+      "clientId": {
+        "label": "OAuth client ID",
+        "help": "מסתיים ב-.apps.googleusercontent.com."
+      },
+      "clientSecret": {
+        "label": "OAuth client secret",
+        "help": "מופיע ליד ה-client ID ב-Google Cloud."
+      },
+      "refreshToken": {
+        "label": "Refresh token",
+        "help": "מה-OAuth Playground עם ההרשאה של Google Ads."
+      },
+      "customerId": {
+        "label": "מזהה לקוח (Customer ID)",
+        "help": "המספר בן 10 הספרות בראש Google Ads, למשל 123-456-7890."
+      },
+      "loginCustomerId": {
+        "label": "מזהה חשבון ניהול",
+        "help": "רק אם מגיעים לחשבון דרך חשבון ניהול (MCC)."
+      },
+      "advertiserId": {
+        "label": "מזהה מפרסם (Advertiser ID)",
+        "help": "ב-TikTok Ads Manager: מופיע בתפריט החשבון למעלה."
+      }
+    },
+    "platforms": {
+      "meta_ads": {
+        "name": "פייסבוק ואינסטגרם (Meta)",
+        "why": "פרסום מודעות תמונה ווידאו בפייסבוק ובאינסטגרם, ותכנון קהלים עם נתוני החשיפה של Meta.",
+        "oauth": "התחברות עם פייסבוק",
+        "oauthHint": "הדרך הכי קלה: מתחברים לפייסבוק ובוחרים את חשבון המודעות ואת העמוד.",
+        "manual": "או הזנת הפרטים ידנית",
+        "steps": {
+          "1": "בהגדרות העסק של Meta, פתחו System users, הוסיפו System user (מנהל) ותנו לו שליטה מלאה בחשבון המודעות ובעמוד.",
+          "2": "לחצו \"Generate new token\" לאפליקציה שלכם עם ההרשאות ads_management, ads_read, business_management, pages_show_list ו-pages_read_engagement, והגדירו שלא יפוג.",
+          "3": "העתיקו את מזהה חשבון המודעות ממנהל המודעות (המספר שאחרי act_).",
+          "4": "העתיקו את מזהה העמוד מעמוד הפייסבוק: הגדרות, אודות, מזהה עמוד."
+        }
+      },
+      "google_ads": {
+        "name": "Google Ads",
+        "why": "פרסום מודעות חיפוש ותמונה בגוגל, ונתוני חיפושים חודשיים אמיתיים כשה-AI בוחר מילות מפתח.",
+        "steps": {
+          "1": "בחשבון הניהול (MCC) של Google Ads, פתחו כלים, API Center, והעתיקו את ה-Developer token. לחשבונות אמיתיים צריך Basic access - הגישו בקשה שם אם כתוב Test.",
+          "2": "ב-Google Cloud, הפעילו את Google Ads API וצרו OAuth client ID (סוג: Web application, עם https://developers.google.com/oauthplayground ככתובת הפניה). העתיקו את ה-client ID וה-secret.",
+          "3": "ב-OAuth Playground, פתחו את ההגדרות, סמנו \"Use your own OAuth credentials\", הזינו אותם, אשרו את ההרשאה https://www.googleapis.com/auth/adwords עם משתמש הגוגל שמנהל את החשבון, והחליפו את הקוד ב-refresh token.",
+          "4": "העתיקו את מזהה הלקוח מראש Google Ads. אם מגיעים לחשבון דרך חשבון ניהול, העתיקו גם את המזהה שלו."
+        }
+      },
+      "tiktok_ads": {
+        "name": "TikTok",
+        "why": "חברו עכשיו את חשבון המפרסם ב-TikTok; הוא נבדק ונשמר, מוכן למודעות TikTok.",
+        "note": "כרגע GrowthOS מפרסם לפייסבוק, לאינסטגרם ולגוגל; פרסום ל-TikTok הוא השלב הבא וישתמש בחיבור הזה.",
+        "steps": {
+          "1": "ב-TikTok API for Business, צרו אפליקציית מפתחים עם גישה ל-Marketing API (ניהול מודעות) וחכו לאישור.",
+          "2": "פתחו את קישור ההרשאה למפרסמים של האפליקציה, אשרו אותו לחשבון המפרסם שלכם, והחליפו את ה-auth_code ב-access token לטווח ארוך.",
+          "3": "העתיקו את מזהה המפרסם מ-TikTok Ads Manager.",
+          "4": "הדביקו את שניהם למטה ושמרו: GrowthOS בודק אותם מול TikTok לפני השמירה."
+        }
+      }
     }
   },
   "MetaConnect": {

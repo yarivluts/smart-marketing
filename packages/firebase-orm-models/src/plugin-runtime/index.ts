@@ -9,6 +9,8 @@ export * from './saas-metric-pack';
 export * from './engagement-pack';
 export * from './google-ads';
 export * from './meta-ads';
+export * from './tiktok-ads';
+export * from './connections';
 export * from './youtube';
 export * from './meta-custom-audience';
 export * from './google-customer-match';
