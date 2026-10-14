@@ -5707,6 +5707,7 @@
     },
     "errors": {
       "invalid_site": "הכניסו כתובת אתר, למשל example.co.il.",
+      "invalid_site_email": "זו נראית כתובת אימייל. הכניסו במקומה את כתובת האתר, למשל example.co.il.",
       "empty_request": "כתבו קודם מה אתם רוצים.",
       "quota_exceeded": "מכסת ה-AI של היום נגמרה. היא מתחדשת מחר.",
       "provider_failed": "שירות ה-AI לא ענה. נסו שוב בעוד דקה.",

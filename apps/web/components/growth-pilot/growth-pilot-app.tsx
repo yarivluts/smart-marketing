@@ -48,10 +48,12 @@ function useReason(): (code: string | null | undefined) => string {
   return (code) => t(code && KNOWN_REASONS.includes(code) ? (code as 'generic') : 'generic');
 }
 
+const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
+
 function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
-  const known = ['invalid_site', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable'].includes(code);
+  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable'].includes(code);
   return (
     <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -65,6 +67,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
   const t = useTranslations('GrowthPilot.start');
   const tf = useTranslations('GrowthPilot.failed');
   const [url, setUrl] = React.useState('');
+  const [mistake, setMistake] = React.useState<string | null>(null);
   const steps = [
     { key: 'read', icon: Globe },
     { key: 'propose', icon: Target },
@@ -83,6 +86,12 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
         className="flex w-full flex-col gap-2 rounded-3xl border border-border/60 bg-card p-2 shadow-soft-lg sm:flex-row sm:items-center"
         onSubmit={(event) => {
           event.preventDefault();
+          // An email is the commonest wrong paste: say so at once instead of a round trip to a vague refusal.
+          if (EMAIL_PATTERN.test(url.trim())) {
+            setMistake('invalid_site_email');
+            return;
+          }
+          setMistake(null);
           onStart(url);
         }}
       >
@@ -95,7 +104,10 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
             autoComplete="url"
             dir="ltr"
             value={url}
-            onChange={(event) => setUrl(event.target.value)}
+            onChange={(event) => {
+              setUrl(event.target.value);
+              setMistake(null);
+            }}
             placeholder={t('placeholder')}
             className="h-12 min-w-0 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground/60"
             data-testid="growth-pilot-site-input"
@@ -111,7 +123,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           {t('submit')}
         </button>
       </form>
-      <ErrorLine code={error} />
+      <ErrorLine code={mistake ?? error} />
       <ol className="flex flex-wrap justify-center gap-2">
         {steps.map((step, index) => (
           <li key={step.key} className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
