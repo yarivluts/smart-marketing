@@ -323,6 +323,15 @@ describe('audiences for targets with ads', () => {
     expect(meta.searchAdStudioMetaInterests).toHaveBeenCalledWith(expect.objectContaining({ language: 'he' }));
   });
 
+  it('keeps the matched interests when only the reach estimate fails', async () => {
+    meta.searchAdStudioMetaInterests.mockResolvedValue({ status: 'ok', data: [{ id: 'i1', name: 'Freelancer', path: [], sizeLower: 1, sizeUpper: 2 }] });
+    meta.estimateAdStudioMetaReach.mockResolvedValue({ status: 'unavailable', reason: 'meta_rate_limited' });
+    const model = llm(DRAFT);
+    model.generateJson.mockResolvedValueOnce(DRAFT).mockResolvedValueOnce({ ids: ['i1'] });
+    await advanceGrowthPilot({ ...ctx(model), pilotId: 'g1', autopilot: {} as never });
+    expect(orm.saveGrowthAudienceProposal.mock.calls[0][0].plan).toMatchObject({ meta: 'ok', reach: null, targeting: { interests: [{ id: 'i1' }] } });
+  });
+
   it('without Meta keeps countries, ages and genders, and says why interests are not matched', async () => {
     meta.searchAdStudioMetaInterests.mockResolvedValue({ status: 'unavailable', reason: 'no_credential' });
     await advanceGrowthPilot({ ...ctx(llm(DRAFT)), pilotId: 'g1', autopilot: {} as never });
