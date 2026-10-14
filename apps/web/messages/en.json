@@ -5635,6 +5635,27 @@
         "connect": "Connect Meta"
       }
     },
+    "performance": {
+      "title": "How the ads are doing",
+      "period": "Period",
+      "days": "Last {count} days",
+      "loading": "Reading the numbers from Meta...",
+      "unavailable": "Meta did not return the numbers right now. Try again in a few minutes.",
+      "unavailableMeta": "Connect your Meta ad account to see how the ads are doing.",
+      "noDelivery": "The ads have not been shown yet in this period - paused ads show no results until they are turned on.",
+      "chart": "Clicks and conversions per day",
+      "ctr": "{value} click-through rate",
+      "costPerConversion": "{value} per conversion",
+      "source": "Numbers come from Meta for the campaigns the pilot created, in your ad account currency.",
+      "targetResults": "{clicks} clicks, {spend} spent",
+      "kpi": {
+        "spend": "Spend",
+        "impressions": "Impressions",
+        "clicks": "Clicks",
+        "cpc": "Cost per click",
+        "conversions": "Conversions"
+      }
+    },
     "operator": {
       "title": "Growth Pilots",
       "description": "Every customer pilot: where it stands, when the scheduler last ran it, and a pause for any of them. Platform operators only.",

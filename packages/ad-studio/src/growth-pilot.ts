@@ -8,6 +8,7 @@ import {
   createAdStudioBrief,
   listGrowthPilotIndex,
   recordGrowthPilotRun,
+  listAdStudioExports,
   failGrowthPublish,
   getGrowthProposal,
   GrowthProposalNotPendingError,
@@ -48,6 +49,8 @@ import {
   buildInterestChoicePrompt,
   GROWTH_INTEREST_CANDIDATES_PER_KEYWORD,
   buildLandingPagePrompt,
+  lastDays,
+  summarizeGrowthPerformance,
   landingCtaUrl,
   defaultMetaTargeting,
   buildSiteAnalysisPrompt,
@@ -67,11 +70,12 @@ import {
   type GrowthAudiencePlan,
   type GrowthInterestCandidate,
   type GrowthLandingContent,
+  type GrowthPerformanceSummary,
   type GrowthSiteAnalysis,
   type GrowthSitePage,
   type GrowthTargetDraft,
 } from '@growthos/shared';
-import { estimateAdStudioMetaReach, searchAdStudioMetaInterests } from './audiences';
+import { estimateAdStudioMetaReach, loadAdStudioMetaCampaignInsights, searchAdStudioMetaInterests } from './audiences';
 import { publishBriefAd } from './publish';
 import { serverKms } from './planning-sources';
 import { advanceAdStudioAutopilot, startAdStudioAutopilot, type AdStudioAutopilotDeps } from './autopilot';
@@ -690,4 +694,34 @@ export async function runScheduledGrowthPilots(ctx: {
     runs.push({ organizationId: row.organization_id, projectId: row.project_id, units, outcome });
   }
   return runs;
+}
+
+/** How a pilot's published ads are doing: nothing published yet, Meta unavailable (and why), or the numbers. */
+export type GrowthPerformance =
+  | { status: 'none' }
+  | { status: 'unavailable'; reason: string }
+  | { status: 'ok'; since: string; until: string; summary: GrowthPerformanceSummary };
+
+/**
+ * Reads the last `days` days of the pilot's own campaigns from Meta - only the campaigns its
+ * published targets created - and sums them up per target and per day. Read-only; nothing is stored,
+ * so the page always shows what Meta says now.
+ */
+export async function loadGrowthPerformance(ctx: { organizationId: string; projectId: string; pilotId: string; days: number; now?: Date; fetchImpl?: typeof fetch }): Promise<GrowthPerformance> {
+  await ensureOrm();
+  const targets = (await listGrowthTargets(ctx.organizationId, ctx.projectId, ctx.pilotId)).filter((target) => target.ad_export_ids?.length && target.brief_id);
+  const targetOfCampaign: Record<string, string> = {};
+  for (const target of targets) {
+    const rows = await listAdStudioExports(ctx.organizationId, ctx.projectId, target.brief_id!);
+    for (const row of rows) {
+      const campaignId = row.platform_refs?.campaign_id;
+      if (campaignId && target.ad_export_ids!.includes(row.id)) targetOfCampaign[campaignId] = target.id;
+    }
+  }
+  const campaignIds = Object.keys(targetOfCampaign);
+  if (!campaignIds.length) return { status: 'none' };
+  const range = lastDays(ctx.days, ctx.now);
+  const result = await loadAdStudioMetaCampaignInsights({ organizationId: ctx.organizationId, projectId: ctx.projectId, campaignIds, ...range, fetchImpl: ctx.fetchImpl });
+  if (result.status !== 'ok') return { status: 'unavailable', reason: result.reason };
+  return { status: 'ok', ...range, summary: summarizeGrowthPerformance(result.data, targetOfCampaign, range) };
 }

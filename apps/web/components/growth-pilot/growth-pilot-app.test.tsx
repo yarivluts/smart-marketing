@@ -275,7 +275,7 @@ describe('GrowthPilotApp', () => {
     const PUBLISH: GrowthProposalView = { ...PROPOSAL, id: 'pub1', kind: 'publish', briefId: 'b1', publish: PLAN, previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Free plan', description: '', audience: '', reason: '' } };
 
     it('publishes the approved images paused, at the budget the person sets - a yes or no, not a change for the AI', async () => {
-      const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'published' }] }) });
+      const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'published' }] }) }, { body: { status: 'ok', since: 'a', until: 'b', summary: { totals: { spend: 0, impressions: 0, clicks: 0, linkClicks: 0, conversions: 0, ctr: null, cpc: null, costPerConversion: null }, daily: [], byTarget: {} } } });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent('Publish the ads for Free plan');
@@ -306,5 +306,14 @@ describe('GrowthPilotApp', () => {
       expect(line).toHaveTextContent('Ready to publish once a Meta ad account is connected.');
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
     });
+  });
+
+  it('shows each published target its own clicks and spend from Meta', async () => {
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'running' as const, publishFailure: null };
+    const totals = { spend: 84.5, impressions: 1000, clicks: 310, linkClicks: 200, conversions: 3, ctr: 0.31, cpc: 0.27, costPerConversion: 28.17 };
+    stubFetch({ body: { status: 'ok', since: 'a', until: 'b', summary: { totals, daily: [], byTarget: { t1: totals } } } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [TARGET] })} />, { locale: 'en' });
+    expect(await screen.findByTestId('growth-pilot-target-results')).toHaveTextContent('310 clicks, 84.5 spent');
+    expect(screen.getByTestId('growth-pilot-target-publish')).toHaveTextContent('Ads are running');
   });
 });

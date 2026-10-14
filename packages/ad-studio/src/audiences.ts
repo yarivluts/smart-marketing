@@ -2,6 +2,7 @@ import { metaAdSetTargeting, metaLocaleFor, normalizeMetaTargeting, type AdStudi
 import {
   buildMetaTargetingSpec,
   estimateMetaReach,
+  getMetaCampaignDailyInsights,
   getMetaPerformanceBreakdown,
   listMetaAudiences,
   MetaInsightsError,
@@ -11,6 +12,7 @@ import {
   type KmsProvider,
   type MetaAudience,
   type MetaBreakdown,
+  type MetaCampaignDay,
   type MetaInterest,
   type MetaPerformanceRow,
   type MetaReachEstimate,
@@ -75,4 +77,9 @@ export function estimateAdStudioMetaReach(params: Lookup & { targeting: AdStudio
 /** The ad account's last 90 days by age and gender, placement or country. */
 export function loadAdStudioMetaPerformance(params: Lookup & { breakdown: MetaBreakdown }): Promise<AdStudioAudienceResult<MetaPerformanceRow[]>> {
   return withMeta(params, (token, account, fetchImpl) => getMetaPerformanceBreakdown(token, account, params.breakdown, fetchImpl));
+}
+
+/** Day-by-day results of the given campaigns over a date range, from the project's Meta ad account. */
+export function loadAdStudioMetaCampaignInsights(params: Lookup & { campaignIds: string[]; since: string; until: string }): Promise<AdStudioAudienceResult<MetaCampaignDay[]>> {
+  return withMeta(params, (token, account, fetchImpl) => getMetaCampaignDailyInsights(token, account, { campaignIds: params.campaignIds, since: params.since, until: params.until }, fetchImpl));
 }
