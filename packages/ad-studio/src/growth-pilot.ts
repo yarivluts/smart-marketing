@@ -415,8 +415,8 @@ async function resolveAudiencePlan(ctx: AdStudioCallContext, draft: GrowthAudien
   let reach: GrowthAudiencePlan['reach'] = null;
   if (meta === 'ok') {
     const estimate = await estimateAdStudioMetaReach({ ...lookup, targeting });
+    // A failed estimate only means no reach figure: the matched interests stand.
     if (estimate.status === 'ok' && estimate.data.ready) reach = { lower: estimate.data.monthlyLower, upper: estimate.data.monthlyUpper };
-    else if (estimate.status !== 'ok') meta = estimate.reason;
   }
   return { summary: draft.summary, targeting, unresolvedInterests: unresolved, reach, meta };
 }
