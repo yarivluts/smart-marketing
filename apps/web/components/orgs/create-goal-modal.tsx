@@ -58,25 +58,25 @@ export function CreateGoalModal({
     setDeadline(in60d);
 
     if (presetType === 'mrr') {
-      setName('Quarterly MRR Expansion');
+      setName(t('presetNameMrr'));
       setMetricName('mrr_usd');
       setDirection('maximize');
       setTargetValue('100000');
       setRhythm('work_week_weekend');
     } else if (presetType === 'leads') {
-      setName('Monthly Qualified Leads');
+      setName(t('presetNameLeads'));
       setMetricName('qualified_leads');
       setDirection('maximize');
       setTargetValue('1500');
       setRhythm('even');
     } else if (presetType === 'cac') {
-      setName('Blended CAC Guardrail');
+      setName(t('presetNameCac'));
       setMetricName('blended_cac_usd');
       setDirection('minimize');
       setTargetValue('45');
       setRhythm('even');
     } else if (presetType === 'cvr') {
-      setName('Demo-to-Close Conversion');
+      setName(t('presetNameCvr'));
       setMetricName('demo_sign_cvr_pct');
       setDirection('maximize');
       setTargetValue('25');
