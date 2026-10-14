@@ -506,6 +506,9 @@ function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audie
   const genders = plan.targeting.genders.length ? plan.targeting.genders.map((gender) => t(`gender.${gender}`)).join(', ') : t('gender.all');
   return (
     <div className="flex flex-col gap-2" data-testid="growth-pilot-audience">
+      <p className="text-xs text-muted-foreground" data-testid="growth-pilot-audience-explain">
+        {t('explain')}
+      </p>
       {plan.summary ? (
         <p className="text-sm text-muted-foreground" dir="auto">
           {plan.summary}

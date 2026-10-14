@@ -276,6 +276,7 @@ describe('GrowthPilotApp', () => {
       expect(card).toHaveTextContent('Audience for Freelancers');
       const audience = screen.getByTestId('growth-pilot-audience');
       expect(audience).toHaveTextContent('Freelancers in Israel who sign contracts');
+      expect(screen.getByTestId('growth-pilot-audience-explain')).toHaveTextContent('This is who will see your ads');
       expect(audience).toHaveTextContent('IL');
       expect(audience).toHaveTextContent('Ages 25-65+');
       expect(audience).toHaveTextContent('Everyone');

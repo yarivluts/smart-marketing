@@ -5605,6 +5605,7 @@
     },
     "audience": {
       "title": "Audience for {name}",
+      "explain": "This is who will see your ads: the places, ages and interests below. Approve it, or ask the AI to change it.",
       "ages": "Ages {min}-{max}",
       "gender": {
         "all": "Everyone",
