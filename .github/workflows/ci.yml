@@ -82,6 +82,10 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
+        # The e2e shard builds the web app first (next build): it needs the same heap as Build below,
+        # or the build is killed (SIGABRT) once the default ~4GB is used up.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm test
 
       - name: Build
