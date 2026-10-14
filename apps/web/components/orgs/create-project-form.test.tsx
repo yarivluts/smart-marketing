@@ -31,7 +31,7 @@ describe('CreateProjectForm', () => {
     fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Growth' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/proj-123/onboarding'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/proj-123'));
     expect(fetch).toHaveBeenCalledWith(
       '/api/orgs/org-1/projects',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Growth' }) }),
@@ -71,5 +71,10 @@ describe('CreateProjectForm', () => {
 
     await waitFor(() => expect(push).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects', expect.objectContaining({ body: JSON.stringify({ name: 'Bakery' }) }));
+  });
+
+  it('opens the project root (Growth Pilot) and no longer promises a setup wizard', async () => {
+    renderForm();
+    expect(screen.queryByText(/setup guide/i)).not.toBeInTheDocument();
   });
 });
