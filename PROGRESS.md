@@ -17,6 +17,10 @@ Template for each entry:
 
 ---
 
+## UX hourly
+
+- 2026-10-14 - (a) first visit to Growth Pilot: a failed read no longer offers "Try again" when it cannot help (nothing found, daily AI limit used up) and shows no buttons at all when the limit is gone. PR pending. Next candidates: (1) approval cards: explain jargon like "audience" and "paused" in one line; (2) project home for a newcomer: point to Growth Pilot first; (3) start screen: accept pasted full URLs/emails with a clearer hint.
+
 ## 2026-10-14 - Growth Pilot landing pages (KAN-396)
 
 - **What it does:** for each approved target the AI writes a landing page in the site's language, using site facts only. It arrives as a proposal with a full preview. Approving publishes it at the public /lp/<slug>, which is outside locale routing and sign-in, noindex, with utm-tagged buttons. Drafts, rejected pages and unknown slugs all return 404.

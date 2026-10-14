@@ -108,6 +108,21 @@ describe('GrowthPilotApp', () => {
     await waitFor(() => expect(sent(fetchMock, 0)).toEqual({ url: BASE, body: { siteUrl: 'https://easysign.co.il/' } }));
   });
 
+  it('offers only the next steps that can work after a failed read', () => {
+    const view = (failureCode: string) => renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode })} />, { locale: 'en' });
+    const nothing = view('nothing_found');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Use another address' })).toBeInTheDocument();
+    nothing.unmount();
+    const quota = view('quota_exceeded');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use another address' })).toBeNull();
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('resets tomorrow');
+    quota.unmount();
+    view('provider_failed');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
   it('puts every proposal in front of the person to approve, reject or change', async () => {
     const approved = page({ proposals: [{ ...PROPOSAL, status: 'approved' }], targets: [{ ...page().targets[0], status: 'active' }] });
     const fetchMock = stubFetch({ body: approved });

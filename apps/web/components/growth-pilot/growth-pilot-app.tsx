@@ -159,6 +159,10 @@ function AnalyzingCard({ host }: { host: string }): React.ReactElement {
 
 function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; code: string | null; onRetry: () => void; onOther: () => void; pending: boolean }): React.ReactElement {
   const t = useTranslations('GrowthPilot');
+  const kind = failureKey(code);
+  // Trying the same address again cannot help when nothing was found or today's AI limit is gone - offer only what can work.
+  const canRetry = kind === 'site' || kind === 'provider';
+  const canUseOther = kind !== 'quota_exceeded';
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-3xl border border-warning/40 bg-card p-6 shadow-soft" data-testid="growth-pilot-failed">
       <div className="flex items-start gap-3">
@@ -169,13 +173,17 @@ function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; c
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={onRetry} disabled={pending} className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-          {t('failed.retry')}
-        </button>
-        <button type="button" onClick={onOther} className="inline-flex h-10 items-center rounded-full border border-border px-5 text-sm font-semibold hover:bg-muted">
-          {t('failed.other')}
-        </button>
+        {canRetry ? (
+          <button type="button" onClick={onRetry} disabled={pending} className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+            {t('failed.retry')}
+          </button>
+        ) : null}
+        {canUseOther ? (
+          <button type="button" onClick={onOther} className="inline-flex h-10 items-center rounded-full border border-border px-5 text-sm font-semibold hover:bg-muted">
+            {t('failed.other')}
+          </button>
+        ) : null}
       </div>
     </section>
   );
