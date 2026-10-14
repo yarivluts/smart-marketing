@@ -25,15 +25,18 @@ function cap(value: string, max: number): string {
 export function growthBriefInput(params: { analysis: GrowthSiteAnalysis; target: GrowthBriefTarget; siteUrl: string }): AdStudioBriefInput {
   const { analysis, target } = params;
   const business = analysis.businessName || target.name;
+  // Only the site's own words (the analysis is in the site's language) and punctuation: the person
+  // sees these on the ad, so no English glue around Hebrew text.
+  const parts = (...values: string[]) => values.map((value) => value.trim()).filter(Boolean);
   const objective =
     target.kind === 'audience'
-      ? `Reach ${target.name} and bring them to ${business}. ${target.description} ${target.audience}`
-      : `Bring ${target.audience || 'the right customers'} to try ${target.name} by ${business}. ${target.description}`;
+      ? parts(`${target.name} (${business})`, target.description, target.audience).join(' - ')
+      : parts(`${target.name} (${business})`, target.audience, target.description).join(' - ');
   const productDescription = [
     `${business}: ${analysis.summary}`,
     `${target.name}: ${target.description}`,
-    target.audience ? `For: ${target.audience}` : '',
-    analysis.offerings.length ? `Offerings: ${analysis.offerings.map((offering) => `${offering.name} - ${offering.description}`).join('; ')}` : '',
+    target.audience,
+    analysis.offerings.map((offering) => `${offering.name} - ${offering.description}`).join('; '),
   ]
     .filter(Boolean)
     .join('\n');
