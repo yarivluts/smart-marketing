@@ -25,10 +25,16 @@ export function GrowthPerformanceSection({ base, onTargets }: { base: string; on
   React.useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void fetch(`${base}/performance?days=${days}`)
-      .then(async (response) => (response.ok ? ((await response.json()) as Performance) : ({ status: 'unavailable', reason: 'error' } as const)))
-      .catch(() => ({ status: 'unavailable', reason: 'error' }) as const)
-      .then((result) => {
+    // Any failure - network, a bad answer - reads as "Meta did not return the numbers", never as a crash.
+    const load = async (): Promise<Performance> => {
+      try {
+        const response = await fetch(`${base}/performance?days=${days}`);
+        return response.ok ? ((await response.json()) as Performance) : { status: 'unavailable', reason: 'error' };
+      } catch {
+        return { status: 'unavailable', reason: 'error' };
+      }
+    };
+    void load().then((result) => {
         if (cancelled) return;
         setData(result);
         setLoading(false);
