@@ -68,7 +68,7 @@ describe('GrowthPilotApp', () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
     expect(screen.getByRole('heading', { name: 'Enter the website you want to grow' })).toBeInTheDocument();
-    expect(screen.getByText('Nothing goes live without your approval. Every ad is created paused.')).toBeInTheDocument();
+    expect(screen.getByText('Nothing goes live without your approval. Every ad is created switched off, so nobody sees it until you turn it on.')).toBeInTheDocument();
     expect(screen.getByTestId('growth-pilot-start-button')).toBeDisabled();
     fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
     fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
@@ -306,7 +306,7 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent('Publish the ads for Free plan');
-      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Meta as paused ads in one ad set');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Meta as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
@@ -315,16 +315,25 @@ describe('GrowthPilotApp', () => {
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '35' } });
       fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
       await waitFor(() => expect(sent(fetchMock)).toEqual({ url: BASE + '/proposals/pub1', body: { action: 'approve', dailyBudget: 35 } }));
-      expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Meta, paused');
+      expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Meta, switched off - not showing to anyone');
     });
 
     it('turning on is its own decision, saying it starts spending', () => {
       const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: [{ ...TARGET, publishStatus: 'published' }] })} />, { locale: 'en' });
       expect(screen.getByTestId('growth-pilot-proposal')).toHaveTextContent('Turn on the ads for Free plan');
-      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Turning them on starts spending - up to 20 a day');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Turning them on makes them visible and starts spending - up to 20 a day');
       expect(screen.getByTestId('growth-pilot-approve')).toHaveTextContent('Turn on the ads');
       expect(screen.queryByTestId('growth-pilot-budget')).toBeNull();
+    });
+
+    it('explains "paused" in plain words in both languages, never the platform term alone', () => {
+      for (const [locale, word] of [['en', 'switched-off'], ['he', 'כבוי']] as const) {
+        const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale });
+        expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent(word);
+        expect(screen.getByTestId('growth-pilot-publish')).not.toHaveTextContent(/paused|ad set|מושה/);
+        view.unmount();
+      }
     });
 
     it('shows how to connect Meta when that is what publishing waits for', () => {

@@ -5452,7 +5452,7 @@
         "build": "Builds ads and landing pages",
         "watch": "Watches and improves"
       },
-      "safe": "Nothing goes live without your approval. Every ad is created paused."
+      "safe": "Nothing goes live without your approval. Every ad is created switched off, so nobody sees it until you turn it on."
     },
     "analyzing": {
       "title": "Reading {host}",
@@ -5618,17 +5618,17 @@
     "publish": {
       "title": "Publish the ads for {name}",
       "activateTitle": "Turn on the ads for {name}",
-      "description": "{count, plural, one {The approved image goes to Meta as a paused ad} other {The # approved images go to Meta as paused ads in one ad set}}. Nothing runs or spends until you turn them on.",
-      "activateDescription": "The ads are on Meta, paused. Turning them on starts spending - up to {budget} a day in your ad account currency.",
+      "description": "{count, plural, one {The approved image goes to Meta as a ready-but-switched-off ad} other {The # approved images go to Meta as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
+      "activateDescription": "The ads are on Meta, switched off. Turning them on makes them visible and starts spending - up to {budget} a day in your ad account currency.",
       "link": "Link",
       "countries": "Countries",
       "budget": "Daily budget",
-      "approve": "Publish (paused)",
+      "approve": "Publish (switched off)",
       "activate": "Turn on the ads",
       "status": {
         "needs_meta": "Ready to publish once a Meta ad account is connected.",
         "ready": "Publishing waits for your approval",
-        "published": "On Meta, paused",
+        "published": "On Meta, switched off - not showing to anyone",
         "running": "Ads are running",
         "rejected": "You chose not to publish",
         "failed": "Publishing failed ({reason})",
