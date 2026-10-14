@@ -127,4 +127,17 @@ describe('ConnectionsApp', () => {
     expect(screen.queryByRole('button', { name: en.checkAgain })).toBeNull();
     expect(screen.queryByTestId('connections-google_ads-add')).toBeNull();
   });
+
+  it('updates a re-checked connection where it is, and shows when it was checked', async () => {
+    const second: ConnectionRow = { ...META_ROW, id: 'c2', accountName: 'Old account', accountId: '58689695', lastCheckStatus: null, lastCheckedOn: null, projects: [] };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ check: { status: 'failed', reason: 'invalid_details' }, connection: { ...second, lastCheckStatus: 'invalid_details', lastCheckedOn: '2026-10-15T09:00:00.000Z' } })));
+    renderApp({ connections: [META_ROW, second] });
+    const rows = () => within(screen.getByTestId('connections-meta_ads-rows')).getAllByRole('listitem');
+    expect(rows()[1]).toHaveTextContent(en.neverChecked);
+    fireEvent.click(within(rows()[1]!).getByRole('button', { name: en.checkAgain }));
+    await waitFor(() => expect(rows()[1]).toHaveTextContent(en.reasons.invalid_details));
+    expect(rows()[0]).toHaveTextContent('Yariv Luts');
+    expect(rows()[1]).toHaveTextContent('Old account');
+    expect(rows()[1]!.textContent).toMatch(/2026/);
+  });
 });
