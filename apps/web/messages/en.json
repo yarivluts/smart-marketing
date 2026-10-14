@@ -5648,7 +5648,7 @@
         "organization": "Organization",
         "status": "Status",
         "lastRun": "Last scheduled run",
-        "action": ""
+        "action": "Pause or resume"
       },
       "status": {
         "analyzing": "Reading the site",
