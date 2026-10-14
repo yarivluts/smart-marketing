@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { landingCtaUrl, normalizeSiteUrl, siteHost, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft } from '@growthos/shared';
+import { landingCtaUrl, normalizeSiteUrl, siteHost, type GrowthAudiencePlan, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft } from '@growthos/shared';
 import {
   GrowthActivityModel,
   GrowthLandingPageModel,
@@ -11,6 +11,7 @@ import {
   type GrowthPilotPage,
 } from '../models/growth-pilot.model';
 import { recordAuditLogEntry } from './audit-log.service';
+import { saveAdStudioMetaTargeting } from './ad-studio-audience.service';
 
 /**
  * Growth Pilot state: the pilot (one website), its targets, the proposals waiting for the person,
@@ -175,6 +176,8 @@ function newTarget(scope: Scope, pilotId: string, draft: GrowthTargetDraft, orig
   target.landing_page_id = null;
   target.landing_status = 'none';
   target.landing_failure = null;
+  target.audience_status = 'none';
+  target.audience_failure = null;
   target.created_on = now;
   target.updated_on = now;
   target.setPathParams(pathParams(scope.organizationId, scope.projectId));
@@ -192,6 +195,7 @@ function newTargetProposal(scope: Scope, pilotId: string, targetId: string, draf
   proposal.draft = draft;
   proposal.brief_id = null;
   proposal.landing_page_id = null;
+  proposal.audience = null;
   proposal.preview_image_ids = null;
   proposal.change_requests = [];
   proposal.decided_by = null;
@@ -316,6 +320,15 @@ export async function decideGrowthProposal(params: Scope & { proposalId: string;
     target.updated_on = now;
     await target.save();
     if (params.decision === 'approve') await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: 'landing_published', actor: params.actorId, subject: target.name, now: params.now });
+  }
+  if (target && proposal.kind === 'audience') {
+    // Approving puts the audience on the target's ads, where publishing reads it.
+    if (params.decision === 'approve' && proposal.audience && target.brief_id) {
+      await saveAdStudioMetaTargeting({ organizationId: params.organizationId, projectId: params.projectId, briefId: target.brief_id, targeting: proposal.audience.targeting, now: params.now });
+    }
+    target.audience_status = params.decision === 'approve' ? 'approved' : 'rejected';
+    target.updated_on = now;
+    await target.save();
   }
   if (target && proposal.kind === 'ads') {
     target.ads_status = params.decision === 'approve' ? 'approved' : 'rejected';
@@ -561,4 +574,54 @@ export async function getPublishedGrowthLanding(slug: string): Promise<GrowthLan
 export async function listGrowthLandingPages(organizationId: string, projectId: string, pilotId: string): Promise<GrowthLandingPageModel[]> {
   const rows = await GrowthLandingPageModel.initPath(pathParams(organizationId, projectId)).where('pilot_id', '==', pilotId).get();
   return rows.sort((a, b) => a.created_on.localeCompare(b.created_on));
+}
+
+/** The pilot proposes an audience for a target's ads; it waits for the person like everything else. */
+export async function saveGrowthAudienceProposal(params: Scope & { targetId: string; plan: GrowthAudiencePlan; now?: Date }): Promise<GrowthProposalModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  const now = (params.now ?? new Date()).toISOString();
+  const proposal = new GrowthProposalModel();
+  proposal.organization_id = params.organizationId;
+  proposal.project_id = params.projectId;
+  proposal.pilot_id = target.pilot_id;
+  proposal.target_id = target.id;
+  proposal.kind = 'audience';
+  proposal.status = 'pending';
+  proposal.draft = { kind: target.kind, name: target.name, description: target.description, audience: target.audience, reason: '' };
+  proposal.brief_id = target.brief_id ?? null;
+  proposal.landing_page_id = null;
+  proposal.audience = params.plan;
+  proposal.preview_image_ids = null;
+  proposal.change_requests = [];
+  proposal.decided_by = null;
+  proposal.decided_on = null;
+  proposal.created_on = now;
+  proposal.updated_on = now;
+  proposal.setPathParams(pathParams(params.organizationId, params.projectId));
+  await proposal.save();
+  target.audience_status = 'ready';
+  target.audience_failure = null;
+  target.updated_on = now;
+  await target.save();
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'audience_ready', actor: 'pilot', subject: target.name, now: params.now });
+  return proposal;
+}
+
+export async function failGrowthAudience(params: Scope & { targetId: string; failureCode: string; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  target.audience_status = 'failed';
+  target.audience_failure = params.failureCode;
+  target.updated_on = (params.now ?? new Date()).toISOString();
+  await target.save();
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'audience_failed', actor: 'pilot', subject: target.name, now: params.now });
+  return target;
+}
+
+/** Replaces a proposed audience with the AI's revision (the proposal is completed by the caller). */
+export async function updateGrowthAudiencePlan(params: Scope & { proposalId: string; plan: GrowthAudiencePlan; now?: Date }): Promise<GrowthProposalModel> {
+  const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
+  proposal.audience = params.plan;
+  proposal.updated_on = (params.now ?? new Date()).toISOString();
+  await proposal.save();
+  return proposal;
 }

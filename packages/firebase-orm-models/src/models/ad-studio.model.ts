@@ -170,7 +170,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**
