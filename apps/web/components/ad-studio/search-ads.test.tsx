@@ -8,7 +8,14 @@ import { KeywordResearch } from './keyword-research';
 import { SearchAdEditor } from './search-ad-editor';
 
 const refresh = vi.fn();
-vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh }) }));
+vi.mock('@/i18n/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), refresh }),
+  Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 const BASE = '/api/orgs/o/projects/p/ad-studio/briefs/b1';
 const en = enMessages.AdStudio.search;
@@ -301,5 +308,25 @@ describe('SearchAdEditor', () => {
     expect(screen.getByText(en.confirmRewrite)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: en.cancel }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('without keywords, says Google will not show the ad and links to choosing them with AI', () => {
+    vi.stubGlobal('fetch', vi.fn());
+    renderWithIntl(
+      <SearchAdEditor
+        orgId="o"
+        projectId="p"
+        briefId="b1"
+        initial={AD}
+        keywordCount={0}
+        linkUrl={null}
+        advertiser="EasySign"
+        aiAvailable
+        keywordsHref="/orgs/o/projects/p/ad-studio?brief=b1&step=plan&open=keywords"
+      />,
+      { locale: 'he' },
+    );
+    expect(screen.getByText(he.noKeywordsYet)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: he.chooseKeywords })).toHaveAttribute('href', '/orgs/o/projects/p/ad-studio?brief=b1&step=plan&open=keywords');
   });
 });

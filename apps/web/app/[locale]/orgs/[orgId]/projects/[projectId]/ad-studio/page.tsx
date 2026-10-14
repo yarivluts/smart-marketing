@@ -106,7 +106,7 @@ import { isPlatformOperator } from '@/lib/auth/platform-operator';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
-  searchParams: Promise<{ brief?: string; step?: string; item?: string }>;
+  searchParams: Promise<{ brief?: string; step?: string; item?: string; open?: string }>;
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
@@ -139,7 +139,7 @@ export default async function AdStudioPage({
   searchParams,
 }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
-  const { brief: selectedBriefId, step: requestedStep, item: requestedItem } = await searchParams;
+  const { brief: selectedBriefId, step: requestedStep, item: requestedItem, open: requestedSection } = await searchParams;
   setRequestLocale(locale);
 
   const session = await getServerSession();
@@ -532,6 +532,7 @@ export default async function AdStudioPage({
                 title={t('planSections.keywords')}
                 state={selected.searchKeywords?.keywords.length ? t('planSections.keywordsChosen', { count: selected.searchKeywords.keywords.length }) : t('planSections.notSet')}
                 testId="ad-studio-plan-keywords"
+                defaultOpen={requestedSection === 'keywords'}
               >
                 <KeywordResearch
                   orgId={orgId}
@@ -744,6 +745,7 @@ export default async function AdStudioPage({
                   briefId={selected.id}
                   initial={selected.searchAd}
                   keywordCount={selected.searchKeywords?.keywords.length ?? 0}
+                  keywordsHref={`${stepHref('plan')}&open=keywords`}
                   linkUrl={selected.landingPageUrl}
                   advertiser={brandKit.brandName || selected.name}
                   aiAvailable={providers.text !== null}

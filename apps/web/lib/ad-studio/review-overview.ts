@@ -125,7 +125,8 @@ export function summarizeVideoCreative(params: {
 export function summarizeSearchCreative(ad: AdStudioSearchAd | null, keywords: number): SearchCreativeSummary {
   const headlines = ad?.headlines.filter((line) => line.trim()).length ?? 0;
   const descriptions = ad?.descriptions.filter((line) => line.trim()).length ?? 0;
-  const state: CreativeState = !ad || (headlines === 0 && descriptions === 0) ? 'empty' : headlines >= 3 && descriptions >= 2 ? 'ready' : 'attention';
+  // Publishing refuses a search ad without keywords, so a written ad without them is not ready.
+  const state: CreativeState = !ad || (headlines === 0 && descriptions === 0) ? 'empty' : headlines >= 3 && descriptions >= 2 && keywords > 0 ? 'ready' : 'attention';
   const filled = (lines: readonly string[] | undefined) => (lines ?? []).map((line) => line.trim()).filter(Boolean);
   const [sample = null, sampleSecond = null] = filled(ad?.headlines);
   return { kind: 'search', state, headlines, descriptions, keywords, sample, sampleSecond, sampleDescription: filled(ad?.descriptions)[0] ?? null };

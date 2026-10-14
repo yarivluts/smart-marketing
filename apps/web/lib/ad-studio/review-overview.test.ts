@@ -76,6 +76,10 @@ describe('summarizeSearchCreative', () => {
     expect(summarizeSearchCreative({ headlines: ['A'], descriptions: [], path1: '', path2: '' }, 0)).toMatchObject({ state: 'attention', sample: 'A', sampleSecond: null, sampleDescription: null });
     expect(summarizeSearchCreative(null, 4)).toMatchObject({ state: 'empty', sample: null, sampleSecond: null, sampleDescription: null });
   });
+
+  it('needs a look when the ad is written but no keyword is chosen, since publishing refuses it', () => {
+    expect(summarizeSearchCreative({ headlines: ['A', 'B', 'C'], descriptions: ['D', 'E'], path1: '', path2: '' }, 0)).toMatchObject({ state: 'attention', keywords: 0 });
+  });
 });
 
 describe('reviewNextStep', () => {

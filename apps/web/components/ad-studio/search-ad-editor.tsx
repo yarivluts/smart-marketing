@@ -12,7 +12,7 @@ import {
   searchAdIssues,
   type AdStudioSearchAd,
 } from '@growthos/shared';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 import { SearchResultPreview } from './search-result-preview';
@@ -28,6 +28,8 @@ export interface SearchAdEditorProps {
   advertiser: string;
   /** A text model is configured, so the AI can write the ad. */
   aiAvailable: boolean;
+  /** Where the keywords are chosen (the Plan step, keyword section open). */
+  keywordsHref?: string | null;
 }
 
 function padded(lines: readonly string[], min: number): string[] {
@@ -101,6 +103,7 @@ export function SearchAdEditor({
   linkUrl,
   advertiser,
   aiAvailable,
+  keywordsHref = null,
 }: SearchAdEditorProps): React.ReactElement {
   const t = useTranslations('AdStudio.search');
   const router = useRouter();
@@ -176,7 +179,16 @@ export function SearchAdEditor({
             {t('adTitle')}
           </h2>
           <p className="max-w-2xl text-sm text-muted-foreground">{t('adDescription')}</p>
-          {keywordCount === 0 ? <p className="text-xs text-warning">{t('noKeywordsYet')}</p> : null}
+          {keywordCount === 0 ? (
+            <p className="flex flex-wrap items-center gap-x-2 text-xs text-warning">
+              {t('noKeywordsYet')}
+              {keywordsHref ? (
+                <Link href={keywordsHref} className="font-semibold text-primary underline-offset-2 hover:underline" data-testid="ad-studio-search-choose-keywords">
+                  {t('chooseKeywords')}
+                </Link>
+              ) : null}
+            </p>
+          ) : null}
         </div>
         {confirmRewrite ? (
           <div className="flex items-center gap-2 text-sm">

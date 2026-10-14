@@ -6,9 +6,9 @@ import { ChevronDown } from 'lucide-react';
  * person opens it. Keeps the main path - plan, script, image ideas - on screen instead of under
  * every research tool at once.
  */
-export function PlanSection({ title, state, children, testId }: { title: string; state: string; children: React.ReactNode; testId?: string }): React.ReactElement {
+export function PlanSection({ title, state, children, testId, defaultOpen = false }: { title: string; state: string; children: React.ReactNode; testId?: string; /** Opened on arrival, when a link sent the person here to use it. */ defaultOpen?: boolean }): React.ReactElement {
   return (
-    <details className="group rounded-2xl border border-border bg-card shadow-sm" data-testid={testId}>
+    <details className="group rounded-2xl border border-border bg-card shadow-sm" data-testid={testId} open={defaultOpen || undefined}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <span className="flex min-w-0 flex-col">
           <span className="text-sm font-semibold">{title}</span>
