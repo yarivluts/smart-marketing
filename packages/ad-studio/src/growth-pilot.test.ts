@@ -15,6 +15,8 @@ const orm = vi.hoisted(() => ({
   linkGrowthTargetAds: vi.fn(),
   finishGrowthTargetAds: vi.fn(),
   createAdStudioBrief: vi.fn(),
+  listGrowthPilotIndex: vi.fn(),
+  recordGrowthPilotRun: vi.fn(),
   resolveAdStudioExportDestinations: vi.fn(),
   listGrowthProposals: vi.fn(),
   listGrowthLandingPages: vi.fn(),
@@ -47,7 +49,7 @@ vi.mock('./audiences', () => meta);
 vi.mock('./image-pipeline', () => ({ listBriefImages: studio.listBriefImages, rewriteAdStudioImageConcept: studio.rewriteAdStudioImageConcept }));
 
 import { AdStudioQuotaExceededError } from '@growthos/firebase-orm-models';
-import { advanceGrowthPilot, approveGrowthActivation, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
+import { advanceGrowthPilot, approveGrowthActivation, GROWTH_SCHEDULER_UNITS_PER_PILOT, runScheduledGrowthPilots, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
 import { AdStudioProviderError, type AdStudioLlm } from './llm';
 
 const publicResolver = vi.fn(async () => ['93.184.215.14']);
@@ -451,5 +453,50 @@ describe('publishing and turning on', () => {
     });
     await expect(approveGrowthActivation({ ...ctx(llm({})), proposalId: 'act1' }, { setStatus: stopped as never })).rejects.toThrow('kill switch');
     expect(orm.markGrowthAdsRunning).not.toHaveBeenCalled();
+  });
+});
+
+describe('the scheduler', () => {
+  const line = (id: string, extra: object = {}) => ({ organization_id: 'o-' + id, project_id: 'p-' + id, pilot_id: 'g-' + id, status: 'active', started_by: 'u-' + id, last_run_on: null, ...extra });
+
+  it('runs the pilots that have work, least recently run first, on behalf of whoever started each', async () => {
+    orm.listGrowthPilotIndex.mockResolvedValue([
+      line('recent', { last_run_on: '2026-10-14T09:00:00Z' }),
+      line('paused', { status: 'paused' }),
+      line('failed', { status: 'failed' }),
+      line('never'),
+      line('reading', { status: 'analyzing', last_run_on: '2026-10-14T08:00:00Z' }),
+    ]);
+    const done: Record<string, number> = { never: 2, reading: 1, recent: 0 };
+    const step = vi.fn(async (stepCtx: { pilotId: string }) => {
+      const key = stepCtx.pilotId.slice(2);
+      const worked = done[key] > 0;
+      done[key] -= 1;
+      return { pilot: {} as never, worked };
+    });
+    const runs = await runScheduledGrowthPilots({ llm: llm({}), autopilot: {} as never, budgetMs: 60_000, step: step as never });
+    expect(runs.map((run) => [run.projectId, run.units, run.outcome])).toEqual([
+      ['p-never', 2, 'worked'],
+      ['p-reading', 1, 'worked'],
+      ['p-recent', 0, 'idle'],
+    ]);
+    expect(step.mock.calls[0][0]).toMatchObject({ organizationId: 'o-never', projectId: 'p-never', pilotId: 'g-never', actorId: 'u-never' });
+    expect(orm.recordGrowthPilotRun).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p-recent', outcome: 'idle' }));
+  });
+
+  it('caps one pilot per run and stops at the time budget, recording a failure and moving on', async () => {
+    orm.listGrowthPilotIndex.mockResolvedValue([line('busy'), line('broken'), line('late')]);
+    let now = 0;
+    const step = vi.fn(async (stepCtx: { pilotId: string }) => {
+      now += 1_000;
+      if (stepCtx.pilotId === 'g-broken') throw new AdStudioQuotaExceededError('text', 50, 50);
+      if (stepCtx.pilotId === 'g-late') now += 1_000_000;
+      return { pilot: {} as never, worked: true };
+    });
+    const runs = await runScheduledGrowthPilots({ llm: llm({}), autopilot: {} as never, budgetMs: 30_000, clock: () => now, step: step as never });
+    expect(runs[0]).toMatchObject({ projectId: 'p-busy', units: GROWTH_SCHEDULER_UNITS_PER_PILOT, outcome: 'worked' });
+    expect(runs[1]).toMatchObject({ projectId: 'p-broken', units: 0, outcome: 'quota_exceeded' });
+    expect(runs[2]).toMatchObject({ projectId: 'p-late', units: 1 });
+    expect(runs).toHaveLength(3);
   });
 });

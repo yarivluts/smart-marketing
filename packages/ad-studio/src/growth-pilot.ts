@@ -6,6 +6,8 @@ import {
   completeGrowthProposalRevision,
   AdStudioExportUnavailableError,
   createAdStudioBrief,
+  listGrowthPilotIndex,
+  recordGrowthPilotRun,
   failGrowthPublish,
   getGrowthProposal,
   GrowthProposalNotPendingError,
@@ -174,29 +176,44 @@ export function growthFailureCode(error: unknown): string {
   return 'provider_error';
 }
 
+/** Who advances which pilot, with what: the model, the ad pipeline, and the public origin for landing links. */
+export interface GrowthAdvanceContext extends AdStudioCallContext {
+  pilotId: string;
+  deps?: PlanningSourceDeps;
+  autopilot?: AdStudioAutopilotDeps;
+  publicWebUrl?: string | null;
+}
+
 /**
- * Does the pilot's pending work: while the site is being analyzed, the caller holding the lease reads
- * the site and proposes targets. Returns the pilot as it stands (untouched when there was nothing to
- * do or another caller is on it). Safe to call repeatedly - the page polls it.
+ * Does the pilot's pending work, one unit (see advanceGrowthPilotOnce), and returns the pilot as it
+ * stands. Safe to call repeatedly - the page polls it.
  */
-export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: string; deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps; publicWebUrl?: string | null }): Promise<GrowthPilotModel> {
+export async function advanceGrowthPilot(ctx: GrowthAdvanceContext): Promise<GrowthPilotModel> {
+  return (await advanceGrowthPilotOnce(ctx)).pilot;
+}
+
+/**
+ * One unit of the pilot's pending work, and whether there was any: reading the site while it is
+ * being analyzed; once active, the next step of a target's landing page, audience, ads or publish
+ * proposal. A paused pilot, or one with nothing left to do, reports `worked: false`.
+ */
+export async function advanceGrowthPilotOnce(ctx: GrowthAdvanceContext): Promise<{ pilot: GrowthPilotModel; worked: boolean }> {
   await ensureOrm();
   const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, ctx.pilotId);
   if (pilot.status === 'active' && ctx.autopilot) {
-    await progressGrowthAds({ ...ctx, autopilot: ctx.autopilot }, pilot);
-    return pilot;
+    return { pilot, worked: await progressGrowthAds({ ...ctx, autopilot: ctx.autopilot }, pilot) };
   }
-  if (pilot.status !== 'analyzing') return pilot;
+  if (pilot.status !== 'analyzing') return { pilot, worked: false };
   const token = await acquireGrowthPilotLease(pilot, { now: ctx.now });
-  if (!token) return pilot;
+  if (!token) return { pilot, worked: false };
   const site = await readGrowthSite(pilot.site_url, ctx.deps ?? adStudioRuntime().siteReader);
-  if (site.status !== 'ok') return (await failGrowthPilotAnalysis({ pilot, token, code: `site_${site.reason}`, now: ctx.now })) ?? pilot;
+  if (site.status !== 'ok') return { pilot: (await failGrowthPilotAnalysis({ pilot, token, code: `site_${site.reason}`, now: ctx.now })) ?? pilot, worked: true };
   try {
     const prompt = buildSiteAnalysisPrompt(site.pages);
     const raw = await meteredCall(ctx, 'site_analysis', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthSiteAnalysisSchema, effort: 'high' }));
     const analysis = sanitizeSiteAnalysis(raw);
     const drafts = proposedTargetsFromAnalysis(analysis);
-    if (drafts.length === 0) return (await failGrowthPilotAnalysis({ pilot, token, code: 'nothing_found', now: ctx.now })) ?? pilot;
+    if (drafts.length === 0) return { pilot: (await failGrowthPilotAnalysis({ pilot, token, code: 'nothing_found', now: ctx.now })) ?? pilot, worked: true };
     const saved = await saveGrowthPilotAnalysis({
       pilot,
       token,
@@ -206,9 +223,9 @@ export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: s
       generatedBy: { provider: ctx.llm.provider, model: ctx.llm.model },
       now: ctx.now,
     });
-    return saved ?? pilot;
+    return { pilot: saved ?? pilot, worked: true };
   } catch (error) {
-    return (await failGrowthPilotAnalysis({ pilot, token, code: growthFailureCode(error), now: ctx.now })) ?? pilot;
+    return { pilot: (await failGrowthPilotAnalysis({ pilot, token, code: growthFailureCode(error), now: ctx.now })) ?? pilot, worked: true };
   }
 }
 
@@ -295,25 +312,25 @@ async function finishAds(ctx: AdsContext, target: GrowthTargetModel, run: AdStud
  * the target when it is done), or else open a brief and start the autopilot for the next approved
  * target that has no ads yet. A paused pilot does none of this.
  */
-async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Promise<void> {
+async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Promise<boolean> {
   const targets = await listGrowthTargets(ctx.organizationId, ctx.projectId, pilot.id);
   const building = targets.find((target) => target.ads_status === 'building' && target.brief_id && target.run_id);
   if (building?.brief_id && building.run_id) {
     let run = await getAdStudioRun(ctx.organizationId, ctx.projectId, building.brief_id, building.run_id);
     if (run.status === 'running') run = await advanceAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: building.brief_id, actorId: ctx.actorId, runId: run.id }, ctx.autopilot);
     if (run.status !== 'running' && run.status !== 'awaiting_approval') await finishAds(ctx, building, run);
-    return;
+    return true;
   }
-  if (!pilot.analysis) return;
+  if (!pilot.analysis) return false;
   const needsPage = targets.find((target) => target.status === 'active' && (target.landing_status ?? 'none') === 'none');
   if (needsPage) {
     await writeGrowthLanding(ctx, pilot, needsPage);
-    return;
+    return true;
   }
   const needsAudience = targets.find((target) => target.status === 'active' && target.brief_id && (target.audience_status ?? 'none') === 'none');
   if (needsAudience) {
     await planGrowthAudience(ctx, pilot, needsAudience);
-    return;
+    return true;
   }
   const readyToPublish = targets.find(
     (target) =>
@@ -323,9 +340,9 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
       decided(target.landing_status) &&
       ['none', 'needs_meta'].includes(target.publish_status ?? 'none'),
   );
-  if (readyToPublish && (await proposeGrowthPublish(ctx, pilot, readyToPublish))) return;
+  if (readyToPublish && (await proposeGrowthPublish(ctx, pilot, readyToPublish))) return true;
   const next = targets.find((target) => target.status === 'active' && !target.brief_id && (target.ads_status ?? 'none') === 'none');
-  if (!next) return;
+  if (!next) return false;
   const brief = await createAdStudioBrief({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -342,6 +359,7 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
     await linkGrowthTargetAds({ ...scope, briefId: brief.id, runId: '' });
     await finishGrowthTargetAds({ ...scope, previewImageIds: [], failureCode: growthFailureCode(error) });
   }
+  return true;
 }
 
 /**
@@ -610,4 +628,66 @@ export async function approveGrowthActivation(ctx: AdStudioCallContext & { propo
   if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');
   await (deps.setStatus ?? setAdStudioMetaAdsStatus)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: target.ad_export_ids ?? [], status: 'ACTIVE', actorId: ctx.actorId, kms });
   return markGrowthAdsRunning({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: proposal.id, actorId: ctx.actorId, now: ctx.now });
+}
+
+export interface GrowthSchedulerRun {
+  organizationId: string;
+  projectId: string;
+  units: number;
+  outcome: string;
+}
+
+/** The most units one scheduled run gives a single pilot, so one busy pilot cannot starve the rest. */
+export const GROWTH_SCHEDULER_UNITS_PER_PILOT = 12;
+
+/**
+ * Keeps every Growth Pilot moving without an open tab: walks the pilots that have work (being read,
+ * or active), least recently run first, and does their pending units on behalf of the person who
+ * started each - within the project's daily AI limits like any other call - until the time budget is
+ * spent. Publishing and turning ads on are never done here: they wait for the person's approval.
+ */
+export async function runScheduledGrowthPilots(ctx: {
+  llm: AdStudioCallContext['llm'];
+  autopilot: AdStudioAutopilotDeps;
+  publicWebUrl?: string | null;
+  budgetMs: number;
+  clock?: () => number;
+  now?: Date;
+  /** The unit of work (tests); defaults to advanceGrowthPilotOnce. */
+  step?: typeof advanceGrowthPilotOnce;
+}): Promise<GrowthSchedulerRun[]> {
+  await ensureOrm();
+  const clock = ctx.clock ?? Date.now;
+  const deadline = clock() + ctx.budgetMs;
+  const pilots = (await listGrowthPilotIndex())
+    .filter((row) => row.status === 'analyzing' || row.status === 'active')
+    .sort((a, b) => (a.last_run_on ?? '').localeCompare(b.last_run_on ?? ''));
+  const runs: GrowthSchedulerRun[] = [];
+  for (const row of pilots) {
+    if (clock() >= deadline) break;
+    let units = 0;
+    let outcome = 'idle';
+    try {
+      while (units < GROWTH_SCHEDULER_UNITS_PER_PILOT && clock() < deadline) {
+        const step = await (ctx.step ?? advanceGrowthPilotOnce)({
+          organizationId: row.organization_id,
+          projectId: row.project_id,
+          actorId: row.started_by,
+          llm: ctx.llm,
+          pilotId: row.pilot_id,
+          autopilot: ctx.autopilot,
+          publicWebUrl: ctx.publicWebUrl,
+          now: ctx.now,
+        });
+        if (!step.worked) break;
+        units += 1;
+        outcome = 'worked';
+      }
+    } catch (error) {
+      outcome = growthFailureCode(error);
+    }
+    await recordGrowthPilotRun({ organizationId: row.organization_id, projectId: row.project_id, outcome, now: ctx.now });
+    runs.push({ organizationId: row.organization_id, projectId: row.project_id, units, outcome });
+  }
+  return runs;
 }
