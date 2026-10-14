@@ -15,6 +15,7 @@ const orm = vi.hoisted(() => ({
   linkGrowthTargetAds: vi.fn(),
   finishGrowthTargetAds: vi.fn(),
   createAdStudioBrief: vi.fn(),
+  listAdStudioExports: vi.fn(),
   resolveAdStudioExportDestinations: vi.fn(),
   listGrowthProposals: vi.fn(),
   listGrowthLandingPages: vi.fn(),
@@ -42,12 +43,12 @@ vi.mock('./runtime', () => ({ ensureOrm: vi.fn(async () => undefined) }));
 vi.mock('./planning-sources', async (importOriginal) => ({ ...(await importOriginal<object>()), serverKms: () => ({ kind: 'test-kms' }) }));
 const studio = vi.hoisted(() => ({ startAdStudioAutopilot: vi.fn(), advanceAdStudioAutopilot: vi.fn(), listBriefImages: vi.fn(), rewriteAdStudioImageConcept: vi.fn() }));
 vi.mock('./autopilot', () => ({ startAdStudioAutopilot: studio.startAdStudioAutopilot, advanceAdStudioAutopilot: studio.advanceAdStudioAutopilot }));
-const meta = vi.hoisted(() => ({ searchAdStudioMetaInterests: vi.fn(), estimateAdStudioMetaReach: vi.fn() }));
+const meta = vi.hoisted(() => ({ searchAdStudioMetaInterests: vi.fn(), estimateAdStudioMetaReach: vi.fn(), loadAdStudioMetaCampaignInsights: vi.fn() }));
 vi.mock('./audiences', () => meta);
 vi.mock('./image-pipeline', () => ({ listBriefImages: studio.listBriefImages, rewriteAdStudioImageConcept: studio.rewriteAdStudioImageConcept }));
 
 import { AdStudioQuotaExceededError } from '@growthos/firebase-orm-models';
-import { advanceGrowthPilot, approveGrowthActivation, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
+import { advanceGrowthPilot, approveGrowthActivation, loadGrowthPerformance, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
 import { AdStudioProviderError, type AdStudioLlm } from './llm';
 
 const publicResolver = vi.fn(async () => ['93.184.215.14']);
@@ -451,5 +452,37 @@ describe('publishing and turning on', () => {
     });
     await expect(approveGrowthActivation({ ...ctx(llm({})), proposalId: 'act1' }, { setStatus: stopped as never })).rejects.toThrow('kill switch');
     expect(orm.markGrowthAdsRunning).not.toHaveBeenCalled();
+  });
+});
+
+describe('performance of published ads', () => {
+  const now = new Date('2026-10-14T10:00:00Z');
+
+  it('reads only the campaigns the pilot published, and sums them per target and per day', async () => {
+    orm.listGrowthTargets.mockResolvedValue([
+      { id: 't1', brief_id: 'b1', ad_export_ids: ['e1', 'e2'] },
+      { id: 't2', brief_id: 'b2', ad_export_ids: null },
+    ]);
+    orm.listAdStudioExports.mockResolvedValue([
+      { id: 'e1', platform_refs: { campaign_id: 'c1' } },
+      { id: 'e2', platform_refs: { campaign_id: 'c1' } },
+      { id: 'e9', platform_refs: { campaign_id: 'not-ours' } },
+    ]);
+    meta.loadAdStudioMetaCampaignInsights.mockResolvedValue({ status: 'ok', data: [{ campaignId: 'c1', date: '2026-10-14', spend: 12, impressions: 600, clicks: 18, linkClicks: 15, conversions: 2 }] });
+    const result = await loadGrowthPerformance({ organizationId: 'o', projectId: 'p', pilotId: 'g1', days: 7, now });
+    expect(meta.loadAdStudioMetaCampaignInsights).toHaveBeenCalledWith(expect.objectContaining({ campaignIds: ['c1'], since: '2026-10-08', until: '2026-10-14' }));
+    expect(result).toMatchObject({ status: 'ok', since: '2026-10-08', until: '2026-10-14', summary: { totals: { spend: 12, clicks: 18, conversions: 2, costPerConversion: 6 }, byTarget: { t1: { clicks: 18 } } } });
+    if (result.status === 'ok') expect(result.summary.daily).toHaveLength(7);
+  });
+
+  it('says there is nothing yet before anything is published, and why when Meta cannot be read', async () => {
+    orm.listGrowthTargets.mockResolvedValue([{ id: 't1', brief_id: 'b1', ad_export_ids: null }]);
+    expect(await loadGrowthPerformance({ organizationId: 'o', projectId: 'p', pilotId: 'g1', days: 30, now })).toEqual({ status: 'none' });
+    expect(meta.loadAdStudioMetaCampaignInsights).not.toHaveBeenCalled();
+
+    orm.listGrowthTargets.mockResolvedValue([{ id: 't1', brief_id: 'b1', ad_export_ids: ['e1'] }]);
+    orm.listAdStudioExports.mockResolvedValue([{ id: 'e1', platform_refs: { campaign_id: 'c1' } }]);
+    meta.loadAdStudioMetaCampaignInsights.mockResolvedValue({ status: 'unavailable', reason: 'meta_auth_failed' });
+    expect(await loadGrowthPerformance({ organizationId: 'o', projectId: 'p', pilotId: 'g1', days: 30, now })).toEqual({ status: 'unavailable', reason: 'meta_auth_failed' });
   });
 });

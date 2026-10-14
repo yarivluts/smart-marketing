@@ -9,6 +9,8 @@ import { Link } from '@/i18n/navigation';
 import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthLandingPageView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
 import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
 import { GrowthLandingView } from './landing-view';
+import { GrowthPerformanceSection } from './performance-section';
+import type { GrowthPerformanceTotals } from '@growthos/shared';
 
 const KIND_ICON = { product: Package, service: Megaphone, audience: Users } as const;
 const SHORT = { dateStyle: 'short', timeStyle: 'short' } as const;
@@ -395,7 +397,7 @@ function ProposalCard({
   );
 }
 
-function TargetCard({ target, landingSlug, metaConnectHref }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null }): React.ReactElement {
+function TargetCard({ target, landingSlug, metaConnectHref, results }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.targets');
   return (
     <li className="flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-target">
@@ -414,7 +416,7 @@ function TargetCard({ target, landingSlug, metaConnectHref }: { target: GrowthTa
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
       <TargetLandingLine target={target} slug={landingSlug} />
       <TargetAudienceLine target={target} />
-      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} />
+      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} results={results} />
       <TargetAdsLine target={target} />
     </li>
   );
@@ -440,14 +442,21 @@ function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: s
 }
 
 /** Where the target's ads stand on the platform; when Meta is missing, the way to connect it. */
-function TargetPublishLine({ target, metaConnectHref }: { target: GrowthTargetView; metaConnectHref: string | null }): React.ReactElement | null {
+function TargetPublishLine({ target, metaConnectHref, results }: { target: GrowthTargetView; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.publish.status');
+  const tr = useTranslations('GrowthPilot.performance');
+  const locale = useLocale();
   if (target.status !== 'active' || target.publishStatus === 'none') return null;
   const status = target.publishStatus;
   return (
     <p className={cn('flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'running' ? 'text-success' : status === 'failed' || status === 'needs_meta' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-publish" data-publish={status}>
       <Send className="h-3.5 w-3.5" aria-hidden="true" />
       {status === 'failed' ? t('failed', { reason: target.publishFailure ?? '' }) : t(status)}
+      {results && (status === 'published' || status === 'running') ? (
+        <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
+          {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}
+        </span>
+      ) : null}
       {status === 'needs_meta' && metaConnectHref ? (
         <a href={metaConnectHref} className="font-semibold text-primary hover:underline" data-testid="growth-pilot-connect-meta">
           {t('connect')}
@@ -579,6 +588,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
   const [busy, setBusy] = React.useState<string | null>(null);
   const [startingOver, setStartingOver] = React.useState(false);
   const [newTarget, setNewTarget] = React.useState<string | null>(null);
+  const [byTarget, setByTarget] = React.useState<Record<string, GrowthPerformanceTotals> | null>(null);
 
   const run = React.useCallback(
     async (key: string, path: string, body?: unknown): Promise<boolean> => {
@@ -712,6 +722,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
+          {data.targets.some((target) => target.publishStatus === 'published' || target.publishStatus === 'running') ? <GrowthPerformanceSection base={base} onTargets={setByTarget} /> : null}
           <section className="flex flex-col gap-3" aria-labelledby="growth-pilot-waiting">
             <h2 id="growth-pilot-waiting" className="flex items-center gap-2 font-pp-display text-xl font-semibold">
               {t('waiting.title')}
@@ -746,7 +757,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {targets.map((target) => (
-                  <TargetCard key={target.id} target={target} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
+                  <TargetCard key={target.id} target={target} results={byTarget?.[target.id] ?? null} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
                 ))}
               </ul>
             )}
