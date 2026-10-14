@@ -72,7 +72,7 @@ describe('POST /api/orgs/[orgId]/resources/credentials/[credentialId]/secret/rot
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -101,7 +101,7 @@ describe('POST /api/orgs/[orgId]/resources/credentials/[credentialId]/secret/rot
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -119,7 +119,7 @@ describe('POST /api/orgs/[orgId]/resources/credentials/[credentialId]/secret/rot
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });

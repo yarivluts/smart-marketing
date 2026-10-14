@@ -7,7 +7,7 @@ import type { SecretEnvelope } from '../vault';
  * connector stories (KAN-49/50/51); `generic` covers anything pushed in
  * manually (e.g. a CRM API key) ahead of a dedicated plugin existing.
  */
-export const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'youtube', 'stripe', 'ga4', 'generic'] as const;
+export const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'tiktok_ads', 'youtube', 'stripe', 'ga4', 'generic'] as const;
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number];
 
 export function isCredentialProvider(value: string): value is CredentialProvider {
@@ -85,4 +85,16 @@ export class SharedCredentialModel extends BaseModel {
   /** How the secret was set: `oauth` for a connect flow, absent for one pasted by hand. */
   @Field()
   public connected_via?: 'oauth' | null;
+
+  /** When the connection was last checked against the platform (ad platforms only). */
+  @Field()
+  public last_checked_on?: string | null;
+
+  /** The last check: `ok`, or a stable failure reason (`auth_failed`, `account_not_found`, ...). */
+  @Field()
+  public last_check_status?: string | null;
+
+  /** The account the last check reached: its name and currency, as the platform reports them. */
+  @Field()
+  public last_check_account?: { id: string; name: string | null; currency: string | null } | null;
 }

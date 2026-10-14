@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import React from 'react';
 import { CreateGoalModal } from './create-goal-modal';
 import { renderWithIntl } from '../../tests/e2e/helpers/test-harness';
@@ -22,6 +22,17 @@ describe('CreateGoalModal presets', () => {
 
   it('has a Hebrew label for every preset', () => {
     for (const key of PRESET_KEYS) {
+      expect(heMessages.Goals[key]).toMatch(/[֐-׿]/);
+    }
+  });
+
+  it('fills the goal name from the translations, not from English text in code', () => {
+    renderWithIntl(<CreateGoalModal orgId="o" projectId="p" isOpen onClose={() => undefined} />);
+    fireEvent.click(screen.getByTestId('preset-cac-btn'));
+    expect((screen.getByDisplayValue(enMessages.Goals.presetNameCac) as HTMLInputElement).value).toBe(
+      'Keep the cost per customer under $45',
+    );
+    for (const key of ['presetNameMrr', 'presetNameLeads', 'presetNameCac', 'presetNameCvr'] as const) {
       expect(heMessages.Goals[key]).toMatch(/[֐-׿]/);
     }
   });

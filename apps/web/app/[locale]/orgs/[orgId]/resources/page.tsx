@@ -215,7 +215,7 @@ export default async function ResourceLibraryPage({
             )}
             {canManageResources ? (
               <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-muted/20 p-4">
-                <a href={`/${locale}/orgs/${orgId}/integrations/meta`} className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#1877F2] px-4 py-2 text-sm font-semibold text-white hover:bg-[#166fe0]" data-testid="resource-library-connect-meta">
+                <a href={`/${locale}/orgs/${orgId}/connections`} className="inline-flex w-fit items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90" data-testid="resource-library-connect-meta">
                   {t('connectMeta')}
                 </a>
                 <CreateCredentialForm orgId={orgId} />
