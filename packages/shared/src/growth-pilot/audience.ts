@@ -86,3 +86,38 @@ export function buildAudiencePrompt(params: { analysis: GrowthSiteAnalysis; targ
   }
   return { system: ['You plan Meta ads audiences for small businesses.', RULES].join('\n'), user: [...facts, '', 'Propose the audience.'].join('\n') };
 }
+
+/** A Meta interest found for one of the AI's keywords: what it is, where Meta files it, how big it is. */
+export interface GrowthInterestCandidate {
+  id: string;
+  name: string;
+  path: string[];
+  keyword: string;
+}
+
+/** How many Meta results per keyword the AI chooses from. */
+export const GROWTH_INTEREST_CANDIDATES_PER_KEYWORD = 5;
+
+/**
+ * Meta's interest search matches words loosely ("action" finds action movies), so its biggest
+ * result is often unrelated. The AI picks, from all candidates, only the interests that people who
+ * would buy this actually have.
+ */
+export function buildInterestChoicePrompt(params: { analysis: GrowthSiteAnalysis; target: GrowthBriefTarget; candidates: readonly GrowthInterestCandidate[] }): { system: string; user: string } {
+  const list = params.candidates.map((candidate) => `- id ${candidate.id}: ${candidate.name} [${candidate.path.join(' > ')}] (for "${candidate.keyword}")`).join('\n');
+  return {
+    system: [
+      'You choose Meta ad interests. Keep only interests that the people who would buy this offer plausibly have - their profession, industry, business needs or the tools they use.',
+      'Drop anything unrelated even if its name shares a word (entertainment, games, sports, hobbies unless the offer is about them). When unsure, leave it out: fewer relevant interests beat many loose ones.',
+    ].join('\n'),
+    user: [
+      `Business: ${params.analysis.businessName}. ${params.analysis.summary}`,
+      `Offer: ${params.target.name} (${params.target.kind}). ${params.target.description} Audience: ${params.target.audience}`,
+      '',
+      'Candidate interests:',
+      list,
+      '',
+      'Return the ids of the relevant ones, at most 8.',
+    ].join('\n'),
+  };
+}

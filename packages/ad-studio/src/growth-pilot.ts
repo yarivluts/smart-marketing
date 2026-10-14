@@ -31,6 +31,8 @@ import {
 import {
   audienceTargeting,
   buildAudiencePrompt,
+  buildInterestChoicePrompt,
+  GROWTH_INTEREST_CANDIDATES_PER_KEYWORD,
   buildLandingPagePrompt,
   defaultMetaTargeting,
   buildSiteAnalysisPrompt,
@@ -48,7 +50,9 @@ import {
   sanitizeTargetDraft,
   type GrowthAudienceDraft,
   type GrowthAudiencePlan,
+  type GrowthInterestCandidate,
   type GrowthLandingContent,
+  type GrowthSiteAnalysis,
   type GrowthSitePage,
   type GrowthTargetDraft,
 } from '@growthos/shared';
@@ -117,6 +121,8 @@ export const GrowthAudienceDraftSchema = z.object({
   genders: z.array(z.enum(['male', 'female'])).describe('Empty for everyone.'),
   interestKeywords: z.array(z.string()).describe('3-8 short English words to look up as Meta interests.'),
 });
+
+export const GrowthInterestChoiceSchema = z.object({ ids: z.array(z.string()).describe('The ids of the relevant interests, at most 8.') });
 
 export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[] } | { status: 'unavailable'; reason: string };
 
@@ -376,30 +382,35 @@ async function reviseGrowthLanding(ctx: AdStudioCallContext, held: GrowthProposa
 }
 
 /**
- * Turns the AI's audience into Meta targeting: each interest word is matched to the biggest Meta
- * interest for it, and the whole gets a reach estimate. Without Meta (not connected, or it failed)
- * the plan still holds countries, ages and genders, and says why the interests are not matched.
+ * Turns the AI's audience into Meta targeting. Each interest word is looked up in Meta, and from all
+ * the candidates the AI keeps only the relevant ones - Meta's search matches loosely, so its biggest
+ * hit is often unrelated. The result gets a reach estimate. Without Meta (not connected, or it
+ * failed) the plan still holds countries, ages and genders, and says why the interests are not matched.
  */
-async function resolveAudiencePlan(ctx: AdStudioCallContext, draft: GrowthAudienceDraft, language: string): Promise<GrowthAudiencePlan> {
+async function resolveAudiencePlan(ctx: AdStudioCallContext, draft: GrowthAudienceDraft, context: { analysis: GrowthSiteAnalysis; target: GrowthTargetModel }): Promise<GrowthAudiencePlan> {
   const lookup = { organizationId: ctx.organizationId, projectId: ctx.projectId };
-  const interests: GrowthAudiencePlan['targeting']['interests'] = [];
-  const unresolved: string[] = [];
+  const language = context.analysis.language || 'en';
+  const candidates: (GrowthInterestCandidate & { sizeLower: number | null; sizeUpper: number | null })[] = [];
   let meta = 'ok';
   for (const word of draft.interestKeywords) {
-    if (meta !== 'ok') {
-      unresolved.push(word);
-      continue;
-    }
     const found = await searchAdStudioMetaInterests({ ...lookup, query: word, language });
     if (found.status !== 'ok') {
       meta = found.reason;
-      unresolved.push(word);
-      continue;
+      break;
     }
-    const best = found.data.find((interest) => !interests.some((chosen) => chosen.id === interest.id));
-    if (best) interests.push({ id: best.id, name: best.name, sizeLower: best.sizeLower, sizeUpper: best.sizeUpper });
-    else unresolved.push(word);
+    for (const interest of found.data.slice(0, GROWTH_INTEREST_CANDIDATES_PER_KEYWORD)) {
+      if (!candidates.some((candidate) => candidate.id === interest.id)) candidates.push({ id: interest.id, name: interest.name, path: interest.path, keyword: word, sizeLower: interest.sizeLower, sizeUpper: interest.sizeUpper });
+    }
   }
+  let interests: GrowthAudiencePlan['targeting']['interests'] = [];
+  if (meta === 'ok' && candidates.length) {
+    const prompt = buildInterestChoicePrompt({ analysis: context.analysis, target: context.target, candidates });
+    const chosen = await meteredCall(ctx, 'audience_plan', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthInterestChoiceSchema }));
+    const ids = new Set((chosen as { ids: string[] }).ids);
+    interests = candidates.filter((candidate) => ids.has(candidate.id)).slice(0, 8).map((candidate) => ({ id: candidate.id, name: candidate.name, sizeLower: candidate.sizeLower, sizeUpper: candidate.sizeUpper }));
+  }
+  const matchedWords = new Set(candidates.filter((candidate) => interests.some((interest) => interest.id === candidate.id)).map((candidate) => candidate.keyword));
+  const unresolved = draft.interestKeywords.filter((word) => !matchedWords.has(word));
   const targeting = audienceTargeting(draft, interests);
   let reach: GrowthAudiencePlan['reach'] = null;
   if (meta === 'ok') {
@@ -422,7 +433,7 @@ async function planGrowthAudience(ctx: AdStudioCallContext, pilot: GrowthPilotMo
   const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
   try {
     const draft = await writeAudienceDraft(ctx, pilot, target);
-    const plan = await resolveAudiencePlan(ctx, draft, pilot.analysis!.language || 'en');
+    const plan = await resolveAudiencePlan(ctx, draft, { analysis: pilot.analysis!, target });
     await saveGrowthAudienceProposal({ ...scope, plan });
   } catch (error) {
     await failGrowthAudience({ ...scope, failureCode: growthFailureCode(error) });
@@ -445,7 +456,7 @@ async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthPropos
     };
     const request = held.change_requests[held.change_requests.length - 1].text;
     const draft = await writeAudienceDraft(ctx, pilot, target, current, request);
-    const plan = await resolveAudiencePlan(ctx, draft, pilot.analysis.language || 'en');
+    const plan = await resolveAudiencePlan(ctx, draft, { analysis: pilot.analysis, target });
     await updateGrowthAudiencePlan({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, plan, now: ctx.now });
     return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
   } catch (error) {

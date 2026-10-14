@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GrowthSiteAnalysis } from './analysis';
-import { audienceTargeting, buildAudiencePrompt, sanitizeAudienceDraft, type GrowthAudienceDraft } from './audience';
+import { audienceTargeting, buildAudiencePrompt, buildInterestChoicePrompt, sanitizeAudienceDraft, type GrowthAudienceDraft } from './audience';
 
 const ANALYSIS: GrowthSiteAnalysis = { businessName: 'EasySign', summary: 'Signatures on WhatsApp.', language: 'he', offerings: [], audiences: [] };
 const TARGET = { kind: 'audience' as const, name: 'Freelancers', description: 'Self-employed', audience: 'Fast signatures' };
@@ -32,5 +32,14 @@ describe('audience targeting and prompt', () => {
     const revise = buildAudiencePrompt({ analysis: ANALYSIS, target: TARGET, siteUrl: 'https://easy-sign.co.il/', current: DRAFT, request: 'Only women 30-45' });
     expect(revise.user).toContain('Only women 30-45');
     expect(revise.user).toContain('"ageMin": 25');
+  });
+});
+
+describe('interest choice prompt', () => {
+  it('lists every candidate with where Meta files it, and asks to drop what only shares a word', () => {
+    const prompt = buildInterestChoicePrompt({ analysis: ANALYSIS, target: TARGET, candidates: [{ id: 'm1', name: 'Action movies', path: ['Interests', 'Movies'], keyword: 'Freelancer' }] });
+    expect(prompt.user).toContain('- id m1: Action movies [Interests > Movies] (for "Freelancer")');
+    expect(prompt.user).toContain('Offer: Freelancers (audience)');
+    expect(prompt.system).toMatch(/even if its name shares a word/);
   });
 });
