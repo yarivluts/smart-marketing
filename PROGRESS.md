@@ -22,6 +22,29 @@ Template for each entry:
 - 2026-10-14 - (b) approval cards: failed ads / landing page / audience / publish / change requests no longer print raw codes like `quota_exceeded` in the sentence; known causes now read in plain words (en + he) and unknown codes fall back to a generic sentence. PR #672. Next candidates: (1) approval cards: explain "audience", "ad set" and "paused" in one line; (2) project home for a newcomer: point to Growth Pilot first; (3) start screen: accept pasted full URLs/emails with a clearer hint.
 - 2026-10-14 - (a) first visit to Growth Pilot: a failed read no longer offers "Try again" when it cannot help (nothing found, daily AI limit used up) and shows no buttons at all when the limit is gone. PR #671. Next candidates: (1) approval cards: explain jargon like "audience" and "paused" in one line; (2) project home for a newcomer: point to Growth Pilot first; (3) start screen: accept pasted full URLs/emails with a clearer hint.
 
+## 2026-10-14 - Growth Pilot audiences, publish + monitoring, scheduler (KAN-397..399)
+
+- **Last completed:**
+  - **KAN-397 audiences:** for each approved target, the AI proposes a Meta audience. It looks up to 5 interest matches per keyword, then the AI keeps only the relevant ones, with reach estimated by Meta. A failed reach estimate shows reach as unknown and is not reported as unmatched interests. PRs #666, #667.
+  - **KAN-398 publish + monitoring:**
+    - Once ads, a landing page and an audience are approved, a publish proposal follows. Approving it needs `automation.execute`. It creates the Meta campaign, ad set and ads PAUSED.
+    - Spending is a separate "activate" proposal, refused while the kill switch is engaged. Budget is validated.
+    - Monitoring shows real Meta daily campaign insights only (no invented numbers). PRs #668, #669.
+  - **KAN-399 scheduler + admin:**
+    - Cloud Scheduler `growth-pilot-every-10m` POSTs `/api/cron/growth-pilot` with an OIDC token from SA `growth-pilot-scheduler`. The token is verified via Google tokeninfo.
+    - Each run gets an 8-minute budget and up to 12 units per pilot. It runs least-recently-run first, acting as the pilot's starter.
+    - Platform index `growth_pilot_index`.
+    - Operator page `/operator/growth-pilots` lists every pilot and its last run, with pause/resume.
+    - PR #670, plus #673: the index heals itself, so a pilot that predates it goes back in the index whenever it advances.
+- **Verified on prod (easy-sign.co.il, real data):**
+  - Scheduler calls return 200, with index outcome "idle".
+  - Audience reach is 2.9M-3.4M with relevant interests.
+  - No console errors, no overflow at 390 px.
+- **Nothing approved on the user's behalf:** the target proposals, ads, landing page and audience are waiting for the person.
+- **Waiting on human:** KAN-400 (one-click Google Ads OAuth) needs:
+  - a Google Ads developer token with Basic access, from the platform MCC API Center;
+  - OAuth consent screen verification for the `adwords` scope in growthos-g2w84.
+
 ## 2026-10-14 - Growth Pilot landing pages (KAN-396)
 
 - **What it does:** for each approved target the AI writes a landing page in the site's language, using site facts only. It arrives as a proposal with a full preview. Approving publishes it at the public /lp/<slug>, which is outside locale routing and sign-in, noindex, with utm-tagged buttons. Drafts, rejected pages and unknown slugs all return 404.
