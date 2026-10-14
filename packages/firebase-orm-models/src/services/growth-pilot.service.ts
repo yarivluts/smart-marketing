@@ -792,3 +792,14 @@ export async function recordGrowthPilotRun(params: Scope & { outcome: string; no
   row.updated_on = now;
   await row.save();
 }
+
+/**
+ * Adds or corrects the project's index line when it is missing or out of step - for pilots started
+ * before the index existed, or a write that was lost. One read when everything is in order.
+ */
+export async function ensureGrowthPilotIndexed(pilot: Pick<GrowthPilotModel, 'id' | 'organization_id' | 'project_id' | 'site_url' | 'status' | 'started_by'>, now?: Date): Promise<boolean> {
+  const row = await GrowthPilotIndexModel.init(indexId(pilot.organization_id, pilot.project_id));
+  if (row && row.pilot_id === pilot.id && row.status === pilot.status) return false;
+  await syncGrowthPilotIndex(pilot, now);
+  return true;
+}

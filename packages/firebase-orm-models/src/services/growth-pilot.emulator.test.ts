@@ -9,6 +9,8 @@ import {
   createProject,
   createAdStudioBrief,
   decideGrowthProposal,
+  ensureGrowthPilotIndexed,
+  GrowthPilotIndexModel,
   listGrowthPilotIndex,
   recordGrowthPilotRun,
   failGrowthPublish,
@@ -364,5 +366,18 @@ describe('Growth Pilot', () => {
     expect(await line()).toMatchObject({ pilot_id: again.id, status: 'analyzing', site_url: 'https://other.co.il/' });
     expect((await line())?.last_run_outcome ?? null).toBeNull();
     expect((await listGrowthPilotIndex()).filter((row) => row.organization_id === scope.organizationId)).toHaveLength(1);
+  });
+
+  it('puts a pilot back in the index when its line is missing or out of step, and writes nothing when it is in order', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const line = async () => (await listGrowthPilotIndex()).find((row) => row.organization_id === scope.organizationId);
+    const fresh = await getCurrentGrowthPilot(scope.organizationId, scope.projectId);
+    expect(await ensureGrowthPilotIndexed(fresh!)).toBe(false);
+    await (await GrowthPilotIndexModel.init(`${scope.organizationId}_${scope.projectId}`))!.remove();
+    expect(await line()).toBeUndefined();
+    expect(await ensureGrowthPilotIndexed(fresh!)).toBe(true);
+    expect(await line()).toMatchObject({ pilot_id: pilot.id, status: 'active' });
+    expect(await ensureGrowthPilotIndexed({ id: fresh!.id, organization_id: fresh!.organization_id, project_id: fresh!.project_id, site_url: fresh!.site_url, started_by: fresh!.started_by, status: 'paused' })).toBe(true);
+    expect((await line())?.status).toBe('paused');
   });
 });

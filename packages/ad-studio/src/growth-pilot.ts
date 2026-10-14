@@ -6,6 +6,7 @@ import {
   completeGrowthProposalRevision,
   AdStudioExportUnavailableError,
   createAdStudioBrief,
+  ensureGrowthPilotIndexed,
   listGrowthPilotIndex,
   recordGrowthPilotRun,
   listAdStudioExports,
@@ -237,7 +238,10 @@ export async function advanceGrowthPilotOnce(ctx: GrowthAdvanceContext): Promise
 export async function advanceCurrentGrowthPilot(ctx: AdStudioCallContext & { deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps; publicWebUrl?: string | null }): Promise<GrowthPilotModel | null> {
   await ensureOrm();
   const pilot = await getCurrentGrowthPilot(ctx.organizationId, ctx.projectId);
-  return pilot ? advanceGrowthPilot({ ...ctx, pilotId: pilot.id }) : null;
+  if (!pilot) return null;
+  // The scheduler finds pilots through the index: make sure this one is in it.
+  await ensureGrowthPilotIndexed(pilot, ctx.now);
+  return advanceGrowthPilot({ ...ctx, pilotId: pilot.id });
 }
 
 /**
