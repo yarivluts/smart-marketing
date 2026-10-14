@@ -146,6 +146,65 @@ describe('KeywordResearch', () => {
       await screen.findByText(he.unavailable.developer_token_not_approved),
     ).toBeInTheDocument();
   });
+
+  it('lets the AI fill the keywords and the excluded searches for review, then saves what the person keeps', async () => {
+    const chosen = {
+      targeting: { country: 'IL', language: 'he' },
+      keywords: [
+        { text: 'electronic signature', matchType: 'EXACT', avgMonthlySearches: 12100, competition: 'HIGH', lowTopOfPageBid: 2.1, highTopOfPageBid: 9.4 },
+        { text: 'sign pdf', matchType: 'PHRASE', avgMonthlySearches: 880, competition: 'LOW', lowTopOfPageBid: null, highTopOfPageBid: null },
+      ],
+      negatives: ['jobs', 'course'],
+    };
+    const fetchMock = vi.fn(async (url: string) =>
+      url.endsWith('/keywords/suggest')
+        ? json({ suggestion: { keywords: chosen, researched: true, reason: null } })
+        : json({ brief: {} }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(
+      <KeywordResearch
+        orgId="o"
+        projectId="p"
+        briefId="b1"
+        language="he"
+        landingPageUrl="https://easysign.example"
+        initial={null}
+        suggestedSeeds={['e signature']}
+      />,
+      { locale: 'he' },
+    );
+    fireEvent.click(screen.getByRole('button', { name: he.aiChoose }));
+    // The sentence after the count, as the page shows it.
+    expect(await screen.findByText(new RegExp(he.aiChosen.split('}} ')[1]!.split('.')[0]!))).toBeInTheDocument();
+    const [suggestUrl, suggestInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(suggestUrl).toBe(`${BASE}/keywords/suggest`);
+    expect(JSON.parse(String(suggestInit.body))).toEqual({ seeds: ['e signature'], url: 'https://easysign.example', targeting: { country: 'IL', language: 'he' } });
+    // Nothing is saved until the person saves; they can drop one first.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByPlaceholderText(he.negativesPlaceholder)).toHaveValue('jobs, course');
+    fireEvent.click(screen.getByRole('button', { name: he.removeKeyword.replace('{keyword}', 'sign pdf') }));
+    fireEvent.click(screen.getByRole('button', { name: he.saveKeywords }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body)).keywords).toEqual({ ...chosen, keywords: [chosen.keywords[0]] });
+  });
+
+  it('says plainly when the AI chose without Google volumes, and shows a failure', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json({ suggestion: { keywords: { targeting: { country: 'ALL', language: 'en' }, keywords: [{ text: 'sign contracts online', matchType: 'PHRASE', avgMonthlySearches: null, competition: null, lowTopOfPageBid: null, highTopOfPageBid: null }], negatives: [] }, researched: false, reason: 'no_google_ads_credential' } }))
+      .mockResolvedValueOnce(json({ error: 'quota_exceeded' }, 429));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(
+      <KeywordResearch orgId="o" projectId="p" briefId="b1" language="en" landingPageUrl={null} initial={null} suggestedSeeds={[]} />,
+      { locale: 'en' },
+    );
+    fireEvent.click(screen.getByRole('button', { name: en.aiChoose }));
+    expect(await screen.findByText(/from your plan\. Google's monthly searches are not available/)).toBeInTheDocument();
+    expect(screen.getByText('sign contracts online')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: en.aiChoose }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+  });
 });
 
 describe('SearchAdEditor', () => {

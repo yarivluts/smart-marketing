@@ -311,3 +311,94 @@ export function buildSearchAdPrompt(brief: AdStudioBriefInput, keywords: readonl
       .join('\n'),
   };
 }
+
+/** How many keywords the AI picks for a search ad, and how many searches it excludes at most. */
+export const AD_STUDIO_AI_KEYWORDS_MAX = 15;
+export const AD_STUDIO_AI_NEGATIVES_MAX = 10;
+
+/** The keyword ideas the AI chooses from, busiest first. */
+const KEYWORD_CHOICE_IDEAS = 100;
+
+/**
+ * The instructions for choosing a search ad's keywords for someone who does not know Google Ads:
+ * from Google's own ideas (with monthly searches) when there are some, otherwise from the brief and
+ * the plan alone. Also asks for the searches to exclude.
+ */
+export function buildKeywordChoicePrompt(
+  brief: AdStudioBriefInput,
+  ideas: readonly AdStudioKeywordIdea[] | null,
+  context: AdStudioScriptContext = {},
+): AdStudioPrompt {
+  const contextLines = [
+    context.landingPageSummary ? `Landing page summary: ${context.landingPageSummary}` : null,
+    context.audience ? `Audience: ${context.audience}` : null,
+    context.keywordThemes?.length ? `Keyword themes: ${context.keywordThemes.join('; ')}` : null,
+  ].filter((line): line is string => line !== null);
+  const list = ideas?.length
+    ? [...ideas]
+        .sort((a, b) => (b.avgMonthlySearches ?? -1) - (a.avgMonthlySearches ?? -1))
+        .slice(0, KEYWORD_CHOICE_IDEAS)
+        .map((idea) => `${idea.keyword} | ${idea.avgMonthlySearches ?? '?'} | ${idea.competition ?? '?'}`)
+    : null;
+  return {
+    system: [
+      'You choose the keywords a Google search ad bids on, for a business owner who does not know Google Ads.',
+      'Rules:',
+      `- Choose at most ${AD_STUDIO_AI_KEYWORDS_MAX} keywords: searches someone ready to use or buy this product would type. Fewer, well-aimed keywords beat many loose ones.`,
+      list
+        ? '- Choose ONLY from the keyword ideas listed (Google\'s own, with monthly searches): copy each one exactly as written. Prefer specific searches with real volume; skip ideas about something else, competitor brand names, jobs, courses or pure research.'
+        : `- There are no Google volumes: write keywords in the ad language (${languageName(brief.language)}) the way people really search - 2 to 4 words, no punctuation.`,
+      '- matchType: PHRASE for most keywords; EXACT for the most specific, high-intent ones; BROAD only for a clear, narrow product search.',
+      `- negatives: at most ${AD_STUDIO_AI_NEGATIVES_MAX} words or short phrases for searches that would waste money (jobs, salary, course, template, download, what is...). Never exclude a word that describes what the business sells or offers - if it has a free plan, do not exclude "free".`,
+      `- ${UNTRUSTED_INPUT_RULE}`,
+    ].join('\n'),
+    user: [
+      `Ad name: ${brief.name}`,
+      `Objective: ${brief.objective}`,
+      `Product: ${brief.productDescription}`,
+      brief.landingPageUrl ? `Landing page: ${brief.landingPageUrl}` : null,
+      `Ad language: ${languageName(brief.language)}`,
+      ...(contextLines.length ? ['', 'Context:', ...contextLines] : []),
+      ...(list ? ['', 'Keyword ideas (keyword | monthly searches | competition):', ...list] : []),
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n'),
+  };
+}
+
+/**
+ * Makes the AI's keyword choice safe to show: only Google's own ideas when there were some (with
+ * their volumes), legal and unique keywords, a known match type, and no negative that would block
+ * one of the chosen keywords.
+ */
+export function sanitizeKeywordChoice(
+  raw: unknown,
+  ideas: readonly AdStudioKeywordIdea[] | null,
+): { keywords: AdStudioSearchKeyword[]; negatives: string[] } {
+  const value = (raw && typeof raw === 'object' ? raw : {}) as { keywords?: unknown; negatives?: unknown };
+  const known = ideas?.length ? new Map(ideas.map((idea) => [cleanKeyword(idea.keyword), idea])) : null;
+  const keywords: AdStudioSearchKeyword[] = [];
+  const seen = new Set<string>();
+  for (const item of Array.isArray(value.keywords) ? value.keywords : []) {
+    const entry = (item && typeof item === 'object' ? item : {}) as { text?: unknown; matchType?: unknown };
+    const text = cleanKeyword(entry.text);
+    if (keywordIssue(text) || seen.has(text)) continue;
+    const matchType = (AD_STUDIO_MATCH_TYPES as readonly unknown[]).includes(entry.matchType) ? (entry.matchType as AdStudioMatchType) : 'PHRASE';
+    const idea = known?.get(text);
+    if (known && !idea) continue;
+    seen.add(text);
+    keywords.push(
+      idea
+        ? keywordFromIdea(idea, matchType)
+        : { text, matchType, avgMonthlySearches: null, competition: null, lowTopOfPageBid: null, highTopOfPageBid: null },
+    );
+    if (keywords.length === AD_STUDIO_AI_KEYWORDS_MAX) break;
+  }
+  const words = keywords.map((keyword) => new Set(keyword.text.split(' ')));
+  const negatives = [...new Set((Array.isArray(value.negatives) ? value.negatives : []).map(cleanKeyword))]
+    .filter((negative) => negative && !keywordIssue(negative))
+    // A negative whose words all appear in a chosen keyword would stop that keyword from ever showing.
+    .filter((negative) => !words.some((set) => negative.split(' ').every((word) => set.has(word))))
+    .slice(0, AD_STUDIO_AI_NEGATIVES_MAX);
+  return { keywords, negatives };
+}

@@ -3896,7 +3896,8 @@
       "site_analysis": "Site reading",
       "target_writing": "Target writing",
       "landing_page": "Landing page writing",
-      "audience_plan": "Audience planning"
+      "audience_plan": "Audience planning",
+      "keyword_choice": "Keyword choice"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4744,6 +4745,10 @@
       "seedsPlaceholder": "e.g. digital signature, sign pdf online",
       "useLandingPage": "Also use the landing page",
       "research": "Look up keywords",
+      "aiChoose": "Let AI choose the keywords",
+      "aiChooseHint": "Don't know Google Ads? The AI picks the searches worth paying for and the ones to exclude - you only review and save.",
+      "aiChosen": "{count, plural, one {The AI chose # keyword} other {The AI chose # keywords}} from Google's own searches. Review them below and save.",
+      "aiChosenNoVolumes": "{count, plural, one {The AI chose # keyword} other {The AI chose # keywords}} from your plan. Google's monthly searches are not available for this project, so there are no volumes. Review them below and save.",
       "noIdeas": "Google returned no keyword ideas for these words. Try broader words or another country.",
       "unavailable": {
         "no_google_ads_credential": "No Google Ads account is connected to this project, so there are no search volumes. Connect one in Resources.",
@@ -4789,7 +4794,7 @@
       "keywordsSaved": "Keywords saved.",
       "adTitle": "Search ad (Google)",
       "adDescription": "A responsive search ad: up to 15 headlines and 4 descriptions that Google combines for each search. Write it with AI from the plan and the keywords, or by hand.",
-      "noKeywordsYet": "No keywords chosen yet - choose them in the Plan step so the ad is written for them.",
+      "noKeywordsYet": "No keywords chosen yet - in the Plan step, let the AI choose them for you.",
       "writeAd": "Write with AI",
       "rewriteAd": "Rewrite with AI",
       "confirmRewrite": "Replace the saved search ad?",

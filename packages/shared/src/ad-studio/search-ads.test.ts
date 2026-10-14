@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AD_STUDIO_AI_KEYWORDS_MAX,
+  buildKeywordChoicePrompt,
   buildSearchAdPrompt,
+  sanitizeKeywordChoice,
   cleanKeyword,
   cleanKeywordSeeds,
   defaultSearchTargeting,
@@ -115,5 +118,56 @@ describe('responsive search ads', () => {
     expect(prompt.user).toContain('Keywords the ad bids on (monthly searches): e signature (5000), sign pdf (10)');
     expect(prompt.user).toContain('Audience: Small law firms');
     expect(buildSearchAdPrompt(BRIEF, []).user).toContain('No keywords chosen yet');
+  });
+});
+
+describe('AI keyword choice', () => {
+  const IDEAS = [
+    { keyword: 'Digital Signature', avgMonthlySearches: 2400, competition: 'MEDIUM' as const, lowTopOfPageBid: 1.2, highTopOfPageBid: 4.5 },
+    { keyword: 'sign pdf online', avgMonthlySearches: 900, competition: 'LOW' as const, lowTopOfPageBid: 0.8, highTopOfPageBid: 2 },
+    { keyword: 'docusign jobs', avgMonthlySearches: 50, competition: null, lowTopOfPageBid: null, highTopOfPageBid: null },
+  ];
+
+  it('asks to choose only from Google ideas, busiest first, when there are some', () => {
+    const prompt = buildKeywordChoicePrompt(BRIEF, [...IDEAS].reverse());
+    expect(prompt.system).toContain('ONLY from the keyword ideas');
+    expect(prompt.user.indexOf('Digital Signature | 2400 | MEDIUM')).toBeLessThan(prompt.user.indexOf('sign pdf online | 900'));
+    expect(prompt.system).toContain('do not exclude "free"');
+  });
+
+  it('asks for keywords in the ad language when Google gave no ideas', () => {
+    const prompt = buildKeywordChoicePrompt({ ...BRIEF, language: 'he' }, null, { keywordThemes: ['e-signature'] });
+    expect(prompt.system).not.toContain('ONLY from');
+    expect(prompt.system).toContain('Hebrew');
+    expect(prompt.user).toContain('Keyword themes: e-signature');
+    expect(prompt.user).not.toContain('Keyword ideas');
+  });
+
+  it('keeps only listed ideas, with their volumes, and a known match type', () => {
+    const chosen = sanitizeKeywordChoice(
+      { keywords: [{ text: 'digital signature', matchType: 'EXACT' }, { text: 'Sign PDF online', matchType: 'WEIRD' }, { text: 'made up keyword', matchType: 'PHRASE' }, { text: 'digital signature', matchType: 'PHRASE' }], negatives: [] },
+      IDEAS,
+    );
+    expect(chosen.keywords).toEqual([
+      { text: 'digital signature', matchType: 'EXACT', avgMonthlySearches: 2400, competition: 'MEDIUM', lowTopOfPageBid: 1.2, highTopOfPageBid: 4.5 },
+      { text: 'sign pdf online', matchType: 'PHRASE', avgMonthlySearches: 900, competition: 'LOW', lowTopOfPageBid: 0.8, highTopOfPageBid: 2 },
+    ]);
+  });
+
+  it('accepts its own keywords without volumes when there were no ideas, and caps the list', () => {
+    const many = Array.from({ length: 30 }, (_, index) => ({ text: `keyword ${index}`, matchType: 'PHRASE' }));
+    const chosen = sanitizeKeywordChoice({ keywords: [{ text: HEBREW, matchType: 'BROAD' }, { text: '', matchType: 'PHRASE' }, { text: 'a '.repeat(12), matchType: 'PHRASE' }, ...many] }, null);
+    expect(chosen.keywords[0]).toEqual({ text: HEBREW, matchType: 'BROAD', avgMonthlySearches: null, competition: null, lowTopOfPageBid: null, highTopOfPageBid: null });
+    expect(chosen.keywords).toHaveLength(AD_STUDIO_AI_KEYWORDS_MAX);
+  });
+
+  it('drops negatives that would block a chosen keyword, repeats and junk', () => {
+    const chosen = sanitizeKeywordChoice({ keywords: [{ text: 'free digital signature', matchType: 'PHRASE' }], negatives: ['free', 'Jobs', 'jobs', 'digital signature', 'course', 42] }, null);
+    expect(chosen.negatives).toEqual(['jobs', 'course']);
+  });
+
+  it('survives a malformed answer', () => {
+    expect(sanitizeKeywordChoice(null, IDEAS)).toEqual({ keywords: [], negatives: [] });
+    expect(sanitizeKeywordChoice({ keywords: 'x', negatives: {} }, null)).toEqual({ keywords: [], negatives: [] });
   });
 });

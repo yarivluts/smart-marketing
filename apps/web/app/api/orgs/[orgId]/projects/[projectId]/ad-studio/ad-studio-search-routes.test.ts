@@ -20,6 +20,7 @@ import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { getServerKmsProvider } from '@/lib/vault/kms-provider';
 import { POST as createBrief } from './briefs/route';
 import { POST as research } from './briefs/[briefId]/keywords/research/route';
+import { POST as suggest } from './briefs/[briefId]/keywords/suggest/route';
 import { PUT as saveKeywords } from './briefs/[briefId]/keywords/route';
 import { PUT as saveSearchAd } from './briefs/[briefId]/search-ad/route';
 import { POST as writeSearchAd } from './briefs/[briefId]/search-ad/generate/route';
@@ -252,5 +253,31 @@ describe('Ad Studio search ads', () => {
     expect(await edited.json()).toEqual({ error: 'invalid_search', issues: [{ code: 'headline_too_long', index: 4 }] });
     const ok = await saveSearchAd(request('PUT', { ad: { ...brief.searchAd, headlines: [...brief.searchAd.headlines, 'Signed by lunch'] } }), ctx.p);
     expect(((await ok.json()) as { brief: { searchAd: { headlines: string[] } } }).brief.searchAd.headlines).toHaveLength(4);
+  });
+
+  it('the AI chooses keywords for review without saving them: its own without Google, Google ideas with it', async () => {
+    const ctx = await setup();
+    stubNetwork({ gemini: [JSON.stringify({ keywords: [{ text: 'Sign contracts online', matchType: 'PHRASE' }], negatives: ['jobs', 'online'] })] });
+    const own = await suggest(request('POST', { seeds: ['e signature'], targeting: { country: 'IL', language: 'he' } }), ctx.p);
+    expect(own.status).toBe(200);
+    expect(await own.json()).toEqual({
+      suggestion: {
+        researched: false,
+        reason: 'no_google_ads_credential',
+        keywords: { targeting: { country: 'IL', language: 'he' }, negatives: ['jobs'], keywords: [{ text: 'sign contracts online', matchType: 'PHRASE', avgMonthlySearches: null, competition: null, lowTopOfPageBid: null, highTopOfPageBid: null }] },
+      },
+    });
+    expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).search_keywords ?? null).toBeNull();
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).map((row) => [row.kind, row.outcome])).toEqual([['keyword_choice', 'succeeded']]);
+    expect((await suggest(request('POST', { seeds: [], targeting: { country: 'ZZ', language: 'he' } }), ctx.p)).status).toBe(400);
+
+    await attachGoogleAds(ctx.orgId, ctx.projectId, ctx.owner.id);
+    stubNetwork({
+      gemini: [JSON.stringify({ keywords: [{ text: 'electronic signature', matchType: 'EXACT' }, { text: 'not an idea', matchType: 'PHRASE' }], negatives: [] })],
+      googleAds: () => new Response(JSON.stringify({ results: [{ text: 'electronic signature', keywordIdeaMetrics: { avgMonthlySearches: '12100', competition: 'HIGH', lowTopOfPageBidMicros: '2100000', highTopOfPageBidMicros: '9400000' } }] }), { status: 200 }),
+    });
+    const researched = (await (await suggest(request('POST', { seeds: ['e signature'], targeting: { country: 'IL', language: 'he' } }), ctx.p)).json()) as { suggestion: { researched: boolean; keywords: { keywords: unknown[] } } };
+    expect(researched.suggestion.researched).toBe(true);
+    expect(researched.suggestion.keywords.keywords).toEqual([{ text: 'electronic signature', matchType: 'EXACT', avgMonthlySearches: 12100, competition: 'HIGH', lowTopOfPageBid: 2.1, highTopOfPageBid: 9.4 }]);
   });
 });
