@@ -194,13 +194,13 @@ describe('CreateGoalModal Component', () => {
 
     // Click MRR preset
     fireEvent.click(screen.getByTestId('preset-mrr-btn'));
-    expect(screen.getByTestId('modal-input-name')).toHaveValue('Quarterly MRR Expansion');
+    expect(screen.getByTestId('modal-input-name')).toHaveValue(enMessages.Goals.presetNameMrr);
     expect(screen.getByTestId('modal-input-metric')).toHaveValue('mrr_usd');
     expect(screen.getByTestId('modal-input-target')).toHaveValue(100000);
 
     // Click CAC preset
     fireEvent.click(screen.getByTestId('preset-cac-btn'));
-    expect(screen.getByTestId('modal-input-name')).toHaveValue('Blended CAC Guardrail');
+    expect(screen.getByTestId('modal-input-name')).toHaveValue(enMessages.Goals.presetNameCac);
     expect(screen.getByTestId('modal-input-metric')).toHaveValue('blended_cac_usd');
     expect(screen.getByTestId('modal-input-target')).toHaveValue(45);
   });
