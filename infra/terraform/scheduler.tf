@@ -173,7 +173,7 @@ resource "google_service_account" "growth_pilot_scheduler" {
   project      = var.project_id
   account_id   = "growth-pilot-scheduler"
   display_name = "Growth Pilot scheduler"
-  description  = "Signs the identity tokens Cloud Scheduler sends to the Growth Pilot cron route. No roles: it only proves who is calling."
+  description  = "Signs the identity tokens Cloud Scheduler sends to the Growth Pilot cron route; no roles"
 }
 
 resource "google_cloud_scheduler_job" "growth_pilot" {
