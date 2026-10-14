@@ -5,6 +5,9 @@ import {
   addRequestedGrowthTarget,
   completeGrowthProposalRevision,
   createAdStudioBrief,
+  failGrowthAudience,
+  saveGrowthAudienceProposal,
+  updateGrowthAudiencePlan,
   failGrowthLanding,
   getGrowthLandingPage,
   saveGrowthLandingDraft,
@@ -26,7 +29,10 @@ import {
   type GrowthProposalModel,
 } from '@growthos/firebase-orm-models';
 import {
+  audienceTargeting,
+  buildAudiencePrompt,
   buildLandingPagePrompt,
+  defaultMetaTargeting,
   buildSiteAnalysisPrompt,
   buildTargetFromRequestPrompt,
   buildTargetRevisionPrompt,
@@ -36,13 +42,17 @@ import {
   growthBriefInput,
   pickSiteLinks,
   proposedTargetsFromAnalysis,
+  sanitizeAudienceDraft,
   sanitizeLandingContent,
   sanitizeSiteAnalysis,
   sanitizeTargetDraft,
+  type GrowthAudienceDraft,
+  type GrowthAudiencePlan,
   type GrowthLandingContent,
   type GrowthSitePage,
   type GrowthTargetDraft,
 } from '@growthos/shared';
+import { estimateAdStudioMetaReach, searchAdStudioMetaInterests } from './audiences';
 import { advanceAdStudioAutopilot, startAdStudioAutopilot, type AdStudioAutopilotDeps } from './autopilot';
 import { listBriefImages, rewriteAdStudioImageConcept } from './image-pipeline';
 import { AdStudioProviderError } from './llm';
@@ -97,6 +107,15 @@ export const GrowthLandingContentSchema = z.object({
   faq: z.array(z.object({ question: z.string(), answer: z.string() })),
   ctaText: z.string().describe('The button: 2-4 words.'),
   closingHeadline: z.string(),
+});
+
+export const GrowthAudienceDraftSchema = z.object({
+  summary: z.string().describe('One or two sentences for the owner, in the site language: who these ads reach and why.'),
+  countries: z.array(z.string()).describe('ISO 3166 two-letter country codes.'),
+  ageMin: z.number(),
+  ageMax: z.number(),
+  genders: z.array(z.enum(['male', 'female'])).describe('Empty for everyone.'),
+  interestKeywords: z.array(z.string()).describe('3-8 short English words to look up as Meta interests.'),
 });
 
 export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[] } | { status: 'unavailable'; reason: string };
@@ -189,6 +208,7 @@ export async function reviseGrowthProposal(ctx: AdStudioCallContext & { proposal
   const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, now: ctx.now };
   if (held.kind === 'ads') return reviseGrowthAds(ctx, held, scope);
   if (held.kind === 'landing_page') return reviseGrowthLanding(ctx, held, scope);
+  if (held.kind === 'audience') return reviseGrowthAudience(ctx, held, scope);
   try {
     const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id);
     if (!held.draft || !pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
@@ -269,6 +289,11 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
     await writeGrowthLanding(ctx, pilot, needsPage);
     return;
   }
+  const needsAudience = targets.find((target) => target.status === 'active' && target.brief_id && (target.audience_status ?? 'none') === 'none');
+  if (needsAudience) {
+    await planGrowthAudience(ctx, pilot, needsAudience);
+    return;
+  }
   const next = targets.find((target) => target.status === 'active' && !target.brief_id && (target.ads_status ?? 'none') === 'none');
   if (!next) return;
   const brief = await createAdStudioBrief({
@@ -344,6 +369,84 @@ async function reviseGrowthLanding(ctx: AdStudioCallContext, held: GrowthProposa
     const content = sanitizeLandingContent(raw as GrowthLandingContent);
     if (!content) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'invalid_output' });
     await updateGrowthLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, pageId: page.id, content, now: ctx.now });
+    return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
+  } catch (error) {
+    return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
+  }
+}
+
+/**
+ * Turns the AI's audience into Meta targeting: each interest word is matched to the biggest Meta
+ * interest for it, and the whole gets a reach estimate. Without Meta (not connected, or it failed)
+ * the plan still holds countries, ages and genders, and says why the interests are not matched.
+ */
+async function resolveAudiencePlan(ctx: AdStudioCallContext, draft: GrowthAudienceDraft, language: string): Promise<GrowthAudiencePlan> {
+  const lookup = { organizationId: ctx.organizationId, projectId: ctx.projectId };
+  const interests: GrowthAudiencePlan['targeting']['interests'] = [];
+  const unresolved: string[] = [];
+  let meta = 'ok';
+  for (const word of draft.interestKeywords) {
+    if (meta !== 'ok') {
+      unresolved.push(word);
+      continue;
+    }
+    const found = await searchAdStudioMetaInterests({ ...lookup, query: word, language });
+    if (found.status !== 'ok') {
+      meta = found.reason;
+      unresolved.push(word);
+      continue;
+    }
+    const best = found.data.find((interest) => !interests.some((chosen) => chosen.id === interest.id));
+    if (best) interests.push({ id: best.id, name: best.name, sizeLower: best.sizeLower, sizeUpper: best.sizeUpper });
+    else unresolved.push(word);
+  }
+  const targeting = audienceTargeting(draft, interests);
+  let reach: GrowthAudiencePlan['reach'] = null;
+  if (meta === 'ok') {
+    const estimate = await estimateAdStudioMetaReach({ ...lookup, targeting });
+    if (estimate.status === 'ok' && estimate.data.ready) reach = { lower: estimate.data.monthlyLower, upper: estimate.data.monthlyUpper };
+    else if (estimate.status !== 'ok') meta = estimate.reason;
+  }
+  return { summary: draft.summary, targeting, unresolvedInterests: unresolved, reach, meta };
+}
+
+async function writeAudienceDraft(ctx: AdStudioCallContext, pilot: GrowthPilotModel, target: GrowthTargetModel, current?: GrowthAudienceDraft, request?: string): Promise<GrowthAudienceDraft> {
+  const analysis = pilot.analysis!;
+  const prompt = buildAudiencePrompt({ analysis, target, siteUrl: pilot.site_url, current, request });
+  const raw = await meteredCall(ctx, 'audience_plan', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthAudienceDraftSchema }));
+  return sanitizeAudienceDraft(raw as GrowthAudienceDraft, defaultMetaTargeting(analysis.language || 'en').countries[0]);
+}
+
+/** Proposes the audience for a target whose ads exist (one text call, then Meta lookups). */
+async function planGrowthAudience(ctx: AdStudioCallContext, pilot: GrowthPilotModel, target: GrowthTargetModel): Promise<void> {
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
+  try {
+    const draft = await writeAudienceDraft(ctx, pilot, target);
+    const plan = await resolveAudiencePlan(ctx, draft, pilot.analysis!.language || 'en');
+    await saveGrowthAudienceProposal({ ...scope, plan });
+  } catch (error) {
+    await failGrowthAudience({ ...scope, failureCode: growthFailureCode(error) });
+  }
+}
+
+/** The person asked for a change to an audience: the AI revises it, Meta matches it again, and it comes back. */
+async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthProposalModel, scope: { organizationId: string; projectId: string; proposalId: string; now?: Date }): Promise<GrowthProposalModel> {
+  try {
+    if (!held.audience || !held.target_id) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
+    const [pilot, target] = await Promise.all([getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id), getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id)]);
+    if (!pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
+    const current: GrowthAudienceDraft = {
+      summary: held.audience.summary,
+      countries: held.audience.targeting.countries,
+      ageMin: held.audience.targeting.ageMin,
+      ageMax: held.audience.targeting.ageMax,
+      genders: held.audience.targeting.genders,
+      interestKeywords: [...held.audience.targeting.interests.map((interest) => interest.name), ...held.audience.unresolvedInterests],
+    };
+    const request = held.change_requests[held.change_requests.length - 1].text;
+    const draft = await writeAudienceDraft(ctx, pilot, target, current, request);
+    const plan = await resolveAudiencePlan(ctx, draft, pilot.analysis.language || 'en');
+    await updateGrowthAudiencePlan({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, plan, now: ctx.now });
     return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
   } catch (error) {
     return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
