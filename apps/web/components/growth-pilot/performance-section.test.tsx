@@ -32,9 +32,9 @@ describe('GrowthPerformanceSection', () => {
     expect(await screen.findByTestId('growth-pilot-kpi-spend')).toHaveTextContent('84.5');
     expect(fetchMock).toHaveBeenCalledWith('/api/x/growth-pilot/performance?days=30');
     expect(screen.getByTestId('growth-pilot-kpi-impressions')).toHaveTextContent('12.4K');
-    expect(screen.getByTestId('growth-pilot-kpis')).toHaveTextContent('2.5% click-through rate');
+    expect(screen.getByTestId('growth-pilot-kpis')).toHaveTextContent('2.5% of the people who saw an ad clicked it');
     expect(screen.getByTestId('growth-pilot-kpi-cpc')).toHaveTextContent('0.27');
-    expect(screen.getByTestId('growth-pilot-kpis')).toHaveTextContent('7.04 per conversion');
+    expect(screen.getByTestId('growth-pilot-kpis')).toHaveTextContent('7.04 for each sign-up or sale');
     expect(screen.getByRole('table', { hidden: true })).toHaveTextContent('10-14');
     expect(onTargets).toHaveBeenCalledWith(SUMMARY.byTarget);
   });
