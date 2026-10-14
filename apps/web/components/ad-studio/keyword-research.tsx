@@ -395,9 +395,12 @@ export function KeywordResearch({
           <span className="text-sm font-semibold">
             {t('selectedTitle', { count: selected.length })}
           </span>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {t('selectedSearches', { searches: number.format(totalSearches) })}
-          </span>
+          {/* Only Google's own numbers: without volumes a total of 0 would mislead. */}
+          {selected.some((keyword) => keyword.avgMonthlySearches !== null) ? (
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {t('selectedSearches', { searches: number.format(totalSearches) })}
+            </span>
+          ) : null}
         </div>
         {selected.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t('selectedEmpty')}</p>
@@ -405,7 +408,7 @@ export function KeywordResearch({
         <ul className="flex flex-col gap-1.5" data-testid="ad-studio-selected-keywords">
           {selected.map((keyword, position) => (
             <li key={keyword.text} className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="min-w-0 flex-1 truncate" dir="auto">
+              <span className="min-w-0 flex-1 break-words" dir="auto">
                 {keyword.text}
               </span>
               <span className="text-xs text-muted-foreground tabular-nums">

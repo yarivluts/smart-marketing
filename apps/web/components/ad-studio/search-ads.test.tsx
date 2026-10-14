@@ -202,6 +202,8 @@ describe('KeywordResearch', () => {
     fireEvent.click(screen.getByRole('button', { name: en.aiChoose }));
     expect(await screen.findByText(/from your plan\. Google's monthly searches are not available/)).toBeInTheDocument();
     expect(screen.getByText('sign contracts online')).toBeInTheDocument();
+    // No Google volumes: no misleading "0 searches a month" total.
+    expect(screen.queryByText(en.selectedSearches.replace('{searches}', '0'))).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: en.aiChoose }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
