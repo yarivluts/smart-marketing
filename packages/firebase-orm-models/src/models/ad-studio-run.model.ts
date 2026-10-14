@@ -108,3 +108,33 @@ export class AdStudioRunModel extends BaseModel {
   @Field({ is_required: false })
   public qa_retries?: Record<string, number> | null;
 }
+
+/**
+ * One line per autopilot run that has not finished, at the top level: the scheduler that keeps runs
+ * moving after the person closed the tab reads it instead of walking every organization. Written
+ * when a run starts; removed once the run is done, failed or cancelled.
+ */
+@Model({
+  reference_path: 'ad_studio_run_index',
+  path_id: 'ad_studio_run_index_id',
+})
+export class AdStudioRunIndexModel extends BaseModel {
+  @Field({ is_required: true })
+  public organization_id!: string;
+
+  @Field({ is_required: true })
+  public project_id!: string;
+
+  @Field({ is_required: true })
+  public brief_id!: string;
+
+  @Field({ is_required: true })
+  public run_id!: string;
+
+  /** The person who started it: scheduled work runs, and counts toward limits, on their behalf. */
+  @Field({ is_required: true })
+  public started_by!: string;
+
+  @Field({ is_required: true })
+  public started_on!: string;
+}
