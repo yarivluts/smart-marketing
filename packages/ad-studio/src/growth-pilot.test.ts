@@ -403,6 +403,7 @@ describe('publishing and turning on', () => {
   });
 
   it('publishes every approved image, paused, into one ad set with its idea words and the chosen budget', async () => {
+    orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
     orm.getGrowthProposal.mockResolvedValue({ id: 'pub1', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: PLAN });
     studio.listBriefImages.mockResolvedValue([{ id: 'i1', conceptId: 'c1' }, { id: 'i2', conceptId: 'c2' }]);
     let n = 0;
@@ -416,6 +417,7 @@ describe('publishing and turning on', () => {
   });
 
   it('publishes nothing more when the first ad fails, says why, and refuses a bad budget', async () => {
+    orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
     orm.getGrowthProposal.mockResolvedValue({ id: 'pub1', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: PLAN });
     studio.listBriefImages.mockResolvedValue([{ id: 'i1', conceptId: 'c1' }]);
     const publish = vi.fn(async () => ({ id: 'e1', status: 'failed', failure_code: 'meta_account_restricted' }));
@@ -425,6 +427,15 @@ describe('publishing and turning on', () => {
     expect(orm.markGrowthAdsPublished).not.toHaveBeenCalled();
     await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: -5 }, { publish: publish as never })).rejects.toThrow('daily budget');
     await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: Number.NaN }, { publish: publish as never })).rejects.toThrow('daily budget');
+  });
+
+  it('refuses to publish without a Meta ad account before reading or creating anything', async () => {
+    orm.getGrowthProposal.mockResolvedValue({ id: 'pub1', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: PLAN });
+    orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: false, reason: 'no_credential' } });
+    const publish = vi.fn();
+    await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1' }, { publish: publish as never })).rejects.toMatchObject({ name: 'AdStudioExportUnavailableError' });
+    expect(publish).not.toHaveBeenCalled();
+    expect(orm.getAdStudioBrief).not.toHaveBeenCalled();
   });
 
   it('turns the published ads on only when the person approves that, and records it', async () => {

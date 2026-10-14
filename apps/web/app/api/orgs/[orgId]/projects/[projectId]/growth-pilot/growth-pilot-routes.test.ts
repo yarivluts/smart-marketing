@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, listAdStudioUsage, listAuditLogEntriesForOrg } from '@growthos/firebase-orm-models';
+import { acceptInvite, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, inviteMemberToOrganization, listAdStudioUsage, listAuditLogEntriesForOrg, saveGrowthPublishProposal } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { configureAdStudioRuntime, resetAdStudioRuntime } from '@/lib/ad-studio/engine';
 import type { GrowthPilotPageData } from '@/lib/growth-pilot/view';
@@ -83,7 +83,7 @@ async function setup() {
   const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
   getServerSessionMock.mockResolvedValue(session);
   const p = (extra: Record<string, string> = {}) => ({ params: Promise.resolve({ orgId: organization.id, projectId: project.id, ...extra }) }) as never;
-  return { orgId: organization.id, projectId: project.id, p };
+  return { orgId: organization.id, projectId: project.id, ownerId: owner.id, p };
 }
 
 const json = async (response: Response) => (await response.json()) as GrowthPilotPageData & { error?: string };
@@ -154,5 +154,29 @@ describe('Growth Pilot routes', () => {
     await startPilot(request('POST', { siteUrl: 'missing.co.il' }), p());
     const failed = await json(await advancePilot(request('POST'), p()));
     expect(failed.pilot).toMatchObject({ status: 'failed', failureCode: 'site_http_error' });
+  });
+
+  it('publishing needs the publish permission and a connected Meta account, and never goes through the plain decision', async () => {
+    fakeGemini();
+    const { orgId, projectId, ownerId, p } = await setup();
+    await startPilot(request('POST', { siteUrl: 'easysign.co.il' }), p());
+    const ready = await json(await advancePilot(request('POST'), p()));
+    const target = ready.targets[0];
+    const publish = await saveGrowthPublishProposal({ organizationId: orgId, projectId, targetId: target.id, plan: { destination: 'meta', imageIds: ['i1'], dailyBudget: 20, linkUrl: 'https://a.co/', campaignName: 'C', countries: ['IL'] } });
+
+    // No Meta account connected in this project: a clear refusal, nothing published.
+    const noMeta = await decide(request('POST', { action: 'approve', dailyBudget: 20 }), p({ proposalId: publish.id }));
+    expect(noMeta.status).toBe(409);
+    expect(await noMeta.json()).toMatchObject({ error: 'meta_unavailable' });
+
+    // A member who may use AI but not act on ad platforms cannot publish.
+    const memberEmail = `${unique('member')}@example.com`;
+    const invitation = await inviteMemberToOrganization({ organizationId: orgId, email: memberEmail, role: 'editor', invitedByUserId: ownerId, projectId });
+    const memberSession = { uid: unique('uid'), email: memberEmail, email_verified: true } as DecodedIdToken;
+    const member = await ensureUserForFirebaseSession({ firebaseUid: memberSession.uid, email: memberEmail });
+    await acceptInvite({ organizationId: orgId, membershipId: invitation.id, userId: member.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const forbidden = await decide(request('POST', { action: 'approve', dailyBudget: 20 }), p({ proposalId: publish.id }));
+    expect([403, 404]).toContain(forbidden.status);
   });
 });

@@ -5548,7 +5548,10 @@
         "landing_published": "You published the landing page for {subject}",
         "landing_failed": "Could not write a landing page for {subject}",
         "audience_ready": "Planned an audience for {subject}",
-        "audience_failed": "Could not plan an audience for {subject}"
+        "audience_failed": "Could not plan an audience for {subject}",
+        "ads_published": "{count, plural, one {Published # paused ad} other {Published # paused ads}} for {subject}",
+        "publish_failed": "Could not publish the ads for {subject}",
+        "ads_activated": "You turned on the ads for {subject}"
       }
     },
     "errors": {
@@ -5559,7 +5562,10 @@
       "not_pending": "This proposal was already decided.",
       "not_ready": "The site is still being read.",
       "not_found": "Not found. Refresh the page.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "invalid_budget": "Enter a daily budget above zero.",
+      "automation_stopped": "Automation is stopped for your organization (kill switch). Turn it back on to run ads.",
+      "meta_unavailable": "The Meta ad account is not connected or not allowed to publish."
     },
     "ads": {
       "title": "Ads for {name}",
@@ -5607,6 +5613,26 @@
         "approved": "Audience approved",
         "rejected": "You rejected the audience",
         "failed": "The audience could not be planned ({reason})"
+      }
+    },
+    "publish": {
+      "title": "Publish the ads for {name}",
+      "activateTitle": "Turn on the ads for {name}",
+      "description": "{count, plural, one {The approved image goes to Meta as a paused ad} other {The # approved images go to Meta as paused ads in one ad set}}. Nothing runs or spends until you turn them on.",
+      "activateDescription": "The ads are on Meta, paused. Turning them on starts spending - up to {budget} a day in your ad account currency.",
+      "link": "Link",
+      "countries": "Countries",
+      "budget": "Daily budget",
+      "approve": "Publish (paused)",
+      "activate": "Turn on the ads",
+      "status": {
+        "needs_meta": "Ready to publish once a Meta ad account is connected.",
+        "ready": "Publishing waits for your approval",
+        "published": "On Meta, paused",
+        "running": "Ads are running",
+        "rejected": "You chose not to publish",
+        "failed": "Publishing failed ({reason})",
+        "connect": "Connect Meta"
       }
     }
   }

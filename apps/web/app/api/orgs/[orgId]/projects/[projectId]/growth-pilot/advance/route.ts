@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { publicWebOrigin } from '@/lib/integrations/meta';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { advanceCurrentGrowthPilot, resolveAdStudioAutopilotDeps, resolveAdStudioImageDeps, resolveAdStudioLlm, resolveAdStudioVideoDeps } from '@/lib/ad-studio/engine';
 import { loadGrowthPilotPage } from '@/lib/growth-pilot/store';
@@ -17,7 +18,7 @@ export const maxDuration = 300;
  * and returns the page data. Safe to call repeatedly and from several tabs: a lease makes the others
  * wait. Counts one call toward the daily AI text limit when it analyzes. Gated on `ai.use`.
  */
-export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
+export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
   const { user, error } = await requireProjectPermission(orgId, projectId, 'ai.use');
   if (error) return error;
@@ -25,7 +26,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams): Prom
   if (!llm) return NextResponse.json({ error: 'provider_failed', code: 'not_configured' }, { status: 503 });
   try {
     const autopilot = resolveAdStudioAutopilotDeps(resolveAdStudioVideoDeps(), resolveAdStudioImageDeps());
-    await advanceCurrentGrowthPilot({ organizationId: orgId, projectId, actorId: user.id, llm, autopilot });
+    await advanceCurrentGrowthPilot({ organizationId: orgId, projectId, actorId: user.id, llm, autopilot, publicWebUrl: publicWebOrigin(request.url) });
     return NextResponse.json((await loadGrowthPilotPage(orgId, projectId)) ?? { pilot: null });
   } catch (err) {
     return growthPilotErrorResponse(err);

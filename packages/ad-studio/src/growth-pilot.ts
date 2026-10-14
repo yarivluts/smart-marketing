@@ -4,6 +4,7 @@ import {
   acquireGrowthPilotLease,
   addRequestedGrowthTarget,
   completeGrowthProposalRevision,
+  AdStudioExportUnavailableError,
   createAdStudioBrief,
   failGrowthPublish,
   getGrowthProposal,
@@ -558,6 +559,9 @@ export async function approveGrowthPublish(ctx: AdStudioCallContext & { proposal
   if (proposal.status !== 'pending' || proposal.kind !== 'publish' || !proposal.publish || !proposal.target_id) throw new GrowthProposalNotPendingError(proposal.status);
   const budget = ctx.dailyBudget ?? proposal.publish.dailyBudget;
   if (!Number.isFinite(budget) || budget <= 0 || budget > MAX_DAILY_BUDGET) throw new GrowthPublishInvalidError();
+  // Before anything is read or created: is there a Meta ad account to publish to?
+  const destinations = await resolveAdStudioExportDestinations(ctx.organizationId, ctx.projectId);
+  if (!destinations.meta.available) throw new AdStudioExportUnavailableError('meta', destinations.meta.reason);
   const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, proposal.target_id);
   const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, proposal.pilot_id);
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!);
