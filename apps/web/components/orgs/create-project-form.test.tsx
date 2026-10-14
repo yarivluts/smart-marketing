@@ -48,4 +48,28 @@ describe('CreateProjectForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('asks for a name instead of sending an empty request', () => {
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Please type a name for your project.');
+    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Project name'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('shows an example hint and sends a trimmed name', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ projectId: 'p1' }) } as Response);
+    renderForm();
+
+    expect(screen.getByText(/Your business or website name is perfect/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Project name'), { target: { value: '  Bakery ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects', expect.objectContaining({ body: JSON.stringify({ name: 'Bakery' }) }));
+  });
 });

@@ -16,16 +16,22 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
+  const [missingName, setMissingName] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(false);
+    if (name.trim() === '') {
+      setMissingName(true);
+      return;
+    }
+    setMissingName(false);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: name.trim() }),
       });
       if (!response.ok) {
         setError(true);
@@ -44,7 +50,23 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
         <label className="text-sm font-medium" htmlFor="project-name">
           {t('nameLabel')}
         </label>
-        <Input id="project-name" required value={name} onChange={(event) => setName(event.target.value)} />
+        <Input
+          id="project-name"
+          required
+          value={name}
+          aria-invalid={missingName}
+          aria-describedby={missingName ? 'project-name-error' : 'project-name-hint'}
+          onChange={(event) => setName(event.target.value)}
+        />
+        {missingName ? (
+          <p id="project-name-error" role="alert" className="text-sm text-destructive">
+            {t('nameRequired')}
+          </p>
+        ) : (
+          <p id="project-name-hint" className="text-sm text-muted-foreground">
+            {t('nameHint')}
+          </p>
+        )}
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
