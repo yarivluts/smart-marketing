@@ -17,12 +17,16 @@ describe('growthBriefInput', () => {
     expect(input.objective).toContain('Small offices');
     expect(input.objective).toContain('Pro plan');
     expect(input.productDescription).toContain('EasySign: Signatures on WhatsApp.');
-    expect(input.productDescription).toContain('For: Small offices');
+    expect(input.productDescription).toContain('Small offices');
+    // Only the site's words and punctuation: no English glue around the site's language.
+    expect(input.objective).toBe('Pro plan (EasySign) - Small offices - 20 documents a month');
+    expect(input.productDescription).not.toMatch(/For:|Offerings:/);
   });
 
-  it('briefs an audience as reaching that group, and keeps within the brief limits', () => {
+  it('briefs an audience by its own words, and keeps within the brief limits', () => {
     const input = growthBriefInput({ analysis: { ...ANALYSIS, language: '' }, target: { kind: 'audience', name: 'x'.repeat(200), description: 'd'.repeat(3000), audience: '' }, siteUrl: 'https://a.co/' });
-    expect(input.objective.startsWith('Reach ')).toBe(true);
+    expect(input.objective.startsWith('x')).toBe(true);
+    expect(input.objective).not.toMatch(/Reach|Bring/);
     expect(input.name.length).toBeLessThanOrEqual(120);
     expect(input.objective.length).toBeLessThanOrEqual(2000);
     expect(input.productDescription.length).toBeLessThanOrEqual(4000);
