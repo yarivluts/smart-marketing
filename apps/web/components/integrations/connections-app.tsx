@@ -1,12 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { AlertTriangle, CheckCircle2, ChevronDown, CircleDashed, ExternalLink, Link2, Loader2, Plus, RefreshCw } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { CONNECTION_FIELDS, CONNECTION_GUIDE_LINKS, CONNECTION_PLATFORMS, type ConnectionPlatform } from '@/lib/integrations/connection-fields';
 import type { ConnectionView } from '@/lib/integrations/connections';
+import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
 
 export interface ConnectionRow extends ConnectionView {
   /** The projects this connection is attached to. */
@@ -29,6 +30,8 @@ export interface ConnectionsAppProps {
 }
 
 type Result = { tone: 'ok' | 'error'; text: string };
+
+const WHEN = { dateStyle: 'medium', timeStyle: 'short' } as const;
 
 const KNOWN_REASONS = new Set(['invalid_details', 'auth_failed', 'developer_token_not_approved', 'account_not_found', 'permission_denied', 'account_disabled', 'page_not_accessible', 'rate_limited', 'api_error']);
 
@@ -87,7 +90,10 @@ export function ConnectionsApp({ orgId, canManage, projects, connections: initia
           returnTo={returnTo}
           metaConnectHref={platform === 'meta_ads' ? metaConnectHref : null}
           openOnArrival={focus === platform}
-          onSaved={(row) => setConnections((current) => [row, ...current.filter((entry) => entry.id !== row.id)])}
+          onSaved={(row) =>
+            // A known connection updates where it is; a new one goes first.
+            setConnections((current) => (current.some((entry) => entry.id === row.id) ? current.map((entry) => (entry.id === row.id ? row : entry)) : [row, ...current]))
+          }
         />
       ))}
     </div>
@@ -108,9 +114,9 @@ function PlatformCard(props: {
 }): React.ReactElement {
   const { orgId, platform, canManage, projects, rows, initialProjectId, returnTo, metaConnectHref, openOnArrival, onSaved } = props;
   const t = useTranslations('Connections');
-  const locale = useLocale();
   const router = useRouter();
-  const when = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  // Formatted in the browser only: the server's UTC text would not match the viewer's (hydration).
+  const when = useLocalDateTime(WHEN);
   const [adding, setAdding] = React.useState(openOnArrival);
   const [manual, setManual] = React.useState(platform !== 'meta_ads' || !metaConnectHref);
   const [values, setValues] = React.useState<Record<string, string>>({});
@@ -213,7 +219,7 @@ function PlatformCard(props: {
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {row.lastCheckStatus && row.lastCheckStatus !== 'ok' ? `${reasonText(row.lastCheckStatus)} ` : ''}
-                  {row.lastCheckedOn ? t('checkedOn', { when: when.format(new Date(row.lastCheckedOn)) }) : t('neverChecked')}
+                  {row.lastCheckedOn ? t('checkedOn', { when: when(row.lastCheckedOn) }) : t('neverChecked')}
                 </span>
                 <span className="text-xs text-muted-foreground" dir="auto">
                   {row.projects.length ? t('usedIn', { projects: row.projects.join(', ') }) : t('notInProject')}
