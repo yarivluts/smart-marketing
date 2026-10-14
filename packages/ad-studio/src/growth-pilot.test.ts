@@ -291,17 +291,33 @@ describe('audiences for targets with ads', () => {
     orm.listGrowthTargets.mockResolvedValue([TARGET]);
   });
 
-  it('matches each interest word to the biggest Meta interest, estimates the reach, and proposes it', async () => {
-    meta.searchAdStudioMetaInterests.mockImplementation(async ({ query }: { query: string }) =>
-      query === 'Paperwork'
-        ? { status: 'ok', data: [] }
-        : { status: 'ok', data: [{ id: query === 'Freelancer' ? 'i1' : 'i1', name: query, sizeLower: 10, sizeUpper: 20, path: [] }, { id: 'i2', name: query + ' 2', sizeLower: 1, sizeUpper: 2, path: [] }] },
-    );
+  it('keeps only the Meta interests the AI finds relevant - not whatever Meta matched loosely - and estimates the reach', async () => {
+    const found: Record<string, { id: string; name: string; path: string[] }[]> = {
+      Freelancer: [
+        { id: 'movies', name: 'Action movies', path: ['Interests', 'Entertainment', 'Movies'] },
+        { id: 'i1', name: 'Freelancer', path: ['Interests', 'Business and industry'] },
+      ],
+      'Small business': [
+        { id: 'i3', name: 'Small business', path: ['Interests', 'Business and industry'] },
+        { id: 'i1', name: 'Freelancer', path: ['Interests', 'Business and industry'] },
+      ],
+      Paperwork: [{ id: 'games', name: 'First-person shooter games', path: ['Interests', 'Games'] }],
+    };
+    meta.searchAdStudioMetaInterests.mockImplementation(async ({ query }: { query: string }) => ({ status: 'ok', data: (found[query] ?? []).map((interest) => ({ ...interest, sizeLower: 10, sizeUpper: 20 })) }));
     meta.estimateAdStudioMetaReach.mockResolvedValue({ status: 'ok', data: { monthlyLower: 50000, monthlyUpper: 80000, ready: true } });
-    await advanceGrowthPilot({ ...ctx(llm(DRAFT)), pilotId: 'g1', autopilot: {} as never });
+    const model = llm(DRAFT);
+    model.generateJson.mockResolvedValueOnce(DRAFT).mockResolvedValueOnce({ ids: ['i1', 'i3', 'unknown'] });
+    await advanceGrowthPilot({ ...ctx(model), pilotId: 'g1', autopilot: {} as never });
+
+    // The AI saw every candidate once, with where Meta files it, and the offer it is choosing for.
+    const choice = model.generateJson.mock.calls[1][0];
+    expect(choice.user).toContain('id movies: Action movies [Interests > Entertainment > Movies] (for "Freelancer")');
+    expect(choice.user.match(/id i1:/g)).toHaveLength(1);
+    expect(choice.user).toContain('Offer: Freelancers (audience)');
+
     const plan = orm.saveGrowthAudienceProposal.mock.calls[0][0].plan;
-    // The second word's biggest match was already chosen, so it takes the next one rather than repeat it.
-    expect(plan.targeting.interests.map((interest: { id: string }) => interest.id)).toEqual(['i1', 'i2']);
+    expect(plan.targeting.interests.map((interest: { id: string }) => interest.id)).toEqual(['i1', 'i3']);
+    // A word whose only matches were unrelated stays unmatched instead of pulling in games.
     expect(plan).toMatchObject({ summary: 'Freelancers in Israel', unresolvedInterests: ['Paperwork'], reach: { lower: 50000, upper: 80000 }, meta: 'ok', targeting: { countries: ['IL'], ageMin: 25, ageMax: 55 } });
     expect(orm.recordAdStudioUsage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'audience_plan' }));
     expect(meta.searchAdStudioMetaInterests).toHaveBeenCalledWith(expect.objectContaining({ language: 'he' }));
