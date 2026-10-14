@@ -3895,7 +3895,8 @@
       "image_qa": "בדיקת AI לתמונה",
       "site_analysis": "קריאת אתר",
       "target_writing": "ניסוח יעד",
-      "landing_page": "כתיבת דף נחיתה"
+      "landing_page": "כתיבת דף נחיתה",
+      "audience_plan": "תכנון קהל"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -5545,7 +5546,9 @@
         "ads_failed": "לא הצליח להכין מודעות ל{subject}",
         "landing_ready": "כתב דף נחיתה ל{subject}",
         "landing_published": "פרסמתם את דף הנחיתה ל{subject}",
-        "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}"
+        "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}",
+        "audience_ready": "תכנן קהל ל{subject}",
+        "audience_failed": "לא הצליח לתכנן קהל ל{subject}"
       }
     },
     "errors": {
@@ -5584,6 +5587,26 @@
         "rejected": "דחיתם את דף הנחיתה",
         "failed": "לא הצלחנו לכתוב את דף הנחיתה ({reason})",
         "open": "פתיחה"
+      }
+    },
+    "audience": {
+      "title": "קהל ל{name}",
+      "ages": "גילאי {min}-{max}",
+      "gender": {
+        "all": "כולם",
+        "male": "גברים",
+        "female": "נשים"
+      },
+      "reach": "Meta מעריכה {lower}-{upper} אנשים בחודש",
+      "metaMissing": "חברו את חשבון המודעות של Meta כדי להתאים את תחומי העניין ולראות את ההיקף. עד אז המודעות ישתמשו במדינות, בגילאים ובמגדר שלמעלה.",
+      "metaFailed": "Meta לא ענתה, ולכן תחומי העניין עוד לא הותאמו. אפשר לאשר את השאר כבר עכשיו.",
+      "revising": "ה-AI מעדכן את הקהל...",
+      "changePlaceholder": "את מי המודעות צריכות להגיע? למשל: רק נשים 30-45, להוסיף רואי חשבון",
+      "status": {
+        "ready": "קהל מחכה לאישור שלכם",
+        "approved": "הקהל אושר",
+        "rejected": "דחיתם את הקהל",
+        "failed": "לא הצלחנו לתכנן קהל ({reason})"
       }
     }
   }

@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { siteHost } from '@growthos/shared';
-import { AlertTriangle, ArrowLeft, Check, ExternalLink, Eye, FileText, Globe, ImageIcon, Loader2, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Eye, FileText, Globe, ImageIcon, Loader2, MapPin, UserRound, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
 import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthLandingPageView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
@@ -216,6 +216,8 @@ function ProposalCard({
   const page = proposal.kind === 'landing_page' ? (landing ?? null) : null;
   const tl = useTranslations('GrowthPilot.landing');
   const [previewing, setPreviewing] = React.useState(false);
+  const audience = proposal.kind === 'audience' ? proposal.audience : null;
+  const tu = useTranslations('GrowthPilot.audience');
   const [changing, setChanging] = React.useState(false);
   const [text, setText] = React.useState('');
   const draft = proposal.draft;
@@ -226,12 +228,12 @@ function ProposalCard({
     <li className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-proposal" aria-busy={revising || busy}>
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          {ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : page ? <FileText className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
+          {ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : audience ? <Users className="h-5 w-5" aria-hidden="true" /> : page ? <FileText className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-pp-display text-base font-semibold" dir="auto">
-              {ads ? ta('title', { name: draft.name }) : page ? tl('title', { name: draft.name }) : draft.name}
+              {ads ? ta('title', { name: draft.name }) : audience ? tu('title', { name: draft.name }) : page ? tl('title', { name: draft.name }) : draft.name}
             </h3>
             <KindChip kind={draft.kind} />
           </div>
@@ -241,12 +243,13 @@ function ProposalCard({
               <span className="font-semibold text-foreground">{page.content.headline}</span> - {page.content.subheadline}
             </p>
           ) : null}
-          {!ads && !page && draft.description ? (
+          {audience ? <AudienceSummary plan={audience} /> : null}
+          {!ads && !page && !audience && draft.description ? (
             <p className="text-sm text-muted-foreground" dir="auto">
               {draft.description}
             </p>
           ) : null}
-          {!ads && !page && draft.audience ? (
+          {!ads && !page && !audience && draft.audience ? (
             <p className="text-xs text-muted-foreground" dir="auto">
               <span className="font-semibold text-foreground">{t('for')}: </span>
               {draft.audience}
@@ -305,7 +308,7 @@ function ProposalCard({
       {revising ? (
         <p className="flex items-center gap-2 text-sm font-medium text-primary" role="status">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          {ads ? ta('revising') : page ? tl('revising') : t('revising')}
+          {ads ? ta('revising') : audience ? tu('revising') : page ? tl('revising') : t('revising')}
         </p>
       ) : changing ? (
         <form
@@ -320,7 +323,7 @@ function ProposalCard({
           <textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
-            placeholder={ads ? ta('changePlaceholder') : page ? tl('changePlaceholder') : t('changePlaceholder')}
+            placeholder={ads ? ta('changePlaceholder') : audience ? tu('changePlaceholder') : page ? tl('changePlaceholder') : t('changePlaceholder')}
             rows={2}
             dir="auto"
             className="w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm"
@@ -375,6 +378,7 @@ function TargetCard({ target, landingSlug }: { target: GrowthTargetView; landing
       ) : null}
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
       <TargetLandingLine target={target} slug={landingSlug} />
+      <TargetAudienceLine target={target} />
       <TargetAdsLine target={target} />
     </li>
   );
@@ -396,6 +400,65 @@ function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: s
         </a>
       ) : null}
     </p>
+  );
+}
+
+/** Where the target's audience stands. */
+function TargetAudienceLine({ target }: { target: GrowthTargetView }): React.ReactElement | null {
+  const t = useTranslations('GrowthPilot.audience.status');
+  if (target.status !== 'active' || target.audienceStatus === 'none') return null;
+  const status = target.audienceStatus;
+  return (
+    <p className={cn('flex items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'approved' ? 'text-success' : status === 'failed' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-audience" data-audience={status}>
+      <Users className="h-3.5 w-3.5" aria-hidden="true" />
+      {status === 'failed' ? t('failed', { reason: target.audienceFailure ?? '' }) : t(status)}
+    </p>
+  );
+}
+
+/** An audience proposal: who, where, which interests, and how many people Meta says it reaches. */
+function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audience']> }): React.ReactElement {
+  const t = useTranslations('GrowthPilot.audience');
+  const number = new Intl.NumberFormat(useLocale(), { notation: 'compact', maximumFractionDigits: 1 });
+  const genders = plan.targeting.genders.length ? plan.targeting.genders.map((gender) => t(`gender.${gender}`)).join(', ') : t('gender.all');
+  return (
+    <div className="flex flex-col gap-2" data-testid="growth-pilot-audience">
+      {plan.summary ? (
+        <p className="text-sm text-muted-foreground" dir="auto">
+          {plan.summary}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-1.5 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+          <MapPin className="h-3 w-3" aria-hidden="true" />
+          <span dir="ltr">{plan.targeting.countries.join(', ')}</span>
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
+          <UserRound className="h-3 w-3" aria-hidden="true" />
+          {t('ages', { min: plan.targeting.ageMin, max: plan.targeting.ageMax === 65 ? '65+' : String(plan.targeting.ageMax) })} · {genders}
+        </span>
+        {plan.targeting.interests.map((interest) => (
+          <span key={interest.id} className="rounded-full bg-primary/10 px-2.5 py-1 font-medium text-primary" dir="auto" data-testid="growth-pilot-audience-interest">
+            {interest.name}
+          </span>
+        ))}
+        {plan.unresolvedInterests.map((word) => (
+          <span key={word} className="rounded-full border border-dashed border-border px-2.5 py-1 text-muted-foreground" dir="auto">
+            {word}
+          </span>
+        ))}
+      </div>
+      {plan.reach && plan.reach.lower !== null && plan.reach.upper !== null ? (
+        <p className="text-xs font-semibold text-foreground" data-testid="growth-pilot-audience-reach">
+          {t('reach', { lower: number.format(plan.reach.lower), upper: number.format(plan.reach.upper) })}
+        </p>
+      ) : null}
+      {plan.meta !== 'ok' ? (
+        <p className="text-xs text-muted-foreground" data-testid="growth-pilot-audience-meta">
+          {t(plan.meta === 'no_meta_credential' || plan.meta === 'credential_not_configured' ? 'metaMissing' : 'metaFailed')}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

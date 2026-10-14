@@ -3895,7 +3895,8 @@
       "image_qa": "AI image check",
       "site_analysis": "Site reading",
       "target_writing": "Target writing",
-      "landing_page": "Landing page writing"
+      "landing_page": "Landing page writing",
+      "audience_plan": "Audience planning"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -5545,7 +5546,9 @@
         "ads_failed": "Could not make ads for {subject}",
         "landing_ready": "Wrote a landing page for {subject}",
         "landing_published": "You published the landing page for {subject}",
-        "landing_failed": "Could not write a landing page for {subject}"
+        "landing_failed": "Could not write a landing page for {subject}",
+        "audience_ready": "Planned an audience for {subject}",
+        "audience_failed": "Could not plan an audience for {subject}"
       }
     },
     "errors": {
@@ -5584,6 +5587,26 @@
         "rejected": "You rejected the landing page",
         "failed": "The landing page could not be written ({reason})",
         "open": "Open"
+      }
+    },
+    "audience": {
+      "title": "Audience for {name}",
+      "ages": "Ages {min}-{max}",
+      "gender": {
+        "all": "Everyone",
+        "male": "Men",
+        "female": "Women"
+      },
+      "reach": "Meta estimates {lower}-{upper} people a month",
+      "metaMissing": "Connect your Meta ad account to match the interests and see the reach. Until then, the ads use the countries, ages and genders above.",
+      "metaFailed": "Meta did not answer, so the interests are not matched yet. You can approve the rest now.",
+      "revising": "The AI is updating the audience...",
+      "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
+      "status": {
+        "ready": "Audience waiting for your approval",
+        "approved": "Audience approved",
+        "rejected": "You rejected the audience",
+        "failed": "The audience could not be planned ({reason})"
       }
     }
   }

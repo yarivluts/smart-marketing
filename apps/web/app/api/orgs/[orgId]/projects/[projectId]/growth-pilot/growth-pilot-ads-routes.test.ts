@@ -49,6 +49,8 @@ function fakeGemini() {
       const schema = JSON.stringify((body.generationConfig as { responseJsonSchema?: unknown } | undefined)?.responseJsonSchema ?? {});
       const answer = schema.includes('"offerings"')
         ? (kinds.push('analysis'), ANALYSIS)
+        : schema.includes('"interestKeywords"')
+          ? (kinds.push('audience'), { summary: 'Small offices in Israel', countries: ['IL'], ageMin: 25, ageMax: 60, genders: [], interestKeywords: ['Small business'] })
         : schema.includes('"closingHeadline"')
           ? (kinds.push('landing'), LANDING)
         : schema.includes('"messagingAngles"')
@@ -111,7 +113,7 @@ describe('Growth Pilot ads', () => {
     let data = read;
     for (let call = 0; call < 12; call += 1) {
       data = await json(await advancePilot(request(), p()));
-      if (data.targets[0].adsStatus !== 'building' && data.targets[0].briefId && data.targets[0].landingStatus !== 'none') break;
+      if (data.targets[0].adsStatus !== 'building' && data.targets[0].briefId && data.targets[0].landingStatus !== 'none' && data.targets[0].audienceStatus !== 'none') break;
     }
     const target = data.targets[0];
     expect(target).toMatchObject({ status: 'active', adsStatus: 'ready' });
@@ -138,6 +140,13 @@ describe('Growth Pilot ads', () => {
     const published = await json(await decide(request({ action: 'approve' }), p({ proposalId: landingProposal!.id })));
     expect(published.targets[0].landingStatus).toBe('published');
     expect(await getPublishedGrowthLanding(page.slug)).toMatchObject({ status: 'published' });
+
+    // The audience: Meta is not connected here, so it carries countries, ages and genders and says why.
+    const audience = published.proposals.find((proposal) => proposal.kind === 'audience');
+    expect(audience?.audience).toMatchObject({ meta: 'no_meta_credential', unresolvedInterests: ['Small business'], targeting: { countries: ['IL'], ageMin: 25, ageMax: 60 } });
+    const withAudience = await json(await decide(request({ action: 'approve' }), p({ proposalId: audience!.id })));
+    expect(withAudience.targets[0].audienceStatus).toBe('approved');
+    expect((await getAdStudioBrief(organization.id, project.id, target.briefId!)).meta_targeting).toMatchObject({ countries: ['IL'], ageMin: 25, ageMax: 60 });
     // Nothing left to do: another advance changes nothing.
     const after = await json(await advancePilot(request(), p()));
     expect(after.targets[0].adsStatus).toBe('approved');
