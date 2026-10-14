@@ -73,6 +73,8 @@ import {
   type VizStatus,
 } from '@/components/viz';
 import { BriefForm } from '@/components/ad-studio/brief-form';
+import { AdFromSite } from '@/components/ad-studio/ad-from-site';
+import { getCurrentGrowthPilot } from '@growthos/firebase-orm-models';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
 import { ReferenceLibrary } from '@/components/ad-studio/reference-library';
 import { VideoStudio } from '@/components/ad-studio/video-studio';
@@ -160,7 +162,7 @@ export default async function AdStudioPage({
     can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
 
   const canEditBrand = can(bindings, principal, 'project.configure', { orgId, projectId });
-  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded] =
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot] =
     await Promise.all([
       listOrgProjects(orgId),
       listAdStudioBriefs(orgId, projectId),
@@ -170,6 +172,7 @@ export default async function AdStudioPage({
       getAdStudioKeywordDataStatus(orgId, projectId),
       isFfmpegAvailable(),
       loadAdStudioBrandKit(orgId, projectId),
+      getCurrentGrowthPilot(orgId, projectId).catch(() => null),
     ]);
   const brandKit = brandLoaded.kit;
   const logoUrl = brandLoaded.logoVersion ? `/api/orgs/${orgId}/projects/${projectId}/ad-studio/brand-kit/logo?v=${encodeURIComponent(brandLoaded.logoVersion)}` : null;
@@ -178,6 +181,8 @@ export default async function AdStudioPage({
 
   const t = await getTranslations('AdStudio');
   const briefs = briefModels.map(toAdStudioBriefView);
+  // The site this project already advertises - from an earlier ad or Growth Pilot - so a new ad needs no typing at all.
+  const knownSite = briefs.find((brief) => brief.landingPageUrl)?.landingPageUrl ?? growthPilot?.site_url ?? null;
   const selected = selectedBriefId
     ? briefs.find((brief) => brief.id === selectedBriefId)
     : undefined;
@@ -854,7 +859,11 @@ export default async function AdStudioPage({
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
           <ChartCard title={t('newAdTitle')} description={t('newAdDescription')} icon={Plus}>
-            <BriefForm orgId={orgId} projectId={projectId} studioHref={base} />
+            <div className="flex flex-col gap-4">
+              <AdFromSite orgId={orgId} projectId={projectId} studioHref={base} defaultSiteUrl={knownSite} />
+              <p className="text-center text-xs font-medium text-muted-foreground">{t('fromSite.or')}</p>
+              <BriefForm orgId={orgId} projectId={projectId} studioHref={base} />
+            </div>
           </ChartCard>
 
           {/* On phones the person's existing ads come first; the new-ad form follows. */}
