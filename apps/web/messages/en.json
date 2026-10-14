@@ -5651,17 +5651,17 @@
       "unavailable": "Meta did not return the numbers right now. Try again in a few minutes.",
       "unavailableMeta": "Connect your Meta ad account to see how the ads are doing.",
       "noDelivery": "The ads have not been shown yet in this period - paused ads show no results until they are turned on.",
-      "chart": "Clicks and conversions per day",
-      "ctr": "{value} click-through rate",
-      "costPerConversion": "{value} per conversion",
+      "chart": "Clicks, sign-ups and sales per day",
+      "ctr": "{value} of the people who saw an ad clicked it",
+      "costPerConversion": "{value} for each sign-up or sale",
       "source": "Numbers come from Meta for the campaigns the pilot created, in your ad account currency.",
       "targetResults": "{clicks} clicks, {spend} spent",
       "kpi": {
         "spend": "Spend",
-        "impressions": "Impressions",
-        "clicks": "Clicks",
-        "cpc": "Cost per click",
-        "conversions": "Conversions"
+        "impressions": "Times shown",
+        "clicks": "Clicks on the ads",
+        "cpc": "Cost of each click",
+        "conversions": "Sign-ups and sales"
       }
     },
     "operator": {
