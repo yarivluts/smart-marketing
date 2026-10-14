@@ -85,8 +85,9 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
   const errorMessage = useAdStudioErrorMessage();
   const [run, setRun] = React.useState<AdStudioRunView | null>(initialRun);
   const [plan, setPlan] = React.useState(true);
-  const [images, setImages] = React.useState(true);
-  const [video, setVideo] = React.useState(true);
+  // Only what can be made here starts on, so pressing Prepare never runs into a missing model.
+  const [images, setImages] = React.useState(available.images);
+  const [video, setVideo] = React.useState(available.video);
   const [formats, setFormats] = React.useState<AdStudioImageFormat[]>(['square', 'portrait']);
   const [pending, setPending] = React.useState<'start' | 'cancel' | 'approve' | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);

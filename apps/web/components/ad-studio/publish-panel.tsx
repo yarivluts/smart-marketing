@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { defaultMetaTargeting } from '@growthos/shared';
 import { useTranslations } from 'next-intl';
 import type { AdStudioAdCopy, AdStudioImageFormat, AdStudioMetaTargeting } from '@growthos/shared';
 import { AdPlacementPreview, type AdPlacement, type AdPreviewMedia } from './ad-placement-preview';
@@ -74,6 +75,38 @@ export interface PublishPanelProps {
   metaTargeting?: AdStudioMetaTargeting | null;
   /** Starts "Connect with Facebook" and comes back here; null when the viewer cannot connect accounts or no Meta app is configured. */
   metaConnectHref?: string | null;
+  /** The ad language: where the ad runs when no audience was planned. */
+  language?: string;
+  /** The advertiser name Google shows on image ads (the brand kit's name, else the ad's). */
+  businessName?: string;
+}
+
+/**
+ * Where publishing starts: the first creative a connected platform takes (Meta for images and the
+ * video, Google Ads for the search ad and images), so a person can publish without picking anything.
+ */
+export function defaultPublishStart(
+  creatives: readonly PublishCreative[],
+  destinations: Record<Destination, boolean>,
+): { creative: PublishCreative | null; destination: Destination } {
+  const fits = (entry: PublishCreative, destination: Destination) =>
+    destination === 'meta' ? entry.kind !== 'search' : entry.kind !== 'video';
+  for (const destination of ['meta', 'google_ads'] as const) {
+    if (!destinations[destination]) continue;
+    const creative = creatives.find((entry) => fits(entry, destination));
+    if (creative) return { creative, destination };
+  }
+  const creative = creatives[0] ?? null;
+  return { creative, destination: creative?.kind === 'search' ? 'google_ads' : 'meta' };
+}
+
+/** Google's business name is at most 25 characters: a longer brand name is cut at a word boundary. */
+export function fitBusinessName(name: string): string {
+  const text = name.replace(/\s+/g, ' ').trim();
+  if (text.length <= 25) return text;
+  const cut = text.slice(0, 26);
+  const space = cut.lastIndexOf(' ');
+  return (space > 0 ? cut.slice(0, space) : text.slice(0, 25)).trim();
 }
 
 /** The placements a published ad can run in on each platform (Google Ads takes images only). */
@@ -133,9 +166,11 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
-  const [selected, setSelected] = React.useState(creatives[0]?.key ?? '');
-  const firstCopy = creatives[0]?.copy ?? null;
-  const [destination, setDestination] = React.useState<Destination>('meta');
+  // Start where the ad can go without a single choice: the first creative the connected platforms take.
+  const start = defaultPublishStart(creatives, destinations);
+  const [selected, setSelected] = React.useState(start.creative?.key ?? '');
+  const firstCopy = start.creative?.copy ?? null;
+  const [destination, setDestination] = React.useState<Destination>(start.destination);
   const [campaignName, setCampaignName] = React.useState(briefName);
   const [headline, setHeadline] = React.useState(firstCopy?.headline || briefName.slice(0, 30));
   const [primaryText, setPrimaryText] = React.useState(
@@ -143,12 +178,15 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
   );
   const [description, setDescription] = React.useState(firstCopy?.description ?? '');
   const [linkUrl, setLinkUrl] = React.useState(props.defaultLink);
-  const [businessName, setBusinessName] = React.useState('');
+  const [businessName, setBusinessName] = React.useState(fitBusinessName(props.businessName ?? ''));
   const [dailyBudget, setDailyBudget] = React.useState('20');
   const [countries, setCountries] = React.useState<string[]>(
-    props.metaTargeting?.countries.length ? [...props.metaTargeting.countries] : ['IL'],
+    props.metaTargeting?.countries.length
+      ? [...props.metaTargeting.countries]
+      : defaultMetaTargeting(props.language ?? 'he').countries,
   );
-  const [euPolitical, setEuPolitical] = React.useState<'' | 'yes' | 'no'>('');
+  // Almost no ad is EU political advertising: answered "no" up front, still shown and changeable.
+  const [euPolitical, setEuPolitical] = React.useState<'' | 'yes' | 'no'>('no');
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{
     tone: 'ok' | 'error';
