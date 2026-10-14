@@ -386,3 +386,43 @@ export class GrowthLandingSlugModel extends BaseModel {
   @Field({ is_required: true })
   public landing_page_id!: string;
 }
+
+/**
+ * One line per project that has a Growth Pilot, at the top level: the scheduler that keeps every
+ * pilot moving without an open tab - and the operators' view of all pilots - read it instead of
+ * walking every organization. Mirrors the pilot's status; adds when it last ran and how that went.
+ */
+@Model({
+  reference_path: 'growth_pilot_index',
+  path_id: 'growth_pilot_index_id',
+})
+export class GrowthPilotIndexModel extends BaseModel {
+  @Field({ is_required: true })
+  public organization_id!: string;
+
+  @Field({ is_required: true })
+  public project_id!: string;
+
+  @Field({ is_required: true })
+  public pilot_id!: string;
+
+  @Field({ is_required: true })
+  public site_url!: string;
+
+  @Field({ is_required: true })
+  public status!: GrowthPilotStatus;
+
+  /** The person who started it: scheduled work runs, and counts toward limits, on their behalf. */
+  @Field({ is_required: true })
+  public started_by!: string;
+
+  @Field({ is_required: false })
+  public last_run_on?: string | null;
+
+  /** `worked`, `idle`, or a failure code from the last scheduled run. */
+  @Field({ is_required: false })
+  public last_run_outcome?: string | null;
+
+  @Field({ is_required: true })
+  public updated_on!: string;
+}

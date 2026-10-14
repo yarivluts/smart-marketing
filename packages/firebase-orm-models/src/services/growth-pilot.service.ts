@@ -4,6 +4,7 @@ import {
   GrowthActivityModel,
   GrowthLandingPageModel,
   GrowthLandingSlugModel,
+  GrowthPilotIndexModel,
   GrowthPilotModel,
   GrowthProposalModel,
   GrowthTargetModel,
@@ -135,6 +136,7 @@ export async function startGrowthPilot(params: Scope & { siteUrl: string; actorI
   pilot.updated_on = now;
   pilot.setPathParams(pathParams(params.organizationId, params.projectId));
   await pilot.save();
+  await syncGrowthPilotIndex(pilot, params.now);
   await recordGrowthActivity({ ...params, pilotId: pilot.id, kind: 'pilot_started', actor: params.actorId, subject: siteHost(siteUrl), now: params.now });
   await audit(params, params.actorId, 'growth_pilot.started', 'growth_pilot', pilot.id, `Started Growth Pilot for ${siteHost(siteUrl)}`, { site_url: siteUrl, archived: current?.id ?? null });
   return pilot;
@@ -245,6 +247,7 @@ export async function saveGrowthPilotAnalysis(params: {
   fresh.lease_until = null;
   fresh.updated_on = now;
   await fresh.save();
+  await syncGrowthPilotIndex(fresh, params.now);
   await recordGrowthActivity({ ...scope, pilotId: fresh.id, kind: 'site_read', actor: 'pilot', subject: siteHost(fresh.site_url), count: params.pages.length, now: params.now });
   await recordGrowthActivity({ ...scope, pilotId: fresh.id, kind: 'targets_proposed', actor: 'pilot', count: params.drafts.length, now: params.now });
   return fresh;
@@ -261,6 +264,7 @@ export async function failGrowthPilotAnalysis(params: { pilot: Pick<GrowthPilotM
   fresh.lease_until = null;
   fresh.updated_on = now;
   await fresh.save();
+  await syncGrowthPilotIndex(fresh, params.now);
   await recordGrowthActivity({ organizationId: fresh.organization_id, projectId: fresh.project_id, pilotId: fresh.id, kind: 'analysis_failed', actor: 'pilot', subject: params.code, now: params.now });
   return fresh;
 }
@@ -405,6 +409,7 @@ export async function setGrowthPilotPaused(params: Scope & { pilotId: string; pa
   pilot.status = params.paused ? 'paused' : 'active';
   pilot.updated_on = now;
   await pilot.save();
+  await syncGrowthPilotIndex(pilot, params.now);
   await recordGrowthActivity({ ...params, pilotId: pilot.id, kind: params.paused ? 'pilot_paused' : 'pilot_resumed', actor: params.actorId, now: params.now });
   await audit(params, params.actorId, params.paused ? 'growth_pilot.paused' : 'growth_pilot.resumed', 'growth_pilot', pilot.id, `${params.paused ? 'Paused' : 'Resumed'} Growth Pilot for ${siteHost(pilot.site_url)}`);
   return pilot;
@@ -745,4 +750,45 @@ export async function markGrowthAdsRunning(params: Scope & { proposalId: string;
   await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'ads_activated', actor: params.actorId, subject: target.name, now: params.now });
   await audit(params, params.actorId, 'growth_pilot.ads_activated', 'growth_proposal', proposal.id, `Turned on the ads for "${target.name}"`, { daily_budget: proposal.publish?.dailyBudget ?? null });
   return proposal;
+}
+
+function indexId(organizationId: string, projectId: string): string {
+  return `${organizationId}_${projectId}`;
+}
+
+/** Keeps the project's line in the platform-wide index in step with its current pilot. */
+export async function syncGrowthPilotIndex(pilot: Pick<GrowthPilotModel, 'id' | 'organization_id' | 'project_id' | 'site_url' | 'status' | 'started_by'>, now?: Date): Promise<void> {
+  const id = indexId(pilot.organization_id, pilot.project_id);
+  let existing = await GrowthPilotIndexModel.init(id);
+  if (existing && existing.pilot_id !== pilot.id) {
+    // A new pilot for the project: a fresh line, so the old pilot's last run is not carried over.
+    await existing.remove();
+    existing = null;
+  }
+  const row = existing ?? new GrowthPilotIndexModel();
+  row.organization_id = pilot.organization_id;
+  row.project_id = pilot.project_id;
+  row.pilot_id = pilot.id;
+  row.site_url = pilot.site_url;
+  row.status = pilot.status;
+  row.started_by = pilot.started_by;
+  row.updated_on = (now ?? new Date()).toISOString();
+  if (existing) await row.save();
+  else await row.save(id);
+}
+
+/** Every project's pilot line, for the scheduler and the operators. */
+export async function listGrowthPilotIndex(): Promise<GrowthPilotIndexModel[]> {
+  return GrowthPilotIndexModel.getAll();
+}
+
+/** Records how a scheduled run of this pilot went. */
+export async function recordGrowthPilotRun(params: Scope & { outcome: string; now?: Date }): Promise<void> {
+  const row = await GrowthPilotIndexModel.init(indexId(params.organizationId, params.projectId));
+  if (!row) return;
+  const now = (params.now ?? new Date()).toISOString();
+  row.last_run_on = now;
+  row.last_run_outcome = params.outcome;
+  row.updated_on = now;
+  await row.save();
 }

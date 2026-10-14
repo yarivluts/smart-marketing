@@ -9,6 +9,8 @@ import {
   createProject,
   createAdStudioBrief,
   decideGrowthProposal,
+  listGrowthPilotIndex,
+  recordGrowthPilotRun,
   failGrowthPublish,
   GrowthProposalNeedsPlatformError,
   markGrowthAdsPublished,
@@ -347,5 +349,20 @@ describe('Growth Pilot', () => {
     const activate = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'activate')!;
     await decideGrowthProposal({ ...scope, proposalId: activate.id, decision: 'reject' });
     expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)?.publish_status).toBe('published');
+  });
+
+  it('keeps one line per project in the platform index, in step with the pilot, with its last scheduled run', async () => {
+    const { scope, pilot } = await analyzedPilot();
+    const line = async () => (await listGrowthPilotIndex()).find((row) => row.organization_id === scope.organizationId);
+    expect(await line()).toMatchObject({ pilot_id: pilot.id, status: 'active', site_url: 'https://easysign.co.il/', started_by: scope.actorId });
+    expect((await line())?.last_run_on ?? null).toBeNull();
+    await recordGrowthPilotRun({ ...scope, outcome: 'worked' });
+    expect(await line()).toMatchObject({ last_run_outcome: 'worked' });
+    await setGrowthPilotPaused({ ...scope, pilotId: pilot.id, paused: true });
+    expect((await line())?.status).toBe('paused');
+    const again = await startGrowthPilot({ ...scope, siteUrl: 'other.co.il' });
+    expect(await line()).toMatchObject({ pilot_id: again.id, status: 'analyzing', site_url: 'https://other.co.il/' });
+    expect((await line())?.last_run_outcome ?? null).toBeNull();
+    expect((await listGrowthPilotIndex()).filter((row) => row.organization_id === scope.organizationId)).toHaveLength(1);
   });
 });
