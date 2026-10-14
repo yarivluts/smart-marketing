@@ -40,6 +40,14 @@ function failureKey(code: string | null): 'site' | 'quota_exceeded' | 'nothing_f
   return 'provider';
 }
 
+const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed'];
+
+/** A stored failure code in plain words; an unknown code never reaches the screen. */
+function useReason(): (code: string | null | undefined) => string {
+  const t = useTranslations('GrowthPilot.reasons');
+  return (code) => t(code && KNOWN_REASONS.includes(code) ? (code as 'generic') : 'generic');
+}
+
 function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
@@ -229,6 +237,7 @@ function ProposalCard({
   const audience = proposal.kind === 'audience' ? proposal.audience : null;
   const platform = proposal.kind === 'publish' || proposal.kind === 'activate' ? proposal.publish : null;
   const tp = useTranslations('GrowthPilot.publish');
+  const reasonOf = useReason();
   const [budget, setBudget] = React.useState(String(proposal.publish?.dailyBudget ?? ''));
   const tu = useTranslations('GrowthPilot.audience');
   const [changing, setChanging] = React.useState(false);
@@ -330,7 +339,7 @@ function ProposalCard({
       ) : null}
       {last ? (
         <p className={cn('rounded-xl px-3 py-2 text-xs', last.outcome === 'failed' ? 'bg-warning/10 text-warning' : 'bg-muted/60 text-muted-foreground')} dir="auto">
-          {last.outcome === 'failed' ? t('changeFailed', { reason: last.failureCode ?? '' }) : t('asked', { text: last.text })}
+          {last.outcome === 'failed' ? t('changeFailed', { reason: reasonOf(last.failureCode) }) : t('asked', { text: last.text })}
         </p>
       ) : null}
       {revising ? (
@@ -432,13 +441,14 @@ function TargetCard({ target, landingSlug, metaConnectHref, results }: { target:
 
 /** Where the target's landing page stands; once published, its public address. */
 function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: string | null }): React.ReactElement | null {
+  const reasonOf = useReason();
   const t = useTranslations('GrowthPilot.landing.status');
   if (target.status !== 'active' || target.landingStatus === 'none') return null;
   const status = target.landingStatus;
   return (
     <p className={cn('mt-auto flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'published' ? 'text-success' : status === 'failed' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-landing" data-landing={status}>
       <FileText className="h-3.5 w-3.5" aria-hidden="true" />
-      {status === 'failed' ? t('failed', { reason: target.landingFailure ?? '' }) : t(status)}
+      {status === 'failed' ? t('failed', { reason: reasonOf(target.landingFailure) }) : t(status)}
       {status === 'published' && slug ? (
         <a href={`/lp/${slug}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" data-testid="growth-pilot-landing-link">
           {t('open')}
@@ -451,6 +461,7 @@ function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: s
 
 /** Where the target's ads stand on the platform; when Meta is missing, the way to connect it. */
 function TargetPublishLine({ target, metaConnectHref, results }: { target: GrowthTargetView; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement | null {
+  const reasonOf = useReason();
   const t = useTranslations('GrowthPilot.publish.status');
   const tr = useTranslations('GrowthPilot.performance');
   const locale = useLocale();
@@ -459,7 +470,7 @@ function TargetPublishLine({ target, metaConnectHref, results }: { target: Growt
   return (
     <p className={cn('flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'running' ? 'text-success' : status === 'failed' || status === 'needs_meta' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-publish" data-publish={status}>
       <Send className="h-3.5 w-3.5" aria-hidden="true" />
-      {status === 'failed' ? t('failed', { reason: target.publishFailure ?? '' }) : t(status)}
+      {status === 'failed' ? t('failed', { reason: reasonOf(target.publishFailure) }) : t(status)}
       {results && (status === 'published' || status === 'running') ? (
         <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
           {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}
@@ -476,13 +487,14 @@ function TargetPublishLine({ target, metaConnectHref, results }: { target: Growt
 
 /** Where the target's audience stands. */
 function TargetAudienceLine({ target }: { target: GrowthTargetView }): React.ReactElement | null {
+  const reasonOf = useReason();
   const t = useTranslations('GrowthPilot.audience.status');
   if (target.status !== 'active' || target.audienceStatus === 'none') return null;
   const status = target.audienceStatus;
   return (
     <p className={cn('flex items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'approved' ? 'text-success' : status === 'failed' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-audience" data-audience={status}>
       <Users className="h-3.5 w-3.5" aria-hidden="true" />
-      {status === 'failed' ? t('failed', { reason: target.audienceFailure ?? '' }) : t(status)}
+      {status === 'failed' ? t('failed', { reason: reasonOf(target.audienceFailure) }) : t(status)}
     </p>
   );
 }
@@ -535,6 +547,7 @@ function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audie
 
 /** Where the target's ads stand, at the foot of its card. */
 function TargetAdsLine({ target }: { target: GrowthTargetView }): React.ReactElement {
+  const reasonOf = useReason();
   const t = useTranslations('GrowthPilot.targets');
   const ta = useTranslations('GrowthPilot.ads.status');
   const status = target.status === 'active' ? target.adsStatus : 'none';
@@ -542,7 +555,7 @@ function TargetAdsLine({ target }: { target: GrowthTargetView }): React.ReactEle
   return (
     <p className={cn('mt-auto flex items-center gap-1.5 border-t border-border/60 pt-2 text-xs', tone)} data-testid="growth-pilot-target-ads" data-ads={status}>
       {status === 'building' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
-      {status === 'none' ? t('next') : status === 'failed' ? ta('failed', { reason: target.adsFailure ?? '' }) : ta(status)}
+      {status === 'none' ? t('next') : status === 'failed' ? ta('failed', { reason: reasonOf(target.adsFailure) }) : ta(status)}
     </p>
   );
 }

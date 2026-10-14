@@ -155,7 +155,7 @@ describe('GrowthPilotApp', () => {
     const failedChange = { ...PROPOSAL, changes: [{ text: 'x', on: 'x', outcome: 'failed' as const, failureCode: 'quota_exceeded' }] };
     const fetchMock = stubFetch({ status: 201, body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [failedChange] })} />, { locale: 'en' });
-    expect(screen.getByTestId('growth-pilot-proposal')).toHaveTextContent('The AI could not make that change (quota_exceeded). The proposal is unchanged.');
+    expect(screen.getByTestId('growth-pilot-proposal')).toHaveTextContent('The AI could not make that change (today\'s AI limit is used up, it resets tomorrow). The proposal is unchanged.');
     fireEvent.click(screen.getByTestId('growth-pilot-new-target'));
     const form = screen.getByTestId('growth-pilot-new-target-form');
     fireEvent.change(within(form).getByRole('textbox'), { target: { value: 'Accountants in the north' } });
@@ -208,12 +208,24 @@ describe('GrowthPilotApp', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
+    it('never shows a raw failure code: unknown ones become a plain sentence, in Hebrew too', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_error_190', adsStatus: 'failed' as const, adsFailure: 'no_images' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(screen.getByText('Publishing failed (something went wrong, try again in a minute)')).toBeInTheDocument();
+      expect(screen.getByText('The ads could not be made (no image passed the quality check)')).toBeInTheDocument();
+      expect(view.container).not.toHaveTextContent('meta_error_190');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).not.toHaveTextContent('meta_error_190');
+      expect(he.container).not.toHaveTextContent('no_images');
+    });
+
     it('says why ads failed, and starts them for an approved target that has none yet', async () => {
       const waiting = page({ proposals: [], targets: [{ ...ACTIVE_TARGET, briefId: null, adsStatus: 'none' }] });
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...ACTIVE_TARGET, adsStatus: 'failed', adsFailure: 'quota_exceeded' }] }) });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={waiting} />, { locale: 'en' });
       await waitFor(() => expect(sent(fetchMock).url).toBe(BASE + '/advance'));
-      expect(await screen.findByText('The ads could not be made (quota_exceeded)')).toBeInTheDocument();
+      expect(await screen.findByText('The ads could not be made (today\'s AI limit is used up, it resets tomorrow)')).toBeInTheDocument();
     });
   });
 
@@ -249,7 +261,7 @@ describe('GrowthPilotApp', () => {
       const [live, failed] = screen.getAllByTestId('growth-pilot-target-landing');
       expect(live).toHaveTextContent('Landing page live');
       expect(within(live).getByTestId('growth-pilot-landing-link')).toHaveAttribute('href', '/lp/abcDEF123456');
-      expect(failed).toHaveTextContent('The landing page could not be written (quota_exceeded)');
+      expect(failed).toHaveTextContent('The landing page could not be written (today\'s AI limit is used up, it resets tomorrow)');
     });
   });
 
@@ -280,7 +292,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Meta ad account');
       expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
       expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
-      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (quota_exceeded)');
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (today\'s AI limit is used up, it resets tomorrow)');
     });
   });
 
