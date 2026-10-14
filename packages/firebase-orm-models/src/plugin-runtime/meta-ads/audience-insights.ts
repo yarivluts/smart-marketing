@@ -187,3 +187,57 @@ export async function getMetaPerformanceBreakdown(accessToken: string, adAccount
     })
     .sort((a, b) => b.spend - a.spend);
 }
+
+/** One campaign's results on one day. */
+export interface MetaCampaignDay {
+  campaignId: string;
+  /** YYYY-MM-DD in the ad account's time zone. */
+  date: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  linkClicks: number;
+  conversions: number;
+}
+
+/**
+ * Day-by-day results of the given campaigns over a date range (inclusive) - what the Growth Pilot
+ * charts. Only those campaigns: the account's other campaigns are not mixed in. Read-only.
+ */
+export async function getMetaCampaignDailyInsights(
+  accessToken: string,
+  adAccountId: string,
+  params: { campaignIds: readonly string[]; since: string; until: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<MetaCampaignDay[]> {
+  if (!params.campaignIds.length) return [];
+  const body = await get<{ data?: Record<string, unknown>[] }>(
+    accessToken,
+    `${act(adAccountId)}/insights`,
+    {
+      level: 'campaign',
+      time_increment: '1',
+      time_range: JSON.stringify({ since: params.since, until: params.until }),
+      filtering: JSON.stringify([{ field: 'campaign.id', operator: 'IN', value: params.campaignIds }]),
+      fields: 'campaign_id,date_start,spend,impressions,clicks,actions',
+      limit: '500',
+    },
+    fetchImpl,
+  );
+  return (body.data ?? [])
+    .map((raw) => {
+      const actions = Array.isArray(raw.actions) ? (raw.actions as { action_type?: string; value?: string | number }[]) : [];
+      const sum = (match: (type: string) => boolean) => actions.filter((action) => action.action_type && match(action.action_type)).reduce((total, action) => total + (count(action.value) ?? 0), 0);
+      return {
+        campaignId: String(raw.campaign_id ?? ''),
+        date: String(raw.date_start ?? ''),
+        spend: count(raw.spend) ?? 0,
+        impressions: count(raw.impressions) ?? 0,
+        clicks: count(raw.clicks) ?? 0,
+        linkClicks: sum((type) => type === 'link_click'),
+        conversions: sum((type) => CONVERSION_ACTIONS.has(type)),
+      };
+    })
+    .filter((row) => row.campaignId && /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}

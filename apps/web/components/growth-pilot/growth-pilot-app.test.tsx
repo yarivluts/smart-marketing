@@ -307,4 +307,13 @@ describe('GrowthPilotApp', () => {
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
     });
   });
+
+  it('shows each published target its own clicks and spend from Meta', async () => {
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'running' as const, publishFailure: null };
+    const totals = { spend: 84.5, impressions: 1000, clicks: 310, linkClicks: 200, conversions: 3, ctr: 0.31, cpc: 0.27, costPerConversion: 28.17 };
+    stubFetch({ body: { status: 'ok', since: 'a', until: 'b', summary: { totals, daily: [], byTarget: { t1: totals } } } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [TARGET] })} />, { locale: 'en' });
+    expect(await screen.findByTestId('growth-pilot-target-results')).toHaveTextContent('310 clicks, 84.5 spent');
+    expect(screen.getByTestId('growth-pilot-target-publish')).toHaveTextContent('Ads are running');
+  });
 });

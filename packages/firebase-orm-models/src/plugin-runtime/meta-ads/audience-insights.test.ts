@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildMetaTargetingSpec } from './api-client';
-import { estimateMetaReach, getMetaPerformanceBreakdown, listMetaAudiences, MetaInsightsError, searchMetaInterests } from './audience-insights';
+import { estimateMetaReach, getMetaCampaignDailyInsights, getMetaPerformanceBreakdown, listMetaAudiences, MetaInsightsError, searchMetaInterests } from './audience-insights';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status });
@@ -80,5 +80,35 @@ describe('Meta audience lookups', () => {
     const other = await failure(answer({ error: { code: 1 } }, 500));
     expect(other.failure).toBe('api_error');
     expect(other.message).not.toContain('secret-token');
+  });
+});
+
+describe('getMetaCampaignDailyInsights', () => {
+  it('reads only the given campaigns, day by day, with link clicks and conversions from the actions', async () => {
+    const fetchImpl = fakeGraph({
+      'act_99/insights': {
+        data: [
+          { campaign_id: 'c1', date_start: '2026-10-02', spend: '12.5', impressions: '900', clicks: '30', actions: [{ action_type: 'link_click', value: '22' }, { action_type: 'lead', value: '2' }] },
+          { campaign_id: 'c1', date_start: '2026-10-01', spend: '10', impressions: '800', clicks: '25' },
+          { date_start: '2026-10-01', spend: '1' },
+        ],
+      },
+    });
+    const rows = await getMetaCampaignDailyInsights('t', '99', { campaignIds: ['c1'], since: '2026-10-01', until: '2026-10-02' }, fetchImpl as unknown as typeof fetch);
+    expect(rows).toEqual([
+      { campaignId: 'c1', date: '2026-10-01', spend: 10, impressions: 800, clicks: 25, linkClicks: 0, conversions: 0 },
+      { campaignId: 'c1', date: '2026-10-02', spend: 12.5, impressions: 900, clicks: 30, linkClicks: 22, conversions: 2 },
+    ]);
+    const url = new URL(String(fetchImpl.mock.calls[0][0]));
+    expect(url.searchParams.get('level')).toBe('campaign');
+    expect(url.searchParams.get('time_increment')).toBe('1');
+    expect(JSON.parse(url.searchParams.get('filtering')!)).toEqual([{ field: 'campaign.id', operator: 'IN', value: ['c1'] }]);
+    expect(JSON.parse(url.searchParams.get('time_range')!)).toEqual({ since: '2026-10-01', until: '2026-10-02' });
+  });
+
+  it('asks nothing without campaigns', async () => {
+    const fetchImpl = vi.fn();
+    expect(await getMetaCampaignDailyInsights('t', '99', { campaignIds: [], since: '2026-10-01', until: '2026-10-02' }, fetchImpl as unknown as typeof fetch)).toEqual([]);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

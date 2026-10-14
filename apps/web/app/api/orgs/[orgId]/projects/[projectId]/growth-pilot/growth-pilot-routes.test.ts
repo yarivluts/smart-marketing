@@ -11,6 +11,7 @@ import { POST as advancePilot } from './advance/route';
 import { POST as decide } from './proposals/[proposalId]/route';
 import { POST as requestTarget } from './targets/route';
 import { POST as pausePilot } from './pause/route';
+import { GET as performance } from './performance/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -178,5 +179,16 @@ describe('Growth Pilot routes', () => {
     getServerSessionMock.mockResolvedValue(memberSession);
     const forbidden = await decide(request('POST', { action: 'approve', dailyBudget: 20 }), p({ proposalId: publish.id }));
     expect([403, 404]).toContain(forbidden.status);
+  });
+
+  it('reports performance only for what the pilot published, for a known period', async () => {
+    fakeGemini();
+    const { p } = await setup();
+    const at = (days: string) => new NextRequest(`http://localhost/api/test?days=${days}`);
+    expect(await (await performance(at('30'), p())).json()).toEqual({ status: 'none' });
+    await startPilot(request('POST', { siteUrl: 'easysign.co.il' }), p());
+    await advancePilot(request('POST'), p());
+    expect(await (await performance(at('7'), p())).json()).toEqual({ status: 'none' });
+    expect((await performance(at('12'), p())).status).toBe(400);
   });
 });
