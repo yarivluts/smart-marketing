@@ -32,7 +32,7 @@ describe('AdsKpiScorecards', () => {
     expect(screen.getByText('Meta: $11,000 · Google: $7,500')).toBeInTheDocument();
 
     // 2. Blended ROAS
-    expect(screen.getByText('Blended ROAS')).toBeInTheDocument();
+    expect(screen.getByText('Sales per $1 of ads (ROAS)')).toBeInTheDocument();
     expect(screen.getByText('4.2x')).toBeInTheDocument();
     // Deliberately asserts ABSENCE: the card used to show "Target: 3.5x" with a
     // progress bar against it, a benchmark no project ever set. This assertion
@@ -40,16 +40,16 @@ describe('AdsKpiScorecards', () => {
     expect(screen.queryByText('Target: 3.5x')).not.toBeInTheDocument();
 
     // 3. Impressions & Clicks
-    expect(screen.getByText('Impressions & Clicks')).toBeInTheDocument();
+    expect(screen.getByText('Times shown & clicks')).toBeInTheDocument();
     expect(screen.getByText('125.0k')).toBeInTheDocument();
     expect(screen.getByText('4,200 clicks · 420 conv.')).toBeInTheDocument();
 
     // 4. Average CTR
-    expect(screen.getByText('Average CTR')).toBeInTheDocument();
+    expect(screen.getByText('Share who clicked (CTR)')).toBeInTheDocument();
     expect(screen.getByText('3.36%')).toBeInTheDocument();
 
     // 5. Blended CPA
-    expect(screen.getByText('Blended CPA')).toBeInTheDocument();
+    expect(screen.getByText('Cost per sign-up or sale (CPA)')).toBeInTheDocument();
     expect(screen.getByText('$44.05')).toBeInTheDocument();
 
     // 6. Active Campaigns
