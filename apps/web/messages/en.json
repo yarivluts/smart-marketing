@@ -4885,10 +4885,10 @@
       "columns": {
         "segment": "Segment",
         "spend": "Spend",
-        "linkClicks": "Link clicks",
-        "ctr": "CTR",
-        "costPerClick": "Cost / click",
-        "conversions": "Conversions"
+        "linkClicks": "Clicks to your page",
+        "ctr": "Share who clicked (CTR)",
+        "costPerClick": "Cost of each click",
+        "conversions": "Sign-ups and sales"
       },
       "segments": {
         "female": "women",
