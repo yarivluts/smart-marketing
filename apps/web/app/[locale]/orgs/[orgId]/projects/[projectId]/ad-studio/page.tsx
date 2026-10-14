@@ -765,6 +765,8 @@ export default async function AdStudioPage({
                 defaultLink={selected.landingPageUrl ?? ''}
                 defaultPrimaryText={selected.objective}
                 metaTargeting={selected.metaTargeting}
+                language={selected.language}
+                businessName={brandKit.brandName || selected.name}
                 creatives={publishCreatives}
                 destinations={{
                   meta: Boolean(exportDestinations?.meta.available),

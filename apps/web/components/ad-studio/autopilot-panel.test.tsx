@@ -112,6 +112,12 @@ describe('AutopilotPanel', () => {
 
   it('cannot start with nothing to make, and warns in Hebrew when a model is not set up', () => {
     renderPanel({ available: { text: true, images: false, video: true } }, 'he');
+    // What has no model starts off, so Prepare never runs into it...
+    expect(screen.getByLabelText(heMessages.AdStudio.autopilot.optionImages)).not.toBeChecked();
+    expect(screen.getByLabelText(heMessages.AdStudio.autopilot.optionVideo)).toBeChecked();
+    expect(screen.queryByRole('note')).toBeNull();
+    // ...and turning it on anyway warns.
+    fireEvent.click(screen.getByLabelText(heMessages.AdStudio.autopilot.optionImages));
     expect(screen.getByRole('note')).toHaveTextContent(heMessages.AdStudio.autopilot.missingModels);
     fireEvent.click(screen.getByLabelText(heMessages.AdStudio.autopilot.optionImages));
     fireEvent.click(screen.getByLabelText(heMessages.AdStudio.autopilot.optionVideo));
