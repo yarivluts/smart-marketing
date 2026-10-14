@@ -4,12 +4,16 @@ import {
   AD_STUDIO_RSA_DESCRIPTIONS,
   AD_STUDIO_RSA_HEADLINE_MAX,
   AD_STUDIO_RSA_HEADLINES,
+  buildKeywordChoicePrompt,
   buildSearchAdPrompt,
   cleanKeywordSeeds,
   fitSearchAd,
   planToScriptContext,
+  sanitizeKeywordChoice,
+  AD_STUDIO_MATCH_TYPES,
   searchTargetingToGoogle,
   type AdStudioKeywordIdea,
+  type AdStudioSearchKeywords,
   type AdStudioSearchTargeting,
 } from '@growthos/shared';
 import {
@@ -141,4 +145,44 @@ export async function writeAdStudioSearchAd(ctx: AdStudioCallContext & { briefId
     throw new AdStudioProviderError('invalid_output', 'The model returned too few usable headlines or descriptions for a search ad.');
   }
   return saveAdStudioSearchAd({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, ad, now: ctx.now });
+}
+
+/** The keywords and excluded searches a model chooses; `sanitizeKeywordChoice` checks them afterwards. */
+export const KeywordChoiceSchema = z.object({
+  keywords: z.array(z.object({ text: z.string(), matchType: z.enum(AD_STUDIO_MATCH_TYPES) })).describe('At most 15 keywords to bid on.'),
+  negatives: z.array(z.string()).describe('At most 10 searches to exclude.'),
+});
+
+export interface AdStudioKeywordSuggestion {
+  keywords: AdStudioSearchKeywords;
+  /** True when the AI chose from Google's own ideas (with monthly searches). */
+  researched: boolean;
+  /** Why Google's ideas were not used, when the lookup was unavailable. */
+  reason: AdStudioKeywordResearchUnavailable | null;
+}
+
+/**
+ * Lets the AI choose the search ad's keywords, match types and excluded searches, so a person who
+ * does not know Google Ads only has to review them: from Google's own ideas when the project's
+ * Google Ads credential can look them up, otherwise from the brief and the plan alone (no volumes).
+ * One metered text call (kind `keyword_choice`). Nothing is saved - the person reviews and saves.
+ */
+export async function suggestAdStudioKeywords(
+  ctx: AdStudioCallContext & { briefId: string; targeting: AdStudioSearchTargeting; seeds: readonly string[]; url?: string | null; kms?: KmsProvider | null; fetchImpl?: typeof fetch },
+): Promise<AdStudioKeywordSuggestion> {
+  await ensureOrm();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
+  const seeds = cleanKeywordSeeds([...ctx.seeds, ...(context.keywordThemes ?? []), brief.name]);
+  const research = await researchAdStudioKeywords({ organizationId: ctx.organizationId, projectId: ctx.projectId, seeds, url: ctx.url ?? brief.landing_page_url ?? null, targeting: ctx.targeting, kms: ctx.kms, fetchImpl: ctx.fetchImpl });
+  const ideas = research.status === 'ok' && research.ideas.length ? research.ideas : null;
+  const prompt = buildKeywordChoicePrompt(await briefPromptInput(brief), ideas, context);
+  const raw = await meteredCall(ctx, 'keyword_choice', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: KeywordChoiceSchema }));
+  const chosen = sanitizeKeywordChoice(raw, ideas);
+  if (chosen.keywords.length === 0) throw new AdStudioProviderError('invalid_output', 'The model chose no usable keywords.');
+  return {
+    keywords: { targeting: ctx.targeting, keywords: chosen.keywords, negatives: chosen.negatives },
+    researched: ideas !== null,
+    reason: research.status === 'unavailable' ? research.reason : null,
+  };
 }

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { Check, Loader2, Plus, Search, Trash2, X } from 'lucide-react';
+import { Check, Loader2, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
 import {
   AD_STUDIO_MATCH_TYPES,
   AD_STUDIO_MAX_KEYWORDS,
@@ -83,7 +83,7 @@ export function KeywordResearch({
   const [selected, setSelected] = React.useState<AdStudioSearchKeyword[]>(initial?.keywords ?? []);
   const [negativesText, setNegativesText] = React.useState((initial?.negatives ?? []).join(', '));
   const [ownKeyword, setOwnKeyword] = React.useState('');
-  const [pending, setPending] = React.useState<'research' | 'save' | null>(null);
+  const [pending, setPending] = React.useState<'research' | 'suggest' | 'save' | null>(null);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const number = new Intl.NumberFormat(locale);
   const money = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
@@ -121,6 +121,41 @@ export function KeywordResearch({
         return;
       }
       setResearch(result.research);
+    } catch {
+      setMessage({ tone: 'error', text: errorMessage({}) });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  /** The AI fills the list and the excluded searches; nothing is saved until the person saves. */
+  async function suggest(): Promise<void> {
+    setPending('suggest');
+    setMessage(null);
+    try {
+      const response = await fetch(`${base}/keywords/suggest`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seeds: splitList(seedsText),
+          url: useUrl ? landingPageUrl : null,
+          targeting,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as AdStudioApiError & {
+        suggestion?: { keywords: AdStudioSearchKeywords; researched: boolean };
+      };
+      if (!response.ok || !result.suggestion) {
+        setMessage({ tone: 'error', text: errorMessage(result) });
+        return;
+      }
+      const { keywords, researched } = result.suggestion;
+      setSelected(keywords.keywords);
+      setNegativesText(keywords.negatives.join(', '));
+      setMessage({
+        tone: 'ok',
+        text: t(researched ? 'aiChosen' : 'aiChosenNoVolumes', { count: keywords.keywords.length }),
+      });
     } catch {
       setMessage({ tone: 'error', text: errorMessage({}) });
     } finally {
@@ -196,6 +231,24 @@ export function KeywordResearch({
         <p className="max-w-3xl text-sm text-muted-foreground">{t('keywordsDescription')}</p>
       </div>
 
+      <div className="flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm">{t('aiChooseHint')}</p>
+        <button
+          type="button"
+          onClick={() => void suggest()}
+          disabled={pending !== null}
+          className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          data-testid="ad-studio-keywords-ai"
+        >
+          {pending === 'suggest' ? (
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Sparkles className="h-4 w-4" aria-hidden="true" />
+          )}
+          {t('aiChoose')}
+        </button>
+      </div>
+
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           {t('countryLabel')}
@@ -253,7 +306,7 @@ export function KeywordResearch({
           type="button"
           onClick={() => void runResearch()}
           disabled={pending !== null}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-semibold hover:bg-muted disabled:opacity-50"
         >
           {pending === 'research' ? (
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
