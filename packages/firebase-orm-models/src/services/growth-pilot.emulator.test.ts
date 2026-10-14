@@ -9,6 +9,12 @@ import {
   createProject,
   createAdStudioBrief,
   decideGrowthProposal,
+  failGrowthPublish,
+  GrowthProposalNeedsPlatformError,
+  markGrowthAdsPublished,
+  markGrowthAdsRunning,
+  markGrowthTargetNeedsMeta,
+  saveGrowthPublishProposal,
   failGrowthAudience,
   getAdStudioBrief,
   saveGrowthAudienceProposal,
@@ -299,5 +305,47 @@ describe('Growth Pilot', () => {
     expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)?.audience_status).toBe('rejected');
     const failed = await failGrowthAudience({ ...scope, targetId, failureCode: 'quota_exceeded' });
     expect(failed).toMatchObject({ audience_status: 'failed', audience_failure: 'quota_exceeded' });
+  });
+
+  const PUBLISH = { destination: 'meta' as const, imageIds: ['i1', 'i2'], dailyBudget: 20, linkUrl: 'https://app/lp/abc', campaignName: 'EasySign - Pro', countries: ['IL'] };
+
+  it('publishing is its own decision, and turning the ads on (spending) another one after it', async () => {
+    const { scope, pilot, targetId } = await targetWithBrief();
+    await markGrowthTargetNeedsMeta({ ...scope, targetId });
+    expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)?.publish_status).toBe('needs_meta');
+
+    const publish = await saveGrowthPublishProposal({ ...scope, targetId, plan: PUBLISH });
+    expect(publish).toMatchObject({ kind: 'publish', status: 'pending', publish: PUBLISH, preview_image_ids: ['i1', 'i2'] });
+    // Approving it must go through the platform, never the plain decision.
+    await expect(decideGrowthProposal({ ...scope, proposalId: publish.id, decision: 'approve' })).rejects.toBeInstanceOf(GrowthProposalNeedsPlatformError);
+
+    await failGrowthPublish({ ...scope, targetId, failureCode: 'meta_account_restricted' });
+    expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)).toMatchObject({ publish_status: 'failed', publish_failure: 'meta_account_restricted' });
+
+    await markGrowthAdsPublished({ ...scope, proposalId: publish.id, exportIds: ['e1', 'e2'], dailyBudget: 35 });
+    let target = (await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId);
+    expect(target).toMatchObject({ publish_status: 'published', ad_export_ids: ['e1', 'e2'], publish_failure: null });
+    const activate = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'activate')!;
+    expect(activate).toMatchObject({ status: 'pending', publish: { dailyBudget: 35 } });
+    await expect(decideGrowthProposal({ ...scope, proposalId: activate.id, decision: 'approve' })).rejects.toBeInstanceOf(GrowthProposalNeedsPlatformError);
+
+    await markGrowthAdsRunning({ ...scope, proposalId: activate.id });
+    target = (await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId);
+    expect(target?.publish_status).toBe('running');
+    const kinds = (await listGrowthActivity(scope.organizationId, scope.projectId, pilot.id)).map((row) => row.kind);
+    expect(kinds).toEqual(expect.arrayContaining(['publish_failed', 'ads_published', 'ads_activated']));
+  });
+
+  it('rejecting the publish keeps the ads off the platform; rejecting the activation keeps them published and paused', async () => {
+    const { scope, pilot, targetId } = await targetWithBrief();
+    const publish = await saveGrowthPublishProposal({ ...scope, targetId, plan: PUBLISH });
+    await decideGrowthProposal({ ...scope, proposalId: publish.id, decision: 'reject' });
+    expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)?.publish_status).toBe('rejected');
+
+    const again = await saveGrowthPublishProposal({ ...scope, targetId, plan: PUBLISH });
+    await markGrowthAdsPublished({ ...scope, proposalId: again.id, exportIds: ['e1'], dailyBudget: 20 });
+    const activate = (await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.kind === 'activate')!;
+    await decideGrowthProposal({ ...scope, proposalId: activate.id, decision: 'reject' });
+    expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)?.publish_status).toBe('published');
   });
 });
