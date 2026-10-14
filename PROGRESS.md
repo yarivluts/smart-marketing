@@ -17,6 +17,13 @@ Template for each entry:
 
 ---
 
+## 2026-10-14 - Growth Pilot landing pages (KAN-396)
+
+- **What it does:** for each approved target the AI writes a landing page in the site's language, using site facts only. It arrives as a proposal with a full preview. Approving publishes it at the public /lp/<slug>, which is outside locale routing and sign-in, noindex, with utm-tagged buttons. Drafts, rejected pages and unknown slugs all return 404.
+- **Live:** PR #663, web-prod-00164.
+- **Verified on prod:** the Free plan page was written in 16 s, in Hebrew RTL, with real facts only, and its draft URL returns 404. It is left for the person to approve.
+- **Next:** KAN-397 audiences, KAN-398 publish + monitoring, KAN-399 scheduler + admin, KAN-400 Google Ads OAuth (needs human).
+
 ## 2026-10-14 - Growth Pilot: enter the website, approve what the AI proposes, get ads (KAN-393..395)
 
 - **New top-level Growth Pilot** (first in the project nav, `ai.use`):
