@@ -136,6 +136,10 @@ describe('AudiencePanel', () => {
     fireEvent.click(screen.getByRole('tab', { name: he.breakdowns.age_gender }));
     const table = await screen.findByTestId('ad-studio-meta-performance');
     expect(within(table).getByText(`25-34 · ${he.segments.female}`)).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: he.columns.ctr })).toBeInTheDocument();
+    expect(he.columns.ctr).not.toBe('CTR');
+    expect(en.columns.conversions).toBe('Sign-ups and sales');
+    expect(en.columns.costPerClick).not.toMatch(/\//);
   });
 
   it('will not save targeting that breaks the rules', () => {

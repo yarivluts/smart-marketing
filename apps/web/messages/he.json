@@ -4885,10 +4885,10 @@
       "columns": {
         "segment": "פלח",
         "spend": "הוצאה",
-        "linkClicks": "קליקים לקישור",
-        "ctr": "CTR",
-        "costPerClick": "עלות לקליק",
-        "conversions": "המרות"
+        "linkClicks": "קליקים לדף שלך",
+        "ctr": "אחוז מי שלחץ (CTR)",
+        "costPerClick": "עלות כל קליק",
+        "conversions": "הרשמות ומכירות"
       },
       "segments": {
         "female": "נשים",
