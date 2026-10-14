@@ -134,3 +134,69 @@ resource "google_cloud_scheduler_job" "dbt_refresh_hourly" {
     }
   }
 }
+
+# ---------------------------------------------------------------------------
+# Growth Pilot scheduler (KAN-399): every ten minutes Cloud Scheduler POSTs the
+# web app's /api/cron/growth-pilot with a Google-signed OIDC identity token for
+# its own service account. The route accepts nothing else (it verifies the
+# token with Google: issuer, this audience, this account, verified, unexpired)
+# and then advances every customer's pilot that has work - on behalf of the
+# person who started it, inside their project's daily AI limits. Publishing and
+# turning ads on are never done by the scheduler.
+#
+# The web service reads the expected identity from two env vars set on
+# web-prod (env is not modelled in cloud_run.tf, same as the rest):
+#   GROWTHOS_SCHEDULER_SA        = the service account email below
+#   GROWTHOS_SCHEDULER_AUDIENCE  = var.growth_pilot_cron_url
+#
+# Created live on 2026-10-14 with gcloud, so these are adopted by import.
+# TODO(human): `terraform plan` should report no changes to them.
+# ---------------------------------------------------------------------------
+
+variable "growth_pilot_cron_url" {
+  description = "The Growth Pilot cron route the scheduler calls; also the OIDC audience the route expects."
+  type        = string
+  default     = "https://web-prod-1098891924957.me-west1.run.app/api/cron/growth-pilot"
+}
+
+import {
+  to = google_service_account.growth_pilot_scheduler
+  id = "projects/growthos-g2w84/serviceAccounts/growth-pilot-scheduler@growthos-g2w84.iam.gserviceaccount.com"
+}
+
+import {
+  to = google_cloud_scheduler_job.growth_pilot
+  id = "projects/growthos-g2w84/locations/me-west1/jobs/growth-pilot-every-10m"
+}
+
+resource "google_service_account" "growth_pilot_scheduler" {
+  project      = var.project_id
+  account_id   = "growth-pilot-scheduler"
+  display_name = "Growth Pilot scheduler"
+  description  = "Signs the identity tokens Cloud Scheduler sends to the Growth Pilot cron route. No roles: it only proves who is calling."
+}
+
+resource "google_cloud_scheduler_job" "growth_pilot" {
+  project          = var.project_id
+  region           = var.region
+  name             = "growth-pilot-every-10m"
+  description      = "Keeps every Growth Pilot moving without an open tab."
+  schedule         = "*/10 * * * *"
+  time_zone        = "Etc/UTC"
+  attempt_deadline = "600s"
+
+  # A missed run is simply picked up by the next one ten minutes later.
+  retry_config {
+    retry_count = 0
+  }
+
+  http_target {
+    http_method = "POST"
+    uri         = var.growth_pilot_cron_url
+
+    oidc_token {
+      service_account_email = google_service_account.growth_pilot_scheduler.email
+      audience              = var.growth_pilot_cron_url
+    }
+  }
+}

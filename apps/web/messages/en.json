@@ -5634,6 +5634,29 @@
         "failed": "Publishing failed ({reason})",
         "connect": "Connect Meta"
       }
+    },
+    "operator": {
+      "title": "Growth Pilots",
+      "description": "Every customer pilot: where it stands, when the scheduler last ran it, and a pause for any of them. Platform operators only.",
+      "empty": "No pilots yet.",
+      "failed": "That did not work. Refresh and try again.",
+      "never": "Not yet",
+      "pause": "Pause",
+      "resume": "Resume",
+      "column": {
+        "site": "Site",
+        "organization": "Organization",
+        "status": "Status",
+        "lastRun": "Last scheduled run",
+        "action": ""
+      },
+      "status": {
+        "analyzing": "Reading the site",
+        "active": "Active",
+        "paused": "Paused",
+        "failed": "Failed",
+        "archived": "Archived"
+      }
     }
   }
 }
