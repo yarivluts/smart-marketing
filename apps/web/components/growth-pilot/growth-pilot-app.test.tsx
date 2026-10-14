@@ -21,6 +21,7 @@ const PROPOSAL: GrowthProposalView = {
   kind: 'target',
   briefId: null,
   landingPageId: null,
+  audience: null,
   previewImageIds: [],
   targetId: 't1',
   status: 'pending',
@@ -40,7 +41,7 @@ function page(extra: Partial<GrowthPilotPageData> & { status?: GrowthPilotPageDa
       pagesRead: [{ url: 'https://easysign.co.il/', title: 'EasySign' }],
       createdOn: '2026-10-13T10:00:00Z',
     },
-    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null }],
+    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null }],
     proposals: extra.proposals ?? [PROPOSAL],
     activity: extra.activity ?? [{ id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 1, on: '2026-10-13T10:00:00Z' }],
     landingPages: extra.landingPages ?? [],
@@ -158,7 +159,7 @@ describe('GrowthPilotApp', () => {
   });
 
   describe('ads', () => {
-    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null };
+    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null };
     const ADS: GrowthProposalView = { ...PROPOSAL, id: 'ad1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
     it('shows the ads with previews, a way into the Ad Studio, and the same approve / change / reject', async () => {
@@ -203,7 +204,7 @@ describe('GrowthPilotApp', () => {
   describe('landing pages', () => {
     const CONTENT = { eyebrow: 'For small offices', headline: 'Sign 20 documents a month', subheadline: 'On WhatsApp, for 20 ILS.', benefits: [{ title: 'Fast', text: 'Signed in seconds' }], steps: ['Upload', 'Send'], faq: [{ question: 'Price?', answer: '20 ILS a month' }], ctaText: 'Start now', closingHeadline: 'Ready to sign?' };
     const PAGE = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'draft' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://easy-sign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=abcDEF123456' };
-    const TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: 'lp1', landingStatus: 'ready' as const, landingFailure: null };
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: 'lp1', landingStatus: 'ready' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null };
     const PROPOSAL_LP: GrowthProposalView = { ...PROPOSAL, id: 'p-lp', kind: 'landing_page', landingPageId: 'lp1', draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
     it('shows the page it proposes, as visitors will see it, with the button leading to the tagged site', () => {
@@ -225,7 +226,7 @@ describe('GrowthPilotApp', () => {
         <GrowthPilotApp
           orgId="o"
           projectId="p"
-          initial={page({ proposals: [], targets: [{ ...TARGET, landingStatus: 'published' }, { ...TARGET, id: 't2', landingPageId: null, landingStatus: 'failed', landingFailure: 'quota_exceeded' }], landingPages: [{ ...PAGE, status: 'published' }] })}
+          initial={page({ proposals: [], targets: [{ ...TARGET, landingStatus: 'published' }, { ...TARGET, id: 't2', landingPageId: null, landingStatus: 'failed', landingFailure: 'quota_exceeded', audienceStatus: 'approved' as const, audienceFailure: null }], landingPages: [{ ...PAGE, status: 'published' }] })}
         />,
         { locale: 'en' },
       );
@@ -233,6 +234,37 @@ describe('GrowthPilotApp', () => {
       expect(live).toHaveTextContent('Landing page live');
       expect(within(live).getByTestId('growth-pilot-landing-link')).toHaveAttribute('href', '/lp/abcDEF123456');
       expect(failed).toHaveTextContent('The landing page could not be written (quota_exceeded)');
+    });
+  });
+
+  describe('audiences', () => {
+    const TARGET = { id: 't1', kind: 'audience' as const, name: 'Freelancers', description: 'Self-employed', audience: 'Fast', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'ready' as const, audienceFailure: null };
+    const PLAN = { summary: 'Freelancers in Israel who sign contracts', targeting: { countries: ['IL'], ageMin: 25, ageMax: 65, genders: [] as ('male' | 'female')[], customAudiences: [], interests: [{ id: 'i1', name: 'Freelancer', sizeLower: 1, sizeUpper: 2 }] }, unresolvedInterests: ['Paperwork'], reach: { lower: 52000, upper: 81000 }, meta: 'ok' };
+    const AUDIENCE: GrowthProposalView = { ...PROPOSAL, id: 'p-aud', kind: 'audience', audience: PLAN, draft: { kind: 'audience', name: 'Freelancers', description: '', audience: '', reason: '' } };
+
+    it('shows who the ads reach - countries, ages, genders, matched interests, the reach - for approval', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [AUDIENCE], targets: [TARGET] })} />, { locale: 'en' });
+      const card = screen.getByTestId('growth-pilot-proposal');
+      expect(card).toHaveTextContent('Audience for Freelancers');
+      const audience = screen.getByTestId('growth-pilot-audience');
+      expect(audience).toHaveTextContent('Freelancers in Israel who sign contracts');
+      expect(audience).toHaveTextContent('IL');
+      expect(audience).toHaveTextContent('Ages 25-65+');
+      expect(audience).toHaveTextContent('Everyone');
+      expect(screen.getAllByTestId('growth-pilot-audience-interest').map((chip) => chip.textContent)).toEqual(['Freelancer']);
+      expect(audience).toHaveTextContent('Paperwork');
+      expect(screen.getByTestId('growth-pilot-audience-reach')).toHaveTextContent(/52K-81K people a month/);
+      expect(screen.queryByTestId('growth-pilot-audience-meta')).toBeNull();
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('Audience waiting for your approval');
+    });
+
+    it('without Meta says how to get the interests matched, and shows a failed audience with its reason', () => {
+      const noMeta = { ...AUDIENCE, audience: { ...PLAN, meta: 'no_meta_credential', reach: null, targeting: { ...PLAN.targeting, interests: [], genders: ['female' as const] } } };
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [noMeta], targets: [{ ...TARGET, audienceStatus: 'failed', audienceFailure: 'quota_exceeded' }] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Meta ad account');
+      expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
+      expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (quota_exceeded)');
     });
   });
 });

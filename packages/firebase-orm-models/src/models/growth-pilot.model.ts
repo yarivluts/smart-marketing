@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { GrowthLandingContent, GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
+import type { GrowthAudiencePlan, GrowthLandingContent, GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
 
 /**
  * Growth Pilot: the person gives their website and the AI does the marketing work - reads the site,
@@ -80,6 +80,10 @@ export type GrowthAdsStatus = (typeof GROWTH_ADS_STATUSES)[number];
 export const GROWTH_LANDING_STATUSES = ['none', 'ready', 'published', 'rejected', 'failed'] as const;
 export type GrowthLandingStatus = (typeof GROWTH_LANDING_STATUSES)[number];
 
+/** Where a target's ads audience stands. */
+export const GROWTH_AUDIENCE_STATUSES = ['none', 'ready', 'approved', 'rejected', 'failed'] as const;
+export type GrowthAudienceStatus = (typeof GROWTH_AUDIENCE_STATUSES)[number];
+
 /** One thing to grow: a product, a service or an audience. */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/growth_targets',
@@ -138,6 +142,12 @@ export class GrowthTargetModel extends BaseModel {
   @Field({ is_required: false })
   public landing_failure?: string | null;
 
+  @Field({ is_required: false })
+  public audience_status?: GrowthAudienceStatus | null;
+
+  @Field({ is_required: false })
+  public audience_failure?: string | null;
+
   @Field({ is_required: true })
   public created_on!: string;
 
@@ -146,7 +156,7 @@ export class GrowthTargetModel extends BaseModel {
 }
 
 /** What a proposal asks the person to decide. Later stories add creatives, landing pages, audiences and publishing. */
-export const GROWTH_PROPOSAL_KINDS = ['target', 'ads', 'landing_page'] as const;
+export const GROWTH_PROPOSAL_KINDS = ['target', 'ads', 'landing_page', 'audience'] as const;
 export type GrowthProposalKind = (typeof GROWTH_PROPOSAL_KINDS)[number];
 
 /** `revising`: the person asked for a change and the AI is rewriting it; it comes back `pending`. */
@@ -194,6 +204,10 @@ export class GrowthProposalModel extends BaseModel {
   @Field({ is_required: false })
   public brief_id?: string | null;
 
+  /** The audience to approve (kind `audience`). */
+  @Field({ is_required: false })
+  public audience?: GrowthAudiencePlan | null;
+
   /** The landing page to approve (kind `landing_page`). */
   @Field({ is_required: false })
   public landing_page_id?: string | null;
@@ -237,6 +251,8 @@ export const GROWTH_ACTIVITY_KINDS = [
   'landing_ready',
   'landing_published',
   'landing_failed',
+  'audience_ready',
+  'audience_failed',
 ] as const;
 export type GrowthActivityKind = (typeof GROWTH_ACTIVITY_KINDS)[number];
 

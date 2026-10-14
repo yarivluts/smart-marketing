@@ -1,5 +1,5 @@
-import type { GrowthActivityKind, GrowthAdsStatus, GrowthLandingPageStatus, GrowthLandingStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
-import { isRtlLanguage, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft, type GrowthTargetKind } from '@growthos/shared';
+import type { GrowthActivityKind, GrowthAdsStatus, GrowthAudienceStatus, GrowthLandingPageStatus, GrowthLandingStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
+import { isRtlLanguage, type GrowthAudiencePlan, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft, type GrowthTargetKind } from '@growthos/shared';
 
 /** What the Growth Pilot page shows: plain, serializable, no model classes. */
 export interface GrowthPilotView {
@@ -26,6 +26,8 @@ export interface GrowthTargetView {
   landingPageId: string | null;
   landingStatus: GrowthLandingStatus;
   landingFailure: string | null;
+  audienceStatus: GrowthAudienceStatus;
+  audienceFailure: string | null;
 }
 
 export interface GrowthLandingPageView {
@@ -43,6 +45,7 @@ export interface GrowthProposalView {
   kind: GrowthProposalKind;
   briefId: string | null;
   landingPageId: string | null;
+  audience: GrowthAudiencePlan | null;
   previewImageIds: string[];
   targetId: string | null;
   status: GrowthProposalStatus;
@@ -105,6 +108,8 @@ export function toGrowthTargetView(row: {
   landing_page_id?: string | null;
   landing_status?: GrowthLandingStatus | null;
   landing_failure?: string | null;
+  audience_status?: GrowthAudienceStatus | null;
+  audience_failure?: string | null;
 }): GrowthTargetView {
   return {
     id: row.id,
@@ -120,6 +125,8 @@ export function toGrowthTargetView(row: {
     landingPageId: row.landing_page_id ?? null,
     landingStatus: row.landing_status ?? 'none',
     landingFailure: row.landing_failure ?? null,
+    audienceStatus: row.audience_status ?? 'none',
+    audienceFailure: row.audience_failure ?? null,
   };
 }
 
@@ -128,6 +135,7 @@ export function toGrowthProposalView(row: {
   kind: GrowthProposalKind;
   brief_id?: string | null;
   landing_page_id?: string | null;
+  audience?: GrowthAudiencePlan | null;
   preview_image_ids?: string[] | null;
   target_id?: string | null;
   status: GrowthProposalStatus;
@@ -140,6 +148,7 @@ export function toGrowthProposalView(row: {
     kind: row.kind,
     briefId: row.brief_id ?? null,
     landingPageId: row.landing_page_id ?? null,
+    audience: row.audience ?? null,
     previewImageIds: row.preview_image_ids ?? [],
     targetId: row.target_id ?? null,
     status: row.status,
@@ -164,7 +173,8 @@ export function toGrowthActivityView(row: { id: string; kind: GrowthActivityKind
 export function growthPilotHasPendingWork(data: GrowthPilotPageData): boolean {
   if (data.pilot.status !== 'active') return false;
   const active = data.targets.filter((target) => target.status === 'active');
-  if (active.some((target) => target.adsStatus === 'building' || (!target.briefId && target.adsStatus === 'none') || target.landingStatus === 'none')) return true;
+  if (active.some((target) => target.adsStatus === 'building' || (!target.briefId && target.adsStatus === 'none') || target.landingStatus === 'none' || (target.briefId && target.audienceStatus === 'none'))) return true;
+  // A change to ads is redone over several calls; other revisions finish within their own request.
   return data.proposals.some((proposal) => proposal.kind === 'ads' && proposal.status === 'revising');
 }
 

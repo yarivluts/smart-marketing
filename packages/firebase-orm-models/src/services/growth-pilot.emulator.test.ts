@@ -7,7 +7,12 @@ import {
   completeGrowthProposalRevision,
   createOrganizationWithOwner,
   createProject,
+  createAdStudioBrief,
   decideGrowthProposal,
+  failGrowthAudience,
+  getAdStudioBrief,
+  saveGrowthAudienceProposal,
+  updateGrowthAudiencePlan,
   failGrowthLanding,
   getPublishedGrowthLanding,
   saveGrowthLandingDraft,
@@ -247,5 +252,52 @@ describe('Growth Pilot', () => {
     expect(failed).toMatchObject({ landing_status: 'failed', landing_failure: 'quota_exceeded' });
     expect(await getPublishedGrowthLanding('../../etc')).toBeNull();
     expect(await getPublishedGrowthLanding('nosuchslug123')).toBeNull();
+  });
+
+  const PLAN = {
+    summary: 'Freelancers in Israel',
+    targeting: { countries: ['IL'], ageMin: 25, ageMax: 55, genders: [], customAudiences: [], interests: [{ id: '6003', name: 'Freelancer', sizeLower: 100, sizeUpper: 200 }] },
+    unresolvedInterests: ['Paperwork'],
+    reach: { lower: 1000, upper: 2000 },
+    meta: 'ok',
+  };
+
+  async function targetWithBrief() {
+    const { scope, pilot } = await analyzedPilot();
+    const [proposal] = await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id);
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'approve' });
+    const brief = await createAdStudioBrief({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+      input: { name: 'Sign', objective: 'Trials', productDescription: 'E-sign', landingPageUrl: null, format: 'vertical', language: 'he', targetSeconds: 15 },
+      createdByUserId: scope.actorId,
+    });
+    await linkGrowthTargetAds({ ...scope, targetId: proposal.target_id!, briefId: brief.id, runId: 'r' });
+    return { scope, pilot, targetId: proposal.target_id!, briefId: brief.id };
+  }
+
+  it('puts an approved audience on the target ads, where publishing reads it', async () => {
+    const { scope, pilot, targetId, briefId } = await targetWithBrief();
+    const proposal = await saveGrowthAudienceProposal({ ...scope, targetId, plan: PLAN });
+    expect(proposal).toMatchObject({ kind: 'audience', status: 'pending', brief_id: briefId, audience: PLAN });
+    await requestGrowthProposalChange({ ...scope, proposalId: proposal.id, text: 'Ages 30 to 45' });
+    await updateGrowthAudiencePlan({ ...scope, proposalId: proposal.id, plan: { ...PLAN, targeting: { ...PLAN.targeting, ageMin: 30, ageMax: 45 } } });
+    await completeGrowthProposalRevision({ ...scope, proposalId: proposal.id, draft: proposal.draft ?? null });
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'approve' });
+    const brief = await getAdStudioBrief(scope.organizationId, scope.projectId, briefId);
+    expect(brief.meta_targeting).toMatchObject({ countries: ['IL'], ageMin: 30, ageMax: 45, interests: [{ id: '6003', name: 'Freelancer' }] });
+    const target = (await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId);
+    expect(target?.audience_status).toBe('approved');
+    expect((await listGrowthActivity(scope.organizationId, scope.projectId, pilot.id)).map((row) => row.kind)).toContain('audience_ready');
+  });
+
+  it('a rejected audience leaves the ads as they were, and a failure says why', async () => {
+    const { scope, pilot, targetId, briefId } = await targetWithBrief();
+    const proposal = await saveGrowthAudienceProposal({ ...scope, targetId, plan: PLAN });
+    await decideGrowthProposal({ ...scope, proposalId: proposal.id, decision: 'reject' });
+    expect((await getAdStudioBrief(scope.organizationId, scope.projectId, briefId)).meta_targeting ?? null).toBeNull();
+    expect((await listGrowthTargets(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === targetId)?.audience_status).toBe('rejected');
+    const failed = await failGrowthAudience({ ...scope, targetId, failureCode: 'quota_exceeded' });
+    expect(failed).toMatchObject({ audience_status: 'failed', audience_failure: 'quota_exceeded' });
   });
 });

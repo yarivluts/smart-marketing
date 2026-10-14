@@ -15,6 +15,9 @@ const orm = vi.hoisted(() => ({
   linkGrowthTargetAds: vi.fn(),
   finishGrowthTargetAds: vi.fn(),
   createAdStudioBrief: vi.fn(),
+  failGrowthAudience: vi.fn(),
+  saveGrowthAudienceProposal: vi.fn(),
+  updateGrowthAudiencePlan: vi.fn(),
   failGrowthLanding: vi.fn(),
   getGrowthLandingPage: vi.fn(),
   saveGrowthLandingDraft: vi.fn(),
@@ -29,6 +32,8 @@ vi.mock('@growthos/firebase-orm-models', async (importOriginal) => ({ ...(await 
 vi.mock('./runtime', () => ({ ensureOrm: vi.fn(async () => undefined) }));
 const studio = vi.hoisted(() => ({ startAdStudioAutopilot: vi.fn(), advanceAdStudioAutopilot: vi.fn(), listBriefImages: vi.fn(), rewriteAdStudioImageConcept: vi.fn() }));
 vi.mock('./autopilot', () => ({ startAdStudioAutopilot: studio.startAdStudioAutopilot, advanceAdStudioAutopilot: studio.advanceAdStudioAutopilot }));
+const meta = vi.hoisted(() => ({ searchAdStudioMetaInterests: vi.fn(), estimateAdStudioMetaReach: vi.fn() }));
+vi.mock('./audiences', () => meta);
 vi.mock('./image-pipeline', () => ({ listBriefImages: studio.listBriefImages, rewriteAdStudioImageConcept: studio.rewriteAdStudioImageConcept }));
 
 import { AdStudioQuotaExceededError } from '@growthos/firebase-orm-models';
@@ -65,6 +70,7 @@ const PILOT = { id: 'g1', organization_id: 'o', project_id: 'p', site_url: 'http
 beforeEach(() => {
   for (const fn of Object.values(orm)) fn.mockReset();
   for (const fn of Object.values(studio)) fn.mockReset();
+  for (const fn of Object.values(meta)) fn.mockReset();
   orm.getGrowthPilot.mockResolvedValue(PILOT);
   orm.acquireGrowthPilotLease.mockResolvedValue('lease');
   orm.saveGrowthPilotAnalysis.mockImplementation(async (params: { drafts: unknown[] }) => ({ ...PILOT, status: 'active', drafts: params.drafts }));
@@ -272,5 +278,57 @@ describe('landing pages for approved targets', () => {
     expect(model.generateJson.mock.calls[0][0].user).toContain('"headline": "Sign 20 documents"');
     expect(orm.updateGrowthLandingContent).toHaveBeenCalledWith(expect.objectContaining({ pageId: 'page1', content: expect.objectContaining({ headline: 'Sign fast' }) }));
     expect(orm.completeGrowthProposalRevision).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'lp1', draft: { name: 'Pro plan' } }));
+  });
+});
+
+describe('audiences for targets with ads', () => {
+  const ACTIVE = { ...PILOT, status: 'active', analysis: { ...ANALYSIS, language: 'he', offerings: [], audiences: [] } };
+  const TARGET = { id: 't1', pilot_id: 'g1', kind: 'audience', name: 'Freelancers', description: 'Self-employed', audience: 'Fast signatures', status: 'active', brief_id: 'b1', ads_status: 'ready', landing_status: 'ready', audience_status: 'none' };
+  const DRAFT = { summary: 'Freelancers in Israel', countries: ['IL'], ageMin: 25, ageMax: 55, genders: [], interestKeywords: ['Freelancer', 'Small business', 'Paperwork'] };
+
+  beforeEach(() => {
+    orm.getGrowthPilot.mockResolvedValue(ACTIVE);
+    orm.listGrowthTargets.mockResolvedValue([TARGET]);
+  });
+
+  it('matches each interest word to the biggest Meta interest, estimates the reach, and proposes it', async () => {
+    meta.searchAdStudioMetaInterests.mockImplementation(async ({ query }: { query: string }) =>
+      query === 'Paperwork'
+        ? { status: 'ok', data: [] }
+        : { status: 'ok', data: [{ id: query === 'Freelancer' ? 'i1' : 'i1', name: query, sizeLower: 10, sizeUpper: 20, path: [] }, { id: 'i2', name: query + ' 2', sizeLower: 1, sizeUpper: 2, path: [] }] },
+    );
+    meta.estimateAdStudioMetaReach.mockResolvedValue({ status: 'ok', data: { monthlyLower: 50000, monthlyUpper: 80000, ready: true } });
+    await advanceGrowthPilot({ ...ctx(llm(DRAFT)), pilotId: 'g1', autopilot: {} as never });
+    const plan = orm.saveGrowthAudienceProposal.mock.calls[0][0].plan;
+    // The second word's biggest match was already chosen, so it takes the next one rather than repeat it.
+    expect(plan.targeting.interests.map((interest: { id: string }) => interest.id)).toEqual(['i1', 'i2']);
+    expect(plan).toMatchObject({ summary: 'Freelancers in Israel', unresolvedInterests: ['Paperwork'], reach: { lower: 50000, upper: 80000 }, meta: 'ok', targeting: { countries: ['IL'], ageMin: 25, ageMax: 55 } });
+    expect(orm.recordAdStudioUsage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'audience_plan' }));
+    expect(meta.searchAdStudioMetaInterests).toHaveBeenCalledWith(expect.objectContaining({ language: 'he' }));
+  });
+
+  it('without Meta keeps countries, ages and genders, and says why interests are not matched', async () => {
+    meta.searchAdStudioMetaInterests.mockResolvedValue({ status: 'unavailable', reason: 'no_credential' });
+    await advanceGrowthPilot({ ...ctx(llm(DRAFT)), pilotId: 'g1', autopilot: {} as never });
+    expect(meta.searchAdStudioMetaInterests).toHaveBeenCalledTimes(1);
+    expect(meta.estimateAdStudioMetaReach).not.toHaveBeenCalled();
+    expect(orm.saveGrowthAudienceProposal.mock.calls[0][0].plan).toMatchObject({ meta: 'no_credential', reach: null, unresolvedInterests: ['Freelancer', 'Small business', 'Paperwork'], targeting: { interests: [], countries: ['IL'] } });
+  });
+
+  it('records why the audience could not be planned, and revises one on request', async () => {
+    orm.assertAdStudioQuota.mockRejectedValueOnce(new AdStudioQuotaExceededError('text', 50, 50));
+    await advanceGrowthPilot({ ...ctx(llm(DRAFT)), pilotId: 'g1', autopilot: {} as never });
+    expect(orm.failGrowthAudience).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', failureCode: 'quota_exceeded' }));
+
+    meta.searchAdStudioMetaInterests.mockResolvedValue({ status: 'unavailable', reason: 'no_credential' });
+    const held = { id: 'a1', kind: 'audience', pilot_id: 'g1', target_id: 't1', draft: { name: 'Freelancers' }, change_requests: [{ text: 'Only women' }], audience: { summary: 's', targeting: { countries: ['IL'], ageMin: 25, ageMax: 55, genders: [], customAudiences: [], interests: [{ id: 'i1', name: 'Freelancer', sizeLower: 1, sizeUpper: 2 }] }, unresolvedInterests: ['Paperwork'], reach: null, meta: 'ok' } };
+    orm.requestGrowthProposalChange.mockResolvedValue(held);
+    orm.getGrowthTarget.mockResolvedValue(TARGET);
+    const model = llm({ ...DRAFT, genders: ['female'] });
+    await reviseGrowthProposal({ ...ctx(model), proposalId: 'a1', request: 'Only women' });
+    expect(model.generateJson.mock.calls[0][0].user).toContain('"Freelancer"');
+    expect(model.generateJson.mock.calls[0][0].user).toContain('"Paperwork"');
+    expect(orm.updateGrowthAudiencePlan).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'a1', plan: expect.objectContaining({ targeting: expect.objectContaining({ genders: ['female'] }) }) }));
+    expect(orm.completeGrowthProposalRevision).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'a1', draft: { name: 'Freelancers' } }));
   });
 });
