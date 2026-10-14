@@ -1,4 +1,4 @@
-import type { GrowthActivityKind, GrowthAdsStatus, GrowthAudienceStatus, GrowthLandingPageStatus, GrowthLandingStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
+import type { GrowthActivityKind, GrowthAdsStatus, GrowthAudienceStatus, GrowthPublishPlan, GrowthPublishStatus, GrowthLandingPageStatus, GrowthLandingStatus, GrowthPilotStatus, GrowthProposalKind, GrowthProposalStatus, GrowthTargetStatus } from '@growthos/firebase-orm-models';
 import { isRtlLanguage, type GrowthAudiencePlan, type GrowthLandingContent, type GrowthSiteAnalysis, type GrowthTargetDraft, type GrowthTargetKind } from '@growthos/shared';
 
 /** What the Growth Pilot page shows: plain, serializable, no model classes. */
@@ -28,6 +28,8 @@ export interface GrowthTargetView {
   landingFailure: string | null;
   audienceStatus: GrowthAudienceStatus;
   audienceFailure: string | null;
+  publishStatus: GrowthPublishStatus;
+  publishFailure: string | null;
 }
 
 export interface GrowthLandingPageView {
@@ -46,6 +48,7 @@ export interface GrowthProposalView {
   briefId: string | null;
   landingPageId: string | null;
   audience: GrowthAudiencePlan | null;
+  publish: GrowthPublishPlan | null;
   previewImageIds: string[];
   targetId: string | null;
   status: GrowthProposalStatus;
@@ -110,6 +113,8 @@ export function toGrowthTargetView(row: {
   landing_failure?: string | null;
   audience_status?: GrowthAudienceStatus | null;
   audience_failure?: string | null;
+  publish_status?: GrowthPublishStatus | null;
+  publish_failure?: string | null;
 }): GrowthTargetView {
   return {
     id: row.id,
@@ -127,6 +132,8 @@ export function toGrowthTargetView(row: {
     landingFailure: row.landing_failure ?? null,
     audienceStatus: row.audience_status ?? 'none',
     audienceFailure: row.audience_failure ?? null,
+    publishStatus: row.publish_status ?? 'none',
+    publishFailure: row.publish_failure ?? null,
   };
 }
 
@@ -136,6 +143,7 @@ export function toGrowthProposalView(row: {
   brief_id?: string | null;
   landing_page_id?: string | null;
   audience?: GrowthAudiencePlan | null;
+  publish?: GrowthPublishPlan | null;
   preview_image_ids?: string[] | null;
   target_id?: string | null;
   status: GrowthProposalStatus;
@@ -149,6 +157,7 @@ export function toGrowthProposalView(row: {
     briefId: row.brief_id ?? null,
     landingPageId: row.landing_page_id ?? null,
     audience: row.audience ?? null,
+    publish: row.publish ?? null,
     previewImageIds: row.preview_image_ids ?? [],
     targetId: row.target_id ?? null,
     status: row.status,
@@ -170,10 +179,16 @@ export function toGrowthActivityView(row: { id: string; kind: GrowthActivityKind
  * Whether the pilot has work the page should keep asking for: ads being made, an approved target
  * without ads yet, or an ads proposal being redone on the person's request.
  */
+/** Ads approved and the audience and page decided, but no publish proposal yet: the pilot has one to write. */
+function readyToPublish(target: GrowthTargetView): boolean {
+  const decided = (status: string) => status !== 'none' && status !== 'ready';
+  return target.adsStatus === 'approved' && decided(target.audienceStatus) && decided(target.landingStatus) && target.publishStatus === 'none';
+}
+
 export function growthPilotHasPendingWork(data: GrowthPilotPageData): boolean {
   if (data.pilot.status !== 'active') return false;
   const active = data.targets.filter((target) => target.status === 'active');
-  if (active.some((target) => target.adsStatus === 'building' || (!target.briefId && target.adsStatus === 'none') || target.landingStatus === 'none' || (target.briefId && target.audienceStatus === 'none'))) return true;
+  if (active.some((target) => target.adsStatus === 'building' || (!target.briefId && target.adsStatus === 'none') || target.landingStatus === 'none' || (target.briefId && target.audienceStatus === 'none') || readyToPublish(target))) return true;
   // A change to ads is redone over several calls; other revisions finish within their own request.
   return data.proposals.some((proposal) => proposal.kind === 'ads' && proposal.status === 'revising');
 }

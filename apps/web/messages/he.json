@@ -5548,7 +5548,10 @@
         "landing_published": "פרסמתם את דף הנחיתה ל{subject}",
         "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}",
         "audience_ready": "תכנן קהל ל{subject}",
-        "audience_failed": "לא הצליח לתכנן קהל ל{subject}"
+        "audience_failed": "לא הצליח לתכנן קהל ל{subject}",
+        "ads_published": "{count, plural, one {פרסם מודעה מושהית אחת} other {פרסם # מודעות מושהות}} ל{subject}",
+        "publish_failed": "לא הצליח לפרסם את המודעות ל{subject}",
+        "ads_activated": "הפעלתם את המודעות ל{subject}"
       }
     },
     "errors": {
@@ -5559,7 +5562,10 @@
       "not_pending": "כבר החליטו על ההצעה הזו.",
       "not_ready": "האתר עדיין נקרא.",
       "not_found": "לא נמצא. רעננו את הדף.",
-      "generic": "משהו השתבש. נסו שוב."
+      "generic": "משהו השתבש. נסו שוב.",
+      "invalid_budget": "הכניסו תקציב יומי גדול מאפס.",
+      "automation_stopped": "האוטומציה בארגון עצורה (מתג חירום). הפעילו אותה מחדש כדי להריץ מודעות.",
+      "meta_unavailable": "חשבון המודעות של Meta לא מחובר או לא מורשה לפרסם."
     },
     "ads": {
       "title": "מודעות ל{name}",
@@ -5607,6 +5613,26 @@
         "approved": "הקהל אושר",
         "rejected": "דחיתם את הקהל",
         "failed": "לא הצלחנו לתכנן קהל ({reason})"
+      }
+    },
+    "publish": {
+      "title": "פרסום המודעות של {name}",
+      "activateTitle": "הפעלת המודעות של {name}",
+      "description": "{count, plural, one {התמונה שאושרה עולה ל-Meta כמודעה מושהית} other {# התמונות שאושרו עולות ל-Meta כמודעות מושהות באותה קבוצת מודעות}}. שום דבר לא רץ ולא מוציא כסף עד שתפעילו.",
+      "activateDescription": "המודעות נמצאות ב-Meta, מושהות. הפעלה מתחילה הוצאה - עד {budget} ביום במטבע של חשבון המודעות.",
+      "link": "קישור",
+      "countries": "מדינות",
+      "budget": "תקציב יומי",
+      "approve": "פרסום (מושהה)",
+      "activate": "הפעלת המודעות",
+      "status": {
+        "needs_meta": "מוכן לפרסום ברגע שיחובר חשבון מודעות של Meta.",
+        "ready": "הפרסום מחכה לאישור שלכם",
+        "published": "ב-Meta, מושהה",
+        "running": "המודעות רצות",
+        "rejected": "בחרתם לא לפרסם",
+        "failed": "הפרסום נכשל ({reason})",
+        "connect": "חיבור Meta"
       }
     }
   }

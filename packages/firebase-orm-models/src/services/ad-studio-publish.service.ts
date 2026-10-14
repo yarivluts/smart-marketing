@@ -8,6 +8,7 @@ import { GoogleAdsApiError, GoogleAdsHttpApiClient, type GoogleAdsApiClient } fr
 import { AdStudioExportInvalidError, AdStudioExportUnavailableError, resolveAdStudioExportDestinations } from './ad-studio-export.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
 import { recordAuditLogEntry } from './audit-log.service';
+import { isAutomationKillSwitchEngaged } from './automation-kill-switch.service';
 import { metaAdSetTargeting, searchAdIssues, searchTargetingToGoogle, type AdStudioMetaTargeting, type AdStudioSearchAd, type AdStudioSearchKeyword, type AdStudioSearchTargeting } from '@growthos/shared';
 
 /**
@@ -395,4 +396,60 @@ export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promis
     // Best-effort.
   }
   return row;
+}
+
+export class AdStudioAutomationStoppedError extends Error {
+  constructor() {
+    super('Automation is stopped for this organization (kill switch): nothing can be turned on.');
+    this.name = 'AdStudioAutomationStoppedError';
+  }
+}
+
+/**
+ * Turns published, paused Meta ads on - or back off. Campaign, ad set and each ad are set, since all
+ * three were created paused. Turning on starts spending, so it refuses while the organization's
+ * automation kill switch is engaged, and it is audited either way.
+ */
+export async function setAdStudioMetaAdsStatus(params: {
+  organizationId: string;
+  projectId: string;
+  exportIds: string[];
+  status: 'ACTIVE' | 'PAUSED';
+  actorId: string;
+  kms: KmsProvider;
+  clients?: { meta?: (accessToken: string) => MetaAdsApiClient };
+}): Promise<{ campaigns: number; adSets: number; ads: number }> {
+  if (params.status === 'ACTIVE' && (await isAutomationKillSwitchEngaged(params.organizationId))) throw new AdStudioAutomationStoppedError();
+  const rows = (await Promise.all(params.exportIds.map((id) => AdStudioExportModel.init(id, { organization_id: params.organizationId, project_id: params.projectId })))).filter(
+    (row): row is AdStudioExportModel => Boolean(row && row.destination === 'meta' && row.result_kind === 'ad' && row.status === 'done'),
+  );
+  if (!rows.length) throw new AdStudioExportInvalidError(['no published Meta ads to change']);
+  const destinations = await resolveAdStudioExportDestinations(params.organizationId, params.projectId);
+  const target = destinations.meta;
+  if (!target.available) throw new AdStudioExportUnavailableError('meta', target.reason);
+  const secret = parseMetaAdsCredentialSecret(await revealSharedCredentialSecret({ organizationId: params.organizationId, credentialId: target.credentialId, kms: params.kms }));
+  const client = params.clients?.meta?.(secret.accessToken) ?? new MetaAdsHttpApiClient({ accessToken: secret.accessToken });
+  const pick = (key: string) => [...new Set(rows.map((row) => row.platform_refs?.[key]).filter((value): value is string => Boolean(value)))];
+  const campaigns = pick('campaign_id');
+  const adSets = pick('ad_set_id');
+  const ads = pick('ad_id');
+  // Ads first when pausing, campaigns first when turning on: nothing runs half-configured.
+  const order = params.status === 'ACTIVE' ? [...campaigns, ...adSets, ...ads] : [...ads, ...adSets, ...campaigns];
+  for (const id of order) await client.setObjectStatus(id, params.status);
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: params.status === 'ACTIVE' ? 'ad_studio.ads_activated' : 'ad_studio.ads_paused',
+      targetType: 'ad_studio_export',
+      targetId: rows[0].id,
+      summary: `${params.status === 'ACTIVE' ? 'Turned on' : 'Paused'} ${ads.length} Meta ad(s)`,
+      after: { campaigns, ad_sets: adSets, ads },
+    });
+  } catch {
+    // Best-effort: the platform change already happened.
+  }
+  return { campaigns: campaigns.length, adSets: adSets.length, ads: ads.length };
 }

@@ -4,7 +4,19 @@ import {
   acquireGrowthPilotLease,
   addRequestedGrowthTarget,
   completeGrowthProposalRevision,
+  AdStudioExportUnavailableError,
   createAdStudioBrief,
+  failGrowthPublish,
+  getGrowthProposal,
+  GrowthProposalNotPendingError,
+  listGrowthLandingPages,
+  listGrowthProposals,
+  markGrowthAdsPublished,
+  markGrowthAdsRunning,
+  markGrowthTargetNeedsMeta,
+  resolveAdStudioExportDestinations,
+  saveGrowthPublishProposal,
+  setAdStudioMetaAdsStatus,
   failGrowthAudience,
   saveGrowthAudienceProposal,
   updateGrowthAudiencePlan,
@@ -34,6 +46,7 @@ import {
   buildInterestChoicePrompt,
   GROWTH_INTEREST_CANDIDATES_PER_KEYWORD,
   buildLandingPagePrompt,
+  landingCtaUrl,
   defaultMetaTargeting,
   buildSiteAnalysisPrompt,
   buildTargetFromRequestPrompt,
@@ -57,6 +70,8 @@ import {
   type GrowthTargetDraft,
 } from '@growthos/shared';
 import { estimateAdStudioMetaReach, searchAdStudioMetaInterests } from './audiences';
+import { publishBriefAd } from './publish';
+import { serverKms } from './planning-sources';
 import { advanceAdStudioAutopilot, startAdStudioAutopilot, type AdStudioAutopilotDeps } from './autopilot';
 import { listBriefImages, rewriteAdStudioImageConcept } from './image-pipeline';
 import { AdStudioProviderError } from './llm';
@@ -164,7 +179,7 @@ export function growthFailureCode(error: unknown): string {
  * the site and proposes targets. Returns the pilot as it stands (untouched when there was nothing to
  * do or another caller is on it). Safe to call repeatedly - the page polls it.
  */
-export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: string; deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps }): Promise<GrowthPilotModel> {
+export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: string; deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps; publicWebUrl?: string | null }): Promise<GrowthPilotModel> {
   await ensureOrm();
   const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, ctx.pilotId);
   if (pilot.status === 'active' && ctx.autopilot) {
@@ -198,7 +213,7 @@ export async function advanceGrowthPilot(ctx: AdStudioCallContext & { pilotId: s
 }
 
 /** The project's current pilot, advanced if it has pending work; null when none was started. */
-export async function advanceCurrentGrowthPilot(ctx: AdStudioCallContext & { deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps }): Promise<GrowthPilotModel | null> {
+export async function advanceCurrentGrowthPilot(ctx: AdStudioCallContext & { deps?: PlanningSourceDeps; autopilot?: AdStudioAutopilotDeps; publicWebUrl?: string | null }): Promise<GrowthPilotModel | null> {
   await ensureOrm();
   const pilot = await getCurrentGrowthPilot(ctx.organizationId, ctx.projectId);
   return pilot ? advanceGrowthPilot({ ...ctx, pilotId: pilot.id }) : null;
@@ -261,7 +276,7 @@ export const GROWTH_ADS_RUN_OPTIONS = { plan: true, images: true, video: false, 
 /** How many images an ads proposal previews. */
 const PREVIEW_IMAGES = 6;
 
-type AdsContext = AdStudioCallContext & { autopilot: AdStudioAutopilotDeps };
+type AdsContext = AdStudioCallContext & { autopilot: AdStudioAutopilotDeps; publicWebUrl?: string | null };
 
 /** Why a finished run left no usable images: the run's own failure, the images step's reason, or none rendered. */
 function runFailureCode(run: AdStudioRunModel): string {
@@ -300,6 +315,15 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
     await planGrowthAudience(ctx, pilot, needsAudience);
     return;
   }
+  const readyToPublish = targets.find(
+    (target) =>
+      target.status === 'active' &&
+      target.ads_status === 'approved' &&
+      decided(target.audience_status) &&
+      decided(target.landing_status) &&
+      ['none', 'needs_meta'].includes(target.publish_status ?? 'none'),
+  );
+  if (readyToPublish && (await proposeGrowthPublish(ctx, pilot, readyToPublish))) return;
   const next = targets.find((target) => target.status === 'active' && !target.brief_id && (target.ads_status ?? 'none') === 'none');
   if (!next) return;
   const brief = await createAdStudioBrief({
@@ -462,4 +486,128 @@ async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthPropos
   } catch (error) {
     return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
   }
+}
+
+/** The person has had their say on this part (approved, rejected, or it failed) - nothing waits on it. */
+function decided(status: string | null | undefined): boolean {
+  return Boolean(status) && status !== 'none' && status !== 'ready';
+}
+
+/** The default daily budget a publish proposal suggests, in the ad account's currency; the person sets their own. */
+export const GROWTH_DEFAULT_DAILY_BUDGET = 20;
+const MAX_DAILY_BUDGET = 100_000;
+
+/**
+ * Proposes publishing a target whose ads are approved and whose audience and page are decided: the
+ * approved images, sending people to its published landing page (or the tagged site). Without a
+ * Meta ad account it marks the target as waiting for one instead. True when it did a unit of work.
+ */
+async function proposeGrowthPublish(ctx: AdsContext, pilot: GrowthPilotModel, target: GrowthTargetModel): Promise<boolean> {
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
+  const destinations = await resolveAdStudioExportDestinations(ctx.organizationId, ctx.projectId);
+  if (!destinations.meta.available) {
+    if (target.publish_status === 'needs_meta') return false;
+    await markGrowthTargetNeedsMeta(scope);
+    return true;
+  }
+  const [proposals, pages, brief] = await Promise.all([
+    listGrowthProposals(ctx.organizationId, ctx.projectId, pilot.id),
+    listGrowthLandingPages(ctx.organizationId, ctx.projectId, pilot.id),
+    getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!),
+  ]);
+  const ads = proposals.find((proposal) => proposal.kind === 'ads' && proposal.status === 'approved' && proposal.target_id === target.id);
+  const imageIds = ads?.preview_image_ids ?? [];
+  if (!imageIds.length) return false;
+  const page = pages.find((candidate) => candidate.target_id === target.id && candidate.status === 'published');
+  const base = ctx.publicWebUrl?.replace(/\/+$/, '');
+  const linkUrl = page ? (base ? `${base}/lp/${page.slug}` : page.cta_url) : landingCtaUrl(pilot.site_url, `target-${target.id}`);
+  const language = pilot.analysis?.language || 'en';
+  await saveGrowthPublishProposal({
+    ...scope,
+    plan: {
+      destination: 'meta',
+      imageIds,
+      dailyBudget: GROWTH_DEFAULT_DAILY_BUDGET,
+      linkUrl,
+      campaignName: `${pilot.analysis?.businessName || 'Growth Pilot'} - ${target.name}`.slice(0, 100),
+      countries: brief.meta_targeting?.countries?.length ? brief.meta_targeting.countries : defaultMetaTargeting(language).countries,
+    },
+  });
+  return true;
+}
+
+export class GrowthPublishInvalidError extends Error {
+  constructor() {
+    super('The daily budget must be a positive number.');
+    this.name = 'GrowthPublishInvalidError';
+  }
+}
+
+export interface GrowthPlatformDeps {
+  publish?: typeof publishBriefAd;
+  setStatus?: typeof setAdStudioMetaAdsStatus;
+}
+
+/**
+ * The person approved publishing (with the daily budget they chose): every approved image becomes a
+ * paused Meta ad in one ad set, with its idea's words and the proposal's link. If the first cannot be
+ * created nothing is, and the target says why; turning the ads on becomes the next proposal.
+ */
+export async function approveGrowthPublish(ctx: AdStudioCallContext & { proposalId: string; dailyBudget?: number }, deps: GrowthPlatformDeps = {}): Promise<GrowthProposalModel> {
+  await ensureOrm();
+  const proposal = await getGrowthProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
+  if (proposal.status !== 'pending' || proposal.kind !== 'publish' || !proposal.publish || !proposal.target_id) throw new GrowthProposalNotPendingError(proposal.status);
+  const budget = ctx.dailyBudget ?? proposal.publish.dailyBudget;
+  if (!Number.isFinite(budget) || budget <= 0 || budget > MAX_DAILY_BUDGET) throw new GrowthPublishInvalidError();
+  // Before anything is read or created: is there a Meta ad account to publish to?
+  const destinations = await resolveAdStudioExportDestinations(ctx.organizationId, ctx.projectId);
+  if (!destinations.meta.available) throw new AdStudioExportUnavailableError('meta', destinations.meta.reason);
+  const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, proposal.target_id);
+  const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, proposal.pilot_id);
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!);
+  const images = await listBriefImages({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id });
+  const publish = deps.publish ?? publishBriefAd;
+  const plan = proposal.publish;
+  const done: string[] = [];
+  for (const imageId of plan.imageIds) {
+    const concept = (brief.image_concepts ?? []).find((candidate) => candidate.id === images.find((image) => image.id === imageId)?.conceptId);
+    const copy = concept?.copy;
+    const row = await publish({
+      organizationId: ctx.organizationId,
+      projectId: ctx.projectId,
+      briefId: brief.id,
+      destination: 'meta',
+      source: { kind: 'image', imageId },
+      copy: {
+        headline: copy?.headline || concept?.headline || target.name,
+        primaryText: copy?.primaryText || concept?.headline || target.description,
+        description: copy?.description ?? '',
+        linkUrl: plan.linkUrl,
+        businessName: pilot.analysis?.businessName || target.name,
+      },
+      campaignName: plan.campaignName,
+      dailyBudget: budget,
+      countries: plan.countries,
+      ...(done.length ? { addToAdSetOf: done[0] } : {}),
+      actorId: ctx.actorId,
+    });
+    if (row.status === 'done') done.push(row.id);
+    else if (!done.length) {
+      await failGrowthPublish({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, failureCode: row.failure_code ?? 'publish_failed', now: ctx.now });
+      return proposal;
+    }
+  }
+  return markGrowthAdsPublished({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: proposal.id, exportIds: done, dailyBudget: budget, actorId: ctx.actorId, now: ctx.now });
+}
+
+/** The person approved turning the ads on: from now they spend up to the daily budget. Refused while the kill switch is on. */
+export async function approveGrowthActivation(ctx: AdStudioCallContext & { proposalId: string }, deps: GrowthPlatformDeps = {}): Promise<GrowthProposalModel> {
+  await ensureOrm();
+  const proposal = await getGrowthProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
+  if (proposal.status !== 'pending' || proposal.kind !== 'activate' || !proposal.target_id) throw new GrowthProposalNotPendingError(proposal.status);
+  const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, proposal.target_id);
+  const kms = serverKms();
+  if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');
+  await (deps.setStatus ?? setAdStudioMetaAdsStatus)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: target.ad_export_ids ?? [], status: 'ACTIVE', actorId: ctx.actorId, kms });
+  return markGrowthAdsRunning({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: proposal.id, actorId: ctx.actorId, now: ctx.now });
 }

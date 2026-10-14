@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { siteHost } from '@growthos/shared';
-import { AlertTriangle, ArrowLeft, Check, ExternalLink, Eye, FileText, Globe, ImageIcon, Loader2, MapPin, UserRound, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, ExternalLink, Eye, FileText, Globe, ImageIcon, Loader2, MapPin, Power, Send, UserRound, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
 import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthLandingPageView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
@@ -41,7 +41,7 @@ function failureKey(code: string | null): 'site' | 'quota_exceeded' | 'nothing_f
 function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
-  const known = ['invalid_site', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found'].includes(code);
+  const known = ['invalid_site', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable'].includes(code);
   return (
     <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -202,7 +202,7 @@ function ProposalCard({
 }: {
   proposal: GrowthProposalView;
   busy: boolean;
-  onDecide: (action: 'approve' | 'reject') => void;
+  onDecide: (action: 'approve' | 'reject', extra?: Record<string, unknown>) => void;
   onRevise: (text: string) => void;
   /** Where the Ad Studio lives for this project: ads previews and the link to edit them. */
   studio: { media: string; page: string };
@@ -217,6 +217,9 @@ function ProposalCard({
   const tl = useTranslations('GrowthPilot.landing');
   const [previewing, setPreviewing] = React.useState(false);
   const audience = proposal.kind === 'audience' ? proposal.audience : null;
+  const platform = proposal.kind === 'publish' || proposal.kind === 'activate' ? proposal.publish : null;
+  const tp = useTranslations('GrowthPilot.publish');
+  const [budget, setBudget] = React.useState(String(proposal.publish?.dailyBudget ?? ''));
   const tu = useTranslations('GrowthPilot.audience');
   const [changing, setChanging] = React.useState(false);
   const [text, setText] = React.useState('');
@@ -228,12 +231,12 @@ function ProposalCard({
     <li className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-proposal" aria-busy={revising || busy}>
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-          {ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : audience ? <Users className="h-5 w-5" aria-hidden="true" /> : page ? <FileText className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
+          {proposal.kind === 'publish' ? <Send className="h-5 w-5" aria-hidden="true" /> : proposal.kind === 'activate' ? <Power className="h-5 w-5" aria-hidden="true" /> : ads ? <ImageIcon className="h-5 w-5" aria-hidden="true" /> : audience ? <Users className="h-5 w-5" aria-hidden="true" /> : page ? <FileText className="h-5 w-5" aria-hidden="true" /> : React.createElement(KIND_ICON[draft.kind], { className: 'h-5 w-5', 'aria-hidden': true })}
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-pp-display text-base font-semibold" dir="auto">
-              {ads ? ta('title', { name: draft.name }) : audience ? tu('title', { name: draft.name }) : page ? tl('title', { name: draft.name }) : draft.name}
+              {proposal.kind === 'publish' ? tp('title', { name: draft.name }) : proposal.kind === 'activate' ? tp('activateTitle', { name: draft.name }) : ads ? ta('title', { name: draft.name }) : audience ? tu('title', { name: draft.name }) : page ? tl('title', { name: draft.name }) : draft.name}
             </h3>
             <KindChip kind={draft.kind} />
           </div>
@@ -244,12 +247,27 @@ function ProposalCard({
             </p>
           ) : null}
           {audience ? <AudienceSummary plan={audience} /> : null}
-          {!ads && !page && !audience && draft.description ? (
+          {platform ? (
+            <div className="flex flex-col gap-1.5 text-sm text-muted-foreground" data-testid="growth-pilot-publish">
+              <p>{proposal.kind === 'publish' ? tp('description', { count: platform.imageIds.length }) : tp('activateDescription', { budget: platform.dailyBudget })}</p>
+              <p className="truncate text-xs">
+                <span className="font-semibold text-foreground">{tp('link')}: </span>
+                <a href={platform.linkUrl} target="_blank" rel="noopener" className="text-primary hover:underline" dir="ltr">
+                  {platform.linkUrl}
+                </a>
+              </p>
+              <p className="text-xs">
+                <span className="font-semibold text-foreground">{tp('countries')}: </span>
+                <span dir="ltr">{platform.countries.join(', ')}</span>
+              </p>
+            </div>
+          ) : null}
+          {!ads && !page && !audience && !platform && draft.description ? (
             <p className="text-sm text-muted-foreground" dir="auto">
               {draft.description}
             </p>
           ) : null}
-          {!ads && !page && !audience && draft.audience ? (
+          {!ads && !page && !audience && !platform && draft.audience ? (
             <p className="text-xs text-muted-foreground" dir="auto">
               <span className="font-semibold text-foreground">{t('for')}: </span>
               {draft.audience}
@@ -263,7 +281,7 @@ function ProposalCard({
           ) : null}
         </div>
       </div>
-      {ads && proposal.briefId && proposal.previewImageIds.length ? (
+      {(ads || proposal.kind === 'publish') && proposal.briefId && proposal.previewImageIds.length ? (
         <ul className="flex flex-wrap gap-2" data-testid="growth-pilot-ads-preview">
           {proposal.previewImageIds.map((imageId) => (
             <li key={imageId} className="h-28 overflow-hidden rounded-2xl bg-muted">
@@ -341,15 +359,32 @@ function ProposalCard({
           </div>
         </form>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy} onClick={() => onDecide('approve')} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
+        <div className="flex flex-wrap items-center gap-2">
+          {proposal.kind === 'publish' ? (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="font-medium">{tp('budget')}</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                inputMode="decimal"
+                value={budget}
+                onChange={(event) => setBudget(event.target.value)}
+                className="h-9 w-24 rounded-xl border border-input bg-background px-2 text-sm tabular-nums"
+                data-testid="growth-pilot-budget"
+              />
+            </label>
+          ) : null}
+          <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-            {t('approve')}
+            {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? tp('activate') : t('approve')}
           </button>
+          {platform ? null : (
           <button type="button" disabled={busy} onClick={() => setChanging(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-4 text-sm font-semibold text-primary disabled:opacity-60" data-testid="growth-pilot-change">
             <Wand2 className="h-4 w-4" aria-hidden="true" />
             {t('change')}
           </button>
+          )}
           <button type="button" disabled={busy} onClick={() => onDecide('reject')} className="inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-60" data-testid="growth-pilot-reject">
             <X className="h-4 w-4" aria-hidden="true" />
             {t('reject')}
@@ -360,7 +395,7 @@ function ProposalCard({
   );
 }
 
-function TargetCard({ target, landingSlug }: { target: GrowthTargetView; landingSlug: string | null }): React.ReactElement {
+function TargetCard({ target, landingSlug, metaConnectHref }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.targets');
   return (
     <li className="flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-target">
@@ -379,6 +414,7 @@ function TargetCard({ target, landingSlug }: { target: GrowthTargetView; landing
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
       <TargetLandingLine target={target} slug={landingSlug} />
       <TargetAudienceLine target={target} />
+      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} />
       <TargetAdsLine target={target} />
     </li>
   );
@@ -397,6 +433,24 @@ function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: s
         <a href={`/lp/${slug}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" data-testid="growth-pilot-landing-link">
           {t('open')}
           <ExternalLink className="h-3 w-3" aria-hidden="true" />
+        </a>
+      ) : null}
+    </p>
+  );
+}
+
+/** Where the target's ads stand on the platform; when Meta is missing, the way to connect it. */
+function TargetPublishLine({ target, metaConnectHref }: { target: GrowthTargetView; metaConnectHref: string | null }): React.ReactElement | null {
+  const t = useTranslations('GrowthPilot.publish.status');
+  if (target.status !== 'active' || target.publishStatus === 'none') return null;
+  const status = target.publishStatus;
+  return (
+    <p className={cn('flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'running' ? 'text-success' : status === 'failed' || status === 'needs_meta' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-publish" data-publish={status}>
+      <Send className="h-3.5 w-3.5" aria-hidden="true" />
+      {status === 'failed' ? t('failed', { reason: target.publishFailure ?? '' }) : t(status)}
+      {status === 'needs_meta' && metaConnectHref ? (
+        <a href={metaConnectHref} className="font-semibold text-primary hover:underline" data-testid="growth-pilot-connect-meta">
+          {t('connect')}
         </a>
       ) : null}
     </p>
@@ -507,6 +561,8 @@ export interface GrowthPilotAppProps {
   orgId: string;
   projectId: string;
   initial: GrowthPilotPageData | null;
+  /** Where connecting a Meta ad account starts (and returns here); null when the person cannot connect accounts. */
+  metaConnectHref?: string | null;
 }
 
 /**
@@ -514,7 +570,7 @@ export interface GrowthPilotAppProps {
  * and proposes what to grow, and every proposal waits for the person - approve, reject, or ask the AI
  * for a change. The person can pause the pilot or ask for more targets at any time.
  */
-export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProps): React.ReactElement {
+export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: GrowthPilotAppProps): React.ReactElement {
   const t = useTranslations('GrowthPilot');
   const base = `/api/orgs/${orgId}/projects/${projectId}/growth-pilot`;
   const studio = { media: `/api/orgs/${orgId}/projects/${projectId}/ad-studio`, page: `/orgs/${orgId}/projects/${projectId}/ad-studio` };
@@ -670,7 +726,7 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
                     key={proposal.id}
                     proposal={proposal}
                     busy={busy === proposal.id}
-                    onDecide={(action) => void run(proposal.id, `/proposals/${proposal.id}`, { action })}
+                    onDecide={(action, extra) => void run(proposal.id, `/proposals/${proposal.id}`, { action, ...extra })}
                     onRevise={(text) => void run(proposal.id, `/proposals/${proposal.id}`, { action: 'revise', request: text })}
                     studio={studio}
                     host={host}
@@ -690,7 +746,7 @@ export function GrowthPilotApp({ orgId, projectId, initial }: GrowthPilotAppProp
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {targets.map((target) => (
-                  <TargetCard key={target.id} target={target} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
+                  <TargetCard key={target.id} target={target} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
                 ))}
               </ul>
             )}

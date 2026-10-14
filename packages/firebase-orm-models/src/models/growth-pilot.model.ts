@@ -84,6 +84,20 @@ export type GrowthLandingStatus = (typeof GROWTH_LANDING_STATUSES)[number];
 export const GROWTH_AUDIENCE_STATUSES = ['none', 'ready', 'approved', 'rejected', 'failed'] as const;
 export type GrowthAudienceStatus = (typeof GROWTH_AUDIENCE_STATUSES)[number];
 
+/** Where a target's ads stand on the ad platform. `needs_meta`: ready to publish once a Meta ad account is connected. */
+export const GROWTH_PUBLISH_STATUSES = ['none', 'needs_meta', 'ready', 'published', 'running', 'rejected', 'failed'] as const;
+export type GrowthPublishStatus = (typeof GROWTH_PUBLISH_STATUSES)[number];
+
+/** What a publish proposal publishes: the approved images as paused Meta ads, with their link and daily budget. */
+export interface GrowthPublishPlan {
+  destination: 'meta';
+  imageIds: string[];
+  dailyBudget: number;
+  linkUrl: string;
+  campaignName: string;
+  countries: string[];
+}
+
 /** One thing to grow: a product, a service or an audience. */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/growth_targets',
@@ -148,6 +162,16 @@ export class GrowthTargetModel extends BaseModel {
   @Field({ is_required: false })
   public audience_failure?: string | null;
 
+  @Field({ is_required: false })
+  public publish_status?: GrowthPublishStatus | null;
+
+  @Field({ is_required: false })
+  public publish_failure?: string | null;
+
+  /** The Ad Studio export rows of its published ads. */
+  @Field({ is_required: false })
+  public ad_export_ids?: string[] | null;
+
   @Field({ is_required: true })
   public created_on!: string;
 
@@ -156,7 +180,7 @@ export class GrowthTargetModel extends BaseModel {
 }
 
 /** What a proposal asks the person to decide. Later stories add creatives, landing pages, audiences and publishing. */
-export const GROWTH_PROPOSAL_KINDS = ['target', 'ads', 'landing_page', 'audience'] as const;
+export const GROWTH_PROPOSAL_KINDS = ['target', 'ads', 'landing_page', 'audience', 'publish', 'activate'] as const;
 export type GrowthProposalKind = (typeof GROWTH_PROPOSAL_KINDS)[number];
 
 /** `revising`: the person asked for a change and the AI is rewriting it; it comes back `pending`. */
@@ -203,6 +227,10 @@ export class GrowthProposalModel extends BaseModel {
   /** The Ad Studio brief holding the ads (kind `ads`). */
   @Field({ is_required: false })
   public brief_id?: string | null;
+
+  /** What publishing or turning on would do (kinds `publish`, `activate`). */
+  @Field({ is_required: false })
+  public publish?: GrowthPublishPlan | null;
 
   /** The audience to approve (kind `audience`). */
   @Field({ is_required: false })
@@ -253,6 +281,9 @@ export const GROWTH_ACTIVITY_KINDS = [
   'landing_failed',
   'audience_ready',
   'audience_failed',
+  'ads_published',
+  'publish_failed',
+  'ads_activated',
 ] as const;
 export type GrowthActivityKind = (typeof GROWTH_ACTIVITY_KINDS)[number];
 

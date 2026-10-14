@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { loadGrowthPilotPage } from '@/lib/growth-pilot/store';
+import { isMetaOAuthConfigured, metaConnectHref } from '@/lib/integrations/meta';
 import { GrowthPilotApp } from '@/components/growth-pilot/growth-pilot-app';
 
 type PageProps = Readonly<{
@@ -24,9 +25,11 @@ export default async function GrowthPilotPage({ params }: PageProps): Promise<Re
   const membership = findActiveMembership(memberships, orgId);
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ai.use', { orgId, projectId })) notFound();
   const initial = await loadGrowthPilotPage(orgId, projectId);
+  const canConnect = can(bindings, { type: 'user', id: user.id }, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
+  const connectHref = canConnect ? metaConnectHref({ orgId, projectId, locale, returnTo: `/${locale}/orgs/${orgId}/projects/${projectId}/growth-pilot` }) : null;
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
-      <GrowthPilotApp orgId={orgId} projectId={projectId} initial={initial} />
+      <GrowthPilotApp orgId={orgId} projectId={projectId} initial={initial} metaConnectHref={connectHref} />
     </div>
   );
 }

@@ -4,6 +4,8 @@ import {
   createOrganizationWithOwner,
   createProject,
   createSharedCredential,
+  disengageAutomationKillSwitch,
+  engageAutomationKillSwitch,
   ensureUserForFirebaseSession,
   generateLocalKmsKeyRing,
   listAdStudioExports,
@@ -11,6 +13,7 @@ import {
   MetaAdsApiError,
   publishAdStudioAd,
   pushResourceAttachment,
+  setAdStudioMetaAdsStatus,
   setResourceAttachmentWriteTier,
   setSharedCredentialSecret,
   type GoogleAdsApiClient,
@@ -336,5 +339,32 @@ describe('publishAdStudioAd', () => {
       name: 'AdStudioExportUnavailableError',
       reason: 'not_attached',
     });
+  });
+});
+
+describe('setAdStudioMetaAdsStatus', () => {
+  it('turns published paused ads on - campaign, ad set, then ads - refuses while the kill switch is on, and pauses them back', async () => {
+    const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
+    const meta = fakeMeta();
+    let ad = 0;
+    meta.createAd.mockImplementation(async () => ({ adId: `a${++ad}` }));
+    const setObjectStatus = vi.fn(async () => undefined);
+    Object.assign(meta, { setObjectStatus });
+    const base = { organizationId: ctx.orgId, projectId: ctx.projectId, briefId: 'b1', destination: 'meta' as const, copy: COPY, campaignName: 'Sign fast', dailyBudget: 20, countries: ['IL'], kms, actorId: ctx.owner.id, clients: { meta: () => meta } };
+    const first = await publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i1', primary: IMG, square: null, landscape: null } });
+    const second = await publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i2', primary: IMG, square: null, landscape: null }, addToAdSetOf: first.id });
+
+    await engageAutomationKillSwitch({ organizationId: ctx.orgId, reason: 'test', actorId: ctx.owner.id });
+    await expect(setAdStudioMetaAdsStatus({ organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: [first.id, second.id], status: 'ACTIVE', actorId: ctx.owner.id, kms, clients: { meta: () => meta } })).rejects.toMatchObject({ name: 'AdStudioAutomationStoppedError' });
+    expect(setObjectStatus).not.toHaveBeenCalled();
+    await disengageAutomationKillSwitch({ organizationId: ctx.orgId, actorId: ctx.owner.id });
+
+    const on = await setAdStudioMetaAdsStatus({ organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: [first.id, second.id], status: 'ACTIVE', actorId: ctx.owner.id, kms, clients: { meta: () => meta } });
+    expect(on).toEqual({ campaigns: 1, adSets: 1, ads: 2 });
+    expect(setObjectStatus.mock.calls).toEqual([['c1', 'ACTIVE'], ['s1', 'ACTIVE'], ['a1', 'ACTIVE'], ['a2', 'ACTIVE']]);
+    setObjectStatus.mockClear();
+    await setAdStudioMetaAdsStatus({ organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: [first.id, second.id], status: 'PAUSED', actorId: ctx.owner.id, kms, clients: { meta: () => meta } });
+    expect(setObjectStatus.mock.calls.map((call) => call[0])).toEqual(['a1', 'a2', 's1', 'c1']);
+    await expect(setAdStudioMetaAdsStatus({ organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: ['missing'], status: 'ACTIVE', actorId: ctx.owner.id, kms, clients: { meta: () => meta } })).rejects.toMatchObject({ name: 'AdStudioExportInvalidError' });
   });
 });
