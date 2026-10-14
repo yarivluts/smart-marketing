@@ -87,6 +87,25 @@ describe('GrowthPilotApp', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a website address, like example.com.');
   });
 
+  it('tells someone who pasted an email to enter the website, without calling the server', () => {
+    const fetchMock = stubFetch();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const input = screen.getByTestId('growth-pilot-site-input');
+    fireEvent.change(input, { target: { value: ' me@easysign.co.il ' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(screen.getByRole('alert')).toHaveTextContent('That looks like an email address. Enter your website instead, like example.com.');
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.change(input, { target: { value: 'easysign.co.il' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says the email mistake in Hebrew', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'he' });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'me@easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(screen.getByRole('alert')).toHaveTextContent(heMessages.GrowthPilot.errors.invalid_site_email);
+  });
+
   it('while another caller reads the site, looks again until it is done', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const fetchMock = stubFetch({ body: page({ status: 'analyzing' }) }, { body: page() });
