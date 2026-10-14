@@ -24,6 +24,7 @@ export * from './image-pipeline';
 export * from './image-qa';
 export * from './headline-overlay';
 export * from './autopilot';
+export * from './scheduled-runs';
 export * from './growth-pilot';
 export * from './brief-from-site';
 export * from './publish';

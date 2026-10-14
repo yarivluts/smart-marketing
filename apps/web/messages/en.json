@@ -4279,7 +4279,7 @@
       "discardPlan": "Stop without creating",
       "resume": "Resume",
       "pausedHint": "Paused after repeated errors. Resume to try again.",
-      "keepOpen": "The autopilot runs while this page is open."
+      "keepOpen": "You can close this page: the autopilot keeps going on its own (it checks in every few minutes) and everything it makes waits here for you."
     },
     "images": {
       "title": "Image ads",

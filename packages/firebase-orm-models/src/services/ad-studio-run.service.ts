@@ -6,6 +6,7 @@ import {
   type AdStudioRunOptions,
   type AdStudioRunStep,
   type AdStudioRunStepId,
+  AdStudioRunIndexModel,
 } from '../models/ad-studio-run.model';
 import { AdStudioBriefModel } from '../models/ad-studio.model';
 import { recordAuditLogEntry } from './audit-log.service';
@@ -127,6 +128,14 @@ export async function startAdStudioRun(params: {
   run.last_advanced_on = now.toISOString();
   run.setPathParams(pathParams(params.organizationId, params.projectId));
   await run.save();
+  const line = new AdStudioRunIndexModel();
+  line.organization_id = params.organizationId;
+  line.project_id = params.projectId;
+  line.brief_id = params.briefId;
+  line.run_id = run.id;
+  line.started_by = params.actorId;
+  line.started_on = run.started_on;
+  await line.save(run.id);
   try {
     await recordAuditLogEntry({
       organizationId: params.organizationId,
@@ -278,4 +287,16 @@ export async function deleteAdStudioBriefRuns(organizationId: string, projectId:
   const runs = await listAdStudioRuns(organizationId, projectId, briefId);
   await Promise.all(runs.map((run) => run.remove()));
   return runs.length;
+}
+
+/** The autopilot runs that have not finished, oldest first: what the scheduler keeps moving. */
+export async function listAdStudioRunIndex(): Promise<AdStudioRunIndexModel[]> {
+  const rows = await AdStudioRunIndexModel.getAll();
+  return [...rows].sort((a, b) => a.started_on.localeCompare(b.started_on));
+}
+
+/** Drops a run's line once it has finished (or no longer exists). */
+export async function removeAdStudioRunIndex(runId: string): Promise<void> {
+  const line = await AdStudioRunIndexModel.init(runId);
+  if (line) await line.remove();
 }
