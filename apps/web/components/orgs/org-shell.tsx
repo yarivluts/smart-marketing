@@ -59,6 +59,7 @@ export async function OrgShell({
 
   const items: AppShellNavItem[] = [
     { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
+    { href: `/orgs/${orgId}/connections`, label: t('connectionsLink'), icon: 'KeyRound' },
     { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
     ...(canViewAuditLog
       ? [

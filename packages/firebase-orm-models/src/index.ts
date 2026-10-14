@@ -130,6 +130,7 @@ export * from './services/resource-library.service';
 export * from './services/key.service';
 export * from './services/vault.service';
 export * from './services/meta-oauth.service';
+export * from './services/ad-platform-connection.service';
 export * from './services/schema-registry.service';
 export * from './services/backfill.service';
 export * from './services/ad-studio.service';

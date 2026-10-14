@@ -29,7 +29,7 @@ function renderPanel(
       destinations={{ meta: true, google_ads: true }}
       canPublish
       published={[]}
-      resourcesHref="/resources"
+      connectionsHref="/he/orgs/o/connections?projectId=p"
       {...props}
     />,
     { locale },
@@ -253,10 +253,10 @@ describe('PublishPanel', () => {
     fireEvent.click(screen.getByRole('radio', { name: /Google Ads/ }));
     expect(screen.queryByTestId('ad-studio-connect-meta')).toBeNull();
     unmount();
-    // Without the right (or with no Meta app configured) it points to the resources page instead.
+    // Without the right (or with no Meta app configured) it opens the Connections page on Meta instead.
     renderPanel({ destinations: { meta: false, google_ads: true }, metaConnectHref: null });
     expect(screen.queryByTestId('ad-studio-connect-meta')).toBeNull();
-    expect(screen.getByRole('link', { name: /resources/i })).toHaveAttribute('href', '/resources');
+    expect(screen.getByTestId('ad-studio-open-connections')).toHaveAttribute('href', '/he/orgs/o/connections?projectId=p&platform=meta_ads');
   });
 
   it('tests a second creative in the same Meta ad set as the first, with its own copy', async () => {

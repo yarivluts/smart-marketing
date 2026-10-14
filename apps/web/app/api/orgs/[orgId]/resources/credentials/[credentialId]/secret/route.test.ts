@@ -73,7 +73,7 @@ describe('PUT /api/orgs/[orgId]/resources/credentials/[credentialId]/secret', ()
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -102,7 +102,7 @@ describe('PUT /api/orgs/[orgId]/resources/credentials/[credentialId]/secret', ()
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -133,7 +133,7 @@ describe('PUT /api/orgs/[orgId]/resources/credentials/[credentialId]/secret', ()
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -190,7 +190,7 @@ describe('DELETE /api/orgs/[orgId]/resources/credentials/[credentialId]/secret',
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -230,7 +230,7 @@ describe('DELETE /api/orgs/[orgId]/resources/credentials/[credentialId]/secret',
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });
@@ -248,7 +248,7 @@ describe('DELETE /api/orgs/[orgId]/resources/credentials/[credentialId]/secret',
     const credential = await createSharedCredential({
       organizationId: organization.id,
       name: 'Agency Meta MCC',
-      provider: 'meta_ads',
+      provider: 'stripe',
       availableScopes: ['act_1'],
       createdByUserId: owner.id,
     });

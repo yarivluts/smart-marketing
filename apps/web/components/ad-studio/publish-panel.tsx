@@ -69,7 +69,8 @@ export interface PublishPanelProps {
   destinations: Record<Destination, boolean>;
   canPublish: boolean;
   published: PublishedAdRow[];
-  resourcesHref: string;
+  /** The Connections page for this project (it returns here once connected); the platform is added to it. */
+  connectionsHref: string;
   /** The Meta audience planned for the ad; the Meta ad set targets it (countries can be changed here). */
   metaTargeting?: AdStudioMetaTargeting | null;
   /** Starts "Connect with Facebook" and comes back here; null when the viewer cannot connect accounts or no Meta app is configured. */
@@ -128,7 +129,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
     creatives,
     destinations,
     canPublish,
-    resourcesHref,
+    connectionsHref,
   } = props;
   const t = useTranslations('AdStudio');
   const router = useRouter();
@@ -412,8 +413,8 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
                 {t('publish.connectMeta')}
               </a>
             ) : (
-              <a href={resourcesHref} className="font-medium text-primary hover:underline">
-                {t('exportOpenResources')}
+              <a href={`${connectionsHref}${connectionsHref.includes('?') ? '&' : '?'}platform=${destination === 'meta' ? 'meta_ads' : 'google_ads'}`} className="font-medium text-primary hover:underline" data-testid="ad-studio-open-connections">
+                {t('publish.openConnections')}
               </a>
             )}
           </p>

@@ -772,7 +772,7 @@ export default async function AdStudioPage({
                 }}
                 canPublish={canExport}
                 published={publishedAds}
-                resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
+                connectionsHref={`/${locale}/orgs/${orgId}/connections?${new URLSearchParams({ projectId, returnTo: `/${locale}/orgs/${orgId}/projects/${projectId}/ad-studio?brief=${selected.id}&step=publish` }).toString()}`}
                 metaConnectHref={
                   canConnectAccounts
                     ? metaConnectHref({
@@ -813,7 +813,7 @@ export default async function AdStudioPage({
                       canExport={canExport}
                       defaultTitle={selected.name}
                       defaultDescription={selected.objective}
-                      resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
+                      resourcesHref={`/orgs/${orgId}/connections?projectId=${projectId}`}
                     />
                   </div>
                 </details>
