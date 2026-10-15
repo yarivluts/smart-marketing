@@ -43,6 +43,60 @@
     "noResults": "No results for \"{query}\".",
     "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} win_rule {Win rule} customer {Customer} page {Page} other {Result}}"
   },
+  "CommandPalette": {
+    "open": "Open command search",
+    "trigger": "Jump to any page...",
+    "dialogLabel": "Command search dialog",
+    "inputLabel": "Search command dialog",
+    "inputPlaceholder": "Type a page name or a keyword...",
+    "escHint": "ESC to close",
+    "noResults": "No page found for “{query}”",
+    "emptyPreview": "Select a page to see what it is for",
+    "enterHint": "↵ to open",
+    "arrowsHint": "↑↓ to move",
+    "badgeLive": "Live",
+    "badgeAi": "AI powered",
+    "categories": {
+      "Core": "Main",
+      "Analytics": "Results",
+      "AI & Automation": "AI helper",
+      "Operations": "Account"
+    },
+    "items": {
+      "campaigns": {
+        "title": "Ads & results",
+        "description": "See how your ads are doing and change their daily budget"
+      },
+      "funnel": {
+        "title": "Customer journey",
+        "description": "See where people drop off between the first visit and buying"
+      },
+      "goals": {
+        "title": "Goals",
+        "description": "Set growth targets and see whether you are on pace to reach them"
+      },
+      "automation": {
+        "title": "AI helper & automation",
+        "description": "Get suggestions from the AI and approve them in one click"
+      },
+      "tv": {
+        "title": "Big-screen display",
+        "description": "Show your live results on a TV in the office"
+      },
+      "billing-ops-feed": {
+        "title": "Billing & usage",
+        "description": "Invoices, payments and how much of your plan you have used"
+      },
+      "members": {
+        "title": "Team & roles",
+        "description": "Invite people and choose what each person can do"
+      },
+      "settings": {
+        "title": "Project settings",
+        "description": "Connections, tracking and security"
+      }
+    }
+  },
   "Auth": {
     "emailLabel": "Email",
     "passwordLabel": "Password",

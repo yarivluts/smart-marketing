@@ -78,7 +78,11 @@ describe('App Shell Suite', () => {
 
   it('renders CommandDialog trigger button and opens modal with instant previews', async () => {
     const user = userEvent.setup();
-    render(<CommandDialog orgId="org-1" projectId="p-1" />);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <CommandDialog orgId="org-1" projectId="p-1" />
+      </NextIntlClientProvider>,
+    );
 
     const searchTrigger = screen.getByRole('button', { name: /open command search/i });
     expect(searchTrigger).toBeInTheDocument();
@@ -86,9 +90,9 @@ describe('App Shell Suite', () => {
     await user.click(searchTrigger);
 
     expect(screen.getByRole('dialog', { name: /command search dialog/i })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/type a command/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/type a page name/i)).toBeInTheDocument();
 
-    const cockpitOptions = screen.getAllByText('Ads & Performance Cockpit');
+    const cockpitOptions = screen.getAllByText('Ads & results');
     expect(cockpitOptions.length).toBeGreaterThan(0);
 
     const firstOption = screen.getAllByRole('option')[0];
