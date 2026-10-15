@@ -5700,7 +5700,7 @@
         "landing_failed": "Could not write a landing page for {subject}",
         "audience_ready": "Planned an audience for {subject}",
         "audience_failed": "Could not plan an audience for {subject}",
-        "ads_published": "{count, plural, one {Published # paused ad} other {Published # paused ads}} for {subject}",
+        "ads_published": "{count, plural, one {Sent # switched-off ad to Meta} other {Sent # switched-off ads to Meta}} for {subject}",
         "publish_failed": "Could not publish the ads for {subject}",
         "ads_activated": "You turned on the ads for {subject}"
       }
@@ -5796,7 +5796,7 @@
       "loading": "Reading the numbers from Meta...",
       "unavailable": "Meta did not return the numbers right now. Try again in a few minutes.",
       "unavailableMeta": "Connect your Facebook and Instagram (Meta) ad account to see how the ads are doing.",
-      "noDelivery": "The ads have not been shown yet in this period - paused ads show no results until they are turned on.",
+      "noDelivery": "The ads have not been shown yet in this period - switched-off ads show no results until you turn them on.",
       "chart": "Clicks, sign-ups and sales per day",
       "ctr": "{value} of the people who saw an ad clicked it",
       "costPerConversion": "{value} for each sign-up or sale",
