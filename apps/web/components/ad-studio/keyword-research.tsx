@@ -143,18 +143,21 @@ export function KeywordResearch({
         }),
       });
       const result = (await response.json().catch(() => ({}))) as AdStudioApiError & {
-        suggestion?: { keywords: AdStudioSearchKeywords; researched: boolean };
+        suggestion?: { keywords: AdStudioSearchKeywords; researched: boolean; reason?: string | null };
       };
       if (!response.ok || !result.suggestion) {
         setMessage({ tone: 'error', text: errorMessage(result) });
         return;
       }
-      const { keywords, researched } = result.suggestion;
+      const { keywords, researched, reason } = result.suggestion;
       setSelected(keywords.keywords);
       setNegativesText(keywords.negatives.join(', '));
       setMessage({
         tone: 'ok',
-        text: t(researched ? 'aiChosen' : 'aiChosenNoVolumes', { count: keywords.keywords.length }),
+        // Without Google's numbers, say why (e.g. the developer token lacks Keyword Planner access).
+        text: researched
+          ? t('aiChosen', { count: keywords.keywords.length })
+          : `${t('aiChosenNoVolumes', { count: keywords.keywords.length })}${reason && UNAVAILABLE_REASONS.has(reason) && reason !== 'no_seeds' ? ` ${t(`unavailable.${reason}`)}` : ''}`,
       });
     } catch {
       setMessage({ tone: 'error', text: errorMessage({}) });
