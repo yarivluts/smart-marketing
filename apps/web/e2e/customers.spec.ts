@@ -56,7 +56,7 @@ test.describe('Customer search (KAN-108)', () => {
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // Register a "customer" entity schema so the search form itself renders.
-    await page.getByRole('link', { name: 'Schema registry' }).click();
+    await page.getByRole('link', { name: 'Data fields' }).click();
     await page.getByLabel('Kind').selectOption('entity');
     await page.getByLabel('Name', { exact: true }).fill('customer');
     await page.getByLabel('Field name').fill('email');
