@@ -75,6 +75,10 @@ describe('KeywordResearch', () => {
     const table = await screen.findByTestId('ad-studio-keyword-ideas');
     expect(within(table).getByText('12,100')).toBeInTheDocument();
     expect(within(table).getByText('2.1-9.4')).toBeInTheDocument();
+    // Plain column name and a one-line explanation of every column, no "top-of-page bid" jargon.
+    expect(within(table).getByText(en.columns.bid)).toBeInTheDocument();
+    expect(en.columns.bid).not.toMatch(/bid/i);
+    expect(screen.getByText(en.bidNote)).toBeInTheDocument();
     const [researchUrl, researchInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(researchUrl).toBe(`${BASE}/keywords/research`);
     expect(JSON.parse(String(researchInit.body))).toEqual({
