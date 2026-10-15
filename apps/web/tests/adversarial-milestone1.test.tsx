@@ -34,6 +34,14 @@ vi.mock('@/i18n/navigation', () => ({
   usePathname: () => currentMockPathname,
 }));
 
+function renderDialog(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={messages}>
+      {ui}
+    </NextIntlClientProvider>,
+  );
+}
+
 describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navigation)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,7 +50,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
 
   describe('1. Cmd+K Omni-Search Keyboard Handling & Shortcuts', () => {
     it('1.1 toggles dialog open with Cmd+K and Ctrl+K shortcuts and prevents default', () => {
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       expect(screen.queryByRole('dialog', { name: /command search dialog/i })).not.toBeInTheDocument();
 
@@ -56,7 +64,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
     });
 
     it('1.2 closes modal upon Escape key from document or inside input', () => {
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       // Open via Ctrl+K
       fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
@@ -68,7 +76,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
     });
 
     it('1.3 closes on backdrop click but does not close when clicking modal inner container', () => {
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       // Open via trigger button
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
@@ -89,43 +97,43 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
   describe('2. Cmd+K Search Query Filtering & Empty States', () => {
     it('2.1 filters correctly by title, description, and category (case-insensitive)', async () => {
       const user = userEvent.setup();
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
-      const input = screen.getByPlaceholderText(/type a command/i);
+      const input = screen.getByPlaceholderText(/type a page name/i);
 
       // Search by title snippet
-      await user.type(input, 'cockpit');
+      await user.type(input, 'daily budget');
       let options = screen.getAllByRole('option');
       expect(options).toHaveLength(1);
-      expect(options[0]).toHaveTextContent('Ads & Performance Cockpit');
+      expect(options[0]).toHaveTextContent('Ads & results');
 
       // Clear and search by category
       await user.clear(input);
-      await user.type(input, 'operations');
+      await user.type(input, 'account');
       options = screen.getAllByRole('option');
       expect(options.length).toBe(4); // tv, billing, members, settings
 
       // Clear and search by description keyword
       await user.clear(input);
-      await user.type(input, 'drop-off');
+      await user.type(input, 'drop off');
       options = screen.getAllByRole('option');
       expect(options).toHaveLength(1);
-      expect(options[0]).toHaveTextContent('Conversion Funnel Flow');
+      expect(options[0]).toHaveTextContent('Customer journey');
     });
 
     it('2.2 shows zero-state message when search yields no matches and resets selection on query change', async () => {
       const user = userEvent.setup();
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
-      const input = screen.getByPlaceholderText(/type a command/i);
+      const input = screen.getByPlaceholderText(/type a page name/i);
 
       await user.type(input, 'nonexistent_query_xyz');
       expect(screen.queryAllByRole('option')).toHaveLength(0);
-      expect(screen.getByText(/No matching commands found for/i)).toBeInTheDocument();
+      expect(screen.getByText(/No page found for/i)).toBeInTheDocument();
       expect(screen.getByText(/nonexistent_query_xyz/i)).toBeInTheDocument();
-      expect(screen.getByText('Select an item to view preview')).toBeInTheDocument();
+      expect(screen.getByText('Select a page to see what it is for')).toBeInTheDocument();
 
       // Pressing Enter in empty state does not throw or navigate
       fireEvent.keyDown(input, { key: 'Enter' });
@@ -135,20 +143,23 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
 
   describe('3. Cmd+K Arrow Key Navigation & Action Execution', () => {
     it('3.1 navigates list with ArrowDown/ArrowUp clamping at boundaries and activates preview', async () => {
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
-      const input = screen.getByPlaceholderText(/type a command/i);
+      const input = screen.getByPlaceholderText(/type a page name/i);
       const options = screen.getAllByRole('option');
 
       expect(options[0]).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByText('Route:')).toBeInTheDocument();
-      expect(screen.getByText('/orgs/org-alpha/projects/proj-beta/campaigns')).toBeInTheDocument();
+      expect(
+        screen.getByText('See how your ads are doing and change their daily budget'),
+      ).toBeInTheDocument();
 
       // Arrow down to second option
       fireEvent.keyDown(input, { key: 'ArrowDown' });
       expect(options[1]).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByText('/orgs/org-alpha/projects/proj-beta/funnel')).toBeInTheDocument();
+      expect(
+        screen.getByText('See where people drop off between the first visit and buying'),
+      ).toBeInTheDocument();
 
       // Arrow up back to first option
       fireEvent.keyDown(input, { key: 'ArrowUp' });
@@ -171,7 +182,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
     });
 
     it('3.2 updates preview on mouseEnter and executes on option click', async () => {
-      render(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
+      renderDialog(<CommandDialog orgId="org-alpha" projectId="proj-beta" />);
 
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
       const options = screen.getAllByRole('option');
@@ -179,7 +190,9 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
       // Hover over Automation Hub (index 3)
       fireEvent.mouseEnter(options[3]);
       expect(options[3]).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByText('/orgs/org-alpha/projects/proj-beta/automation')).toBeInTheDocument();
+      expect(
+        screen.getByText('Get suggestions from the AI and approve them in one click'),
+      ).toBeInTheDocument();
 
       // Click option
       fireEvent.click(options[3]);
@@ -200,7 +213,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
         },
       ];
 
-      render(<CommandDialog customItems={customItems} />);
+      renderDialog(<CommandDialog customItems={customItems} />);
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
 
       const options = screen.getAllByRole('option');
@@ -213,7 +226,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
     });
 
     it('3.4 defaults to un-scoped routes when orgId and projectId are not provided', async () => {
-      render(<CommandDialog />);
+      renderDialog(<CommandDialog />);
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
 
       const options = screen.getAllByRole('option');

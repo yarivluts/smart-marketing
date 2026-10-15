@@ -43,6 +43,60 @@
     "noResults": "אין תוצאות עבור \"{query}\".",
     "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} goal {יעד} win_rule {כלל ניצחון} customer {לקוח} page {עמוד} other {תוצאה}}"
   },
+  "CommandPalette": {
+    "open": "פתיחת חיפוש מהיר",
+    "trigger": "עברו לכל עמוד...",
+    "dialogLabel": "חלון חיפוש מהיר",
+    "inputLabel": "חיפוש בחלון המהיר",
+    "inputPlaceholder": "הקלידו שם עמוד או מילת מפתח...",
+    "escHint": "ESC לסגירה",
+    "noResults": "לא נמצא עמוד עבור “{query}”",
+    "emptyPreview": "בחרו עמוד כדי לראות למה הוא משמש",
+    "enterHint": "↵ לפתיחה",
+    "arrowsHint": "↑↓ למעבר",
+    "badgeLive": "חי",
+    "badgeAi": "מופעל על ידי AI",
+    "categories": {
+      "Core": "עיקרי",
+      "Analytics": "תוצאות",
+      "AI & Automation": "עוזר AI",
+      "Operations": "חשבון"
+    },
+    "items": {
+      "campaigns": {
+        "title": "מודעות ותוצאות",
+        "description": "ראו איך המודעות שלכם מתפקדות ושנו את התקציב היומי"
+      },
+      "funnel": {
+        "title": "מסע הלקוח",
+        "description": "ראו איפה אנשים נושרים בין הביקור הראשון לרכישה"
+      },
+      "goals": {
+        "title": "יעדים",
+        "description": "הגדירו יעדי צמיחה וראו אם אתם בקצב להשיג אותם"
+      },
+      "automation": {
+        "title": "עוזר AI ואוטומציה",
+        "description": "קבלו הצעות מה-AI ואשרו אותן בלחיצה אחת"
+      },
+      "tv": {
+        "title": "תצוגת מסך גדול",
+        "description": "הציגו את התוצאות החיות על טלוויזיה במשרד"
+      },
+      "billing-ops-feed": {
+        "title": "חיובים ושימוש",
+        "description": "חשבוניות, תשלומים וכמה מהחבילה שלכם כבר נוצל"
+      },
+      "members": {
+        "title": "צוות והרשאות",
+        "description": "הזמינו אנשים וקבעו מה כל אחד מהם יכול לעשות"
+      },
+      "settings": {
+        "title": "הגדרות הפרויקט",
+        "description": "חיבורים, מעקב ואבטחה"
+      }
+    }
+  },
   "Auth": {
     "emailLabel": "אימייל",
     "passwordLabel": "סיסמה",

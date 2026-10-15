@@ -663,18 +663,17 @@ describe('Adversarial Stress Test: Milestone 1 UI Primitives & Shell', () => {
       const openBtn = screen.getByRole('button', { name: /open command search/i });
       fireEvent.click(openBtn);
 
-      const searchInput = screen.getByPlaceholderText(/type a command/i);
+      const searchInput = screen.getByPlaceholderText(/type a page name/i);
       expect(searchInput).toBeInTheDocument();
 
       // Search for specific campaign cockpit keyword
-      fireEvent.change(searchInput, { target: { value: 'Cockpit' } });
-      const cockpitMatches = screen.getAllByText('Ads & Performance Cockpit');
+      fireEvent.change(searchInput, { target: { value: 'results' } });
+      const cockpitMatches = screen.getAllByText('Ads & results');
       expect(cockpitMatches.length).toBeGreaterThan(0);
-      expect(screen.getByText('/campaigns')).toBeInTheDocument();
 
       // Search for non-existent item
       fireEvent.change(searchInput, { target: { value: 'NonExistentFeatureXYZ' } });
-      expect(screen.getByText(/no matching commands found/i)).toBeInTheDocument();
+      expect(screen.getByText(/no page found for/i)).toBeInTheDocument();
     });
 
     it('10.2 CommandDialog supports keyboard arrow navigation and Escape dismissal', () => {
@@ -687,7 +686,7 @@ describe('Adversarial Stress Test: Milestone 1 UI Primitives & Shell', () => {
       const openBtn = screen.getByRole('button', { name: /open command search/i });
       fireEvent.click(openBtn);
 
-      const searchInput = screen.getByPlaceholderText(/type a command/i);
+      const searchInput = screen.getByPlaceholderText(/type a page name/i);
 
       // Press ArrowDown
       fireEvent.keyDown(searchInput, { key: 'ArrowDown' });
@@ -696,7 +695,7 @@ describe('Adversarial Stress Test: Milestone 1 UI Primitives & Shell', () => {
 
       // Press Escape
       fireEvent.keyDown(document, { key: 'Escape' });
-      expect(screen.queryByPlaceholderText(/type a command/i)).not.toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/type a page name/i)).not.toBeInTheDocument();
     });
 
     it('10.3 Header renders brand, workspace switcher, and responsive elements', () => {
