@@ -5653,7 +5653,7 @@
       "submit": "Start",
       "steps": {
         "read": "Reads the site",
-        "propose": "Proposes targets",
+        "propose": "Proposes what to grow",
         "build": "Builds ads and landing pages",
         "watch": "Watches and improves"
       },
@@ -5686,7 +5686,7 @@
       "paused": "Paused",
       "pause": "Pause",
       "resume": "Resume",
-      "newTarget": "New target",
+      "newTarget": "Something else to grow",
       "startOver": "Start over with another site"
     },
     "summary": {
@@ -5713,8 +5713,8 @@
       "audience": "Audience"
     },
     "targets": {
-      "title": "Your targets",
-      "empty": "Approve a proposal and it becomes a target the pilot works on.",
+      "title": "What we are growing",
+      "empty": "Approve a proposal and it becomes something the pilot works on.",
       "status": {
         "proposed": "Waiting for approval",
         "active": "Active",
@@ -5722,7 +5722,7 @@
         "rejected": "Rejected"
       },
       "requested": "You asked for it",
-      "next": "Next: ads, a landing page and audiences for this target."
+      "next": "Next: ads, a landing page and audiences for this one."
     },
     "newTarget": {
       "title": "What else should we grow?",

@@ -70,6 +70,8 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByRole('heading', { name: 'Enter the website you want to grow' })).toBeInTheDocument();
     expect(screen.getByText('Nothing goes live without your approval. Every ad is created switched off, so nobody sees it until you turn it on.')).toBeInTheDocument();
     expect(screen.getByTestId('growth-pilot-start-button')).toBeDisabled();
+    expect(screen.getByText('Proposes what to grow')).toBeInTheDocument();
+    expect(screen.queryByText(/targets/i)).not.toBeInTheDocument();
     fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
     fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -164,7 +166,9 @@ describe('GrowthPilotApp', () => {
     expect(card).toHaveTextContent('Service');
     expect(card).toHaveTextContent('For: Small law firms');
     expect(screen.getByRole('heading', { name: /Waiting for your approval/ })).toHaveTextContent('1');
-    expect(screen.getByText('Approve a proposal and it becomes a target the pilot works on.')).toBeInTheDocument();
+    expect(screen.getByText('Approve a proposal and it becomes something the pilot works on.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'What we are growing' })).toBeInTheDocument();
+    expect(screen.getByTestId('growth-pilot-new-target')).toHaveTextContent('Something else to grow');
 
     fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
     await waitFor(() => expect(sent(fetchMock)).toEqual({ url: `${BASE}/proposals/pr1`, body: { action: 'approve' } }));
