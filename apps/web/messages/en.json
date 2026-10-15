@@ -5810,9 +5810,9 @@
         "male": "Men",
         "female": "Women"
       },
-      "reach": "Meta estimates {lower}-{upper} people a month",
+      "reach": "Facebook and Instagram estimate {lower}-{upper} people a month",
       "metaMissing": "Connect your Facebook and Instagram (Meta) ad account to match the interests and see the reach. Until then, the ads use the countries, ages and genders above.",
-      "metaFailed": "Meta did not answer, so the interests are not matched yet. You can approve the rest now.",
+      "metaFailed": "Facebook and Instagram did not answer, so the interests are not matched yet. You can approve the rest now.",
       "revising": "The AI is updating the audience...",
       "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
       "status": {

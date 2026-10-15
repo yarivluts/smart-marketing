@@ -328,7 +328,7 @@ describe('GrowthPilotApp', () => {
       expect(audience).toHaveTextContent('Everyone');
       expect(screen.getAllByTestId('growth-pilot-audience-interest').map((chip) => chip.textContent)).toEqual(['Freelancer']);
       expect(audience).toHaveTextContent('Paperwork');
-      expect(screen.getByTestId('growth-pilot-audience-reach')).toHaveTextContent(/52K-81K people a month/);
+      expect(screen.getByTestId('growth-pilot-audience-reach')).toHaveTextContent(/Facebook and Instagram estimate 52K-81K people a month/);
       expect(screen.queryByTestId('growth-pilot-audience-meta')).toBeNull();
       expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('Audience waiting for your approval');
     });
@@ -339,6 +339,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Facebook and Instagram (Meta) ad account');
       expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
       expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
+      expect(screen.getByTestId('growth-pilot-audience-meta').textContent ?? '').not.toMatch(/^Meta /);
       expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (today\'s AI limit is used up, it resets tomorrow)');
     });
   });
