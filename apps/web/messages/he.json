@@ -371,7 +371,7 @@
     "sourceStepNoEventsYet": "עדיין לא הגיעו נתונים לפרויקט הזה. מפתח לבדו אינו מעביר נתונים — האפליקציה שלכם עדיין צריכה לשלוח אירועים (דברים שאנשים עושים, כמו הרשמה) לכתובת שלמעלה.",
     "sourceStepEventsReceived": "התקבלו {count} אירועים. הקליטה עובדת.",
     "sourceStepQuarantined": "{count} רשומות נדחו והועברו לבידוד.",
-    "sourceStepIngestHealthLink": "בדקו מדוע במסך תקינות הקליטה",
+    "sourceStepIngestHealthLink": "בדקו מדוע ב״תקינות הנתונים״",
     "sourceContinueWithoutDataButton": "המשך ללא נתונים",
     "metaTitle": "צעדים ראשונים",
     "title": "הגדרת {projectName}",
@@ -716,7 +716,7 @@
     "editOrigins": "עריכת דומיינים",
     "saveOrigins": "שמירת הדומיינים",
     "originsSaveError": "לא הצלחנו לשמור את הדומיינים. נסו שוב.",
-    "touchpointSnippetVerify": "כדי לבדוק את ההתקנה, פתחו את הקונסול של הדפדפן באתר והריצו GrowthOS.verify() - או ראו את בדיקת ההתקנה ב-Ingest health."
+    "touchpointSnippetVerify": "כדי לבדוק את ההתקנה, פתחו את הקונסול של הדפדפן באתר והריצו GrowthOS.verify() - או ראו את בדיקת ההתקנה ב״תקינות הנתונים״."
   },
   "McpConsent": {
     "metaTitle": "חיבור לקוח MCP",
@@ -898,7 +898,7 @@
   },
   "SchemaRegistry": {
     "eventRejectedCount": "{count} רשומות נדחו והועברו לבידוד — הן מעולם לא נחתו, ולכן הסכימה עדיין מוצגת כמי שלא התקבלה.",
-    "eventRejectedLink": "בדקו מדוע במסך תקינות הקליטה",
+    "eventRejectedLink": "בדקו מדוע ב״תקינות הנתונים״",
     "eventRejectedSampleNote": "נספר מתוך {sampled} הרשומות האחרונות שבבידוד, ולכן המספר בפועל עשוי להיות גבוה יותר.",
     "metaTitle": "שדות הנתונים",
     "title": "שדות הנתונים עבור {projectName}",
@@ -987,7 +987,7 @@
     "typesEmpty": "עדיין לא נרשם דבר",
     "coverageTitle": "כיסוי דרישות",
     "coverageDescription": "איזו סכמה מזינה כל דרישת הגדרה, בצבע לפי מה שהתקבל בפועל ב-{environment}.",
-    "coverageIngestHealthLink": "פתיחת תקינות הקליטה",
+    "coverageIngestHealthLink": "לתקינות הנתונים",
     "chipLegendFlowing": "רשומות נקלטות",
     "chipLegendRejected": "רשומות נדחות",
     "chipLegendSilent": "רשומה, לא התקבל דבר",
@@ -1383,7 +1383,7 @@
     "kpiVisitors": "מבקרים אנונימיים שונים",
     "kpiCustomersSub": "{count, plural, one {לקוח מזוהה אחד} other {# לקוחות מזוהים}}",
     "kpiLatest": "הרשומה האחרונה",
-    "noEventSchemasDetail": "רשומות מוצגות לפי סכמת אירוע. רשמו אחת במאגר הסכמות, ואז שלחו אירועים עם מפתח קליטה.",
+    "noEventSchemasDetail": "רשומות מוצגות לפי סוג אירוע. הוסיפו אחד ב״שדות הנתונים״, ואז שלחו אירועים עם מפתח קליטה.",
     "arrivalsTitle": "הגעות",
     "arrivalsHourly": "מתי נקלטו {count} הרשומות המוצגות, לפי שעה (UTC).",
     "arrivalsDaily": "מתי נקלטו {count} הרשומות המוצגות, לפי יום (UTC).",
@@ -1427,8 +1427,8 @@
     "kpiMatchesCapped": "{count}+",
     "kpiMatchesFor": "עבור \"{query}\"",
     "kpiNoValue": "עוד לא חיפשתם",
-    "noEntitySchemasDetail": "רשומות לקוחות נשמרות תחת סכמות ישויות. רשמו סכמה במאגר הסכמות, והרשומות שנקלטו יהיו ניתנות לחיפוש כאן.",
-    "registerSchemaCta": "למאגר הסכמות",
+    "noEntitySchemasDetail": "רשומות לקוחות נשמרות לפי סוג נתוני לקוח. הוסיפו אחד ב״שדות הנתונים״, והרשומות שיגיעו יהיו ניתנות לחיפוש כאן.",
+    "registerSchemaCta": "לשדות הנתונים",
     "searchCardTitle": "איתור לקוח",
     "searchCardDescription": "מתאים לפי מזהה או לפי ערך של כל שדה, בכל סכמות הישויות או באחת מהן.",
     "promptDetail": "התוצאות מוצגות ככרטיסים, עם כל השדות של הרשומה שנמצאה. שדות מידע אישי נשארים מוסתרים.",
@@ -1546,7 +1546,7 @@
     "feedTitle": "ציר זמן",
     "feedDescription": "מהחדשה לישנה. אזהרות מודגשות.",
     "kindAction": {
-      "tracking_alert": "לבדיקת תקינות הקליטה",
+      "tracking_alert": "לבדיקת תקינות הנתונים",
       "win_event": "לכללי ההצלחה",
       "metric_health": "לתיקון המדד"
     }

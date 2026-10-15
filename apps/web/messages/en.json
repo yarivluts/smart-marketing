@@ -371,7 +371,7 @@
     "sourceStepNoEventsYet": "No data has reached this project yet. A key on its own does not move data - your app still has to send events (things people do, like signing up) to the address above.",
     "sourceStepEventsReceived": "{count} events accepted so far. Ingestion is working.",
     "sourceStepQuarantined": "{count} records were rejected and quarantined.",
-    "sourceStepIngestHealthLink": "See why in Ingest Health",
+    "sourceStepIngestHealthLink": "See why in Data health",
     "sourceContinueWithoutDataButton": "Continue without data",
     "metaTitle": "Get started",
     "title": "Get {projectName} set up",
@@ -716,7 +716,7 @@
     "editOrigins": "Edit domains",
     "saveOrigins": "Save domains",
     "originsSaveError": "Couldn't save the domains. Please try again.",
-    "touchpointSnippetVerify": "To check the install, open the browser console on your site and run GrowthOS.verify() - or see the Installation check on Ingest health."
+    "touchpointSnippetVerify": "To check the install, open the browser console on your site and run GrowthOS.verify() - or see the Installation check in Data health."
   },
   "McpConsent": {
     "metaTitle": "Connect an MCP client",
@@ -898,7 +898,7 @@
   },
   "SchemaRegistry": {
     "eventRejectedCount": "{count} records rejected and quarantined - they never landed, so this schema still reads as never received.",
-    "eventRejectedLink": "See why in Ingest Health",
+    "eventRejectedLink": "See why in Data health",
     "eventRejectedSampleNote": "Counted from the {sampled} most recent quarantined records, so the real number may be higher.",
     "metaTitle": "Data fields",
     "title": "Data fields for {projectName}",
@@ -987,7 +987,7 @@
     "typesEmpty": "Nothing registered yet",
     "coverageTitle": "Requirement coverage",
     "coverageDescription": "Which schema feeds which setup requirement, coloured by what {environment} actually received.",
-    "coverageIngestHealthLink": "Open ingest health",
+    "coverageIngestHealthLink": "Open Data health",
     "chipLegendFlowing": "Records landing",
     "chipLegendRejected": "Records rejected",
     "chipLegendSilent": "Registered, nothing received",
@@ -1383,7 +1383,7 @@
     "kpiVisitors": "Distinct anonymous visitors",
     "kpiCustomersSub": "{count, plural, one {# known customer} other {# known customers}}",
     "kpiLatest": "Latest record",
-    "noEventSchemasDetail": "Records are browsed per event schema. Register one in the schema registry, then send events with an ingest key.",
+    "noEventSchemasDetail": "Records are browsed per kind of event. Add one in Data fields, then send events with an access key.",
     "arrivalsTitle": "Arrivals",
     "arrivalsHourly": "When the {count} records shown landed, per hour (UTC).",
     "arrivalsDaily": "When the {count} records shown landed, per day (UTC).",
@@ -1427,8 +1427,8 @@
     "kpiMatchesCapped": "{count}+",
     "kpiMatchesFor": "for \"{query}\"",
     "kpiNoValue": "No search yet",
-    "noEntitySchemasDetail": "Customer records are stored under entity schemas. Register one in the schema registry, and landed records become searchable here.",
-    "registerSchemaCta": "Open the schema registry",
+    "noEntitySchemasDetail": "Customer records are stored by kind of customer data. Add one in Data fields, and the records that arrive become searchable here.",
+    "registerSchemaCta": "Open Data fields",
     "searchCardTitle": "Find a customer",
     "searchCardDescription": "Matches an id or any field value, across every entity schema or just one.",
     "promptDetail": "Results show as cards, with each field of the matching record. PII fields stay hidden.",
@@ -1546,7 +1546,7 @@
     "feedTitle": "Timeline",
     "feedDescription": "Newest first. Warnings are highlighted.",
     "kindAction": {
-      "tracking_alert": "Check ingest health",
+      "tracking_alert": "Check Data health",
       "win_event": "View win rules",
       "metric_health": "Fix the metric"
     }
