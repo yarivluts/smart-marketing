@@ -29,7 +29,7 @@ describe('AuthCard Component', () => {
       { locale: 'en' },
     );
 
-    expect(screen.getByText('Guarded automation')).toBeInTheDocument();
+    expect(screen.getByText('You stay in control')).toBeInTheDocument();
     expect(screen.getByText('Encrypted in transit (HTTPS)')).toBeInTheDocument();
     expect(screen.getByText('Every change audit-logged')).toBeInTheDocument();
     // No certification the product cannot back up.
@@ -44,5 +44,16 @@ describe('AuthCard Component', () => {
       { locale: 'he' },
     );
     expect(screen.getByText(he.Auth.brandFeature1Title)).toBeInTheDocument();
+  });
+
+  it('explains the product without marketing jargon', () => {
+    renderWithIntl(
+      <AuthCard title="x">
+        <div>Form Content</div>
+      </AuthCard>,
+      { locale: 'en' },
+    );
+    expect(screen.getByText(/Tell us your website/)).toBeInTheDocument();
+    expect(screen.queryByText(/funnels|cohorts|attribution|schemas/i)).toBeNull();
   });
 });
