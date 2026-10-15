@@ -263,7 +263,7 @@ describe('PublishPanel', () => {
     expect(screen.getByTestId('ad-studio-open-connections')).toHaveAttribute('href', '/he/orgs/o/connections?projectId=p&platform=meta_ads');
   });
 
-  it('tests a second creative in the same Meta ad set as the first, with its own copy', async () => {
+  it('tests a second creative next to the first, with its own copy', async () => {
     const second: PublishCreative = { key: 'img2', kind: 'image', id: 'img2', label: 'Idea 2 · Square', previewSrc: '/i2', copy: { headline: 'No more paper', primaryText: 'Contracts signed online.', description: '' } };
     const ad = (id: string) => ({ id, destination: 'meta', mediaKind: 'image', title: 'Sign fast', status: 'done', externalUrl: 'https://adsmanager.facebook.com/x', failureCode: null, failureDetail: null, resultKind: 'ad' });
     const fetchMock = vi
@@ -272,9 +272,11 @@ describe('PublishPanel', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ad: ad('e2') }), { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);
     renderPanel({ creatives: [...CREATIVES, second] });
+    expect(screen.getByTestId('ad-studio-publish-variants')).toHaveTextContent('Try more versions of this ad');
+    expect(screen.getByTestId('ad-studio-publish-variants')).not.toHaveTextContent(/ad set/i);
     fireEvent.click(within(screen.getByTestId('ad-studio-publish-variants')).getByRole('checkbox', { name: 'Idea 2 · Square' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create paused ad on Facebook & Instagram' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Created 2 paused ads in one ad set on Facebook & Instagram.'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Created 2 switched-off ads together on Facebook & Instagram.'));
     const variant = JSON.parse((fetchMock.mock.calls[1] as [string, RequestInit])[1].body as string);
     expect(variant).toMatchObject({ source: { kind: 'image', imageId: 'img2' }, addToAdSetOf: 'e1', copy: { headline: 'No more paper' } });
     expect(JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string).addToAdSetOf).toBeUndefined();
