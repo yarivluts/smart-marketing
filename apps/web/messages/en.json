@@ -5894,6 +5894,10 @@
       "invalid_output": "the AI's answer was not usable, ask for a change to try again",
       "no_images": "no image passed the quality check",
       "publish_failed": "Facebook and Instagram did not accept it, check your ad account connection",
+      "auth_failed": "Facebook and Instagram no longer accept the saved connection, reconnect your ad account in Ad platform connections",
+      "no_secret": "your Facebook and Instagram connection has no saved login, reconnect your ad account in Ad platform connections",
+      "account_action_required": "Facebook needs you to verify your ad account in Ads Manager (adsmanager.facebook.com) first, then try again",
+      "rejected": "Facebook and Instagram refused the ad, ask for a change to the ads or check your ad account",
       "generic": "something went wrong, try again in a minute"
     }
   }

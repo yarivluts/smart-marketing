@@ -256,6 +256,17 @@ describe('GrowthPilotApp', () => {
       expect(he.container).not.toHaveTextContent('no_images');
     });
 
+    it('explains a publish failure the person can act on instead of "try again"', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('verify your ad account in Ads Manager');
+      expect(view.container).not.toHaveTextContent('account_action_required');
+      view.unmount();
+      const auth = { ...target, publishFailure: 'auth_failed' };
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [auth] })} />, { locale: 'en' });
+      expect(screen.getByText(/reconnect your ad account in Ad platform connections/)).toBeInTheDocument();
+    });
+
     it('says why ads failed, and starts them for an approved target that has none yet', async () => {
       const waiting = page({ proposals: [], targets: [{ ...ACTIVE_TARGET, briefId: null, adsStatus: 'none' }] });
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...ACTIVE_TARGET, adsStatus: 'failed', adsFailure: 'quota_exceeded' }] }) });
