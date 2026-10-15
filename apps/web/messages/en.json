@@ -733,8 +733,8 @@
   "Hooks": {
     "queueNotIngestedNote": "A received delivery is stored for review - it is not ingested, and nothing measures it. It becomes data only when a field mapping is applied to it, which turns its payload into records. Marking a delivery reviewed or discarded does not ingest anything.",
     "queueFieldMappingsLink": "Set up a field mapping",
-    "metaTitle": "Inbound hooks",
-    "title": "Inbound hooks for {projectName}",
+    "metaTitle": "Incoming data links",
+    "title": "Incoming data links for {projectName}",
     "existingEndpointsHeading": "Hook endpoints",
     "noEndpoints": "No hook endpoints created for this project yet.",
     "disabledLabel": "Disabled",
@@ -900,8 +900,8 @@
     "eventRejectedCount": "{count} records rejected and quarantined - they never landed, so this schema still reads as never received.",
     "eventRejectedLink": "See why in Ingest Health",
     "eventRejectedSampleNote": "Counted from the {sampled} most recent quarantined records, so the real number may be higher.",
-    "metaTitle": "Schema registry",
-    "title": "Schema registry for {projectName}",
+    "metaTitle": "Data fields",
+    "title": "Data fields for {projectName}",
     "registeredHeading": "Registered schemas",
     "noSchemas": "No schemas registered for this project yet.",
     "familyHeading": "{kind}: {name}",
@@ -1108,8 +1108,8 @@
     "traceLineage": "Trace lineage"
   },
   "IngestHealth": {
-    "metaTitle": "Ingest health",
-    "title": "Ingest health for {projectName}",
+    "metaTitle": "Data health",
+    "title": "Data health for {projectName}",
     "summaryHeading": "Summary",
     "overallHeading": "Overall",
     "entity": "Entities",
@@ -1445,8 +1445,8 @@
     "schemaNoFields": "No fields declared."
   },
   "CohortRetention": {
-    "metaTitle": "Cohort retention",
-    "title": "Cohort retention for {projectName}",
+    "metaTitle": "Who comes back",
+    "title": "Who comes back to {projectName}",
     "description": "Monthly signup cohorts and what share of each stuck around period over period.",
     "conversionEventLabel": "Conversion event",
     "conversionEventPlaceholder": "Leave blank for any activity, or name an event (e.g. purchase)",
