@@ -4426,7 +4426,7 @@
       "title": "Publish as real ads",
       "description": "Pick a finished image or the video, a platform, and the ad’s words. The ad is created paused on the platform so you can review it there before it spends.",
       "nothingReady": "Nothing is ready to publish yet. Create the images and video first.",
-      "chooseCreative": "Which creative",
+      "chooseCreative": "Which ad to publish (picture or video)",
       "platform": "Platform",
       "destination": {
         "meta": "Facebook & Instagram",
@@ -4470,9 +4470,9 @@
       "addCountry": "Add a country",
       "otherCountry": "Other (code)",
       "removeCountry": "Remove {country}",
-      "variantsTitle": "Test more variants in the same ad set",
-      "variantsHint": "Each one becomes another paused ad in the same campaign and ad set, with its own saved copy, so Meta can compare them.",
-      "doneVariants": "Created {count} paused ads in one ad set on {destination}.{failed, plural, =0 {} one { # variant could not be created.} other { # variants could not be created.}}"
+      "variantsTitle": "Try more versions of this ad",
+      "variantsHint": "Each one becomes another switched-off ad next to the first, with its own saved text, so Facebook and Instagram (Meta) can show them both and you can see which works better.",
+      "doneVariants": "Created {count} switched-off ads together on {destination}.{failed, plural, =0 {} one { # variant could not be created.} other { # variants could not be created.}}"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
