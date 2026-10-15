@@ -321,7 +321,7 @@ describe('GrowthPilotApp', () => {
     it('without Meta says how to get the interests matched, and shows a failed audience with its reason', () => {
       const noMeta = { ...AUDIENCE, audience: { ...PLAN, meta: 'no_meta_credential', reach: null, targeting: { ...PLAN.targeting, interests: [], genders: ['female' as const] } } };
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [noMeta], targets: [{ ...TARGET, audienceStatus: 'failed', audienceFailure: 'quota_exceeded' }] })} />, { locale: 'en' });
-      expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Meta ad account');
+      expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Facebook and Instagram (Meta) ad account');
       expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
       expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
       expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (today\'s AI limit is used up, it resets tomorrow)');
@@ -338,7 +338,7 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent('Publish the ads for Free plan');
-      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Meta as ready-but-switched-off ads');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
@@ -387,7 +387,7 @@ describe('GrowthPilotApp', () => {
     it('shows how to connect Meta when that is what publishing waits for', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref="/api/integrations/meta/start?orgId=o" initial={page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'needs_meta' }] })} />, { locale: 'en' });
       const line = screen.getByTestId('growth-pilot-target-publish');
-      expect(line).toHaveTextContent('Ready to publish once a Meta ad account is connected.');
+      expect(line).toHaveTextContent('Ready to publish once your Facebook and Instagram (Meta) ad account is connected.');
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
     });
   });

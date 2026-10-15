@@ -5756,7 +5756,7 @@
         "female": "Women"
       },
       "reach": "Meta estimates {lower}-{upper} people a month",
-      "metaMissing": "Connect your Meta ad account to match the interests and see the reach. Until then, the ads use the countries, ages and genders above.",
+      "metaMissing": "Connect your Facebook and Instagram (Meta) ad account to match the interests and see the reach. Until then, the ads use the countries, ages and genders above.",
       "metaFailed": "Meta did not answer, so the interests are not matched yet. You can approve the rest now.",
       "revising": "The AI is updating the audience...",
       "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
@@ -5770,7 +5770,7 @@
     "publish": {
       "title": "Publish the ads for {name}",
       "activateTitle": "Turn on the ads for {name}",
-      "description": "{count, plural, one {The approved image goes to Meta as a ready-but-switched-off ad} other {The # approved images go to Meta as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
+      "description": "{count, plural, one {The approved image goes to Facebook and Instagram (Meta) as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
       "activateDescription": "The ads are on Meta, switched off. Turning them on makes them visible and starts spending - up to {budget} a day in your ad account currency.",
       "link": "Link",
       "countries": "Countries",
@@ -5778,13 +5778,13 @@
       "approve": "Publish (switched off)",
       "activate": "Turn on the ads",
       "status": {
-        "needs_meta": "Ready to publish once a Meta ad account is connected.",
+        "needs_meta": "Ready to publish once your Facebook and Instagram (Meta) ad account is connected.",
         "ready": "Publishing waits for your approval",
         "published": "On Meta, switched off - not showing to anyone",
         "running": "Ads are running",
         "rejected": "You chose not to publish",
         "failed": "Publishing failed ({reason})",
-        "connect": "Connect Meta"
+        "connect": "Connect Facebook and Instagram"
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",
       "confirmCancel": "Not yet"
@@ -5795,7 +5795,7 @@
       "days": "Last {count} days",
       "loading": "Reading the numbers from Meta...",
       "unavailable": "Meta did not return the numbers right now. Try again in a few minutes.",
-      "unavailableMeta": "Connect your Meta ad account to see how the ads are doing.",
+      "unavailableMeta": "Connect your Facebook and Instagram (Meta) ad account to see how the ads are doing.",
       "noDelivery": "The ads have not been shown yet in this period - paused ads show no results until they are turned on.",
       "chart": "Clicks, sign-ups and sales per day",
       "ctr": "{value} of the people who saw an ad clicked it",

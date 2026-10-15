@@ -45,7 +45,7 @@ describe('GrowthPerformanceSection', () => {
     await screen.findByTestId('growth-pilot-kpis');
     fireEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
     await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith('/b/performance?days=7'));
-    expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Connect your Meta ad account');
+    expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Connect your Facebook and Instagram (Meta) ad account');
   });
 
   it('says the ads have not been shown yet when Meta has no impressions, and hides itself before anything is published', async () => {
