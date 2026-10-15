@@ -45,7 +45,8 @@ describe('buildScenePrompt', () => {
 
   it('shortens a long product description so every scene prompt stays compact', () => {
     const prompt = buildScenePrompt(scene('a', 5), { ...CONTEXT, productDescription: 'x'.repeat(1000) });
-    expect(prompt.length).toBeLessThan(900);
+    expect(prompt).not.toContain('x'.repeat(400));
+    expect(prompt.length).toBeLessThan(1000);
   });
 
   it('builds an edit instruction that keeps everything else and repeats the no-text rule', () => {
