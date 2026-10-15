@@ -17,9 +17,9 @@
   "AppShell": {
     "brandName": "GrowthOS",
     "homeLink": "Home",
-    "adsAndPerformance": "Ads & Performance",
-    "funnelAndGoals": "Funnel & Goals",
-    "aiCopilotAndAutomation": "AI Copilot & Automation",
+    "adsAndPerformance": "Ads & results",
+    "funnelAndGoals": "Customer journey & goals",
+    "aiCopilotAndAutomation": "AI helper & automation",
     "settings": "Settings",
     "dataSection": "Data",
     "automationSection": "Automation",
