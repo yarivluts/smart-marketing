@@ -106,6 +106,19 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(heMessages.GrowthPilot.errors.invalid_site_email);
   });
 
+  it.each([
+    ['automation_stopped', 'Resume automation'],
+    ['meta_unavailable', 'Ad platform connections'],
+  ])('explains %s in plain words with where to go next', async (code, place) => {
+    stubFetch({ status: 409, body: { error: code } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(place);
+    expect(alert.textContent ?? '').not.toMatch(/kill switch|Meta ad account|_/i);
+  });
+
   it('while another caller reads the site, looks again until it is done', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const fetchMock = stubFetch({ body: page({ status: 'analyzing' }) }, { body: page() });

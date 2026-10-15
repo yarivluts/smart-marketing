@@ -5711,13 +5711,13 @@
       "empty_request": "Write what you want first.",
       "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
       "provider_failed": "The AI service did not answer. Try again in a minute.",
-      "not_pending": "This proposal was already decided.",
-      "not_ready": "The site is still being read.",
-      "not_found": "Not found. Refresh the page.",
+      "not_pending": "You already decided on this one. Reload the page to see what is next.",
+      "not_ready": "We are still reading your site. Give it a minute, then try again.",
+      "not_found": "We could not find that any more. Reload the page to see the latest.",
       "generic": "Something went wrong. Try again.",
       "invalid_budget": "Enter a daily budget above zero.",
-      "automation_stopped": "Automation is stopped for your organization (kill switch). Turn it back on to run ads.",
-      "meta_unavailable": "The Meta ad account is not connected or not allowed to publish."
+      "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI Copilot & Automation and choose Resume automation, then try again.",
+      "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again."
     },
     "ads": {
       "title": "Ads for {name}",
