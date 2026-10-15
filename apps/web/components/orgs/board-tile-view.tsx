@@ -745,7 +745,7 @@ function TableView({
         </details>
       ) : null}
       <div className="max-h-48 overflow-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-start text-xs">
           <thead>
             <tr>
               {columns.map((column) => {
@@ -844,7 +844,7 @@ function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap'
         <tbody>
           {view.rowLabels.map((row, rowIndex) => (
             <tr key={row}>
-              <th className="border-r border-input px-2 py-1 text-left font-medium">{row}</th>
+              <th className="border-e border-input px-2 py-1 text-start font-medium">{row}</th>
               {view.columnLabels.map((column, columnIndex) => {
                 const value = view.matrix[rowIndex][columnIndex];
                 return (
@@ -979,7 +979,7 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
     <TileUnitContext.Provider value={unit}>
     <div ref={bodyRef} data-testid="board-tile-body" className="relative h-full overflow-y-auto overflow-x-hidden">
       {freshness ? (
-        <div className="absolute right-0 top-0">
+        <div className="absolute end-0 top-0">
           <TileFreshnessBadge freshness={freshness} />
         </div>
       ) : null}
