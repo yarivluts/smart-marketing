@@ -17,6 +17,35 @@ Template for each entry:
 
 ---
 
+## 2026-10-15 - Ad editor for beginners + ad platform connections (KAN-401..403)
+
+- **Last completed:**
+  - KAN-403, a beginner publishes without choosing anything:
+    - PR #700: make an ad from just the website. The AI writes the brief and the autopilot starts; the field is prefilled from an earlier ad or Growth Pilot.
+    - PR #697: publish and autopilot defaults. Publish starts on a connected platform; business name from the brand; country by the ad language; EU declaration "no"; autopilot options follow the available models.
+    - PR #702: the autopilot keeps going after the tab closes, via `ad_studio_run_index` and the 10-minute scheduler, which gives Growth Pilots half the budget and autopilot runs the rest.
+    - PR #704: briefs are written in the site's language, without English glue words.
+  - KAN-402, ad platform connections (PRs #699, #703): one org page for Meta, Google Ads and TikTok.
+    - Each platform has a guide, fields, and "Save and check", which calls the platform and saves only a connection that works.
+    - Connections can be re-checked and attached to a project with the manage tier.
+    - TikTok is a new provider; malformed ad-platform secrets are refused on save.
+  - KAN-401, AI keyword choice in the ad editor: PRs #677, #679, #683.
+  - CI: the Test step gets the build's heap (PR #698); `next build` in the e2e shard was being killed with SIGABRT.
+- **Verified on prod (QA user, EasySign, Hebrew, 390 px):**
+  - Site prefilled; brief in 16 s; plan ready in 95 s and confirmed once.
+  - 6 images, 3 scenes and the video in 9 min.
+  - Publish was enabled with no warnings and created a PAUSED Facebook & Instagram ad in account 58689695.
+  - Every step: no overflow, 0 console errors, axe clean.
+  - Connections: Meta 58689695 and Google easy-sign (4816235600) are working. An older Meta connection with no saved details and an MCC Google connection are correctly reported as not working.
+  - Closed tab: a run continued after the browser closed (images 6/6, then the scenes) by the scheduler alone.
+- **Incident fixed:** Cloud Scheduler got 401 from 2026-10-14 08:00 until 2026-10-15 03:20 (Growth Pilot and autopilot stalled).
+  - Cause: the web-prod deploy copies env from an old revision, so the hand-set `GROWTHOS_SCHEDULER_*` vars were dropped.
+  - Fix: they are now part of every deploy, and the cron is back to 200.
+- **Waiting on human:**
+  - KAN-400 (one-click Google Ads OAuth) still needs the developer token and the OAuth consent verification.
+  - TikTok publishing is not built yet; connections are saved and checked only.
+  - Two stale connections in the EasySign org (older Meta, MCC Google) can be archived from Resources if unused.
+
 ## UX hourly
 
 - 2026-10-15 - (g) Hebrew copy: 95 messages told the reader "נסה שוב" (singular) while the rest of the app speaks in the plural; now "נסו שוב", plus a stray English "plugin" and "מתקין" in the onboarding wizard. PR #707. Next candidates: (1) delete unused analytics* keys (CVR, Total Impressions) in en/he; (2) onboarding wizard still says "metric pack / API key / funnel" - plain-language pass (it is the advanced path now); (3) RTL layout check of the wizard steps.
