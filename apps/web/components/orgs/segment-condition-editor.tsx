@@ -270,7 +270,7 @@ export function SegmentConditionEditor({
                 </Button>
               </div>
 
-              <div className="flex flex-col gap-1.5 pl-4">
+              <div className="flex flex-col gap-1.5 ps-4">
                 <span className="text-xs font-medium text-muted-foreground">{t('eventConditionFiltersLabel')}</span>
                 {row.filters.map((filter, filterIndex) => (
                   <div key={filterIndex} className="flex flex-wrap items-end gap-2">

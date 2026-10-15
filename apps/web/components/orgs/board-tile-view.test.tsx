@@ -866,4 +866,34 @@ describe('BoardTileView landing-page session-replay links', () => {
     renderLpTable('javascript:alert(1)');
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
+
+  describe('right-to-left layout', () => {
+    it('uses logical classes so Hebrew mirrors the freshness badge and row headings', () => {
+      const { container } = renderTile(
+        {
+          kind: 'heatmap',
+          rowLabels: ['2026-01-01'],
+          columnLabels: ['0'],
+          matrix: [[1]],
+          isEmpty: false,
+          freshness: { asOf: '2026-07-12T00:00:00.000Z', isStale: false },
+        },
+        { type: 'heatmap' },
+      );
+      const badge = container.querySelector('[data-testid="board-tile-body"] > div.absolute');
+      expect(badge).toHaveClass('end-0');
+      expect(badge).not.toHaveClass('right-0');
+      const rowHeading = screen.getByText('2026-01-01');
+      expect(rowHeading).toHaveClass('text-start', 'border-e');
+      expect(rowHeading).not.toHaveClass('text-left');
+    });
+
+    it('aligns table text to the start edge', () => {
+      renderTile(
+        { kind: 'table', columns: ['campaign_id'], rows: [{ campaign_id: '42' }], isEmpty: false, freshness: null },
+        { type: 'table' },
+      );
+      expect(screen.getByRole('table')).toHaveClass('text-start');
+    });
+  });
 });
