@@ -62,6 +62,6 @@ describe('GrowthPerformanceSection', () => {
   it('reads a failed request as no numbers, never as a crash', async () => {
     vi.stubGlobal('fetch', vi.fn(() => undefined));
     renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
-    expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Meta did not return the numbers');
+    expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Facebook and Instagram did not return the numbers');
   });
 });

@@ -347,7 +347,7 @@ describe('GrowthPilotApp', () => {
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '35' } });
       fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
       await waitFor(() => expect(sent(fetchMock)).toEqual({ url: BASE + '/proposals/pub1', body: { action: 'approve', dailyBudget: 35 } }));
-      expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Meta, switched off - not showing to anyone');
+      expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Facebook and Instagram, switched off - not showing to anyone');
     });
 
     it('turning on is its own decision, saying it starts spending', () => {

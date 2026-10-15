@@ -29,3 +29,18 @@ describe('Growth Pilot cards explain what "Meta" is the first time they say it',
     expect(p.he.publish.status.connect).toMatch(/פייסבוק ואינסטגרם/);
   });
 });
+
+describe('after publishing, Growth Pilot says Facebook and Instagram instead of the bare brand', () => {
+  it('uses the plain names in the status, activity, failure and results lines', () => {
+    const en = p.en;
+    for (const text of [en.publish.status.published, en.activity.kind.ads_published, en.publish.activateDescription, en.reasons.publish_failed, en.performance.unavailable, en.performance.loading, en.performance.source]) {
+      expect(text).toMatch(/Facebook and Instagram/);
+      expect(text).not.toMatch(/\bMeta\b/);
+    }
+    const he = p.he;
+    for (const text of [he.publish.status.published, he.activity.kind.ads_published, he.publish.activateDescription, he.reasons.publish_failed, he.performance.unavailable, he.performance.loading, he.performance.source]) {
+      expect(text).toMatch(/פייסבוק/);
+      expect(text).not.toMatch(/Meta/);
+    }
+  });
+});
