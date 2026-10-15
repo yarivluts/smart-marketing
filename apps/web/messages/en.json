@@ -4348,7 +4348,7 @@
       "visualPrompt": "What the picture shows",
       "visualPromptHint": "What the picture shows: subject, setting, light, style. Any language works; it is translated for the image model. No text here.",
       "headline": "Headline in the image (optional)",
-      "placements": "Placements",
+      "placements": "Where the ad shows",
       "addIdea": "Add an idea",
       "saveIdeas": "Save ideas",
       "ideasSaved": "Ideas saved.",
@@ -4918,10 +4918,11 @@
       "loading": "Reading your Meta ad account...",
       "noAudiences": "The ad account has no custom or lookalike audiences yet.",
       "kinds": {
-        "custom": "Custom",
-        "lookalike": "Lookalike",
-        "saved": "Saved"
+        "custom": "Your people",
+        "lookalike": "Similar to your people",
+        "saved": "Saved preset"
       },
+      "kindsHint": "\"Your people\" are real contacts or visitors you already have. \"Similar to your people\" are new people Meta finds who resemble them.",
       "savedNote": "Saved audiences are targeting presets in Ads Manager - they are listed for reference and cannot be added here.",
       "sizeUnknown": "size unknown",
       "interestsTitle": "Interests ({count} of up to {max})",

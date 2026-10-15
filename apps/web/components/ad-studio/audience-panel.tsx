@@ -356,6 +356,11 @@ export function AudiencePanel({
             })}
           </ul>
         )}
+        {audiences?.status === 'ok' && audiences.data.length > 0 ? (
+          <p className="text-xs text-muted-foreground" data-testid="ad-studio-kinds-hint">
+            {t('kindsHint')}
+          </p>
+        ) : null}
         {audiences?.status === 'ok' &&
         audiences.data.some((audience) => audience.kind === 'saved') ? (
           <p className="text-xs text-muted-foreground">{t('savedNote')}</p>

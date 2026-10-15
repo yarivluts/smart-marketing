@@ -88,6 +88,11 @@ describe('AudiencePanel', () => {
     expect(within(list).getByText('1K-1.2K')).toBeInTheDocument();
     // A saved audience is a preset: listed, not selectable.
     expect(within(list).getAllByRole('checkbox')[1]).toBeDisabled();
+    // Plain tags and a one-line explanation instead of "Custom / Lookalike".
+    expect(within(list).getByText(en.kinds.custom)).toBeInTheDocument();
+    expect(screen.getByTestId('ad-studio-kinds-hint')).toHaveTextContent(en.kindsHint);
+    expect(en.kinds.lookalike).not.toBe('Lookalike');
+    expect(he.kindsHint.length).toBeGreaterThan(0);
     fireEvent.click(within(list).getAllByRole('checkbox')[0]);
 
     fireEvent.change(screen.getByLabelText(en.ageMin), { target: { value: '25' } });
