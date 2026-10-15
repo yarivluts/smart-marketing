@@ -5785,7 +5785,9 @@
         "rejected": "You chose not to publish",
         "failed": "Publishing failed ({reason})",
         "connect": "Connect Meta"
-      }
+      },
+      "confirmActivate": "Yes, turn on - spend up to {budget} a day",
+      "confirmCancel": "Not yet"
     },
     "performance": {
       "title": "How the ads are doing",

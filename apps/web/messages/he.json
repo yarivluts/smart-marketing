@@ -5785,7 +5785,9 @@
         "rejected": "בחרתם לא לפרסם",
         "failed": "הפרסום נכשל ({reason})",
         "connect": "חיבור Meta"
-      }
+      },
+      "confirmActivate": "כן, להפעיל - עד {budget} ביום",
+      "confirmCancel": "עוד לא"
     },
     "performance": {
       "title": "איך המודעות מתקדמות",

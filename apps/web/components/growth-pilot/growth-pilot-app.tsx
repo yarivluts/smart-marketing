@@ -253,6 +253,7 @@ function ProposalCard({
   const [budget, setBudget] = React.useState(String(proposal.publish?.dailyBudget ?? ''));
   const tu = useTranslations('GrowthPilot.audience');
   const [changing, setChanging] = React.useState(false);
+  const [confirmingOn, setConfirmingOn] = React.useState(false);
   const [text, setText] = React.useState('');
   const draft = proposal.draft;
   const revising = proposal.status === 'revising';
@@ -406,10 +407,15 @@ function ProposalCard({
               />
             </label>
           ) : null}
-          <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined)} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
+          <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-            {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? tp('activate') : t('approve')}
+            {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : t('approve')}
           </button>
+          {confirmingOn && !busy ? (
+            <button type="button" onClick={() => setConfirmingOn(false)} className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted" data-testid="growth-pilot-activate-cancel">
+              {tp('confirmCancel')}
+            </button>
+          ) : null}
           {platform ? null : (
           <button type="button" disabled={busy} onClick={() => setChanging(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-4 text-sm font-semibold text-primary disabled:opacity-60" data-testid="growth-pilot-change">
             <Wand2 className="h-4 w-4" aria-hidden="true" />

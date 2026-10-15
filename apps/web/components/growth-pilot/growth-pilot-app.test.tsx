@@ -359,6 +359,22 @@ describe('GrowthPilotApp', () => {
       expect(screen.queryByTestId('growth-pilot-budget')).toBeNull();
     });
 
+    it('turning on asks once more, naming the daily spend, and sends nothing until the person says yes', async () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'running' }] }) });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: [{ ...TARGET, publishStatus: 'published' }] })} />, { locale: 'en' });
+      fireEvent.click(screen.getByTestId('growth-pilot-approve'));
+      expect(screen.getByTestId('growth-pilot-approve')).toHaveTextContent('Yes, turn on - spend up to 20 a day');
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/proposals/'))).toBe(false);
+      fireEvent.click(screen.getByTestId('growth-pilot-activate-cancel'));
+      expect(screen.getByTestId('growth-pilot-approve')).toHaveTextContent('Turn on the ads');
+      fireEvent.click(screen.getByTestId('growth-pilot-approve'));
+      fireEvent.click(screen.getByTestId('growth-pilot-approve'));
+      await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => url === BASE + '/proposals/act1')).toBe(true));
+      const call = fetchMock.mock.calls.findIndex(([url]) => url === BASE + '/proposals/act1');
+      expect(sent(fetchMock, call).body).toEqual({ action: 'approve' });
+    });
+
     it('explains "paused" in plain words in both languages, never the platform term alone', () => {
       for (const [locale, word] of [['en', 'switched-off'], ['he', 'כבוי']] as const) {
         const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale });
