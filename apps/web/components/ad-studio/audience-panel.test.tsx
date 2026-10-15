@@ -142,6 +142,20 @@ describe('AudiencePanel', () => {
     expect(en.columns.costPerClick).not.toMatch(/\//);
   });
 
+  it.each([
+    ['en', en],
+    ['he', he],
+  ] as const)('explains custom and lookalike audiences in plain words (%s)', async (locale, msgs) => {
+    vi.stubGlobal('fetch', graph());
+    renderWithIntl(
+      <AudiencePanel orgId="o" projectId="p" briefId="b1" language="en" initial={null} />,
+      { locale },
+    );
+    expect(await screen.findByTestId('ad-studio-audience-kinds-help')).toHaveTextContent(
+      msgs.kindsHelp,
+    );
+  });
+
   it('will not save targeting that breaks the rules', () => {
     vi.stubGlobal('fetch', graph());
     renderWithIntl(

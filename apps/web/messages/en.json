@@ -4771,7 +4771,7 @@
         "keyword": "Keyword",
         "searches": "Monthly searches",
         "competition": "Competition",
-        "bid": "Top-of-page bid",
+        "bid": "Cost per click (top of page)",
         "add": "Add"
       },
       "competition": {
@@ -4868,6 +4868,7 @@
         "lookalike": "Lookalike",
         "saved": "Saved"
       },
+      "kindsHelp": "Custom = people who already know you (your visitors or customers). Lookalike = new people who resemble them.",
       "savedNote": "Saved audiences are targeting presets in Ads Manager - they are listed for reference and cannot be added here.",
       "sizeUnknown": "size unknown",
       "interestsTitle": "Interests ({count} of up to {max})",
