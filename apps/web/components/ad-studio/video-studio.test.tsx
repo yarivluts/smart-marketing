@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
+import { renderToString } from 'react-dom/server';
+import { NextIntlClientProvider } from 'next-intl';
+import enMessages from '@/messages/en.json';
 import { sceneFingerprint, type AdStudioScene } from '@growthos/shared';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import type { AdStudioClipView, AdStudioVideoView } from '@/lib/ad-studio/view';
@@ -226,5 +229,23 @@ describe('VideoStudio narration and the phone layout', () => {
     fireEvent.click(toggle);
     expect(second).toHaveAttribute('data-open', 'true');
     expect(document.getElementById(toggle.getAttribute('aria-controls') as string)).not.toHaveClass('max-md:hidden');
+  });
+
+  it('renders the same markup on the server whenever it renders a scene in progress, then counts in the browser', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ clips: [clip('c1', 'a', 1, 'generating', fp(0))], videos: [] })));
+    const studio = (
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <VideoStudio orgId="o" projectId="p" briefId="b1" scenes={SCENES} format="vertical" language="en" initialClips={[clip('c1', 'a', 1, 'generating', fp(0))]} initialVideos={[]} videoAvailable videoSecondsLeft={300} />
+      </NextIntlClientProvider>
+    );
+    // Two server renders a second apart give identical markup: no clock in it (hydration error #418).
+    vi.useFakeTimers({ now: new Date('2026-09-27T10:01:05.000Z') });
+    const first = renderToString(studio);
+    vi.setSystemTime(new Date('2026-09-27T10:01:06.000Z'));
+    expect(renderToString(studio)).toBe(first);
+    expect(first).not.toMatch(/1:0[56]/);
+    vi.useRealTimers();
+    renderStudio({ initialClips: [clip('c1', 'a', 1, 'generating', fp(0), { requestedOn: new Date(Date.now() - 65_000).toISOString() })] });
+    expect(await screen.findByText(/1:0[5-9]/)).toBeInTheDocument();
   });
 });
