@@ -81,7 +81,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await expect(page.getByRole('link', { name: 'Funnel', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Invite your team' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Set a goal' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Turn on the war room' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Show your results on a TV screen' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.getByText("You're all set!")).toBeVisible();
