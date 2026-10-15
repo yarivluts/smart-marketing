@@ -95,7 +95,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
 
     await openOmnisearch(page);
 
-    await page.getByPlaceholder(/search boards, metrics/i).fill('cohort retention');
+    await page.getByPlaceholder(/search boards, metrics/i).fill('who comes back');
     const result = page.getByRole('option', { name: /Who comes back/ });
     await expect(result).toBeVisible();
     await expect(result).toHaveText(/Page/);
