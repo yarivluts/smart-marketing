@@ -37,7 +37,7 @@ test.describe('Cohort retention (KAN-113)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Cohort retention' }).click();
+    await page.getByRole('link', { name: 'Who comes back' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cohorts$`));
     await expect(page.getByRole('heading', { name: `Cohort retention for Client Theta` })).toBeVisible();
     await expect(page.getByText('Cohort retention unavailable (warehouse not configured yet)')).toBeVisible();

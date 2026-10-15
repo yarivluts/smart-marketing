@@ -47,7 +47,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await seedIngestFixture({ organizationId: orgId, projectId, ownerEmail: email });
 
-    await page.getByRole('link', { name: 'Ingest health' }).click();
+    await page.getByRole('link', { name: 'Data health' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/ingest-health$`));
 
     // Only one kind (event) was seeded, so the "Overall" and "Events" rows
@@ -109,7 +109,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     await page.goto(`/en/orgs/${orgId}`);
 
-    await page.getByRole('link', { name: 'Ingest health' }).click();
+    await page.getByRole('link', { name: 'Data health' }).click();
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
     // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
     await expect(page.getByText('0 of 6 setup requirements connected in the Prod environment.')).toBeVisible();

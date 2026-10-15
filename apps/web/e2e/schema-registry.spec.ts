@@ -36,7 +36,7 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Schema registry' }).click();
+    await page.getByRole('link', { name: 'Data fields' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/schema-defs$`));
     await expect(page.getByText('No schemas registered for this project yet.')).toBeVisible();
 
