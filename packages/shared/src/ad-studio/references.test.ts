@@ -65,6 +65,9 @@ describe('scene reference images', () => {
     const withScreen = buildScenePrompt(scene(), CONTEXT, [{ use: 'screen', description: 'Dashboard' }]);
     expect(withScreen).toContain('Attached image 1 is the real screen of the product (Dashboard).');
     expect(withScreen).toContain('Apart from what the attached screen or opening frame shows, do not show any readable text');
+    // Without an attached screen, every screen in the shot stays unreadable (models invent garbled writing on it).
+    expect(plain).toContain('any phone or computer screen faces away or is out of focus');
+    expect(withScreen).not.toContain('faces away or is out of focus');
   });
 
   it('changes the fingerprint when images are attached or their use changes, and only then', () => {

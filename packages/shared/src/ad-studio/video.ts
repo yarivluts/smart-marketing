@@ -87,7 +87,9 @@ export function buildScenePrompt(
       : musicPromptLine(settings, false),
     referencesShowText(references)
       ? 'Apart from what the attached screen or opening frame shows, do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame.'
-      : 'Do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame.',
+      : // Video models fill a visible phone or laptop screen with invented, garbled writing (the AI
+        // check keeps catching it): unless an attached image is the screen, keep every screen unreadable.
+        'Do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame; any phone or computer screen faces away or is out of focus.',
     ...(settings.avoid ? [`Never show any of these anywhere in the video: ${settings.avoid}.`] : []),
   ].join('\n');
 }

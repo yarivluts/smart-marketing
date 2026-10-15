@@ -52,6 +52,7 @@ const SCRIPT_RULES = [
   `Use between 1 and ${AD_STUDIO_MAX_SCENES} scenes. Each scene is ${AD_STUDIO_SCENE_MIN_SECONDS}-${AD_STUDIO_SCENE_MAX_SECONDS} whole seconds: every scene is generated separately by a text-to-video model, so each must stand alone as one continuous shot.`,
   'Open with a hook in the first scene; end with a clear call to action that matches the objective.',
   'visualPrompt describes only what the camera sees - subject, setting, action, camera movement, lighting, mood - in English, concretely enough for a video model. Never ask for readable text inside the footage; put words in onScreenText instead.',
+  'When a scene shows a phone, tablet or computer, never describe what is on its screen (no messages, chats, documents or apps): show the reaction of the person, the hand, or the screen as a soft glow seen at an angle. Video models turn any screen content into garbled writing.',
   'voiceover and onScreenText are written in the ad language. Keep voiceover short enough to be spoken within the scene length. Leave a field empty rather than padding it.',
   'In voiceover, write numbers, prices, percentages and symbols out as words, in the form that agrees grammatically with the noun they count - a narrator model reads digits badly and gets their gender wrong.',
 ];
