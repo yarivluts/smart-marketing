@@ -139,7 +139,10 @@ export function VideoStudio({
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [instructions, setInstructions] = React.useState<Record<string, string>>({});
   const [shown, setShown] = React.useState<Record<string, string>>({});
-  const [now, setNow] = React.useState(() => new Date());
+  // The clock starts in the browser: an elapsed time rendered on the server never matches the one the
+  // browser renders a second later, and React rejects the page (hydration error #418).
+  const [now, setNow] = React.useState<Date | null>(null);
+  React.useEffect(() => setNow(new Date()), []);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
 
   React.useEffect(() => setClips(initialClips), [initialClips]);
@@ -480,7 +483,7 @@ export function VideoStudio({
                   >
                     <span className="inline-flex items-center gap-2 text-sm font-medium text-primary">
                       <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                      {t('video.generating', { elapsed: formatElapsed(inFlight.requestedOn, now) })}
+                      {t('video.generating', { elapsed: now ? formatElapsed(inFlight.requestedOn, now) : '…' })}
                     </span>
                     <span
                       className="h-1 overflow-hidden rounded-full bg-primary/15"

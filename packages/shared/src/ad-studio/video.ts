@@ -75,8 +75,8 @@ export function buildScenePrompt(
   const settings = normalizeVideoSettings(context.settings);
   const music = musicPromptLine(settings, true);
   const narrationLine = onScreen
-    ? `Audio: ${who ? `${who} in the shot` : 'the person in the shot'} looks at the camera and says, in ${language}${exactly}: "${voiceover}". Their lips move in sync with every word. ${who ? 'No one else in the shot speaks.' : 'Only this one person speaks.'}${voice ? ` They speak with the voice of ${voice} - the same voice in every scene of this ad.` : ''} There is no off-screen narrator. ${music}`
-    : `Audio: ${voice ? `a voice-over narrator - ${voice} - says` : 'a warm, clear voice-over narrator says'}, in ${language}${exactly}: "${voiceover}".${vocalized ? ' Say each word once, fluently, without repeating or stuttering.' : ''}${voice ? ' It is exactly the same narrator voice in every scene of this ad.' : ''} ${music} The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`;
+    ? `Audio: ${who ? `${who} in the shot` : 'the person in the shot'} looks at the camera and says, in ${language}${exactly}: "${voiceover}". Each word once, fluently, without repeating or stuttering. Their lips move in sync with every word. ${who ? 'No one else in the shot speaks.' : 'Only this one person speaks.'}${voice ? ` They speak with the voice of ${voice} - the same voice in every scene of this ad.` : ''} There is no off-screen narrator. ${music}`
+    : `Audio: ${voice ? `a voice-over narrator - ${voice} - says` : 'a warm, clear voice-over narrator says'}, in ${language}${exactly}: "${voiceover}". Say each word once, fluently, without repeating or stuttering.${voice ? ' It is exactly the same narrator voice in every scene of this ad.' : ''} ${music} The narration is audio only: the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.`;
   return [
     `[0-${seconds}s] ${oneLine(scene.visualPrompt)}`,
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,

@@ -83,6 +83,8 @@ describe('pronunciation in the scene prompt, fingerprint and rules', () => {
     const plain = buildScenePrompt(scene(), HE);
     expect(plain).toContain(`says, in Hebrew: "${PLAIN}"`);
     expect(plain).not.toContain('nikud');
+    // Every narration is asked not to stutter or repeat a word (the AI check caught one doing it).
+    expect(plain).toContain('without repeating or stuttering');
     const vocalized = buildScenePrompt(scene({ pronunciation: VOCALIZED }), HE);
     expect(vocalized).toContain('full nikud vowel marks');
     expect(vocalized).toContain(`"${VOCALIZED}"`);
