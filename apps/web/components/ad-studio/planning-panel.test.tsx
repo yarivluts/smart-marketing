@@ -5,6 +5,8 @@ import type { AdStudioPlan, AdStudioPlanSources } from '@growthos/shared';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { PlanningPanel } from './planning-panel';
 import { AdStudioAdminPanel } from './ad-studio-admin-panel';
+import en from '@/messages/en.json';
+import he from '@/messages/he.json';
 
 const refresh = vi.fn();
 vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh }) }));
@@ -61,7 +63,7 @@ describe('PlanningPanel', () => {
     expect(rows.map((row) => row.getAttribute('data-status'))).toEqual(['ok', 'ok', 'unavailable', 'unavailable', 'model']);
     expect(within(rows[0]).getByText('Read example.com/lawyers')).toBeInTheDocument();
     expect(within(rows[2]).getByText('The project has no campaigns yet.')).toBeInTheDocument();
-    expect(within(rows[3]).getByText('No Google Ads credential is attached to the project.')).toBeInTheDocument();
+    expect(within(rows[3]).getByText('Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.')).toBeInTheDocument();
     expect(within(rows[4]).getByText('General knowledge from the AI model. Not measured.')).toBeInTheDocument();
   });
 
@@ -74,7 +76,7 @@ describe('PlanningPanel', () => {
     expect(screen.getByText('cmp-lawyers')).toBeInTheDocument();
     // No empty chart repeats the reason: it is said once, next to the source.
     expect(screen.queryByText(/^Not available:/)).toBeNull();
-    expect(screen.getAllByText('No Google Ads credential is attached to the project.')).toHaveLength(1);
+    expect(screen.getAllByText('Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.')).toHaveLength(1);
     expect(within(screen.getByTestId('ad-studio-plan-sources')).getByText('The project has no campaigns yet.')).toBeInTheDocument();
   });
 
@@ -186,5 +188,16 @@ describe('AdStudioAdminPanel AI quality check', () => {
     fireEvent.click(screen.getByLabelText('Check every clip and image'));
     expect(screen.getByLabelText('Automatic re-renders per scene or image')).toBeDisabled();
     vi.unstubAllGlobals();
+  });
+
+  it('explains every missing planning source in plain words, with no vault, credential, brief or token jargon', () => {
+    for (const messages of [en, he] as const) {
+      const reasons = messages.AdStudio.plan.reasons as Record<string, Record<string, string>>;
+      for (const source of ['landing_page', 'keywords']) {
+        for (const [reason, text] of Object.entries(reasons[source])) {
+          expect(text, `${source}.${reason}`).not.toMatch(/vault|credential|\bbrief\b|\btoken\b|secret|deployment|\u05db\u05e1\u05e4\u05ea|\u05d1\u05e8\u05d9\u05e3|\u05e1\u05d5\u05d3|Developer/i);
+        }
+      }
+    }
   });
 });

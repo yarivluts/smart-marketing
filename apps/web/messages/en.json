@@ -4115,11 +4115,11 @@
       "landingPageRead": "Read {url}",
       "reasons": {
         "landing_page": {
-          "no_url": "The brief has no landing page.",
-          "blocked_url": "The address is not a public https page, so it was not read.",
+          "no_url": "No page was chosen for this ad, so there was nothing to read.",
+          "blocked_url": "That address is not a public website page (it must start with https://), so we did not read it.",
           "timeout": "The page did not answer within 10 seconds.",
           "fetch_failed": "The page could not be reached.",
-          "http_error": "The page returned an error.",
+          "http_error": "The page showed an error when we opened it.",
           "not_html": "The address is not a web page.",
           "too_many_redirects": "The page redirects too many times.",
           "empty_page": "The page has no readable text."
@@ -4135,13 +4135,13 @@
           "no_campaigns": "The project has no campaigns yet."
         },
         "keywords": {
-          "no_google_ads_credential": "No Google Ads credential is attached to the project.",
-          "vault_not_configured": "The secret vault is not configured for this deployment.",
-          "credential_not_configured": "The attached Google Ads credential is incomplete.",
-          "no_seeds": "There was nothing to seed a keyword search with.",
-          "google_ads_auth_failed": "Google refused the Google Ads sign-in.",
-          "developer_token_not_approved": "Keyword volumes need Google Ads keyword-planning access, which is not enabled yet.",
-          "google_ads_error": "Google Ads returned an error.",
+          "no_google_ads_credential": "Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.",
+          "vault_not_configured": "We could not open the saved Google Ads connection on our side, so there are no real search numbers. Nothing is wrong with your ad.",
+          "credential_not_configured": "The Google Ads connection is saved but unfinished. Finish it in Ad platform connections to get real search numbers.",
+          "no_seeds": "We had no words to start a keyword search from.",
+          "google_ads_auth_failed": "Google refused the Google Ads connection. Reconnect it in Ad platform connections.",
+          "developer_token_not_approved": "Google has not yet allowed keyword search numbers on this account. The ad works fine without them.",
+          "google_ads_error": "Google Ads could not answer right now. The ad works fine without search numbers.",
           "no_ideas": "Google Ads had no keyword ideas for this ad."
         }
       },
