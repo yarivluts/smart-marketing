@@ -5700,7 +5700,7 @@
         "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}",
         "audience_ready": "תכנן קהל ל{subject}",
         "audience_failed": "לא הצליח לתכנן קהל ל{subject}",
-        "ads_published": "{count, plural, one {פרסם מודעה מושהית אחת} other {פרסם # מודעות מושהות}} ל{subject}",
+        "ads_published": "{count, plural, one {שלח מודעה כבויה אחת ל-Meta} other {שלח # מודעות כבויות ל-Meta}} ל{subject}",
         "publish_failed": "לא הצליח לפרסם את המודעות ל{subject}",
         "ads_activated": "הפעלתם את המודעות ל{subject}"
       }
@@ -5796,7 +5796,7 @@
       "loading": "קוראים את הנתונים מ-Meta...",
       "unavailable": "Meta לא החזירה את הנתונים כרגע. נסו שוב בעוד כמה דקות.",
       "unavailableMeta": "חברו את חשבון המודעות של פייסבוק ואינסטגרם (Meta) כדי לראות איך המודעות מתקדמות.",
-      "noDelivery": "המודעות עוד לא הוצגו בתקופה הזו - מודעות מושהות לא מראות תוצאות עד שמפעילים אותן.",
+      "noDelivery": "המודעות עוד לא הוצגו בתקופה הזו - מודעות כבויות לא מראות תוצאות עד שתפעילו אותן.",
       "chart": "לחיצות, הרשמות ומכירות ליום",
       "ctr": "{value} מהאנשים שראו מודעה לחצו עליה",
       "costPerConversion": "{value} לכל הרשמה או מכירה",
