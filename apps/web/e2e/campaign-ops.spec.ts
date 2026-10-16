@@ -37,9 +37,9 @@ test.describe('Campaign ops (KAN-86)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Campaign ops' }).click();
+    await page.getByRole('link', { name: 'Ad payback' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/campaign-ops$`));
-    await expect(page.getByRole('heading', { name: 'Campaign ops for Client Delta' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Ad payback: Client Delta' })).toBeVisible();
 
     // Spend targets don't need the pack installed at all — no warehouse configured in this environment.
     await expect(page.getByText('No spend data available yet — connect a data warehouse to see this.')).toBeVisible();

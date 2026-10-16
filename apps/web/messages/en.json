@@ -266,7 +266,7 @@
     "projectFeedbackLink": "Feedback",
     "projectChurnReasonsLink": "Why people cancel",
     "projectIntentQualityLink": "Intent & quality",
-    "projectFirmographicsLink": "Firmographics",
+    "projectFirmographicsLink": "Customer types",
     "projectExperimentsLink": "Experiments",
     "projectSupportLink": "Support",
     "projectDemosLink": "Demos",
@@ -279,8 +279,8 @@
     "projectCohortsLink": "Who comes back",
     "projectTvLink": "Results on a TV screen",
     "projectSessionReplayLink": "Session replay",
-    "projectCampaignOpsLink": "Campaign ops",
-    "projectRepCollectionsLink": "Rep collections",
+    "projectCampaignOpsLink": "Ad payback",
+    "projectRepCollectionsLink": "Sales by team member",
     "projectFunnelLink": "Conversion",
     "projectInsightsLink": "Insights",
     "orgSettingsLink": "Organization settings",
@@ -1810,8 +1810,8 @@
     "mixAlertCurrentLabel": "Current"
   },
   "Firmographics": {
-    "metaTitle": "Firmographics",
-    "title": "Firmographics for {projectName}",
+    "metaTitle": "Customer types",
+    "title": "Customer types: {projectName}",
     "description": "Company industry, size and region from your own company_firmographic events, with # vs $ composition dashboards and composition-shift alerts. Industry is matched from the company name and domain by a fixed keyword list in the tracking SDK - not by an AI model and not by a third-party enrichment service.",
     "setupIntro": "Install the Firmographic pack to register the company_firmographic schema and its two composition metrics. You supply company name, domain, size and region; industry is matched from the name and domain by a fixed keyword list, falling back to Other. No outside data source is consulted.",
     "industryHeading": "Customers by industry",
@@ -1912,8 +1912,8 @@
     "pipelineConversionsSub": "experiment_conversion"
   },
   "CampaignOps": {
-    "metaTitle": "Campaign ops",
-    "title": "Campaign ops for {projectName}",
+    "metaTitle": "Ad payback",
+    "title": "Ad payback: {projectName}",
     "description": "Fixed-window payback and per-campaign spend targets.",
     "paybackHeading": "Fixed-window payback",
     "paybackUnavailable": "No payback data available yet — connect a data warehouse to see this.",
@@ -1952,7 +1952,7 @@
     "targetUpdateError": "Couldn't update the target. Please try again.",
     "targetInputLabel": "Spend target for {campaignId}",
     "targetInputPlaceholder": "No target",
-    "eyebrow": "Campaign ops",
+    "eyebrow": "Ad payback",
     "kpiTrackedCampaigns": "Tracked campaigns",
     "kpiSpend": "Spend ({days} days)",
     "kpiOverTarget": "Over target",
@@ -3172,8 +3172,8 @@
     "environmentsNone": "No environments yet."
   },
   "RepCollections": {
-    "metaTitle": "Rep collections",
-    "title": "Rep collections for {projectName}",
+    "metaTitle": "Sales by team member",
+    "title": "Sales by team member: {projectName}",
     "description": "Attribute upgrades, saves, and expansions to the team member who drove them.",
     "leaderboardHeading": {
       "week": "This week",
