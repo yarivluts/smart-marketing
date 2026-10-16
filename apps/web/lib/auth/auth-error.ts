@@ -2,6 +2,9 @@ export type AuthErrorMessageKey =
   | 'invalidCredentialsError'
   | 'emailInUseError'
   | 'weakPasswordError'
+  | 'tooManyAttemptsError'
+  | 'networkError'
+  | 'popupBlockedError'
   | 'invalidOrExpiredTokenError'
   | 'genericError';
 
@@ -12,6 +15,9 @@ const CODE_TO_KEY: Record<string, AuthErrorMessageKey> = {
   'auth/wrong-password': 'invalidCredentialsError',
   'auth/email-already-in-use': 'emailInUseError',
   'auth/weak-password': 'weakPasswordError',
+  'auth/too-many-requests': 'tooManyAttemptsError',
+  'auth/network-request-failed': 'networkError',
+  'auth/popup-blocked': 'popupBlockedError',
   // A custom token (`/login/token`) that's expired (~1hr lifetime),
   // already-consumed-and-revoked, or was minted for a mismatched Firebase
   // project.
@@ -29,4 +35,12 @@ export function authErrorMessageKey(error: unknown): AuthErrorMessageKey {
     return CODE_TO_KEY[error.code] ?? 'genericError';
   }
   return 'genericError';
+}
+
+/** The person closed the Google window themselves - that is a choice, not an error to show. */
+export function isAuthCancelled(error: unknown): boolean {
+  return (
+    hasErrorCode(error) &&
+    (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request')
+  );
 }

@@ -87,6 +87,22 @@ describe('EmailPasswordForm Component', () => {
     expect(screen.getByRole('heading', { name: enMessages.Auth.signUpTitle })).toBeInTheDocument();
   });
 
+  it('shows no error when the person closes the Google window', async () => {
+    mockSignInWithGoogle.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.signInWithGoogle }));
+    await waitFor(() => expect(mockSignInWithGoogle).toHaveBeenCalled());
+    expect(screen.queryByText(enMessages.Auth.genericError)).toBeNull();
+    expect(screen.getByRole('button', { name: enMessages.Auth.signInWithGoogle })).toBeEnabled();
+  });
+
+  it('tells the person when the browser blocked the Google window', async () => {
+    mockSignInWithGoogle.mockRejectedValueOnce({ code: 'auth/popup-blocked' });
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.signInWithGoogle }));
+    expect(await screen.findByText(enMessages.Auth.popupBlockedError)).toBeInTheDocument();
+  });
+
   it('triggers Google SSO sign in when Google button is clicked', async () => {
     mockSignInWithGoogle.mockResolvedValueOnce(undefined);
 

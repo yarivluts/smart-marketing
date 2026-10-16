@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authErrorMessageKey } from './auth-error';
+import { authErrorMessageKey, isAuthCancelled } from './auth-error';
 
 describe('authErrorMessageKey', () => {
   it.each([
@@ -9,6 +9,9 @@ describe('authErrorMessageKey', () => {
     ['auth/wrong-password', 'invalidCredentialsError'],
     ['auth/email-already-in-use', 'emailInUseError'],
     ['auth/weak-password', 'weakPasswordError'],
+    ['auth/too-many-requests', 'tooManyAttemptsError'],
+    ['auth/network-request-failed', 'networkError'],
+    ['auth/popup-blocked', 'popupBlockedError'],
     ['auth/invalid-custom-token', 'invalidOrExpiredTokenError'],
     ['auth/custom-token-mismatch', 'invalidOrExpiredTokenError'],
   ])('maps Firebase code %s to %s', (code, key) => {
@@ -16,7 +19,7 @@ describe('authErrorMessageKey', () => {
   });
 
   it('falls back to the generic error for an unrecognized Firebase code', () => {
-    expect(authErrorMessageKey({ code: 'auth/network-request-failed' })).toBe('genericError');
+    expect(authErrorMessageKey({ code: 'auth/internal-error' })).toBe('genericError');
   });
 
   it('falls back to the generic error for a non-Firebase error shape', () => {
@@ -24,5 +27,16 @@ describe('authErrorMessageKey', () => {
     expect(authErrorMessageKey('boom')).toBe('genericError');
     expect(authErrorMessageKey(null)).toBe('genericError');
     expect(authErrorMessageKey(undefined)).toBe('genericError');
+  });
+});
+
+describe('isAuthCancelled', () => {
+  it('is true when the person closed the Google window', () => {
+    expect(isAuthCancelled({ code: 'auth/popup-closed-by-user' })).toBe(true);
+    expect(isAuthCancelled({ code: 'auth/cancelled-popup-request' })).toBe(true);
+  });
+  it('is false for real failures', () => {
+    expect(isAuthCancelled({ code: 'auth/network-request-failed' })).toBe(false);
+    expect(isAuthCancelled(new Error('boom'))).toBe(false);
   });
 });
