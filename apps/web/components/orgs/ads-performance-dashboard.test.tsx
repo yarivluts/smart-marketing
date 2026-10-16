@@ -78,7 +78,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.getByText('1-Click Apply')).toBeInTheDocument();
   });
 
-  it('switches between Overview, Creatives Gallery, and Analytics tabs', () => {
+  it('switches between Overview, Ad gallery, and Analytics tabs', () => {
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
         <AdsPerformanceDashboard
@@ -97,8 +97,8 @@ describe('AdsPerformanceDashboard', () => {
     // Initial Overview tab
     expect(screen.getByTestId('campaign-list-table')).toBeInTheDocument();
 
-    // Click Creatives Gallery tab
-    fireEvent.click(screen.getByRole('button', { name: /Creatives Gallery/i }));
+    // Click Ad gallery tab
+    fireEvent.click(screen.getByRole('button', { name: /Ad gallery/i }));
     expect(screen.getByTestId('creative-preview-gallery')).toBeInTheDocument();
 
     // Click Analytics tab

@@ -46,6 +46,6 @@ describe('MetaAdPreviewCard', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText('Creative Preview Mockup')).toBeInTheDocument();
+    expect(screen.getByText('Ad preview')).toBeInTheDocument();
   });
 });
