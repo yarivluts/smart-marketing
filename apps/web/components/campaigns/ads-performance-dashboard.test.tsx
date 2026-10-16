@@ -88,7 +88,7 @@ describe('AdsPerformanceDashboard', () => {
 
     // Tab navigation
     expect(screen.getByText('Campaigns & Performance')).toBeInTheDocument();
-    expect(screen.getByText('Creatives Gallery')).toBeInTheDocument();
+    expect(screen.getByText('Ad gallery')).toBeInTheDocument();
     expect(screen.getByText('Spend & ROAS Analytics')).toBeInTheDocument();
   });
 
@@ -157,7 +157,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.queryByTestId('proactive-recommendation-banner')).not.toBeInTheDocument();
   });
 
-  it('switches to Creatives Gallery tab and Analytics tab seamlessly', () => {
+  it('switches to Ad gallery tab and Analytics tab seamlessly', () => {
     renderWithIntl(
       <AdsPerformanceDashboard
         orgId="org-1"
@@ -171,7 +171,7 @@ describe('AdsPerformanceDashboard', () => {
     );
 
     // Switch to creatives tab
-    fireEvent.click(screen.getByText('Creatives Gallery'));
+    fireEvent.click(screen.getByText('Ad gallery'));
     expect(screen.getByTestId('creative-preview-gallery')).toBeInTheDocument();
     expect(screen.queryByTestId('campaign-list-table')).not.toBeInTheDocument();
 

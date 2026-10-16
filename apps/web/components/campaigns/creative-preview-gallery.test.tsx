@@ -80,6 +80,6 @@ describe('CreativePreviewGallery', () => {
     fireEvent.click(screen.getByText('Google Ads'));
 
     expect(screen.queryByText('Sign Documents Fast')).not.toBeInTheDocument();
-    expect(screen.getByText('No creatives found matching your filter.')).toBeInTheDocument();
+    expect(screen.getByText('No ads match your filter.')).toBeInTheDocument();
   });
 });

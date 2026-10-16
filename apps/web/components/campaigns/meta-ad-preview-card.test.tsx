@@ -36,7 +36,7 @@ describe('MetaAdPreviewCard', () => {
     const adWithoutImage = { ...mockAd, imageUrl: '' };
     renderWithIntl(<MetaAdPreviewCard campaignName="Meta Retargeting" ad={adWithoutImage} />);
 
-    expect(screen.getByText('Creative Preview Mockup')).toBeInTheDocument();
+    expect(screen.getByText('Ad preview')).toBeInTheDocument();
   });
 
   /**
