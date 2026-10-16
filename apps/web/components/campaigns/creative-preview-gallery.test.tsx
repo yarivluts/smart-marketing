@@ -52,7 +52,7 @@ describe('CreativePreviewGallery', () => {
 
     expect(screen.getByTestId('creative-preview-gallery')).toBeInTheDocument();
     expect(screen.getByText('All Platforms')).toBeInTheDocument();
-    expect(screen.getByText('Meta Ads')).toBeInTheDocument();
+    expect(screen.getByText('Facebook & Instagram')).toBeInTheDocument();
     expect(screen.getByText('Google Ads')).toBeInTheDocument();
 
     expect(screen.getByText('Sign Documents Fast')).toBeInTheDocument();
