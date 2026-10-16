@@ -264,7 +264,7 @@
     "projectRecordFeedLink": "פיד רשומות",
     "projectCustomersLink": "לקוחות",
     "projectFeedbackLink": "משוב",
-    "projectChurnReasonsLink": "למה לקוחות עוזבים",
+    "projectChurnReasonsLink": "למה אנשים מבטלים",
     "projectIntentQualityLink": "כוונה ואיכות",
     "projectFirmographicsLink": "נתונים פירמוגרפיים",
     "projectExperimentsLink": "ניסויים",
@@ -1689,8 +1689,8 @@
     "repShowRateDescription": "דמואים שהתקיימו כחלק מכלל התוצאות של כל נציג."
   },
   "ChurnReasons": {
-    "metaTitle": "למה לקוחות עוזבים",
-    "title": "למה לקוחות עוזבים: {projectName}",
+    "metaTitle": "למה אנשים מבטלים",
+    "title": "למה אנשים מבטלים: {projectName}",
     "description": "מדוע לקוחות מבטלים, לפי סיבה מובנית, נושא חופשי, תוכנית, ערוץ וקוהורט הרשמה.",
     "setupIntro": "התקינו את חבילת סיבות הנטישה כדי להתחיל לאסוף סיבות ביטול מתהליך הביטול או מסקר היציאה שלכם.",
     "reasonCodeHeading": "סיבות",

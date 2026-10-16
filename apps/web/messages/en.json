@@ -264,7 +264,7 @@
     "projectRecordFeedLink": "Record feed",
     "projectCustomersLink": "Customers",
     "projectFeedbackLink": "Feedback",
-    "projectChurnReasonsLink": "Why customers leave",
+    "projectChurnReasonsLink": "Why people cancel",
     "projectIntentQualityLink": "Intent & quality",
     "projectFirmographicsLink": "Firmographics",
     "projectExperimentsLink": "Experiments",
@@ -1689,8 +1689,8 @@
     "repShowRateDescription": "Held demos as a share of each rep's outcomes."
   },
   "ChurnReasons": {
-    "metaTitle": "Why customers leave",
-    "title": "Why customers leave: {projectName}",
+    "metaTitle": "Why people cancel",
+    "title": "Why people cancel: {projectName}",
     "description": "Why customers cancel, broken down by structured reason, free-text theme, plan, channel, and signup cohort.",
     "setupIntro": "Install the Churn Reasons pack to start capturing cancellation reasons from your cancel flow or exit survey.",
     "reasonCodeHeading": "Reasons",
