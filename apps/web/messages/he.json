@@ -3676,6 +3676,12 @@
     "noBackfills": "עדיין לא התבקשו השלמות.",
     "requestedAt": "התבקשה {at}",
     "failedLine": "נכשלה: {reason}",
+    "reason": {
+      "denied": "הנקודה שלך סירבה לבקשה (HTTP {status}). בדקו שהיא מקבלת את סוד החתימה ואז בקשו שוב.",
+      "notFound": "הכתובת של הנקודה שלך לא נמצאה (HTTP {status}). בדקו את הכתובת ואז בקשו שוב.",
+      "serverError": "הייתה שגיאה בצד הנקודה שלך (HTTP {status}). נסו שוב בעוד כמה דקות.",
+      "generic": "לא הצלחנו להגיע לנקודה שלך. בדקו את הכתובת ושהיא פעילה, ואז בקשו שוב."
+    },
     "progressLine": "{batches} אצוות · {accepted} התקבלו · {duplicates} כפולות · {quarantined} בהסגר",
     "status": {
       "requested": "התבקשה",
