@@ -73,6 +73,6 @@ test.describe('Customer search (KAN-108)', () => {
     await page.getByRole('button', { name: 'Search customers' }).click();
 
     await expect(page).toHaveURL(/[?&]q=alice%40example\.com/);
-    await expect(page.getByText('Customer search unavailable (warehouse not configured yet)')).toBeVisible();
+    await expect(page.getByText('Customer search is not ready: your data is not connected yet')).toBeVisible();
   });
 });

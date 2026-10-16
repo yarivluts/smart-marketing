@@ -1412,9 +1412,9 @@
     "clearSearch": "Clear search",
     "prompt": "Enter a search term to look up a customer.",
     "empty": "No customers match \"{query}\".",
-    "notConfigured": "Customer search unavailable (warehouse not configured yet)",
-    "quotaExceeded": "Customer search unavailable (daily query quota reached)",
-    "queryError": "Customer search unavailable",
+    "notConfigured": "Customer search is not ready: your data is not connected yet",
+    "quotaExceeded": "Customer search is paused: too many data requests today. Try again tomorrow",
+    "queryError": "Customer search could not load. Refresh the page to try again",
     "resultSchemaLine": "Schema {schemaName}",
     "resultEntityIdLine": "id {entityId}",
     "resultLastSeenLine": "Last seen {lastSeenAt}",
@@ -1455,9 +1455,9 @@
     "conversionEventPlaceholder": "Leave blank for any activity, or name an event (e.g. purchase)",
     "conversionEventApplyButton": "Apply",
     "conversionEventClear": "Clear",
-    "notConfigured": "Cohort retention unavailable (warehouse not configured yet)",
-    "quotaExceeded": "Cohort retention unavailable (daily query quota reached)",
-    "queryError": "Cohort retention unavailable",
+    "notConfigured": "Returning-customer view is not ready: your data is not connected yet",
+    "quotaExceeded": "Returning-customer view is paused: too many data requests today. Try again tomorrow",
+    "queryError": "Returning-customer view could not load. Refresh the page to try again",
     "empty": "No cohort data yet.",
     "cohortColumnHeading": "Cohort",
     "cohortSizeColumnHeading": "Size",
@@ -1504,9 +1504,9 @@
     "dropOffLabel": "drop-off",
     "stageVelocityNote": "Calculated against previous stage",
     "noFunnel": "No funnel confirmed yet for this project. Confirm a funnel mapping during onboarding to see conversion here.",
-    "notConfigured": "Funnel conversion unavailable (warehouse not configured yet)",
-    "quotaExceeded": "Funnel conversion unavailable (daily query quota reached)",
-    "queryError": "Funnel conversion unavailable",
+    "notConfigured": "Sign-up-to-purchase steps are not ready: your data is not connected yet",
+    "quotaExceeded": "Sign-up-to-purchase steps are paused: too many data requests today. Try again tomorrow",
+    "queryError": "Sign-up-to-purchase steps could not load. Refresh the page to try again",
     "stepHeading": "{order}. {stage}",
     "stepConversion": "{percent}% of step 1",
     "stepCustomerCount": "{count} people reached this stage in order"
@@ -2761,10 +2761,10 @@
     "convertingLabel": "Converting at",
     "convertingValue": "{ratePct}%",
     "unavailable": {
-      "warehouse_not_configured": "Trial pipeline data needs a connected warehouse.",
-      "quota_exceeded": "This project's daily query quota is exhausted. Try again tomorrow.",
-      "not_yet_backed": "Trial pipeline data isn't backed by real warehouse data yet.",
-      "query_error": "Couldn't load trial pipeline data. Install the SaaS metric pack to see it here."
+      "warehouse_not_configured": "Free-trial numbers appear once your data is connected.",
+      "quota_exceeded": "Too many data requests today. Try again tomorrow.",
+      "not_yet_backed": "There is no real data for free trials yet.",
+      "query_error": "Couldn't load the free-trial numbers. Refresh the page; if it keeps happening, check that your data is connected."
     }
   },
   "TvPairing": {
