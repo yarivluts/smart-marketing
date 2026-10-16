@@ -289,6 +289,7 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PROPOSAL_LP], targets: [TARGET], landingPages: [PAGE] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent(`Landing page for ${isolate('Pro plan')}`);
+      expect(card).toHaveTextContent('The page people see after they click your ad.');
       expect(card).toHaveTextContent('Sign 20 documents a month - On WhatsApp, for 20 ILS.');
       expect(screen.queryByTestId('growth-pilot-landing-preview')).toBeNull();
       fireEvent.click(screen.getByTestId('growth-pilot-landing-toggle'));

@@ -5790,6 +5790,7 @@
     },
     "landing": {
       "title": "Landing page for {name}",
+      "explain": "The page people see after they click your ad. Its job is to turn visitors into sign-ups or sales.",
       "preview": "Show the page",
       "hidePreview": "Hide the page",
       "revising": "The AI is rewriting the page...",
