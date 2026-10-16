@@ -29,7 +29,7 @@ describe('AdsKpiScorecards', () => {
     // 1. Total Spend
     expect(screen.getByText('Total Spend')).toBeInTheDocument();
     expect(screen.getByText('$18,500')).toBeInTheDocument();
-    expect(screen.getByText('Meta: $11,000 · Google: $7,500')).toBeInTheDocument();
+    expect(screen.getByText('Facebook & Instagram: $11,000 · Google: $7,500')).toBeInTheDocument();
 
     // 2. Blended ROAS
     expect(screen.getByText('Sales per $1 of ads (ROAS)')).toBeInTheDocument();

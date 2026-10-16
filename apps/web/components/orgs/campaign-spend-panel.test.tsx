@@ -13,7 +13,7 @@ describe('CampaignSpendPanel', () => {
   it('explains why spend is missing when the query degraded', () => {
     renderWithIntl(<CampaignSpendPanel spend={{ ok: false, reason: 'not_yet_backed' }} />);
     expect(screen.getByText('Spend is not available yet')).toBeInTheDocument();
-    expect(screen.getByText('The spend table has not been built in the warehouse yet.')).toBeInTheDocument();
+    expect(screen.getByText('Spend numbers are still being prepared. Check back a little later.')).toBeInTheDocument();
     expect(screen.queryByTestId('trend-chart')).not.toBeInTheDocument();
   });
 

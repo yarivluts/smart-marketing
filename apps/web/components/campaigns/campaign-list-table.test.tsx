@@ -74,7 +74,7 @@ describe('CampaignListTable', () => {
     expect(screen.getByText('Meta Retargeting Leads')).toBeInTheDocument();
     expect(screen.getByText('Google Search - Commercial')).toBeInTheDocument();
 
-    expect(screen.getByText('Meta')).toBeInTheDocument();
+    expect(screen.getByText('Facebook & Instagram')).toBeInTheDocument();
     expect(screen.getByText('Google Ads')).toBeInTheDocument();
 
     expect(screen.getByText('$1,200')).toBeInTheDocument();

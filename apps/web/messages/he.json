@@ -3304,7 +3304,7 @@
     "metricBlendedCpa": "עלות להרשמה או מכירה (CPA)",
     "metricActiveCampaigns": "קמפיינים פעילים",
     "filterAllPlatforms": "כל הפלטפורמות",
-    "filterMetaAds": "Meta Ads",
+    "filterMetaAds": "פייסבוק ואינסטגרם",
     "filterGoogleAds": "Google Ads",
     "filterSimulated": "סימולציה",
     "filterAllStatuses": "כל הסטטוסים",
@@ -3367,15 +3367,15 @@
     "increaseBudgetBy": "הגדל תקציב ב-{percent}%",
     "decreaseBudgetBy": "הקטן תקציב ב-{percent}%",
     "spendDegraded": {
-      "warehouse_not_configured": "מחסן הנתונים אינו מוגדר בסביבה זו, ולכן לא ניתן לשלוף נתוני הוצאה.",
-      "metric_not_registered": "המדד ad_spend אינו רשום בפרויקט - התקינו את חבילת מדדי השיווק כדי להפעיל מעקב הוצאות.",
-      "not_yet_backed": "טבלת ההוצאות טרם נבנתה במחסן הנתונים.",
-      "quota_exceeded": "מכסת השאילתות של הפרויקט מוצתה - נתוני ההוצאה יוצגו שוב כשהמכסה תתאפס.",
-      "query_error": "נתוני הוצאה אינם זמינים לקמפיין הזה עדיין - במחסן הנתונים לא הוקמה טבלת הוצאות עבור הפרויקט. מצב הקמפיין שלמעלה אינו מושפע."
+      "warehouse_not_configured": "נתוני ההוצאה עדיין לא מחוברים בסביבה הזו, ולכן אי אפשר להציג אותם.",
+      "metric_not_registered": "הפרויקט הזה עדיין לא עוקב אחרי הוצאות הפרסום. סיימו את שלבי ההגדרה וההוצאה תופיע כאן.",
+      "not_yet_backed": "נתוני ההוצאה עדיין בהכנה. נסו שוב עוד קצת.",
+      "quota_exceeded": "השתמשתם במכסה היומית לטעינת נתונים. ההוצאה תוצג שוב כשהמכסה תתאפס.",
+      "query_error": "אי אפשר להציג הוצאה לקמפיין הזה עדיין. הקמפיין עצמו לא מושפע."
     },
     "platform": {
       "google_ads": "Google Ads",
-      "meta_ads": "Meta",
+      "meta_ads": "פייסבוק ואינסטגרם",
       "stripe": "Stripe",
       "ga4": "GA4",
       "generic": "כללי",
@@ -3398,7 +3398,7 @@
       "book_travel": "הזמן עכשיו"
     },
     "heroEyebrow": "פרסום",
-    "spendSplitLine": "Meta: ${meta} · Google: ${google}",
+    "spendSplitLine": "פייסבוק ואינסטגרם: ${meta} · גוגל: ${google}",
     "activeSharePct": "{percent}% פעילים",
     "spendEmptyTitle": "עדיין לא חוברה הוצאת פרסום",
     "spendEmptyNoRows": "אף חשבון מודעות לא דיווח על הוצאה ב-{days} הימים האחרונים. חברו את Meta Ads או Google Ads כדי שההוצאה, הגרפים לפי ערוץ ומדדי היעילות יופיעו כאן.",

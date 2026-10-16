@@ -51,7 +51,7 @@ describe('AdsPerformanceCharts', () => {
     // Channel mix and budget come from the campaign rows themselves, so they still render.
     const budget = screen.getByRole('region', { name: 'Daily budget by channel' });
     const rows = within(budget).getAllByRole('row');
-    expect(rows.map((row) => row.textContent)).toEqual(['channelActivePaused', 'Meta$50$0', 'Google Ads$0$20']);
+    expect(rows.map((row) => row.textContent)).toEqual(['channelActivePaused', 'Facebook & Instagram$50$0', 'Google Ads$0$20']);
     expect(within(screen.getByRole('region', { name: 'Campaigns by channel' })).getByText('2')).toBeInTheDocument();
   });
 
