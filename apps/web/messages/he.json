@@ -262,9 +262,9 @@
     "projectSchemaRegistryLink": "שדות הנתונים",
     "projectIngestHealthLink": "תקינות הנתונים",
     "projectHooksLink": "קישורי נתונים נכנסים",
-    "projectFieldMappingsLink": "מיפויי שדות",
-    "projectBillingOpsFeedLink": "פיד אירועי חיוב",
-    "projectRecordFeedLink": "פיד רשומות",
+    "projectFieldMappingsLink": "התאמת שדות הנתונים",
+    "projectBillingOpsFeedLink": "תשלומים והחזרים",
+    "projectRecordFeedLink": "הרשומות האחרונות",
     "projectCustomersLink": "לקוחות",
     "projectFeedbackLink": "משוב",
     "projectChurnReasonsLink": "למה אנשים מבטלים",
@@ -805,8 +805,8 @@
     "kpiPendingSub": "לא נקלטים עד שמוחל עליהם מיפוי"
   },
   "FieldMappings": {
-    "metaTitle": "מיפויי שדות",
-    "title": "מיפויי שדות עבור {projectName}",
+    "metaTitle": "התאמת שדות הנתונים",
+    "title": "התאמת שדות הנתונים עבור {projectName}",
     "existingMappingsHeading": "מיפויים שמורים",
     "noMappings": "עדיין לא נוצרו מיפויי שדות עבור פרויקט זה.",
     "disabledLabel": "מושבת",
@@ -1268,9 +1268,9 @@
     "backfillCoverageHint": "ל-{missing} מתוך {total} הלקוחות שמופיעים באירועים אין רשומת לקוח (כיסוי של {percent}%). סביר שהם נרשמו לפני שהמערכת המשלבת התחילה לשלוח לקוחות. בקשו ממנה לשלוח אותם שוב פעם אחת באמצעות מילוי חוסרים (backfill)."
   },
   "BillingOpsFeed": {
-    "metaTitle": "פיד אירועי חיוב",
-    "title": "פיד אירועי חיוב עבור {projectName}",
-    "description": "חיובים, תשלומים שנכשלו והחזרים אחרונים שנקלטו על ידי מחבר Stripe - הגשר בין לוחות המחוונים לתפעול החיוב היומיומי.",
+    "metaTitle": "תשלומים והחזרים",
+    "title": "תשלומים והחזרים עבור {projectName}",
+    "description": "החיובים, התשלומים שנכשלו וההחזרים האחרונים שלכם, שנאספו מ-Stripe.",
     "empty": "טרם נקלטו אירועי חיוב עבור פרויקט זה.",
     "typeCharge": "חיוב",
     "typeFailedPayment": "תשלום שנכשל",
@@ -1356,11 +1356,11 @@
     "recoveryListCap": "מוצגים {shown} התשלומים האחרונים שהושבו מתוך {total}."
   },
   "RecordFeed": {
-    "metaTitle": "פיד רשומות",
-    "title": "פיד רשומות עבור {projectName}",
+    "metaTitle": "הרשומות האחרונות",
+    "title": "הרשומות האחרונות עבור {projectName}",
     "description": "עיין ברשומות האחרונות שנקלטו עבור כל סכימת אירוע רשומה בפרויקט זה.",
     "schemaPickerLabel": "סכימת אירוע",
-    "noEventSchemasRegistered": "יש לרשום סכימת אירוע תחילה כדי לעיין בפיד רשומות.",
+    "noEventSchemasRegistered": "יש לרשום סכימת אירוע תחילה כדי לעיין ברשומות האחרונות.",
     "empty": "טרם נקלטו רשומות עבור סכימה זו.",
     "fieldLine": "{name}: {value}",
     "landedAtLine": "נקלט ב-{landedAt}",

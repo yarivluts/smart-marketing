@@ -262,9 +262,9 @@
     "projectSchemaRegistryLink": "Data fields",
     "projectIngestHealthLink": "Data health",
     "projectHooksLink": "Incoming data links",
-    "projectFieldMappingsLink": "Field mappings",
-    "projectBillingOpsFeedLink": "Billing ops feed",
-    "projectRecordFeedLink": "Record feed",
+    "projectFieldMappingsLink": "Match your data fields",
+    "projectBillingOpsFeedLink": "Payments & refunds",
+    "projectRecordFeedLink": "Latest records",
     "projectCustomersLink": "Customers",
     "projectFeedbackLink": "Feedback",
     "projectChurnReasonsLink": "Why people cancel",
@@ -805,8 +805,8 @@
     "kpiPendingSub": "Not ingested until a mapping is applied"
   },
   "FieldMappings": {
-    "metaTitle": "Field mappings",
-    "title": "Field mappings for {projectName}",
+    "metaTitle": "Match your data fields",
+    "title": "Match your data fields for {projectName}",
     "existingMappingsHeading": "Saved mappings",
     "noMappings": "No field mappings created for this project yet.",
     "disabledLabel": "Disabled",
@@ -1268,9 +1268,9 @@
     "backfillCoverageHint": "{missing} of {total} customers seen in events have no customer record ({percent}% covered). They most likely signed up before the integration started sending customers. Ask the integrator to resend them once with a backfill."
   },
   "BillingOpsFeed": {
-    "metaTitle": "Billing ops feed",
-    "title": "Billing ops feed for {projectName}",
-    "description": "Recent charges, failed payments, and refunds landed by the Stripe connector — the bridge from dashboards to daily billing ops.",
+    "metaTitle": "Payments & refunds",
+    "title": "Payments & refunds for {projectName}",
+    "description": "Your latest charges, failed payments and refunds, collected from Stripe.",
     "empty": "No billing events landed for this project yet.",
     "typeCharge": "Charge",
     "typeFailedPayment": "Failed payment",
@@ -1356,11 +1356,11 @@
     "recoveryListCap": "Showing the {shown} most recent of {total} recovered payments."
   },
   "RecordFeed": {
-    "metaTitle": "Record feed",
-    "title": "Record feed for {projectName}",
+    "metaTitle": "Latest records",
+    "title": "Latest records for {projectName}",
     "description": "Browse the most recently landed records for any registered event schema in this project.",
     "schemaPickerLabel": "Event schema",
-    "noEventSchemasRegistered": "Register an event schema first to browse a record feed.",
+    "noEventSchemasRegistered": "Register an event schema first to browse the latest records.",
     "empty": "No records landed for this schema yet.",
     "fieldLine": "{name}: {value}",
     "landedAtLine": "Landed {landedAt}",
