@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
-import type { GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
+import type { GrowthActivityView, GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { isolate } from '@/lib/bidi';
 import { GrowthPilotApp } from './growth-pilot-app';
 
@@ -203,7 +203,7 @@ describe('GrowthPilotApp', () => {
   });
 
   it('words the activity log without the word "target"', () => {
-    const activity = [
+    const activity: GrowthActivityView[] = [
       { id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 3, on: '2026-10-13T10:00:00Z' },
       { id: 'a2', kind: 'target_requested', byPilot: false, subject: 'Accountants', count: null, on: '2026-10-13T11:00:00Z' },
     ];
