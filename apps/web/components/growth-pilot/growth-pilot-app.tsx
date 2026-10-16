@@ -49,6 +49,20 @@ function useReason(): (code: string | null | undefined) => string {
   return (code) => t(code && KNOWN_REASONS.includes(code) ? (code as 'generic') : 'generic');
 }
 
+/** Country codes as names in the reader's language ("IL" -> "Israel"); a code the browser does not know stays as it is. */
+function useCountryNames(): (codes: string[]) => string {
+  const locale = useLocale();
+  return (codes) => {
+    let names: Intl.DisplayNames | null = null;
+    try {
+      names = new Intl.DisplayNames(locale, { type: 'region' });
+    } catch {
+      names = null;
+    }
+    return codes.map((code) => { try { return names?.of(code) ?? code; } catch { return code; } }).join(', ');
+  };
+}
+
 const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 
 function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
@@ -251,6 +265,7 @@ function ProposalCard({
   const platform = proposal.kind === 'publish' || proposal.kind === 'activate' ? proposal.publish : null;
   const tp = useTranslations('GrowthPilot.publish');
   const reasonOf = useReason();
+  const countryNames = useCountryNames();
   const [budget, setBudget] = React.useState(String(proposal.publish?.dailyBudget ?? ''));
   const tu = useTranslations('GrowthPilot.audience');
   const [changing, setChanging] = React.useState(false);
@@ -292,7 +307,7 @@ function ProposalCard({
               </p>
               <p className="text-xs">
                 <span className="font-semibold text-foreground">{tp('countries')}: </span>
-                <span dir="ltr">{platform.countries.join(', ')}</span>
+                <span dir="auto">{countryNames(platform.countries)}</span>
               </p>
             </div>
           ) : null}
@@ -522,6 +537,7 @@ function TargetAudienceLine({ target }: { target: GrowthTargetView }): React.Rea
 /** An audience proposal: who, where, which interests, and how many people Meta says it reaches. */
 function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audience']> }): React.ReactElement {
   const t = useTranslations('GrowthPilot.audience');
+  const countryNames = useCountryNames();
   const number = new Intl.NumberFormat(useLocale(), { notation: 'compact', maximumFractionDigits: 1 });
   const genders = plan.targeting.genders.length ? plan.targeting.genders.map((gender) => t(`gender.${gender}`)).join(', ') : t('gender.all');
   return (
@@ -534,7 +550,7 @@ function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audie
       <div className="flex flex-wrap gap-1.5 text-xs">
         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
           <MapPin className="h-3 w-3" aria-hidden="true" />
-          <span dir="ltr">{plan.targeting.countries.join(', ')}</span>
+          <span dir="auto">{countryNames(plan.targeting.countries)}</span>
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
           <UserRound className="h-3 w-3" aria-hidden="true" />

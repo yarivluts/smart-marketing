@@ -348,7 +348,7 @@ describe('GrowthPilotApp', () => {
       expect(card).toHaveTextContent(`Audience for ${isolate('Freelancers')}`);
       const audience = screen.getByTestId('growth-pilot-audience');
       expect(audience).toHaveTextContent('Freelancers in Israel who sign contracts');
-      expect(audience).toHaveTextContent('IL');
+      expect(audience).toHaveTextContent('Israel');
       expect(audience).toHaveTextContent('Ages 25-65+');
       expect(audience).toHaveTextContent('Everyone');
       expect(screen.getAllByTestId('growth-pilot-audience-interest').map((chip) => chip.textContent)).toEqual(['Freelancer']);
@@ -381,6 +381,7 @@ describe('GrowthPilotApp', () => {
       expect(card).toHaveTextContent(`Publish the ads for ${isolate('Free plan')}`);
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '0' } });
@@ -389,6 +390,12 @@ describe('GrowthPilotApp', () => {
       fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
       await waitFor(() => expect(sent(fetchMock)).toEqual({ url: BASE + '/proposals/pub1', body: { action: 'approve', dailyBudget: 35 } }));
       expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Facebook and Instagram, switched off - not showing to anyone');
+    });
+
+    it('names the countries in the reader\'s language instead of codes', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('ישראל');
+      expect(screen.getByTestId('growth-pilot-publish')).not.toHaveTextContent('IL');
     });
 
     it('turning on is its own decision, saying it starts spending', () => {
