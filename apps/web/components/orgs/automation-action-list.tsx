@@ -122,7 +122,12 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove }: 
               ))}
             </ul>
           ) : null}
-          {action.failureReason ? <p className="text-destructive">{t('failureReasonLine', { reason: action.failureReason })}</p> : null}
+          {action.failureReason ? (
+            <div className="flex flex-col gap-0.5 text-destructive" data-testid={`automation-failure-${action.id}`}>
+              <p>{t('failureReasonLine', { reason: action.failureReason })}</p>
+              <p className="text-muted-foreground">{t('failureNextStep')}</p>
+            </div>
+          ) : null}
           {action.rollbackReason ? <p className="text-muted-foreground">{t('rollbackReasonLine', { reason: action.rollbackReason })}</p> : null}
 
           <div className="flex flex-wrap items-center gap-2">
