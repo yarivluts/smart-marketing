@@ -125,7 +125,8 @@ describe('DashboardContent', () => {
 
   it('shows a create-organization call to action when there are no orgs', () => {
     renderDashboard({ orgs: [], pendingInviteCount: 0 });
-    expect(screen.getByText(/not a member of any organization/)).toBeInTheDocument();
+    expect(screen.getByText(/one step away/)).toBeInTheDocument();
+    expect(screen.queryByText(/boards|data sources/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create your first organization' })).toHaveAttribute('href', '/orgs/new');
     expect(screen.queryByRole('link', { name: /pending invite/ })).not.toBeInTheDocument();
   });
