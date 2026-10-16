@@ -274,6 +274,7 @@ function ProposalCard({
             <KindChip kind={draft.kind} />
           </div>
           {ads ? <p className="text-sm text-muted-foreground">{ta('description')}</p> : null}
+          {page ? <p className="text-sm text-muted-foreground">{tl('explain')}</p> : null}
           {page ? (
             <p className="text-sm text-muted-foreground" dir={page.dir}>
               <span className="font-semibold text-foreground">{page.content.headline}</span> - {page.content.subheadline}
