@@ -266,7 +266,7 @@
     "projectFeedbackLink": "משוב",
     "projectChurnReasonsLink": "למה אנשים מבטלים",
     "projectIntentQualityLink": "כוונה ואיכות",
-    "projectFirmographicsLink": "נתונים פירמוגרפיים",
+    "projectFirmographicsLink": "סוגי לקוחות",
     "projectExperimentsLink": "ניסויים",
     "projectSupportLink": "תמיכה",
     "projectDemosLink": "הדגמות",
@@ -279,8 +279,8 @@
     "projectCohortsLink": "מי חוזר אלינו",
     "projectTvLink": "תוצאות על מסך טלוויזיה",
     "projectSessionReplayLink": "הקלטות סשן",
-    "projectCampaignOpsLink": "תפעול קמפיינים",
-    "projectRepCollectionsLink": "גבייה לפי נציג",
+    "projectCampaignOpsLink": "החזר על הפרסום",
+    "projectRepCollectionsLink": "מכירות לפי נציג",
     "projectFunnelLink": "משפך המרות",
     "projectInsightsLink": "תובנות",
     "orgSettingsLink": "הגדרות ארגון",
@@ -1810,8 +1810,8 @@
     "mixAlertCurrentLabel": "נוכחי"
   },
   "Firmographics": {
-    "metaTitle": "נתונים פירמוגרפיים",
-    "title": "נתונים פירמוגרפיים עבור {projectName}",
+    "metaTitle": "סוגי לקוחות",
+    "title": "סוגי לקוחות עבור {projectName}",
     "description": "תחום, גודל ואזור של החברה מתוך אירועי company_firmographic שלכם, עם לוחות הרכב # מול $ והתראות על שינוי הרכב. התחום נקבע משם החברה והדומיין לפי רשימת מילות מפתח קבועה ב-SDK המעקב — לא על ידי מודל AI ולא על ידי שירות העשרה חיצוני.",
     "setupIntro": "התקינו את חבילת Firmographic כדי לרשום את סכמת company_firmographic ואת שתי מטריקות ההרכב. אתם מספקים שם חברה, דומיין, גודל ואזור; התחום נקבע מהשם ומהדומיין לפי רשימת מילות מפתח קבועה, עם נפילה לקטגוריה אחר. אין פנייה לשום מקור נתונים חיצוני.",
     "industryHeading": "לקוחות לפי ענף",
@@ -1912,8 +1912,8 @@
     "pipelineConversionsSub": "experiment_conversion"
   },
   "CampaignOps": {
-    "metaTitle": "תפעול קמפיינים",
-    "title": "תפעול קמפיינים עבור {projectName}",
+    "metaTitle": "החזר על הפרסום",
+    "title": "החזר על הפרסום עבור {projectName}",
     "description": "החזר השקעה בחלון זמן קבוע ויעדי הוצאה לכל קמפיין.",
     "paybackHeading": "החזר השקעה בחלון זמן קבוע",
     "paybackUnavailable": "אין עדיין נתוני החזר השקעה — חברו מחסן נתונים כדי לראות זאת.",
@@ -1952,7 +1952,7 @@
     "targetUpdateError": "עדכון היעד נכשל. נסו שוב.",
     "targetInputLabel": "יעד הוצאה עבור {campaignId}",
     "targetInputPlaceholder": "ללא יעד",
-    "eyebrow": "תפעול קמפיינים",
+    "eyebrow": "החזר על הפרסום",
     "kpiTrackedCampaigns": "קמפיינים במעקב",
     "kpiSpend": "הוצאה ({days} ימים)",
     "kpiOverTarget": "מעל היעד",
@@ -3172,8 +3172,8 @@
     "environmentsNone": "עדיין אין סביבות."
   },
   "RepCollections": {
-    "metaTitle": "גבייה לפי נציג",
-    "title": "גבייה לפי נציג עבור {projectName}",
+    "metaTitle": "מכירות לפי נציג",
+    "title": "מכירות לפי נציג עבור {projectName}",
     "description": "שייכו שדרוגים, שימורים והרחבות לנציג שהוביל אותם.",
     "leaderboardHeading": {
       "week": "השבוע",
