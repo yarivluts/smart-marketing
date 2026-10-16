@@ -42,7 +42,7 @@ test.describe('Record feed (KAN-81)', () => {
     await page.getByRole('link', { name: 'Latest records' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/record-feed$`));
     await expect(page.getByRole('heading', { name: `Latest records for Client Beta` })).toBeVisible();
-    await expect(page.getByText('Register an event schema first to browse the latest records.')).toBeVisible();
+    await expect(page.getByText('Add a kind of record first to see the latest records here.')).toBeVisible();
   });
 
   test('an org owner filters the record feed to records matching one field\'s exact value', async ({ page }) => {
