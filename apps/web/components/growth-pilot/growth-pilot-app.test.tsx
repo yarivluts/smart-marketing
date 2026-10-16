@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
-import type { GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
+import type { GrowthActivityView, GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { isolate } from '@/lib/bidi';
 import { GrowthPilotApp } from './growth-pilot-app';
 
@@ -202,12 +202,24 @@ describe('GrowthPilotApp', () => {
     await waitFor(() => expect(sent(fetchMock)).toEqual({ url: `${BASE}/targets`, body: { request: 'Accountants in the north' } }));
   });
 
+  it('words the activity log without the word "target"', () => {
+    const activity: GrowthActivityView[] = [
+      { id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 3, on: '2026-10-13T10:00:00Z' },
+      { id: 'a2', kind: 'target_requested', byPilot: false, subject: 'Accountants', count: null, on: '2026-10-13T11:00:00Z' },
+    ];
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ activity })} />, { locale: 'en' });
+    const log = screen.getByTestId('growth-pilot-activity');
+    expect(log).toHaveTextContent('Suggested 3 things to grow');
+    expect(log).toHaveTextContent('You asked us to grow something new: Accountants');
+    expect(log).not.toHaveTextContent(/target/i);
+  });
+
   it('pauses the pilot, and reads in Hebrew with the activity worded', async () => {
     const fetchMock = stubFetch({ body: page({ status: 'paused' }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
     expect(screen.getByTestId('growth-pilot-status')).toHaveTextContent(heMessages.GrowthPilot.header.active);
-    // "Proposed one target", worded by the Hebrew plural rule.
-    expect(screen.getByTestId('growth-pilot-activity')).toHaveTextContent('\u05d4\u05e6\u05d9\u05e2 \u05d9\u05e2\u05d3 \u05d0\u05d7\u05d3');
+    // "Suggested one thing to grow", worded by the Hebrew plural rule.
+    expect(screen.getByTestId('growth-pilot-activity')).toHaveTextContent('\u05d4\u05e6\u05d9\u05e2 \u05d3\u05d1\u05e8 \u05d0\u05d7\u05d3 \u05dc\u05e7\u05d3\u05dd');
     fireEvent.click(screen.getByTestId('growth-pilot-pause'));
     await waitFor(() => expect(sent(fetchMock)).toEqual({ url: `${BASE}/pause`, body: { paused: true } }));
     expect(await screen.findByText(heMessages.GrowthPilot.header.paused)).toBeInTheDocument();
