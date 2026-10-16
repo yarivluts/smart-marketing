@@ -264,7 +264,7 @@
     "projectRecordFeedLink": "Record feed",
     "projectCustomersLink": "Customers",
     "projectFeedbackLink": "Feedback",
-    "projectChurnReasonsLink": "Churn reasons",
+    "projectChurnReasonsLink": "Why customers leave",
     "projectIntentQualityLink": "Intent & quality",
     "projectFirmographicsLink": "Firmographics",
     "projectExperimentsLink": "Experiments",
@@ -1689,8 +1689,8 @@
     "repShowRateDescription": "Held demos as a share of each rep's outcomes."
   },
   "ChurnReasons": {
-    "metaTitle": "Churn reasons",
-    "title": "Churn reasons for {projectName}",
+    "metaTitle": "Why customers leave",
+    "title": "Why customers leave: {projectName}",
     "description": "Why customers cancel, broken down by structured reason, free-text theme, plan, channel, and signup cohort.",
     "setupIntro": "Install the Churn Reasons pack to start capturing cancellation reasons from your cancel flow or exit survey.",
     "reasonCodeHeading": "Reasons",
@@ -2673,9 +2673,9 @@
     "createDescription": "Pick an entity schema, then combine field filters and event conditions."
   },
   "WinRules": {
-    "metaTitle": "Win rules",
-    "title": "Win rules for {projectName}",
-    "rulesHeading": "Win rules",
+    "metaTitle": "Celebrate wins",
+    "title": "Celebrate wins: {projectName}",
+    "rulesHeading": "What counts as a win",
     "noWinRules": "This project has no win rules yet.",
     "ruleSummary": "On {schemaName} — {filterSummary}",
     "anyOccurrence": "any occurrence",

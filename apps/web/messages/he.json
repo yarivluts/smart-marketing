@@ -264,7 +264,7 @@
     "projectRecordFeedLink": "פיד רשומות",
     "projectCustomersLink": "לקוחות",
     "projectFeedbackLink": "משוב",
-    "projectChurnReasonsLink": "סיבות נטישה",
+    "projectChurnReasonsLink": "למה לקוחות עוזבים",
     "projectIntentQualityLink": "כוונה ואיכות",
     "projectFirmographicsLink": "נתונים פירמוגרפיים",
     "projectExperimentsLink": "ניסויים",
@@ -1689,8 +1689,8 @@
     "repShowRateDescription": "דמואים שהתקיימו כחלק מכלל התוצאות של כל נציג."
   },
   "ChurnReasons": {
-    "metaTitle": "סיבות נטישה",
-    "title": "סיבות נטישה עבור {projectName}",
+    "metaTitle": "למה לקוחות עוזבים",
+    "title": "למה לקוחות עוזבים: {projectName}",
     "description": "מדוע לקוחות מבטלים, לפי סיבה מובנית, נושא חופשי, תוכנית, ערוץ וקוהורט הרשמה.",
     "setupIntro": "התקינו את חבילת סיבות הנטישה כדי להתחיל לאסוף סיבות ביטול מתהליך הביטול או מסקר היציאה שלכם.",
     "reasonCodeHeading": "סיבות",
@@ -2673,9 +2673,9 @@
     "createDescription": "בחרו סכמת ישות, ואז שלבו מסנני שדות ותנאי אירועים."
   },
   "WinRules": {
-    "metaTitle": "כללי ניצחון",
-    "title": "כללי ניצחון עבור {projectName}",
-    "rulesHeading": "כללי ניצחון",
+    "metaTitle": "חגיגת ניצחונות",
+    "title": "חגיגת ניצחונות: {projectName}",
+    "rulesHeading": "מה נחשב לניצחון",
     "noWinRules": "לפרויקט זה אין עדיין כללי ניצחון.",
     "ruleSummary": "על אירוע {schemaName} — {filterSummary}",
     "anyOccurrence": "כל התרחשות",
