@@ -214,6 +214,15 @@ describe('GrowthPilotApp', () => {
     expect(log).not.toHaveTextContent(/target/i);
   });
 
+  it('explains what Pause does, and that running ads are untouched', async () => {
+    stubFetch({ body: page({ status: 'paused' }) });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-status-hint')).toHaveTextContent('Ads you already turned on keep running');
+    fireEvent.click(screen.getByTestId('growth-pilot-pause'));
+    await waitFor(() => expect(screen.getByTestId('growth-pilot-status-hint')).toHaveTextContent('Press Resume to continue'));
+    expect(screen.getByTestId('growth-pilot-status-hint')).toHaveTextContent('keep running');
+  });
+
   it('pauses the pilot, and reads in Hebrew with the activity worded', async () => {
     const fetchMock = stubFetch({ body: page({ status: 'paused' }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
