@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
+import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
 import { REVIEW_POLL_MS, ReviewOverview, type ReviewOverviewProps } from './review-overview';
 
@@ -80,7 +81,7 @@ describe('ReviewOverview', () => {
     renderWithIntl(<ReviewOverview {...PROPS} publishHref="/r?step=publish" />, { locale: 'en' });
     const next = screen.getByTestId('ad-studio-review-next');
     expect(next).toHaveAttribute('data-next', 'attention');
-    expect(next).toHaveTextContent('One creative needs a look');
+    expect(next).toHaveTextContent('One ad needs a look');
     expect(screen.getByTestId('ad-studio-review-next-action')).toHaveAttribute('href', '/r?item=image:c2');
     expect(screen.getByTestId('ad-studio-review-next-publish')).toHaveAttribute('href', '/r?step=publish');
     expect(screen.getByTestId('ad-studio-creative-image-2')).toHaveAttribute('data-highlight', 'attention');
@@ -100,9 +101,17 @@ describe('ReviewOverview', () => {
       <ReviewOverview {...PROPS} images={[PROPS.images[0], ready]} video={{ ...PROPS.video, state: 'ready', rendered: 3, assembled: true, assembledSeconds: 15 }} publishHref="/r?step=publish" />,
       { locale: 'en' },
     );
-    expect(screen.getByTestId('ad-studio-review-next')).toHaveTextContent('3 creatives are ready');
+    expect(screen.getByTestId('ad-studio-review-next')).toHaveTextContent('3 ads are ready');
     expect(screen.getByTestId('ad-studio-review-next-action')).toHaveAttribute('href', '/r?step=publish');
     expect(screen.queryByTestId('ad-studio-review-next-publish')).toBeNull();
+  });
+
+  it('calls the things to review "ads", not the marketing word "creatives", in both languages', () => {
+    const copy = (messages: { AdStudio: { review: unknown } }) => JSON.stringify(messages.AdStudio.review);
+    expect(copy(enMessages)).not.toMatch(/creative/i);
+    expect(copy(heMessages)).not.toContain('קריאייטיב');
+    renderWithIntl(<ReviewOverview {...PROPS} />, { locale: 'en' });
+    expect(screen.getByRole('heading', { name: 'Your ads' })).toBeInTheDocument();
   });
 
   it('offers to start image ideas when there are none, in Hebrew', () => {

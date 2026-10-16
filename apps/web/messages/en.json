@@ -4262,7 +4262,7 @@
     "stageImagesValue": "{current} of {total} images",
     "autopilot": {
       "title": "Create everything automatically",
-      "description": "One click takes this ad from brief to finished creatives: a deep plan, the script, image ad ideas and images in every placement, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
+      "description": "One click takes this ad from brief to finished ads: a deep plan, the script, image ad ideas and images in every placement, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
       "optionPlan": "Deep plan first",
       "optionImages": "Image ads",
       "optionVideo": "Video ad",
@@ -4439,7 +4439,7 @@
       },
       "imagesHeading": "Images ({count})",
       "openFull": "Open full size",
-      "ideaMissing": "This idea is no longer in the ad. Go back to all creatives to pick another."
+      "ideaMissing": "This idea is no longer in the ad. Go back to all your ads to pick another."
     },
     "dailyImages": "Images per day",
     "usageTodayImages": "Images today",
@@ -5066,7 +5066,7 @@
       "logoUnsupported": "The logo must be a PNG or JPEG image."
     },
     "review": {
-      "title": "Your creatives",
+      "title": "Your ads",
       "description": "Every image idea, the video and the search ad at a glance. Open one to see all of it and edit it.",
       "count": {
         "ready": "{count} ready",
@@ -5094,7 +5094,7 @@
       "searchSponsored": "Sponsored",
       "searchCounts": "{headlines} headlines, {descriptions} descriptions",
       "searchKeywords": "{count, plural, =0 {No keywords chosen} one {# keyword} other {# keywords}}",
-      "back": "All creatives",
+      "back": "All your ads",
       "videoNotAssembled": "Every scene is ready - assemble the video",
       "videoVertical": "Vertical 9:16",
       "videoHorizontal": "Horizontal 16:9",
@@ -5102,7 +5102,7 @@
         "eyebrow": "Next step",
         "continuePublish": "Continue to publish",
         "attention": {
-          "title": "{count, plural, one {One creative needs} other {# creatives need}} a look",
+          "title": "{count, plural, one {One ad needs} other {# ads need}} a look",
           "description": "Open it to see what the check found and fix it before publishing.",
           "action": "Open and fix"
         },
@@ -5112,12 +5112,12 @@
           "action": "Assemble the video"
         },
         "working": {
-          "title": "{count, plural, one {One creative is} other {# creatives are}} still being made",
+          "title": "{count, plural, one {One ad is} other {# ads are}} still being made",
           "description": "This page updates by itself as they finish. Meanwhile you can open and edit the ready ones."
         },
         "publish": {
           "title": "Ready to publish",
-          "description": "{count, plural, one {One creative is} other {# creatives are}} ready. Choose what to publish on the next step.",
+          "description": "{count, plural, one {One ad is} other {# ads are}} ready. Choose what to publish on the next step.",
           "action": "Continue to publish"
         },
         "start": {
