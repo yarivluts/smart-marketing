@@ -44,6 +44,14 @@ function schemaKey(schema: BackfillPanelSchema): string {
  */
 export function BackfillPanel({ orgId, projectId, environmentId, environmentLabel, canConfigure, endpoint, availableSchemas, backfills }: BackfillPanelProps): React.ReactElement {
   const t = useTranslations('Backfill');
+  // The server's reason is English developer text; turn it into a translated sentence that says what to do.
+  const reasonText = (reason: string | undefined): string => {
+    const status = Number(/HTTP (\d{3})/.exec(reason ?? '')?.[1]);
+    if (status === 401 || status === 403) return t('reason.denied', { status });
+    if (status === 404) return t('reason.notFound', { status });
+    if (status >= 500) return t('reason.serverError', { status });
+    return t('reason.generic');
+  };
   const router = useRouter();
   const [url, setUrl] = React.useState(endpoint?.url ?? '');
   const [selected, setSelected] = React.useState<Set<string>>(new Set((endpoint?.schemas ?? availableSchemas.filter((schema) => schema.kind === 'entity')).map(schemaKey)));
@@ -88,7 +96,7 @@ export function BackfillPanel({ orgId, projectId, environmentId, environmentLabe
       if (!response.ok || !body.backfill) {
         setMessage({ tone: 'error', text: t('requestError') });
       } else if (body.backfill.status === 'failed') {
-        setMessage({ tone: 'error', text: t('requestFailed', { reason: body.backfill.failureReason ?? '' }) });
+        setMessage({ tone: 'error', text: t('requestFailed', { reason: reasonText(body.backfill.failureReason) }) });
       } else {
         setMessage({ tone: 'ok', text: t('requestDelivered') });
       }
@@ -234,7 +242,7 @@ export function BackfillPanel({ orgId, projectId, environmentId, environmentLabe
                   {backfill.status === 'failed' ? (
                     <p className="flex items-center gap-2 text-destructive">
                       <TriangleAlert className="h-4 w-4" />
-                      {t('failedLine', { reason: backfill.failureReason ?? '' })}
+                      {t('failedLine', { reason: reasonText(backfill.failureReason) })}
                     </p>
                   ) : (
                     <ol className="flex flex-wrap items-center gap-1.5">

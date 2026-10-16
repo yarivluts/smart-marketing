@@ -3676,6 +3676,12 @@
     "noBackfills": "No backfills requested yet.",
     "requestedAt": "Requested {at}",
     "failedLine": "Failed: {reason}",
+    "reason": {
+      "denied": "Your endpoint refused the request (HTTP {status}). Check that it accepts the signing secret, then request again.",
+      "notFound": "Your endpoint address was not found (HTTP {status}). Check the address, then request again.",
+      "serverError": "Your endpoint had an error on its side (HTTP {status}). Try again in a few minutes.",
+      "generic": "We could not reach your endpoint. Check the address and that it is online, then request again."
+    },
     "progressLine": "{batches} batches · {accepted} accepted · {duplicates} duplicates · {quarantined} quarantined",
     "status": {
       "requested": "Requested",

@@ -63,10 +63,32 @@ describe('BackfillPanel', () => {
     const receiving = within(screen.getByTestId('backfill-bf1'));
     expect(receiving.getByText('2 batches · 8 accepted · 6 duplicates · 0 quarantined')).toBeInTheDocument();
     expect(receiving.getAllByRole('listitem').map((step) => step.className.includes('text-success'))).toEqual([true, true, true, false]);
-    expect(within(screen.getByTestId('backfill-bf0')).getByText('Failed: The endpoint answered HTTP 401.')).toBeInTheDocument();
+    expect(within(screen.getByTestId('backfill-bf0')).getByText('Failed: Your endpoint refused the request (HTTP 401). Check that it accepts the signing secret, then request again.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Request backfill' }));
     await waitFor(() => expect(screen.getByText(/Backfill requested/)).toBeInTheDocument());
+  });
+
+  it('explains a failed backfill in plain words and never prints the raw server text', () => {
+    const entry = (backfillId: string, failureReason: string) => ({
+      backfillId,
+      status: 'failed' as const,
+      requestedAt: '2026-09-26T10:00:00Z',
+      failureReason,
+      progress: { batches: 0, accepted: 0, duplicates: 0, quarantined: 0 },
+    });
+    renderWithIntl(
+      <BackfillPanel
+        {...baseProps}
+        endpoint={{ url: 'https://x.example/hook', schemas: [{ kind: 'entity', name: 'customer' }] }}
+        backfills={[entry('a', 'The endpoint answered HTTP 502.'), entry('b', 'Delivery failed: ECONNREFUSED')]}
+      />,
+      { locale: 'he' },
+    );
+    expect(within(screen.getByTestId('backfill-a')).getByText(/שגיאה בצד הנקודה שלך \(HTTP 502\)/)).toBeInTheDocument();
+    const generic = within(screen.getByTestId('backfill-b'));
+    expect(generic.getByText(/לא הצלחנו להגיע לנקודה שלך/)).toBeInTheDocument();
+    expect(screen.queryByText(/ECONNREFUSED/)).toBeNull();
   });
 
   it('is read-only without project.configure', () => {
