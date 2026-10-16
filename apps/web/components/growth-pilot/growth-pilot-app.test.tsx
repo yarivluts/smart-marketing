@@ -69,6 +69,8 @@ describe('GrowthPilotApp', () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
     expect(screen.getByRole('heading', { name: 'Enter the website you want to grow' })).toBeInTheDocument();
+    expect(screen.getByText(/Type your website and the AI does the rest.*about a minute\./)).toBeInTheDocument();
+    expect(screen.queryByText(/audiences/)).not.toBeInTheDocument();
     expect(screen.getByText('Nothing goes live without your approval. Every ad is created switched off, so nobody sees it until you turn it on.')).toBeInTheDocument();
     expect(screen.getByTestId('growth-pilot-start-button')).toBeDisabled();
     expect(screen.getByText('Proposes what to grow')).toBeInTheDocument();
