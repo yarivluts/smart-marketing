@@ -20,4 +20,12 @@ describe('project sidebar names for the data pages', () => {
     expect(e.BillingOpsFeed.metaTitle).toBe(e.OrgDetailPage.projectBillingOpsFeedLink);
     expect(e.RecordFeed.metaTitle).toBe(e.OrgDetailPage.projectRecordFeedLink);
   });
+
+  it('no sidebar link name contains another one (e2e role lookups match by substring)', () => {
+    const nav = en.OrgDetailPage as Record<string, string>;
+    const names = KEYS.map((k) => nav[k].toLowerCase());
+    for (const other of [nav.projectSchemaRegistryLink, nav.projectIngestHealthLink, nav.projectHooksLink]) {
+      for (const name of names) expect(name).not.toContain(other.toLowerCase());
+    }
+  });
 });

@@ -262,7 +262,7 @@
     "projectSchemaRegistryLink": "Data fields",
     "projectIngestHealthLink": "Data health",
     "projectHooksLink": "Incoming data links",
-    "projectFieldMappingsLink": "Match your data fields",
+    "projectFieldMappingsLink": "Match your fields",
     "projectBillingOpsFeedLink": "Payments & refunds",
     "projectRecordFeedLink": "Latest records",
     "projectCustomersLink": "Customers",
@@ -805,8 +805,8 @@
     "kpiPendingSub": "Not ingested until a mapping is applied"
   },
   "FieldMappings": {
-    "metaTitle": "Match your data fields",
-    "title": "Match your data fields for {projectName}",
+    "metaTitle": "Match your fields",
+    "title": "Match your fields for {projectName}",
     "existingMappingsHeading": "Saved mappings",
     "noMappings": "No field mappings created for this project yet.",
     "disabledLabel": "Disabled",
