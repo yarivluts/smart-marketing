@@ -5648,7 +5648,7 @@
     "start": {
       "eyebrow": "Growth Pilot",
       "title": "Enter the website you want to grow",
-      "subtitle": "The AI learns the business, proposes what to grow, and builds ads, landing pages and audiences for it - you only approve.",
+      "subtitle": "Type your website and the AI does the rest: it reads the site, suggests what to promote, and writes the ads and web pages. You only say yes, no, or ask for a change. It takes about a minute.",
       "placeholder": "your-site.com",
       "label": "Website address",
       "submit": "Start",
