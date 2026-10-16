@@ -64,7 +64,7 @@ describe('CampaignListTable', () => {
     expect(screen.getByText('Campaign')).toBeInTheDocument();
     expect(screen.getByText('Meta Scale Growth')).toBeInTheDocument();
     expect(screen.getByText('Google Search High Intent')).toBeInTheDocument();
-    expect(screen.getByText('Meta')).toBeInTheDocument();
+    expect(screen.getByText('Facebook & Instagram')).toBeInTheDocument();
     expect(screen.getByText('Google Ads')).toBeInTheDocument();
     expect(screen.getByText('3.8x')).toBeInTheDocument();
     expect(screen.getByText('3.2x')).toBeInTheDocument();
