@@ -3300,7 +3300,7 @@
     "metricTotalSpend": "Total Spend",
     "metricBlendedRoas": "Sales per $1 of ads (ROAS)",
     "metricImpressionsClicks": "Times shown & clicks",
-    "metricAvgCtr": "Share who clicked (CTR)",
+    "metricAvgCtr": "Share who clicked",
     "metricBlendedCpa": "Cost per sign-up or sale (CPA)",
     "metricActiveCampaigns": "Active Campaigns",
     "filterAllPlatforms": "All Platforms",
@@ -4184,7 +4184,7 @@
         "unknown": "Competition not reported"
       },
       "keywordSublabel": "{competition}",
-      "keywordSublabelBid": "{competition} · top-of-page bid {low}-{high}",
+      "keywordSublabelBid": "{competition} · typical cost per click {low}-{high}",
       "volumeUnknown": "not reported",
       "campaignsTitle": "Existing campaigns",
       "campaignsDescription": "Your campaigns by daily budget (USD), with their imported ads.",
@@ -4522,7 +4522,7 @@
       "searchAd": "Search ad (Google)",
       "searchKeywords": "{count} keywords",
       "searchGoogleOnly": "A search ad runs on Google Search - choose Google Ads.",
-      "searchNote": "Creates a paused Google Search campaign (Google Search only, no Display) in the country and language its keywords were researched in, with the search ad, the keywords and the negative keywords. The max CPC starts from the keywords' top-of-page bids.",
+      "searchNote": "Creates a paused Google Search campaign (Google Search only, no Display) in the country and language its keywords were researched in, with the search ad, the keywords and the negative keywords. The most you pay per click starts from what Google says it typically costs to show first for those keywords.",
       "kindSearch": "Search ad",
       "audiencePlanned": "Audience from the plan: ages {ages}, {genders}, {audiences} audiences, {interests} interests - in the countries below.",
       "audienceBroad": "No audience planned: every adult in the countries below. Plan one in the Plan step.",
@@ -4781,7 +4781,7 @@
     },
     "search": {
       "keywordsTitle": "Keywords for a search ad",
-      "keywordsDescription": "What people type into Google when they look for what you sell - with Google's own monthly searches, competition and top-of-page bids. Pick the keywords the search ad bids on.",
+      "keywordsDescription": "What people type into Google when they look for what you sell - with Google's own monthly searches, competition and the typical cost per click to show first. Pick the keywords the search ad bids on.",
       "countryLabel": "Country",
       "languageLabel": "Language",
       "countries": {
@@ -4952,7 +4952,7 @@
         "segment": "Segment",
         "spend": "Spend",
         "linkClicks": "Clicks to your page",
-        "ctr": "Share who clicked (CTR)",
+        "ctr": "Share who clicked",
         "costPerClick": "Cost of each click",
         "conversions": "Sign-ups and sales"
       },

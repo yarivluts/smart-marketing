@@ -45,7 +45,7 @@ describe('AdsKpiScorecards', () => {
     expect(screen.getByText('4,200 clicks · 420 conv.')).toBeInTheDocument();
 
     // 4. Average CTR
-    expect(screen.getByText('Share who clicked (CTR)')).toBeInTheDocument();
+    expect(screen.getByText('Share who clicked')).toBeInTheDocument();
     expect(screen.getByText('3.36%')).toBeInTheDocument();
 
     // 5. Blended CPA

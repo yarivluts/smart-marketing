@@ -112,7 +112,7 @@ describe('PlanningPanel', () => {
     });
     expect(within(screen.getByTestId('ad-studio-keyword-competition')).getByText('High competition · 1')).toBeInTheDocument();
     expect(screen.getByText('12,100')).toBeInTheDocument();
-    expect(screen.getByText('High competition · top-of-page bid 2.1-9.4')).toBeInTheDocument();
+    expect(screen.getByText('High competition · typical cost per click 2.1-9.4')).toBeInTheDocument();
     expect(screen.getByText('not reported')).toBeInTheDocument();
   });
 
