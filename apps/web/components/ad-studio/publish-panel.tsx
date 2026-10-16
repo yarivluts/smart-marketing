@@ -19,6 +19,7 @@ import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 import { withFirstFrame } from './media-src';
+import { describeInvalidReasons } from './invalid-reasons';
 import { CountryPicker } from './country-picker';
 
 type Destination = 'meta' | 'google_ads';
@@ -282,7 +283,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
       } else if (body.error === 'export_unavailable' && body.reason) {
         setMessage({ tone: 'error', text: t(`exportUnavailable.${body.reason}`) });
       } else if (body.error === 'invalid_export') {
-        setMessage({ tone: 'error', text: t('publish.invalid', { reasons: (body.reasons ?? []).join('; ') }) });
+        setMessage({ tone: 'error', text: describeInvalidReasons(t, body.reasons) });
       } else {
         setMessage({ tone: 'error', text: errorMessage(body) });
       }

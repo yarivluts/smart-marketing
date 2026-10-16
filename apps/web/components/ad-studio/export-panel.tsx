@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { CheckCircle2, CircleAlert, ExternalLink, Loader2, Send, Upload } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useLocalDateTime } from './use-local-date-time';
+import { describeInvalidReasons } from './invalid-reasons';
 
 const MEDIUM = { dateStyle: 'medium', timeStyle: 'short' } as const;
 import { cn } from '@/lib/utils';
@@ -77,7 +78,7 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
       } else if (body.error === 'export_unavailable' && body.reason) {
         setMessage({ tone: 'error', text: t(`exportUnavailable.${body.reason}`) });
       } else if (body.error === 'invalid_export') {
-        setMessage({ tone: 'error', text: t('exportInvalid', { reasons: (body.reasons ?? []).join('; ') }) });
+        setMessage({ tone: 'error', text: describeInvalidReasons(t, body.reasons) });
       } else if (body.error === 'video_not_ready') {
         setMessage({ tone: 'error', text: t('exportVideoNotReady') });
       } else {

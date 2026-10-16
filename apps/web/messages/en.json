@@ -4248,7 +4248,6 @@
       "invalid_credential": "The saved credentials are not in the expected format.",
       "account_action_required": "Meta needs you to verify the account in Ads Manager (adsmanager.facebook.com) before ads can be created or changed."
     },
-    "exportInvalid": "Check the export details: {reasons}",
     "exportVideoNotReady": "That video is not assembled yet.",
     "exportHistory": "Exports",
     "exportHistoryEmpty": "Nothing exported yet.",
@@ -4504,7 +4503,6 @@
       "pausedNote": "The ad is created paused. It spends nothing until you turn it on in the platform.",
       "create": "Create paused ad on {destination}",
       "done": "Created a paused ad on {destination}.",
-      "invalid": "Check the ad details: {reasons}",
       "openAd": "Open the ad",
       "history": "Ads created - paused on the platform until you turn them on",
       "historyEmpty": "No ads published yet.",
@@ -5145,6 +5143,30 @@
         "unreachable": "The site did not answer. Check the address and try again.",
         "unreadable": "The page has no readable text (it may be built only with images or scripts). Try another page of the site."
       }
+    },
+    "invalidReason": {
+      "campaignName": "The campaign name needs 1 to 120 characters.",
+      "searchOnGoogle": "A search ad can only be created on Google Ads.",
+      "keyword": "Choose at least one keyword.",
+      "searchLimits": "The search ad is longer than Google allows - fix it in the Review step.",
+      "searchFirst": "Write the search ad first.",
+      "headline": "Add a headline.",
+      "primaryText": "Add the main text of the ad.",
+      "link": "The link must start with http:// or https://.",
+      "budget": "The daily budget must be more than zero.",
+      "country": "Choose at least one country.",
+      "euPolitical": "Answer whether the ad is about politics in the EU (most ads: no).",
+      "googleVideo": "Video ads for Google run from YouTube. Use an image ad here.",
+      "googleHeadline": "The Google headline can be at most 30 characters.",
+      "googleLongText": "The long headline and description can be at most 90 characters each.",
+      "businessName": "The business name needs 1 to 25 characters.",
+      "googleImages": "Google needs a square image and a wide image.",
+      "adSetAccount": "That ad group belongs to a different ad account.",
+      "adSetNotReady": "You can only add to an ad group of a finished Facebook & Instagram ad from this ad.",
+      "title": "The title needs 1 to 100 characters.",
+      "description": "The description can be at most 5000 characters.",
+      "privacy": "Choose who can see the video: private, unlisted or public.",
+      "other": "Some of the details need a fix. Check the form and try again."
     }
   },
   "Connections": {
