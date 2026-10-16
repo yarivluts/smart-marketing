@@ -4,6 +4,7 @@ import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
 import type { GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
+import { isolate } from '@/lib/bidi';
 import { GrowthPilotApp } from './growth-pilot-app';
 
 vi.mock('@/i18n/navigation', () => ({
@@ -125,7 +126,7 @@ describe('GrowthPilotApp', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const fetchMock = stubFetch({ body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'analyzing' })} />, { locale: 'en' });
-    expect(screen.getByTestId('growth-pilot-analyzing')).toHaveTextContent('Reading easysign.co.il');
+    expect(screen.getByTestId('growth-pilot-analyzing')).toHaveTextContent(`Reading ${isolate('easysign.co.il')}`);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     await vi.advanceTimersByTimeAsync(5000);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -136,7 +137,7 @@ describe('GrowthPilotApp', () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_http_error' })} />, { locale: 'en' });
     const failed = screen.getByTestId('growth-pilot-failed');
-    expect(failed).toHaveTextContent('We could not finish reading easysign.co.il');
+    expect(failed).toHaveTextContent(`We could not finish reading ${isolate('easysign.co.il')}`);
     expect(failed).toHaveTextContent('The site did not open for us');
     fireEvent.click(within(failed).getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(sent(fetchMock, 0)).toEqual({ url: BASE, body: { siteUrl: 'https://easysign.co.il/' } }));
@@ -218,7 +219,7 @@ describe('GrowthPilotApp', () => {
       const fetchMock = stubFetch({ body: page({ proposals: [{ ...ADS, status: 'revising', changes: [{ text: 'Brighter', on: 'x', outcome: 'pending', failureCode: null }] }], targets: [ACTIVE_TARGET] }) });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ADS], targets: [ACTIVE_TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent('Ads for Pro plan');
+      expect(card).toHaveTextContent(`Ads for ${isolate('Pro plan')}`);
       const images = within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true });
       expect(images.map((image) => image.getAttribute('src'))).toEqual(['/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i1/media', '/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i2/media']);
       expect(screen.getByTestId('growth-pilot-open-studio')).toHaveAttribute('href', '/orgs/o/projects/p/ad-studio?brief=b1&step=review');
@@ -239,7 +240,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-target-ads')).toHaveAttribute('data-ads', 'building');
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2), { timeout: 4000 });
       expect(fetchMock.mock.calls.every((call) => call[0] === BASE + '/advance')).toBe(true);
-      expect(await screen.findByText('Ads for Pro plan')).toBeInTheDocument();
+      expect(await screen.findByText(`Ads for ${isolate('Pro plan')}`)).toBeInTheDocument();
       await new Promise((resolve) => setTimeout(resolve, 1800));
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
@@ -285,7 +286,7 @@ describe('GrowthPilotApp', () => {
     it('shows the page it proposes, as visitors will see it, with the button leading to the tagged site', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PROPOSAL_LP], targets: [TARGET], landingPages: [PAGE] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent('Landing page for Pro plan');
+      expect(card).toHaveTextContent(`Landing page for ${isolate('Pro plan')}`);
       expect(card).toHaveTextContent('Sign 20 documents a month - On WhatsApp, for 20 ILS.');
       expect(screen.queryByTestId('growth-pilot-landing-preview')).toBeNull();
       fireEvent.click(screen.getByTestId('growth-pilot-landing-toggle'));
@@ -320,7 +321,7 @@ describe('GrowthPilotApp', () => {
     it('shows who the ads reach - countries, ages, genders, matched interests, the reach - for approval', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [AUDIENCE], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent('Audience for Freelancers');
+      expect(card).toHaveTextContent(`Audience for ${isolate('Freelancers')}`);
       const audience = screen.getByTestId('growth-pilot-audience');
       expect(audience).toHaveTextContent('Freelancers in Israel who sign contracts');
       expect(audience).toHaveTextContent('IL');
@@ -353,7 +354,7 @@ describe('GrowthPilotApp', () => {
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'published' }] }) }, { body: { status: 'ok', since: 'a', until: 'b', summary: { totals: { spend: 0, impressions: 0, clicks: 0, linkClicks: 0, conversions: 0, ctr: null, cpc: null, costPerConversion: null }, daily: [], byTarget: {} } } });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent('Publish the ads for Free plan');
+      expect(card).toHaveTextContent(`Publish the ads for ${isolate('Free plan')}`);
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
@@ -369,7 +370,7 @@ describe('GrowthPilotApp', () => {
     it('turning on is its own decision, saying it starts spending', () => {
       const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: [{ ...TARGET, publishStatus: 'published' }] })} />, { locale: 'en' });
-      expect(screen.getByTestId('growth-pilot-proposal')).toHaveTextContent('Turn on the ads for Free plan');
+      expect(screen.getByTestId('growth-pilot-proposal')).toHaveTextContent(`Turn on the ads for ${isolate('Free plan')}`);
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Turning them on makes them visible and starts spending - up to 20 a day');
       expect(screen.getByTestId('growth-pilot-approve')).toHaveTextContent('Turn on the ads');
       expect(screen.queryByTestId('growth-pilot-budget')).toBeNull();

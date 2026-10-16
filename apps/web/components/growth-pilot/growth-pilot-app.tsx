@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
 import { growthPilotHasPendingWork, waitingProposals, type GrowthActivityView, type GrowthLandingPageView, type GrowthPilotPageData, type GrowthProposalView, type GrowthTargetView } from '@/lib/growth-pilot/view';
 import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
+import { isolate } from '@/lib/bidi';
 import { GrowthLandingView } from './landing-view';
 import { GrowthPerformanceSection } from './performance-section';
 import type { GrowthPerformanceTotals } from '@growthos/shared';
@@ -157,7 +158,7 @@ function AnalyzingCard({ host }: { host: string }): React.ReactElement {
         </span>
         <div className="min-w-0">
           <h2 className="font-pp-display text-lg font-semibold" role="status">
-            {t('title', { host })}
+            {t('title', { host: isolate(host) })}
           </h2>
           <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
         </div>
@@ -188,7 +189,7 @@ function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; c
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
         <div className="flex flex-col gap-1">
-          <h2 className="font-pp-display text-lg font-semibold">{t('failed.title', { host })}</h2>
+          <h2 className="font-pp-display text-lg font-semibold">{t('failed.title', { host: isolate(host) })}</h2>
           <p className="text-sm text-muted-foreground">{t(`failure.${failureKey(code)}`)}</p>
         </div>
       </div>
@@ -268,7 +269,7 @@ function ProposalCard({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-pp-display text-base font-semibold" dir="auto">
-              {proposal.kind === 'publish' ? tp('title', { name: draft.name }) : proposal.kind === 'activate' ? tp('activateTitle', { name: draft.name }) : ads ? ta('title', { name: draft.name }) : audience ? tu('title', { name: draft.name }) : page ? tl('title', { name: draft.name }) : draft.name}
+              {proposal.kind === 'publish' ? tp('title', { name: isolate(draft.name) }) : proposal.kind === 'activate' ? tp('activateTitle', { name: isolate(draft.name) }) : ads ? ta('title', { name: isolate(draft.name) }) : audience ? tu('title', { name: isolate(draft.name) }) : page ? tl('title', { name: isolate(draft.name) }) : draft.name}
             </h3>
             <KindChip kind={draft.kind} />
           </div>
@@ -807,7 +808,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
           {analysis ? (
             <section className="flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" aria-labelledby="growth-pilot-summary">
               <h2 id="growth-pilot-summary" className="font-pp-display text-base font-semibold" dir="auto">
-                {t('summary.title', { business: analysis.businessName || host })}
+                {t('summary.title', { business: isolate(analysis.businessName || host) })}
               </h2>
               <p className="text-sm text-muted-foreground" dir="auto">
                 {analysis.summary}
