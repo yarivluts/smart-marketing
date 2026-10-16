@@ -5716,6 +5716,8 @@
     },
     "header": {
       "active": "Pilot on",
+      "activeHint": "Pause stops new proposals and new ads. Ads you already turned on keep running.",
+      "pausedHint": "The pilot is not making anything new. Ads you already turned on keep running. Press Resume to continue.",
       "paused": "Paused",
       "pause": "Pause",
       "resume": "Resume",

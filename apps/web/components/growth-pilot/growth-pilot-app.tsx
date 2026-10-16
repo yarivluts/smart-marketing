@@ -703,6 +703,9 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
               <span className={cn('h-1.5 w-1.5 rounded-full', paused ? 'bg-muted-foreground' : 'bg-success')} aria-hidden="true" />
               {t(paused ? 'header.paused' : 'header.active')}
             </span>
+            <p className="text-xs text-muted-foreground" data-testid="growth-pilot-status-hint">
+              {t(paused ? 'header.pausedHint' : 'header.activeHint')}
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
