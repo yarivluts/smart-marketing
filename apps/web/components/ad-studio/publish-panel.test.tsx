@@ -211,7 +211,7 @@ describe('PublishPanel', () => {
         .fn()
         .mockResolvedValue(
           new Response(
-            JSON.stringify({ error: 'invalid_export', reasons: ['headline_too_long'] }),
+            JSON.stringify({ error: 'invalid_export', reasons: ['choose at least one country'] }),
             { status: 400 },
           ),
         ),
@@ -222,7 +222,7 @@ describe('PublishPanel', () => {
     );
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(
-        'Check the ad details: headline_too_long',
+        'Choose at least one country.',
       ),
     );
   });
