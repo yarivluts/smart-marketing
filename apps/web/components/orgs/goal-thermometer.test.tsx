@@ -59,7 +59,7 @@ describe('GoalThermometer', () => {
 
   it('renders each degraded outcome kind with its own translated message', () => {
     renderThermometer({ kind: 'warehouse_not_configured' });
-    expect(screen.getByText('Warehouse not configured yet')).toBeInTheDocument();
+    expect(screen.getByText('Your data is not connected yet')).toBeInTheDocument();
   });
 
   it('renders a quota_exceeded degraded outcome with its message', () => {
