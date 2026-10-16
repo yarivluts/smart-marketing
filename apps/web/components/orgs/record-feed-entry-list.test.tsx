@@ -117,7 +117,7 @@ describe('RecordFeedFieldSelect', () => {
     expect(select.value).toBe('anon_id');
     const identityGroup = screen.getByRole('group', { name: 'Identity' });
     expect(within(identityGroup).getAllByRole('option').map((option) => option.textContent)).toEqual(['anon_id', 'customer_id']);
-    const declaredGroup = screen.getByRole('group', { name: 'Schema fields' });
+    const declaredGroup = screen.getByRole('group', { name: 'Record fields' });
     expect(within(declaredGroup).getAllByRole('option').map((option) => option.textContent)).toEqual(['plan']);
   });
 
