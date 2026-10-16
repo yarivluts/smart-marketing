@@ -29,16 +29,16 @@ describe('TrialPipelineWidget', () => {
 
   it('shows a translated empty state when the warehouse is not configured', () => {
     renderWidget({ status: 'unavailable', reason: 'warehouse_not_configured' });
-    expect(screen.getByText('Trial pipeline data needs a connected warehouse.')).toBeInTheDocument();
+    expect(screen.getByText('Free-trial numbers appear once your data is connected.')).toBeInTheDocument();
   });
 
   it('shows a translated empty state when the daily quota is exceeded', () => {
     renderWidget({ status: 'unavailable', reason: 'quota_exceeded' });
-    expect(screen.getByText("This project's daily query quota is exhausted. Try again tomorrow.")).toBeInTheDocument();
+    expect(screen.getByText("Too many data requests today. Try again tomorrow.")).toBeInTheDocument();
   });
 
   it('shows a translated empty state on a query error (e.g. the SaaS pack was never installed)', () => {
     renderWidget({ status: 'unavailable', reason: 'query_error' });
-    expect(screen.getByText("Couldn't load trial pipeline data. Install the SaaS metric pack to see it here.")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't load the free-trial numbers. Refresh the page; if it keeps happening, check that your data is connected.")).toBeInTheDocument();
   });
 });

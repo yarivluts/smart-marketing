@@ -40,7 +40,7 @@ test.describe('Cohort retention (KAN-113)', () => {
     await page.getByRole('link', { name: 'Who comes back' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cohorts$`));
     await expect(page.getByRole('heading', { name: `Who comes back to Client Theta` })).toBeVisible();
-    await expect(page.getByText('Cohort retention unavailable (warehouse not configured yet)')).toBeVisible();
+    await expect(page.getByText('Returning-customer view is not ready: your data is not connected yet')).toBeVisible();
 
     // KAN-118: the conversion-event filter renders and round-trips through the URL, even though
     // there's no warehouse here to actually change what renders once submitted.
