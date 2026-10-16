@@ -14,7 +14,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '@/lib/auth/auth-context';
 import { getFirebaseAuth } from '@/lib/firebase/client';
-import { authErrorMessageKey, type AuthErrorMessageKey } from '@/lib/auth/auth-error';
+import { authErrorMessageKey, isAuthCancelled, type AuthErrorMessageKey } from '@/lib/auth/auth-error';
 import { resolveRedirectTarget } from '@/lib/auth/redirect-target';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,7 +128,7 @@ export function EmailPasswordForm({
       await signInWithGoogle();
       redirectAfterAuth();
     } catch (error) {
-      setErrorKey(authErrorMessageKey(error));
+      if (!isAuthCancelled(error)) setErrorKey(authErrorMessageKey(error));
       setIsGoogleLoading(false);
     }
   }
