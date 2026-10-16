@@ -15,3 +15,16 @@ describe('Growth Pilot talks about what to grow, not "targets"', () => {
     expect(he.GrowthPilot.start.steps.propose).toBe('מציע מה לקדם');
   });
 });
+
+describe('Growth Pilot start steps avoid marketing jargon', () => {
+  it('says "web pages" instead of "landing pages" and explains the watch step', () => {
+    expect(en.GrowthPilot.start.steps.build).toBe('Writes your ads and web pages');
+    expect(en.GrowthPilot.start.steps.watch).toBe('Checks the results and suggests fixes');
+    expect(en.GrowthPilot.start.steps.build).not.toMatch(/landing/i);
+  });
+
+  it('keeps Hebrew in step and free of the jargon "דפי נחיתה"', () => {
+    expect(he.GrowthPilot.start.steps.build).toBe('כותב לכם מודעות ודפי אינטרנט');
+    expect(he.GrowthPilot.start.steps.watch).toBe('בודק את התוצאות ומציע תיקונים');
+  });
+});

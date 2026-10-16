@@ -5684,8 +5684,8 @@
       "steps": {
         "read": "Reads the site",
         "propose": "Proposes what to grow",
-        "build": "Builds ads and landing pages",
-        "watch": "Watches and improves"
+        "build": "Writes your ads and web pages",
+        "watch": "Checks the results and suggests fixes"
       },
       "safe": "Nothing goes live without your approval. Every ad is created switched off, so nobody sees it until you turn it on."
     },
