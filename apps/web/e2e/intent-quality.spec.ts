@@ -24,7 +24,7 @@ async function createOrganization(page: Page, name: string): Promise<string> {
 }
 
 test.describe('Intent & Quality Scoring (KAN-83)', () => {
-  test('an org owner reaches the Intent & quality page via nav, installs the pack, and sees the empty states', async ({ page }) => {
+  test('an org owner reaches the Signup quality page via nav, installs the pack, and sees the empty states', async ({ page }) => {
     const email = uniqueEmail('intent-quality-owner');
     await signUp(page, email);
     const orgId = await createOrganization(page, 'Intent Quality E2E Org');
@@ -37,15 +37,15 @@ test.describe('Intent & Quality Scoring (KAN-83)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Intent & quality' }).click();
+    await page.getByRole('link', { name: 'Signup quality' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/intent-quality$`));
-    await expect(page.getByRole('heading', { name: `Intent & quality for Client Delta` })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `Signup quality for Client Delta` })).toBeVisible();
     await expect(
-      page.getByText('Install the Intent & Quality Scoring pack to start capturing onboarding-survey answers and computing a quality score at signup.'),
+      page.getByText('Turn on sign-up scoring to start collecting the answers people give when they join and giving each sign-up a quality score.'),
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Install' }).click();
     await expect(page.getByText('No onboarding-survey answers landed for this project yet.')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('No mix-shift alert history yet.')).toBeVisible();
+    await expect(page.getByText('No quality-drop alerts yet.')).toBeVisible();
   });
 });
