@@ -5936,6 +5936,13 @@
       "no_secret": "your Facebook and Instagram connection has no saved login, reconnect your ad account in Ad platform connections",
       "account_action_required": "Facebook needs you to verify your ad account in Ads Manager (adsmanager.facebook.com) first, then try again",
       "rejected": "Facebook and Instagram refused the ad, ask for a change to the ads or check your ad account",
+      "rate_limited": "the AI service is busy, try again in a minute",
+      "refused": "the AI declined to write this, ask for a change worded differently",
+      "provider_billing": "the AI service is not available on our side right now, trying again will not help - please contact GrowthOS support",
+      "not_configured": "the AI service is not set up on our side yet, trying again will not help - please contact GrowthOS support",
+      "upload_failed": "the upload to Facebook and Instagram did not go through, try again in a minute",
+      "cancelled": "it was stopped before it finished, ask for a change to try again",
+      "nothing_to_revise": "there was nothing to change yet, reload the page and try again",
       "generic": "something went wrong, try again in a minute"
     }
   }

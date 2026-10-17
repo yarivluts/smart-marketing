@@ -41,7 +41,7 @@ function failureKey(code: string | null): 'site' | 'quota_exceeded' | 'nothing_f
   return 'provider';
 }
 
-const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'rejected', 'no_secret'];
+const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise'];
 
 /** A stored failure code in plain words; an unknown code never reaches the screen. */
 function useReason(): (code: string | null | undefined) => string {

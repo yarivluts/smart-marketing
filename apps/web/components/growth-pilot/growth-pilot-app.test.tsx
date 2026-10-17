@@ -291,6 +291,19 @@ describe('GrowthPilotApp', () => {
       expect(he.container).not.toHaveTextContent('no_images');
     });
 
+    it('says when trying again will not help (AI account out of credit) and never leaks the code, in Hebrew too', () => {
+      const target = { ...ACTIVE_TARGET, adsStatus: 'failed' as const, adsFailure: 'provider_billing', publishStatus: 'failed' as const, publishFailure: 'upload_failed' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('trying again will not help - please contact GrowthOS support');
+      expect(view.container).toHaveTextContent('the upload to Facebook and Instagram did not go through');
+      expect(view.container).not.toHaveTextContent('provider_billing');
+      expect(view.container).not.toHaveTextContent('upload_failed');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('ניסיון נוסף לא יעזור');
+      expect(he.container).not.toHaveTextContent('provider_billing');
+    });
+
     it('explains a publish failure the person can act on instead of "try again"', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
