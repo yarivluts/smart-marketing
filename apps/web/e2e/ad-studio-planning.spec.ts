@@ -47,7 +47,7 @@ test.describe('AI Ad Studio deep analysis (KAN-230)', () => {
     await expect(panel.getByRole('heading', { name: 'Deep analysis' })).toBeVisible();
     await expect(panel.getByText('No analysis yet')).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Run deep analysis' })).toBeVisible();
-    await expect(page.getByTestId('ad-studio-keyword-data')).toContainText('No Google Ads credential is attached to this project.');
+    await expect(page.getByTestId('ad-studio-keyword-data')).toContainText('Google Ads is not connected to this project');
 
     // Stand in for a model call: store a plan through the same service the plan route writes with.
     await seedAdStudioPlan({ organizationId: orgId, projectId, briefId });
