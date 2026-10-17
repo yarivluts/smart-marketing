@@ -18,7 +18,7 @@ describe('PackSetupLanding', () => {
           projectId="project-1"
           icon={Gauge}
           eyebrow="Signup quality"
-          title="Intent & quality for Client Delta"
+          title="Signup quality for Client Delta"
           intro="Install the pack to start."
           featuresTitle="What this page shows"
           installTitle="Install the pack"
@@ -31,7 +31,7 @@ describe('PackSetupLanding', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Intent & quality for Client Delta' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Signup quality for Client Delta' })).toBeInTheDocument();
     expect(screen.getByText('Install the pack to start.')).toBeInTheDocument();
     const features = screen.getAllByTestId('pack-setup-feature');
     expect(features).toHaveLength(2);
