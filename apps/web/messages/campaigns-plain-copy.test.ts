@@ -19,3 +19,17 @@ describe('Campaigns beginner copy', () => {
     expect(he.Campaigns.noCampaigns).toContain(he.AppShell.growthPilot);
   });
 });
+
+describe('Campaigns spend, tab and recommendation copy', () => {
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it(`${name}: spend messages have no data-plumbing jargon`, () => {
+      for (const text of Object.values(bundle.Campaigns.spendCockpitDegraded)) {
+        expect(text).not.toMatch(/warehouse|quota|quer|מחסן|שאילתות|מכסה/i);
+      }
+    });
+    it(`${name}: tab and recommendation do not use the ROAS acronym`, () => {
+      expect(bundle.Campaigns.tabAnalytics).not.toMatch(/ROAS/);
+      expect(bundle.Campaigns.proactiveRecommendationDesc).not.toMatch(/ROAS/);
+    });
+  }
+});

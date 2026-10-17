@@ -3302,7 +3302,7 @@
     "cockpitDescription": "All your Facebook, Instagram and Google ads in one place: the ads, what you spent, and how much you earned back for each dollar.",
     "tabOverview": "Campaigns & Performance",
     "tabCreatives": "Ad gallery",
-    "tabAnalytics": "Spend & ROAS Analytics",
+    "tabAnalytics": "Spend and results",
     "noData": "No data",
     "metricTotalSpend": "Total Spend",
     "metricBlendedRoas": "Sales per $1 of ads (ROAS)",
@@ -3334,7 +3334,7 @@
     "keywordsLabel": "Keywords",
     "noCreativesFound": "No ads match your filter.",
     "proactiveRecommendationHeading": "AI Growth Recommendation",
-    "proactiveRecommendationDesc": "{campaignLabel} has the highest measured ROAS at {roas}x. Applying raises its daily budget from ${currentBudget} to ${nextBudget}, a 20% increase. No conversion lift is projected — none is measured.",
+    "proactiveRecommendationDesc": "{campaignLabel} earns the most back for every $1 spent: {roas}x. Applying raises its daily budget from ${currentBudget} to ${nextBudget}, a 20% increase. We do not predict more sign-ups or sales - none is measured.",
     "applyRecommendationButton": "1-Click Apply",
     "recommendationApplied": "Recommendation applied successfully!",
     "statusActive": "Active",
@@ -3410,10 +3410,10 @@
     "spendEmptyTitle": "No ad spend connected yet",
     "spendEmptyNoRows": "None of your ad accounts has reported spend for the last {days} days. Connect Meta Ads or Google Ads so spend, per-channel charts and efficiency figures can appear here.",
     "spendCockpitDegraded": {
-      "warehouse_not_configured": "The data warehouse is not configured in this environment, so ad spend cannot be queried yet. Connect an ad source and a warehouse to see spend by channel and campaign.",
-      "quota_exceeded": "This project's daily query quota is used up. Spend charts return when the quota resets.",
-      "not_yet_backed": "The ad spend table has not been built in the warehouse yet. Connect Meta Ads or Google Ads and let the first sync land.",
-      "query_error": "Ad spend could not be read from the warehouse - no spend table is provisioned for this project yet. Connect Meta Ads or Google Ads to start measuring spend."
+      "warehouse_not_configured": "Your ad numbers are not connected yet, so ad spend cannot be shown. Connect your ad account to see spend by channel and campaign.",
+      "quota_exceeded": "GrowthOS has reached today's limit for loading your numbers. The spend charts come back tomorrow.",
+      "not_yet_backed": "Your ad spend has not arrived yet. Connect Meta Ads or Google Ads and wait for the first update.",
+      "query_error": "We could not load your ad spend - no spend has been collected for this project yet. Connect Meta Ads or Google Ads to start measuring spend."
     },
     "connectAdSourceCta": "Connect an ad source",
     "chartsSpendByChannel": "Spend by channel",

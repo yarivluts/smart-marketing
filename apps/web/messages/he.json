@@ -3302,7 +3302,7 @@
     "cockpitDescription": "כל המודעות שלך בפייסבוק, באינסטגרם ובגוגל במקום אחד: המודעות, כמה הוצאת, וכמה הרווחת בחזרה על כל דולר.",
     "tabOverview": "קמפיינים וביצועים",
     "tabCreatives": "גלריית מודעות",
-    "tabAnalytics": "ניתוח הוצאה ו-ROAS",
+    "tabAnalytics": "הוצאה ותוצאות",
     "noData": "אין נתונים",
     "metricTotalSpend": "סך ההוצאה",
     "metricBlendedRoas": "מכירות על כל $1 פרסום (ROAS)",
@@ -3334,7 +3334,7 @@
     "keywordsLabel": "מילות מפתח",
     "noCreativesFound": "אין מודעות שמתאימות לסינון.",
     "proactiveRecommendationHeading": "המלצת צמיחה של AI",
-    "proactiveRecommendationDesc": "ל-{campaignLabel} ה-ROAS הנמדד הגבוה ביותר, {roas}x. הפעלה תעלה את התקציב היומי מ-${currentBudget} ל-${nextBudget}, עלייה של 20%. לא נחזית עלייה בהמרות — אין מדידה כזו.",
+    "proactiveRecommendationDesc": "{campaignLabel} מחזיר הכי הרבה על כל $1 שמוציאים: {roas}x. הפעלה תעלה את התקציב היומי מ-${currentBudget} ל-${nextBudget}, עלייה של 20%. אנחנו לא מבטיחים יותר הרשמות או מכירות - אין מדידה כזו.",
     "applyRecommendationButton": "החל בלחיצה אחת",
     "recommendationApplied": "ההמלצה הוחלה בהצלחה!",
     "statusActive": "פעיל",
@@ -3410,10 +3410,10 @@
     "spendEmptyTitle": "עדיין לא חוברה הוצאת פרסום",
     "spendEmptyNoRows": "אף חשבון מודעות לא דיווח על הוצאה ב-{days} הימים האחרונים. חברו את Meta Ads או Google Ads כדי שההוצאה, הגרפים לפי ערוץ ומדדי היעילות יופיעו כאן.",
     "spendCockpitDegraded": {
-      "warehouse_not_configured": "מחסן הנתונים לא מוגדר בסביבה הזו, ולכן עדיין אי אפשר לשלוף את הוצאת הפרסום. חברו מקור מודעות ומחסן נתונים כדי לראות הוצאה לפי ערוץ וקמפיין.",
-      "quota_exceeded": "מכסת השאילתות היומית של הפרויקט נוצלה. גרפי ההוצאה יחזרו כשהמכסה תתאפס.",
-      "not_yet_backed": "טבלת הוצאות הפרסום עדיין לא נבנתה במחסן הנתונים. חברו את Meta Ads או Google Ads והמתינו לסנכרון הראשון.",
-      "query_error": "לא ניתן היה לקרוא את הוצאת הפרסום ממחסן הנתונים - עדיין לא הוקמה טבלת הוצאות לפרויקט הזה. חברו את Meta Ads או Google Ads כדי להתחיל למדוד הוצאה."
+      "warehouse_not_configured": "נתוני הפרסום שלכם עדיין לא מחוברים, ולכן אי אפשר להציג הוצאה. חברו את חשבון המודעות כדי לראות הוצאה לפי ערוץ וקמפיין.",
+      "quota_exceeded": "GrowthOS הגיע היום למגבלת טעינת הנתונים. גרפי ההוצאה יחזרו מחר.",
+      "not_yet_backed": "הוצאת הפרסום שלכם עדיין לא הגיעה. חברו את Meta Ads או Google Ads והמתינו לעדכון הראשון.",
+      "query_error": "לא הצלחנו לטעון את הוצאת הפרסום - עדיין לא נאספה הוצאה לפרויקט הזה. חברו את Meta Ads או Google Ads כדי להתחיל למדוד הוצאה."
     },
     "connectAdSourceCta": "חיבור מקור מודעות",
     "chartsSpendByChannel": "הוצאה לפי ערוץ",

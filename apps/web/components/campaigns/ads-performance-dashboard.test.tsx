@@ -89,7 +89,7 @@ describe('AdsPerformanceDashboard', () => {
     // Tab navigation
     expect(screen.getByText('Campaigns & Performance')).toBeInTheDocument();
     expect(screen.getByText('Ad gallery')).toBeInTheDocument();
-    expect(screen.getByText('Spend & ROAS Analytics')).toBeInTheDocument();
+    expect(screen.getByText('Spend and results')).toBeInTheDocument();
   });
 
   it('states the recommendation from the selected campaign, not a fixed string', () => {
@@ -135,7 +135,7 @@ describe('AdsPerformanceDashboard', () => {
     // forecast, so the text must not imply one.
     expect(banner).not.toHaveTextContent('4.8x');
     expect(banner).not.toHaveTextContent('+18%');
-    expect(banner).toHaveTextContent('No conversion lift is projected');
+    expect(banner).toHaveTextContent('We do not predict more sign-ups or sales');
   });
 
   it('shows no recommendation when no campaign has a measured ROAS', () => {
@@ -176,7 +176,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.queryByTestId('campaign-list-table')).not.toBeInTheDocument();
 
     // Switch to analytics tab
-    fireEvent.click(screen.getByText('Spend & ROAS Analytics'));
+    fireEvent.click(screen.getByText('Spend and results'));
     expect(screen.getByTestId('executive-blended-report')).toBeInTheDocument();
   });
 });
