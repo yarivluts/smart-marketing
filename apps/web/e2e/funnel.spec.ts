@@ -37,7 +37,7 @@ test.describe('Funnel conversion (query_funnel admin surface)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Conversion', exact: true }).click();
+    await page.getByRole('link', { name: 'Where people drop off', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
     // A fresh project has no confirmed funnel. The cockpit used to "synthesize a full,
     // zero-config view" here - a sample EasySign funnel with a drop-off alert and an AI Copilot
