@@ -19,3 +19,18 @@ describe('the three main sidebar modules use words a beginner knows', () => {
     }
   });
 });
+
+describe('sidebar links for customer groups and visitor recordings use plain words', () => {
+  it('English avoids "segments" and "session replay"', () => {
+    expect(en.OrgDetailPage.projectSegmentsLink).toBe('Customer groups');
+    expect(en.OrgDetailPage.projectSessionReplayLink).toBe('Visitor recordings');
+  });
+
+  it('Hebrew avoids the transliterated "session" and the statistical "slices"', () => {
+    const { projectSegmentsLink, projectSessionReplayLink } = he.OrgDetailPage;
+    expect(projectSegmentsLink).not.toContain('פלח');
+    expect(projectSessionReplayLink).not.toContain('סשן');
+    expect(projectSegmentsLink).toMatch(/[֐-׿]/);
+    expect(projectSessionReplayLink).toMatch(/[֐-׿]/);
+  });
+});
