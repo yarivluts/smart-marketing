@@ -121,6 +121,12 @@ describe('ConnectionsApp', () => {
     expect(within(card).getByText(en.status.failed)).toBeInTheDocument();
   });
 
+  it('offers a non-technical person a way to hand the steps to someone else, in both languages', () => {
+    expect(en.guideHandoff).toBeTruthy();
+    expect(he.guideHandoff).toBeTruthy();
+    for (const messages of [en, he]) for (const [code, reason] of Object.entries(messages.reasons)) if (code !== 'developer_token_not_approved') expect(reason).not.toMatch(/\btoken\b|טוקן/i);
+  });
+
   it('lets a member see the state but not change it', () => {
     renderApp({ canManage: false, connections: [META_ROW] });
     expect(screen.getByRole('note')).toHaveTextContent(en.readOnly);

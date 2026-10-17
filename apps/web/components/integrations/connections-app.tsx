@@ -271,6 +271,7 @@ function PlatformCard(props: {
             <>
               <div className="flex flex-col gap-2">
                 <h3 className="text-sm font-semibold">{t('guideTitle')}</h3>
+                <p className="text-sm text-muted-foreground" data-testid={`connections-${platform}-handoff`}>{t('guideHandoff')}</p>
                 <ol className="flex list-decimal flex-col gap-2 ps-5 text-sm">
                   {steps.map((href, index) => (
                     <li key={index}>
