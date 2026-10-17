@@ -30,7 +30,7 @@ async function callPilot(base: string, path: string, body?: unknown): Promise<Ap
     if (!response.ok) return { ok: false, error: typeof json.error === 'string' ? json.error : 'generic' };
     return { ok: true, data: json.pilot ? json : null };
   } catch {
-    return { ok: false, error: 'generic' };
+    return { ok: false, error: 'offline' };
   }
 }
 
@@ -68,7 +68,7 @@ const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
-  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable'].includes(code);
+  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline'].includes(code);
   return (
     <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
