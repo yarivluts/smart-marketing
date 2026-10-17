@@ -42,7 +42,17 @@ describe('CheckFirmographicCompositionAlertsButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Check now' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check right now. Check your internet connection and try again. Nothing was changed.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the network is down', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check now' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not check right now.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });

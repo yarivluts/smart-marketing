@@ -29,6 +29,8 @@ export function CheckTrackingAlertsButton({ orgId, projectId }: CheckTrackingAle
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }
