@@ -81,7 +81,7 @@ describe('ExportPanel', () => {
     fireEvent.change(within(youtube).getByLabelText('Visibility on YouTube'), { target: { value: 'private' } });
     fireEvent.click(within(youtube).getByRole('button'));
 
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('The platform upload quota is used up for today.'));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('The ad platform will not take any more uploads today. Try again tomorrow.'));
     expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toMatchObject({ destination: 'youtube', privacy: 'private' });
   });
 

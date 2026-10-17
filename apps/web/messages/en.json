@@ -4250,12 +4250,12 @@
     "exportNeedsPermission": "Exporting needs permission to make changes on the ad platforms. Ask a project admin.",
     "exportDone": "Uploaded to {destination}.",
     "exportFailure": {
-      "auth_failed": "The platform rejected the saved credentials. Reconnect the account in Ad platform connections.",
-      "quota_exceeded": "The platform upload quota is used up for today.",
+      "auth_failed": "The ad platform no longer accepts the saved login. Reconnect the account in Ad platform connections.",
+      "quota_exceeded": "The ad platform will not take any more uploads today. Try again tomorrow.",
       "rejected": "The platform refused the request. Check the ad details and the connected account.",
       "upload_failed": "The upload failed. Try again.",
-      "no_secret": "The connection has no credentials saved.",
-      "invalid_credential": "The saved credentials are not in the expected format.",
+      "no_secret": "This connection has no login saved yet. Add it in Ad platform connections.",
+      "invalid_credential": "The saved login looks incomplete or wrong. Save it again in Ad platform connections.",
       "account_action_required": "Meta needs you to verify the account in Ads Manager (adsmanager.facebook.com) before ads can be created or changed."
     },
     "exportVideoNotReady": "That video is not assembled yet.",
@@ -4822,11 +4822,11 @@
       "noIdeas": "Google returned no keyword ideas for these words. Try broader words or another country.",
       "unavailable": {
         "no_google_ads_credential": "No Google Ads account is connected to this project, so there are no search volumes. Connect one in Ad platform connections.",
-        "credential_not_configured": "The Google Ads account attached to this project has no working credential. Update it in Ad platform connections.",
-        "vault_not_configured": "This deployment cannot read stored credentials (no vault configured).",
+        "credential_not_configured": "The Google Ads account attached to this project has no working login. Update it in Ad platform connections.",
+        "vault_not_configured": "Saved logins cannot be read right now, so there are no search volumes. Try again later.",
         "no_seeds": "Enter at least one word, or use the landing page.",
         "google_ads_auth_failed": "Google Ads refused the connection - the credential may have expired. Reconnect it in Ad platform connections.",
-        "developer_token_not_approved": "The Google Ads developer token is not approved for live data yet, so Google gives no search volumes.",
+        "developer_token_not_approved": "Google has not yet allowed GrowthOS to read real search numbers, so none are shown. Your ads are not affected.",
         "google_ads_error": "Google Ads could not answer right now. Try again in a minute."
       },
       "columns": {
@@ -4984,7 +4984,7 @@
       "unavailable": {
         "no_meta_credential": "No Meta ad account is connected to this project. Connect one in the Publish step.",
         "credential_not_configured": "The Meta account attached to this project has no working credential. Reconnect it.",
-        "vault_not_configured": "This deployment cannot read stored credentials (no vault configured).",
+        "vault_not_configured": "Saved logins cannot be read right now, so there are no search volumes. Try again later.",
         "meta_auth_failed": "Meta refused the connection - the access may have expired. Reconnect the Meta account.",
         "meta_permission_denied": "The Meta connection lacks permission to read this (ads_read). Reconnect and allow it.",
         "meta_rate_limited": "Meta is limiting requests right now. Try again in a few minutes.",
