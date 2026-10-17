@@ -40,7 +40,7 @@ describe('StartOnboardingButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Start onboarding' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not save this step. Check your internet connection and try again - your earlier steps are kept.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });
