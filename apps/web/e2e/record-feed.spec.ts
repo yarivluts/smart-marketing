@@ -83,7 +83,7 @@ test.describe('Record feed (KAN-81)', () => {
     // render "5,000" and a bare template literal would stop matching.
     const window = RECORD_FIELD_FILTER_CANDIDATE_WINDOW.toLocaleString('en-US');
     await expect(
-      page.getByText(`Filtered to records where amount is 42, applied across the ${window} most recent records for this schema.`),
+      page.getByText(`Showing only records where amount is 42, looked for among the ${window} newest records of this kind.`),
     ).toBeVisible();
     await expect(page.getByText('id ord-1')).toBeVisible();
     await expect(page.getByText('id ord-2')).not.toBeVisible();
