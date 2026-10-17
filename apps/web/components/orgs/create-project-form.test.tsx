@@ -45,7 +45,19 @@ describe('CreateProjectForm', () => {
     fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Growth' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not create it. Nothing was saved, so please try again in a moment.');
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('says the connection dropped, and that nothing was saved, when the request cannot be sent', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Growth' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('We cannot reach GrowthOS. Check your internet connection');
+    expect(screen.getByRole('button', { name: 'Create project' })).toBeEnabled();
     expect(push).not.toHaveBeenCalled();
   });
 

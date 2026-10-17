@@ -11,11 +11,11 @@ export function CreateOrganizationForm(): React.ReactElement {
   const router = useRouter();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'generic' | 'offline' | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(false);
+    setError(null);
     setSubmitting(true);
     try {
       const response = await fetch('/api/orgs', {
@@ -24,11 +24,13 @@ export function CreateOrganizationForm(): React.ReactElement {
         body: JSON.stringify({ name }),
       });
       if (!response.ok) {
-        setError(true);
+        setError('generic');
         return;
       }
       const { organizationId } = (await response.json()) as { organizationId: string };
       router.push(`/orgs/${organizationId}`);
+    } catch {
+      setError('offline');
     } finally {
       setSubmitting(false);
     }
@@ -44,7 +46,7 @@ export function CreateOrganizationForm(): React.ReactElement {
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
-          {t('genericError')}
+          {t(error === 'offline' ? 'networkError' : 'genericError')}
         </p>
       ) : null}
       <Button type="submit" disabled={submitting}>

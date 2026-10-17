@@ -15,12 +15,12 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
   const router = useRouter();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'generic' | 'offline' | null>(null);
   const [missingName, setMissingName] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(false);
+    setError(null);
     if (name.trim() === '') {
       setMissingName(true);
       return;
@@ -34,11 +34,13 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
         body: JSON.stringify({ name: name.trim() }),
       });
       if (!response.ok) {
-        setError(true);
+        setError('generic');
         return;
       }
       const { projectId } = (await response.json()) as { projectId: string };
       router.push(`/orgs/${orgId}/projects/${projectId}/onboarding`);
+    } catch {
+      setError('offline');
     } finally {
       setSubmitting(false);
     }
@@ -70,7 +72,7 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
-          {t('genericError')}
+          {t(error === 'offline' ? 'networkError' : 'genericError')}
         </p>
       ) : null}
       <Button type="submit" disabled={submitting}>
