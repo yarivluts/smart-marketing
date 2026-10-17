@@ -102,7 +102,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.getByTestId('creative-preview-gallery')).toBeInTheDocument();
 
     // Click Analytics tab
-    fireEvent.click(screen.getByRole('button', { name: /Spend & ROAS Analytics/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Spend and results/i }));
     expect(screen.getByTestId('analytics-tab')).toBeInTheDocument();
   });
 });
