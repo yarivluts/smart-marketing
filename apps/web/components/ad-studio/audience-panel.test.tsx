@@ -137,7 +137,9 @@ describe('AudiencePanel', () => {
       { locale: 'he' },
     );
     expect(await screen.findByText(he.unavailable.no_meta_credential)).toBeInTheDocument();
-    expect(screen.getByLabelText(he.countriesLabel)).toHaveValue('IL');
+    const hebrewCountries = screen.getByTestId('ad-studio-countries');
+    expect(hebrewCountries).toHaveTextContent('ישראל');
+    expect(hebrewCountries).not.toHaveTextContent('IL');
     fireEvent.click(screen.getByRole('tab', { name: he.breakdowns.age_gender }));
     const table = await screen.findByTestId('ad-studio-meta-performance');
     expect(within(table).getByText(`25-34 · ${he.segments.female}`)).toBeInTheDocument();
@@ -147,14 +149,23 @@ describe('AudiencePanel', () => {
     expect(en.columns.costPerClick).not.toMatch(/\//);
   });
 
-  it('will not save targeting that breaks the rules', () => {
+  it('picks countries by name and will not save without one', () => {
     vi.stubGlobal('fetch', graph());
     renderWithIntl(
       <AudiencePanel orgId="o" projectId="p" briefId="b1" language="en" initial={null} />,
       { locale: 'en' },
     );
-    fireEvent.change(screen.getByLabelText(en.countriesLabel), { target: { value: 'Israel' } });
-    expect(screen.getByText(en.issues.invalid_country)).toBeInTheDocument();
+    const chosen = screen.getByTestId('ad-studio-countries');
+    expect(chosen).toHaveTextContent('United States');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove United States' }));
+    expect(screen.getByText(en.issues.no_countries)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: en.save })).toBeDisabled();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Add a country' }), {
+      target: { value: 'IL' },
+    });
+    expect(chosen).toHaveTextContent('Israel');
+    expect(screen.getByRole('button', { name: en.save })).toBeEnabled();
+    expect(en.countriesLabel).not.toMatch(/IL|US/);
+    expect(he.countriesLabel).not.toMatch(/IL|US/);
   });
 });

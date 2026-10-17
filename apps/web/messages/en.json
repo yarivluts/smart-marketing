@@ -4913,7 +4913,7 @@
     "audience": {
       "title": "Audience (Facebook & Instagram)",
       "description": "Who will see your ad on Facebook and Instagram. We read your real ad account to suggest it: your own groups of people, topics they like, roughly how many people you would reach, and what your past ads achieved. The ad is shown to whatever you save here.",
-      "countriesLabel": "Countries (e.g. IL, US)",
+      "countriesLabel": "Countries",
       "ageMin": "Age from",
       "ageMax": "Age to",
       "gendersLabel": "Gender",
