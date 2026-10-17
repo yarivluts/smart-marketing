@@ -34,3 +34,15 @@ describe('sidebar links for customer groups and visitor recordings use plain wor
     expect(projectSessionReplayLink).toMatch(/[֐-׿]/);
   });
 });
+
+describe('the funnel sidebar link says what the page shows', () => {
+  it('English says where people drop off, not "Conversion"', () => {
+    expect(en.OrgDetailPage.projectFunnelLink).toBe('Where people drop off');
+  });
+
+  it('Hebrew drops the funnel metaphor and stays in Hebrew', () => {
+    const label = he.OrgDetailPage.projectFunnelLink;
+    expect(label).not.toMatch(/\u05DE\u05E9\u05E4\u05DA/);
+    expect(label).toMatch(/[֐-׿]/);
+  });
+});
