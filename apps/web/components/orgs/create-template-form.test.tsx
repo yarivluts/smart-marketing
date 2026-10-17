@@ -49,7 +49,18 @@ describe('CreateTemplateForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add template' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not add it. Nothing was saved, so please try again in a moment.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says the connection is down when the request cannot be sent', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add template' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('We cannot reach GrowthOS. Check your internet connection and try again - nothing was saved.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });

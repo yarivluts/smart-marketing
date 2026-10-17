@@ -18,11 +18,11 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
   const [title, setTitle] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'server' | 'network' | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(false);
+    setError(null);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/resources/people`, {
@@ -36,7 +36,7 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
         }),
       });
       if (!response.ok) {
-        setError(true);
+        setError('server');
         return;
       }
       setName('');
@@ -44,6 +44,8 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
       setTitle('');
       setPhotoUrl('');
       router.refresh();
+    } catch {
+      setError('network');
     } finally {
       setSubmitting(false);
     }
@@ -85,7 +87,7 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
       </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-destructive">
-          {t('createError')}
+          {t(error === 'network' ? 'createNetworkError' : 'createError')}
         </p>
       ) : null}
     </form>

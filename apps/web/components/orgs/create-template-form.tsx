@@ -18,11 +18,11 @@ export function CreateTemplateForm({ orgId }: CreateTemplateFormProps): React.Re
   const [name, setName] = useState('');
   const [type, setType] = useState<(typeof RESOURCE_TEMPLATE_TYPES)[number]>('metric_definition');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'server' | 'network' | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(false);
+    setError(null);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/resources/templates`, {
@@ -31,11 +31,13 @@ export function CreateTemplateForm({ orgId }: CreateTemplateFormProps): React.Re
         body: JSON.stringify({ name, type }),
       });
       if (!response.ok) {
-        setError(true);
+        setError('server');
         return;
       }
       setName('');
       router.refresh();
+    } catch {
+      setError('network');
     } finally {
       setSubmitting(false);
     }
@@ -71,7 +73,7 @@ export function CreateTemplateForm({ orgId }: CreateTemplateFormProps): React.Re
       </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-destructive">
-          {t('createError')}
+          {t(error === 'network' ? 'createNetworkError' : 'createError')}
         </p>
       ) : null}
     </form>

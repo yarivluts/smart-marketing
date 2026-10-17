@@ -19,11 +19,11 @@ export function CreateCredentialForm({ orgId }: CreateCredentialFormProps): Reac
   const [provider, setProvider] = useState<(typeof CREDENTIAL_PROVIDERS)[number]>('generic');
   const [scopes, setScopes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'server' | 'network' | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(false);
+    setError(null);
     setSubmitting(true);
     try {
       const availableScopes = scopes
@@ -36,12 +36,14 @@ export function CreateCredentialForm({ orgId }: CreateCredentialFormProps): Reac
         body: JSON.stringify({ name, provider, availableScopes }),
       });
       if (!response.ok) {
-        setError(true);
+        setError('server');
         return;
       }
       setName('');
       setScopes('');
       router.refresh();
+    } catch {
+      setError('network');
     } finally {
       setSubmitting(false);
     }
@@ -88,7 +90,7 @@ export function CreateCredentialForm({ orgId }: CreateCredentialFormProps): Reac
       </Button>
       {error ? (
         <p role="alert" className="w-full text-sm text-destructive">
-          {t('createError')}
+          {t(error === 'network' ? 'createNetworkError' : 'createError')}
         </p>
       ) : null}
     </form>
