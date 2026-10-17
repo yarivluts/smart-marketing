@@ -29,6 +29,8 @@ export function CheckQualityMixAlertsButton({ orgId, projectId }: CheckQualityMi
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

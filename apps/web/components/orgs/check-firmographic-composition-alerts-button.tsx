@@ -29,6 +29,8 @@ export function CheckFirmographicCompositionAlertsButton({ orgId, projectId }: C
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }
