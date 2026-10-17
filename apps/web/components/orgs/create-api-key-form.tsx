@@ -72,7 +72,7 @@ export function CreateApiKeyForm({
     API_KEY_SCOPES.filter((scope) => initialScopes?.includes(scope)),
   );
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'failed' | 'network' | null>(null);
   const [mintedKey, setMintedKey] = useState<MintedKey | null>(null);
 
   const originsIssue = allowedOriginsIssue(originsFromText(originsText));
@@ -85,7 +85,7 @@ export function CreateApiKeyForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    setError(false);
+    setError(null);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/keys`, {
@@ -98,7 +98,7 @@ export function CreateApiKeyForm({
         ),
       });
       if (!response.ok) {
-        setError(true);
+        setError('failed');
         return;
       }
       const body = (await response.json()) as { keyPrefix: string; rawKey: string };
@@ -106,6 +106,8 @@ export function CreateApiKeyForm({
       setName('');
       setSelectedScopes([]);
       setOriginsText('');
+    } catch {
+      setError('network');
     } finally {
       setSubmitting(false);
     }
@@ -219,7 +221,7 @@ export function CreateApiKeyForm({
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">
-          {t('createError')}
+          {t(error === 'network' ? 'createNetworkError' : 'createError')}
         </p>
       ) : null}
       <Button
