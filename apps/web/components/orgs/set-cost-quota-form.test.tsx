@@ -28,9 +28,9 @@ describe('SetCostQuotaForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Daily query limit'), { target: { value: '10' } });
-    fireEvent.change(screen.getByLabelText('Labels'), { target: { value: 'team=growth\ntier=internal' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save quota' }));
+    fireEvent.change(screen.getByLabelText('Daily data request limit'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Tags'), { target: { value: 'team=growth\ntier=internal' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save limit' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/cost-guardrails/quota', {
@@ -43,10 +43,10 @@ describe('SetCostQuotaForm', () => {
   it('rejects a non-positive limit client-side without calling fetch', async () => {
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Daily query limit'), { target: { value: '0' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save quota' }));
+    fireEvent.change(screen.getByLabelText('Daily data request limit'), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save limit' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Daily query limit must be a positive whole number.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The daily limit must be a whole number above zero.');
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -54,9 +54,9 @@ describe('SetCostQuotaForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save quota' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save limit' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't set the quota. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save the limit. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });
