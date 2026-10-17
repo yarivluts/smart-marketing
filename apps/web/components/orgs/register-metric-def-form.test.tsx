@@ -109,4 +109,18 @@ describe('RegisterMetricDefForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('A metric with this name is already registered in this project.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('explains that nothing was saved when GrowthOS cannot be reached', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'ad_spend' } });
+    fireEvent.change(screen.getByLabelText('Table'), { target: { value: 'fact_ad_spend' } });
+    fireEvent.change(screen.getByLabelText('Column'), { target: { value: 'reporting_spend' } });
+    fireEvent.change(screen.getByLabelText('Time column'), { target: { value: 'date' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Register metric' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('We cannot reach GrowthOS');
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

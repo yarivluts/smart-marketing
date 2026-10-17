@@ -29,6 +29,8 @@ export function RegisterTouchpointSchemaButton({ orgId, projectId }: RegisterTou
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

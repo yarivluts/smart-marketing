@@ -57,6 +57,8 @@ export function EvolveSchemaDefForm({
       // "Evolve" is opened.
       router.refresh();
       onClose();
+    } catch {
+      setError(t('networkError'));
     } finally {
       setSubmitting(false);
     }
