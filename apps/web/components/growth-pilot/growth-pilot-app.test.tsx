@@ -112,6 +112,17 @@ describe('GrowthPilotApp', () => {
   });
 
   it.each([
+    ['en', 'We could not reach GrowthOS. Check your internet connection and try again - nothing was lost.'],
+    ['he', heMessages.GrowthPilot.errors.offline],
+  ] as const)('says the connection dropped, not "something went wrong" (%s)', async (locale, text) => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+  });
+
+  it.each([
     ['automation_stopped', 'Resume automation'],
     ['meta_unavailable', 'Ad platform connections'],
   ])('explains %s in plain words with where to go next', async (code, place) => {
