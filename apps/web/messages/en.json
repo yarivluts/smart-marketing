@@ -4209,9 +4209,9 @@
     "keywordData": "Keyword volumes (Google Ads)",
     "keywordDataValue": "Available through {credential}",
     "keywordDataMissing": {
-      "no_google_ads_credential": "No Google Ads credential is attached to this project. Attach one in the resource library to add real search volumes to deep analysis.",
-      "credential_not_configured": "A Google Ads credential is attached but has no secret set yet.",
-      "vault_not_configured": "The secret vault is not configured for this deployment, so the Google Ads credential cannot be read."
+      "no_google_ads_credential": "Google Ads is not connected to this project, so the plan relies on general market knowledge. Connect it under ad platform connections to add real search numbers.",
+      "credential_not_configured": "Google Ads is connected but the setup is not finished. Finish it under ad platform connections to get real search numbers.",
+      "vault_not_configured": "We could not open the saved Google Ads login right now, so there are no real search numbers. Your ad is not affected."
     },
     "planningAdminHint": "Deep analysis also reads the landing page (public https pages only) and the last 90 days of landing page results from the warehouse. A missing source is shown as missing, never estimated.",
     "exportTitle": "Export",
@@ -4983,10 +4983,10 @@
       "currencyNote": "Amounts are in the ad account currency.",
       "unavailable": {
         "no_meta_credential": "No Meta ad account is connected to this project. Connect one in the Publish step.",
-        "credential_not_configured": "The Meta account attached to this project has no working credential. Reconnect it.",
+        "credential_not_configured": "The Meta account attached to this project is not logged in properly. Reconnect it.",
         "vault_not_configured": "Saved logins cannot be read right now, so there are no search volumes. Try again later.",
         "meta_auth_failed": "Meta refused the connection - the access may have expired. Reconnect the Meta account.",
-        "meta_permission_denied": "The Meta connection lacks permission to read this (ads_read). Reconnect and allow it.",
+        "meta_permission_denied": "The Meta connection is not allowed to read this. Reconnect it and accept every permission it asks for.",
         "meta_rate_limited": "Meta is limiting requests right now. Try again in a few minutes.",
         "meta_error": "Meta could not answer right now. Try again in a minute."
       },
