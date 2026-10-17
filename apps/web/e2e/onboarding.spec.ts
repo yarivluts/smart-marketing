@@ -55,7 +55,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     // A brand-new org has no source manifests registered yet, so the empty-state CTA must be a real,
     // visible button linking to the org's plugin registry — not buried inline text a first-time user
     // reads past (found via dogfooding QA, 2026-08-16: "no link/button to the pack registry").
-    const registryLink = page.getByRole('link', { name: 'Register one from the plugin registry' });
+    const registryLink = page.getByRole('link', { name: 'Add one from the plugin list' });
     await expect(registryLink).toBeVisible();
     await expect(registryLink).toHaveAttribute('href', `/en/orgs/${orgId}/plugins`);
 
