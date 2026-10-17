@@ -3705,9 +3705,9 @@
     "askBudgetAmount": "How much should the daily budget for \"{campaign}\" be?",
     "budgetChangeProposed": "Prepared a budget change for \"{campaign}\", from ${before}/day to ${after}/day.",
     "askNewCampaignBudget": "What daily budget should the new campaign start at?",
-    "campaignDraftProposed": "Prepared a campaign draft at ${budget}/day. Review the creatives before approving.",
+    "campaignDraftProposed": "Prepared a campaign draft at ${budget}/day. Look over the ads before approving.",
     "noFunnelData": "I have no funnel data for this project yet.",
-    "largestDropOff": "The largest drop-off is at \"{stage}\", losing {percent}% of the visitors who reach it. Ask me to draft a retargeting campaign for that stage and name a daily budget.",
+    "largestDropOff": "The largest drop-off is at \"{stage}\", losing {percent}% of the visitors who reach it. Ask me to draft a campaign that wins those visitors back, and name a daily budget.",
     "pauseProposed": "Ready to pause \"{campaign}\", currently running at ${budget}/day.",
     "fallback": "How can I help you with your campaigns today?",
     "intents": {

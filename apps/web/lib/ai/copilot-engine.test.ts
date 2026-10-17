@@ -68,7 +68,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
         EN,
       );
       expect(result.message.content).toBe(
-        'The largest drop-off is at "Document Viewed", losing 62% of the visitors who reach it. Ask me to draft a retargeting campaign for that stage and name a daily budget.',
+        'The largest drop-off is at "Document Viewed", losing 62% of the visitors who reach it. Ask me to draft a campaign that wins those visitors back, and name a daily budget.',
       );
     });
   });
@@ -129,7 +129,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
       expect(result.actionProposal?.actionType).toBe('campaign_draft_create');
       expect(result.actionProposal?.payload.dailyBudgetUsd).toBe(200);
       expect(result.actionProposal?.estimatedImpact).toBeUndefined();
-      expect(result.message.content).toBe('Prepared a campaign draft at $200/day. Review the creatives before approving.');
+      expect(result.message.content).toBe('Prepared a campaign draft at $200/day. Look over the ads before approving.');
     });
 
     it('asks for a budget rather than inventing one for a new campaign', () => {
