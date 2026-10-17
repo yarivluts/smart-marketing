@@ -50,6 +50,8 @@ export function RegisterMetricDefForm({ orgId, projectId }: RegisterMetricDefFor
       setName('');
       setDefinitionState(blankMetricDefinitionFormState());
       router.refresh();
+    } catch {
+      setError(t('networkError'));
     } finally {
       setSubmitting(false);
     }

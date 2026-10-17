@@ -45,6 +45,8 @@ export function RegisterSchemaDefForm({ orgId, projectId }: RegisterSchemaDefFor
       setName('');
       setFields([blankSchemaFieldRow()]);
       router.refresh();
+    } catch {
+      setError(t('networkError'));
     } finally {
       setSubmitting(false);
     }

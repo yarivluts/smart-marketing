@@ -45,6 +45,8 @@ export function EvolveMetricDefForm({ orgId, projectId, name, initialState, onCl
       // "Evolve" is opened.
       router.refresh();
       onClose();
+    } catch {
+      setError(t('networkError'));
     } finally {
       setSubmitting(false);
     }

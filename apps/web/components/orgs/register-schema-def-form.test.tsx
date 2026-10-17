@@ -77,4 +77,28 @@ describe('RegisterSchemaDefForm', () => {
     );
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('explains that nothing was saved when GrowthOS cannot be reached', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'order_id' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Register schema' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('We cannot reach GrowthOS');
+    expect(screen.getByRole('button', { name: 'Register schema' })).toBeEnabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says nothing was changed on a server failure instead of "something went wrong"', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({}) } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'order_id' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Register schema' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed');
+  });
 });
