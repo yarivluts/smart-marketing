@@ -5,6 +5,7 @@ import type { AdStudioScene } from '@growthos/shared';
 import { NextIntlClientProvider } from 'next-intl';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import enMessages from '@/messages/en.json';
+import heMessages from '@/messages/he.json';
 import { ScriptEditor } from './script-editor';
 
 const refresh = vi.fn();
@@ -192,7 +193,14 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     renderEditor();
     fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText(/What the camera shows/), { target: { value: 'Edited' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save script' }));
-    expect(await screen.findByText('Something went wrong. Please try again.')).toBeInTheDocument();
+    expect(await screen.findByText('GrowthOS could not finish that. Check your internet connection and try again in a moment.')).toBeInTheDocument();
+  });
+
+  it('words the generic Ad Studio failure around the connection in both languages', () => {
+    for (const text of [enMessages.AdStudio.errorGeneric, heMessages.AdStudio.errorGeneric]) {
+      expect(text).toContain('GrowthOS');
+      expect(text).not.toMatch(/Something went wrong|משהו השתבש/);
+    }
   });
 
   it('rewrites a scene from the scenes as they stand in the editor, unsaved ones included', async () => {
