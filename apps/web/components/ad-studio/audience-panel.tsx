@@ -16,6 +16,7 @@ import {
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
+import { CountryPicker } from './country-picker';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface AudiencePanelProps {
@@ -77,7 +78,7 @@ export function AudiencePanel({
   const [targeting, setTargeting] = React.useState<AdStudioMetaTargeting>(
     initial ?? defaultMetaTargeting(language),
   );
-  const [countriesText, setCountriesText] = React.useState(targeting.countries.join(', '));
+  const [countries, setCountries] = React.useState<string[]>(targeting.countries);
   const [audiences, setAudiences] = React.useState<Result<Audience[]> | null>(null);
   const [interestQuery, setInterestQuery] = React.useState('');
   const [interestResults, setInterestResults] = React.useState<Result<
@@ -99,7 +100,7 @@ export function AudiencePanel({
 
   const current = normalizeMetaTargeting({
     ...targeting,
-    countries: countriesText.split(/[\s,]+/).filter(Boolean),
+    countries,
   });
   const issues = metaTargetingIssues(current);
   const size = (lower: number | null, upper: number | null) =>
@@ -239,18 +240,14 @@ export function AudiencePanel({
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-          {t('countriesLabel')}
-          <input
-            value={countriesText}
-            onChange={(event) => {
-              setCountriesText(event.target.value);
-              setEstimate(null);
-            }}
-            dir="ltr"
-            className="h-9 w-40 rounded-lg border border-input bg-background px-3 text-sm uppercase text-foreground"
-          />
-        </label>
+        <CountryPicker
+          value={countries}
+          onChange={(next) => {
+            setCountries(next);
+            setEstimate(null);
+          }}
+          label={t('countriesLabel')}
+        />
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           {t('ageMin')}
           <select
