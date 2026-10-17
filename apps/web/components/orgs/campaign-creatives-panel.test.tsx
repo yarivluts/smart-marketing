@@ -66,7 +66,7 @@ const importedAds = [
 describe('CampaignCreativesPanel', () => {
   it('shows the no-draft empty state when the target has no campaign draft', () => {
     renderPanel(undefined);
-    expect(screen.getByText('No campaign draft exists for this target yet - create one from the campaigns page.')).toBeInTheDocument();
+    expect(screen.getByText(messages.Campaigns.noCreativesYet)).toBeInTheDocument();
   });
 
   it('renders imported platform ads (image, headline, primary text, link, CTA, status) and prefers them over a draft', () => {
