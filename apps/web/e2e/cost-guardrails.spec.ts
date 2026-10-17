@@ -36,18 +36,18 @@ test.describe('Cost guardrails: set a project quota, see usage + labels reflecte
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Cost guardrails' }).click();
+    await page.getByRole('link', { name: 'Data usage limit' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cost-guardrails$`));
 
-    await expect(page.getByText('No quota has been explicitly set for this project yet — the default limit applies.')).toBeVisible();
-    await expect(page.getByText(/0 of 500 query attempts used today/)).toBeVisible();
-    await expect(page.getByText('No metric queries logged for this project yet.')).toBeVisible();
+    await expect(page.getByText("You haven't set a limit for this project yet — the standard daily limit applies.")).toBeVisible();
+    await expect(page.getByText(/0 of 500 data requests used today/)).toBeVisible();
+    await expect(page.getByText('No data requests yet for this project.')).toBeVisible();
 
-    await page.getByLabel('Daily query limit').fill('5');
-    await page.getByLabel('Labels').fill('team=growth');
-    await page.getByRole('button', { name: 'Save quota' }).click();
+    await page.getByLabel('Daily data request limit').fill('5');
+    await page.getByLabel('Tags').fill('team=growth');
+    await page.getByRole('button', { name: 'Save limit' }).click();
 
-    await expect(page.getByText(/0 of 5 query attempts used today/)).toBeVisible();
-    await expect(page.getByText('Labels: team=growth')).toBeVisible();
+    await expect(page.getByText(/0 of 5 data requests used today/)).toBeVisible();
+    await expect(page.getByText('Tags: team=growth')).toBeVisible();
   });
 });
