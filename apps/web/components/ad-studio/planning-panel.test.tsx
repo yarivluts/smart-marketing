@@ -154,7 +154,7 @@ describe('AdStudioAdminPanel keyword data', () => {
 
   it('says why keyword volumes are missing, or which credential provides them', () => {
     const { unmount } = renderWithIntl(<AdStudioAdminPanel {...base} keywordData={{ available: false, reason: 'no_google_ads_credential' }} />, { locale: 'en' });
-    expect(screen.getByTestId('ad-studio-keyword-data')).toHaveTextContent('No Google Ads credential is attached to this project.');
+    expect(screen.getByTestId('ad-studio-keyword-data')).toHaveTextContent('Google Ads is not connected to this project');
     unmount();
     renderWithIntl(<AdStudioAdminPanel {...base} keywordData={{ available: true, credentialName: 'Agency MCC' }} />, { locale: 'en' });
     expect(screen.getByTestId('ad-studio-keyword-data')).toHaveTextContent('Available through Agency MCC');
