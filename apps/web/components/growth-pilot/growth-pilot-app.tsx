@@ -410,18 +410,22 @@ function ProposalCard({
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {proposal.kind === 'publish' ? (
-            <label className="flex items-center gap-2 text-sm">
-              <span className="font-medium">{tp('budget')}</span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                inputMode="decimal"
-                value={budget}
-                onChange={(event) => setBudget(event.target.value)}
-                className="h-9 w-24 rounded-xl border border-input bg-background px-2 text-sm tabular-nums"
-                data-testid="growth-pilot-budget"
-              />
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="font-medium">{tp('budget')}</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  inputMode="decimal"
+                  value={budget}
+                  onChange={(event) => setBudget(event.target.value)}
+                  className="h-9 w-24 rounded-xl border border-input bg-background px-2 text-sm tabular-nums"
+                  data-testid="growth-pilot-budget"
+                  aria-describedby="growth-pilot-budget-hint"
+                />
+              </span>
+              <span id="growth-pilot-budget-hint" className="text-xs text-muted-foreground">{tp('budgetHint')}</span>
             </label>
           ) : null}
           <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
