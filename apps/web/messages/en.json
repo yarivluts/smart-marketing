@@ -460,6 +460,8 @@
     "kpiBoards": "Boards",
     "journeyTitle": "Setup journey",
     "journeyDescription": "Each step's status comes from what this project really has. Click a step to open where it is done.",
+    "startPilotHint": "Not sure what any of this means? You can skip it. Growth Pilot reads your website and does the marketing for you - you only approve.",
+    "startPilotLink": "Skip this and use Growth Pilot",
     "startHint": "Four short steps: what to track, where your data comes from, your customer path and a starter board. You can leave and come back at any point.",
     "globalTitle": "Get set up",
     "globalDescription": "Your path from an organization to live reports, and how far each of your projects has got.",
