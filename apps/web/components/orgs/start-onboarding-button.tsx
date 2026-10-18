@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 
 export interface StartOnboardingButtonProps {
@@ -43,6 +43,12 @@ export function StartOnboardingButton({ orgId, projectId }: StartOnboardingButto
       <Button type="button" onClick={handleClick} disabled={submitting}>
         {t('startButton')}
       </Button>
+      <p className="text-sm text-muted-foreground">
+        {t('startPilotHint')}{' '}
+        <Link href={`/orgs/${orgId}/projects/${projectId}/growth-pilot`} className="font-medium underline">
+          {t('startPilotLink')}
+        </Link>
+      </p>
     </div>
   );
 }
