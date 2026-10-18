@@ -64,9 +64,9 @@ describe('FunnelGoalsDashboard Component', () => {
     for (const label of [
       'Overall Funnel Conv.',
       'Goals on Track',
-      'M1 Avg Retention',
-      'Conversion Velocity',
-      '40d Payback Rev',
+      'Customers still here after 1 month',
+      'Time to become a customer',
+      'Money earned in the first 40 days',
       'Failed payments won back',
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
