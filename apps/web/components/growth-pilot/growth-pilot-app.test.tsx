@@ -123,6 +123,19 @@ describe('GrowthPilotApp', () => {
   });
 
   it.each([
+    ['en', 'We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.'],
+    ['he', heMessages.GrowthPilot.errors.generic],
+  ] as const)('an unknown error says nothing was changed and what to do, not "something went wrong" (%s)', async (locale, text) => {
+    stubFetch({ status: 500, body: { error: 'some_internal_code' } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(text);
+    expect(alert.textContent ?? '').not.toMatch(/some_internal_code|went wrong/i);
+  });
+
+  it.each([
     ['automation_stopped', 'Resume automation'],
     ['meta_unavailable', 'Ad platform connections'],
   ])('explains %s in plain words with where to go next', async (code, place) => {
