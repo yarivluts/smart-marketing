@@ -31,7 +31,8 @@
     "myAccount": "My account",
     "signOut": "Sign out",
     "developersLink": "Developers",
-    "growthPilot": "Growth Pilot"
+    "growthPilot": "Growth Pilot",
+    "growthPilotHint": "Enter your website; we do the rest"
   },
   "OmniSearch": {
     "trigger": "Search...",
