@@ -3062,7 +3062,7 @@
     "filterFailed": "נכשלו",
     "searchAuditPlaceholder": "חיפוש ביומן לפי יעד או מזהה...",
     "auditEmptyNote": "לא נמצאו פעולות בהיסטוריית הביקורת.",
-    "oneClickRollback": "ביטול פעולה בלחיצה",
+    "oneClickRollback": "ביטול השינוי",
     "rollbackSuccess": "הפעולה בוטלה בהצלחה!",
     "rollbackError": "שגיאה בביטול הפעולה.",
     "killSwitchEngagedBadge": "מתג חירום מופעל",
@@ -3799,11 +3799,11 @@
     "columnActions": "פעולות",
     "emptyFiltered": "לא נמצאו פעולות התואמות לחיפוש",
     "emptyNone": "אין פעולות אוטומציה בהיסטוריה",
-    "rollbackButton": "בטל שינוי"
+    "rollbackButton": "ביטול השינוי"
   },
   "ProposalDiffCard": {
     "approveAndExecute": "אישור וביצוע השינוי",
-    "rollbackButton": "בטל שינוי (Rollback)"
+    "rollbackButton": "ביטול השינוי"
   },
   "AdStudio": {
     "metaTitle": "סטודיו מודעות AI",

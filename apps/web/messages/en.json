@@ -3062,7 +3062,7 @@
     "filterFailed": "Failed",
     "searchAuditPlaceholder": "Search audit trail by target or ID...",
     "auditEmptyNote": "No matching actions found in audit history.",
-    "oneClickRollback": "1-Click Rollback",
+    "oneClickRollback": "Undo this change",
     "rollbackSuccess": "Action rolled back successfully!",
     "rollbackError": "Failed to rollback action.",
     "killSwitchEngagedBadge": "KILL SWITCH ACTIVE",
@@ -3799,11 +3799,11 @@
     "columnActions": "Actions",
     "emptyFiltered": "No actions matching your filter",
     "emptyNone": "No automation actions in audit log",
-    "rollbackButton": "1-Click Rollback"
+    "rollbackButton": "Undo this change"
   },
   "ProposalDiffCard": {
     "approveAndExecute": "Approve and apply",
-    "rollbackButton": "1-Click Rollback"
+    "rollbackButton": "Undo this change"
   },
   "AdStudio": {
     "metaTitle": "AI Ad Studio",
