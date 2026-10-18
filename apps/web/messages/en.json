@@ -275,7 +275,7 @@
     "projectExperimentsLink": "Experiments",
     "projectSupportLink": "Support",
     "projectDemosLink": "Demos",
-    "projectMetricRegistryLink": "Metric catalog",
+    "projectMetricRegistryLink": "Your key numbers",
     "projectCostGuardrailsLink": "Data usage limit",
     "projectPluginsLink": "Plugins",
     "projectBoardsLink": "Boards",
@@ -1020,8 +1020,8 @@
     "familyMeta": "{fields, plural, one {# field} other {# fields}} · {versions, plural, one {# version} other {# versions}}{pii, plural, =0 {} other { · # PII}}"
   },
   "MetricRegistry": {
-    "metaTitle": "Metric catalog",
-    "title": "Metric catalog for {projectName}",
+    "metaTitle": "Your key numbers",
+    "title": "Your key numbers for {projectName}",
     "registeredHeading": "Registered metrics",
     "noMetrics": "No metrics registered for this project yet.",
     "versionStatusLabel": "v{version} — {status}",

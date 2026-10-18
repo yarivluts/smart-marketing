@@ -23,7 +23,7 @@ async function createOrganization(page: Page, name: string): Promise<string> {
   return page.url().split('/').pop()!;
 }
 
-test.describe('Metric catalog: register an aggregation and a formula metric, invalid definitions rejected (KAN-40)', () => {
+test.describe('Your key numbers: register an aggregation and a formula metric, invalid definitions rejected (KAN-40)', () => {
   test('an org owner registers an aggregation metric, evolves it, registers a formula referencing it, and an invalid formula is rejected', async ({ page }) => {
     await signUp(page, uniqueEmail('metric-owner'));
     const orgId = await createOrganization(page, 'Metric Catalog E2E Org');
@@ -36,7 +36,7 @@ test.describe('Metric catalog: register an aggregation and a formula metric, inv
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Metric catalog' }).click();
+    await page.getByRole('link', { name: 'Your key numbers' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/metric-defs$`));
     await expect(page.getByText('No metrics registered for this project yet.')).toBeVisible();
 
