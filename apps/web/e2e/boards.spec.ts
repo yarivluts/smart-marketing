@@ -43,7 +43,7 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // A board's tile picker only offers registered, active metrics — register one first.
-    await page.getByRole('link', { name: 'Metric catalog' }).click();
+    await page.getByRole('link', { name: 'Your key numbers' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/metric-defs$`));
     await page.getByLabel('Name').fill('ad_spend');
     await page.getByLabel('Table').fill('fact_ad_spend');

@@ -275,7 +275,7 @@
     "projectExperimentsLink": "ניסויים",
     "projectSupportLink": "תמיכה",
     "projectDemosLink": "הדגמות",
-    "projectMetricRegistryLink": "קטלוג מדדים",
+    "projectMetricRegistryLink": "המספרים החשובים שלך",
     "projectCostGuardrailsLink": "מגבלת שימוש בנתונים",
     "projectPluginsLink": "תוספים",
     "projectBoardsLink": "לוחות מחוונים",
@@ -1020,8 +1020,8 @@
     "familyMeta": "{fields, plural, one {שדה אחד} other {# שדות}} · {versions, plural, one {גרסה אחת} other {# גרסאות}}{pii, plural, =0 {} other { · # PII}}"
   },
   "MetricRegistry": {
-    "metaTitle": "קטלוג מדדים",
-    "title": "קטלוג מדדים עבור {projectName}",
+    "metaTitle": "המספרים החשובים שלך",
+    "title": "המספרים החשובים שלך עבור {projectName}",
     "registeredHeading": "מדדים רשומים",
     "noMetrics": "עדיין לא נרשמו מדדים עבור פרויקט זה.",
     "versionStatusLabel": "גרסה {version} — {status}",
