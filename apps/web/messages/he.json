@@ -30,7 +30,9 @@
     "signOut": "התנתקות",
     "developersLink": "מפתחים",
     "growthPilot": "טייס צמיחה",
-    "growthPilotHint": "מזינים את האתר, ואנחנו עושים את השאר"
+    "growthPilotHint": "מזינים את האתר, ואנחנו עושים את השאר",
+    "adStudioHint": "מכינים מודעה מהאתר שלכם",
+    "aiCopilotAndAutomationHint": "שינויים ש־GrowthOS מציע, ואתם מאשרים"
   },
   "OmniSearch": {
     "trigger": "חיפוש...",
