@@ -1,5 +1,4 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Button } from '@/components/ui/button';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { AccountStatus } from '@/components/auth/account-status';
 
@@ -17,10 +16,6 @@ export default async function HomePage({ params }: PageProps): Promise<React.Rea
       <LocaleSwitcher />
       <h1 className="text-4xl font-bold tracking-tight">{t('title')}</h1>
       <p className="max-w-prose text-muted-foreground">{t('subtitle')}</p>
-      <div className="flex gap-3">
-        <Button>{t('getStarted')}</Button>
-        <Button variant="outline">{t('viewDocs')}</Button>
-      </div>
       <AccountStatus />
     </main>
   );
