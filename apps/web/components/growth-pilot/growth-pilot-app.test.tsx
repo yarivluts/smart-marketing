@@ -405,6 +405,7 @@ describe('GrowthPilotApp', () => {
       expect(card).toHaveTextContent(`Publish the ads for ${isolate('Free plan')}`);
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Where people land after clicking: https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();

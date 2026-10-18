@@ -5871,7 +5871,7 @@
       "activateTitle": "Turn on the ads for {name}",
       "description": "{count, plural, one {The approved image goes to Facebook and Instagram (Meta) as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
       "activateDescription": "The ads are on Facebook and Instagram, switched off. Turning them on makes them visible and starts spending - up to {budget} a day in your ad account currency.",
-      "link": "Link",
+      "link": "Where people land after clicking",
       "countries": "Countries",
       "budget": "Daily budget",
       "approve": "Publish (switched off)",
