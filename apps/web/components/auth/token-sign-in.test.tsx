@@ -62,7 +62,7 @@ describe('TokenSignIn', () => {
   it('shows an error and a way back to /login when no token is present', async () => {
     renderPage();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent(messages.Auth.genericError);
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/login');
     expect(signInWithToken).not.toHaveBeenCalled();
   });

@@ -106,7 +106,7 @@
     "signUpTitle": "יצירת חשבון ב-GrowthOS",
     "needAccount": "אין לך חשבון? הירשם",
     "haveAccount": "כבר יש לך חשבון? התחבר",
-    "genericError": "משהו השתבש. נסו שוב.",
+    "genericError": "לא הצלחנו להכניס אותך כרגע. שום דבר לא השתנה, נסו שוב בעוד רגע.",
     "invalidCredentialsError": "אימייל או סיסמה שגויים.",
     "emailInUseError": "כבר קיים חשבון עם כתובת אימייל זו.",
     "weakPasswordError": "בחרו סיסמה עם 6 תווים לפחות.",
