@@ -3,6 +3,8 @@ import { screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl, createMockCopilotProposal } from '@/tests/e2e/helpers/test-harness';
 import { AutomationHubDashboard } from './automation-hub-dashboard';
+import en from '@/messages/en.json';
+import he from '@/messages/he.json';
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
@@ -136,5 +138,47 @@ describe('AutomationHubDashboard Component', () => {
 
     expect(screen.getByTestId('kill-switch-active-badge')).toBeInTheDocument();
     expect(screen.getByText('KILL SWITCH ACTIVE')).toBeInTheDocument();
+  });
+
+  it.each(['en', 'he'] as const)('shows plain-language headings and no jargon in %s', (locale) => {
+    const messages = locale === 'en' ? en : he;
+    const t = messages.Automation;
+    renderWithIntl(
+      <AutomationHubDashboard
+        orgId="org-1"
+        projectId="proj-1"
+        projectName="GrowthOS Web"
+        killSwitchStatus={mockKillSwitch}
+        policy={mockPolicy}
+        targets={[]}
+        actions={mockActions}
+        connections={[]}
+        proactiveRecommendations={[]}
+        canExecute={true}
+        canApprove={true}
+      />,
+      { locale },
+    );
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(t.hubTitle);
+    expect(screen.getByTestId('tab-proposals')).toHaveTextContent(t.tabProposals);
+    expect(screen.getByTestId('tab-audit')).toHaveTextContent(t.tabHistory);
+    expect(screen.getByTestId('tab-rules')).toHaveTextContent(t.tabGuardrails);
+    expect(screen.getByText(t.proposalsEmptyTitle)).toBeInTheDocument();
+  });
+
+  it('keeps marketing jargon out of the English hub copy', () => {
+    const t = en.Automation;
+    const shown = [
+      t.hubTitle,
+      t.hubDescription,
+      t.tabProposals,
+      t.tabHistory,
+      t.tabGuardrails,
+      t.categoryAdFatigue,
+      t.categoryFunnelDropoff,
+      t.categoryPacing,
+    ].join(' ');
+    expect(shown).not.toMatch(/guardrail|audit|funnel|pacing|fatigue|1-click|engine/i);
   });
 });
