@@ -5,9 +5,7 @@
   },
   "HomePage": {
     "title": "GrowthOS",
-    "subtitle": "Multi-vertical growth analytics platform. This is the bootstrap scaffold — features land per the backlog in TASKS.md.",
-    "getStarted": "Get started",
-    "viewDocs": "View docs"
+    "subtitle": "Tell us your website. We write your ads and show how they do; nothing goes live until you say yes."
   },
   "LocaleSwitcher": {
     "label": "Language",
