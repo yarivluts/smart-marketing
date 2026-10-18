@@ -3051,7 +3051,7 @@
     "impact_low": "השפעה נמוכה",
     "diffLabel": "שינוי",
     "actionExecutedSuccess": "הפעולה בוצעה בהצלחה!",
-    "approveAndExecute": "אשר והפעל בלחיצה",
+    "approveAndExecute": "אישור וביצוע השינוי",
     "executing": "מבצע...",
     "dismiss": "הסר",
     "proposalsEmptyTitle": "אין כרגע מה לאשר",
@@ -3594,7 +3594,7 @@
     "badgeHybridEngine": "מנוע היברידי",
     "impactBadgeLabel": "השפעת {impact, select, high {גבוהה} medium {בינונית} low {נמוכה} other {השפעה}}",
     "actionExecutedSuccess": "הפעולה בוצעה בהצלחה! ניתן לבטל ביומן הביקורת.",
-    "approveAndExecute": "אישור והפעלה בלחיצה אחת",
+    "approveAndExecute": "אישור וביצוע השינוי",
     "inputPlaceholder": "שאל שאלה או תן פקודה...",
     "sendButton": "שלח"
   },
@@ -3802,7 +3802,7 @@
     "rollbackButton": "בטל שינוי"
   },
   "ProposalDiffCard": {
-    "approveAndExecute": "הפעל שינוי בלחיצה אחת",
+    "approveAndExecute": "אישור וביצוע השינוי",
     "rollbackButton": "בטל שינוי (Rollback)"
   },
   "AdStudio": {

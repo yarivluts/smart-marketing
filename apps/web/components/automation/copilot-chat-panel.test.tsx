@@ -49,7 +49,7 @@ describe('CopilotChatPanel Component', () => {
     expect(screen.getByText('$250/day')).toBeInTheDocument();
 
     const quickExecBtn = screen.getByTestId('quick-execute-button');
-    expect(quickExecBtn).toHaveTextContent('1-Click Approve & Execute');
+    expect(quickExecBtn).toHaveTextContent('Approve and apply');
     fireEvent.click(quickExecBtn);
 
     await waitFor(() => {

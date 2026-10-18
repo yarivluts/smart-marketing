@@ -3051,7 +3051,7 @@
     "impact_low": "Low Impact",
     "diffLabel": "Diff",
     "actionExecutedSuccess": "Action executed successfully!",
-    "approveAndExecute": "1-Click Approve & Execute",
+    "approveAndExecute": "Approve and apply",
     "executing": "Executing...",
     "dismiss": "Dismiss",
     "proposalsEmptyTitle": "Nothing to approve right now",
@@ -3594,7 +3594,7 @@
     "badgeHybridEngine": "Hybrid Engine",
     "impactBadgeLabel": "{impact} impact",
     "actionExecutedSuccess": "Action executed successfully! Rollback is available in audit log.",
-    "approveAndExecute": "1-Click Approve & Execute",
+    "approveAndExecute": "Approve and apply",
     "inputPlaceholder": "Ask a question or issue a command...",
     "sendButton": "Send"
   },
@@ -3802,7 +3802,7 @@
     "rollbackButton": "1-Click Rollback"
   },
   "ProposalDiffCard": {
-    "approveAndExecute": "1-Click Approve & Execute",
+    "approveAndExecute": "Approve and apply",
     "rollbackButton": "1-Click Rollback"
   },
   "AdStudio": {

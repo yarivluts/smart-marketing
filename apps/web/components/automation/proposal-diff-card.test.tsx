@@ -31,12 +31,12 @@ describe('ProposalDiffCard Component', () => {
     expect(screen.getByText('+32% projected conversions')).toBeInTheDocument();
   });
 
-  it('triggers onApprove when 1-Click Approve button is clicked', async () => {
+  it('triggers onApprove when Approve and apply button is clicked', async () => {
     const onApprove = vi.fn().mockResolvedValue(undefined);
     renderWithIntl(<ProposalDiffCard proposal={mockProposal} onApprove={onApprove} />, { locale: 'en' });
 
     const btn = screen.getByTestId('quick-execute-button');
-    expect(btn).toHaveTextContent('1-Click Approve & Execute');
+    expect(btn).toHaveTextContent('Approve and apply');
     fireEvent.click(btn);
 
     await waitFor(() => {
