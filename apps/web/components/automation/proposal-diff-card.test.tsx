@@ -58,7 +58,7 @@ describe('ProposalDiffCard Component', () => {
     });
   });
 
-  it('shows 1-Click Rollback button for executed proposals and triggers onRollback', async () => {
+  it('shows the Undo this change button for executed proposals and triggers onRollback', async () => {
     const onRollback = vi.fn().mockResolvedValue(undefined);
     const executedProposal: ActionProposalData = {
       ...mockProposal,
@@ -68,7 +68,7 @@ describe('ProposalDiffCard Component', () => {
     renderWithIntl(<ProposalDiffCard proposal={executedProposal} onRollback={onRollback} />, { locale: 'en' });
 
     const rollbackBtn = screen.getByTestId('proposal-rollback-button');
-    expect(rollbackBtn).toHaveTextContent('1-Click Rollback');
+    expect(rollbackBtn).toHaveTextContent('Undo this change');
     fireEvent.click(rollbackBtn);
 
     await waitFor(() => {
