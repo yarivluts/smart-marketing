@@ -77,6 +77,23 @@ function graph() {
 }
 
 describe('AudiencePanel', () => {
+  it('explains an account with no audiences in plain words and says what to do instead', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === `${BASE}/audiences`) return json({ result: { status: 'ok', data: [] } });
+        throw new Error(`Unexpected ${url}`);
+      }),
+    );
+    renderWithIntl(
+      <AudiencePanel orgId="o" projectId="p" briefId="b1" language="en" initial={null} />,
+      { locale: 'en' },
+    );
+    expect(await screen.findByText(en.noAudiences)).toBeInTheDocument();
+    expect(en.noAudiences).not.toMatch(/lookalike|custom/i);
+    expect(he.noAudiences).not.toMatch(/מותאמ|דומים/);
+  });
+
   it('builds an audience from the account audiences and interests, estimates its reach and saves it', async () => {
     const fetchMock = graph();
     vi.stubGlobal('fetch', fetchMock);
