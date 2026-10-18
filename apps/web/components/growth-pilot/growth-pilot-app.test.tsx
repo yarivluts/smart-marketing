@@ -409,6 +409,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
+      expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription('The most you will spend per day, once you turn the ads on. Nothing is spent before that.');
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '0' } });
       expect(within(card).getByTestId('growth-pilot-approve')).toBeDisabled();
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '35' } });
