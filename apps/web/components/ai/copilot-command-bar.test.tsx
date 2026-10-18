@@ -86,6 +86,16 @@ describe('MarketingCommandBar Component', () => {
     expect(routerPush).toHaveBeenCalledWith('/orgs/org-1/projects/proj-1/goals');
   });
 
+  // Page shortcuts use the sidebar's plain words, not marketing/engineering jargon.
+  it.each(['en', 'he'] as const)('names the page shortcuts without jargon (%s)', (locale) => {
+    renderWithIntl(<MarketingCommandBar orgId="org-1" projectId="proj-1" isOpen={true} />, { locale });
+    for (const id of ['nav-ads', 'nav-funnel', 'nav-automation']) {
+      const text = screen.getByTestId(`command-item-${id}`).textContent ?? '';
+      expect(text).not.toMatch(/roas|cross-channel|pipeline|audit|hub/i);
+      expect(text).not.toMatch(/רב-ערוצי|יומן ביקורת/);
+    }
+  });
+
   it('triggers onClose when close button is clicked', () => {
     const onClose = vi.fn();
     renderWithIntl(
