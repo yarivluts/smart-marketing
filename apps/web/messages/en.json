@@ -4929,7 +4929,7 @@
       },
       "audiencesTitle": "Your audiences ({count} of up to {max} chosen)",
       "loading": "Reading your Meta ad account...",
-      "noAudiences": "The ad account has no custom or lookalike audiences yet.",
+      "noAudiences": "Your ad account has no saved groups of people yet. That is fine - choose age, gender and interests below and the ad still reaches the right people.",
       "kinds": {
         "custom": "Your people",
         "lookalike": "Similar to your people",
