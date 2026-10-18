@@ -151,7 +151,7 @@ describe('ImageStudio', () => {
   it('says why an image failed in image terms, not video terms, in English and Hebrew', () => {
     const failed = image({ id: 'i9', format: 'story', status: 'failed', selected: false, failureCode: 'provider_error', conceptFingerprint: imageConceptFingerprint(CONCEPT, 'story', 'en') });
     const { unmount } = renderStudio({ initialImages: [image(), failed] });
-    expect(within(screen.getByTestId('ad-studio-image-slot-story')).getByText('the image model failed')).toBeInTheDocument();
+    expect(within(screen.getByTestId('ad-studio-image-slot-story')).getByText('the AI image maker had a problem on its side')).toBeInTheDocument();
     unmount();
     renderStudio({ initialImages: [image(), { ...failed, failureCode: 'provider_billing' }] }, 'he');
     expect(within(screen.getByTestId('ad-studio-image-slot-story')).getByText(heMessages.AdStudio.imageFailure.provider_billing)).toBeInTheDocument();

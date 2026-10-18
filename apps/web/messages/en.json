@@ -3912,7 +3912,7 @@
       "rate_limited": "The AI provider is limiting requests right now. Try again in a minute.",
       "refused": "The AI declined this request. Rephrase the brief and try again.",
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
-      "provider_error": "The AI provider failed. Try again."
+      "provider_error": "The AI service had a problem on its side, not yours. Wait a minute and try again."
     },
     "quotaExceeded": "Today's limit is reached ({used} of {limit}). A project admin can raise it in the studio settings.",
     "errorInvalidBrief": "Check the brief: {reasons}",
@@ -4076,7 +4076,7 @@
       "rate_limited": "Gemini is limiting requests right now",
       "refused": "the video model declined this scene",
       "invalid_output": "the video model returned no usable video",
-      "provider_error": "the video model failed",
+      "provider_error": "the AI video maker had a problem on its side",
       "timed_out": "it took too long and was given up"
     },
     "videoFailure": {
@@ -4331,7 +4331,7 @@
         "rate_limited": "AI is limiting requests",
         "refused": "AI declined",
         "invalid_output": "AI answer unusable",
-        "provider_error": "AI failed",
+        "provider_error": "the AI service had a problem",
         "some_images_failed": "some images failed",
         "clip_failed": "a scene failed",
         "clips_not_ready": "clips not ready",
@@ -4551,7 +4551,7 @@
       "rate_limited": "Gemini is limiting requests right now",
       "refused": "the image model declined this picture",
       "invalid_output": "the image model returned no usable image",
-      "provider_error": "the image model failed",
+      "provider_error": "the AI image maker had a problem on its side",
       "storage_error": "the image could not be saved",
       "timed_out": "it took too long and was given up"
     },
