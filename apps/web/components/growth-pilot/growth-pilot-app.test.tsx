@@ -382,6 +382,14 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('Audience waiting for your approval');
     });
 
+    it('an approved audience says what happens next, in English and Hebrew', () => {
+      const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [{ ...TARGET, audienceStatus: 'approved' }] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('the ads will be shown to these people once you publish them');
+      unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [{ ...TARGET, audienceStatus: 'approved' }] })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('כשתפרסמו אותן');
+    });
+
     it('without Meta says how to get the interests matched, and shows a failed audience with its reason', () => {
       const noMeta = { ...AUDIENCE, audience: { ...PLAN, meta: 'no_meta_credential', reach: null, targeting: { ...PLAN.targeting, interests: [], genders: ['female' as const] } } };
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [noMeta], targets: [{ ...TARGET, audienceStatus: 'failed', audienceFailure: 'quota_exceeded' }] })} />, { locale: 'en' });
