@@ -30,7 +30,9 @@
     "signOut": "Sign out",
     "developersLink": "Developers",
     "growthPilot": "Growth Pilot",
-    "growthPilotHint": "Enter your website; we do the rest"
+    "growthPilotHint": "Enter your website; we do the rest",
+    "adStudioHint": "Make an ad from your website",
+    "aiCopilotAndAutomationHint": "Changes GrowthOS suggests, for you to approve"
   },
   "OmniSearch": {
     "trigger": "Search...",

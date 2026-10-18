@@ -105,6 +105,7 @@ export default async function ProjectLayout({
     {
       href: `${base}/automation`,
       label: tShell('aiCopilotAndAutomation'),
+      hint: tShell('aiCopilotAndAutomationHint'),
       icon: 'Bot',
     },
   ];
@@ -168,7 +169,7 @@ export default async function ProjectLayout({
   ];
 
   const restoredAutomationItems: AppShellNavItem[] = [
-    ...(canUseAi ? [{ href: `${base}/ad-studio`, label: t('projectAdStudioLink'), icon: 'Clapperboard' as const }] : []),
+    ...(canUseAi ? [{ href: `${base}/ad-studio`, label: t('projectAdStudioLink'), hint: tShell('adStudioHint'), icon: 'Clapperboard' as const }] : []),
     ...(canManagePlugins
       ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }]
       : []),
