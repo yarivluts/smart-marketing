@@ -145,6 +145,7 @@ describe('GrowthPilotApp', () => {
     fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(place);
+    if (code === 'automation_stopped') expect(alert).toHaveTextContent('AI helper & automation');
     expect(alert.textContent ?? '').not.toMatch(/kill switch|Meta ad account|_/i);
   });
 

@@ -5813,7 +5813,7 @@
       "not_found": "We could not find that any more. Reload the page to see the latest.",
       "generic": "We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.",
       "invalid_budget": "Enter a daily budget above zero.",
-      "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI Copilot & Automation and choose Resume automation, then try again.",
+      "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper & automation and choose Resume automation, then try again.",
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
       "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost."
     },
