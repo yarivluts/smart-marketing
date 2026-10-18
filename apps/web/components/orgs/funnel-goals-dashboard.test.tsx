@@ -67,7 +67,7 @@ describe('FunnelGoalsDashboard Component', () => {
       'M1 Avg Retention',
       'Conversion Velocity',
       '40d Payback Rev',
-      'Dunning Recovery',
+      'Failed payments won back',
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
