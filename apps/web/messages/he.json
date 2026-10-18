@@ -31,7 +31,8 @@
     "myAccount": "החשבון שלי",
     "signOut": "התנתקות",
     "developersLink": "מפתחים",
-    "growthPilot": "טייס צמיחה"
+    "growthPilot": "טייס צמיחה",
+    "growthPilotHint": "מזינים את האתר, ואנחנו עושים את השאר"
   },
   "OmniSearch": {
     "trigger": "חיפוש...",

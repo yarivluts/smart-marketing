@@ -91,7 +91,7 @@ export default async function ProjectLayout({
 
   const primaryModuleItems: AppShellNavItem[] = [
     // The one-input autopilot comes first: enter the site, approve what the AI proposes.
-    ...(canUseAi ? [{ href: `${base}/growth-pilot`, label: tShell('growthPilot'), icon: 'Sparkles' as const }] : []),
+    ...(canUseAi ? [{ href: `${base}/growth-pilot`, label: tShell('growthPilot'), hint: tShell('growthPilotHint'), icon: 'Sparkles' as const }] : []),
     {
       href: `${base}/campaigns`,
       label: tShell('adsAndPerformance'),

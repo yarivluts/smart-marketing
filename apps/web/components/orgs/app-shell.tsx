@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import {
   Activity,
   Award,
@@ -108,6 +108,8 @@ export interface AppShellNavItem {
   href: string;
   label: string;
   icon: AppShellIconName;
+  /** Optional one-line plain-language explanation shown under the label (announced as the link's description). */
+  hint?: string;
 }
 
 export interface AppShellNavSection {
@@ -147,11 +149,15 @@ function bestMatchingHref(pathname: string, hrefs: readonly string[]): string | 
 
 function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boolean; onClick?: () => void }): React.ReactElement {
   const Icon = ICONS[item.icon];
+  const generatedId = useId();
+  const hintId = item.hint ? generatedId : undefined;
   return (
     <Link
       href={item.href}
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
+      aria-label={item.hint ? item.label : undefined}
+      aria-describedby={hintId}
       className={cn(
         'flex items-center gap-pp-sm rounded-pp-lg px-pp-md py-pp-sm text-pp-label-md transition-colors',
         active
@@ -160,7 +166,16 @@ function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boo
       )}
     >
       <Icon className={cn('h-5 w-5 shrink-0', active ? 'text-pp-primary' : 'text-pp-on-surface-variant')} aria-hidden="true" />
-      <span className="truncate">{item.label}</span>
+      {item.hint ? (
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate">{item.label}</span>
+          <span id={hintId} className="text-pp-label-sm font-normal text-pp-on-surface-variant">
+            {item.hint}
+          </span>
+        </span>
+      ) : (
+        <span className="truncate">{item.label}</span>
+      )}
     </Link>
   );
 }

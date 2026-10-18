@@ -111,3 +111,21 @@ describe('AppShell', () => {
     expect(screen.queryByText('omni-search-widget')).not.toBeInTheDocument();
   });
 });
+
+describe('AppShell nav hints', () => {
+  it('shows a one-line hint under an item and exposes it as the link description, not its name', () => {
+    mockUsePathname.mockReturnValue('/orgs/org-1');
+    const pilot: AppShellNavItem = { href: '/orgs/org-1/projects/p1/growth-pilot', label: 'Growth Pilot', icon: 'Sparkles', hint: 'Enter your website; we do the rest' };
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AppShell sections={[{ items: [pilot, homeItem] }]} mobileTabItems={[homeItem]}>
+          <p>page content</p>
+        </AppShell>
+      </NextIntlClientProvider>,
+    );
+    const link = screen.getAllByRole('link', { name: 'Growth Pilot' })[0];
+    expect(link).toHaveAccessibleDescription('Enter your website; we do the rest');
+    expect(screen.getAllByText('Enter your website; we do the rest').length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Home' })[0]).not.toHaveAttribute('aria-describedby');
+  });
+});
