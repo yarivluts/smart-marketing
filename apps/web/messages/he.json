@@ -3766,10 +3766,10 @@
     "chipTopAdsLabel": "מודעות מובילות",
     "chipTopAdsQuery": "אילו מודעות הכי רווחיות השבוע?",
     "chipScaleBudgetLabel": "הגדל תקציב",
-    "chipScaleBudgetQuery": "הגדל תקציב לקמפיין הריטרגטינג ל-$250",
+    "chipScaleBudgetQuery": "הגדל תקציב ל-$250 לקמפיין שלי",
     "chipNewCampaignLabel": "קמפיין חדש",
     "chipNewCampaignQuery": "צור קמפיין חדש לעורכי דין",
-    "chipRebalanceLabel": "איזון תקציבי",
+    "chipRebalanceLabel": "העברת תקציב",
     "chipRebalanceQuery": "העבר תקציב מגוגל למטא",
     "clearChat": "נקה שיחה"
   },
