@@ -227,7 +227,7 @@ export function ExecutiveBlendedReport({
             <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" aria-hidden="true" />
               <span>
-                {`${t('conversionVelocityLabel', { defaultMessage: 'Conversion Velocity' })}: ${plain(metrics.conversionVelocityDays)} ${t('daysUnit', { defaultMessage: 'days' })}`}
+                {`${t('conversionVelocityLabel', { defaultMessage: 'Time to become a customer' })}: ${plain(metrics.conversionVelocityDays)} ${t('daysUnit', { defaultMessage: 'days' })}`}
               </span>
             </div>
           </div>
