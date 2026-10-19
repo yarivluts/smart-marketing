@@ -131,7 +131,7 @@ describe('VideoStudio', () => {
     renderStudio();
     fireEvent.click(within(screen.getByTestId('ad-studio-video-scene-2')).getByRole('button', { name: 'Render (8s)' }));
     await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent('The AI provider refused for billing'));
-    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByTestId('ad-studio-clip-failure')).toHaveTextContent('Failed: the Gemini account is out of credit');
+    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByTestId('ad-studio-clip-failure')).toHaveTextContent('Failed: the AI service is not available on our side right now, so please contact GrowthOS support');
   });
 
   it('edits a finished clip by instruction and lists versions newest first', async () => {

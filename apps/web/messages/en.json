@@ -4072,8 +4072,8 @@
     },
     "clipFailure": {
       "not_configured": "no video model is configured",
-      "provider_billing": "the Gemini account is out of credit",
-      "rate_limited": "Gemini is limiting requests right now",
+      "provider_billing": "the AI service is not available on our side right now, so please contact GrowthOS support",
+      "rate_limited": "the AI service is too busy right now, so please wait a few minutes and try again",
       "refused": "the video model declined this scene",
       "invalid_output": "the video model returned no usable video",
       "provider_error": "the AI video maker had a problem on its side",
@@ -4547,8 +4547,8 @@
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
-      "provider_billing": "the Gemini account is out of credit",
-      "rate_limited": "Gemini is limiting requests right now",
+      "provider_billing": "the AI service is not available on our side right now, so please contact GrowthOS support",
+      "rate_limited": "the AI service is too busy right now, so please wait a few minutes and try again",
       "refused": "the image model declined this picture",
       "invalid_output": "the image model returned no usable image",
       "provider_error": "the AI image maker had a problem on its side",
