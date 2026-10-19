@@ -4080,7 +4080,7 @@
       "timed_out": "it took too long and was given up"
     },
     "videoFailure": {
-      "ffmpeg_unavailable": "the video tool (ffmpeg) is not installed on the server",
+      "ffmpeg_unavailable": "the video could not be put together on our side, so please contact GrowthOS support",
       "ffmpeg_failed": "joining the clips failed",
       "storage_error": "the video could not be stored",
       "timed_out": "it took too long and was given up"
@@ -4094,7 +4094,7 @@
       "already_assembling": "The video is already being assembled."
     },
     "assemblyErrors": {
-      "ffmpeg_unavailable": "The video tool (ffmpeg) is not installed on the server, so the video cannot be assembled.",
+      "ffmpeg_unavailable": "The video could not be put together because of a problem on our side, not yours. Trying again will not help - please contact GrowthOS support.",
       "ffmpeg_failed": "Joining the clips failed. Try again, or re-render the scene that looks wrong.",
       "storage_error": "The video could not be stored. Try again."
     },
