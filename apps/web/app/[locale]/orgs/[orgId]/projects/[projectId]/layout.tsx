@@ -89,9 +89,12 @@ export default async function ProjectLayout({
 
   const base = `/orgs/${orgId}/projects/${projectId}`;
 
+  const adStudioItem: AppShellNavItem = { href: `${base}/ad-studio`, label: t('projectAdStudioLink'), hint: tShell('adStudioHint'), icon: 'Clapperboard' };
+
   const primaryModuleItems: AppShellNavItem[] = [
     // The one-input autopilot comes first: enter the site, approve what the AI proposes.
     ...(canUseAi ? [{ href: `${base}/growth-pilot`, label: tShell('growthPilot'), hint: tShell('growthPilotHint'), icon: 'Sparkles' as const }] : []),
+    ...(canUseAi ? [adStudioItem] : []),
     {
       href: `${base}/campaigns`,
       label: tShell('adsAndPerformance'),
@@ -169,18 +172,19 @@ export default async function ProjectLayout({
   ];
 
   const restoredAutomationItems: AppShellNavItem[] = [
-    ...(canUseAi ? [{ href: `${base}/ad-studio`, label: t('projectAdStudioLink'), hint: tShell('adStudioHint'), icon: 'Clapperboard' as const }] : []),
     ...(canManagePlugins
       ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }]
       : []),
   ];
 
+  // The two setup links a newcomer needs, next to the essentials: the project's settings, and the ad
+  // accounts it publishes to.
+  const setupItems: AppShellNavItem[] = [
+    { href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' },
+    { href: `/orgs/${orgId}/connections?projectId=${projectId}`, label: t('connectionsLink'), icon: 'KeyRound' },
+  ];
+
   const secondaryItems: AppShellNavItem[] = [
-    {
-      href: `${base}/settings`,
-      label: tShell('settings'),
-      icon: 'Settings',
-    },
     { href: `${base}/resources`, label: t('projectResourcesLink'), icon: 'FolderOpen' },
     ...(canManageKeys
       ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: 'KeyRound' as const }]
@@ -193,17 +197,22 @@ export default async function ProjectLayout({
       : []),
   ];
 
+  // A newcomer sees the essentials and the setup links; every other tool folds under "More tools"
+  // (opened by itself when the current page is one of them).
+  const more = { id: 'more', label: tShell('moreTools') };
   const sections: AppShellNavSection[] = [
     { items: primaryModuleItems },
-    { items: orgItems },
-    { items: insightsItems },
-    { heading: tShell('dataSection'), items: dataItems },
-    { heading: tShell('automationSection'), items: restoredAutomationItems },
-    { heading: tShell('settingsSection'), items: secondaryItems },
+    { items: setupItems },
+    { items: orgItems, group: more },
+    { items: insightsItems, group: more },
+    { heading: tShell('dataSection'), items: dataItems, group: more },
+    { heading: tShell('automationSection'), items: restoredAutomationItems, group: more },
+    { heading: tShell('settingsSection'), items: secondaryItems, group: more },
   ].filter((section) => section.items.length > 0);
 
+  // The phone tab bar holds five: the two AI makers, the ads, the approvals and the settings.
   const mobileTabItems: AppShellNavItem[] = [
-    ...primaryModuleItems,
+    ...primaryModuleItems.filter((item) => !item.href.endsWith('/funnel')),
     { href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' },
   ];
 
@@ -214,6 +223,8 @@ export default async function ProjectLayout({
   // they're already one click away everywhere and don't need a search
   // shortcut of their own.
   const pageShortcuts = buildOmniSearchPageShortcuts([
+    ...(canUseAi ? [adStudioItem] : []),
+    ...setupItems.slice(1),
     ...orgItems,
     ...insightsItems,
     ...dataItems,

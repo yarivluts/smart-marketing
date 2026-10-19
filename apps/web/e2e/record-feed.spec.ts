@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 import { RECORD_FIELD_FILTER_CANDIDATE_WINDOW } from '@growthos/firebase-orm-models';
 import { seedIngestFixture } from './test-utils/seed-ingest';
 
@@ -39,6 +40,7 @@ test.describe('Record feed (KAN-81)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Latest records' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/record-feed$`));
     await expect(page.getByRole('heading', { name: `Latest records for Client Beta` })).toBeVisible();
@@ -63,6 +65,7 @@ test.describe('Record feed (KAN-81)', () => {
     // fixture's full accepted/quarantined/duplicate breakdown.
     await seedIngestFixture({ organizationId: orgId, projectId, ownerEmail: email });
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Latest records' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/record-feed$`));
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 import { seedHookDelivery } from './test-utils/seed-hook-delivery';
 
 function uniqueEmail(prefix: string): string {
@@ -41,6 +42,7 @@ test.describe('Inbound hooks: create endpoint, copy receive URL, review queue (K
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Incoming data links' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/hooks$`));
     await expect(page.getByText('No incoming data links yet. Create one below, then paste its address into the tool that should send you data.')).toBeVisible();

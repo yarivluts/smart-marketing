@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 import { seedIngestFixture } from './test-utils/seed-ingest';
 
 function uniqueEmail(prefix: string): string {
@@ -47,6 +48,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await seedIngestFixture({ organizationId: orgId, projectId, ownerEmail: email });
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Data health' }).first().click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/ingest-health$`));
 
@@ -109,6 +111,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     await page.goto(`/en/orgs/${orgId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Data health' }).first().click();
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
     // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
