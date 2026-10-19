@@ -4072,8 +4072,8 @@
     },
     "clipFailure": {
       "not_configured": "לא הוגדר מודל וידאו",
-      "provider_billing": "לחשבון Gemini נגמר הקרדיט",
-      "rate_limited": "Gemini מגביל כרגע בקשות",
+      "provider_billing": "שירות ה-AI לא זמין כרגע בצד שלנו, ולכן כדאי לפנות לתמיכה של GrowthOS",
+      "rate_limited": "שירות ה-AI עמוס כרגע, ולכן כדאי להמתין כמה דקות ולנסות שוב",
       "refused": "מודל הווידאו סירב לסצנה הזו",
       "invalid_output": "מודל הווידאו לא החזיר סרטון שמיש",
       "provider_error": "לכלי ה-AI ליצירת וידאו הייתה תקלה בצד שלו",
@@ -4547,8 +4547,8 @@
     },
     "imageFailure": {
       "not_configured": "לא הוגדר מודל תמונה",
-      "provider_billing": "לחשבון Gemini נגמר הקרדיט",
-      "rate_limited": "Gemini מגביל כרגע בקשות",
+      "provider_billing": "שירות ה-AI לא זמין כרגע בצד שלנו, ולכן כדאי לפנות לתמיכה של GrowthOS",
+      "rate_limited": "שירות ה-AI עמוס כרגע, ולכן כדאי להמתין כמה דקות ולנסות שוב",
       "refused": "מודל התמונה סירב לתמונה הזו",
       "invalid_output": "מודל התמונה לא החזיר תמונה שמישה",
       "provider_error": "לכלי ה-AI ליצירת תמונות הייתה תקלה בצד שלו",
