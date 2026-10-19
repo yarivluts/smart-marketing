@@ -46,6 +46,21 @@ Template for each entry:
   - TikTok publishing is not built yet; connections are saved and checked only.
   - Two stale connections in the EasySign org (older Meta, MCC Google) can be archived from Resources if unused.
 
+## 2026-10-20 - Simpler to use: essentials-only sidebar, land in your project (KAN-405)
+
+- **Last completed:**
+  - **Project sidebar (PR #829):** shows only the essentials - Growth Pilot, AI Ad Studio, Ads & results, Customer journey & goals, AI helper - plus Settings and Ad platform connections. The other 27 tools fold under "More tools", which opens by itself on a page inside it and remembers being opened.
+  - **Org page project card (PR #829):** shows the 6 modules; the full list folds under "All tools (27)".
+  - **Sign-in (PR #830):** lands in the project opened last (cookie `growthos-last-project`, access re-checked) or the only project; otherwise the overview.
+  - **e2e:** `openMoreTools(page)` opens either fold before a folded link is clicked.
+- **Measured on prod (QA user):**
+  - Project sidebar: 42 -> 8 visible links.
+  - Second sign-in lands in the project.
+  - Org card folded with 6 modules visible.
+- **Deploy gap fixed:** prod was 272 commits behind main. The UX routine merges PRs (about 50 simplification PRs since 10-15) but nothing deploys them; deployed b6a9e1d, then dba3af2.
+- **Open:** a rare React #418 on Ad Studio create/publish appeared twice in a sweep after the deploy (0/36 on repeated loads since). Not yet traced.
+- **Waiting on human:** whether main should deploy automatically (e.g. a Cloud Build trigger), so routine PRs reach users without a manual deploy.
+
 ## UX hourly
 
 - 2026-10-19 - (a) Growth Pilot failed read: a site that answered too slowly or an address that loops through redirects both said "the site did not open, maybe the address is wrong"; they now say the site was slow (retry later) or the address goes in a circle (copy the final address, no useless retry) (en + he). PR #828. Next candidates: (1) stale open ux PRs (#680, #682, #684, #689, #719, #757) need triage; (2) onboarding source step still says "access key (API key)"; (3) `meta_account_restricted` has no specific reason.
