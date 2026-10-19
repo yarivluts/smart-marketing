@@ -324,6 +324,19 @@ describe('GrowthPilotApp', () => {
       expect(he.container).not.toHaveTextContent('provider_billing');
     });
 
+    it('words a timed-out or idea-less ads run in plain language, in Hebrew too', () => {
+      const target = { ...ACTIVE_TARGET, adsStatus: 'failed' as const, adsFailure: 'timed_out', publishStatus: 'failed' as const, publishFailure: 'no_concepts' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('it took too long and was given up');
+      expect(view.container).toHaveTextContent('could not come up with ideas');
+      expect(view.container).not.toHaveTextContent('something went wrong');
+      expect(view.container).not.toHaveTextContent('timed_out');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('לקח יותר מדי זמן');
+      expect(he.container).not.toHaveTextContent('no_concepts');
+    });
+
     it('explains a publish failure the person can act on instead of "try again"', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
