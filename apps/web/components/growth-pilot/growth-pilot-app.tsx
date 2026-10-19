@@ -34,8 +34,10 @@ async function callPilot(base: string, path: string, body?: unknown): Promise<Ap
   }
 }
 
-function failureKey(code: string | null): 'site' | 'quota_exceeded' | 'nothing_found' | 'unavailable' | 'provider' {
+function failureKey(code: string | null): 'site' | 'blocked' | 'unreadable' | 'quota_exceeded' | 'nothing_found' | 'unavailable' | 'provider' {
   if (!code) return 'provider';
+  if (code === 'site_blocked_url') return 'blocked';
+  if (code === 'site_not_html' || code === 'site_empty_page') return 'unreadable';
   if (code.startsWith('site_')) return 'site';
   if (code === 'quota_exceeded' || code === 'nothing_found') return code;
   if (code === 'provider_billing' || code === 'not_configured') return 'unavailable';
@@ -196,7 +198,7 @@ function AnalyzingCard({ host }: { host: string }): React.ReactElement {
 function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; code: string | null; onRetry: () => void; onOther: () => void; pending: boolean }): React.ReactElement {
   const t = useTranslations('GrowthPilot');
   const kind = failureKey(code);
-  // Trying the same address again cannot help when nothing was found, today's AI limit is gone or the AI is not available on our side - offer only what can work.
+  // Trying the same address again cannot help when nothing was found, the address is private or has no text, today's AI limit is gone or the AI is not available on our side - offer only what can work.
   const canRetry = kind === 'site' || kind === 'provider';
   const canUseOther = kind !== 'quota_exceeded' && kind !== 'unavailable';
   return (
