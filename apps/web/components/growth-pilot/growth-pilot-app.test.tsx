@@ -360,6 +360,18 @@ describe('GrowthPilotApp', () => {
       expect(he.container).not.toHaveTextContent('no_concepts');
     });
 
+    it('explains a restricted ad account in words, in both languages', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_account_restricted' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('Facebook has restricted your ad account');
+      expect(view.container).not.toHaveTextContent('meta_account_restricted');
+      expect(view.container).not.toHaveTextContent('something went wrong');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('הגבילה את חשבון המודעות');
+      expect(he.container).not.toHaveTextContent('meta_account_restricted');
+    });
+
     it('explains a publish failure the person can act on instead of "try again"', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
