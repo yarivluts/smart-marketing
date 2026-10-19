@@ -5954,6 +5954,7 @@
       "upload_failed": "the upload to Facebook and Instagram did not go through, try again in a minute",
       "cancelled": "it was stopped before it finished, ask for a change to try again",
       "nothing_to_revise": "there was nothing to change yet, reload the page and try again",
+      "platform_busy": "the ad platform is receiving too many requests right now, nothing was spent, try again in a few minutes",
       "generic": "something went wrong, try again in a minute"
     }
   }

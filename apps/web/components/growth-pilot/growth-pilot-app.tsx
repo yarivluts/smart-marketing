@@ -42,7 +42,7 @@ function failureKey(code: string | null): 'site' | 'quota_exceeded' | 'nothing_f
   return 'provider';
 }
 
-const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise'];
+const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise', 'platform_busy'];
 
 /** A stored failure code in plain words; an unknown code never reaches the screen. */
 function useReason(): (code: string | null | undefined) => string {
@@ -512,7 +512,7 @@ function TargetPublishLine({ target, metaConnectHref, results }: { target: Growt
   return (
     <p className={cn('flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'running' ? 'text-success' : status === 'failed' || status === 'needs_meta' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-publish" data-publish={status}>
       <Send className="h-3.5 w-3.5" aria-hidden="true" />
-      {status === 'failed' ? t('failed', { reason: reasonOf(target.publishFailure) }) : t(status)}
+      {status === 'failed' ? t('failed', { reason: reasonOf(target.publishFailure === 'quota_exceeded' ? 'platform_busy' : target.publishFailure) }) : t(status)}
       {results && (status === 'published' || status === 'running') ? (
         <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
           {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}

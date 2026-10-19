@@ -335,6 +335,16 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByText(/reconnect your ad account in Ad platform connections/)).toBeInTheDocument();
     });
 
+    it('does not blame the daily AI limit when the ad platform rate-limits a publish', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('the ad platform is receiving too many requests');
+      expect(view.container).not.toHaveTextContent('AI limit');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('פלטפורמת הפרסום מקבלת כרגע יותר מדי בקשות');
+    });
+
     it('says why ads failed, and starts them for an approved target that has none yet', async () => {
       const waiting = page({ proposals: [], targets: [{ ...ACTIVE_TARGET, briefId: null, adsStatus: 'none' }] });
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...ACTIVE_TARGET, adsStatus: 'failed', adsFailure: 'quota_exceeded' }] }) });
