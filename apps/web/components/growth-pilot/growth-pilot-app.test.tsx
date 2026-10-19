@@ -181,6 +181,12 @@ describe('GrowthPilotApp', () => {
     expect(screen.queryByRole('button', { name: 'Use another address' })).toBeNull();
     expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('resets tomorrow');
     quota.unmount();
+    const unavailable = view('provider_billing');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Use another address' })).toBeNull();
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('contact GrowthOS support');
+    expect(screen.getByTestId('growth-pilot-failed')).not.toHaveTextContent('provider_billing');
+    unavailable.unmount();
     view('provider_failed');
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
