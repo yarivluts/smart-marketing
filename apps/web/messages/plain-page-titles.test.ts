@@ -3,6 +3,7 @@ import en from './en.json';
 import he from './he.json';
 
 const pages = [
+  ['ApiKeys', 'projectKeysLink'],
   ['Hooks', 'projectHooksLink'],
   ['SchemaRegistry', 'projectSchemaRegistryLink'],
   ['IngestHealth', 'projectIngestHealthLink'],

@@ -40,7 +40,7 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'API keys' }).click();
+    await page.getByRole('link', { name: 'Access keys' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/keys$`));
     await expect(page.getByText('No keys minted for this project yet.')).toBeVisible();
 
