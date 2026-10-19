@@ -42,7 +42,7 @@ test.describe('Billing ops feed (KAN-80)', () => {
     await expect(page.getByRole('heading', { name: `Payments & refunds for Client Alpha` })).toBeVisible();
     await expect(page.getByText('No billing events landed for this project yet.')).toBeVisible();
     // KAN-94: a third section for subscriptions currently in dunning, alongside the existing churn one.
-    await expect(page.getByRole('heading', { name: 'Subscriptions in dunning' })).toBeVisible();
-    await expect(page.getByText('No subscriptions in dunning for this project yet.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Subscriptions with a failed payment' })).toBeVisible();
+    await expect(page.getByText('No subscriptions with a failed payment yet. That is good news.')).toBeVisible();
   });
 });
