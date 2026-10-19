@@ -3994,7 +3994,7 @@
     "stageVideoAssembled": "Assembled · {seconds}s",
     "video": {
       "title": "Video",
-      "description": "Each scene becomes its own clip from Gemini Omni. When every scene has a current clip, join them into one video of up to a minute.",
+      "description": "Each scene becomes its own short video clip. When every scene has an up-to-date clip, join them into one video of up to a minute.",
       "textNote": "On-screen text is not drawn into the video: AI video models render letters badly, and Hebrew worst of all. Add it as a caption or text layer in the ad platform.",
       "notConfigured": "No video model is configured for this deployment, so clips cannot be generated. Existing clips can still be watched and assembled.",
       "saveScriptFirst": "Save a script first. Each saved scene can then be rendered as a clip.",
@@ -4596,7 +4596,7 @@
       "promptPlaceholder": "A phone showing a signed contract with a green check mark",
       "aspectLabel": "Shape",
       "labelLabel": "Name",
-      "descriptionLabel": "What it shows (goes into the video prompt)",
+      "descriptionLabel": "What the picture shows (the AI uses this to place it in the video)",
       "descriptionPlaceholder": "The dashboard after a document was signed",
       "working": {
         "upload": "Uploading…",
@@ -4755,7 +4755,7 @@
       "open": "Advanced settings",
       "changed": "Changed",
       "title": "Advanced video settings",
-      "description": "Settings for every scene of this ad, sent to the video model (Gemini Omni) with each clip.",
+      "description": "Settings that apply to every scene of this ad.",
       "resolutionLabel": "Resolution",
       "resolution": {
         "360p": "360p - quick drafts",
@@ -4783,7 +4783,7 @@
       "musicDescriptionPlaceholder": "e.g. upbeat acoustic guitar",
       "avoidLabel": "Never show",
       "avoidPlaceholder": "e.g. animals, cars, crowds",
-      "avoidHint": "Things that must not appear in any scene. The video model has no separate field for this, so it is written into every prompt.",
+      "avoidHint": "Things that must not appear in any scene. The AI is told to avoid them in every scene.",
       "outOfDateNote": "Saving a change makes the clips made with the old settings out of date - render them again to apply it.",
       "reset": "Back to defaults",
       "save": "Save settings",
