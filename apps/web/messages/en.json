@@ -5955,6 +5955,8 @@
       "cancelled": "it was stopped before it finished, ask for a change to try again",
       "nothing_to_revise": "there was nothing to change yet, reload the page and try again",
       "platform_busy": "the ad platform is receiving too many requests right now, nothing was spent, try again in a few minutes",
+      "timed_out": "it took too long and was given up, ask for a change to try again",
+      "no_concepts": "the AI could not come up with ideas for this, ask for a change worded differently",
       "generic": "something went wrong, try again in a minute"
     }
   }
