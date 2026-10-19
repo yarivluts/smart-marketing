@@ -112,6 +112,7 @@
     "invalidCredentialsError": "Incorrect email or password.",
     "emailInUseError": "An account with this email already exists.",
     "weakPasswordError": "Choose a password with at least 6 characters.",
+    "passwordHint": "At least 6 characters.",
     "tooManyAttemptsError": "Too many tries. Wait a few minutes and try again, or use \"Forgot password\".",
     "networkError": "We cannot reach GrowthOS. Check your internet connection and try again.",
     "popupBlockedError": "Your browser blocked the Google window. Allow pop-ups for this site, or sign in with your email.",
