@@ -30,8 +30,8 @@ describe('AuthCard Component', () => {
     );
 
     expect(screen.getByText('You stay in control')).toBeInTheDocument();
-    expect(screen.getByText('Encrypted in transit (HTTPS)')).toBeInTheDocument();
-    expect(screen.getByText('Every change audit-logged')).toBeInTheDocument();
+    expect(screen.getByText('Your data travels over a secure connection')).toBeInTheDocument();
+    expect(screen.getByText('Every change is recorded')).toBeInTheDocument();
     // No certification the product cannot back up.
     expect(screen.queryByText(/SOC ?2/i)).toBeNull();
   });
