@@ -34,10 +34,12 @@ async function callPilot(base: string, path: string, body?: unknown): Promise<Ap
   }
 }
 
-function failureKey(code: string | null): 'site' | 'blocked' | 'unreadable' | 'quota_exceeded' | 'nothing_found' | 'unavailable' | 'provider' {
+function failureKey(code: string | null): 'site' | 'slow' | 'looping' | 'blocked' | 'unreadable' | 'quota_exceeded' | 'nothing_found' | 'unavailable' | 'provider' {
   if (!code) return 'provider';
   if (code === 'site_blocked_url') return 'blocked';
   if (code === 'site_not_html' || code === 'site_empty_page') return 'unreadable';
+  if (code === 'site_timeout') return 'slow';
+  if (code === 'site_too_many_redirects') return 'looping';
   if (code.startsWith('site_')) return 'site';
   if (code === 'quota_exceeded' || code === 'nothing_found') return code;
   if (code === 'provider_billing' || code === 'not_configured') return 'unavailable';
@@ -199,7 +201,7 @@ function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; c
   const t = useTranslations('GrowthPilot');
   const kind = failureKey(code);
   // Trying the same address again cannot help when nothing was found, the address is private or has no text, today's AI limit is gone or the AI is not available on our side - offer only what can work.
-  const canRetry = kind === 'site' || kind === 'provider';
+  const canRetry = kind === 'site' || kind === 'slow' || kind === 'provider';
   const canUseOther = kind !== 'quota_exceeded' && kind !== 'unavailable';
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-3xl border border-warning/40 bg-card p-6 shadow-soft" data-testid="growth-pilot-failed">

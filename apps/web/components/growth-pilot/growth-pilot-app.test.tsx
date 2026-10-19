@@ -170,6 +170,16 @@ describe('GrowthPilotApp', () => {
     await waitFor(() => expect(sent(fetchMock, 0)).toEqual({ url: BASE, body: { siteUrl: 'https://easysign.co.il/' } }));
   });
 
+  it('says a slow site is worth another try, and a redirect loop is not', () => {
+    const slow = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_timeout' })} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('The site took too long to answer');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    slow.unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_too_many_redirects' })} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('keeps sending visitors in a circle');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
   it('says a private address or a page with no text cannot be read, and offers no useless retry', () => {
     const view = (failureCode: string) => renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode })} />, { locale: 'en' });
     const blocked = view('site_blocked_url');
