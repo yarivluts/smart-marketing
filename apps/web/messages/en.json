@@ -305,6 +305,7 @@
     "groupCustomers": "Customers and signals",
     "groupAnalytics": "Analytics",
     "groupAdmin": "Administration",
+    "allTools": "All tools ({count})",
     "inviteHeading": "Invite a teammate",
     "teamMixTitle": "Team mix",
     "teamMixDescription": "Active members by the role they hold.",
