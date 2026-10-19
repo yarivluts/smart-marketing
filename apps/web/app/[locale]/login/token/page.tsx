@@ -21,7 +21,7 @@ export default async function TokenSignInPage({ params }: PageProps): Promise<Re
 
   const session = await getServerSession();
   if (session) {
-    redirect(`/${locale}/dashboard`);
+    redirect(`/${locale}/start`);
   }
 
   return (

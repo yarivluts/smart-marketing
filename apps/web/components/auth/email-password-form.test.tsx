@@ -122,7 +122,7 @@ describe('EmailPasswordForm Component', () => {
 
     await waitFor(() => {
       expect(mockSignInWithGoogle).toHaveBeenCalled();
-      expect(mockRouterPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockRouterPush).toHaveBeenCalledWith('/start');
     });
   });
 });

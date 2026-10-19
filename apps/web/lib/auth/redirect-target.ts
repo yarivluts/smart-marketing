@@ -1,4 +1,5 @@
-const DEFAULT_REDIRECT_PATH = '/dashboard';
+// /start sends a person to the project they work in (see app/[locale]/start/page.tsx).
+const DEFAULT_REDIRECT_PATH = '/start';
 
 /**
  * Resolves where to send the user after sign-in/sign-up. `from` comes from

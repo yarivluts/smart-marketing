@@ -22,7 +22,7 @@ export default async function LoginPage({ params }: PageProps): Promise<React.Re
   // A real (verified) session redirects away from login.
   const session = await getServerSession();
   if (session) {
-    redirect(`/${locale}/dashboard`);
+    redirect(`/${locale}/start`);
   }
 
   return (
