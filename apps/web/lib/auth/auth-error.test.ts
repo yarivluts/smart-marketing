@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import enMessages from '../../messages/en.json';
+import heMessages from '../../messages/he.json';
 import { authErrorMessageKey, isAuthCancelled } from './auth-error';
 
 describe('authErrorMessageKey', () => {
@@ -12,6 +14,8 @@ describe('authErrorMessageKey', () => {
     ['auth/too-many-requests', 'tooManyAttemptsError'],
     ['auth/network-request-failed', 'networkError'],
     ['auth/popup-blocked', 'popupBlockedError'],
+    ['auth/account-exists-with-different-credential', 'accountExistsOtherMethodError'],
+    ['auth/user-disabled', 'accountDisabledError'],
     ['auth/invalid-custom-token', 'invalidOrExpiredTokenError'],
     ['auth/custom-token-mismatch', 'invalidOrExpiredTokenError'],
   ])('maps Firebase code %s to %s', (code, key) => {
@@ -38,5 +42,14 @@ describe('isAuthCancelled', () => {
   it('is false for real failures', () => {
     expect(isAuthCancelled({ code: 'auth/network-request-failed' })).toBe(false);
     expect(isAuthCancelled(new Error('boom'))).toBe(false);
+  });
+});
+
+describe('auth error copy', () => {
+  it('has English and Hebrew text for the new sign-in failures', () => {
+    for (const key of ['accountExistsOtherMethodError', 'accountDisabledError'] as const) {
+      expect(enMessages.Auth[key]).toBeTruthy();
+      expect(heMessages.Auth[key]).toBeTruthy();
+    }
   });
 });
