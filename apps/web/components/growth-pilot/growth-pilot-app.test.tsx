@@ -170,6 +170,19 @@ describe('GrowthPilotApp', () => {
     await waitFor(() => expect(sent(fetchMock, 0)).toEqual({ url: BASE, body: { siteUrl: 'https://easysign.co.il/' } }));
   });
 
+  it('says a private address or a page with no text cannot be read, and offers no useless retry', () => {
+    const view = (failureCode: string) => renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode })} />, { locale: 'en' });
+    const blocked = view('site_blocked_url');
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('not a public website page');
+    expect(screen.getByTestId('growth-pilot-failed')).not.toHaveTextContent('site_blocked_url');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Use another address' })).toBeInTheDocument();
+    blocked.unmount();
+    view('site_empty_page');
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('no text we can read');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+  });
+
   it('offers only the next steps that can work after a failed read', () => {
     const view = (failureCode: string) => renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode })} />, { locale: 'en' });
     const nothing = view('nothing_found');
