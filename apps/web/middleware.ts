@@ -2,6 +2,7 @@ import createIntlMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
 import { SESSION_COOKIE_NAME } from './lib/auth/constants';
+import { LAST_PROJECT_COOKIE, LAST_PROJECT_MAX_AGE_SECONDS, projectFromPath } from './lib/auth/last-project';
 
 const intlMiddleware = createIntlMiddleware(routing);
 
@@ -46,6 +47,17 @@ export default function middleware(request: NextRequest): NextResponse {
       // still has it after signing in; resolveRedirectTarget only accepts same-app relative paths.
       loginUrl.searchParams.set('from', `${pathWithoutLocale}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
+    }
+
+    // Remember the project being opened, so the next sign-in lands back in it.
+    const project = hasSession ? projectFromPath(pathWithoutLocale) : null;
+    if (project) {
+      const response = intlMiddleware(request);
+      const value = `${project.orgId}/${project.projectId}`;
+      if (request.cookies.get(LAST_PROJECT_COOKIE)?.value !== value) {
+        response.cookies.set(LAST_PROJECT_COOKIE, value, { path: '/', maxAge: LAST_PROJECT_MAX_AGE_SECONDS, sameSite: 'lax', httpOnly: true, secure: request.nextUrl.protocol === 'https:' });
+      }
+      return response;
     }
   }
 
