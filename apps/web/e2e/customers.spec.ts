@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -37,6 +38,7 @@ test.describe('Customer search (KAN-108)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Customers' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/customers$`));
     await expect(page.getByRole('heading', { name: 'Customer search for Client Epsilon' })).toBeVisible();
@@ -56,6 +58,7 @@ test.describe('Customer search (KAN-108)', () => {
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // Register a "customer" entity schema so the search form itself renders.
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Data fields' }).click();
     await page.getByLabel('Kind').selectOption('entity');
     await page.getByLabel('Name', { exact: true }).fill('customer');
@@ -63,6 +66,7 @@ test.describe('Customer search (KAN-108)', () => {
     await page.getByRole('button', { name: 'Register schema' }).click();
     await expect(page.getByText('entity: customer')).toBeVisible();
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Customers' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/customers$`));
 

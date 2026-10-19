@@ -1,9 +1,10 @@
 'use client';
 
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import {
   Activity,
   Award,
+  ChevronDown,
   BarChart3,
   Bell,
   Bot,
@@ -115,6 +116,11 @@ export interface AppShellNavItem {
 export interface AppShellNavSection {
   heading?: string;
   items: AppShellNavItem[];
+  /**
+   * Sections that share a group fold together under one toggle, closed by default, so a newcomer
+   * sees only the essentials. The group opens by itself when the current page is inside it.
+   */
+  group?: { id: string; label: string };
 }
 
 export interface AppShellProps {
@@ -204,21 +210,110 @@ function NavSections({
   // The same href can appear twice (a primary module and its restored per-feature link, e.g. the
   // funnel): only the first occurrence is marked current, so the sidebar never shows two active pills.
   const activeItem = sections.flatMap((section) => section.items).find((item) => item.href === activeHref);
+  // Consecutive sections of the same group render as one folded group.
+  const blocks: ({ kind: 'section'; section: AppShellNavSection; index: number } | { kind: 'group'; group: NonNullable<AppShellNavSection['group']>; sections: AppShellNavSection[] })[] = [];
+  sections.forEach((section, index) => {
+    const last = blocks[blocks.length - 1];
+    if (section.group && last?.kind === 'group' && last.group.id === section.group.id) last.sections.push(section);
+    else if (section.group) blocks.push({ kind: 'group', group: section.group, sections: [section] });
+    else blocks.push({ kind: 'section', section, index });
+  });
   return (
     <nav className="flex flex-col gap-pp-md">
-      {sections.map((section, index) => (
-        <div key={section.heading ?? index} className="flex flex-col gap-1">
-          {section.heading ? (
-            <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">{section.heading}</span>
-          ) : index > 0 ? (
-            <div className="mx-pp-md mb-1 border-b border-pp-outline-variant/30" aria-hidden="true" />
-          ) : null}
-          {section.items.map((item) => (
-            <NavLink key={item.href} item={item} active={item === activeItem} onClick={onNavigate} />
+      {blocks.map((block) =>
+        block.kind === 'group' ? (
+          <NavGroup key={`group-${block.group.id}`} group={block.group} sections={block.sections} activeItem={activeItem} onNavigate={onNavigate} />
+        ) : (
+          <div key={block.section.heading ?? block.index} className="flex flex-col gap-1">
+            {block.section.heading ? (
+              <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">{block.section.heading}</span>
+            ) : block.index > 0 ? (
+              <div className="mx-pp-md mb-1 border-b border-pp-outline-variant/30" aria-hidden="true" />
+            ) : null}
+            {block.section.items.map((item) => (
+              <NavLink key={item.href} item={item} active={item === activeItem} onClick={onNavigate} />
+            ))}
+          </div>
+        ),
+      )}
+    </nav>
+  );
+}
+
+/** Where a person's open/closed choice for a nav group is remembered (this browser only). */
+function groupStorageKey(id: string): string {
+  return `growthos.nav.${id}`;
+}
+
+/** A folded run of nav sections: one button with how many links it holds; the links show once opened. */
+function NavGroup({
+  group,
+  sections,
+  activeItem,
+  onNavigate,
+}: {
+  group: NonNullable<AppShellNavSection['group']>;
+  sections: AppShellNavSection[];
+  activeItem: AppShellNavItem | undefined;
+  onNavigate?: () => void;
+}): React.ReactElement {
+  const items = sections.flatMap((section) => section.items);
+  const holdsActive = activeItem !== undefined && items.includes(activeItem);
+  const [open, setOpen] = useState(holdsActive);
+  const panelId = useId();
+  // A remembered choice applies after mount (the server cannot read it); the current page wins.
+  useEffect(() => {
+    if (holdsActive) {
+      setOpen(true);
+      return;
+    }
+    try {
+      if (window.localStorage.getItem(groupStorageKey(group.id)) === 'open') setOpen(true);
+    } catch {
+      // Storage can be blocked: the group just starts closed.
+    }
+  }, [group.id, holdsActive]);
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try {
+      window.localStorage.setItem(groupStorageKey(group.id), next ? 'open' : 'closed');
+    } catch {
+      // Not remembered, still toggled.
+    }
+  };
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="mx-pp-md mb-1 border-b border-pp-outline-variant/30" aria-hidden="true" />
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={open}
+        aria-controls={panelId}
+        className="flex items-center justify-between gap-pp-sm rounded-pp-lg px-pp-md py-pp-sm text-start text-pp-label-md text-pp-on-surface-variant transition-colors hover:bg-pp-surface-container-high hover:text-pp-on-surface"
+        data-testid={`nav-group-${group.id}`}
+      >
+        <span className="font-medium">{group.label}</span>
+        <span className="flex items-center gap-1.5">
+          <span className="rounded-full bg-pp-surface-container-high px-2 py-0.5 text-pp-label-sm tabular-nums" aria-hidden="true">
+            {items.length}
+          </span>
+          <ChevronDown className={cn('h-4 w-4 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+        </span>
+      </button>
+      {open ? (
+        <div id={panelId} className="flex flex-col gap-pp-md">
+          {sections.map((section, index) => (
+            <div key={section.heading ?? index} className="flex flex-col gap-1">
+              {section.heading ? <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">{section.heading}</span> : null}
+              {section.items.map((item) => (
+                <NavLink key={item.href} item={item} active={item === activeItem} onClick={onNavigate} />
+              ))}
+            </div>
           ))}
         </div>
-      ))}
-    </nav>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -55,6 +56,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     await page.goto(`/en/orgs/${orgId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Plugin registry' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/plugins$`));
 
@@ -66,6 +68,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await expect(page.getByText('v1.0.0 · source')).toBeVisible();
 
     await page.goto(`/en/orgs/${orgId}`);
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Plugins' }).click();
     await expect(page).toHaveURL(/\/en\/orgs\/[^/]+\/projects\/[^/]+\/plugins$/);
 
