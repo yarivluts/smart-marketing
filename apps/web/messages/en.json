@@ -2400,7 +2400,7 @@
     "freshnessStaleLabel": "Stale — data as of {asOf}",
     "tileUnavailableReason": {
       "warehouse_not_configured": "Warehouse not configured yet",
-      "quota_exceeded": "Daily query quota reached",
+      "quota_exceeded": "Too many data requests today. Try again tomorrow",
       "not_yet_backed": "Not backed by real data yet",
       "query_error": "Couldn't load this tile"
     },
@@ -2501,7 +2501,7 @@
     "thermometerUnavailableReason": {
       "no_measurements": "No data for this metric yet - pace cannot be judged",
       "warehouse_not_configured": "Warehouse not configured yet",
-      "quota_exceeded": "Daily query quota reached",
+      "quota_exceeded": "Too many data requests today. Try again tomorrow",
       "not_yet_backed": "Not backed by real data yet",
       "query_error": "Couldn't load this goal's progress",
       "pending": "Just created - progress appears once the page is refreshed"
@@ -3526,7 +3526,7 @@
     "funnelUnavailable": {
       "no_funnel": "GrowthOS only shows conversion for a funnel you have confirmed. Confirm your funnel stages in project onboarding, and conversion will appear here once events land.",
       "warehouse_not_configured": "The data warehouse is not configured for this project yet, so the funnel cannot be queried.",
-      "quota_exceeded": "This project's daily query quota is used up. The funnel will load again when the quota resets.",
+      "quota_exceeded": "Too many data requests today, so the funnel is paused. It will load again tomorrow.",
       "query_error": "The funnel could not be loaded. Nothing is shown rather than an estimate - try again later."
     },
     "defineFunnelCta": "Define your funnel",
@@ -3539,7 +3539,7 @@
     "calibrationNoData": "Not enough landed data yet: no signups have been scored into quality tiers for this project.",
     "sectionUnavailable": {
       "warehouse_not_configured": "Unavailable: the data warehouse is not configured for this project yet.",
-      "quota_exceeded": "Unavailable right now: this project's daily query quota is used up.",
+      "quota_exceeded": "Unavailable right now: too many data requests today. Try again tomorrow.",
       "not_yet_backed": "Unavailable: the warehouse table behind this section has not been built yet.",
       "query_error": "This section could not be loaded. Nothing is shown rather than an estimate."
     },
