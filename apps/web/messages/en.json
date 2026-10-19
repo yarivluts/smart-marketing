@@ -5877,6 +5877,7 @@
       "countries": "Countries",
       "budget": "Daily budget",
       "budgetHint": "The most you will spend per day, once you turn the ads on. Nothing is spent before that.",
+      "budgetNeeded": "Enter a daily budget above zero to publish. It is the most you will spend per day, and nothing is spent until you turn the ads on.",
       "approve": "Publish (switched off)",
       "activate": "Turn on the ads",
       "status": {

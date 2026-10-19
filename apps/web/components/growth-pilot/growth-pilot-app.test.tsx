@@ -434,7 +434,9 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription('The most you will spend per day, once you turn the ads on. Nothing is spent before that.');
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '0' } });
       expect(within(card).getByTestId('growth-pilot-approve')).toBeDisabled();
+      expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription(/Enter a daily budget above zero to publish/);
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '35' } });
+      expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription(/^The most you will spend/);
       fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
       await waitFor(() => expect(sent(fetchMock)).toEqual({ url: BASE + '/proposals/pub1', body: { action: 'approve', dailyBudget: 35 } }));
       expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Facebook and Instagram, switched off - not showing to anyone');
