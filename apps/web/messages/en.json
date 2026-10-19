@@ -115,6 +115,8 @@
     "tooManyAttemptsError": "Too many tries. Wait a few minutes and try again, or use \"Forgot password\".",
     "networkError": "We cannot reach GrowthOS. Check your internet connection and try again.",
     "popupBlockedError": "Your browser blocked the Google window. Allow pop-ups for this site, or sign in with your email.",
+    "accountExistsOtherMethodError": "This email already has a GrowthOS account made another way. Sign in with your email and password instead.",
+    "accountDisabledError": "This account has been switched off. Contact GrowthOS support and we will help you.",
     "tokenSignInPending": "Signing you in...",
     "invalidOrExpiredTokenError": "This sign-in link is invalid or has expired.",
     "backToSignIn": "Back to sign in",

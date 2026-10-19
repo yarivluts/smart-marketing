@@ -5,6 +5,8 @@ export type AuthErrorMessageKey =
   | 'tooManyAttemptsError'
   | 'networkError'
   | 'popupBlockedError'
+  | 'accountExistsOtherMethodError'
+  | 'accountDisabledError'
   | 'invalidOrExpiredTokenError'
   | 'genericError';
 
@@ -18,6 +20,9 @@ const CODE_TO_KEY: Record<string, AuthErrorMessageKey> = {
   'auth/too-many-requests': 'tooManyAttemptsError',
   'auth/network-request-failed': 'networkError',
   'auth/popup-blocked': 'popupBlockedError',
+  // Google sign-in for an email that was registered with a password (or the reverse).
+  'auth/account-exists-with-different-credential': 'accountExistsOtherMethodError',
+  'auth/user-disabled': 'accountDisabledError',
   // A custom token (`/login/token`) that's expired (~1hr lifetime),
   // already-consumed-and-revoked, or was minted for a mismatched Firebase
   // project.
