@@ -180,7 +180,7 @@ describe('Tier 1: Zero-Setup Executive Blended Reporting (R3)', () => {
     expect(screen.getByTestId('total-spend-val')).toHaveTextContent('$20,000');
     expect(screen.getByTestId('blended-cac-val')).toHaveTextContent('$40.00');
     expect(screen.getByTestId('blended-roas-val')).toHaveTextContent('4.2x');
-    expect(screen.getByText('500 Total Conversions')).toBeInTheDocument();
+    expect(screen.getByText('500 sign-ups and sales')).toBeInTheDocument();
   });
 });
 

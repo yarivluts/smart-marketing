@@ -188,7 +188,7 @@ export function ExecutiveBlendedReport({
               {usd2(metrics.blendedCacUsd)}
             </div>
             <div className="mt-2 text-xs text-muted-foreground font-medium">
-              {`${plain(metrics.totalConversions)} ${t('totalConversionsLabel', { defaultMessage: 'Total Conversions' })}`}
+              {`${plain(metrics.totalConversions)} ${t('totalConversionsLabel', { defaultMessage: 'sign-ups and sales' })}`}
             </div>
           </div>
           {comparison ? (
@@ -269,7 +269,7 @@ export function ExecutiveBlendedReport({
             </div>
           </div>
           <div className="mt-3 text-xs text-muted-foreground">
-            {`${t('churnRateLabel', { defaultMessage: 'Churn Rate' })}: ${pct(metrics.churnRatePct)}`}
+            {`${t('churnRateLabel', { defaultMessage: 'Customers who left' })}: ${pct(metrics.churnRatePct)}`}
           </div>
         </div>
       </div>
