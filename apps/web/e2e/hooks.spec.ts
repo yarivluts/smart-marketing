@@ -43,7 +43,7 @@ test.describe('Inbound hooks: create endpoint, copy receive URL, review queue (K
 
     await page.getByRole('link', { name: 'Incoming data links' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/hooks$`));
-    await expect(page.getByText('No hook endpoints created for this project yet.')).toBeVisible();
+    await expect(page.getByText('No incoming data links yet. Create one below, then paste its address into the tool that should send you data.')).toBeVisible();
 
     await page.getByLabel('Name').fill('Zapier');
     await page.getByLabel('Environment').selectOption({ label: 'Prod' });
