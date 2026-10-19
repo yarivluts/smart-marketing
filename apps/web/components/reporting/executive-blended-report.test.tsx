@@ -26,9 +26,11 @@ describe('ExecutiveBlendedReport (Reporting Module)', () => {
     expect(screen.getByTestId('blended-cac-val')).toHaveTextContent('$40.00');
     expect(screen.getByTestId('blended-roas-val')).toHaveTextContent('4.2x');
     expect(screen.getByTestId('dunning-rate-val')).toHaveTextContent('84.5%');
-    expect(screen.getByText('500 Total Conversions')).toBeInTheDocument();
+    expect(screen.getByText('500 sign-ups and sales')).toBeInTheDocument();
     expect(screen.getByText('Time to become a customer: 3.5 days')).toBeInTheDocument();
     expect(screen.queryByText(/Conversion Velocity/)).not.toBeInTheDocument();
+    expect(screen.getByText('Customers who left: 1.5%')).toBeInTheDocument();
+    expect(screen.queryByText(/Churn Rate|Total Conversions/)).not.toBeInTheDocument();
   });
 
   /*
