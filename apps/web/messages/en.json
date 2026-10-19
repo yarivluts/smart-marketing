@@ -311,7 +311,7 @@
     "recentActivityEmpty": "Nothing has been changed here yet",
     "recentActivityLatest": "Latest changes",
     "projectAdStudioLink": "AI Ad Studio",
-    "projectInstallLink": "Installation"
+    "projectInstallLink": "Connect your site"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -5389,7 +5389,7 @@
     }
   },
   "Installation": {
-    "metaTitle": "Installation",
+    "metaTitle": "Connect your site",
     "title": "Connect your site",
     "description": "Everything an integration needs in one place: the keys, ready-to-paste code for the website and the server, and a live check of what really arrives.",
     "keysTitle": "Keys for {environment}",

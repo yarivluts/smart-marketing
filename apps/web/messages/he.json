@@ -311,7 +311,7 @@
     "recentActivityEmpty": "עדיין לא בוצעו כאן שינויים",
     "recentActivityLatest": "השינויים האחרונים",
     "projectAdStudioLink": "סטודיו מודעות AI",
-    "projectInstallLink": "התקנה"
+    "projectInstallLink": "חיבור האתר שלכם"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -5389,7 +5389,7 @@
     }
   },
   "Installation": {
-    "metaTitle": "התקנה",
+    "metaTitle": "חיבור האתר שלכם",
     "title": "חיבור האתר שלכם",
     "description": "כל מה שהתממשקות צריכה במקום אחד: המפתחות, קוד מוכן להדבקה לאתר ולשרת, ובדיקה חיה של מה שבאמת מגיע.",
     "keysTitle": "מפתחות ל-{environment}",
