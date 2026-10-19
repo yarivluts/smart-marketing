@@ -425,7 +425,9 @@ function ProposalCard({
                   aria-describedby="growth-pilot-budget-hint"
                 />
               </span>
-              <span id="growth-pilot-budget-hint" className="text-xs text-muted-foreground">{tp('budgetHint')}</span>
+              <span id="growth-pilot-budget-hint" className={Number(budget) > 0 ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
+                {Number(budget) > 0 ? tp('budgetHint') : tp('budgetNeeded')}
+              </span>
             </label>
           ) : null}
           <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
