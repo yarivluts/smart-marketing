@@ -29,3 +29,13 @@ describe('project sidebar names for the data pages', () => {
     }
   });
 });
+
+describe('project access keys name', () => {
+  it('does not use the "API" abbreviation in either language', () => {
+    for (const msgs of [en, he]) {
+      const nav = msgs.OrgDetailPage as Record<string, string>;
+      expect(nav.projectKeysLink).toBeTruthy();
+      expect(nav.projectKeysLink).not.toMatch(/\bAPI\b/i);
+    }
+  });
+});
