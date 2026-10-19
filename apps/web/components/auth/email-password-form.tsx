@@ -255,6 +255,7 @@ export function EmailPasswordForm({
               name="password"
               type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              aria-describedby={mode === 'signup' ? 'password-hint' : undefined}
               required
               placeholder="••••••••"
               value={password}
@@ -262,6 +263,11 @@ export function EmailPasswordForm({
               className="h-10 rounded-xl bg-card text-xs focus:ring-1 focus:ring-primary shadow-inner"
             />
           </div>
+          {mode === 'signup' ? (
+            <p id="password-hint" className="text-[11px] text-muted-foreground">
+              {t('passwordHint')}
+            </p>
+          ) : null}
         </div>
 
         {/* Error Alert Box */}

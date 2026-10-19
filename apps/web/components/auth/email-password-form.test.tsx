@@ -50,6 +50,15 @@ describe('EmailPasswordForm Component', () => {
     mockUseSearchParams.mockReturnValue({ get: () => null });
   });
 
+  it('sign-up tells people the password rule before they type; sign-in does not', () => {
+    const { unmount } = renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    expect(screen.getByText(enMessages.Auth.passwordHint)).toBeTruthy();
+    expect(screen.getByLabelText(enMessages.Auth.passwordLabel).getAttribute('aria-describedby')).toBe('password-hint');
+    unmount();
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    expect(screen.queryByText(enMessages.Auth.passwordHint)).toBeNull();
+  });
+
   it('posts, so a submit before hydration never puts the password in the URL', () => {
     const { container } = renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
     expect(container.querySelector('form')?.getAttribute('method')).toBe('post');
