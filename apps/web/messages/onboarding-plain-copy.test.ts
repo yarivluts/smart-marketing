@@ -24,7 +24,10 @@ describe('onboarding intro copy explains itself to a beginner', () => {
     expect(en.Onboarding.packSaasMarketingDescription).toMatch(/cost per customer \(CAC\)/);
     expect(en.Onboarding.packSaasMarketingDescription).toMatch(/recurring revenue \(MRR\)/);
     expect(en.Onboarding.packEngagementDescription).toMatch(/each day, week and month \(DAU\/WAU\/MAU\)/);
-    expect(en.Onboarding.sourceStepIntro).toMatch(/access key \(API key\)/);
+    expect(en.Onboarding.sourceStepIntro).toMatch(/using an access key/);
+    expect(en.Onboarding.sourceStepIntro).not.toMatch(/API/);
+    expect(he.Onboarding.sourceStepIntro).not.toMatch(/API/);
+    expect(en.Onboarding.sourceStepPushYourOwnHeading).not.toMatch(/push/i);
   });
 
   it('does not lead with plugin / ingest / funnel jargon', () => {
