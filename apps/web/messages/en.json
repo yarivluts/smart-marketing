@@ -5856,6 +5856,7 @@
       "title": "Ads for {name}",
       "description": "Image ads written and designed by the AI for this one. Approve them, ask for a change, or open them in the Ad Studio to edit anything.",
       "open": "Open in the Ad Studio",
+      "previewAlt": "Ad image {number} of {total}",
       "revising": "The AI is rewriting the ideas and making new images...",
       "changePlaceholder": "What should change in the ads? For example: brighter photos, mention the free plan",
       "status": {

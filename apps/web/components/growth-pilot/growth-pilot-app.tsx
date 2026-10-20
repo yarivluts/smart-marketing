@@ -342,10 +342,10 @@ function ProposalCard({
       </div>
       {(ads || proposal.kind === 'publish') && proposal.briefId && proposal.previewImageIds.length ? (
         <ul className="flex flex-wrap gap-2" data-testid="growth-pilot-ads-preview">
-          {proposal.previewImageIds.map((imageId) => (
+          {proposal.previewImageIds.map((imageId, index) => (
             <li key={imageId} className="h-28 overflow-hidden rounded-2xl bg-muted">
               {/* A plain img: private media from our own authenticated route, in its own shape. */}
-              <img src={`${studio.media}/briefs/${proposal.briefId}/images/${imageId}/media`} alt="" className="h-full w-auto object-contain" />
+              <img src={`${studio.media}/briefs/${proposal.briefId}/images/${imageId}/media`} alt={ta('previewAlt', { number: index + 1, total: proposal.previewImageIds.length })} className="h-full w-auto object-contain" />
             </li>
           ))}
         </ul>
