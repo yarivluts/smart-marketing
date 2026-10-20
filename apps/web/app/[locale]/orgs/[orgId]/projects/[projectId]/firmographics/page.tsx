@@ -142,7 +142,7 @@ export default async function FirmographicsPage({ params }: PageProps): Promise<
               items={shares.map((row) => ({
                 key: row.value || '__unknown__',
                 label: valueLabel(dimension.key, row.value),
-                sublabel: t('compositionMrr', { amount: Math.round(row.mrr) }),
+                sublabel: t('compositionRevenueShare', { percent: row.mrrShare }),
                 value: row.count,
               }))}
               valueFormatter={(count) => t('compositionCount', { count })}
