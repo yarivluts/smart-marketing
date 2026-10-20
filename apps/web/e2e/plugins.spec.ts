@@ -90,7 +90,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await expect(sandboxCheckbox).not.toBeChecked();
 
     // KAN-48: submitting without a required field shows an inline error and doesn't install yet.
-    await page.getByLabel("I've reviewed and approve these scopes").check();
+    await page.getByLabel("I allow this").check();
     await page.getByRole('button', { name: 'Install plugin' }).click();
     await expect(page.getByText('This field is required.')).toBeVisible();
 
