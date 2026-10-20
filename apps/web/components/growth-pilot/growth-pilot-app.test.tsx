@@ -123,6 +123,19 @@ describe('GrowthPilotApp', () => {
   });
 
   it.each([
+    ['en', 'You were signed out. Reload the page and sign in again - nothing was lost.'],
+    ['he', heMessages.GrowthPilot.errors.unauthorized],
+  ] as const)('a lost session says to sign in again, not "try again in a minute" (%s)', async (locale, text) => {
+    stubFetch({ status: 401, body: { error: 'unauthorized' } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(text);
+    expect(alert.textContent ?? '').not.toMatch(/unauthorized/i);
+  });
+
+  it.each([
     ['en', 'We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.'],
     ['he', heMessages.GrowthPilot.errors.generic],
   ] as const)('an unknown error says nothing was changed and what to do, not "something went wrong" (%s)', async (locale, text) => {

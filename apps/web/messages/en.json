@@ -5827,6 +5827,7 @@
       "invalid_budget": "Enter a daily budget above zero.",
       "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper & automation and choose Resume automation, then try again.",
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
+      "unauthorized": "You were signed out. Reload the page and sign in again - nothing was lost.",
       "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost."
     },
     "ads": {
