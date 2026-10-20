@@ -47,7 +47,7 @@ describe('EditFieldMappingForm', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('Shopify orders');
     expect(screen.getByLabelText('Target schema')).toHaveValue('order_completed');
     expect(screen.getByPlaceholderText('Target field, e.g. properties.amount')).toHaveValue('event_id');
-    expect(screen.getByLabelText('Source JSONPath, e.g. data.object.amount')).toHaveValue('id');
+    expect(screen.getByLabelText('Where in the data, e.g. data.object.amount')).toHaveValue('id');
   });
 
   it('includes the current schema name as an option even if it has fallen out of the active set', () => {
@@ -65,7 +65,7 @@ describe('EditFieldMappingForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shopify orders v2' } });
     fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_refunded' } });
-    fireEvent.change(screen.getByLabelText('Source JSONPath, e.g. data.object.amount'), { target: { value: 'other_id' } });
+    fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'other_id' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save mapping' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());

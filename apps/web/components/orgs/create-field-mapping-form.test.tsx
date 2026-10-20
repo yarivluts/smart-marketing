@@ -37,7 +37,7 @@ describe('CreateFieldMappingForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shopify orders' } });
     fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByPlaceholderText('Target field, e.g. properties.amount'), { target: { value: 'event_id' } });
-    fireEvent.change(screen.getByLabelText('Source JSONPath, e.g. data.object.amount'), { target: { value: 'id' } });
+    fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'id' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create mapping' }));
 
     await waitFor(() =>
@@ -128,10 +128,10 @@ describe('CreateFieldMappingForm', () => {
 
     fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByPlaceholderText('Target field, e.g. properties.amount'), { target: { value: 'event_id' } });
-    fireEvent.change(screen.getByLabelText('Source JSONPath, e.g. data.object.amount'), { target: { value: 'id' } });
+    fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'id' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByRole('button', { name: 'Apply all' });
 
@@ -152,16 +152,16 @@ describe('CreateFieldMappingForm', () => {
 
     fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
     // The user has started filling in a row (a source path) but hasn't named its target field yet.
-    fireEvent.change(screen.getByLabelText('Source JSONPath, e.g. data.object.amount'), { target: { value: 'created_at' } });
+    fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'created_at' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByRole('button', { name: 'Apply all' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply all' }));
 
-    const sourcePathInputs = screen.getAllByLabelText('Source JSONPath, e.g. data.object.amount');
+    const sourcePathInputs = screen.getAllByLabelText('Where in the data, e.g. data.object.amount');
     expect(sourcePathInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['created_at', 'id']);
   });
 
@@ -179,10 +179,10 @@ describe('CreateFieldMappingForm', () => {
 
     fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByPlaceholderText('Target field, e.g. properties.amount'), { target: { value: 'event_id' } });
-    fireEvent.change(screen.getByLabelText('Source JSONPath, e.g. data.object.amount'), { target: { value: 'my_own_id' } });
+    fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'my_own_id' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByRole('button', { name: 'Apply all' });
 
@@ -190,7 +190,7 @@ describe('CreateFieldMappingForm', () => {
 
     const targetFieldInputs = screen.getAllByPlaceholderText('Target field, e.g. properties.amount');
     expect(targetFieldInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['event_id', 'properties.order_id']);
-    const sourcePathInputs = screen.getAllByLabelText('Source JSONPath, e.g. data.object.amount');
+    const sourcePathInputs = screen.getAllByLabelText('Where in the data, e.g. data.object.amount');
     expect(sourcePathInputs.map((input) => (input as HTMLInputElement).value)).toEqual(['my_own_id', 'id']);
   });
 });
