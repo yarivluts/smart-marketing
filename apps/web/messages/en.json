@@ -436,7 +436,7 @@
     "doneMessage": "You're all set!",
     "packLandingPageTitle": "Landing Page Performance",
     "packLandingPageDescription": "Track conversion per landing page across campaigns.",
-    "sourceStepPushYourOwnIntro": "Works right now, no plugin setup needed — mint a key below and start sending events immediately.",
+    "sourceStepPushYourOwnIntro": "Works right now, with nothing to install first — create an access key below and your app can start sending data straight away.",
     "eyebrow": "Setup",
     "journeyStep_start": "Start",
     "journeyStep_pack": "Starting point",

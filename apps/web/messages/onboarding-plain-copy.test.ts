@@ -36,6 +36,12 @@ describe('onboarding intro copy explains itself to a beginner', () => {
     }
   });
 
+  it('says the send-your-own-data intro without "mint" or "plugin"', () => {
+    expect(en.Onboarding.sourceStepPushYourOwnIntro).not.toMatch(/mint|plugin|events/i);
+    expect(he.Onboarding.sourceStepPushYourOwnIntro).toMatch(/[֐-׿]/);
+    expect(he.Onboarding.sourceStepPushYourOwnIntro).not.toMatch(/תוסף/);
+  });
+
   it('keeps the Hebrew free of the funnel metaphor and in Hebrew', () => {
     expect(he.Onboarding.startHint).not.toMatch(/משפך/);
     for (const key of introKeys) {
