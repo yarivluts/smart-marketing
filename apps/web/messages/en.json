@@ -5719,6 +5719,7 @@
       "placeholder": "your-site.com",
       "label": "Website address",
       "submit": "Start",
+      "hint": "Not sure which address? Use your home page. Any public page works, and you do not need to log in or install anything.",
       "steps": {
         "read": "Reads the site",
         "propose": "Proposes what to grow",
