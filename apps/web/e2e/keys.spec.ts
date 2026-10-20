@@ -44,7 +44,7 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Access keys' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/keys$`));
-    await expect(page.getByText('No keys minted for this project yet.')).toBeVisible();
+    await expect(page.getByText('No access keys yet. You only need one if another tool will send data to GrowthOS or read from it.')).toBeVisible();
 
     await page.getByLabel('Name').fill('CI key');
     await page.getByLabel('Environment').selectOption({ label: 'Prod' });
