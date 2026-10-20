@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { AppShell, type AppShellNavItem } from './app-shell';
+import { AppShell, type AppShellNavItem, type AppShellNavSection } from './app-shell';
 import messages from '../../messages/en.json';
 
 const mockUsePathname = vi.fn();
@@ -127,5 +127,56 @@ describe('AppShell nav hints', () => {
     expect(link).toHaveAccessibleDescription('Enter your website; we do the rest');
     expect(screen.getAllByText('Enter your website; we do the rest').length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Home' })[0]).not.toHaveAttribute('aria-describedby');
+  });
+});
+
+describe('AppShell folded nav group', () => {
+  const pilot: AppShellNavItem = { href: '/orgs/org-1/projects/p1/growth-pilot', label: 'Growth Pilot', icon: 'Sparkles' };
+  const keys: AppShellNavItem = { href: '/orgs/org-1/projects/p1/keys', label: 'Access keys', icon: 'KeyRound' };
+  const more = { id: 'more', label: 'More tools' };
+  const sections: AppShellNavSection[] = [
+    { items: [pilot] },
+    { items: [homeItem, boardsItem], group: more },
+    { heading: 'Data', items: [keys], group: more },
+  ];
+
+  function renderGrouped(pathname: string) {
+    mockUsePathname.mockReturnValue(pathname);
+    return render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AppShell switchers={<span>switcher</span>} sections={sections} mobileTabItems={[pilot]}>
+          <p>page content</p>
+        </AppShell>
+      </NextIntlClientProvider>,
+    );
+  }
+
+  afterEach(() => window.localStorage.clear());
+
+  it('shows the essentials and folds the rest under one closed toggle that says how many it holds', () => {
+    renderGrouped('/orgs/org-1/projects/p1/growth-pilot');
+    const toggle = screen.getAllByRole('button', { name: /More tools/ })[0]!;
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveTextContent('3');
+    expect(screen.queryByRole('link', { name: 'Access keys' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'Growth Pilot' }).length).toBeGreaterThan(0);
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('link', { name: 'Access keys' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Data').length).toBeGreaterThan(0);
+    // The choice is remembered in this browser.
+    expect(window.localStorage.getItem('growthos.nav.more')).toBe('open');
+  });
+
+  it('opens by itself on a page inside it, marking that page', () => {
+    renderGrouped('/orgs/org-1/projects/p1/keys');
+    expect(screen.getAllByRole('button', { name: /More tools/ })[0]).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('link', { name: 'Access keys' })[0]).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('reopens as the person left it', () => {
+    window.localStorage.setItem('growthos.nav.more', 'open');
+    renderGrouped('/orgs/org-1/projects/p1/growth-pilot');
+    expect(screen.getAllByRole('button', { name: /More tools/ })[0]).toHaveAttribute('aria-expanded', 'true');
   });
 });

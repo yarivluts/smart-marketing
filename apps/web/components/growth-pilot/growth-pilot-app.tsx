@@ -34,17 +34,19 @@ async function callPilot(base: string, path: string, body?: unknown): Promise<Ap
   }
 }
 
-function failureKey(code: string | null): 'site' | 'blocked' | 'unreadable' | 'quota_exceeded' | 'nothing_found' | 'unavailable' | 'provider' {
+function failureKey(code: string | null): 'site' | 'slow' | 'looping' | 'blocked' | 'unreadable' | 'quota_exceeded' | 'nothing_found' | 'unavailable' | 'provider' {
   if (!code) return 'provider';
   if (code === 'site_blocked_url') return 'blocked';
   if (code === 'site_not_html' || code === 'site_empty_page') return 'unreadable';
+  if (code === 'site_timeout') return 'slow';
+  if (code === 'site_too_many_redirects') return 'looping';
   if (code.startsWith('site_')) return 'site';
   if (code === 'quota_exceeded' || code === 'nothing_found') return code;
   if (code === 'provider_billing' || code === 'not_configured') return 'unavailable';
   return 'provider';
 }
 
-const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise', 'platform_busy', 'timed_out', 'no_concepts'];
+const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'meta_account_restricted', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise', 'platform_busy', 'timed_out', 'no_concepts'];
 
 /** A stored failure code in plain words; an unknown code never reaches the screen. */
 function useReason(): (code: string | null | undefined) => string {
@@ -71,7 +73,7 @@ const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
-  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline'].includes(code);
+  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized'].includes(code);
   return (
     <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -199,7 +201,7 @@ function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; c
   const t = useTranslations('GrowthPilot');
   const kind = failureKey(code);
   // Trying the same address again cannot help when nothing was found, the address is private or has no text, today's AI limit is gone or the AI is not available on our side - offer only what can work.
-  const canRetry = kind === 'site' || kind === 'provider';
+  const canRetry = kind === 'site' || kind === 'slow' || kind === 'provider';
   const canUseOther = kind !== 'quota_exceeded' && kind !== 'unavailable';
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-3xl border border-warning/40 bg-card p-6 shadow-soft" data-testid="growth-pilot-failed">

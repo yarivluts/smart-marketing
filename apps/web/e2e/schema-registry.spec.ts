@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -36,6 +37,7 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Data fields' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/schema-defs$`));
     await expect(page.getByText('No schemas registered for this project yet.')).toBeVisible();

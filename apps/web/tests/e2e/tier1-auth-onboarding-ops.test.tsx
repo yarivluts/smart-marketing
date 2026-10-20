@@ -70,7 +70,7 @@ describe('Tier 1: Auth, Onboarding & Operations Management (R2.5, R2.6)', () => 
 
     await waitFor(() => {
       expect(mockSignInWithEmail).toHaveBeenCalledWith('user@growthos.io', 'password123');
-      expect(mockRouterPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockRouterPush).toHaveBeenCalledWith('/start');
     });
   });
 
@@ -93,7 +93,7 @@ describe('Tier 1: Auth, Onboarding & Operations Management (R2.5, R2.6)', () => 
 
     await waitFor(() => {
       expect(mockSignUpWithEmail).toHaveBeenCalledWith('newuser@growthos.io', 'securePass999!');
-      expect(mockRouterPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockRouterPush).toHaveBeenCalledWith('/start');
     });
   });
 

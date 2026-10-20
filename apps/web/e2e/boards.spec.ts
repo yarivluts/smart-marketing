@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -43,6 +44,7 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // A board's tile picker only offers registered, active metrics — register one first.
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Your key numbers' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/metric-defs$`));
     await page.getByLabel('Name').fill('ad_spend');
@@ -53,6 +55,7 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await expect(page.getByText('ad_spend', { exact: true })).toBeVisible();
 
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Boards' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
     await expect(page.getByText('This project has no boards yet.')).toBeVisible();

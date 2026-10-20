@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -37,6 +38,7 @@ test.describe('Funnel conversion (query_funnel admin surface)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Where people drop off', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
     // A fresh project has no confirmed funnel. The cockpit used to "synthesize a full,

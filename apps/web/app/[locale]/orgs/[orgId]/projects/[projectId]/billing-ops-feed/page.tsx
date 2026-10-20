@@ -1,3 +1,4 @@
+import { formatMinorUnits } from '@/lib/format-minor-units';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
@@ -132,7 +133,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     return Number.isNaN(parsed.getTime()) ? iso : timeFormat.format(parsed);
   };
   const amountShort = (amount: number | null, currency: string | null): string | undefined =>
-    amount === null || currency === null ? undefined : t('amountShort', { amount: integer.format(amount), currency: currency.toUpperCase() });
+    amount === null || currency === null ? undefined : formatMinorUnits(amount, currency, locale);
   const meta = (landedAt: string, clientId: string, environmentId: string): string =>
     `${t('landedAtLine', { landedAt: formatTime(landedAt) })} · ${t('clientIdLine', { clientId })} · ${environmentName(environmentId)}`;
 
@@ -145,7 +146,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   const churnMrr = sumMrrByCurrency(churnEntries);
   const dunningMrr = sumMrrByCurrency(dunningEntries);
   const mrrLine = (totals: { currency: string; mrr: number }[]): string | undefined =>
-    totals.length === 0 ? undefined : totals.map((total) => t('amountShort', { amount: integer.format(total.mrr), currency: total.currency })).join(' · ');
+    totals.length === 0 ? undefined : totals.map((total) => formatMinorUnits(total.mrr, total.currency, locale)).join(' · ');
 
   const billingGroups: FeedTimelineGroup[] = groupFeedByDay(entries).map((group) => ({
     key: group.day,
@@ -170,7 +171,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
       id: entry.id,
       tone: entry.canceledAt ? 'error' : 'warn',
       title: entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer'),
-      aside: entry.mrrNormalized === null || entry.currency === null ? t('amountUnknown') : t('mrrShort', { amount: integer.format(entry.mrrNormalized), currency: entry.currency.toUpperCase() }),
+      aside: entry.mrrNormalized === null || entry.currency === null ? t('amountUnknown') : t('mrrShort', { amount: formatMinorUnits(entry.mrrNormalized, entry.currency, locale) }),
       lines: entry.canceledAt
         ? [{ text: t('canceledAtLine', { canceledAt: entry.canceledAt }), emphasis: true }]
         : entry.cancelAtPeriodEnd
@@ -186,7 +187,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
       id: entry.id,
       tone: entry.status === 'unpaid' ? 'error' : 'warn',
       title: entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('dunningUnknownCustomer'),
-      aside: entry.mrrNormalized === null || entry.currency === null ? t('amountUnknown') : t('mrrShort', { amount: integer.format(entry.mrrNormalized), currency: entry.currency.toUpperCase() }),
+      aside: entry.mrrNormalized === null || entry.currency === null ? t('amountUnknown') : t('mrrShort', { amount: formatMinorUnits(entry.mrrNormalized, entry.currency, locale) }),
       lines: [{ text: t(dunningFeedEntryStatusLabelKey(entry.status)), emphasis: true }],
       meta: meta(entry.landedAt, entry.clientId, entry.environmentId),
     })),
@@ -267,7 +268,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
                         <td className="py-2 pe-3 font-semibold">{row.currency}</td>
                         {BILLING_OPS_TYPES.map((type) => (
                           <td key={type} className="py-2 pe-3 text-end tabular-nums" dir="ltr">
-                            {integer.format(row[type])}
+                            {formatMinorUnits(row[type], row.currency, locale)}
                           </td>
                         ))}
                       </tr>

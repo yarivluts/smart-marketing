@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openMoreTools } from './test-utils/nav';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -40,9 +41,10 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
+    await openMoreTools(page);
     await page.getByRole('link', { name: 'Access keys' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/keys$`));
-    await expect(page.getByText('No keys minted for this project yet.')).toBeVisible();
+    await expect(page.getByText('No access keys yet. You only need one if another tool will send data to GrowthOS or read from it.')).toBeVisible();
 
     await page.getByLabel('Name').fill('CI key');
     await page.getByLabel('Environment').selectOption({ label: 'Prod' });

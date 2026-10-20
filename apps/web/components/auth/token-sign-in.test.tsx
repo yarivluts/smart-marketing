@@ -47,7 +47,7 @@ describe('TokenSignIn', () => {
 
     expect(screen.getByText('Signing you in...')).toBeInTheDocument();
     await waitFor(() => expect(signInWithToken).toHaveBeenCalledWith('a-custom-token'));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/start'));
   });
 
   it('honors ?from= as the post-sign-in redirect, same as the email/password flow', async () => {

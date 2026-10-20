@@ -109,7 +109,7 @@ describe('Firmographics strings claim only the classification the code performs'
 
 describe('money strings disclose the unit their amount is actually in', () => {
   /**
-   * `Firmographics.compositionMrr` renders `firmographic_mrr_total`, which sums
+   * The Firmographics page used to render `firmographic_mrr_total`, which sums
    * `dim_subscription.mrr` <- `properties.mrr_normalized` <-
    * `computeSubscriptionMrrNormalized`, which divides a Stripe price's
    * `unit_amount` by its billing-cycle length and converts no units. Stripe
@@ -129,7 +129,6 @@ describe('money strings disclose the unit their amount is actually in', () => {
   it.each([
     ['BillingOpsFeed', 'mrrLine'],
     ['BillingOpsFeed', 'amountLine'],
-    ['Firmographics', 'compositionMrr'],
   ])('%s.%s discloses the unit in en and asserts no currency symbol in either locale', (namespace, key) => {
     const read = (messages: unknown) => messageAt(messages, namespace, key);
 
@@ -153,6 +152,25 @@ describe('money strings disclose the unit their amount is actually in', () => {
         key: `${namespace}.${key}`,
         currencySymbol: null,
       });
+    }
+  });
+});
+
+describe('Firmographics page speaks of money, not MRR units', () => {
+  // The page has no currency to format the summed `mrr_normalized` with, so it shows each group's
+  // share of monthly income (a percentage) instead of a raw smallest-unit amount, in plain words.
+  const keys = ['compositionRevenueShare', 'compositionShareMrr', 'compositionDescription', 'setupFeatureCompositionDescription'];
+
+  it.each(keys)('Firmographics.%s has no MRR / smallest-unit jargon in en or he', (key) => {
+    for (const messages of [en, he]) {
+      const text = messageAt(messages, 'Firmographics', key);
+      expect(text).not.toMatch(/MRR|smallest unit|יחידה קטנה/);
+    }
+  });
+
+  it('shows the revenue share as a percent placeholder in both locales', () => {
+    for (const messages of [en, he]) {
+      expect(messageAt(messages, 'Firmographics', 'compositionRevenueShare')).toContain('{percent}%');
     }
   });
 });

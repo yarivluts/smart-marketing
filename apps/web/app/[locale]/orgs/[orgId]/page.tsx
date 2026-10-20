@@ -4,6 +4,9 @@ import { can, isEnvironment, type Environment } from '@growthos/shared';
 import {
   Bot,
   Building2,
+  ChevronDown,
+  Clapperboard,
+  Sparkles,
   Database,
   FolderKanban,
   History,
@@ -211,7 +214,6 @@ export default async function OrgDetailPage({
                 ]
               : []),
             ...(canManagePlugins ? [{ href: 'plugins', label: t('projectPluginsLink') }] : []),
-            ...(canUseAi ? [{ href: 'ad-studio', label: t('projectAdStudioLink') }] : []),
           ],
         },
       ]
@@ -219,8 +221,15 @@ export default async function OrgDetailPage({
         .filter((group) => group.links.length > 0)
     : [];
 
+  // The project's main modules, in front; every other tool folds under "All tools" below them.
   const moduleLinks = currentProjectId
     ? [
+        ...(canUseAi
+          ? [
+              { href: 'growth-pilot', label: tShell('growthPilot'), icon: Sparkles },
+              { href: 'ad-studio', label: t('projectAdStudioLink'), icon: Clapperboard },
+            ]
+          : []),
         { href: 'campaigns', label: tShell('adsAndPerformance'), icon: Megaphone },
         { href: 'funnel', label: tShell('funnelAndGoals'), icon: Target },
         { href: 'automation', label: tShell('aiCopilotAndAutomation'), icon: Bot },
@@ -302,7 +311,12 @@ export default async function OrgDetailPage({
                 </div>
               ) : null}
               {quickLinkGroups.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <details className="group" data-testid="project-all-tools">
+                  <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+                    {t('allTools', { count: quickLinkGroups.reduce((total, group) => total + group.links.length, 0) })}
+                  </summary>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {quickLinkGroups.map((group) => (
                     <div key={group.key} className="rounded-xl border border-border/70 bg-muted/20 p-4">
                       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -323,7 +337,8 @@ export default async function OrgDetailPage({
                       </ul>
                     </div>
                   ))}
-                </div>
+                  </div>
+                </details>
               ) : null}
             </div>
           )}

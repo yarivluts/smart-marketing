@@ -22,7 +22,7 @@ export default async function SignupPage({ params }: PageProps): Promise<React.R
   // A real (verified) session redirects away from signup.
   const session = await getServerSession();
   if (session) {
-    redirect(`/${locale}/dashboard`);
+    redirect(`/${locale}/start`);
   }
 
   return (

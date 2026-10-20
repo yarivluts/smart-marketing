@@ -45,6 +45,18 @@ describe('middleware', () => {
     expect(intlMiddlewareMock).toHaveBeenCalled();
   });
 
+  it('remembers the project a signed-in person opens, once, so the next sign-in lands back in it', () => {
+    intlMiddlewareMock.mockImplementation(() => NextResponse.next());
+    const opened = middleware(requestFor('/he/orgs/o1/projects/p1/ad-studio', { cookie: `${SESSION_COOKIE_NAME}=abc` }));
+    const cookie = opened.cookies.get('growthos-last-project');
+    expect(cookie?.value).toBe('o1/p1');
+    expect(cookie).toMatchObject({ httpOnly: true, sameSite: 'lax', path: '/', secure: true });
+    // Already remembered: no new cookie; other pages and signed-out visitors set none.
+    expect(middleware(requestFor('/he/orgs/o1/projects/p1', { cookie: `${SESSION_COOKIE_NAME}=abc; growthos-last-project=o1/p1` })).cookies.get('growthos-last-project')).toBeUndefined();
+    expect(middleware(requestFor('/he/orgs/o1', { cookie: `${SESSION_COOKIE_NAME}=abc` })).cookies.get('growthos-last-project')).toBeUndefined();
+    expect(middleware(requestFor('/he/orgs/o1/projects/p1')).cookies.get('growthos-last-project')).toBeUndefined();
+  });
+
   it('lets an unauthenticated visitor reach the login page', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en/login'));

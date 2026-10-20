@@ -123,6 +123,19 @@ describe('GrowthPilotApp', () => {
   });
 
   it.each([
+    ['en', 'You were signed out. Reload the page and sign in again - nothing was lost.'],
+    ['he', heMessages.GrowthPilot.errors.unauthorized],
+  ] as const)('a lost session says to sign in again, not "try again in a minute" (%s)', async (locale, text) => {
+    stubFetch({ status: 401, body: { error: 'unauthorized' } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(text);
+    expect(alert.textContent ?? '').not.toMatch(/unauthorized/i);
+  });
+
+  it.each([
     ['en', 'We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.'],
     ['he', heMessages.GrowthPilot.errors.generic],
   ] as const)('an unknown error says nothing was changed and what to do, not "something went wrong" (%s)', async (locale, text) => {
@@ -168,6 +181,16 @@ describe('GrowthPilotApp', () => {
     expect(failed).toHaveTextContent('The site did not open for us');
     fireEvent.click(within(failed).getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(sent(fetchMock, 0)).toEqual({ url: BASE, body: { siteUrl: 'https://easysign.co.il/' } }));
+  });
+
+  it('says a slow site is worth another try, and a redirect loop is not', () => {
+    const slow = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_timeout' })} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('The site took too long to answer');
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    slow.unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_too_many_redirects' })} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('keeps sending visitors in a circle');
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
   });
 
   it('says a private address or a page with no text cannot be read, and offers no useless retry', () => {
@@ -348,6 +371,18 @@ describe('GrowthPilotApp', () => {
       const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
       expect(he.container).toHaveTextContent('לקח יותר מדי זמן');
       expect(he.container).not.toHaveTextContent('no_concepts');
+    });
+
+    it('explains a restricted ad account in words, in both languages', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_account_restricted' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('Facebook has restricted your ad account');
+      expect(view.container).not.toHaveTextContent('meta_account_restricted');
+      expect(view.container).not.toHaveTextContent('something went wrong');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('הגבילה את חשבון המודעות');
+      expect(he.container).not.toHaveTextContent('meta_account_restricted');
     });
 
     it('explains a publish failure the person can act on instead of "try again"', () => {
