@@ -254,6 +254,14 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByText('Nothing waits for you right now.')).toBeInTheDocument();
   });
 
+  it('tells the person what Reject does, in English and Hebrew', () => {
+    const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    expect(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-reject-hint')).toHaveTextContent('nothing is published and no money is spent');
+    unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
+    expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.rejectHint);
+  });
+
   it('sends a change request to the AI and shows it while the AI rewrites', async () => {
     const fetchMock = stubFetch({ body: page({ proposals: [{ ...PROPOSAL, status: 'revising', changes: [{ text: 'Only Tel Aviv', on: 'x', outcome: 'pending', failureCode: null }] }] }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
