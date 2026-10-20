@@ -72,7 +72,7 @@ describe('InstallPluginForm', () => {
   });
 
   it('lists permissions in plain words and keeps an unknown scope readable', () => {
-    renderForm([{ ...SHOPIFY, scopes: ['ingest:write', 'future:thing'] }]);
+    renderForm([{ ...SHOPIFY, scopes: ['ingest:write', 'future:thing'] as unknown as PluginManifestView['scopes'] }]);
     expect(screen.getByText('Send data into GrowthOS', { selector: 'li' })).toBeInTheDocument();
     expect(screen.getByText('future:thing', { selector: 'li' })).toBeInTheDocument();
     expect(screen.queryByText('ingest:write')).not.toBeInTheDocument();
