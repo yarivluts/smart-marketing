@@ -204,6 +204,7 @@ export function CreateApiKeyForm({
       ) : (
         <fieldset className="flex flex-col gap-1.5">
           <legend className="text-sm font-medium">{t('scopesLabel')}</legend>
+          <p className="text-xs text-muted-foreground">{t('scopesHint')}</p>
           <div className="flex flex-col gap-1.5">
             {API_KEY_SCOPES.map((scope) => (
               <label key={scope} className="flex items-center gap-2 text-sm">
@@ -212,7 +213,12 @@ export function CreateApiKeyForm({
                   checked={selectedScopes.includes(scope)}
                   onChange={() => toggleScope(scope)}
                 />
-                {scope}
+                <span>
+                  {t(`scopeNames.${scope.replace('.', '_')}`)}{' '}
+                  <code dir="ltr" className="text-xs text-muted-foreground">
+                    {scope}
+                  </code>
+                </span>
               </label>
             ))}
           </div>

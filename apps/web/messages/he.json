@@ -654,6 +654,18 @@
     "environmentLabel": "סביבה",
     "scopesLabel": "היקפי הרשאה",
     "createKey": "יצירת מפתח",
+    "scopesHint": "סמנו רק מה שהמפתח הזה צריך.",
+    "scopeNames": {
+      "ingest_write": "לשלוח נתונים אל GrowthOS",
+      "project_configure": "לשנות הגדרות פרויקט",
+      "schema_write": "להגדיר את שדות הנתונים",
+      "metrics_write": "ליצור ולשנות מדדים",
+      "dashboards_write": "ליצור ולשנות לוחות",
+      "dashboards_read": "לצפות בלוחות",
+      "data_export": "לייצא את הנתונים",
+      "ai_use": "להשתמש בעוזר ה-AI",
+      "mcp_read": "לאפשר לעוזר AI לקרוא את התוצאות"
+    },
     "createError": "לא הצלחנו ליצור את המפתח. שום מפתח לא נוצר, נסו שוב בעוד רגע.",
     "createNetworkError": "אין לנו חיבור ל-GrowthOS. בדקו את חיבור האינטרנט ונסו שוב - שום מפתח לא נוצר.",
     "secretShownOnceWarning": "העתיקו את המפתח כעת — הוא לא יוצג שוב.",
