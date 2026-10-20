@@ -19,3 +19,16 @@ describe('demos page name', () => {
     expect((en as unknown as Copy).Demos.setupIntro).not.toMatch(/lifecycle|events/i);
   });
 });
+
+describe('demos page Hebrew copy', () => {
+  const he_ = (he as unknown as Copy).Demos;
+  it('addresses everyone in the plural, not "you (m/f)" slashes', () => {
+    const text = Object.values(he_).join(' ');
+    expect(text).not.toMatch(/\p{L}\/\p{L}/u);
+  });
+
+  it('uses one word for a demo call instead of slang and jargon', () => {
+    const text = Object.values(he_).join(' ');
+    expect(text).not.toMatch(/דמואים|צנרת|צינור/);
+  });
+});
