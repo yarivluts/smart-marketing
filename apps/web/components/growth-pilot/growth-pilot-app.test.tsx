@@ -86,8 +86,9 @@ describe('GrowthPilotApp', () => {
 
   it('tells a newcomer which address to enter, and ties the hint to the input', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
-    const hint = screen.getByText(/Not sure which address\? Use your home page/);
+    const hint = screen.getByText(/Not sure which address\? Use your home page/).closest('p') as HTMLElement;
     expect(hint).toHaveTextContent('you do not need to log in or install anything');
+    expect(hint).toHaveTextContent('No website yet? Any public page that describes what you sell works');
     expect(screen.getByTestId('growth-pilot-site-input')).toHaveAttribute('aria-describedby', hint.id);
   });
 

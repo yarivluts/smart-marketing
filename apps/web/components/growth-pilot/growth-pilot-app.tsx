@@ -144,7 +144,10 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           {t('submit')}
         </button>
       </form>
-      <p id="growth-pilot-site-hint" className="-mt-3 text-xs text-muted-foreground">{t('hint')}</p>
+      <p id="growth-pilot-site-hint" className="-mt-3 flex flex-col gap-1 text-xs text-muted-foreground">
+        <span>{t('hint')}</span>
+        <span>{t('noSite')}</span>
+      </p>
       <ErrorLine code={mistake ?? error} />
       <ol className="flex flex-wrap justify-center gap-2">
         {steps.map((step, index) => (
