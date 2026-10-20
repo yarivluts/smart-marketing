@@ -278,7 +278,7 @@
     "projectFirmographicsLink": "Customer types",
     "projectExperimentsLink": "Experiments",
     "projectSupportLink": "Support",
-    "projectDemosLink": "Demos",
+    "projectDemosLink": "Booked demo calls",
     "projectMetricRegistryLink": "Your key numbers",
     "projectCostGuardrailsLink": "Data usage limit",
     "projectPluginsLink": "Plugins",
@@ -1681,10 +1681,10 @@
     "csatEmpty": "No CSAT scores landed yet."
   },
   "Demos": {
-    "metaTitle": "Demos",
-    "title": "Demos for {projectName}",
+    "metaTitle": "Booked demo calls",
+    "title": "Booked demo calls for {projectName}",
     "description": "Scheduled, held, and no-show demos, the project-wide show rate, and a per-rep breakdown.",
-    "setupIntro": "Install the Sales Pipeline pack to start tracking demo lifecycle events.",
+    "setupIntro": "Install the Sales Pipeline pack so GrowthOS can show which demo calls were booked and who actually showed up.",
     "funnelHeading": "Demo funnel",
     "scheduledLabel": "Scheduled",
     "heldLabel": "Held",
