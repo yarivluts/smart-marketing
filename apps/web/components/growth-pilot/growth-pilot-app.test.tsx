@@ -318,7 +318,8 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ADS], targets: [ACTIVE_TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent(`Ads for ${isolate('Pro plan')}`);
-      const images = within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true });
+      const images = within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('img');
+      expect(images.map((image) => image.getAttribute('alt'))).toEqual(['Ad image 1 of 2', 'Ad image 2 of 2']);
       expect(images.map((image) => image.getAttribute('src'))).toEqual(['/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i1/media', '/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i2/media']);
       expect(screen.getByTestId('growth-pilot-open-studio')).toHaveAttribute('href', '/orgs/o/projects/p/ad-studio?brief=b1&step=review');
       expect(screen.getByTestId('growth-pilot-target-ads')).toHaveTextContent('Ads are waiting for your approval');
@@ -514,7 +515,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Where people land after clicking: https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
-      expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
+      expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('img')).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
       expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription('The most you will spend per day, once you turn the ads on. Nothing is spent before that.');
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '0' } });
