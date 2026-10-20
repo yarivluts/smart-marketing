@@ -129,6 +129,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
               setMistake(null);
             }}
             placeholder={t('placeholder')}
+            aria-describedby="growth-pilot-site-hint"
             className="h-12 min-w-0 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground/60"
             data-testid="growth-pilot-site-input"
           />
@@ -143,6 +144,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           {t('submit')}
         </button>
       </form>
+      <p id="growth-pilot-site-hint" className="-mt-3 text-xs text-muted-foreground">{t('hint')}</p>
       <ErrorLine code={mistake ?? error} />
       <ol className="flex flex-wrap justify-center gap-2">
         {steps.map((step, index) => (

@@ -84,6 +84,13 @@ describe('GrowthPilotApp', () => {
     expect(await screen.findByTestId('growth-pilot-center')).toBeInTheDocument();
   });
 
+  it('tells a newcomer which address to enter, and ties the hint to the input', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const hint = screen.getByText(/Not sure which address\? Use your home page/);
+    expect(hint).toHaveTextContent('you do not need to log in or install anything');
+    expect(screen.getByTestId('growth-pilot-site-input')).toHaveAttribute('aria-describedby', hint.id);
+  });
+
   it('says why an address was refused', async () => {
     stubFetch({ status: 400, body: { error: 'invalid_site' } });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
