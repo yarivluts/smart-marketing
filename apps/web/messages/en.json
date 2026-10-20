@@ -654,6 +654,18 @@
     "environmentLabel": "Environment",
     "scopesLabel": "Scopes",
     "createKey": "Create key",
+    "scopesHint": "Tick only what this key needs.",
+    "scopeNames": {
+      "ingest_write": "Send data into GrowthOS",
+      "project_configure": "Change project settings",
+      "schema_write": "Define your data fields",
+      "metrics_write": "Create and change measures",
+      "dashboards_write": "Create and change dashboards",
+      "dashboards_read": "View dashboards",
+      "data_export": "Export your data",
+      "ai_use": "Use the AI helper",
+      "mcp_read": "Let an AI assistant read your results"
+    },
     "createError": "We could not create the key. Nothing was created, so please try again in a moment.",
     "createNetworkError": "We cannot reach GrowthOS. Check your internet connection and try again - no key was created.",
     "secretShownOnceWarning": "Copy this key now — it won't be shown again.",

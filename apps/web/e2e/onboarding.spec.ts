@@ -61,7 +61,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
 
     // Step 2: mint an ingest.write key ("push your own data"), then continue.
     await page.getByLabel('Name').fill('Website snippet');
-    await page.getByRole('checkbox', { name: 'ingest.write' }).check();
+    await page.getByRole('checkbox', { name: /ingest\.write/ }).check();
     await page.getByRole('button', { name: 'Create key' }).click();
     await expect(page.getByText("Copy this key now — it won't be shown again.")).toBeVisible();
     await page.getByRole('button', { name: 'Done' }).click();

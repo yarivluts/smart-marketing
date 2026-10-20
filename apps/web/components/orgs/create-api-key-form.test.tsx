@@ -37,6 +37,13 @@ describe('CreateApiKeyForm', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
+  it('labels each permission in plain words and keeps the technical name beside it', () => {
+    renderForm();
+    expect(screen.getByRole('checkbox', { name: /Send data into GrowthOS/ })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Use the AI helper/ })).toBeInTheDocument();
+    expect(screen.getByText('Tick only what this key needs.')).toBeInTheDocument();
+  });
+
   it('submits the name, selected environment, and checked scopes', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
@@ -50,8 +57,8 @@ describe('CreateApiKeyForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'CI key' } });
     fireEvent.change(screen.getByLabelText('Environment'), { target: { value: 'env-prod' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
-    fireEvent.click(screen.getByRole('checkbox', { name: 'metrics.write' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ingest\.write/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /metrics\.write/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
 
     await waitFor(() =>
@@ -81,7 +88,7 @@ describe('CreateApiKeyForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'CI key' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ingest\.write/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
 
     expect(await screen.findByText('gos_live_abcdef1234567890')).toBeInTheDocument();
@@ -107,7 +114,7 @@ describe('CreateApiKeyForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Website' } });
     fireEvent.click(screen.getByRole('radio', { name: /Browser key/ }));
     // A browser key has no scopes to pick: it can only send events.
-    expect(screen.queryByRole('checkbox', { name: 'ingest.write' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /ingest\.write/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create key' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Allowed domains (one per line)'), {
       target: { value: 'https://example.com/app' },
@@ -144,7 +151,7 @@ describe('CreateApiKeyForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'CI key' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ingest\.write/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
 
     await screen.findByText('gos_live_abcdef1234567890');
@@ -154,7 +161,7 @@ describe('CreateApiKeyForm', () => {
   it('disables submit until at least one scope is checked', () => {
     renderForm();
     expect(screen.getByRole('button', { name: 'Create key' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ingest\.write/ }));
     expect(screen.getByRole('button', { name: 'Create key' })).not.toBeDisabled();
   });
 
@@ -168,8 +175,8 @@ describe('CreateApiKeyForm', () => {
   it('starts on a server key with the linked scopes already checked', () => {
     renderForm({ initialKind: 'secret', initialScopes: ['ingest.write'] });
     expect(screen.getByRole('radio', { name: /Server key/ })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'ingest.write' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'metrics.write' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /ingest\.write/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /metrics\.write/ })).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Create key' })).not.toBeDisabled();
   });
 
@@ -183,7 +190,7 @@ describe('CreateApiKeyForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ingest\.write/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -197,7 +204,7 @@ describe('CreateApiKeyForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /ingest\.write/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
