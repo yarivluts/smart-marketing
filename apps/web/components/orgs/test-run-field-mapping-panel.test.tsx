@@ -27,7 +27,7 @@ describe('TestRunFieldMappingPanel', () => {
   it('is collapsed by default', () => {
     renderPanel();
     expect(screen.getByRole('button', { name: 'Test run' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Sample payload (JSON)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sample data (JSON)')).not.toBeInTheDocument();
   });
 
   it('runs a test against pasted JSON and shows the mapped record on success', async () => {
@@ -38,7 +38,7 @@ describe('TestRunFieldMappingPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
-    fireEvent.change(screen.getByLabelText('Sample payload (JSON)'), { target: { value: '{"id": 1}' } });
+    fireEvent.change(screen.getByLabelText('Sample data (JSON)'), { target: { value: '{"id": 1}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     await waitFor(() =>
@@ -62,7 +62,7 @@ describe('TestRunFieldMappingPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
-    fireEvent.change(screen.getByLabelText('Sample payload (JSON)'), { target: { value: '{}' } });
+    fireEvent.change(screen.getByLabelText('Sample data (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     expect(await screen.findByText('Mapping errors: event_id:not_found:id')).toBeInTheDocument();
@@ -78,7 +78,7 @@ describe('TestRunFieldMappingPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
     fireEvent.change(screen.getByLabelText('Sample source'), { target: { value: 'delivery-1' } });
-    expect(screen.queryByLabelText('Sample payload (JSON)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sample data (JSON)')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     await waitFor(() =>
@@ -94,7 +94,7 @@ describe('TestRunFieldMappingPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
-    fireEvent.change(screen.getByLabelText('Sample payload (JSON)'), { target: { value: '{}' } });
+    fireEvent.change(screen.getByLabelText('Sample data (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't run this test. Please try again.");
@@ -108,7 +108,7 @@ describe('TestRunFieldMappingPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
-    fireEvent.change(screen.getByLabelText('Sample payload (JSON)'), { target: { value: '{}' } });
+    fireEvent.change(screen.getByLabelText('Sample data (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     await screen.findByText('Mapped record is valid for the target schema.');

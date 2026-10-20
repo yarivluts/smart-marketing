@@ -30,3 +30,20 @@ describe('the field mappings page speaks plainly', () => {
     expect(he.FieldMappings.flowHooksLink).toMatch(/קישורי נתונים נכנסים/);
   });
 });
+
+describe('the field mapping form labels speak plainly', () => {
+  const FORM_KEYS = ['sourcePathPlaceholder', 'samplePayloadLabel', 'suggestSamplePayloadLabel', 'rulesSourceHeader', 'createMappingDescription'] as const;
+
+  it('English says "data", not JSONPath / payload / schema', () => {
+    for (const key of FORM_KEYS) {
+      expect(en.FieldMappings[key]).not.toMatch(/jsonpath|payload|schema/i);
+    }
+  });
+
+  it('Hebrew drops JSONPath, מטען and סכמה', () => {
+    for (const key of FORM_KEYS) {
+      expect(he.FieldMappings[key]).toMatch(/[֐-׿]/);
+      expect(he.FieldMappings[key]).not.toMatch(/jsonpath|מטען|סכמה/i);
+    }
+  });
+});

@@ -21,7 +21,7 @@ describe('SuggestFieldMappingsPanel', () => {
   it('is collapsed by default', () => {
     renderPanel();
     expect(screen.getByRole('button', { name: 'Suggest mappings' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Sample payload to propose mappings from (JSON)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sample data to propose mappings from (JSON)')).not.toBeInTheDocument();
   });
 
   it('is disabled until a target schema is chosen', () => {
@@ -41,7 +41,7 @@ describe('SuggestFieldMappingsPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{"id": 1}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
     await waitFor(() =>
@@ -66,7 +66,7 @@ describe('SuggestFieldMappingsPanel', () => {
     const onApplySuggestions = renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{"created_at": "x"}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{"created_at": "x"}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByText('ts ← created_at (30% match)');
 
@@ -90,7 +90,7 @@ describe('SuggestFieldMappingsPanel', () => {
     const onApplySuggestions = renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByRole('button', { name: 'Apply all' });
 
@@ -107,7 +107,7 @@ describe('SuggestFieldMappingsPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
     expect(await screen.findByText('No confident suggestions for this sample — add rules by hand below.')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('SuggestFieldMappingsPanel', () => {
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Suggest mappings' }));
-    fireEvent.change(screen.getByLabelText('Sample payload to propose mappings from (JSON)'), { target: { value: '{}' } });
+    fireEvent.change(screen.getByLabelText('Sample data to propose mappings from (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't get suggestions. Please try again.");

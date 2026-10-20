@@ -34,7 +34,7 @@ describe('FieldMappingRuleEditor', () => {
   it('shows the sourcePath input only for rename/cast, castType only for cast, template only for template, staticValue only for static', () => {
     const onChange = vi.fn();
     renderEditor([{ ...blankFieldMappingRuleRow(), transform: 'rename' }], onChange);
-    expect(screen.queryByLabelText('Source JSONPath, e.g. data.object.amount')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Where in the data, e.g. data.object.amount')).toBeInTheDocument();
     expect(screen.queryByLabelText('Cast to')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Template/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Static value')).not.toBeInTheDocument();
@@ -53,6 +53,6 @@ describe('FieldMappingRuleEditor', () => {
     const onChange = vi.fn();
     renderEditor([{ ...blankFieldMappingRuleRow(), transform: 'cast' }], onChange);
     expect(screen.queryByLabelText('Cast to')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Source JSONPath, e.g. data.object.amount')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Where in the data, e.g. data.object.amount')).toBeInTheDocument();
   });
 });
