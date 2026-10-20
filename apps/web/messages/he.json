@@ -278,7 +278,7 @@
     "projectFirmographicsLink": "סוגי לקוחות",
     "projectExperimentsLink": "ניסויים",
     "projectSupportLink": "תמיכה",
-    "projectDemosLink": "הדגמות",
+    "projectDemosLink": "שיחות הדגמה שנקבעו",
     "projectMetricRegistryLink": "המספרים החשובים שלך",
     "projectCostGuardrailsLink": "מגבלת שימוש בנתונים",
     "projectPluginsLink": "תוספים",
@@ -1681,10 +1681,10 @@
     "csatEmpty": "עדיין לא התקבלו ציוני שביעות רצון."
   },
   "Demos": {
-    "metaTitle": "הדגמות",
-    "title": "הדגמות עבור {projectName}",
+    "metaTitle": "שיחות הדגמה שנקבעו",
+    "title": "שיחות הדגמה שנקבעו עבור {projectName}",
     "description": "הדגמות שנקבעו, התקיימו ולא הגיעו אליהן, שיעור ההגעה ברמת הפרויקט, ופילוח לפי נציג.",
-    "setupIntro": "התקן/י את חבילת צינור המכירות כדי להתחיל לעקוב אחר אירועי מחזור חיי הדגמה.",
+    "setupIntro": "התקן/י את חבילת צינור המכירות כדי ש-GrowthOS יציג אילו שיחות הדגמה נקבעו ומי באמת הגיע.",
     "funnelHeading": "משפך הדגמות",
     "scheduledLabel": "נקבעו",
     "heldLabel": "התקיימו",
