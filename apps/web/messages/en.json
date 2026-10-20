@@ -282,7 +282,7 @@
     "projectMetricRegistryLink": "Your key numbers",
     "projectCostGuardrailsLink": "Data usage limit",
     "projectPluginsLink": "Plugins",
-    "projectBoardsLink": "Boards",
+    "projectBoardsLink": "Dashboards",
     "projectGoalsLink": "Goals",
     "projectSegmentsLink": "Customer groups",
     "projectCohortsLink": "Who comes back",
@@ -2311,9 +2311,9 @@
     "configFieldEnumNotChosen": "Not answered"
   },
   "Boards": {
-    "metaTitle": "Boards",
-    "title": "Boards for {projectName}",
-    "boardsHeading": "Boards",
+    "metaTitle": "Dashboards",
+    "title": "Dashboards for {projectName}",
+    "boardsHeading": "Dashboards",
     "noBoards": "This project has no boards yet.",
     "tileCountLabel": "{count, plural, one {# tile} other {# tiles}}",
     "createHeading": "New board",
