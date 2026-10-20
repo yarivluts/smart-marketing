@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
+import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
 import { AdCopyCard } from './ad-copy-card';
 import { BrandLogoProvider } from './brand-logo';
@@ -49,7 +50,7 @@ describe('AdCopyCard', () => {
     expect(within(preview).getByText('easy-sign.co.il')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Instagram story / Reels' }));
     expect(within(preview).getByRole('img', { name: 'the picture' })).toHaveAttribute('src', '/story.jpg');
-    fireEvent.click(screen.getByRole('tab', { name: 'Google display' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Google websites and apps' }));
     expect(within(preview).getByRole('img', { name: 'the picture' })).toHaveAttribute('src', '/landscape.jpg');
     expect(within(preview).queryByTestId('ad-preview-format-note')).toBeNull();
     // An idea rendered only as a square: the story borrows it and says so.
@@ -57,6 +58,13 @@ describe('AdCopyCard', () => {
     const second = within(screen.getByTestId('ad-studio-copy-c2'));
     fireEvent.click(second.getByRole('tab', { name: 'Instagram story / Reels' }));
     expect(second.getByTestId('ad-preview-format-note')).toHaveTextContent('Showing the square image');
+  });
+
+  it('keeps ad-platform jargon ("placement", "display") out of the preview wording', () => {
+    const preview = JSON.stringify(
+      (enMessages as { AdStudio: { preview: unknown } }).AdStudio.preview,
+    );
+    expect(preview).not.toMatch(/this placement|Google display/);
   });
 
   it('warns plainly when an ad with images has no text, in Hebrew too', () => {
@@ -132,7 +140,7 @@ describe('PublishPanel live preview', () => {
     expect(preview.getByText('Typed headline')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: /Google Ads/ }));
     const google = within(screen.getByTestId('ad-studio-publish-preview'));
-    expect(google.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Google display']);
+    expect(google.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Google websites and apps']);
     expect(google.getByRole('img', { name: 'Idea 1 · Story' })).toHaveAttribute('src', '/story.jpg');
   });
 
