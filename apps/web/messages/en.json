@@ -276,7 +276,7 @@
     "projectChurnReasonsLink": "Why people cancel",
     "projectIntentQualityLink": "Signup quality",
     "projectFirmographicsLink": "Customer types",
-    "projectExperimentsLink": "Experiments",
+    "projectExperimentsLink": "A/B tests",
     "projectSupportLink": "Support",
     "projectDemosLink": "Booked demo calls",
     "projectMetricRegistryLink": "Your key numbers",
@@ -291,7 +291,7 @@
     "projectCampaignOpsLink": "Ad payback",
     "projectRepCollectionsLink": "Sales by team member",
     "projectFunnelLink": "Where people drop off",
-    "projectInsightsLink": "Insights",
+    "projectInsightsLink": "Alerts and wins",
     "orgSettingsLink": "Organization settings",
     "projectSettingsLink": "Project settings",
     "eyebrow": "Organization",
@@ -1538,8 +1538,8 @@
     "stepCustomerCount": "{count} people reached this stage in order"
   },
   "Insights": {
-    "metaTitle": "Insights",
-    "title": "Insights for {projectName}",
+    "metaTitle": "Alerts and wins",
+    "title": "Alerts and wins for {projectName}",
     "description": "Recent noteworthy findings for this project: tracking that may be broken, metrics that can no longer be queried as defined, and wins your win rules just caught.",
     "empty": "No insights yet. This fills in once a tracking alert fires, a win rule matches, or a registered metric stops being queryable.",
     "trackingAlertTitle": "Tracking may be broken: \"{schemaName}\" has gone silent",
@@ -1898,8 +1898,8 @@
     "alertCurrentLabel": "Current"
   },
   "Experiments": {
-    "metaTitle": "Experiments",
-    "title": "Experiments for {projectName}",
+    "metaTitle": "A/B tests",
+    "title": "A/B tests for {projectName}",
     "description": "A/B experiment results by variant, with exposures, conversions, and significance vs. control.",
     "setupIntro": "Install the Experiment pack to start tracking exposures and conversions for your A/B tests.",
     "resultsUnavailable": "No results available yet — connect a data warehouse to see this.",

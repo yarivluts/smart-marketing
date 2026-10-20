@@ -276,7 +276,7 @@
     "projectChurnReasonsLink": "למה אנשים מבטלים",
     "projectIntentQualityLink": "איכות הרשמות",
     "projectFirmographicsLink": "סוגי לקוחות",
-    "projectExperimentsLink": "ניסויים",
+    "projectExperimentsLink": "בדיקות A/B",
     "projectSupportLink": "תמיכה",
     "projectDemosLink": "שיחות הדגמה שנקבעו",
     "projectMetricRegistryLink": "המספרים החשובים שלך",
@@ -291,7 +291,7 @@
     "projectCampaignOpsLink": "החזר על הפרסום",
     "projectRepCollectionsLink": "מכירות לפי נציג",
     "projectFunnelLink": "איפה אנשים נושרים",
-    "projectInsightsLink": "תובנות",
+    "projectInsightsLink": "התראות והצלחות",
     "orgSettingsLink": "הגדרות ארגון",
     "projectSettingsLink": "הגדרות פרויקט",
     "eyebrow": "ארגון",
@@ -1538,8 +1538,8 @@
     "stepCustomerCount": "{count} אנשים הגיעו לשלב זה לפי הסדר"
   },
   "Insights": {
-    "metaTitle": "תובנות",
-    "title": "תובנות עבור {projectName}",
+    "metaTitle": "התראות והצלחות",
+    "title": "התראות והצלחות עבור {projectName}",
     "description": "ממצאים בולטים אחרונים בפרויקט הזה: מעקב שייתכן שנשבר, מדדים שכבר לא ניתן לתשאל כפי שהוגדרו, וזכיות שכללי הזכייה שלכם זיהו.",
     "empty": "אין עדיין תובנות. התוכן יופיע כאשר תתריע התראת מעקב, יתאים כלל זכייה, או כאשר מדד רשום יפסיק להיות ניתן לתשאול.",
     "trackingAlertTitle": "המעקב עלול להיות תקול: \"{schemaName}\" השתתק",
@@ -1898,8 +1898,8 @@
     "alertCurrentLabel": "נוכחי"
   },
   "Experiments": {
-    "metaTitle": "ניסויים",
-    "title": "ניסויים עבור {projectName}",
+    "metaTitle": "בדיקות A/B",
+    "title": "בדיקות A/B עבור {projectName}",
     "description": "תוצאות ניסויי A/B לפי וריאנט, כולל חשיפות, המרות ומובהקות סטטיסטית מול הביקורת.",
     "setupIntro": "התקינו את חבילת הניסויים כדי להתחיל לעקוב אחר חשיפות והמרות בניסויי ה-A/B שלכם.",
     "resultsUnavailable": "אין עדיין תוצאות זמינות - חברו מחסן נתונים כדי לראות זאת.",
