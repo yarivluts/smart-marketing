@@ -5775,6 +5775,7 @@
       "empty": "Nothing waits for you right now.",
       "approve": "Approve",
       "reject": "Reject",
+      "rejectHint": "Not for you? Reject it - nothing is published and no money is spent.",
       "change": "Ask for a change",
       "changePlaceholder": "What should change? For example: only small offices in Tel Aviv",
       "send": "Send to the AI",

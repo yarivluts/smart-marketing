@@ -459,6 +459,9 @@ function ProposalCard({
             <X className="h-4 w-4" aria-hidden="true" />
             {t('reject')}
           </button>
+          <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-reject-hint">
+            {t('rejectHint')}
+          </p>
         </div>
       )}
     </li>
