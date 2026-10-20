@@ -37,6 +37,11 @@ function newestVersion(family: PluginFamilyView): PluginManifestView {
  */
 export function InstallPluginForm({ orgId, projectId, manifests }: InstallPluginFormProps): React.ReactElement {
   const t = useTranslations('ProjectPlugins');
+  // Plain label for a known scope; an unknown one (newer manifest) still shows its raw name.
+  const scopeLabel = (scope: string) => {
+    const key = `scopeNames.${scope.replace(':', '_')}`;
+    return t.has(key) ? t(key) : scope;
+  };
   const router = useRouter();
 
   const families = useMemo(() => groupManifestsByPluginId(manifests), [manifests]);
@@ -150,7 +155,7 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
               <span className="font-medium">{newest.displayName}</span>
               <span className="text-xs text-muted-foreground">{family.pluginId}</span>
               <span className="text-xs text-muted-foreground">{t('galleryTypeLine', { type: newest.type })}</span>
-              <span className="text-xs text-muted-foreground">{t('galleryScopesLine', { scopes: newest.scopes.join(', ') })}</span>
+              <span className="text-xs text-muted-foreground">{t('galleryScopesLine', { scopes: newest.scopes.map(scopeLabel).join(', ') })}</span>
               {registersCount > 0 ? (
                 <span className="text-xs text-muted-foreground">
                   {t('galleryRegistersLine', {
@@ -191,7 +196,7 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
             <span className="text-sm font-medium">{t('scopesHeading')}</span>
             <ul className="text-sm text-muted-foreground">
               {selected.scopes.map((scope) => (
-                <li key={scope}>{scope}</li>
+                <li key={scope}>{scopeLabel(scope)}</li>
               ))}
             </ul>
             <label className="flex items-center gap-2 text-sm">

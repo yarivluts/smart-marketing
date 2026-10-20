@@ -59,7 +59,7 @@ describe('InstallPluginForm', () => {
     expect(screen.getByText('Shopify Commerce Pack')).toBeInTheDocument();
     expect(screen.getByText('com.example.shopify-pack')).toBeInTheDocument();
     expect(screen.getByText('Type: source')).toBeInTheDocument();
-    expect(screen.getByText('Requests: ingest:write, schema:write')).toBeInTheDocument();
+    expect(screen.getByText('Requests: Send data into GrowthOS, Define your data fields')).toBeInTheDocument();
     expect(screen.getByText('Registers: 1 entities · 1 events · 0 metrics')).toBeInTheDocument();
     expect(screen.getByText('Ads Pack')).toBeInTheDocument();
   });
@@ -67,8 +67,15 @@ describe('InstallPluginForm', () => {
   it('auto-selects the first plugin and shows its scope consent + config form', () => {
     renderForm([SHOPIFY]);
     expect(screen.getByRole('option', { name: /Shopify Commerce Pack/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('This plugin requests the following scopes')).toBeInTheDocument();
+    expect(screen.getByText('This plugin asks for permission to:')).toBeInTheDocument();
     expect(screen.getByLabelText(/shop_domain/)).toBeInTheDocument();
+  });
+
+  it('lists permissions in plain words and keeps an unknown scope readable', () => {
+    renderForm([{ ...SHOPIFY, scopes: ['ingest:write', 'future:thing'] as unknown as PluginManifestView['scopes'] }]);
+    expect(screen.getByText('Send data into GrowthOS', { selector: 'li' })).toBeInTheDocument();
+    expect(screen.getByText('future:thing', { selector: 'li' })).toBeInTheDocument();
+    expect(screen.queryByText('ingest:write')).not.toBeInTheDocument();
   });
 
   it('switches the config form when a different plugin card is clicked', () => {
@@ -84,17 +91,17 @@ describe('InstallPluginForm', () => {
     fireEvent.change(screen.getByLabelText(/shop_domain/), { target: { value: 'my-shop' } });
     expect(screen.getByRole('button', { name: 'Install plugin' })).toBeDisabled();
 
-    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    fireEvent.click(screen.getByLabelText("I allow this"));
     expect(screen.getByRole('button', { name: 'Install plugin' })).toBeEnabled();
 
-    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    fireEvent.click(screen.getByLabelText("I allow this"));
     expect(screen.getByRole('button', { name: 'Install plugin' })).toBeDisabled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it('shows an inline required-field error and does not submit when a required config field is left blank', async () => {
     renderForm();
-    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    fireEvent.click(screen.getByLabelText("I allow this"));
     fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This field is required.');
@@ -111,7 +118,7 @@ describe('InstallPluginForm', () => {
     fireEvent.click(sandboxCheckbox);
     expect(sandboxCheckbox.checked).toBe(true);
 
-    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    fireEvent.click(screen.getByLabelText("I allow this"));
     fireEvent.change(screen.getByLabelText(/shop_domain/), { target: { value: 'my-shop' } });
     fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
 
@@ -132,7 +139,7 @@ describe('InstallPluginForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    fireEvent.click(screen.getByLabelText("I allow this"));
     fireEvent.change(screen.getByLabelText(/shop_domain/), { target: { value: 'my-shop' } });
     fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
 
@@ -153,7 +160,7 @@ describe('InstallPluginForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({ error: 'already_installed' }) } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    fireEvent.click(screen.getByLabelText("I allow this"));
     fireEvent.change(screen.getByLabelText(/shop_domain/), { target: { value: 'my-shop' } });
     fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
 
