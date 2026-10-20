@@ -20,10 +20,12 @@ describe('onboarding intro copy explains itself to a beginner', () => {
     }
   });
 
-  it('spells out every abbreviation next to the term', () => {
-    expect(en.Onboarding.packSaasMarketingDescription).toMatch(/cost per customer \(CAC\)/);
-    expect(en.Onboarding.packSaasMarketingDescription).toMatch(/recurring revenue \(MRR\)/);
-    expect(en.Onboarding.packEngagementDescription).toMatch(/each day, week and month \(DAU\/WAU\/MAU\)/);
+  it('uses plain words instead of marketing abbreviations in the starting-point step', () => {
+    for (const key of ['packSaasMarketingDescription', 'packEngagementDescription'] as const) {
+      expect(en.Onboarding[key]).not.toMatch(/\b(CAC|MRR|DAU|WAU|MAU)\b/);
+      expect(he.Onboarding[key]).not.toMatch(/\b(CAC|MRR|DAU|WAU|MAU)\b/);
+    }
+    expect(en.Onboarding.packStepIntro).toMatch(/Not sure\?/);
     expect(en.Onboarding.sourceStepIntro).toMatch(/access key \(API key\)/);
   });
 
