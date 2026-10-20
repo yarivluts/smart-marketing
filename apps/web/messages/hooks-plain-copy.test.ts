@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import en from './en.json';
 import he from './he.json';
 
-const KEYS = ['existingEndpointsHeading', 'noEndpoints', 'createEndpointHeading', 'heroDescription'] as const;
+const KEYS = [
+  'existingEndpointsHeading',
+  'noEndpoints',
+  'createEndpointHeading',
+  'heroDescription',
+  'endpointsDescription',
+  'kpiEndpoints',
+  'createEndpointDescription',
+] as const;
 
 describe('the incoming data links page speaks plainly', () => {
   it('English headings match the page title and avoid hook / webhook / payload / API jargon', () => {
