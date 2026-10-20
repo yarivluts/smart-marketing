@@ -78,7 +78,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     // display name/type/scopes/registers, then pick it.
     const galleryCard = page.getByRole('option', { name: /Shopify Commerce Pack/ });
     await expect(galleryCard.getByText('Type: source')).toBeVisible();
-    await expect(galleryCard.getByText('Requests: ingest:write, schema:write')).toBeVisible();
+    await expect(galleryCard.getByText('Requests: Send data into GrowthOS, Define your data fields')).toBeVisible();
     await expect(galleryCard.getByText('Registers: 2 entities · 1 events · 0 metrics')).toBeVisible();
     await galleryCard.click();
     await expect(galleryCard).toHaveAttribute('aria-selected', 'true');
