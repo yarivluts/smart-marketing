@@ -39,4 +39,11 @@ describe('onboarding intro copy explains itself to a beginner', () => {
       expect(he.Onboarding[key]).toMatch(/[֐-׿]/);
     }
   });
+
+  it('describes sending your own data without push / mint / plugin jargon', () => {
+    for (const key of ['sourceStepPushYourOwnHeading', 'sourceStepPushYourOwnIntro'] as const) {
+      expect(en.Onboarding[key]).not.toMatch(/\bpush\b|\bmint\b|plugin/i);
+      expect(he.Onboarding[key]).toMatch(/[֐-׿]/);
+    }
+  });
 });
