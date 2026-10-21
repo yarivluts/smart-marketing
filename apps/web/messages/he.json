@@ -3097,7 +3097,7 @@
     "oneClickRollback": "ביטול השינוי",
     "rollbackSuccess": "הפעולה בוטלה בהצלחה!",
     "rollbackError": "שגיאה בביטול הפעולה.",
-    "killSwitchEngagedBadge": "מתג חירום מופעל",
+    "killSwitchEngagedBadge": "עצירת החירום פעילה - שום דבר לא משתנה אוטומטית",
     "lifecycleTitle": "מחזור החיים של פעולה",
     "lifecycleDescription": "כל שינוי מוצע עובר את מעקות הבטיחות, ממתין לאישור, ואז מבוצע ומאומת או מבוטל. המספרים הם הפעולות שנמצאות כרגע בכל מצב.",
     "diffRowLineNew": "{label}: {after} (חדש)",
@@ -3794,7 +3794,7 @@
     }
   },
   "CopilotChatPanel": {
-    "welcomeMessage": "שלום! אני ה-AI Growth Copilot שלך. כיצד אוכל לעזור לך לייעל קמפיינים, לבדוק מדדים או לבצע שינויי תקציב היום?",
+    "welcomeMessage": "שלום! אני עוזר ה-AI שלכם. אפשר לשאול אותי איך המודעות מתקדמות, או לבקש שאכין שינוי - שום דבר לא קורה עד שתאשרו.",
     "chipTopAdsLabel": "מודעות מובילות",
     "chipTopAdsQuery": "אילו מודעות הכי רווחיות השבוע?",
     "chipScaleBudgetLabel": "הגדל תקציב",
@@ -3806,13 +3806,13 @@
     "clearChat": "נקה שיחה"
   },
   "AutomationHub": {
-    "title": "מרכז האוטומציה וה-AI Copilot",
-    "killSwitchActive": "מתג חירום פעיל",
-    "guardrailsActive": "מערכת פעילה ומאובטחת",
+    "title": "עוזר ה-AI והאישורים",
+    "killSwitchActive": "עצירת החירום פעילה - שום דבר לא משתנה אוטומטית",
+    "guardrailsActive": "מגבלות הבטיחות פעילות",
     "description": "ניהול הצעות שינוי, בקרת תקציב אוטומטית ויומן פעולות עבור {projectName}",
     "actionsExecuted": "פעולות שבוצעו",
     "pendingProposals": "הצעות ממתינות",
-    "tabCopilot": "AI Copilot & הצעות",
+    "tabCopilot": "עוזר ה-AI והצעות",
     "tabAudit": "יומן ביקורת (Audit)",
     "proactiveProposals": "הצעות פרואקטיביות",
     "pendingCount": "{count} ממתינות"

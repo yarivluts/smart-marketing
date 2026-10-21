@@ -3097,7 +3097,7 @@
     "oneClickRollback": "Undo this change",
     "rollbackSuccess": "Action rolled back successfully!",
     "rollbackError": "Failed to rollback action.",
-    "killSwitchEngagedBadge": "KILL SWITCH ACTIVE",
+    "killSwitchEngagedBadge": "Emergency stop is on - nothing changes automatically",
     "lifecycleTitle": "Action lifecycle",
     "lifecycleDescription": "Every proposed change passes the guardrails, waits for approval, then executes and is verified or rolled back. Numbers are actions in each state now.",
     "diffRowLineNew": "{label}: {after} (new)",
@@ -3611,8 +3611,8 @@
   "Copilot": {
     "actionExecuted": "Action submitted. You can roll it back from the audit log.",
     "actionFailed": "The action did not go through. Nothing was changed - check the audit log and try again.",
-    "drawerTitle": "AI Growth Copilot",
-    "drawerSubtitle": "Natural language marketing actions & instant insights",
+    "drawerTitle": "Your AI helper",
+    "drawerSubtitle": "Ask in plain words - it explains your results and prepares changes for you to approve",
     "emptyTitle": "How can I assist your campaigns?",
     "emptySubtitle": "Ask for performance breakdowns, budget reallocations, or campaign drafting.",
     "beforeLabel": "Before",
@@ -3794,7 +3794,7 @@
     }
   },
   "CopilotChatPanel": {
-    "welcomeMessage": "Hello! I'm your AI Growth Copilot. How can I assist you with optimizing campaigns, checking metrics, or reallocating budgets today?",
+    "welcomeMessage": "Hello! I'm your AI helper. Ask me how your ads are doing, or ask me to prepare a change - nothing happens until you approve it.",
     "chipTopAdsLabel": "Top Ads",
     "chipTopAdsQuery": "What are top ads this week?",
     "chipScaleBudgetLabel": "Spend more",
@@ -3806,13 +3806,13 @@
     "clearChat": "Clear Chat"
   },
   "AutomationHub": {
-    "title": "AI Automation Hub",
-    "killSwitchActive": "KILL SWITCH ACTIVE",
-    "guardrailsActive": "Guardrails Active",
-    "description": "Autonomous marketing execution, smart proposals, and instant rollback for {projectName}",
+    "title": "AI helper and approvals",
+    "killSwitchActive": "Emergency stop is on - nothing changes automatically",
+    "guardrailsActive": "Safety limits are on",
+    "description": "Changes the AI suggests for {projectName}. You approve each one, and you can undo it.",
     "actionsExecuted": "Actions Executed",
     "pendingProposals": "Pending Proposals",
-    "tabCopilot": "AI Copilot & Proposals",
+    "tabCopilot": "AI helper and suggestions",
     "tabAudit": "Audit Trail",
     "proactiveProposals": "Proactive Proposals",
     "pendingCount": "{count} pending"
