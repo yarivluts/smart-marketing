@@ -4930,8 +4930,8 @@
         "keyword_empty": "keyword {index} is empty",
         "keyword_too_long": "keyword {index} is longer than 80 characters",
         "keyword_too_many_words": "keyword {index} has more than 10 words",
-        "invalid_match_type": "keyword {index} has an unknown match type",
-        "duplicate_keyword": "keyword {index} is listed twice with the same match type",
+        "invalid_match_type": "keyword {index} has an unknown matching style (exact, phrase or broad)",
+        "duplicate_keyword": "keyword {index} is listed twice with the same matching style",
         "too_many_negatives": "at most 50 negative keywords",
         "too_few_headlines": "write at least 3 headlines",
         "too_many_headlines": "at most 15 headlines",
@@ -4940,8 +4940,8 @@
         "too_few_descriptions": "write at least 2 descriptions",
         "too_many_descriptions": "at most 4 descriptions",
         "description_too_long": "description {index} is longer than 90 characters",
-        "path_too_long": "a display path is longer than 15 characters",
-        "unknown": "a rule was broken"
+        "path_too_long": "the short web address shown under the ad is longer than 15 characters",
+        "unknown": "something in the ad needs a fix - check the text and try again"
       }
     },
     "audience": {
@@ -4965,7 +4965,7 @@
         "saved": "Saved preset"
       },
       "kindsHint": "\"Your people\" are real contacts or visitors you already have. \"Similar to your people\" are new people Meta finds who resemble them.",
-      "savedNote": "Saved audiences are targeting presets in Ads Manager - they are listed for reference and cannot be added here.",
+      "savedNote": "These are groups of people you saved in your Meta ad account. They are shown so you can see them, but you cannot add them here - pick age, gender and interests instead.",
       "sizeUnknown": "size unknown",
       "interestsTitle": "Interests ({count} of up to {max})",
       "interestPlaceholder": "Search topics people like, e.g. law, real estate",
@@ -5036,7 +5036,7 @@
         "too_many_audiences": "at most 10 audiences",
         "too_many_interests": "at most 25 interests",
         "invalid_audience": "an audience or interest is not a Meta one",
-        "unknown": "a rule was broken"
+        "unknown": "something in the ad needs a fix - check the text and try again"
       }
     },
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
