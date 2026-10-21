@@ -1260,11 +1260,11 @@
       },
       "signups": {
         "title": "Signups",
-        "impact": "Without a signup event the funnel has no entry step, and cost per signup, landing-page conversion and cohorts cannot be computed."
+        "impact": "Without a signup event we cannot see how many visitors sign up, or what each signup costs."
       },
       "product_usage": {
         "title": "Product usage events",
-        "impact": "Without product events there is no activation, engagement or retention reading."
+        "impact": "Without product events we cannot tell whether new customers start using your product and keep coming back."
       },
       "customer_profiles": {
         "title": "Customer entity",
@@ -1272,11 +1272,11 @@
       },
       "billing": {
         "title": "Billing and subscriptions",
-        "impact": "Without billing records (subscription_state_change events or the Stripe connector) there is no revenue, MRR, churn or payback reading."
+        "impact": "Without billing records (subscription_state_change events or the Stripe connector) we cannot show your income, or how many customers cancel."
       },
       "ad_spend": {
         "title": "Ad spend",
-        "impact": "Without ad spend there is no cost side: CAC, cost per signup, ROAS and payback cannot be computed."
+        "impact": "Without ad spend we cannot tell what each customer or signup costs you, or whether your ads earn their money back."
       }
     },
     "panelDescription": "Which data streams your reports need, and whether each one is flowing in this environment.",
