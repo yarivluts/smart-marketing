@@ -48,17 +48,17 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/create and execute a campaign draft/)).toBeInTheDocument();
+    expect(screen.getByText(/create and run a campaign draft/)).toBeInTheDocument();
   });
 
   it('submits a budget-only edit for the selected target and ad set', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    expect(screen.getByLabelText('Ad set')).toHaveValue('act_999/adsets/1');
+    expect(screen.getByLabelText('Audience group')).toHaveValue('act_999/adsets/1');
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose audience group change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { targetId: string; adSetResourceName: string; dailyBudgetUsd?: number; status?: string };
@@ -73,7 +73,7 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'paused' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose audience group change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { dailyBudgetUsd?: number; status?: string };
@@ -85,9 +85,9 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Ad set'), { target: { value: 'act_999/adsets/2' } });
+    fireEvent.change(screen.getByLabelText('Audience group'), { target: { value: 'act_999/adsets/2' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose audience group change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { adSetResourceName: string };
@@ -98,7 +98,7 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose audience group change' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a daily budget or choose a new status.');
     expect(fetch).not.toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '0' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose audience group change' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a positive daily budget.');
     expect(fetch).not.toHaveBeenCalled();
@@ -120,9 +120,9 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose audience group change' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the ad set edit. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the audience group change. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });
