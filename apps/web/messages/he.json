@@ -2054,7 +2054,7 @@
     "logEntryCostUnknown": "עלות משוערת: לא זמינה",
     "logCapNote": "מוצגות {count} בקשות הנתונים האחרונות.",
     "logCapNoteTruncated": "מוצגות {count} בקשות הנתונים האחרונות — יש עוד, ולכן סכום שתחברו מהרשימה הזו נמוך מהסכום האמיתי.",
-    "outcomeExecuted": "בוצע",
+    "outcomeExecuted": "הושלם",
     "outcomeBlockedQuotaExceeded": "נחסם — הגעתם למגבלה היומית",
     "outcomeWarehouseNotConfigured": "בוצע (הנתונים שלכם עדיין לא מחוברים)",
     "eyebrow": "בקרת עלויות",
@@ -3407,7 +3407,7 @@
     "increaseBudgetBy": "הגדל תקציב ב-{percent}%",
     "decreaseBudgetBy": "הקטן תקציב ב-{percent}%",
     "spendDegraded": {
-      "warehouse_not_configured": "נתוני ההוצאה עדיין לא מחוברים בסביבה הזו, ולכן אי אפשר להציג אותם.",
+      "warehouse_not_configured": "הוצאות הפרסום שלכם עדיין לא מחוברות, ולכן אי אפשר להציג אותן. חברו את חשבון המודעות, או בקשו מעוזר AI לעשות זאת בשבילכם.",
       "metric_not_registered": "הפרויקט הזה עדיין לא עוקב אחרי הוצאות הפרסום. סיימו את שלבי ההגדרה וההוצאה תופיע כאן.",
       "not_yet_backed": "נתוני ההוצאה עדיין בהכנה. נסו שוב עוד קצת.",
       "quota_exceeded": "השתמשתם במכסה היומית לטעינת נתונים. ההוצאה תוצג שוב כשהמכסה תתאפס.",

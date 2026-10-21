@@ -2054,7 +2054,7 @@
     "logEntryCostUnknown": "Estimated cost: not available",
     "logCapNote": "Showing the {count} most recent data requests.",
     "logCapNoteTruncated": "Showing the {count} most recent data requests — there are more, so any total you add up from this list is lower than the real one.",
-    "outcomeExecuted": "Executed",
+    "outcomeExecuted": "Done",
     "outcomeBlockedQuotaExceeded": "Blocked — daily limit reached",
     "outcomeWarehouseNotConfigured": "Done (your data is not connected yet)",
     "eyebrow": "Cost control",
@@ -3407,7 +3407,7 @@
     "increaseBudgetBy": "Increase budget by {percent}%",
     "decreaseBudgetBy": "Decrease budget by {percent}%",
     "spendDegraded": {
-      "warehouse_not_configured": "Spend numbers are not connected in this environment yet, so we cannot show them.",
+      "warehouse_not_configured": "Your ad spend isn't connected yet, so we can't show it. Connect your ad account, or ask the AI helper to do it for you.",
       "metric_not_registered": "This project is not tracking ad spend yet. Finish the setup steps and spend will show up here.",
       "not_yet_backed": "Spend numbers are still being prepared. Check back a little later.",
       "quota_exceeded": "You have used today's limit for loading numbers. Spend will show again when the limit resets.",
