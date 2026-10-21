@@ -56,7 +56,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     renderForm();
 
     expect(screen.getByLabelText('Ad set')).toHaveValue('act_999/adsets/1');
-    fireEvent.change(screen.getByLabelText('Countries (ISO codes, one per line)'), { target: { value: 'US\nCA' } });
+    fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US\nCA' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '45' } });
     fireEvent.click(screen.getByLabelText('Female'));
@@ -78,7 +78,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Countries (ISO codes, one per line)'), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
     fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -91,7 +91,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Ad set'), { target: { value: 'act_999/adsets/2' } });
-    fireEvent.change(screen.getByLabelText('Countries (ISO codes, one per line)'), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
     fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -113,7 +113,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Countries (ISO codes, one per line)'), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '50' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
@@ -126,7 +126,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Countries (ISO codes, one per line)'), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
     fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the ad set targeting edit. Please try again.");
