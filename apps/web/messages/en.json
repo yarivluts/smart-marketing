@@ -3936,7 +3936,7 @@
     "scriptSaved": "Script saved.",
     "providerErrors": {
       "not_configured": "No AI provider is configured for this deployment.",
-      "provider_billing": "The AI provider refused for billing - its account needs credit.",
+      "provider_billing": "The AI service stopped because its account is out of credit. Ask your account admin to top it up, then try again.",
       "rate_limited": "The AI provider is limiting requests right now. Try again in a minute.",
       "refused": "The AI declined this request. Rephrase the brief and try again.",
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
@@ -4019,7 +4019,7 @@
       "title": "Video",
       "description": "Each scene becomes its own short video clip. When every scene has an up-to-date clip, join them into one video of up to a minute.",
       "textNote": "On-screen text is not drawn into the video: AI video models render letters badly, and Hebrew worst of all. Add it as a caption or text layer in the ad platform.",
-      "notConfigured": "No video model is configured for this deployment, so clips cannot be generated. Existing clips can still be watched and assembled.",
+      "notConfigured": "Making video clips is not switched on yet, so new clips cannot be made. Ask the AI helper or your account admin to turn it on. Clips you already have can still be watched and joined.",
       "saveScriptFirst": "Save a script first. Each saved scene can then be rendered as a clip.",
       "progress": "{rendered} of {total} scenes rendered",
       "rulerLabel": "Video status of each scene on the one-minute ruler",
@@ -4099,7 +4099,7 @@
       "chosen": "This version will be used in the video. Assemble again to apply it."
     },
     "clipFailure": {
-      "not_configured": "no video model is configured",
+      "not_configured": "making video is not switched on yet",
       "provider_billing": "the AI service is not available on our side right now, so please contact GrowthOS support",
       "rate_limited": "the AI service is too busy right now, so please wait a few minutes and try again",
       "refused": "the video model declined this scene",
@@ -4317,7 +4317,7 @@
       "keepsPlan": "the plan",
       "keepsScript": "the script",
       "keepsConcepts": "the image ideas",
-      "missingModels": "Some of the AI models are not set up for this deployment, so the steps that need them will say so.",
+      "missingModels": "Some AI features are not switched on yet, so the steps that need them will say so. Your account admin can turn them on.",
       "start": "Create everything",
       "runAgain": "Run the autopilot again",
       "runAgainHint": "After an edit, a new run redoes only what changed.",
@@ -4353,7 +4353,7 @@
         "already_done": "kept what you have",
         "no_concepts": "no image ideas",
         "no_script": "no script",
-        "not_configured": "model not set up",
+        "not_configured": "this AI feature is not switched on yet",
         "quota_exceeded": "daily limit reached",
         "provider_billing": "AI account needs credit",
         "rate_limited": "AI is limiting requests",
@@ -4387,7 +4387,7 @@
       "leftToday": "{count, plural, one {# image left today} other {# images left today}}",
       "writeIdeas": "Write ideas with AI",
       "rewriteIdeas": "Write new ideas with AI",
-      "notConfigured": "No image model is set up for this deployment.",
+      "notConfigured": "Making pictures is not switched on yet. Ask the AI helper or your account admin to turn it on.",
       "noIdeas": "No image ideas yet. Write them with AI or add one yourself.",
       "ideaLabel": "Idea {index}",
       "removeIdea": "Remove",
@@ -4574,7 +4574,7 @@
       "doneVariants": "Created {count} switched-off ads together on {destination}.{failed, plural, =0 {} one { # variant could not be created.} other { # variants could not be created.}}"
     },
     "imageFailure": {
-      "not_configured": "no image model is configured",
+      "not_configured": "making pictures is not switched on yet",
       "provider_billing": "the AI service is not available on our side right now, so please contact GrowthOS support",
       "rate_limited": "the AI service is too busy right now, so please wait a few minutes and try again",
       "refused": "the image model declined this picture",
@@ -4607,7 +4607,7 @@
       "description": "Your own images - a product photo, your logo, a person, a place - real screenshots of your app, or AI illustrations. Attach them to scenes and the video model uses them instead of inventing its own.",
       "unavailable": {
         "upload": "Upload a PNG or JPEG image.",
-        "illustration": "No image model is configured for this deployment."
+        "illustration": "Making pictures is not switched on yet. Ask your account admin to turn it on."
       },
       "add": {
         "upload": "Upload an image",
@@ -4657,7 +4657,7 @@
       "errors": {
         "unsupported_image": "Only PNG and JPEG images can be used.",
         "image_too_large": "The image is larger than 4 MB.",
-        "illustration_not_configured": "No image model is configured for this deployment.",
+        "illustration_not_configured": "Making pictures is not switched on yet. Ask your account admin to turn it on.",
         "reference_not_ready": "That image is not ready yet.",
         "label_required": "Give the image a name.",
         "label_too_long": "The name is too long.",
