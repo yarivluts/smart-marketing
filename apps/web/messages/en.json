@@ -38,12 +38,12 @@
   "OmniSearch": {
     "trigger": "Search...",
     "shortcutHint": "⌘K",
-    "dialogLabel": "Search boards, metrics, segments, campaigns, goals, win rules, customers, and pages",
-    "inputPlaceholder": "Search boards, metrics, segments, campaigns, customers, pages...",
+    "dialogLabel": "Search your dashboards, numbers, audiences, ads, goals, customers and pages",
+    "inputPlaceholder": "Search your ads, goals, customers, dashboards...",
     "emptyPrompt": "Start typing to search this project.",
     "loading": "Loading...",
     "noResults": "No results for \"{query}\".",
-    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} win_rule {Win rule} customer {Customer} page {Page} other {Result}}"
+    "resultType": "{type, select, board {Dashboard} metric {Number} segment {Audience} campaign {Ad} goal {Goal} win_rule {Win alert} customer {Customer} page {Page} other {Result}}"
   },
   "CommandPalette": {
     "open": "Open command search",
