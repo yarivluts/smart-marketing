@@ -20,6 +20,18 @@ describe('describeInvalidReasons', () => {
     expect(describeInvalidReasons(lookup(en), undefined)).toBe(en.AdStudio.invalidReason.other);
   });
 
+  it('explains the ad-group problems without the words ad group or ad set', () => {
+    for (const messages of [en, he]) {
+      for (const key of ['adSetAccount', 'adSetNotReady'] as const) {
+        const text = messages.AdStudio.invalidReason[key];
+        expect(text).not.toMatch(/ad group|ad set|קבוצת מודעות|קבוצת המודעות/i);
+      }
+    }
+    expect(describeInvalidReasons(lookup(en), ['the ad set to add to is not a finished Meta ad of this ad'])).toContain(
+      'Choose a finished ad',
+    );
+  });
+
   it('has an English and a Hebrew sentence for every known phrase', () => {
     expect(Object.keys(he.AdStudio.invalidReason).sort()).toEqual(Object.keys(en.AdStudio.invalidReason).sort());
     expect(describeInvalidReasons(lookup(he), ['choose at least one keyword'])).toBe(he.AdStudio.invalidReason.keyword);
