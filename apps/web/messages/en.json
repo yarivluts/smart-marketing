@@ -5892,8 +5892,8 @@
         "female": "Women"
       },
       "reach": "Facebook and Instagram estimate {lower}-{upper} people a month",
-      "metaMissing": "Connect your Facebook and Instagram (Meta) ad account to match the interests and see the reach. Until then, the ads use the countries, ages and genders above.",
-      "metaFailed": "Facebook and Instagram did not answer, so the interests are not matched yet. You can approve the rest now.",
+      "metaMissing": "Connect your Facebook and Instagram (Meta) ad account to see how many people the ads can reach and to match what they care about. Until then, the ads use the countries, ages and genders above.",
+      "metaFailed": "Facebook and Instagram did not answer, so we could not match what these people care about yet. You can approve the rest now.",
       "revising": "The AI is updating the audience...",
       "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
       "status": {
@@ -5938,7 +5938,7 @@
       "chart": "Clicks, sign-ups and sales per day",
       "ctr": "{value} of the people who saw an ad clicked it",
       "costPerConversion": "{value} for each sign-up or sale",
-      "source": "Numbers come from Facebook and Instagram for the campaigns the pilot created, in your ad account currency.",
+      "source": "Numbers come from Facebook and Instagram for the ads the pilot made, in your ad account currency.",
       "targetResults": "{clicks} clicks, {spend} spent",
       "kpi": {
         "spend": "Spend",
