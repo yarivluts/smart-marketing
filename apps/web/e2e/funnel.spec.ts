@@ -48,6 +48,6 @@ test.describe('Funnel conversion (query_funnel admin surface)', () => {
     await expect(page.getByText('No funnel is defined for this project yet')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Define your funnel' })).toBeVisible();
     await expect(page.getByText(/Simulated Mode/)).toHaveCount(0);
-    await expect(page.getByText('Funnel Drop-off Alert')).toHaveCount(0);
+    await expect(page.getByText('Many people are leaving here')).toHaveCount(0);
   });
 });
