@@ -40,7 +40,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
     fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
-    fireEvent.change(screen.getByLabelText('Final URL'), { target: { value: 'https://example.com/widgets' } });
+    fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText(/Headlines/), {
       target: { value: 'Buy Blue Widgets\nBest Widgets Online\nWidgets For Less' },
     });
@@ -78,7 +78,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Summer Sale' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
     fireEvent.change(screen.getByLabelText('Objective'), { target: { value: 'OUTCOME_LEADS' } });
-    fireEvent.change(screen.getByLabelText('Ad set name'), { target: { value: 'Ad Set 1' } });
+    fireEvent.change(screen.getByLabelText('Audience group name'), { target: { value: 'Ad Set 1' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '55' } });
     fireEvent.click(screen.getByLabelText('Female'));
@@ -110,7 +110,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
     fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Summer Sale' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
-    fireEvent.change(screen.getByLabelText('Ad set name'), { target: { value: 'Ad Set 1' } });
+    fireEvent.change(screen.getByLabelText('Audience group name'), { target: { value: 'Ad Set 1' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '55' } });
     fireEvent.change(screen.getByLabelText(/Countries/), { target: { value: 'US' } });
@@ -120,8 +120,8 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Sale' } });
 
     const file = new File(['fake-png-bytes'], 'ad.png', { type: 'image/png' });
-    fireEvent.change(screen.getByLabelText('Ad creative image (optional)'), { target: { files: [file] } });
-    await screen.findByAltText('Selected ad creative image preview');
+    fireEvent.change(screen.getByLabelText('Ad image (optional)'), { target: { files: [file] } });
+    await screen.findByAltText('Preview of the selected ad image');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
@@ -137,10 +137,10 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
 
     const file = new File(['not an image'], 'ad.gif', { type: 'image/gif' });
-    fireEvent.change(screen.getByLabelText('Ad creative image (optional)'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('Ad image (optional)'), { target: { files: [file] } });
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Image must be a PNG or JPEG file.');
-    expect(screen.queryByAltText('Selected ad creative image preview')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('Preview of the selected ad image')).not.toBeInTheDocument();
   });
 
   it('rejects an oversized image file with an inline error and no preview', async () => {
@@ -148,10 +148,10 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
 
     const file = new File([new Uint8Array(400_001)], 'ad.png', { type: 'image/png' });
-    fireEvent.change(screen.getByLabelText('Ad creative image (optional)'), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('Ad image (optional)'), { target: { files: [file] } });
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Image must be 390KB or smaller.');
-    expect(screen.queryByAltText('Selected ad creative image preview')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('Preview of the selected ad image')).not.toBeInTheDocument();
   });
 
   it('shows an inline error for a Meta draft with no countries, without submitting', async () => {
@@ -175,7 +175,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
     fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
-    fireEvent.change(screen.getByLabelText('Final URL'), { target: { value: 'https://example.com/widgets' } });
+    fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText(/Headlines/), {
       target: { value: 'Buy Blue Widgets\nBest Widgets Online\nWidgets For Less' },
     });
