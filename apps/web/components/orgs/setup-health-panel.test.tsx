@@ -171,3 +171,17 @@ describe('SetupHealthPanel: customer coverage and the backfill hint', () => {
     expect(screen.getByTestId('setup-backfill-hint')).toHaveTextContent(expected);
   });
 });
+
+describe('SetupHealthPanel: plain-language impact lines', () => {
+  const jargon = /\b(CAC|ROAS|MRR|churn|cohorts?|funnel|payback)\b/i;
+
+  it.each([
+    ['en', en],
+    ['he', he],
+  ])('has no marketing jargon in the %s impact lines', (_locale, messages) => {
+    const requirements = messages.SetupHealth.requirements as Record<string, { impact: string }>;
+    for (const [id, { impact }] of Object.entries(requirements)) {
+      expect(impact, id).not.toMatch(jargon);
+    }
+  });
+});
