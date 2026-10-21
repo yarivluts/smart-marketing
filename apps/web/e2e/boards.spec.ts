@@ -80,12 +80,12 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await expect(page.getByText('Ad spend')).toBeVisible();
     // No real warehouse exists in this environment (KAN-18) — the tile honestly
     // degrades instead of showing fabricated data or breaking the whole board.
-    await expect(page.getByText('Warehouse not configured yet')).toBeVisible();
+    await expect(page.getByText("Your data isn't connected yet")).toBeVisible();
 
     // Layout persists (KAN-60 AC): reload and the tile is still there.
     await page.reload();
     await expect(page.getByText('Ad spend')).toBeVisible();
-    await expect(page.getByText('Warehouse not configured yet')).toBeVisible();
+    await expect(page.getByText("Your data isn't connected yet")).toBeVisible();
 
     // Add a second tile, then remove the first — both a multi-tile board and
     // a remove-then-save round trip.
