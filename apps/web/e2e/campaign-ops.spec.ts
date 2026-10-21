@@ -44,12 +44,12 @@ test.describe('Campaign ops (KAN-86)', () => {
     await expect(page.getByRole('heading', { name: 'Ad payback: Client Delta' })).toBeVisible();
 
     // Spend targets don't need the pack installed at all — no warehouse configured in this environment.
-    await expect(page.getByText('No spend data available yet — connect a data warehouse to see this.')).toBeVisible();
+    await expect(page.getByText('No spend data available yet — it will show here once your data is connected.')).toBeVisible();
 
     // Payback (and the per-campaign collection/ROI breakdown) needs the Campaign Ops pack installed.
-    await expect(page.getByText('No payback data available yet — connect a data warehouse to see this.')).not.toBeVisible();
+    await expect(page.getByText('No payback data available yet — it will show here once your data is connected.')).not.toBeVisible();
     await page.getByRole('button', { name: 'Install' }).click();
-    await expect(page.getByText('No payback data available yet — connect a data warehouse to see this.')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('No per-campaign payback data available yet — connect a data warehouse to see this.')).toBeVisible();
+    await expect(page.getByText('No payback data available yet — it will show here once your data is connected.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('No per-campaign payback data available yet — it will show here once your data is connected.')).toBeVisible();
   });
 });
