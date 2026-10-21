@@ -137,7 +137,7 @@ describe('AutomationHubDashboard Component', () => {
     );
 
     expect(screen.getByTestId('kill-switch-active-badge')).toBeInTheDocument();
-    expect(screen.getByText('KILL SWITCH ACTIVE')).toBeInTheDocument();
+    expect(screen.getByText('Emergency stop is on - nothing changes automatically')).toBeInTheDocument();
   });
 
   it.each(['en', 'he'] as const)('shows plain-language headings and no jargon in %s', (locale) => {
