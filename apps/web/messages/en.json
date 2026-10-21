@@ -5776,6 +5776,12 @@
       "approve": "Approve",
       "reject": "Reject",
       "rejectHint": "Not for you? Reject it - nothing is published and no money is spent.",
+      "approveHint": {
+        "target": "Approve and the AI starts making ads, a landing page and an audience for it. Nothing goes live yet.",
+        "ads": "Approve to keep these ads. They are not published yet - you will be asked before anything is sent.",
+        "landing": "Approve and the page goes online at a public address that anyone with the link can open.",
+        "audience": "Approve to use this audience for the ads. Nothing is published yet."
+      },
       "change": "Ask for a change",
       "changePlaceholder": "What should change? For example: only small offices in Tel Aviv",
       "send": "Send to the AI",
