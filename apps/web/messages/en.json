@@ -1251,7 +1251,7 @@
     "rejectedLine": "{count, plural, one {# record is} other {# records are}} rejected and open in quarantine ({schemas}): {reasons}",
     "silentRegisteredLine": "Registered but never received in this environment: {schemas}.",
     "nothingReceivedLine": "Nothing received in this environment, accepted or rejected.",
-    "sourceNote": "Derived only from the records this environment accepted or rejected; no requirement can be marked connected by hand. For step-by-step fixes, run the audit_installation_gaps MCP tool.",
+    "sourceNote": "This is worked out only from the data that actually arrived, so nothing can be marked as connected by hand. For step-by-step help fixing a gap, ask the AI helper to check your setup.",
     "mappingNote": "Schemas are matched to requirements by their names, so check the schemas listed under each one: a name like \"order_viewed\" would be counted as billing.",
     "requirements": {
       "landing_page_attribution": {
