@@ -48,20 +48,20 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/create and execute a campaign draft/)).toBeInTheDocument();
+    expect(screen.getByText(/create and run a campaign draft/)).toBeInTheDocument();
   });
 
   it('submits the full targeting spec for the selected target and ad set', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    expect(screen.getByLabelText('Ad set')).toHaveValue('act_999/adsets/1');
+    expect(screen.getByLabelText('Audience group')).toHaveValue('act_999/adsets/1');
     fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US\nCA' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '45' } });
     fireEvent.click(screen.getByLabelText('Female'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose who-it-reaches change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as {
@@ -79,7 +79,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose who-it-reaches change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { targeting: { genders?: string[] } };
@@ -90,9 +90,9 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Ad set'), { target: { value: 'act_999/adsets/2' } });
+    fireEvent.change(screen.getByLabelText('Audience group'), { target: { value: 'act_999/adsets/2' } });
     fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose who-it-reaches change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { adSetResourceName: string };
@@ -103,7 +103,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose who-it-reaches change' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter at least one country code.');
     expect(fetch).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '50' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '30' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose who-it-reaches change' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid age range (min age must not exceed max age).');
     expect(fetch).not.toHaveBeenCalled();
@@ -127,9 +127,9 @@ describe('AutomationProposeMetaAdSetTargetingEditForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Countries (two-letter codes like US or IL, one per line)'), { target: { value: 'US' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad set targeting edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose who-it-reaches change' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the ad set targeting edit. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the change to who the audience group reaches. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

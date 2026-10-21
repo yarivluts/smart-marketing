@@ -61,7 +61,7 @@ describe('AutomationProposeMetaAdCreativeEditForm', () => {
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Mega Sale' } });
     fireEvent.change(screen.getByLabelText('Description (optional)'), { target: { value: 'Shop now' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad creative edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose image and text change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as {
@@ -87,7 +87,7 @@ describe('AutomationProposeMetaAdCreativeEditForm', () => {
     fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText('Primary text'), { target: { value: 'Even bigger savings.' } });
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Mega Sale' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad creative edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose image and text change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { description?: string };
@@ -102,7 +102,7 @@ describe('AutomationProposeMetaAdCreativeEditForm', () => {
     fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText('Primary text'), { target: { value: 'Even bigger savings.' } });
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Mega Sale' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad creative edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose image and text change' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { adResourceName: string };
@@ -113,7 +113,7 @@ describe('AutomationProposeMetaAdCreativeEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad creative edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose image and text change' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter primary text, a headline, and a link URL.');
     expect(fetch).not.toHaveBeenCalled();
@@ -126,9 +126,9 @@ describe('AutomationProposeMetaAdCreativeEditForm', () => {
     fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText('Primary text'), { target: { value: 'Even bigger savings.' } });
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Mega Sale' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Propose ad creative edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose image and text change' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the ad creative edit. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the image and text change. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });
