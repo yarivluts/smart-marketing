@@ -130,7 +130,7 @@ describe('VideoStudio', () => {
     );
     renderStudio();
     fireEvent.click(within(screen.getByTestId('ad-studio-video-scene-2')).getByRole('button', { name: 'Render (8s)' }));
-    await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent('The AI provider refused for billing'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent('The AI service stopped because its account is out of credit'));
     expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByTestId('ad-studio-clip-failure')).toHaveTextContent('Failed: the AI service is not available on our side right now, so please contact GrowthOS support');
   });
 
@@ -190,7 +190,7 @@ describe('VideoStudio', () => {
     expect(screen.getByText(/Save a script first/)).toBeInTheDocument();
     unmount();
     const second = renderStudio({ videoAvailable: false });
-    expect(screen.getByText(/No video model is configured/)).toBeInTheDocument();
+    expect(screen.getByText(/Making video clips is not switched on yet/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Render all scenes (13s)' })).toBeDisabled();
     second.unmount();
     renderStudio({}, 'he');
