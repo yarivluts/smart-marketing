@@ -2424,9 +2424,9 @@
     "freshnessAsOfLabel": "Data as of {asOf}",
     "freshnessStaleLabel": "Stale — data as of {asOf}",
     "tileUnavailableReason": {
-      "warehouse_not_configured": "Warehouse not configured yet",
+      "warehouse_not_configured": "Your data isn't connected yet",
       "quota_exceeded": "Too many data requests today. Try again tomorrow",
-      "not_yet_backed": "Not backed by real data yet",
+      "not_yet_backed": "There's no real data for this yet",
       "query_error": "Couldn't load this tile"
     },
     "sessionReplayLinkTitle": "Open the session recordings for this landing page",
@@ -2525,9 +2525,9 @@
     "projectedFinalValueLabel": "Projected at deadline",
     "thermometerUnavailableReason": {
       "no_measurements": "No data for this metric yet - pace cannot be judged",
-      "warehouse_not_configured": "Warehouse not configured yet",
+      "warehouse_not_configured": "Your data isn't connected yet",
       "quota_exceeded": "Too many data requests today. Try again tomorrow",
-      "not_yet_backed": "Not backed by real data yet",
+      "not_yet_backed": "There's no real data for this yet",
       "query_error": "Couldn't load this goal's progress",
       "pending": "Just created - progress appears once the page is refreshed"
     },
@@ -3549,10 +3549,10 @@
     "funnelEmptyTitle": "No funnel is defined for this project yet",
     "funnelUnavailableTitle": "Funnel conversion is unavailable",
     "funnelUnavailable": {
-      "no_funnel": "GrowthOS only shows conversion for a funnel you have confirmed. Confirm your funnel stages in project onboarding, and conversion will appear here once events land.",
-      "warehouse_not_configured": "The data warehouse is not configured for this project yet, so the funnel cannot be queried.",
-      "quota_exceeded": "Too many data requests today, so the funnel is paused. It will load again tomorrow.",
-      "query_error": "The funnel could not be loaded. Nothing is shown rather than an estimate - try again later."
+      "no_funnel": "GrowthOS only shows results for a customer path you have confirmed. Confirm the steps your customers take in project setup, and the results will appear here once activity arrives.",
+      "warehouse_not_configured": "Your data isn't connected to this project yet, so the customer path can't be shown.",
+      "quota_exceeded": "Too many data requests today, so the customer path is paused. It will load again tomorrow.",
+      "query_error": "The customer path could not be loaded. Nothing is shown rather than a guess - try again later."
     },
     "defineFunnelCta": "Define your funnel",
     "goalsEmptyTitle": "No goals yet",
@@ -3563,10 +3563,10 @@
     "paybackNoData": "Not enough landed data yet: no collected revenue has reached the warehouse for this project.",
     "calibrationNoData": "Not enough landed data yet: no signups have been scored into quality tiers for this project.",
     "sectionUnavailable": {
-      "warehouse_not_configured": "Unavailable: the data warehouse is not configured for this project yet.",
-      "quota_exceeded": "Unavailable right now: too many data requests today. Try again tomorrow.",
-      "not_yet_backed": "Unavailable: the warehouse table behind this section has not been built yet.",
-      "query_error": "This section could not be loaded. Nothing is shown rather than an estimate."
+      "warehouse_not_configured": "Not shown yet: your data isn't connected to this project.",
+      "quota_exceeded": "Not shown right now: too many data requests today. Try again tomorrow.",
+      "not_yet_backed": "Not shown yet: the data behind this section isn't ready.",
+      "query_error": "This section could not be loaded. Nothing is shown rather than a guess."
     },
     "recommendationFailed": "The optimization could not be applied. Nothing was changed.",
     "eyebrow": "Growth",
