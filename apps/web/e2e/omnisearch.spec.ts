@@ -69,7 +69,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await openOmnisearch(page);
 
-    const input = page.getByPlaceholder(/search boards, metrics/i);
+    const input = page.getByPlaceholder(/search your ads, goals/i);
     await input.fill('marketing');
     const result = page.getByRole('option', { name: /Marketing Overview/ });
     await expect(result).toBeVisible();
@@ -97,7 +97,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
 
     await openOmnisearch(page);
 
-    await page.getByPlaceholder(/search boards, metrics/i).fill('who comes back');
+    await page.getByPlaceholder(/search your ads, goals/i).fill('who comes back');
     const result = page.getByRole('option', { name: /Who comes back/ });
     await expect(result).toBeVisible();
     await expect(result).toHaveText(/Page/);
@@ -120,7 +120,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
     await openOmnisearch(page, () => page.getByRole('button', { name: /search/i }).click());
     await expect(page.getByText('Start typing to search this project.')).toBeVisible();
 
-    await page.getByPlaceholder(/search boards, metrics/i).fill('nothing-should-match-this-xyz');
+    await page.getByPlaceholder(/search your ads, goals/i).fill('nothing-should-match-this-xyz');
     await expect(page.getByText('No results for "nothing-should-match-this-xyz".')).toBeVisible();
 
     await page.keyboard.press('Escape');
