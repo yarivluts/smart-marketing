@@ -39,8 +39,8 @@ describe('MetaLookalikeAudienceControls', () => {
 
   it('shows the no-seed-audience message and no form when the install has never synced', () => {
     renderControls({ hasSeedAudience: false });
-    expect(screen.getByText('Sync a segment to this plugin at least once first — a Lookalike Audience needs an existing Custom Audience to expand from.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Create Lookalike Audience' })).not.toBeInTheDocument();
+    expect(screen.getByText(messages.ProjectPlugins.lookalikeNoSeedAudience)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create audience like my customers' })).not.toBeInTheDocument();
   });
 
   it('POSTs a create request with the entered name/country/ratio and refreshes on success', async () => {
@@ -48,9 +48,9 @@ describe('MetaLookalikeAudienceControls', () => {
     renderControls();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Warm leads - Lookalike 5%' } });
-    fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'us' } });
-    fireEvent.change(screen.getByLabelText('Similarity (%)'), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Lookalike Audience' }));
+    fireEvent.change(screen.getByLabelText('Country code'), { target: { value: 'us' } });
+    fireEvent.change(screen.getByLabelText('How alike (%)'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create audience like my customers' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/plugins/install-1/lookalike-audiences', {
@@ -65,22 +65,33 @@ describe('MetaLookalikeAudienceControls', () => {
     renderControls();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Warm leads' } });
-    fireEvent.change(screen.getByLabelText('Country'), { target: { value: 'US' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Lookalike Audience' }));
+    fireEvent.change(screen.getByLabelText('Country code'), { target: { value: 'US' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create audience like my customers' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't create the Lookalike Audience. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't create the audience. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 
   it('shows the empty-list message when no Lookalike Audiences have been created yet', () => {
     renderControls({ audiences: [] });
-    fireEvent.click(screen.getByText('Created Lookalike Audiences'));
-    expect(screen.getByText('No Lookalike Audiences created yet.')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Audiences already created'));
+    expect(screen.getByText('No audiences created yet.')).toBeInTheDocument();
   });
 
   it('lists every created Lookalike Audience', () => {
     renderControls({ audiences: AUDIENCES });
-    fireEvent.click(screen.getByText('Created Lookalike Audiences'));
+    fireEvent.click(screen.getByText('Audiences already created'));
     expect(screen.getByText('Warm leads - Lookalike 5% · 5% · US · created 2026-08-20T00:00:00.000Z')).toBeInTheDocument();
+  });
+
+  it('uses plain words in English and Hebrew, without lookalike / custom audience / ISO jargon', async () => {
+    const he = (await import('../../messages/he.json')).default;
+    for (const bundle of [messages, he]) {
+      const text = Object.entries(bundle.ProjectPlugins)
+        .filter(([key]) => key.startsWith('lookalike'))
+        .map(([, value]) => String(value))
+        .join(' ');
+      expect(text).not.toMatch(/lookalike|custom audience|ISO|קהל מותאם/i);
+    }
   });
 });
