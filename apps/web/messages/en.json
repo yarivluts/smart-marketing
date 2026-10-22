@@ -5931,7 +5931,7 @@
         "published": "On Facebook and Instagram, switched off - not showing to anyone",
         "running": "Ads are running",
         "rejected": "You chose not to publish",
-        "failed": "Publishing failed ({reason})",
+        "failed": "Publishing failed ({reason}). No ad was switched on, so nothing was spent.",
         "connect": "Connect Facebook and Instagram"
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",
@@ -5999,7 +5999,7 @@
       "upload_failed": "the upload to Facebook and Instagram did not go through, try again in a minute",
       "cancelled": "it was stopped before it finished, ask for a change to try again",
       "nothing_to_revise": "there was nothing to change yet, reload the page and try again",
-      "platform_busy": "the ad platform is receiving too many requests right now, nothing was spent, try again in a few minutes",
+      "platform_busy": "the ad platform is receiving too many requests right now, try again in a few minutes",
       "timed_out": "it took too long and was given up, ask for a change to try again",
       "no_concepts": "the AI could not come up with ideas for this, ask for a change worded differently",
       "generic": "something went wrong, try again in a minute"

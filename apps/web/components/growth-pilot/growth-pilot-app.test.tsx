@@ -368,13 +368,24 @@ describe('GrowthPilotApp', () => {
     it('never shows a raw failure code: unknown ones become a plain sentence, in Hebrew too', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_error_190', adsStatus: 'failed' as const, adsFailure: 'no_images' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
-      expect(screen.getByText('Publishing failed (something went wrong, try again in a minute)')).toBeInTheDocument();
+      expect(screen.getByText('Publishing failed (something went wrong, try again in a minute). No ad was switched on, so nothing was spent.')).toBeInTheDocument();
       expect(screen.getByText('The ads could not be made (no image passed the quality check)')).toBeInTheDocument();
       expect(view.container).not.toHaveTextContent('meta_error_190');
       view.unmount();
       const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
       expect(he.container).not.toHaveTextContent('meta_error_190');
       expect(he.container).not.toHaveTextContent('no_images');
+    });
+
+    it('reassures that a failed publish spent nothing, once, and says the same in Hebrew', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      const line = screen.getByText(/^Publishing failed/);
+      expect(line).toHaveTextContent('too many requests right now, try again in a few minutes). No ad was switched on, so nothing was spent.');
+      expect(line.textContent?.match(/nothing was spent/g)).toHaveLength(1);
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('שום מודעה לא הופעלה, ולכן לא הוצא כסף');
     });
 
     it('says when trying again will not help (AI account out of credit) and never leaks the code, in Hebrew too', () => {
