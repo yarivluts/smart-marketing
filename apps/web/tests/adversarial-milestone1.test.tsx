@@ -151,14 +151,14 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
 
       expect(options[0]).toHaveAttribute('aria-selected', 'true');
       expect(
-        screen.getByText('See how your ads are doing and change their daily budget'),
+        screen.getByText('Enter your website and the AI proposes what to grow - you only approve'),
       ).toBeInTheDocument();
 
       // Arrow down to second option
       fireEvent.keyDown(input, { key: 'ArrowDown' });
       expect(options[1]).toHaveAttribute('aria-selected', 'true');
       expect(
-        screen.getByText('See where people drop off between the first visit and buying'),
+        screen.getByText('Make an ad from your website: text, images and video'),
       ).toBeInTheDocument();
 
       // Arrow up back to first option
@@ -187,15 +187,15 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
       const options = screen.getAllByRole('option');
 
-      // Hover over Automation Hub (index 3)
-      fireEvent.mouseEnter(options[3]);
-      expect(options[3]).toHaveAttribute('aria-selected', 'true');
+      // Hover over the AI helper & automation page (index 5)
+      fireEvent.mouseEnter(options[5]);
+      expect(options[5]).toHaveAttribute('aria-selected', 'true');
       expect(
         screen.getByText('Get suggestions from the AI and approve them in one click'),
       ).toBeInTheDocument();
 
       // Click option
-      fireEvent.click(options[3]);
+      fireEvent.click(options[5]);
       expect(pushMock).toHaveBeenCalledWith('/orgs/org-alpha/projects/proj-beta/automation');
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
