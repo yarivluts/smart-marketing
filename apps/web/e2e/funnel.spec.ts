@@ -45,8 +45,8 @@ test.describe('Funnel conversion (query_funnel admin surface)', () => {
     // zero-config view" here - a sample EasySign funnel with a drop-off alert and an AI Copilot
     // suggestion (Jira B15). It must show an honest empty state instead, with no sample badge.
     await expect(page.getByRole('heading', { name: 'Funnel, Goals & Revenue Health' })).toBeVisible();
-    await expect(page.getByText('No funnel is defined for this project yet')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Define your funnel' })).toBeVisible();
+    await expect(page.getByText('Your customer path is not set up yet')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Set up your customer path' })).toBeVisible();
     await expect(page.getByText(/Simulated Mode/)).toHaveCount(0);
     await expect(page.getByText('Many people are leaving here')).toHaveCount(0);
   });
