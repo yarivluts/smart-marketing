@@ -68,6 +68,28 @@ const mockItems: UnifiedCampaignItem[] = [
 ];
 
 describe('AdsPerformanceDashboard', () => {
+  it('hides the Simulated filter unless simulated campaigns exist', () => {
+    const props = {
+      orgId: 'org-1',
+      projectId: 'proj-1',
+      summary: mockSummary,
+      rawTargets: [],
+      connections: [],
+      canExecute: true,
+    };
+    const { unmount } = renderWithIntl(<AdsPerformanceDashboard {...props} items={mockItems} />);
+    expect(screen.queryByRole('button', { name: 'Simulated' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Facebook & Instagram' })).toBeInTheDocument();
+    unmount();
+    renderWithIntl(
+      <AdsPerformanceDashboard
+        {...props}
+        items={[...mockItems, { ...mockItems[0], id: 'c3', platform: 'simulated' }]}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Simulated' })).toBeInTheDocument();
+  });
+
   it('renders complete Ads & Performance Cockpit with KPI scorecards, recommendation, and tabs', () => {
     renderWithIntl(
       <AdsPerformanceDashboard
