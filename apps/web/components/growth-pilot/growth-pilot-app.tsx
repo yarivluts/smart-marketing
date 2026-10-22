@@ -813,7 +813,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
               {waiting.length ? <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">{waiting.length}</span> : null}
             </h2>
             {waiting.length === 0 ? (
-              <p className="rounded-3xl border border-dashed border-border p-5 text-sm text-muted-foreground">{t('waiting.empty')}</p>
+              <p className="rounded-3xl border border-dashed border-border p-5 text-sm text-muted-foreground">{t(paused ? 'waiting.emptyPaused' : working ? 'waiting.emptyWorking' : 'waiting.empty')}</p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {waiting.map((proposal) => (
