@@ -119,7 +119,7 @@ describe('PlanningPanel', () => {
   it('before any analysis it explains the step; with no provider the button is disabled', () => {
     renderPanel({ plan: null, sources: null, generatedBy: null, aiAvailable: false });
     expect(screen.getByText('No analysis yet')).toBeInTheDocument();
-    expect(screen.getByText('No AI provider is configured for this deployment, so deep analysis cannot run.')).toBeInTheDocument();
+    expect(screen.getByText('The AI helper is not switched on yet, so it cannot analyze your ads. Contact GrowthOS support to switch it on.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run deep analysis' })).toBeDisabled();
   });
 

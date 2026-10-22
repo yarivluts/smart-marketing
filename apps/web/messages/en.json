@@ -3849,7 +3849,7 @@
     "kpiTextToday": "AI text calls today",
     "kpiVideoToday": "Video seconds today",
     "kpiOfLimit": "of {limit} allowed per day",
-    "providerNotConfigured": "No AI provider is configured for this deployment, so scripts cannot be written yet. Existing ads can still be edited by hand.",
+    "providerNotConfigured": "The AI helper is not switched on yet, so it cannot write scripts for you. Trying again will not help - contact GrowthOS support. You can still edit your existing ads by hand.",
     "stage": {
       "brief": "Brief",
       "plan": "Plan",
@@ -3936,7 +3936,7 @@
     "unsavedChanges": "Unsaved changes",
     "scriptSaved": "Script saved.",
     "providerErrors": {
-      "not_configured": "No AI provider is configured for this deployment.",
+      "not_configured": "The AI helper is not switched on yet. Trying again will not help - contact GrowthOS support.",
       "provider_billing": "The AI service stopped because its account is out of credit. Ask your account admin to top it up, then try again.",
       "rate_limited": "The AI provider is limiting requests right now. Try again in a minute.",
       "refused": "The AI declined this request. Rephrase the brief and try again.",
@@ -4142,7 +4142,7 @@
       "rerun": "Run again",
       "running": "Analyzing...",
       "runningHint": "Reading the landing page, results, campaigns and keyword volumes. This can take up to a minute.",
-      "noProvider": "No AI provider is configured for this deployment, so deep analysis cannot run.",
+      "noProvider": "The AI helper is not switched on yet, so it cannot analyze your ads. Contact GrowthOS support to switch it on.",
       "emptyTitle": "No analysis yet",
       "emptyDescription": "Run a deep analysis to see what the evidence says before writing the script. The script writer then builds on it.",
       "generatedBy": "Analyzed by {model} on {date}",
