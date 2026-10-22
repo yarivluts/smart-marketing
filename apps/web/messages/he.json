@@ -501,15 +501,16 @@
   },
   "Invite": {
     "title": "הזמנה לארגון",
-    "alreadyResolved": "הזמנה זו כבר נוצלה.",
+    "alreadyResolved": "ההזמנה הזו כבר נוצלה. אם זה היה אתם, הצוות מחכה לכם - פשוט פתחו את GrowthOS והתחברו.",
+    "openGrowthOs": "פתיחת GrowthOS",
     "description": "הוזמנתם להצטרף אל {organizationName}. ההזמנה נשלחה אל {email}.",
     "signInToAccept": "התחברו כדי לאשר",
     "signUpToAccept": "הירשמו כדי לאשר",
     "accept": "אישור הזמנה",
     "acceptError": "לא ניתן היה לאשר את ההזמנה. נסו שוב.",
     "verifyEmailError": "יש לאמת את כתובת הדוא\"ל לפני אישור ההזמנה. בדקו את תיבת הדואר הנכנס שלכם לקבלת קישור האימות.",
-    "emailMismatch": "הזמנה זו נשלחה אל {email}, אך אתה מחובר עם חשבון אחר.",
-    "switchAccount": "התנתק והחלף חשבון"
+    "emailMismatch": "ההזמנה הזו נשלחה אל {email}, אבל החשבון שמחובר כעת הוא חשבון אחר.",
+    "switchAccount": "התנתקו והחליפו חשבון"
   },
   "ResourceLibrary": {
     "title": "ספריית משאבים",

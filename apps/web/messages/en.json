@@ -501,7 +501,8 @@
   },
   "Invite": {
     "title": "Organization invite",
-    "alreadyResolved": "This invite has already been used.",
+    "alreadyResolved": "This invite has already been used. If it was you, your team is waiting - just open GrowthOS and sign in.",
+    "openGrowthOs": "Open GrowthOS",
     "description": "You've been invited to join {organizationName}. This invite was sent to {email}.",
     "signInToAccept": "Sign in to accept",
     "signUpToAccept": "Sign up to accept",
