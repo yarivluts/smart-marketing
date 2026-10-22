@@ -5822,7 +5822,7 @@
     },
     "activity": {
       "title": "What the pilot did",
-      "empty": "Nothing yet.",
+      "empty": "Nothing yet. Every step the pilot takes - reading your site, suggesting what to grow, writing ads - will be listed here, and so will what you approve.",
       "kind": {
         "pilot_started": "Started on {subject}",
         "site_read": "{count, plural, one {Read # page} other {Read # pages}} of {subject}",
