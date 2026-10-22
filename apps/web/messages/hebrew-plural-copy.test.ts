@@ -56,3 +56,35 @@ describe('Hebrew instructions use the plural form', () => {
     expect(copyKey?.secretShownOnceWarning.match(SINGULAR_IMPERATIVES)).toBeNull();
   });
 });
+
+describe('Hebrew sign-in, sign-up and invite screens address the reader in the plural', () => {
+  const he_ = he as unknown as Record<string, Record<string, string>>;
+  // Escapes keep Hebrew out of code files: singular "your" (שלך), "you were invited" (הוזמנת),
+  // "welcome back" (שובך) and the singular verbs הירשם / התחבר.
+  const SINGULAR = new RegExp(
+    '\\u05e9\\u05dc\\u05da|\\u05dc\\u05da\\b|\\u05d4\\u05d5\\u05d6\\u05de\\u05e0\\u05ea|\\u05e9\\u05d5\\u05d1\\u05da|' +
+      '(?<![\\u05d0-\\u05ea])(\\u05d4\\u05d9\\u05e8\\u05e9\\u05dd|\\u05d4\\u05ea\\u05d7\\u05d1\\u05e8)(?![\\u05d0-\\u05ea])',
+  );
+  it.each([
+    ['Auth', ['needAccount', 'haveAccount', 'brandBadgeTls']],
+    ['OrgsPage', ['title']],
+  ])('%s keys are plural', (section, keys) => {
+    for (const k of keys) expect(he_[section][k], `${section}.${k}`).not.toMatch(SINGULAR);
+  });
+
+  it('the organization list heading, loading text and invite screen are plural', () => {
+    const hits: string[] = [];
+    for (const [section, values] of Object.entries(he_)) {
+      for (const [k, v] of Object.entries(values)) {
+        if (
+          typeof v === 'string' &&
+          ['organizationsHeading', 'loadingOrganizations', 'signInToAccept', 'signUpToAccept', 'welcome'].includes(k) &&
+          SINGULAR.test(v)
+        ) {
+          hits.push(`${section}.${k}`);
+        }
+      }
+    }
+    expect(hits).toEqual([]);
+  });
+});

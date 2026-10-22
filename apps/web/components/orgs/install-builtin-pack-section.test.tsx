@@ -37,7 +37,7 @@ describe('InstallBuiltinPackSection', () => {
     expect(screen.getByText('Engagement Pack')).toBeInTheDocument();
     expect(screen.getByText('Landing Page Performance')).toBeInTheDocument();
     expect(screen.getByText('Feedback & NPS')).toBeInTheDocument();
-    expect(screen.getByText(/Ad spend, signups, CAC/)).toBeInTheDocument();
+    expect(screen.getByText(/Ad spend, signups, what each new customer costs you/)).toBeInTheDocument();
   });
 
   it('clicking a card posts only pluginId — no version, scopes, or config — and refreshes', async () => {

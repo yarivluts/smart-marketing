@@ -86,8 +86,9 @@ describe('GrowthPilotApp', () => {
 
   it('tells a newcomer which address to enter, and ties the hint to the input', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
-    const hint = screen.getByText(/Not sure which address\? Use your home page/);
+    const hint = screen.getByText(/Not sure which address\? Use your home page/).closest('p') as HTMLElement;
     expect(hint).toHaveTextContent('you do not need to log in or install anything');
+    expect(hint).toHaveTextContent('No website yet? Any public page that describes what you sell works');
     expect(screen.getByTestId('growth-pilot-site-input')).toHaveAttribute('aria-describedby', hint.id);
   });
 
@@ -253,6 +254,22 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByText('Nothing waits for you right now.')).toBeInTheDocument();
   });
 
+  it('tells the person what Reject does, in English and Hebrew', () => {
+    const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    expect(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-reject-hint')).toHaveTextContent('nothing is published and no money is spent');
+    unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
+    expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.rejectHint);
+  });
+
+  it('says what approving a proposed thing to grow does, in English and Hebrew', () => {
+    const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent('Nothing goes live yet.');
+    unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
+    expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.approveHint.target);
+  });
+
   it('sends a change request to the AI and shows it while the AI rewrites', async () => {
     const fetchMock = stubFetch({ body: page({ proposals: [{ ...PROPOSAL, status: 'revising', changes: [{ text: 'Only Tel Aviv', on: 'x', outcome: 'pending', failureCode: null }] }] }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
@@ -312,12 +329,18 @@ describe('GrowthPilotApp', () => {
     const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null };
     const ADS: GrowthProposalView = { ...PROPOSAL, id: 'ad1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
+    it('says approving ads publishes nothing yet', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ADS], targets: [ACTIVE_TARGET] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent('They are not published yet');
+    });
+
     it('shows the ads with previews, a way into the Ad Studio, and the same approve / change / reject', async () => {
       const fetchMock = stubFetch({ body: page({ proposals: [{ ...ADS, status: 'revising', changes: [{ text: 'Brighter', on: 'x', outcome: 'pending', failureCode: null }] }], targets: [ACTIVE_TARGET] }) });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ADS], targets: [ACTIVE_TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent(`Ads for ${isolate('Pro plan')}`);
-      const images = within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true });
+      const images = within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('img');
+      expect(images.map((image) => image.getAttribute('alt'))).toEqual(['Ad image 1 of 2', 'Ad image 2 of 2']);
       expect(images.map((image) => image.getAttribute('src'))).toEqual(['/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i1/media', '/api/orgs/o/projects/p/ad-studio/briefs/b1/images/i2/media']);
       expect(screen.getByTestId('growth-pilot-open-studio')).toHaveAttribute('href', '/orgs/o/projects/p/ad-studio?brief=b1&step=review');
       expect(screen.getByTestId('growth-pilot-target-ads')).toHaveTextContent('Ads are waiting for your approval');
@@ -345,13 +368,24 @@ describe('GrowthPilotApp', () => {
     it('never shows a raw failure code: unknown ones become a plain sentence, in Hebrew too', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_error_190', adsStatus: 'failed' as const, adsFailure: 'no_images' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
-      expect(screen.getByText('Publishing failed (something went wrong, try again in a minute)')).toBeInTheDocument();
+      expect(screen.getByText('Publishing failed (something went wrong, try again in a minute). No ad was switched on, so nothing was spent.')).toBeInTheDocument();
       expect(screen.getByText('The ads could not be made (no image passed the quality check)')).toBeInTheDocument();
       expect(view.container).not.toHaveTextContent('meta_error_190');
       view.unmount();
       const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
       expect(he.container).not.toHaveTextContent('meta_error_190');
       expect(he.container).not.toHaveTextContent('no_images');
+    });
+
+    it('reassures that a failed publish spent nothing, once, and says the same in Hebrew', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      const line = screen.getByText(/^Publishing failed/);
+      expect(line).toHaveTextContent('too many requests right now, try again in a few minutes). No ad was switched on, so nothing was spent.');
+      expect(line.textContent?.match(/nothing was spent/g)).toHaveLength(1);
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('שום מודעה לא הופעלה, ולכן לא הוצא כסף');
     });
 
     it('says when trying again will not help (AI account out of credit) and never leaks the code, in Hebrew too', () => {
@@ -427,6 +461,11 @@ describe('GrowthPilotApp', () => {
     const PAGE = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'draft' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://easy-sign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=abcDEF123456' };
     const TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: 'lp1', landingStatus: 'ready' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null };
     const PROPOSAL_LP: GrowthProposalView = { ...PROPOSAL, id: 'p-lp', kind: 'landing_page', landingPageId: 'lp1', draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
+
+    it('warns that approving the page puts it online', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PROPOSAL_LP], targets: [TARGET], landingPages: [PAGE] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent('the page goes online at a public address');
+    });
 
     it('shows the page it proposes, as visitors will see it, with the button leading to the tagged site', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PROPOSAL_LP], targets: [TARGET], landingPages: [PAGE] })} />, { locale: 'en' });
@@ -513,7 +552,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Where people land after clicking: https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
-      expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('presentation', { hidden: true })).toHaveLength(2);
+      expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('img')).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
       expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription('The most you will spend per day, once you turn the ads on. Nothing is spent before that.');
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '0' } });

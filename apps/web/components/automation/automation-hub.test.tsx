@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { createTranslator } from 'next-intl';
+import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { AutomationHub } from './automation-hub';
@@ -18,9 +19,9 @@ describe('AutomationHub Component', () => {
     );
 
     expect(screen.getByTestId('action-hub')).toBeInTheDocument();
-    expect(screen.getByText('AI Automation Hub')).toBeInTheDocument();
-    expect(screen.getByText(/Autonomous marketing execution/)).toBeInTheDocument();
-    expect(screen.getByText('AI Copilot & Proposals')).toBeInTheDocument();
+    expect(screen.getByText('AI helper and approvals')).toBeInTheDocument();
+    expect(screen.getByText(/Changes the AI suggests for/)).toBeInTheDocument();
+    expect(screen.getByText('AI helper and suggestions')).toBeInTheDocument();
     expect(screen.getByText('Audit Trail')).toBeInTheDocument();
   });
 
@@ -35,7 +36,7 @@ describe('AutomationHub Component', () => {
     );
 
     expect(screen.getByTestId('kill-switch-active-badge')).toBeInTheDocument();
-    expect(screen.getByText('KILL SWITCH ACTIVE')).toBeInTheDocument();
+    expect(screen.getByText('Emergency stop is on - nothing changes automatically')).toBeInTheDocument();
   });
 
   /**
@@ -143,4 +144,10 @@ describe('AutomationHub Component', () => {
     expect(screen.getByText(t('tabCopilot'))).toBeInTheDocument();
   });
 
+
+  it.each(['en', 'he'] as const)('keeps product jargon out of the helper and hub copy in %s', (locale) => {
+    const m = locale === 'en' ? enMessages : heMessages;
+    const text = [...Object.values(m.AutomationHub), m.CopilotChatPanel.welcomeMessage, m.Copilot.drawerTitle, m.Copilot.drawerSubtitle, m.Automation.killSwitchEngagedBadge].join(' | ');
+    expect(text).not.toMatch(/copilot|kill switch|guardrail|autonomous|rollback/i);
+  });
 });

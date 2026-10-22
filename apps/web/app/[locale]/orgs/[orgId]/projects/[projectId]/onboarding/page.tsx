@@ -25,6 +25,7 @@ import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView 
 import { buildOnboardingJourney, wrapIntoRows } from '@/lib/orgs/onboarding-journey';
 import { onboardingProgress, type OnboardingJourneyStep } from '@/lib/orgs/workspace-view';
 import { StartOnboardingButton } from '@/components/orgs/start-onboarding-button';
+import { OnboardingPilotShortcut } from '@/components/orgs/onboarding-pilot-shortcut';
 import { OnboardingPackStep } from '@/components/orgs/onboarding-pack-step';
 import { OnboardingSourceContinueButton } from '@/components/orgs/onboarding-source-continue-button';
 import { OnboardingFunnelStep } from '@/components/orgs/onboarding-funnel-step';
@@ -147,6 +148,8 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
     },
   );
 
+  // Growth Pilot needs `ai.use`; without it the shortcut would lead to a page the person cannot open.
+  const pilotShortcut = can(bindings, { type: 'user', id: user.id }, 'ai.use', { orgId, projectId }) ? <OnboardingPilotShortcut orgId={orgId} projectId={projectId} /> : null;
   const hero = (
     <PageHero icon={Route} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('introBody')}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -173,6 +176,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
     return (
       <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
         {hero}
+        {pilotShortcut}
         {journeyCard}
         <StepCard>
           <div className="flex flex-col items-start gap-3">
@@ -192,6 +196,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       {hero}
+      {pilotShortcut}
       {journeyCard}
 
       {view.step === 'pack' ? (

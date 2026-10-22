@@ -144,7 +144,10 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           {t('submit')}
         </button>
       </form>
-      <p id="growth-pilot-site-hint" className="-mt-3 text-xs text-muted-foreground">{t('hint')}</p>
+      <p id="growth-pilot-site-hint" className="-mt-3 flex flex-col gap-1 text-xs text-muted-foreground">
+        <span>{t('hint')}</span>
+        <span>{t('noSite')}</span>
+      </p>
       <ErrorLine code={mistake ?? error} />
       <ol className="flex flex-wrap justify-center gap-2">
         {steps.map((step, index) => (
@@ -339,10 +342,10 @@ function ProposalCard({
       </div>
       {(ads || proposal.kind === 'publish') && proposal.briefId && proposal.previewImageIds.length ? (
         <ul className="flex flex-wrap gap-2" data-testid="growth-pilot-ads-preview">
-          {proposal.previewImageIds.map((imageId) => (
+          {proposal.previewImageIds.map((imageId, index) => (
             <li key={imageId} className="h-28 overflow-hidden rounded-2xl bg-muted">
               {/* A plain img: private media from our own authenticated route, in its own shape. */}
-              <img src={`${studio.media}/briefs/${proposal.briefId}/images/${imageId}/media`} alt="" className="h-full w-auto object-contain" />
+              <img src={`${studio.media}/briefs/${proposal.briefId}/images/${imageId}/media`} alt={ta('previewAlt', { number: index + 1, total: proposal.previewImageIds.length })} className="h-full w-auto object-contain" />
             </li>
           ))}
         </ul>
@@ -456,6 +459,14 @@ function ProposalCard({
             <X className="h-4 w-4" aria-hidden="true" />
             {t('reject')}
           </button>
+          {platform ? null : (
+            <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-approve-hint">
+              {t(`approveHint.${ads ? 'ads' : audience ? 'audience' : page ? 'landing' : 'target'}`)}
+            </p>
+          )}
+          <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-reject-hint">
+            {t('rejectHint')}
+          </p>
         </div>
       )}
     </li>

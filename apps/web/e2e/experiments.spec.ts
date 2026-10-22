@@ -47,6 +47,6 @@ test.describe('Experiments (KAN-89)', () => {
     await page.getByRole('button', { name: 'Install' }).click();
     // No BigQuery warehouse is wired up in this test env, so the results section degrades to its own
     // "connect a data warehouse" empty state — same posture Feedback/Firmographics/Campaign Ops assert.
-    await expect(page.getByText('No results available yet — connect a data warehouse to see this.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('No results available yet — it will show here once your data is connected.')).toBeVisible({ timeout: 15_000 });
   });
 });

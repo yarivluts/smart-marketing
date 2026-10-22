@@ -37,7 +37,7 @@ function renderTile(view: TileRenderView, overrides: Partial<BoardTileRow> = {})
 describe('BoardTileView', () => {
   it('renders an unavailable tile with a translated reason', () => {
     renderTile({ kind: 'unavailable', reason: 'warehouse_not_configured', message: 'not configured yet' });
-    expect(screen.getByText('Warehouse not configured yet')).toBeInTheDocument();
+    expect(screen.getByText("Your data isn't connected yet")).toBeInTheDocument();
     expect(screen.getByText('not configured yet')).toBeInTheDocument();
   });
 

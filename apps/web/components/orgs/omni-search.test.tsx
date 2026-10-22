@@ -85,7 +85,7 @@ describe('OmniSearchTrigger', () => {
 
     expect(screen.getByText('Start typing to search this project.')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cac' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'cac' } });
 
     expect(await screen.findByText('CAC')).toBeInTheDocument();
     expect(screen.queryByText('Marketing Overview')).not.toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'zzz-nonexistent' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'zzz-nonexistent' } });
 
     expect(await screen.findByText('No results for "zzz-nonexistent".')).toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe('OmniSearchTrigger', () => {
     renderTrigger();
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'marketing' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'marketing' } });
 
     fireEvent.click(await screen.findByText('Marketing Overview'));
 
@@ -120,7 +120,7 @@ describe('OmniSearchTrigger', () => {
     renderTrigger();
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
-    const input = screen.getByPlaceholderText(/search boards, metrics/i);
+    const input = screen.getByPlaceholderText(/search your ads, goals/i);
     fireEvent.change(input, { target: { value: 'marketing' } });
     await screen.findByText('Marketing Overview');
 
@@ -157,7 +157,7 @@ describe('OmniSearchTrigger', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'a' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'a' } });
     await screen.findByText('Marketing Overview');
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -169,7 +169,7 @@ describe('OmniSearchTrigger', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'c' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'c' } });
 
     expect(await screen.findByText('CAC')).toBeInTheDocument();
     expect(screen.queryByText('Marketing Overview')).not.toBeInTheDocument();
@@ -181,7 +181,7 @@ describe('OmniSearchTrigger', () => {
     renderTrigger();
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'mrr' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'mrr' } });
 
     fireEvent.click(await screen.findByText('Grow MRR 20%'));
 
@@ -201,7 +201,7 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cust' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'cust' } });
 
     expect(await screen.findByText('cust_1')).toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/omnisearch?q=cust'));
@@ -219,7 +219,7 @@ describe('OmniSearchTrigger', () => {
     renderTrigger();
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cust' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'cust' } });
 
     fireEvent.click(await screen.findByText('cust_1'));
 
@@ -232,7 +232,7 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'a' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'a' } });
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -258,7 +258,7 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cost guard' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'cost guard' } });
 
     fireEvent.click(await screen.findByText('Cost guardrails'));
 
@@ -274,7 +274,7 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cost guard' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'cost guard' } });
 
     expect(await screen.findByText('Cost guardrails')).toBeInTheDocument();
     expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
@@ -286,7 +286,7 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
     await screen.findByRole('dialog');
 
-    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cost guard' } });
+    fireEvent.change(screen.getByPlaceholderText(/search your ads, goals/i), { target: { value: 'cost guard' } });
 
     const option = await screen.findByRole('option', { name: /Cost guardrails/ });
     expect(option).toHaveTextContent('Page');
