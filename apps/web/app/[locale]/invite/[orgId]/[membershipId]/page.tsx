@@ -40,6 +40,11 @@ export default async function InvitePage({ params }: PageProps): Promise<React.R
       <main className="mx-auto flex w-full max-w-sm flex-col gap-4 py-16 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">{t('alreadyResolved')}</p>
+        <div className="flex justify-center">
+          <Button asChild size="sm">
+            <Link href="/">{t('openGrowthOs')}</Link>
+          </Button>
+        </div>
       </main>
     );
   }
