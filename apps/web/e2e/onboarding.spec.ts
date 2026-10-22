@@ -68,8 +68,8 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.getByRole('button', { name: 'Continue' }).click();
 
     // Step 3: no events ingested yet, so the AI-proposed funnel is empty — confirm anyway.
-    await expect(page.getByText("This project hasn't received any events yet")).toBeVisible();
-    await page.getByRole('button', { name: 'Confirm funnel' }).click();
+    await expect(page.getByText("Nothing has happened on this project yet")).toBeVisible();
+    await page.getByRole('button', { name: 'Confirm customer path' }).click();
 
     // Step 4: the pack's three starter boards + the invite/goal/war-room CTAs + finish.
     await expect(page.getByRole('heading', { name: 'Your starter board' })).toBeVisible();
@@ -108,22 +108,22 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.reload();
 
     const summary = page.getByTestId('onboarding-confirmed-funnel');
-    await expect(summary.getByRole('heading', { name: 'Your confirmed funnel' })).toBeVisible();
+    await expect(summary.getByRole('heading', { name: 'Your confirmed customer path' })).toBeVisible();
     await expect(summary.getByRole('listitem')).toHaveText([/touchpoint/, /signup/, /document_signed/]);
 
     // Editing starts from the confirmed funnel, not a fresh proposal: drop the middle step.
-    await summary.getByRole('link', { name: 'Edit funnel' }).click();
+    await summary.getByRole('link', { name: 'Edit customer path' }).click();
     await expect(page).toHaveURL(/\/onboarding\?editFunnel=1$/);
     await expect(page.getByRole('checkbox', { name: 'signup' })).toBeChecked();
     await page.getByRole('checkbox', { name: 'signup' }).uncheck();
-    await page.getByRole('button', { name: 'Confirm funnel' }).click();
+    await page.getByRole('button', { name: 'Confirm customer path' }).click();
 
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/onboarding$`));
     await expect(page.getByTestId('onboarding-confirmed-funnel').getByRole('listitem')).toHaveText([/touchpoint/, /document_signed/]);
 
     // The Funnel page reads the same funnel: it may be unable to COUNT it (no warehouse in this
     // environment), but it must not claim no funnel is defined.
-    await page.getByTestId('onboarding-confirmed-funnel').getByRole('link', { name: 'View conversion' }).click();
+    await page.getByTestId('onboarding-confirmed-funnel').getByRole('link', { name: 'See how many people get through' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
     await expect(page.getByRole('heading', { name: 'Funnel, Goals & Revenue Health' })).toBeVisible();
     await expect(page.getByText('Your customer path is not set up yet')).toHaveCount(0);

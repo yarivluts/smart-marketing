@@ -31,7 +31,7 @@ describe('OnboardingFunnelStep', () => {
       </NextIntlClientProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/onboarding/funnel', {
@@ -55,7 +55,7 @@ describe('OnboardingFunnelStep', () => {
     );
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'page_viewed' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -78,7 +78,7 @@ describe('OnboardingFunnelStep', () => {
     // Both rows have their own "Move down" button (the last row's is disabled) — target the first
     // row's (page_viewed) specifically.
     fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -104,7 +104,7 @@ describe('OnboardingFunnelStep', () => {
     );
 
     fireEvent.change(screen.getByDisplayValue('Other'), { target: { value: 'activation' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -124,8 +124,8 @@ describe('OnboardingFunnelStep', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/hasn't received any events yet/)).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    expect(screen.getByText(/Nothing has happened on this project yet/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -156,7 +156,7 @@ describe('OnboardingFunnelStep', () => {
     );
 
     expect(screen.getByRole('checkbox', { name: 'page_viewed' })).not.toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -181,7 +181,7 @@ describe('OnboardingFunnelStep', () => {
       </NextIntlClientProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm funnel' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/orgs/org-1/projects/project-1/onboarding'));
     expect(refresh).not.toHaveBeenCalled();
