@@ -126,6 +126,6 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.getByTestId('onboarding-confirmed-funnel').getByRole('link', { name: 'View conversion' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
     await expect(page.getByRole('heading', { name: 'Funnel, Goals & Revenue Health' })).toBeVisible();
-    await expect(page.getByText('No funnel is defined for this project yet')).toHaveCount(0);
+    await expect(page.getByText('Your customer path is not set up yet')).toHaveCount(0);
   });
 });
