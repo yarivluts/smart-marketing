@@ -95,8 +95,8 @@ describe('App Shell Suite', () => {
     const cockpitOptions = screen.getAllByText('Ads & results');
     expect(cockpitOptions.length).toBeGreaterThan(0);
 
-    const firstOption = screen.getAllByRole('option')[0];
-    await user.click(firstOption);
+    const adsOption = screen.getAllByRole('option').find((o) => o.textContent?.includes('Ads & results'));
+    await user.click(adsOption as HTMLElement);
     expect(pushMock).toHaveBeenCalledWith('/orgs/org-1/projects/p-1/campaigns');
   });
 

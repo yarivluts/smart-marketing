@@ -12,6 +12,8 @@ import {
   Receipt,
   ArrowRight,
   TrendingUp,
+  Rocket,
+  Sparkles,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
@@ -49,6 +51,24 @@ export function CommandDialog({
 
   const defaultItems = React.useMemo<CommandItem[]>(
     () => [
+      {
+        id: 'growth-pilot',
+        title: t('items.growth-pilot.title'),
+        description: t('items.growth-pilot.description'),
+        category: 'Core',
+        href: base ? `${base}/growth-pilot` : '/growth-pilot',
+        icon: Rocket,
+        badge: t('badgeAi'),
+      },
+      {
+        id: 'ad-studio',
+        title: t('items.ad-studio.title'),
+        description: t('items.ad-studio.description'),
+        category: 'Core',
+        href: base ? `${base}/ad-studio` : '/ad-studio',
+        icon: Sparkles,
+        badge: t('badgeAi'),
+      },
       {
         id: 'campaigns',
         title: t('items.campaigns.title'),
