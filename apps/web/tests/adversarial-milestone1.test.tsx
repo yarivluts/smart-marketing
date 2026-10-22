@@ -230,8 +230,8 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
       fireEvent.click(screen.getByRole('button', { name: /open command search/i }));
 
       const options = screen.getAllByRole('option');
-      fireEvent.click(options[0]); // campaigns
-      expect(pushMock).toHaveBeenCalledWith('/campaigns');
+      fireEvent.click(options[0]); // Growth Pilot is the first page
+      expect(pushMock).toHaveBeenCalledWith('/growth-pilot');
     });
   });
 
