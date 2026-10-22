@@ -65,6 +65,14 @@
       "Operations": "Account"
     },
     "items": {
+      "growth-pilot": {
+        "title": "Growth Pilot",
+        "description": "Enter your website and the AI proposes what to grow - you only approve"
+      },
+      "ad-studio": {
+        "title": "AI Ad Studio",
+        "description": "Make an ad from your website: text, images and video"
+      },
       "campaigns": {
         "title": "Ads & results",
         "description": "See how your ads are doing and change their daily budget"

@@ -41,6 +41,24 @@ describe('CommandDialog copy', () => {
     expect(screen.getAllByRole('option')).toHaveLength(4);
   });
 
+  it('offers Growth Pilot and the Ad Studio first, in both languages', () => {
+    for (const locale of ['en', 'he'] as const) {
+      const { unmount } = render(
+        <NextIntlClientProvider locale={locale} messages={locale === 'he' ? he : en}>
+          <CommandDialog orgId="o" projectId="p" />
+        </NextIntlClientProvider>,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: locale === 'he' ? 'פתיחת חיפוש מהיר' : 'Open command search' }),
+      );
+      const messages = locale === 'he' ? he : en;
+      const options = screen.getAllByRole('option');
+      expect(options[0]).toHaveTextContent(messages.CommandPalette.items['growth-pilot'].title);
+      expect(options[1]).toHaveTextContent(messages.CommandPalette.items['ad-studio'].title);
+      unmount();
+    }
+  });
+
   it('has the same keys in en and he', () => {
     expect(Object.keys(he.CommandPalette.items)).toEqual(Object.keys(en.CommandPalette.items));
     expect(Object.keys(he.CommandPalette)).toEqual(Object.keys(en.CommandPalette));
