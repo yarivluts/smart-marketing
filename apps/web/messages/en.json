@@ -5776,7 +5776,9 @@
     },
     "waiting": {
       "title": "Waiting for your approval",
-      "empty": "Nothing waits for you right now.",
+      "empty": "You are all caught up. Want more? Press \"Something else to grow\" at the top and tell the AI what.",
+      "emptyWorking": "The AI is working on the next step. When it needs a yes or no from you, it shows up here.",
+      "emptyPaused": "The pilot is paused, so nothing new will show up here. Press Resume at the top to continue.",
       "approve": "Approve",
       "reject": "Reject",
       "rejectHint": "Not for you? Reject it - nothing is published and no money is spent.",

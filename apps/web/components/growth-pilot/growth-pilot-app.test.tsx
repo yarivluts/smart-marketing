@@ -251,7 +251,23 @@ describe('GrowthPilotApp', () => {
     fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
     await waitFor(() => expect(sent(fetchMock)).toEqual({ url: `${BASE}/proposals/pr1`, body: { action: 'approve' } }));
     expect(await screen.findByTestId('growth-pilot-target')).toHaveTextContent('Active');
-    expect(screen.getByText('Nothing waits for you right now.')).toBeInTheDocument();
+    expect(screen.getByText(/The AI is working on the next step/)).toBeInTheDocument();
+  });
+
+  it('says what happens next when nothing waits: working, paused or all caught up, in both languages', () => {
+    const quiet = page({ proposals: [], targets: [] });
+    const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={quiet} />, { locale: 'en' });
+    expect(screen.getByText(/You are all caught up/)).toHaveTextContent('Something else to grow');
+    expect(screen.queryByText(/Nothing waits/)).not.toBeInTheDocument();
+    unmount();
+    const paused = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'paused', proposals: [] })} />, { locale: 'en' });
+    expect(screen.getByText(/The pilot is paused, so nothing new/)).toHaveTextContent('Press Resume');
+    paused.unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={quiet} />, { locale: 'he' });
+    expect(screen.getByText(heMessages.GrowthPilot.waiting.empty)).toBeInTheDocument();
+    expect(heMessages.GrowthPilot.waiting.empty).toContain(heMessages.GrowthPilot.header.newTarget);
+    expect(heMessages.GrowthPilot.waiting.emptyPaused).toContain(heMessages.GrowthPilot.header.resume);
+    expect(heMessages.GrowthPilot.waiting.emptyWorking).toBeTruthy();
   });
 
   it('tells the person what Reject does, in English and Hebrew', () => {
