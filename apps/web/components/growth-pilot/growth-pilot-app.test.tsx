@@ -321,6 +321,13 @@ describe('GrowthPilotApp', () => {
     expect(log).not.toHaveTextContent(/target/i);
   });
 
+  it('says what the empty activity log will fill with', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ activity: [] })} />, { locale: 'en' });
+    const section = screen.getByRole('region', { name: 'What the pilot did' });
+    expect(section).toHaveTextContent('will be listed here');
+    expect(section).not.toHaveTextContent(/^What the pilot didNothing yet\.$/);
+  });
+
   it('explains what Pause does, and that running ads are untouched', async () => {
     stubFetch({ body: page({ status: 'paused' }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
