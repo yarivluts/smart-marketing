@@ -62,7 +62,7 @@ describe('FunnelGoalsDashboard Component', () => {
 
     expect(screen.getByTestId('funnel-goals-dashboard')).toBeInTheDocument();
     for (const label of [
-      'Overall Funnel Conv.',
+      'People who reach the last step',
       'Goals on Track',
       'Customers still here after 1 month',
       'Time to become a customer',
