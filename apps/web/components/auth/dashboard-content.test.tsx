@@ -106,14 +106,14 @@ describe('DashboardContent', () => {
 
     const card = screen.getByTestId('project-card-p-1');
     expect(within(card).getByText('Growth')).toBeInTheDocument();
-    expect(within(card).getByText('1/2 streams')).toBeInTheDocument();
+    expect(within(card).getByText('1/2 data sources connected')).toBeInTheDocument();
     expect(within(card).getByText('Setup 2 of 4 steps done')).toBeInTheDocument();
     expect(within(card).getByRole('link', { name: /Open project/ })).toHaveAttribute('href', '/orgs/org-1/projects/p-1/campaigns');
     expect(within(card).getByRole('link', { name: /Continue setup/ })).toHaveAttribute('href', '/orgs/org-1/projects/p-1/onboarding');
 
     // A project whose health the viewer cannot read says so rather than showing zeros.
     const restricted = screen.getByTestId('project-card-p-2');
-    expect(within(restricted).getByText('Ingest health is visible to project admins.')).toBeInTheDocument();
+    expect(within(restricted).getByText('Only project admins can see whether data is arriving.')).toBeInTheDocument();
     expect(within(restricted).queryByRole('link', { name: /Data health/ })).not.toBeInTheDocument();
   });
 
