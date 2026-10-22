@@ -3946,7 +3946,7 @@
     "providerErrors": {
       "not_configured": "The AI helper is not switched on yet. Trying again will not help - contact GrowthOS support.",
       "provider_billing": "The AI service stopped because its account is out of credit. Ask your account admin to top it up, then try again.",
-      "rate_limited": "The AI provider is limiting requests right now. Try again in a minute.",
+      "rate_limited": "The AI service is too busy right now. Try again in a minute.",
       "refused": "The AI declined this request. Rephrase the brief and try again.",
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
       "provider_error": "The AI service had a problem on its side, not yours. Wait a minute and try again."
@@ -4111,16 +4111,16 @@
       "not_configured": "making video is not switched on yet",
       "provider_billing": "the AI service is not available on our side right now, so please contact GrowthOS support",
       "rate_limited": "the AI service is too busy right now, so please wait a few minutes and try again",
-      "refused": "the video model declined this scene",
-      "invalid_output": "the video model returned no usable video",
-      "provider_error": "the AI video maker had a problem on its side",
-      "timed_out": "it took too long and was given up"
+      "refused": "the AI would not make this scene - reword the scene and try again",
+      "invalid_output": "the AI made a clip that could not be used - try again",
+      "provider_error": "the AI video maker had a problem on its side - wait a minute and try again",
+      "timed_out": "it took too long, so it was stopped - try again"
     },
     "videoFailure": {
       "ffmpeg_unavailable": "the video could not be put together on our side, so please contact GrowthOS support",
-      "ffmpeg_failed": "joining the clips failed",
-      "storage_error": "the video could not be stored",
-      "timed_out": "it took too long and was given up"
+      "ffmpeg_failed": "the clips could not be joined - try again",
+      "storage_error": "the video could not be saved - try again",
+      "timed_out": "it took too long, so it was stopped - try again"
     },
     "videoRequestErrors": {
       "scene_not_found": "That scene is no longer in the saved script. Save the script and try again.",
@@ -4586,11 +4586,11 @@
       "not_configured": "making pictures is not switched on yet",
       "provider_billing": "the AI service is not available on our side right now, so please contact GrowthOS support",
       "rate_limited": "the AI service is too busy right now, so please wait a few minutes and try again",
-      "refused": "the image model declined this picture",
-      "invalid_output": "the image model returned no usable image",
-      "provider_error": "the AI image maker had a problem on its side",
-      "storage_error": "the image could not be saved",
-      "timed_out": "it took too long and was given up"
+      "refused": "the AI would not make this picture - reword it and try again",
+      "invalid_output": "the AI made a picture that could not be used - try again",
+      "provider_error": "the AI image maker had a problem on its side - wait a minute and try again",
+      "storage_error": "the image could not be saved - try again",
+      "timed_out": "it took too long, so it was stopped - try again"
     },
     "admin": {
       "qaTitle": "AI quality check of clips and images",
