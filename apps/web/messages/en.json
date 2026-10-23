@@ -221,7 +221,7 @@
   "OrgsPage": {
     "title": "Your organizations",
     "createOrganization": "Create organization",
-    "empty": "You're not a member of any organization yet.",
+    "empty": "You do not have an organization yet",
     "roleLabel": "Role: {role}",
     "pendingInvites": "Pending invites",
     "open": "Open",
@@ -231,7 +231,7 @@
     "kpiOrganizations": "Organizations",
     "kpiProjects": "Projects across them",
     "kpiInvites": "Invitations waiting",
-    "emptyHint": "Create an organization to start adding projects, data sources and teammates.",
+    "emptyHint": "An organization is the home for your business. Create one, then type your website and GrowthOS does the marketing work while you approve.",
     "cardProjects": "Projects",
     "cardMembers": "Active members",
     "pendingInvitesDescription": "Organizations that asked you to join. Open one to accept or decline.",
