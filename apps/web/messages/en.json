@@ -3951,9 +3951,9 @@
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
       "provider_error": "The AI service had a problem on its side, not yours. Wait a minute and try again."
     },
-    "quotaExceeded": "Today's limit is reached ({used} of {limit}). A project admin can raise it in the studio settings.",
+    "quotaExceeded": "You have used today's AI allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
     "errorInvalidBrief": "Check the brief: {reasons}",
-    "errorInvalidScript": "The script breaks one of the scene rules. Fix the marked scenes and save again.",
+    "errorInvalidScript": "Some scenes in the script need a change before it can be saved. Fix the scenes marked in red and save again.",
     "errorGeneric": "GrowthOS could not finish that. Check your internet connection and try again in a moment.",
     "detailsSaved": "Details saved.",
     "fieldName": "Ad name",
@@ -4425,7 +4425,7 @@
       "exportDone": "Sent to {destination}.",
       "destinationNotConnected": "Not connected to this project - see Ad platform connections.",
       "errorInvalidConcepts": "Some ideas break the rules - fix the highlighted ones.",
-      "quotaExceeded": "The daily image limit is reached ({used} of {limit}).",
+      "quotaExceeded": "You have used today's picture allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
       "destination": {
         "meta": "Meta",
         "google_ads": "Google Ads"
