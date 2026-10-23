@@ -38,12 +38,12 @@
   "OmniSearch": {
     "trigger": "חיפוש...",
     "shortcutHint": "⌘K",
-    "dialogLabel": "חיפוש בלוחות המחוונים, במספרים, בקהלים, במודעות, ביעדים, בלקוחות ובעמודים",
+    "dialogLabel": "חיפוש בלוחות המחוונים, במספרים, בקבוצות לקוחות, במודעות, ביעדים, בלקוחות ובעמודים",
     "inputPlaceholder": "חיפוש מודעות, יעדים, לקוחות, לוחות מחוונים...",
     "emptyPrompt": "התחילו להקליד כדי לחפש בפרויקט זה.",
     "loading": "טוען...",
     "noResults": "אין תוצאות עבור \"{query}\".",
-    "resultType": "{type, select, board {לוח מחוונים} metric {מספר} segment {קהל} campaign {מודעה} goal {יעד} win_rule {התראת הצלחה} customer {לקוח} page {עמוד} other {תוצאה}}"
+    "resultType": "{type, select, board {לוח מחוונים} metric {מספר} segment {קבוצת לקוחות} campaign {מודעה} goal {יעד} win_rule {התראת הצלחה} customer {לקוח} page {עמוד} other {תוצאה}}"
   },
   "CommandPalette": {
     "open": "פתיחת חיפוש מהיר",
