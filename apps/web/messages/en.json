@@ -5995,7 +5995,7 @@
       "quota_exceeded": "today's AI limit is used up, it resets tomorrow",
       "provider_error": "the AI service did not answer, try again in a minute",
       "invalid_output": "the AI's answer was not usable, ask for a change to try again",
-      "no_images": "no image passed the quality check",
+      "no_images": "no image passed the quality check, ask for a change to try again",
       "publish_failed": "Facebook and Instagram did not accept it, check your ad account connection",
       "auth_failed": "Facebook and Instagram no longer accept the saved connection, reconnect your ad account in Ad platform connections",
       "no_secret": "your Facebook and Instagram connection has no saved login, reconnect your ad account in Ad platform connections",

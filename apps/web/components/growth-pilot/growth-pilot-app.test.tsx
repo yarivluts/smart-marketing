@@ -392,7 +392,7 @@ describe('GrowthPilotApp', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_error_190', adsStatus: 'failed' as const, adsFailure: 'no_images' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(screen.getByText('Publishing failed (something went wrong, try again in a minute). No ad was switched on, so nothing was spent.')).toBeInTheDocument();
-      expect(screen.getByText('The ads could not be made (no image passed the quality check)')).toBeInTheDocument();
+      expect(screen.getByText('The ads could not be made (no image passed the quality check, ask for a change to try again)')).toBeInTheDocument();
       expect(view.container).not.toHaveTextContent('meta_error_190');
       view.unmount();
       const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
