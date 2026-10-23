@@ -3808,11 +3808,11 @@
     "chipTopAdsQuery": "What are top ads this week?",
     "chipScaleBudgetLabel": "Spend more",
     "chipScaleBudgetQuery": "Increase budget to $250 for my campaign",
-    "chipNewCampaignLabel": "New Campaign",
-    "chipNewCampaignQuery": "Create a new campaign for lawyers",
+    "chipNewCampaignLabel": "New campaign",
+    "chipNewCampaignQuery": "Create a new campaign for my business",
     "chipRebalanceLabel": "Move budget",
     "chipRebalanceQuery": "Reallocate Google to Meta budget",
-    "clearChat": "Clear Chat"
+    "clearChat": "Clear chat"
   },
   "AutomationHub": {
     "title": "AI helper and approvals",

@@ -3809,10 +3809,10 @@
     "chipScaleBudgetLabel": "הגדל תקציב",
     "chipScaleBudgetQuery": "הגדל תקציב ל-$250 לקמפיין שלי",
     "chipNewCampaignLabel": "קמפיין חדש",
-    "chipNewCampaignQuery": "צור קמפיין חדש לעורכי דין",
+    "chipNewCampaignQuery": "הכינו קמפיין חדש לעסק שלי",
     "chipRebalanceLabel": "העברת תקציב",
     "chipRebalanceQuery": "העבר תקציב מגוגל למטא",
-    "clearChat": "נקה שיחה"
+    "clearChat": "ניקוי השיחה"
   },
   "AutomationHub": {
     "title": "עוזר ה-AI והאישורים",
