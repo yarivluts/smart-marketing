@@ -94,7 +94,7 @@ export function ExecutiveBlendedReport({
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              {t('title', { defaultMessage: 'Executive Growth & Performance Overview' })}
+              {t('title', { defaultMessage: 'How your ads are doing' })}
             </h2>
             {/* "Live" only when something was actually measured - never on an empty report. */}
             {metrics.totalSpendUsd !== null ? (
@@ -103,13 +103,13 @@ export function ExecutiveBlendedReport({
                 className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
               >
                 <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                {t('liveBadge', { defaultMessage: 'Live Blended Pipeline' })}
+                {t('liveBadge', { defaultMessage: 'Live numbers' })}
               </span>
             ) : null}
           </div>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             {t('subtitle', {
-              defaultMessage: 'Zero-configuration blended analytics across Meta & Google Ads',
+              defaultMessage: 'Your Facebook, Instagram and Google ads together, with nothing to set up',
             })}
           </p>
         </div>
@@ -132,7 +132,7 @@ export function ExecutiveBlendedReport({
           <div>
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-semibold">
-                {t('metricTotalSpend', { defaultMessage: 'Total Blended Spend' })}
+                {t('metricTotalSpend', { defaultMessage: 'Total ad spend (all channels)' })}
               </span>
               <DollarSign className="h-4 w-4 text-primary" aria-hidden="true" />
             </div>
@@ -176,7 +176,7 @@ export function ExecutiveBlendedReport({
           <div>
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-semibold">
-                {t('metricBlendedCac', { defaultMessage: 'Blended CAC' })}
+                {t('metricBlendedCac', { defaultMessage: 'Cost of each new customer' })}
               </span>
               <Target className="h-4 w-4 text-primary" aria-hidden="true" />
             </div>
@@ -213,7 +213,7 @@ export function ExecutiveBlendedReport({
           <div>
             <div className="flex items-center justify-between text-muted-foreground">
               <span className="text-xs font-semibold">
-                {t('metricBlendedRoas', { defaultMessage: 'Blended ROAS' })}
+                {t('metricBlendedRoas', { defaultMessage: 'Sales for every $1 spent on ads' })}
               </span>
               <TrendingUp className="h-4 w-4 text-emerald-500" aria-hidden="true" />
             </div>
@@ -280,7 +280,7 @@ export function ExecutiveBlendedReport({
           <div className="flex items-center gap-2">
             <PieChart className="h-4 w-4 text-primary" aria-hidden="true" />
             <h3 className="text-sm font-bold text-foreground">
-              {t('channelAllocationHeading', { defaultMessage: 'Cross-Channel Spend Allocation' })}
+              {t('channelAllocationHeading', { defaultMessage: 'Where your ad money goes' })}
             </h3>
           </div>
           {channels.length > 0 ? (
@@ -362,13 +362,13 @@ export function ExecutiveBlendedReport({
                   </div>
                 </div>
                 <div>
-                  <span className="text-[10px] text-muted-foreground">{t('metricRoas', { defaultMessage: 'ROAS' })}</span>
+                  <span className="text-[10px] text-muted-foreground">{t('metricRoas', { defaultMessage: 'Sales per $1' })}</span>
                   <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
                     {channel.roas === null ? noData : `${channel.roas}x`}
                   </div>
                 </div>
                 <div>
-                  <span className="text-[10px] text-muted-foreground">{t('metricCac', { defaultMessage: 'CAC' })}</span>
+                  <span className="text-[10px] text-muted-foreground">{t('metricCac', { defaultMessage: 'Cost per customer' })}</span>
                   <div className="text-xs font-bold text-foreground" dir="ltr">
                     {usd2(channel.cacUsd)}
                   </div>

@@ -68,8 +68,8 @@ describe('ExecutiveBlendedReport (Reporting Module)', () => {
 
   it('labels the headline numbers in plain words', () => {
     renderWithIntl(<ExecutiveBlendedReport metrics={createMockExecutiveMetrics({})} canExecute={true} />);
-    expect(screen.getByText('Cost per customer (CAC)')).toBeInTheDocument();
-    expect(screen.getByText('Sales per $1 of ads (ROAS)')).toBeInTheDocument();
+    expect(screen.getByText('Cost of each new customer')).toBeInTheDocument();
+    expect(screen.getByText('Sales for every $1 spent on ads')).toBeInTheDocument();
     expect(screen.getByText('Failed payments recovered')).toBeInTheDocument();
     expect(screen.queryByText(/dunning/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Blended ROAS')).not.toBeInTheDocument();
