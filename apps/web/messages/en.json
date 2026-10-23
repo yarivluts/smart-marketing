@@ -4957,7 +4957,7 @@
       }
     },
     "audience": {
-      "title": "Audience (Facebook & Instagram)",
+      "title": "Who sees the ad (Facebook & Instagram)",
       "description": "Who will see your ad on Facebook and Instagram. We read your real ad account to suggest it: your own groups of people, topics they like, roughly how many people you would reach, and what your past ads achieved. The ad is shown to whatever you save here.",
       "countriesLabel": "Countries",
       "ageMin": "Age from",
@@ -4968,13 +4968,13 @@
         "female": "Women",
         "male": "Men"
       },
-      "audiencesTitle": "Your audiences ({count} of up to {max} chosen)",
+      "audiencesTitle": "Your groups of people ({count} of up to {max} chosen)",
       "loading": "Reading your Meta ad account...",
       "noAudiences": "Your ad account has no saved groups of people yet. That is fine - choose age, gender and interests below and the ad still reaches the right people.",
       "kinds": {
         "custom": "Your people",
         "lookalike": "Similar to your people",
-        "saved": "Saved preset"
+        "saved": "Saved group"
       },
       "kindsHint": "\"Your people\" are real contacts or visitors you already have. \"Similar to your people\" are new people Meta finds who resemble them.",
       "savedNote": "These are groups of people you saved in your Meta ad account. They are shown so you can see them, but you cannot add them here - pick age, gender and interests instead.",
@@ -4990,7 +4990,7 @@
       "estimateValue": "About {range} people a month",
       "estimateNone": "Meta gave no estimate for this audience.",
       "pastTitle": "What worked before",
-      "pastDescription": "Your Meta ad account's last 90 days, every campaign: spend, clicks and conversions per segment.",
+      "pastDescription": "Your Meta ad account's last 90 days, every campaign: money spent, clicks, and sign-ups or sales for each group of people.",
       "breakdowns": {
         "age_gender": "Age & gender",
         "placement": "Where the ad showed",
@@ -4998,8 +4998,8 @@
       },
       "pastEmpty": "No results in the last 90 days.",
       "columns": {
-        "segment": "Segment",
-        "spend": "Spend",
+        "segment": "Group of people",
+        "spend": "Money spent",
         "linkClicks": "Clicks to your page",
         "ctr": "Share who clicked",
         "costPerClick": "Cost of each click",
