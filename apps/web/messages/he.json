@@ -5904,7 +5904,7 @@
       }
     },
     "audience": {
-      "title": "קהל ל{name}",
+      "title": "מי יראה את המודעות ל{name}",
       "ages": "גילאי {min}-{max}",
       "gender": {
         "all": "כולם",

@@ -529,7 +529,7 @@ describe('GrowthPilotApp', () => {
     it('shows who the ads reach - countries, ages, genders, matched interests, the reach - for approval', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [AUDIENCE], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent(`Audience for ${isolate('Freelancers')}`);
+      expect(card).toHaveTextContent(`Who will see the ads for ${isolate('Freelancers')}`);
       const audience = screen.getByTestId('growth-pilot-audience');
       expect(audience).toHaveTextContent('Freelancers in Israel who sign contracts');
       expect(audience).toHaveTextContent('Israel');

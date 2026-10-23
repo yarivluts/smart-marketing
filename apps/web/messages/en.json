@@ -5904,7 +5904,7 @@
       }
     },
     "audience": {
-      "title": "Audience for {name}",
+      "title": "Who will see the ads for {name}",
       "ages": "Ages {min}-{max}",
       "gender": {
         "all": "Everyone",
