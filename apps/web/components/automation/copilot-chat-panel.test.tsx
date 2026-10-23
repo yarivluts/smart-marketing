@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
 import { copilotEngineTranslator } from '@/tests/e2e/helpers/test-harness';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
@@ -164,6 +165,18 @@ describe('CopilotChatPanel Component', () => {
       expect({ label, isFallback: reply.includes(fallback) }).toEqual({ label, isFallback: false });
       unmount();
     }
+  });
+
+  /** A newcomer who taps "New campaign" must not get a campaign for somebody else's trade. */
+  it('keeps the quick-start chips about the visitor’s own business, in both languages', async () => {
+    expect(enMessages.CopilotChatPanel.chipNewCampaignQuery).not.toMatch(/lawyer/i);
+    expect(heMessages.CopilotChatPanel.chipNewCampaignQuery).not.toContain('עורכי דין');
+
+    const fallback = copilotEngineTranslator('en').format('fallback');
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.CopilotChatPanel.chipNewCampaignLabel }));
+    await waitFor(() => expect(screen.getAllByTestId('message-assistant')).toHaveLength(1));
+    expect(screen.getByTestId('message-assistant').textContent ?? '').not.toContain(fallback);
   });
 
 });
