@@ -16,7 +16,10 @@ describe('CreateGoalModal presets', () => {
       expect(screen.getByTestId(PRESET_TEST_IDS[i]).textContent).toBe(enMessages.Goals[key]);
     });
     expect(screen.getByText(/ready-made goal/i)).toBeTruthy();
-    expect(enMessages.Goals.presetCacCeiling).toMatch(/Cost per customer/);
+    expect(enMessages.Goals.presetCacCeiling).toMatch(/cost of each new customer/);
+    for (const key of PRESET_KEYS) {
+      expect(enMessages.Goals[key]).not.toMatch(/\b(CAC|MRR|conversion rate)\b/i);
+    }
     expect(enMessages.Goals.presetLeadVolume).toMatch(/interested people/);
   });
 
