@@ -5074,11 +5074,11 @@
       }
     },
     "planSections": {
-      "keywords": "Search keywords",
+      "keywords": "Words people search for (Google)",
       "keywordsChosen": "{count, plural, one {# keyword chosen} other {# keywords chosen}}",
-      "audience": "Audience (Meta)",
-      "audienceSet": "Audience set",
-      "references": "Reference images",
+      "audience": "Who sees the ad (Facebook and Instagram)",
+      "audienceSet": "Chosen",
+      "references": "Example images",
       "referencesCount": "{count, plural, one {# image} other {# images}}",
       "notSet": "Not set yet - optional"
     },
