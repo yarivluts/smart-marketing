@@ -29,6 +29,16 @@ describe('CampaignCreativesPanel', () => {
     expect(screen.getByText('https://growthos.io/easysign')).toBeInTheDocument();
   });
 
+  it('shows the ad button as plain words, never the raw platform code', () => {
+    const ad = { adName: 'A', adSetName: 'S', headline: 'H', imageUrl: '', linkUrl: '', callToActionType: 'SIGN_UP' };
+    const { unmount } = renderWithIntl(<CampaignCreativesPanel draft={undefined} importedAds={[ad]} />);
+    expect(screen.getByText('Button text: Sign up')).toBeInTheDocument();
+    unmount();
+    renderWithIntl(<CampaignCreativesPanel draft={undefined} importedAds={[{ ...ad, callToActionType: 'SOME_NEW_CODE' }]} />);
+    expect(screen.getByText('Button text: some new code')).toBeInTheDocument();
+    expect(screen.queryByText(/SIGN_UP|SOME_NEW_CODE/)).toBeNull();
+  });
+
   it('displays zero-creatives clean empty state when no ads or drafts are attached', () => {
     renderWithIntl(<CampaignCreativesPanel draft={undefined} importedAds={[]} />);
     expect(screen.getByText(en.Campaigns.noCreativesYet)).toBeInTheDocument();
