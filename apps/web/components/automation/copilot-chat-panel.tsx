@@ -7,7 +7,6 @@ import {
   Sparkles,
   Bot,
   User,
-  Zap,
   Minimize2,
   Trash2,
 } from 'lucide-react';
@@ -305,15 +304,11 @@ export function CopilotChatPanel({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-foreground">
-                {t('drawerTitle') || 'AI Growth Copilot'}
+                {t('drawerTitle')}
               </h3>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <Zap className="h-3 w-3" />
-                <span>{t('badgeHybridEngine') || 'Hybrid Action Engine'}</span>
-              </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {t('drawerSubtitle') || 'Natural language marketing actions & instant insights'}
+              {t('drawerSubtitle')}
             </p>
           </div>
         </div>
@@ -323,6 +318,7 @@ export function CopilotChatPanel({
             type="button"
             onClick={handleClearChat}
             title={tPanel('clearChat')}
+            aria-label={tPanel('clearChat')}
             className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
           >
             <Trash2 className="h-4 w-4" />
@@ -331,6 +327,7 @@ export function CopilotChatPanel({
             <button
               type="button"
               onClick={onClose}
+              aria-label={t('close')}
               className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
             >
               <Minimize2 className="h-4 w-4" />
@@ -347,8 +344,8 @@ export function CopilotChatPanel({
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-6">
             <Sparkles className="h-8 w-8 text-primary/40 mb-2" />
-            <p className="font-semibold text-foreground">{t('emptyTitle') || 'How can I assist your campaigns?'}</p>
-            <p className="text-xs max-w-sm mt-1">{t('emptySubtitle') || 'Ask for performance breakdowns or budget updates.'}</p>
+            <p className="font-semibold text-foreground">{t('emptyTitle')}</p>
+            <p className="text-xs max-w-sm mt-1">{t('emptySubtitle')}</p>
           </div>
         ) : (
           messages.map((m) => {

@@ -147,7 +147,14 @@ describe('AutomationHub Component', () => {
 
   it.each(['en', 'he'] as const)('keeps product jargon out of the helper and hub copy in %s', (locale) => {
     const m = locale === 'en' ? enMessages : heMessages;
-    const text = [...Object.values(m.AutomationHub), m.CopilotChatPanel.welcomeMessage, m.Copilot.drawerTitle, m.Copilot.drawerSubtitle, m.Automation.killSwitchEngagedBadge].join(' | ');
-    expect(text).not.toMatch(/copilot|kill switch|guardrail|autonomous|rollback/i);
+    const text = [...Object.values(m.AutomationHub), m.CopilotChatPanel.welcomeMessage, m.Copilot.drawerTitle, m.Copilot.drawerSubtitle, m.Copilot.emptyTitle, m.Copilot.emptySubtitle, m.Automation.killSwitchEngagedBadge].join(' | ');
+    expect(text).not.toMatch(/copilot|kill switch|guardrail|autonomous|rollback|hybrid|reallocation/i);
+  });
+
+  it('keeps the old Hebrew pilot wording and the engine badge out of the helper header', () => {
+    expect(heMessages.Copilot.drawerTitle).not.toMatch(/טייס/);
+    expect(heMessages.Copilot.drawerSubtitle).not.toMatch(/טייס|תובנות/);
+    expect(heMessages.Copilot).not.toHaveProperty('badgeHybridEngine');
+    expect(enMessages.Copilot).not.toHaveProperty('badgeHybridEngine');
   });
 });
