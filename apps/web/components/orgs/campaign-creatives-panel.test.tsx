@@ -81,7 +81,7 @@ describe('CampaignCreativesPanel', () => {
     expect(screen.getByText('Sign In Minutes')).toBeInTheDocument();
     expect(screen.getByText('Contracts signed from the phone in the same call.')).toBeInTheDocument();
     expect(screen.getByText('https://easysign.example.com/lawyers')).toBeInTheDocument();
-    expect(screen.getByText('CTA: SIGN_UP')).toBeInTheDocument();
+    expect(screen.getByText('Button text: Sign up')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Sign In Minutes' })).toHaveAttribute('src', 'https://cdn.example.com/ad.png');
     // The imported snapshot IS the platform's truth for this campaign — the draft is not rendered alongside it.
     expect(screen.queryByText('Sign Anywhere')).not.toBeInTheDocument();

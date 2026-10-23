@@ -5,6 +5,11 @@ import { useTranslations } from 'next-intl';
 import { Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+/** Unknown platform codes (e.g. BUY_NOW) still read as words, never as SHOUTING_SNAKE_CASE. */
+function readableCode(code: string): string {
+  return code.replace(/_/g, ' ').toLowerCase();
+}
+
 export interface GoogleAdsCampaignDraftView {
   platform: 'google_ads';
   campaignName: string;
@@ -126,7 +131,7 @@ export function CampaignCreativesPanel({
                   ) : null}
                   {ad.callToActionType ? (
                     <span className="font-semibold text-primary" dir="ltr">
-                      {t('importedAdCta', { cta: ad.callToActionType })}
+                      {t('importedAdCta', { cta: ad.callToActionType, ctaFallback: readableCode(ad.callToActionType) })}
                     </span>
                   ) : null}
                 </div>

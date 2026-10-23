@@ -3334,7 +3334,7 @@
     "refreshStateInProgress": "מרענן...",
     "refreshStateError": "לא ניתן היה לרענן מפלטפורמת הפרסום. המצב האחרון שנרשם עדיין מוצג.",
     "objectiveLabel": "מטרת הקמפיין",
-    "importedAdCta": "כפתור הנעה: {cta}",
+    "importedAdCta": "טקסט הכפתור: {cta, select, LEARN_MORE {למידע נוסף} SHOP_NOW {לקנייה עכשיו} SIGN_UP {הרשמה} CONTACT_US {יצירת קשר} GET_QUOTE {קבלת הצעת מחיר} BOOK_TRAVEL {הזמנה} DOWNLOAD {הורדה} SUBSCRIBE {הרשמה לעדכונים} APPLY_NOW {להגשת בקשה} ORDER_NOW {להזמנה עכשיו} GET_OFFER {לקבלת ההצעה} CALL_NOW {התקשרו עכשיו} SEND_MESSAGE {שליחת הודעה} WHATSAPP_MESSAGE {הודעה בוואטסאפ} WATCH_MORE {לצפייה} other {{ctaFallback}}}",
     "spendHeading": "הוצאה על מודעות (28 הימים האחרונים)",
     "spendTotalLabel": "סך ההוצאה",
     "spendAmount": "${amount}",
