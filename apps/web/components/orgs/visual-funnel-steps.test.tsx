@@ -33,7 +33,7 @@ describe('VisualFunnelSteps Component', () => {
   it('renders measured counts, conversion percentages, drop-offs and bar widths', () => {
     renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" />);
 
-    expect(screen.getByText('Conversion Funnel: EasySign')).toBeInTheDocument();
+    expect(screen.getByText('Customer path: EasySign')).toBeInTheDocument();
     expect(screen.getByTestId('count-sent')).toHaveTextContent('500 people');
     expect(screen.getByTestId('count-viewed')).toHaveTextContent('200 people');
     expect(screen.getByTestId('count-signed')).toHaveTextContent('150 people');
@@ -47,7 +47,7 @@ describe('VisualFunnelSteps Component', () => {
   });
 
   /*
-    B20: EasySign's page showed "Total Started 4", every later step "6 users", "Overall Conversion 150%" and
+    B20: EasySign's page showed "Total Started 4", every later step "6 users", "Reached the last step 150%" and
     "-0% drop-off". With the sequential people counts the query now returns, it reads 4 -> 2 -> 2 -> 2 -> 2.
   */
   it("renders EasySign's funnel in people: 50% overall, one real drop-off, no signed zero", () => {
@@ -60,7 +60,7 @@ describe('VisualFunnelSteps Component', () => {
 
     expect(screen.getByTestId('count-awareness')).toHaveTextContent('4 people');
     expect(screen.getByTestId('count-signup')).toHaveTextContent('2 people');
-    expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('50%');
+    expect(screen.getByText('Reached the last step:').parentElement).toHaveTextContent('50%');
     expect(screen.getByTestId('dropoff-signup')).toHaveTextContent('50% drop-off');
     expect(screen.getByTestId('dropoff-signup')).not.toHaveTextContent('-50%');
     // B22: 4 entrants are too few for an alert or a Copilot suggestion, however large the drop.
@@ -95,7 +95,7 @@ describe('VisualFunnelSteps Component', () => {
         funnelName="EasySign"
       />,
     );
-    expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('100%');
+    expect(screen.getByText('Reached the last step:').parentElement).toHaveTextContent('100%');
     expect(screen.queryByText('150%')).not.toBeInTheDocument();
   });
 

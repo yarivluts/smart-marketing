@@ -9,7 +9,7 @@ import { buildFunnelView } from '../../lib/orgs/funnel-view';
 function MockVisualFunnel({ steps = createMockEasySignFunnel() }) {
   return (
     <div data-testid="visual-funnel-container" className="rounded-lg border p-6">
-      <h2 className="text-xl font-bold">Conversion Funnel: EasySign</h2>
+      <h2 className="text-xl font-bold">Customer path: EasySign</h2>
       <div className="mt-4 flex flex-col gap-4">
         {steps.map((step, idx) => (
           <div key={step.stageKey} data-testid={`funnel-step-${step.stageKey}`} className="flex items-center gap-4">
