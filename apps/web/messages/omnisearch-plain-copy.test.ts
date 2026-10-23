@@ -22,4 +22,11 @@ describe('search box copy', () => {
       expect(shown(text)).not.toMatch(JARGON_HE);
     }
   });
+
+  it('names saved customer lists like the sidebar does', () => {
+    expect(en.OmniSearch.resultType).toContain('segment {Customer group}');
+    expect(en.OmniSearch.dialogLabel).not.toMatch(/audiences/i);
+    expect(he.OmniSearch.dialogLabel).not.toContain('בקהלים');
+    expect(he.OmniSearch.resultType).toContain('segment {קבוצת לקוחות}');
+  });
 });
