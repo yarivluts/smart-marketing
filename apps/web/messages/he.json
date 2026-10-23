@@ -5074,11 +5074,11 @@
       }
     },
     "planSections": {
-      "keywords": "מילות מפתח לחיפוש",
+      "keywords": "מה אנשים מחפשים (גוגל)",
       "keywordsChosen": "{count, plural, one {מילת מפתח אחת נבחרה} other {# מילות מפתח נבחרו}}",
-      "audience": "קהל (Meta)",
-      "audienceSet": "הקהל הוגדר",
-      "references": "תמונות רפרנס",
+      "audience": "מי יראו את המודעה (פייסבוק ואינסטגרם)",
+      "audienceSet": "נבחר",
+      "references": "תמונות לדוגמה",
       "referencesCount": "{count, plural, one {תמונה אחת} other {# תמונות}}",
       "notSet": "עדיין לא הוגדר - לא חובה"
     },
