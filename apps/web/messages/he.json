@@ -5808,7 +5808,7 @@
     "kind": {
       "product": "מוצר",
       "service": "שירות",
-      "audience": "קהל"
+      "audience": "למי להגיע"
     },
     "targets": {
       "title": "היעדים שלכם",
@@ -5850,8 +5850,8 @@
         "landing_ready": "כתב דף נחיתה ל{subject}",
         "landing_published": "פרסמתם את דף הנחיתה ל{subject}",
         "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}",
-        "audience_ready": "תכנן קהל ל{subject}",
-        "audience_failed": "לא הצליח לתכנן קהל ל{subject}",
+        "audience_ready": "בירר למי להגיע עבור {subject}",
+        "audience_failed": "לא הצליח לברר למי להגיע עבור {subject}",
         "ads_published": "{count, plural, one {שלח מודעה כבויה אחת לפייסבוק ולאינסטגרם} other {שלח # מודעות כבויות לפייסבוק ולאינסטגרם}} ל{subject}",
         "publish_failed": "לא הצליח לפרסם את המודעות ל{subject}",
         "ads_activated": "הפעלתם את המודעות ל{subject}"
@@ -5917,10 +5917,10 @@
       "revising": "ה-AI מעדכן את הקהל...",
       "changePlaceholder": "את מי המודעות צריכות להגיע? למשל: רק נשים 30-45, להוסיף רואי חשבון",
       "status": {
-        "ready": "קהל מחכה לאישור שלכם",
-        "approved": "הקהל אושר - המודעות יוצגו לאנשים האלה כשתפרסמו אותן",
-        "rejected": "דחיתם את הקהל",
-        "failed": "לא הצלחנו לתכנן קהל ({reason})"
+        "ready": "האנשים שנגיע אליהם מחכים לאישור שלכם",
+        "approved": "אושר - המודעות יוצגו לאנשים האלה כשתפרסמו אותן",
+        "rejected": "דחיתם את האנשים האלה",
+        "failed": "לא הצלחנו לברר למי להגיע ({reason})"
       }
     },
     "publish": {

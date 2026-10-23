@@ -5808,7 +5808,7 @@
     "kind": {
       "product": "Product",
       "service": "Service",
-      "audience": "Audience"
+      "audience": "Who to reach"
     },
     "targets": {
       "title": "What we are growing",
@@ -5850,8 +5850,8 @@
         "landing_ready": "Wrote a landing page for {subject}",
         "landing_published": "You published the landing page for {subject}",
         "landing_failed": "Could not write a landing page for {subject}",
-        "audience_ready": "Planned an audience for {subject}",
-        "audience_failed": "Could not plan an audience for {subject}",
+        "audience_ready": "Worked out who to reach for {subject}",
+        "audience_failed": "Could not work out who to reach for {subject}",
         "ads_published": "{count, plural, one {Sent # switched-off ad to Facebook and Instagram} other {Sent # switched-off ads to Facebook and Instagram}} for {subject}",
         "publish_failed": "Could not publish the ads for {subject}",
         "ads_activated": "You turned on the ads for {subject}"
@@ -5917,10 +5917,10 @@
       "revising": "The AI is updating the audience...",
       "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
       "status": {
-        "ready": "Audience waiting for your approval",
-        "approved": "Audience approved - the ads will be shown to these people once you publish them",
-        "rejected": "You rejected the audience",
-        "failed": "The audience could not be planned ({reason})"
+        "ready": "The people to reach are waiting for your approval",
+        "approved": "Approved - the ads will be shown to these people once you publish them",
+        "rejected": "You rejected these people",
+        "failed": "We could not work out who to reach ({reason})"
       }
     },
     "publish": {

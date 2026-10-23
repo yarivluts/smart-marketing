@@ -539,7 +539,7 @@ describe('GrowthPilotApp', () => {
       expect(audience).toHaveTextContent('Paperwork');
       expect(screen.getByTestId('growth-pilot-audience-reach')).toHaveTextContent(/Facebook and Instagram estimate 52K-81K people a month/);
       expect(screen.queryByTestId('growth-pilot-audience-meta')).toBeNull();
-      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('Audience waiting for your approval');
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The people to reach are waiting for your approval');
     });
 
     it('an approved audience says what happens next, in English and Hebrew', () => {
@@ -557,7 +557,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
       expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
       expect(screen.getByTestId('growth-pilot-audience-meta').textContent ?? '').not.toMatch(/^Meta /);
-      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (today\'s AI limit is used up, it resets tomorrow)');
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('We could not work out who to reach (today\'s AI limit is used up, it resets tomorrow)');
     });
   });
 
