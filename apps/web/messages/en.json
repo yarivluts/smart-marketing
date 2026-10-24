@@ -3355,7 +3355,7 @@
     "filterAllPlatforms": "All Platforms",
     "filterMetaAds": "Facebook & Instagram",
     "filterGoogleAds": "Google Ads",
-    "filterSimulated": "Simulated",
+    "filterSimulated": "Sample data",
     "filterAllStatuses": "All Statuses",
     "filterActive": "Active",
     "filterPaused": "Paused",
@@ -3409,7 +3409,7 @@
     "conversionsCountShort": "{count, plural, one {# sign-up or sale} other {# sign-ups or sales}}",
     "ctrLabel": "clicked",
     "cpaLabel": "per sale",
-    "inspectTarget": "Inspect target",
+    "inspectTarget": "Open this campaign",
     "confirmBudget": "Confirm budget",
     "cancel": "Cancel",
     "perDay": "/day",
@@ -3428,7 +3428,7 @@
       "stripe": "Stripe",
       "ga4": "GA4",
       "generic": "Generic",
-      "simulated": "Simulated",
+      "simulated": "Sample data",
       "youtube": "YouTube"
     },
     "status": {
