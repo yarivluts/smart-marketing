@@ -43,3 +43,19 @@ describe('Ads & results headline names', () => {
     });
   }
 });
+
+describe('Ads & results counts say sign-ups or sales, not conversions', () => {
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it(`${name}: no conversion/impression/CVR jargon in the count lines`, () => {
+      for (const key of [
+        'conversionsCount',
+        'conversionsCountShort',
+        'analyticsConversionRate',
+        'analyticsTotalImpressions',
+        'analyticsTotalConversions',
+      ] as const) {
+        expect(bundle.Campaigns[key]).not.toMatch(/conv|CVR|impression|המרה|המרות|חשיפות/i);
+      }
+    });
+  }
+});
