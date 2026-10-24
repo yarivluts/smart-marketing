@@ -32,7 +32,7 @@ describe('OrganizationSettingsForm', () => {
   it('prefills the current name/slug/billing email', () => {
     renderForm();
     expect(screen.getByLabelText('Organization name')).toHaveValue('Acme Inc');
-    expect(screen.getByLabelText('Slug')).toHaveValue('acme');
+    expect(screen.getByLabelText('Short name')).toHaveValue('acme');
     expect(screen.getByLabelText('Billing contact email')).toHaveValue('billing@acme.test');
   });
 
@@ -41,7 +41,7 @@ describe('OrganizationSettingsForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Acme Corp' } });
-    fireEvent.change(screen.getByLabelText('Slug'), { target: { value: 'acme-corp' } });
+    fireEvent.change(screen.getByLabelText('Short name'), { target: { value: 'acme-corp' } });
     fireEvent.change(screen.getByLabelText('Billing contact email'), { target: { value: 'ap@acme.test' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
