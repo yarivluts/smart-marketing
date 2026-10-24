@@ -15,4 +15,13 @@ describe('Onboarding plain copy', () => {
       expect(text).not.toMatch(/registry|registered|manifest/i);
     }
   });
+
+  it('says "data space" and "ready-made connections" instead of "environments" and "plugin list"', () => {
+    for (const text of [en.Onboarding.sourceStepNoEnvironments, en.Onboarding.sourceStepNoManifestsLink]) {
+      expect(text).not.toMatch(/environment|plugin/i);
+    }
+    expect(en.Onboarding.sourceStepNoEnvironments).toMatch(/project settings/i);
+    expect(he.Onboarding.sourceStepNoEnvironments).not.toContain('סביבות');
+    expect(he.Onboarding.sourceStepNoManifestsLink).not.toContain('תוספים');
+  });
 });
