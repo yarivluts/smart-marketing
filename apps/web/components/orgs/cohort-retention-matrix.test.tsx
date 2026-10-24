@@ -82,6 +82,6 @@ describe('CohortRetentionMatrix Component', () => {
       />,
     );
 
-    expect(screen.getByText('Retention:')).toBeInTheDocument();
+    expect(screen.getByText('Still active:')).toBeInTheDocument();
   });
 });
