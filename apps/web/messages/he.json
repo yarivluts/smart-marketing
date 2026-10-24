@@ -3762,7 +3762,9 @@
       ],
       "budgetChange": [
         "הגדל תקציב",
+        "הגדילו תקציב",
         "העלה תקציב",
+        "העלו תקציב",
         "תקציב ל-",
         "תקציב ל",
         "increase budget",
@@ -3772,6 +3774,7 @@
       "newCampaign": [
         "קמפיין חיפוש",
         "צור קמפיין",
+        "צרו קמפיין",
         "קמפיין חדש",
         "new campaign",
         "create campaign",
@@ -3780,6 +3783,7 @@
       "rebalance": [
         "איזון תקציב",
         "העבר תקציב",
+        "העבירו תקציב",
         "חלוקת תקציב",
         "reallocate",
         "rebalance",
@@ -3806,12 +3810,12 @@
     "welcomeMessage": "שלום! אני עוזר ה-AI שלכם. אפשר לשאול אותי איך המודעות מתקדמות, או לבקש שאכין שינוי - שום דבר לא קורה עד שתאשרו.",
     "chipTopAdsLabel": "מודעות מובילות",
     "chipTopAdsQuery": "אילו מודעות הכי רווחיות השבוע?",
-    "chipScaleBudgetLabel": "הגדל תקציב",
-    "chipScaleBudgetQuery": "הגדל תקציב ל-$250 לקמפיין שלי",
+    "chipScaleBudgetLabel": "הגדלת תקציב",
+    "chipScaleBudgetQuery": "הגדילו תקציב ל-$250 לקמפיין שלי",
     "chipNewCampaignLabel": "קמפיין חדש",
     "chipNewCampaignQuery": "הכינו קמפיין חדש לעסק שלי",
     "chipRebalanceLabel": "העברת תקציב",
-    "chipRebalanceQuery": "העבר תקציב מגוגל למטא",
+    "chipRebalanceQuery": "העבירו תקציב מגוגל למטא",
     "clearChat": "ניקוי השיחה"
   },
   "AutomationHub": {
@@ -3822,7 +3826,7 @@
     "actionsExecuted": "פעולות שבוצעו",
     "pendingProposals": "הצעות ממתינות",
     "tabCopilot": "עוזר ה-AI והצעות",
-    "tabAudit": "יומן ביקורת (Audit)",
+    "tabAudit": "היסטוריית שינויים",
     "proactiveProposals": "הצעות פרואקטיביות",
     "pendingCount": "{count} ממתינות"
   },

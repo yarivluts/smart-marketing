@@ -17,3 +17,16 @@ describe('the copilot quick-prompt chips speak plain words', () => {
     }
   });
 });
+
+describe('the AI helper chips and tabs speak to everyone in plain words', () => {
+  it('Hebrew chip prompts use the plural imperative, not the masculine singular', () => {
+    expect(he.CopilotChatPanel.chipScaleBudgetQuery).toMatch(/^הגדילו /);
+    expect(he.CopilotChatPanel.chipRebalanceQuery).toMatch(/^העבירו /);
+    expect(he.CopilotChatPanel.chipScaleBudgetLabel).not.toMatch(/^הגדל /);
+  });
+
+  it('the history tab is not called an audit trail in either language', () => {
+    expect(en.AutomationHub.tabAudit).not.toMatch(/audit/i);
+    expect(he.AutomationHub.tabAudit).not.toMatch(/audit|ביקורת/i);
+  });
+});

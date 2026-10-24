@@ -22,7 +22,7 @@ describe('AutomationHub Component', () => {
     expect(screen.getByText('AI helper and approvals')).toBeInTheDocument();
     expect(screen.getByText(/Changes the AI suggests for/)).toBeInTheDocument();
     expect(screen.getByText('AI helper and suggestions')).toBeInTheDocument();
-    expect(screen.getByText('Audit Trail')).toBeInTheDocument();
+    expect(screen.getByText('Change history')).toBeInTheDocument();
   });
 
   it('displays kill switch badge when killSwitchEngaged is true', () => {
@@ -108,7 +108,7 @@ describe('AutomationHub Component', () => {
     );
 
     // Switch to Audit Trail tab
-    const auditTab = screen.getByRole('tab', { name: /Audit Trail/i });
+    const auditTab = screen.getByRole('tab', { name: /Change history/i });
     fireEvent.click(auditTab);
 
     expect(screen.getByTestId('audit-trail-container')).toBeInTheDocument();
