@@ -5,6 +5,7 @@ import { useState, useTransition, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
+import { quickActionErrorKey } from './quick-action-error';
 import { Switch } from '@/components/ui/switch';
 
 export interface CampaignStatusToggleProps {
@@ -94,17 +95,7 @@ export function CampaignStatusToggle({
           onStatusChange(previousStatus);
         }
 
-        if (response.status === 422 && data.violations?.length > 0) {
-          setErrorMessage(
-            t('guardrailBlockedError', {
-              reason: data.violations[0].message || data.violations[0].type,
-            }),
-          );
-        } else if (response.status === 403) {
-          setErrorMessage(t('quickActionPermissionDenied'));
-        } else {
-          setErrorMessage(data.message || t('pauseError'));
-        }
+        setErrorMessage(t(quickActionErrorKey(response.status, data)));
         return;
       }
 
@@ -124,7 +115,7 @@ export function CampaignStatusToggle({
       if (onStatusChange) {
         onStatusChange(previousStatus);
       }
-      setErrorMessage(t('pauseError'));
+      setErrorMessage(t('quickActionError'));
     } finally {
       setIsSyncing(false);
     }
