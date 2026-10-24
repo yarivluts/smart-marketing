@@ -3765,7 +3765,9 @@
         "raise budget",
         "budget to",
         "הגדל תקציב",
+        "הגדילו תקציב",
         "העלה תקציב",
+        "העלו תקציב",
         "תקציב ל-",
         "תקציב ל"
       ],
@@ -3775,6 +3777,7 @@
         "search campaign",
         "קמפיין חיפוש",
         "צור קמפיין",
+        "צרו קמפיין",
         "קמפיין חדש"
       ],
       "rebalance": [
@@ -3783,6 +3786,7 @@
         "shift budget",
         "איזון תקציב",
         "העבר תקציב",
+        "העבירו תקציב",
         "חלוקת תקציב"
       ],
       "funnelDropOff": [
@@ -3822,7 +3826,7 @@
     "actionsExecuted": "Actions Executed",
     "pendingProposals": "Pending Proposals",
     "tabCopilot": "AI helper and suggestions",
-    "tabAudit": "Audit Trail",
+    "tabAudit": "Change history",
     "proactiveProposals": "Proactive Proposals",
     "pendingCount": "{count} pending"
   },
