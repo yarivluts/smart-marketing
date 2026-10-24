@@ -112,6 +112,21 @@ describe('GrowthPilotApp', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('ties the address error to the field for screen readers and clears it on typing', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const input = screen.getByTestId('growth-pilot-site-input');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    fireEvent.change(input, { target: { value: 'me@easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    const errorId = screen.getByRole('alert').id;
+    expect(errorId).toBeTruthy();
+    expect(input.getAttribute('aria-describedby')).toContain(errorId);
+    fireEvent.change(input, { target: { value: 'easysign.co.il' } });
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(input.getAttribute('aria-describedby')).not.toContain(errorId);
+  });
+
   it('says the email mistake in Hebrew', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'he' });
     fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'me@easysign.co.il' } });
