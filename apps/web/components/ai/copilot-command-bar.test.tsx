@@ -31,7 +31,7 @@ describe('MarketingCommandBar Component', () => {
       { locale: 'en' },
     );
     const input = screen.getByTestId('command-bar-input');
-    fireEvent.change(input, { target: { value: 'funnel step' } });
+    fireEvent.change(input, { target: { value: 'people leave' } });
 
     expect(screen.getByTestId('command-item-ai-ask-funnel')).toBeInTheDocument();
     expect(screen.queryByTestId('command-item-nav-settings')).not.toBeInTheDocument();
@@ -52,7 +52,7 @@ describe('MarketingCommandBar Component', () => {
     fireEvent.click(screen.getByTestId('command-item-ai-ask-funnel'));
 
     expect(onOpenCopilot).toHaveBeenCalledWith(
-      "Using this project's funnel data, which step loses the most people, and what is known about the people who drop off there?",
+      "Using this project's customer path (the steps from first visit to buying), at which step do the most people leave, and what is known about them?",
     );
   });
 
