@@ -69,10 +69,10 @@ describe('PlanningPanel', () => {
 
   it('charts the measured results and explains a source without data once, in the sources list', () => {
     renderPanel();
-    expect(screen.getByText('Last 90 days. A conversion (a visitor doing what you want, like signing up) is credited to the last page or ad they came from.')).toBeInTheDocument();
+    expect(screen.getByText('Last 90 days. Each sign-up or sale is credited to the last page or ad they came from.')).toBeInTheDocument();
     expect(screen.getByText('example.com/lawyers')).toBeInTheDocument();
-    expect(screen.getByText('48 conversions · 6% of visitors')).toBeInTheDocument();
-    expect(screen.getByText('1,200 visitors · 60 conversions · 5% overall')).toBeInTheDocument();
+    expect(screen.getByText('48 sign-ups or sales · 6% of visitors')).toBeInTheDocument();
+    expect(screen.getByText('1,200 visitors · 60 sign-ups or sales · 5% overall')).toBeInTheDocument();
     expect(screen.getByText('cmp-lawyers')).toBeInTheDocument();
     // No empty chart repeats the reason: it is said once, next to the source.
     expect(screen.queryByText(/^Not available:/)).toBeNull();
