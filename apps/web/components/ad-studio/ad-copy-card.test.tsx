@@ -153,7 +153,7 @@ describe('PublishPanel live preview', () => {
       </ClaimSourcesProvider>,
       { locale: 'en' },
     );
-    expect(screen.getByTestId('ad-studio-copy-claims')).toHaveTextContent('not in the brief or the landing page: 50%, guaranteed');
+    expect(screen.getByTestId('ad-studio-copy-claims')).toHaveTextContent('not in what you told us or the landing page: 50%, guaranteed');
     unmount();
     renderCard({ copy });
     expect(screen.queryByTestId('ad-studio-copy-claims')).toBeNull();

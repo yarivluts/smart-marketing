@@ -3863,7 +3863,7 @@
     "kpiOfLimit": "of {limit} allowed per day",
     "providerNotConfigured": "The AI helper is not switched on yet, so it cannot write scripts for you. Trying again will not help - contact GrowthOS support. You can still edit your existing ads by hand.",
     "stage": {
-      "brief": "Brief",
+      "brief": "About the ad",
       "plan": "Plan",
       "script": "Script",
       "video": "Video",
@@ -3881,8 +3881,8 @@
     "formatHorizontalShort": "Horizontal 16:9",
     "backToAds": "All ads",
     "pipelineTitle": "Where this ad stands",
-    "pipelineDescription": "From the brief to a deep analysis and a script of scenes, then the video and its export.",
-    "editDetails": "Edit brief details",
+    "pipelineDescription": "From what the ad is about, to a plan and a script of scenes, then the video and its export.",
+    "editDetails": "Edit what the ad is about",
     "newAdTitle": "New ad",
     "newAdDescription": "Describe the ad. The AI writes a script from it, and you can edit every scene.",
     "adsListTitle": "Your ads",
@@ -3951,12 +3951,12 @@
       "not_configured": "The AI helper is not switched on yet. Trying again will not help - contact GrowthOS support.",
       "provider_billing": "The AI service stopped because its account is out of credit. Ask your account admin to top it up, then try again.",
       "rate_limited": "The AI service is too busy right now. Try again in a minute.",
-      "refused": "The AI declined this request. Rephrase the brief and try again.",
+      "refused": "The AI declined this request. Rephrase what the ad is about and try again.",
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
       "provider_error": "The AI service had a problem on its side, not yours. Wait a minute and try again."
     },
     "quotaExceeded": "You have used today's AI allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
-    "errorInvalidBrief": "Check the brief: {reasons}",
+    "errorInvalidBrief": "Check what the ad is about: {reasons}",
     "errorInvalidScript": "Some scenes in the script need a change before it can be saved. Fix the scenes marked in red and save again.",
     "errorGeneric": "GrowthOS could not finish that. Check your internet connection and try again in a moment.",
     "detailsSaved": "Details saved.",
@@ -4321,7 +4321,7 @@
     "stageImagesValue": "{current} of {total} images",
     "autopilot": {
       "title": "Create everything automatically",
-      "description": "One click takes this ad from brief to finished ads: a deep plan, the script, image ad ideas and images in every size, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
+      "description": "One click takes this ad from your idea to finished ads: a deep plan, the script, image ad ideas and images in every size, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
       "optionPlan": "Deep plan first",
       "optionImages": "Image ads",
       "optionVideo": "Video ad",
@@ -4508,9 +4508,9 @@
       "back": "Back: {step}",
       "next": "Next: {step}",
       "brief": {
-        "label": "Brief",
+        "label": "About the ad",
         "hint": "What the ad is for",
-        "title": "The brief",
+        "title": "What the ad is about",
         "description": "What you want the ad to achieve, what you sell and to whom, the frame, language and length. Changes here apply to the next plan."
       },
       "plan": {
@@ -4698,7 +4698,7 @@
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
       },
-      "claimsToCheck": "Check before publishing - not in the brief or the landing page: {claims}",
+      "claimsToCheck": "Check before publishing - not in what you told us or the landing page: {claims}",
       "undoRewrite": "Undo rewrite"
     },
     "preview": {
@@ -5414,7 +5414,7 @@
     },
     "share": {
       "title": "Who we share it with",
-      "body": "Only the platforms you connect, and only to do what you asked (for example, sending an ad to Meta's Marketing API or to Google Ads); and the providers that run GrowthOS - Google Cloud for hosting, and Google's Gemini models, which write ad plans and generate images and videos from the brief you give. No one else."
+      "body": "Only the platforms you connect, and only to do what you asked (for example, sending an ad to Meta's Marketing API or to Google Ads); and the providers that run GrowthOS - Google Cloud for hosting, and Google's Gemini models, which write ad plans and generate images and videos from what you tell it. No one else."
     },
     "deletion": {
       "title": "Keeping and deleting data",
