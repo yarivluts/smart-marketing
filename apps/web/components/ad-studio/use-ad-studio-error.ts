@@ -73,6 +73,9 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'invalid_video_settings' && body.code && VIDEO_SETTINGS_CODES.has(body.code)) return t(`advanced.errors.${body.code}`);
     if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');
+    if (body.error === 'unauthenticated') return t('errorSignedOut');
+    if (body.error === 'forbidden') return t('errorForbidden');
+    if (body.error === 'not_found') return t('errorNotFound');
     if (body.error === 'platform_operator_required') return t('errorPlatformOperator');
     if (body.error === 'invalid_options') return t('autopilot.errorInvalidOptions');
     return t('errorGeneric');
