@@ -49,7 +49,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
 
     // Step 1: pick the built-in SaaS/marketing metric pack.
     await expect(page.getByRole('heading', { name: 'Pick a starting point' })).toBeVisible();
-    await page.getByRole('button', { name: /SaaS & Marketing Metrics/ }).click();
+    await page.getByRole('button', { name: /Ads, sign-ups and sales/ }).click();
     await expect(page.getByRole('heading', { name: 'Connect a data source' })).toBeVisible({ timeout: 120_000 });
 
     // A brand-new org has no source manifests registered yet, so the empty-state CTA must be a real,
