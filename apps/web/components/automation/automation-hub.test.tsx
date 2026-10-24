@@ -94,7 +94,7 @@ describe('AutomationHub Component', () => {
     );
 
     expect(screen.getByText('Real Campaign')).toBeInTheDocument();
-    expect(screen.getByText('Pending Proposals')).toBeInTheDocument();
+    expect(screen.getByText('Waiting for your approval')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
@@ -156,5 +156,11 @@ describe('AutomationHub Component', () => {
     expect(heMessages.Copilot.drawerSubtitle).not.toMatch(/טייס|תובנות/);
     expect(heMessages.Copilot).not.toHaveProperty('badgeHybridEngine');
     expect(enMessages.Copilot).not.toHaveProperty('badgeHybridEngine');
+  });
+
+  it.each(['en', 'he'] as const)('keeps developer words out of the hub and change-history labels in %s', (locale) => {
+    const m = locale === 'en' ? enMessages : heMessages;
+    const text = [...Object.values(m.AutomationHub), ...Object.values(m.ActionAuditTrail)].join(' | ');
+    expect(text).not.toMatch(/diff|audit|rolled back|proactive|executed|פרואקטיב/i);
   });
 });
