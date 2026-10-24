@@ -54,7 +54,7 @@ describe('CampaignListTable', () => {
       <CampaignListTable orgId="org-1" projectId="proj-1" items={mockItems} canExecute={true} />,
     );
 
-    expect(screen.getByText('Sales per $1 (ROAS)')).toBeInTheDocument();
+    expect(screen.getByText('Sales per $1')).toBeInTheDocument();
     expect(screen.getByText('Clicked / cost per sale')).toBeInTheDocument();
     expect(screen.queryByText('CTR / CPA')).not.toBeInTheDocument();
     expect(screen.getAllByText('per sale').length).toBeGreaterThan(0);

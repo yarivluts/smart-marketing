@@ -33,3 +33,13 @@ describe('Campaigns spend, tab and recommendation copy', () => {
     });
   }
 });
+
+describe('Ads & results headline names', () => {
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it(`${name}: the scorecards and table column do not show ROAS or CPA`, () => {
+      for (const key of ['metricBlendedRoas', 'metricBlendedCpa', 'columnRoas'] as const) {
+        expect(bundle.Campaigns[key]).not.toMatch(/ROAS|CPA|\(/);
+      }
+    });
+  }
+});
