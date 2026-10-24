@@ -231,7 +231,7 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
 
       await waitFor(() => {
         const alert = screen.getByRole('alert');
-        expect(alert).toHaveTextContent('Daily budget exceeds project spend ceiling of $500');
+        expect(alert).toHaveTextContent(enMessages.Campaigns.guardrailSpendCeiling);
         // Budget rolled back to 100
         expect(screen.getByRole('button', { name: /\$100/ })).toBeInTheDocument();
       });

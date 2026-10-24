@@ -153,7 +153,7 @@ describe('CampaignDailyBudgetControl', () => {
       status: 422,
       json: async () => ({
         error: 'guardrail_blocked',
-        violations: [{ message: 'Exceeds project daily budget ceiling' }],
+        violations: [{ type: 'spend_ceiling', message: 'Requested daily budget of $120 exceeds the $100 ceiling.' }],
       }),
     });
     global.fetch = fetchMock;
@@ -173,7 +173,7 @@ describe('CampaignDailyBudgetControl', () => {
     await waitFor(() => {
       expect(screen.getByText('$100/day')).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'Action blocked: Exceeds project daily budget ceiling',
+        'That budget is above the spending limit set for this project. Try a lower amount.',
       );
     });
   });

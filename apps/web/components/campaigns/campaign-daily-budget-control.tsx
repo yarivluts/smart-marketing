@@ -5,6 +5,7 @@ import { useState, useTransition, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Edit2, Check, X, Loader2, AlertCircle, Plus, Minus } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
+import { quickActionErrorKey } from './quick-action-error';
 
 export interface CampaignDailyBudgetControlProps {
   orgId: string;
@@ -91,17 +92,7 @@ export function CampaignDailyBudgetControl({
           onBudgetChange(previousBudget);
         }
 
-        if (response.status === 422 && data.violations?.length > 0) {
-          setErrorMessage(
-            t('guardrailBlockedError', {
-              reason: data.violations[0].message || data.violations[0].type,
-            }),
-          );
-        } else if (response.status === 403) {
-          setErrorMessage(t('quickActionPermissionDenied'));
-        } else {
-          setErrorMessage(data.message || t('pauseError'));
-        }
+        setErrorMessage(t(quickActionErrorKey(response.status, data)));
         return;
       }
 
@@ -114,7 +105,7 @@ export function CampaignDailyBudgetControl({
       if (onBudgetChange) {
         onBudgetChange(previousBudget);
       }
-      setErrorMessage(t('pauseError'));
+      setErrorMessage(t('quickActionError'));
     } finally {
       setIsSyncing(false);
     }

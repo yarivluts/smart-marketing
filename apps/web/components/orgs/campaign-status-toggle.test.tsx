@@ -84,7 +84,7 @@ describe('CampaignStatusToggle', () => {
       status: 422,
       json: async () => ({
         error: 'guardrail_blocked',
-        violations: [{ message: 'Cannot pause protected campaign' }],
+        violations: [{ type: 'protected_target', message: 'Target "t" is protected' }],
       }),
     });
     global.fetch = fetchMock;
@@ -97,7 +97,7 @@ describe('CampaignStatusToggle', () => {
     await waitFor(() => {
       // Reverted to original
       expect(button).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('alert')).toHaveTextContent('Action blocked: Cannot pause protected campaign');
+      expect(screen.getByRole('alert')).toHaveTextContent('This campaign is protected, so quick changes are switched off for it.');
     });
   });
 
