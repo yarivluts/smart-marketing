@@ -34,7 +34,7 @@ describe('OnboardingPackStep', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'sources' } }) } as Response);
     renderStep();
 
-    fireEvent.click(screen.getByRole('button', { name: /SaaS & Marketing Metrics/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Ads, sign-ups and sales/ }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/onboarding/pack', {
@@ -48,7 +48,7 @@ describe('OnboardingPackStep', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'sources' } }) } as Response);
     renderStep();
 
-    fireEvent.click(screen.getByRole('button', { name: /Custom \/ hybrid/ }));
+    fireEvent.click(screen.getByRole('button', { name: /I will choose my own/ }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -76,7 +76,7 @@ describe('OnboardingPackStep', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderStep();
 
-    fireEvent.click(screen.getByRole('button', { name: /Engagement Pack/ }));
+    fireEvent.click(screen.getByRole('button', { name: /How people use your product/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not save this step. Check your internet connection and try again - your earlier steps are kept.');
     expect(refresh).not.toHaveBeenCalled();
