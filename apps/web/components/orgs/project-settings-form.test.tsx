@@ -27,7 +27,7 @@ describe('ProjectSettingsForm', () => {
   it('prefills the current name/vertical', () => {
     renderForm();
     expect(screen.getByLabelText('Project name')).toHaveValue('Website');
-    expect(screen.getByLabelText('Vertical')).toHaveValue('ecommerce');
+    expect(screen.getByLabelText('Business type')).toHaveValue('ecommerce');
   });
 
   it('submits the edited fields and refreshes on success', async () => {
@@ -35,7 +35,7 @@ describe('ProjectSettingsForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Storefront' } });
-    fireEvent.change(screen.getByLabelText('Vertical'), { target: { value: 'fintech' } });
+    fireEvent.change(screen.getByLabelText('Business type'), { target: { value: 'fintech' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
