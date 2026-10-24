@@ -159,6 +159,19 @@ describe('GrowthPilotApp', () => {
   });
 
   it.each([
+    ['en', 401, 'unauthenticated', 'You were signed out. Reload the page and sign in again - nothing was lost.'],
+    ['he', 401, 'unauthenticated', heMessages.GrowthPilot.errors.unauthorized],
+    ['en', 403, 'forbidden', 'You do not have permission to make this change in this project. Ask the project owner to give you access, then try again.'],
+    ['he', 403, 'forbidden', heMessages.GrowthPilot.errors.forbidden],
+  ] as const)('the real %s %i answer (%s) says what to do, not "try again in a minute"', async (locale, status, code, text) => {
+    stubFetch({ status, body: { error: code } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+  });
+
+  it.each([
     ['en', 'We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.'],
     ['he', heMessages.GrowthPilot.errors.generic],
   ] as const)('an unknown error says nothing was changed and what to do, not "something went wrong" (%s)', async (locale, text) => {
