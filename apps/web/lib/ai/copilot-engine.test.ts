@@ -51,7 +51,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
     it('declines a funnel answer when no funnel steps were supplied', () => {
       const result = processCopilotQuery('Optimize the drop-off', CONTEXT, EN);
       expect(result.actionProposal).toBeUndefined();
-      expect(result.message.content).toMatch(/no funnel data/);
+      expect(result.message.content).toMatch(/cannot see your customer path/);
     });
 
     it('answers the funnel question from the steps it is actually given', () => {
