@@ -70,12 +70,12 @@ function useCountryNames(): (codes: string[]) => string {
 
 const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 
-function ErrorLine({ code }: { code: string | null }): React.ReactElement | null {
+function ErrorLine({ code, id }: { code: string | null; id?: string }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
   const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized'].includes(code);
   return (
-    <p role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
+    <p id={id} role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
       {t(known ? (code as 'generic') : 'generic')}
     </p>
@@ -129,7 +129,8 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
               setMistake(null);
             }}
             placeholder={t('placeholder')}
-            aria-describedby="growth-pilot-site-hint"
+            aria-describedby={mistake ?? error ? 'growth-pilot-site-error growth-pilot-site-hint' : 'growth-pilot-site-hint'}
+            aria-invalid={mistake ?? error ? true : undefined}
             className="h-12 min-w-0 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground/60"
             data-testid="growth-pilot-site-input"
           />
@@ -148,7 +149,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
         <span>{t('hint')}</span>
         <span>{t('noSite')}</span>
       </p>
-      <ErrorLine code={mistake ?? error} />
+      <ErrorLine code={mistake ?? error} id="growth-pilot-site-error" />
       <ol className="flex flex-wrap justify-center gap-2">
         {steps.map((step, index) => (
           <li key={step.key} className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
