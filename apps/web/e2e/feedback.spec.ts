@@ -52,7 +52,7 @@ test.describe('Feedback & NPS (KAN-82)', () => {
     // test env, so every dimension section degrades to its own "connect a data warehouse" empty state.
     await expect(page.getByRole('heading', { name: 'By plan' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'By channel' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'By signup cohort' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'By sign-up month' })).toBeVisible();
     await expect(page.getByText('No plan breakdown available yet — it will show here once your data is connected.')).toBeVisible();
   });
 });
