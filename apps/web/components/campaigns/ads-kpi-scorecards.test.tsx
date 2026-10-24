@@ -42,7 +42,7 @@ describe('AdsKpiScorecards', () => {
     // 3. Impressions & Clicks
     expect(screen.getByText('Times shown & clicks')).toBeInTheDocument();
     expect(screen.getByText('125.0k')).toBeInTheDocument();
-    expect(screen.getByText('4,200 clicks · 420 conv.')).toBeInTheDocument();
+    expect(screen.getByText('4,200 clicks · 420 sign-ups or sales')).toBeInTheDocument();
 
     // 4. Average CTR
     expect(screen.getByText('Share who clicked')).toBeInTheDocument();
