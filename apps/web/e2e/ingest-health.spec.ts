@@ -113,7 +113,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Data health' }).first().click();
-    await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
+    await expect(page.getByText(/No data has arrived for this project yet/)).toBeVisible();
     // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
     await expect(page.getByText('0 of 6 setup requirements connected in the Prod environment.')).toBeVisible();
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
