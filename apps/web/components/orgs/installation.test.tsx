@@ -111,7 +111,7 @@ describe('InstallationCheck', () => {
         initialReport={REPORT}
       />,
     );
-    fireEvent.change(screen.getByLabelText('Schema name, e.g. signup'), {
+    fireEvent.change(screen.getByLabelText('Event name, e.g. signup'), {
       target: { value: 'customer' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Check it too/ }));

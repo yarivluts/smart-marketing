@@ -5492,7 +5492,7 @@
     "copy": "Copy",
     "copied": "Copied",
     "checkTitle": "Installation check",
-    "checkDescription": "For each schema your site should send: what really arrived in this environment, and what to fix. Nothing is sent by checking.",
+    "checkDescription": "For each kind of event your site should send (a sign-up, a purchase...): what really arrived in this environment, and what to fix. Nothing is sent by checking.",
     "noEnvironment": "This project has no environments yet.",
     "statusOk": "Everything expected is arriving in {environment}.",
     "statusAttention": "Something needs attention in {environment}.",
@@ -5502,7 +5502,7 @@
     "checkNow": "Check now",
     "listeningHint": "Re-checking every few seconds - send from your site now and watch each line turn green.",
     "checkError": "Couldn't run the check. Please try again.",
-    "nothingYet": "Nothing registered or received yet. Add the schema names your site sends.",
+    "nothingYet": "Nothing to check yet. Add the names of the events your site sends, for example signup.",
     "status": {
       "receiving": "Receiving",
       "stale": "Nothing in 24 hours",
@@ -5511,10 +5511,10 @@
       "not_registered": "Not registered"
     },
     "lastAccepted": "last received {time}",
-    "inQuarantine": "{count} rejected, waiting in quarantine",
+    "inQuarantine": "{count} rejected - set aside until you fix them",
     "removeSchema": "Stop checking {name}",
     "removeSchemaHint": "Stop checking {name} here. Nothing is deleted - it only leaves this checklist (add it back below).",
-    "addSchemaPlaceholder": "Schema name, e.g. signup",
+    "addSchemaPlaceholder": "Event name, e.g. signup",
     "addSchema": "Check it too",
     "developerGuides": "Developer guides: API, SDKs and MCP"
   },
