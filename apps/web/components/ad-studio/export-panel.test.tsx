@@ -66,7 +66,7 @@ describe('ExportPanel', () => {
   it('explains an unconnected destination, links to project resources, and disables its button', () => {
     renderPanel();
     const youtube = screen.getByTestId('ad-studio-export-youtube');
-    expect(youtube).toHaveTextContent('No connection is attached to this project.');
+    expect(youtube).toHaveTextContent('Your ad account is not connected to this project yet. Connect it under Ad platform connections, then try again.');
     expect(within(youtube).getByRole('link', { name: 'Open project resources' })).toHaveAttribute('href', '/orgs/o/projects/p/resources');
     expect(within(youtube).getByRole('button')).toBeDisabled();
     expect(within(youtube).queryByLabelText('Visibility on YouTube')).toBeNull();
