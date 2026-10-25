@@ -61,13 +61,13 @@ test.describe('Your key numbers: register an aggregation and a formula metric, i
     const adSpendCard = page.getByRole('listitem').filter({ hasText: 'ad_spend' });
 
     // Evolve to v2: widen the dimensions this metric can be broken down by.
-    await adSpendCard.getByRole('button', { name: 'Evolve' }).click();
-    await expect(page.getByRole('heading', { name: 'Evolve "ad_spend" to a new version' })).toBeVisible();
+    await adSpendCard.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit "ad_spend" (saves a new version)' })).toBeVisible();
     // Scoped to the family card — the always-visible "Register a new metric"
     // form below has its own "Dimensions (comma-separated)" field that would
     // otherwise also match once the evolve form (nested in this card) opens.
     await adSpendCard.getByLabel('Dimensions (comma-separated)').fill('channel, campaign');
-    await adSpendCard.getByRole('button', { name: 'Evolve metric' }).click();
+    await adSpendCard.getByRole('button', { name: 'Save new version' }).click();
 
     await expect(adSpendCard.getByText('v1 — Superseded')).toBeVisible();
     await expect(adSpendCard.getByText('v2 — Active')).toBeVisible();
