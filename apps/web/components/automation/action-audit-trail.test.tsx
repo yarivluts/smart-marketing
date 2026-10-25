@@ -98,7 +98,7 @@ describe('ActionAuditTrail Component', () => {
 
   it('distinguishes an empty log from an empty filter result, in English', () => {
     const { unmount } = renderWithIntl(<ActionAuditTrail actions={[]} />, { locale: 'en' });
-    expect(screen.getByText('No automation actions in audit log')).toBeInTheDocument();
+    expect(screen.getByText('No changes have been made yet. When the AI changes something, you will see it here and can undo it.')).toBeInTheDocument();
     unmount();
 
     renderWithIntl(<ActionAuditTrail actions={mockActions} />, { locale: 'en' });

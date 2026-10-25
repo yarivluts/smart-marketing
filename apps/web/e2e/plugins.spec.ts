@@ -57,7 +57,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await page.goto(`/en/orgs/${orgId}`);
 
     await openMoreTools(page);
-    await page.getByRole('link', { name: 'Plugin registry' }).click();
+    await page.getByRole('link', { name: 'Connection library' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/plugins$`));
 
     await expect(page.getByText('No plugin manifests have been registered in this organization yet.')).toBeVisible();
@@ -69,7 +69,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
 
     await page.goto(`/en/orgs/${orgId}`);
     await openMoreTools(page);
-    await page.getByRole('link', { name: 'Plugins' }).click();
+    await page.getByRole('link', { name: 'Ready-made connections' }).click();
     await expect(page).toHaveURL(/\/en\/orgs\/[^/]+\/projects\/[^/]+\/plugins$/);
 
     await expect(page.getByText('No plugins have been installed in this project yet.')).toBeVisible();

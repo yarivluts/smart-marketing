@@ -597,7 +597,7 @@ describe('BoardTileView', () => {
 
   it('renders an empty heatmap state', () => {
     renderTile({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [], isEmpty: true, freshness: null }, { type: 'heatmap' });
-    expect(screen.getByText('No cohort data for this range yet.')).toBeInTheDocument();
+    expect(screen.getByText('Nothing to show for this date range yet.')).toBeInTheDocument();
   });
 
   it('renders a histogram tile as one bar per bucket label, with a translated tooltip', () => {

@@ -54,7 +54,7 @@ describe('CampaignListTable', () => {
       <CampaignListTable orgId="org-1" projectId="proj-1" items={mockItems} canExecute={true} />,
     );
 
-    expect(screen.getByText('Sales per $1 (ROAS)')).toBeInTheDocument();
+    expect(screen.getByText('Sales per $1')).toBeInTheDocument();
     expect(screen.getByText('Clicked / cost per sale')).toBeInTheDocument();
     expect(screen.queryByText('CTR / CPA')).not.toBeInTheDocument();
     expect(screen.getAllByText('per sale').length).toBeGreaterThan(0);
@@ -82,5 +82,22 @@ describe('CampaignListTable', () => {
 
     expect(screen.getByText('3.8x')).toBeInTheDocument();
     expect(screen.getByText('2.5x')).toBeInTheDocument();
+  });
+
+  it('names the campaign link and the test-data badge in plain words (en + he)', async () => {
+    const { default: en } = await import('../../messages/en.json');
+    const { default: he } = await import('../../messages/he.json');
+    renderWithIntl(
+      <CampaignListTable orgId="org-1" projectId="proj-1" items={mockItems} canExecute={true} />,
+    );
+
+    expect(screen.getAllByTitle('Open this campaign').length).toBe(mockItems.length);
+    expect(screen.queryByTitle('Inspect target')).not.toBeInTheDocument();
+
+    for (const m of [en, he]) {
+      const c = (m as { Campaigns?: Record<string, unknown> }).Campaigns ?? {};
+      const text = JSON.stringify([c.inspectTarget, c.filterSimulated]);
+      expect(text).not.toMatch(/Inspect|Simulated|סימולציה|פרטי יעד/);
+    }
   });
 });

@@ -59,6 +59,41 @@ describe('EmailPasswordForm Component', () => {
     expect(screen.queryByText(enMessages.Auth.passwordHint)).toBeNull();
   });
 
+  it('links a failed sign-in to both fields so screen readers hear why', async () => {
+    mockSignInWithEmail.mockRejectedValue({ code: 'auth/invalid-credential' });
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    const email = screen.getByLabelText(enMessages.Auth.emailLabel);
+    const password = screen.getByLabelText(enMessages.Auth.passwordLabel);
+    expect(email.getAttribute('aria-invalid')).toBeNull();
+    fireEvent.change(email, { target: { value: 'a@b.co' } });
+    fireEvent.change(password, { target: { value: 'x' } });
+    fireEvent.submit(email.closest('form') as HTMLFormElement);
+    const alert = await screen.findByRole('alert');
+    expect(alert.id).toBe('auth-error');
+    for (const field of [email, password]) {
+      expect(field.getAttribute('aria-invalid')).toBe('true');
+      expect(field.getAttribute('aria-describedby')).toContain('auth-error');
+    }
+  });
+
+  it('marks the email field when "Forgot password?" is pressed with no email', async () => {
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    await screen.findByText(enMessages.Auth.resetNeedsEmail);
+    const email = screen.getByLabelText(enMessages.Auth.emailLabel);
+    expect(email.getAttribute('aria-invalid')).toBe('true');
+    expect(email.getAttribute('aria-describedby')).toBe('auth-reset-notice');
+  });
+
+  it('keeps the password rule linked on sign-up after an error', async () => {
+    mockSignUpWithEmail.mockRejectedValue({ code: 'auth/email-already-in-use' });
+    renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    const password = screen.getByLabelText(enMessages.Auth.passwordLabel);
+    fireEvent.submit(password.closest('form') as HTMLFormElement);
+    await screen.findByRole('alert');
+    expect(password.getAttribute('aria-describedby')).toBe('password-hint auth-error');
+  });
+
   it('posts, so a submit before hydration never puts the password in the URL', () => {
     const { container } = renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
     expect(container.querySelector('form')?.getAttribute('method')).toBe('post');

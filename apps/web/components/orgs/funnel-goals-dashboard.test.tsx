@@ -394,7 +394,7 @@ describe('FunnelGoalsDashboard Component', () => {
       );
       fireEvent.click(screen.getByTestId('tab-retention-btn'));
       const curve = screen.getByRole('table', { name: enMessages.FunnelGoals.retentionCurveTitle });
-      expect(within(curve).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual(['P0100%', 'P140%']);
+      expect(within(curve).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual(['M0100%', 'M140%']);
     });
 
     it('draws no curve from a single measured period', () => {

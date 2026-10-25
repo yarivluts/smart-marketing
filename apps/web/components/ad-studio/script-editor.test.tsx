@@ -101,7 +101,7 @@ describe('ScriptEditor', () => {
     const { unmount } = renderEditor({ initialScenes: [] });
     expect(screen.getByText('No script yet. Write one with AI, or add scenes by hand.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Write script with AI' }));
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("Today's limit is reached (50 of 50)"));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent("You have used today's AI allowance (50 of 50)"));
     unmount();
     renderEditor({ aiAvailable: false });
     expect(screen.getByRole('button', { name: 'Write script with AI' })).toBeDisabled();

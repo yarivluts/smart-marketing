@@ -20,4 +20,20 @@ describe('Ad Studio audience step copy', () => {
     expect(a.breakdowns.placement).toBe('היכן המודעה הוצגה');
     expect(a.noInterests).not.toContain('מטא');
   });
+
+  it('speaks of groups of people instead of audiences, presets and segments', () => {
+    const a = en.AdStudio.audience;
+    for (const text of [a.title, a.audiencesTitle, a.kinds.saved, a.pastDescription, a.columns.segment]) {
+      expect(text).not.toMatch(/\b(audiences?|presets?|segments?|conversions?)\b/i);
+    }
+    expect(a.title).toBe('Who sees the ad (Facebook & Instagram)');
+  });
+
+  it('addresses everyone in the plural in Hebrew', () => {
+    const a = he.AdStudio.audience;
+    for (const text of [a.noAudiences, a.kinds.custom, a.kinds.lookalike, a.kindsHint, a.columns.linkClicks]) {
+      expect(text).not.toMatch(/שלך|לך\b/);
+    }
+    expect(a.columns.segment).toBe('קבוצת אנשים');
+  });
 });

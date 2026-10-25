@@ -18,3 +18,25 @@ describe('Executive report and funnel cockpit describe payments and costs in pla
     expect(he.FunnelGoals.kpiDunningRecovery).not.toMatch(JARGON);
   });
 });
+
+describe('Executive report headings speak to a beginner', () => {
+  const HEADINGS = [
+    'title',
+    'subtitle',
+    'liveBadge',
+    'channelAllocationHeading',
+    'spendAllocationHeading',
+    'periodComparisonHeading',
+    'metricBlendedCac',
+    'metricBlendedRoas',
+    'metaShare',
+    'googleShare',
+  ] as const;
+  const HEADING_JARGON = /\b(CAC|ROAS|blended|pipeline|cross-channel|executive|meta ads)\b|\(CAC\)|\(ROAS\)|רב-ערוצית|צינור|מנהלים/i;
+
+  it.each(HEADINGS)('%s avoids acronyms and corporate words in en and he', (key) => {
+    expect(en.ExecutiveReport[key]).not.toMatch(HEADING_JARGON);
+    expect(he.ExecutiveReport[key]).not.toMatch(HEADING_JARGON);
+    expect(he.ExecutiveReport[key]).toMatch(HEBREW);
+  });
+});

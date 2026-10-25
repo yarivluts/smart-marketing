@@ -33,3 +33,29 @@ describe('Campaigns spend, tab and recommendation copy', () => {
     });
   }
 });
+
+describe('Ads & results headline names', () => {
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it(`${name}: the scorecards and table column do not show ROAS or CPA`, () => {
+      for (const key of ['metricBlendedRoas', 'metricBlendedCpa', 'columnRoas'] as const) {
+        expect(bundle.Campaigns[key]).not.toMatch(/ROAS|CPA|\(/);
+      }
+    });
+  }
+});
+
+describe('Ads & results counts say sign-ups or sales, not conversions', () => {
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it(`${name}: no conversion/impression/CVR jargon in the count lines`, () => {
+      for (const key of [
+        'conversionsCount',
+        'conversionsCountShort',
+        'analyticsConversionRate',
+        'analyticsTotalImpressions',
+        'analyticsTotalConversions',
+      ] as const) {
+        expect(bundle.Campaigns[key]).not.toMatch(/conv|CVR|impression|המרה|המרות|חשיפות/i);
+      }
+    });
+  }
+});

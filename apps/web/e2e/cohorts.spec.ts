@@ -46,7 +46,7 @@ test.describe('Cohort retention (KAN-113)', () => {
 
     // KAN-118: the conversion-event filter renders and round-trips through the URL, even though
     // there's no warehouse here to actually change what renders once submitted.
-    const conversionEventInput = page.getByLabel('Conversion event');
+    const conversionEventInput = page.getByLabel('Action that counts as coming back');
     await expect(conversionEventInput).toBeVisible();
     await conversionEventInput.fill('purchase');
     await page.getByRole('button', { name: 'Apply' }).click();

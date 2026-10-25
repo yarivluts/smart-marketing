@@ -112,6 +112,21 @@ describe('GrowthPilotApp', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
+  it('ties the address error to the field for screen readers and clears it on typing', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const input = screen.getByTestId('growth-pilot-site-input');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    fireEvent.change(input, { target: { value: 'me@easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    const errorId = screen.getByRole('alert').id;
+    expect(errorId).toBeTruthy();
+    expect(input.getAttribute('aria-describedby')).toContain(errorId);
+    fireEvent.change(input, { target: { value: 'easysign.co.il' } });
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(input.getAttribute('aria-describedby')).not.toContain(errorId);
+  });
+
   it('says the email mistake in Hebrew', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'he' });
     fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'me@easysign.co.il' } });
@@ -141,6 +156,19 @@ describe('GrowthPilotApp', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(text);
     expect(alert.textContent ?? '').not.toMatch(/unauthorized/i);
+  });
+
+  it.each([
+    ['en', 401, 'unauthenticated', 'You were signed out. Reload the page and sign in again - nothing was lost.'],
+    ['he', 401, 'unauthenticated', heMessages.GrowthPilot.errors.unauthorized],
+    ['en', 403, 'forbidden', 'You do not have permission to make this change in this project. Ask the project owner to give you access, then try again.'],
+    ['he', 403, 'forbidden', heMessages.GrowthPilot.errors.forbidden],
+  ] as const)('the real %s %i answer (%s) says what to do, not "try again in a minute"', async (locale, status, code, text) => {
+    stubFetch({ status, body: { error: code } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
   });
 
   it.each([
@@ -529,7 +557,7 @@ describe('GrowthPilotApp', () => {
     it('shows who the ads reach - countries, ages, genders, matched interests, the reach - for approval', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [AUDIENCE], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent(`Audience for ${isolate('Freelancers')}`);
+      expect(card).toHaveTextContent(`Who will see the ads for ${isolate('Freelancers')}`);
       const audience = screen.getByTestId('growth-pilot-audience');
       expect(audience).toHaveTextContent('Freelancers in Israel who sign contracts');
       expect(audience).toHaveTextContent('Israel');
@@ -539,7 +567,7 @@ describe('GrowthPilotApp', () => {
       expect(audience).toHaveTextContent('Paperwork');
       expect(screen.getByTestId('growth-pilot-audience-reach')).toHaveTextContent(/Facebook and Instagram estimate 52K-81K people a month/);
       expect(screen.queryByTestId('growth-pilot-audience-meta')).toBeNull();
-      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('Audience waiting for your approval');
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The people to reach are waiting for your approval');
     });
 
     it('an approved audience says what happens next, in English and Hebrew', () => {
@@ -557,7 +585,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
       expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
       expect(screen.getByTestId('growth-pilot-audience-meta').textContent ?? '').not.toMatch(/^Meta /);
-      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('The audience could not be planned (today\'s AI limit is used up, it resets tomorrow)');
+      expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('We could not work out who to reach (today\'s AI limit is used up, it resets tomorrow)');
     });
   });
 
