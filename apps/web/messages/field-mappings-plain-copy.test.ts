@@ -47,3 +47,24 @@ describe('the field mapping form labels speak plainly', () => {
     }
   });
 });
+
+describe('the field mapping messages avoid schema and quarantine jargon', () => {
+  const KEYS2 = [
+    'noActiveSchemasForKind', 'schemaNameLabel', 'schemaNamePlaceholder', 'targetSchemaNotRegisteredError',
+    'schemaNotRegisteredWarning', 'schemaValidationErrors', 'testRunSuccess', 'applyToDeliverySuccess',
+    'heroDescription', 'flowTitle', 'flowDescription', 'flowSchemaSub', 'flowSchemaMissingSub',
+  ] as const;
+
+  it('English says "data fields" and "set aside"', () => {
+    for (const key of KEYS2) {
+      expect(en.FieldMappings[key].replace(/\{[^}]*\}/g, '')).not.toMatch(/schema|quarantin|ingest|register/i);
+    }
+  });
+
+  it('Hebrew drops סכימה / הסגר / צינור הקליטה', () => {
+    for (const key of KEYS2) {
+      expect(he.FieldMappings[key]).toMatch(/[֐-׿]/);
+      expect(he.FieldMappings[key].replace(/\{[^}]*\}/g, '')).not.toMatch(/סכימ|סכמ|הוסגר|הסגר|צינור/);
+    }
+  });
+});

@@ -45,7 +45,7 @@ describe('EditFieldMappingForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
     expect(screen.getByLabelText('Name')).toHaveValue('Shopify orders');
-    expect(screen.getByLabelText('Target schema')).toHaveValue('order_completed');
+    expect(screen.getByLabelText('Where the data goes')).toHaveValue('order_completed');
     expect(screen.getByPlaceholderText('Target field, e.g. properties.amount')).toHaveValue('event_id');
     expect(screen.getByLabelText('Where in the data, e.g. data.object.amount')).toHaveValue('id');
   });
@@ -54,7 +54,7 @@ describe('EditFieldMappingForm', () => {
     renderForm([]);
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
-    const select = screen.getByLabelText('Target schema') as HTMLSelectElement;
+    const select = screen.getByLabelText('Where the data goes') as HTMLSelectElement;
     expect(Array.from(select.options).map((option) => option.value)).toEqual(['order_completed']);
   });
 
@@ -64,7 +64,7 @@ describe('EditFieldMappingForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shopify orders v2' } });
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_refunded' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_refunded' } });
     fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'other_id' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save mapping' }));
 
@@ -90,7 +90,7 @@ describe('EditFieldMappingForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save mapping' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('The target schema has no active registered version yet. Register it first.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The data fields this goes into are not set up yet. Set them up first.');
     expect(refresh).not.toHaveBeenCalled();
   });
 
