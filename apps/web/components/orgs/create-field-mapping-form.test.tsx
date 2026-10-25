@@ -35,7 +35,7 @@ describe('CreateFieldMappingForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shopify orders' } });
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByPlaceholderText('Target field, e.g. properties.amount'), { target: { value: 'event_id' } });
     fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'id' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create mapping' }));
@@ -72,7 +72,7 @@ describe('CreateFieldMappingForm', () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByRole('button', { name: 'Create mapping' })).toBeDisabled();
-    expect(screen.getByText('No schema of this kind is registered yet — register one first.')).toBeInTheDocument();
+    expect(screen.getByText('No data fields of this kind are set up yet — set them up first.')).toBeInTheDocument();
   });
 
   it('shows a specific error when the target schema is not registered, a generic one otherwise', async () => {
@@ -80,11 +80,11 @@ describe('CreateFieldMappingForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_completed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create mapping' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The target schema has no active registered version yet. Register it first.',
+      'The data fields this goes into are not set up yet. Set them up first.',
     );
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -103,7 +103,7 @@ describe('CreateFieldMappingForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_completed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create mapping' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -126,7 +126,7 @@ describe('CreateFieldMappingForm', () => {
     });
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByPlaceholderText('Target field, e.g. properties.amount'), { target: { value: 'event_id' } });
     fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'id' } });
 
@@ -150,7 +150,7 @@ describe('CreateFieldMappingForm', () => {
     } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_completed' } });
     // The user has started filling in a row (a source path) but hasn't named its target field yet.
     fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'created_at' } });
 
@@ -177,7 +177,7 @@ describe('CreateFieldMappingForm', () => {
     } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.change(screen.getByLabelText('Where the data goes'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByPlaceholderText('Target field, e.g. properties.amount'), { target: { value: 'event_id' } });
     fireEvent.change(screen.getByLabelText('Where in the data, e.g. data.object.amount'), { target: { value: 'my_own_id' } });
 

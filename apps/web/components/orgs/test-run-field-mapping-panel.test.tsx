@@ -50,7 +50,7 @@ describe('TestRunFieldMappingPanel', () => {
         }),
       ),
     );
-    expect(await screen.findByText('Mapped record is valid for the target schema.')).toBeInTheDocument();
+    expect(await screen.findByText('The mapped record looks good.')).toBeInTheDocument();
     expect(screen.getByText(/"event_id": "evt_1"/)).toBeInTheDocument();
   });
 
@@ -66,7 +66,7 @@ describe('TestRunFieldMappingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     expect(await screen.findByText('Mapping errors: event_id:not_found:id')).toBeInTheDocument();
-    expect(screen.queryByText('Mapped record is valid for the target schema.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The mapped record looks good.')).not.toBeInTheDocument();
   });
 
   it('lets a delivery be picked as the sample instead of pasting JSON', async () => {
@@ -111,7 +111,7 @@ describe('TestRunFieldMappingPanel', () => {
     fireEvent.change(screen.getByLabelText('Sample data (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    await screen.findByText('Mapped record is valid for the target schema.');
+    await screen.findByText('The mapped record looks good.');
     expect(screen.queryByRole('button', { name: 'Apply to delivery' })).not.toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe('TestRunFieldMappingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
     fireEvent.change(screen.getByLabelText('Sample source'), { target: { value: 'delivery-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    await screen.findByText('Mapped record is valid for the target schema.');
+    await screen.findByText('The mapped record looks good.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply to delivery' }));
 
@@ -148,7 +148,7 @@ describe('TestRunFieldMappingPanel', () => {
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ hookDeliveryId: 'delivery-1' }) }),
       ),
     );
-    expect(await screen.findByText('Applied to the ingest pipeline: 1 accepted, 0 quarantined, 0 duplicate.')).toBeInTheDocument();
+    expect(await screen.findByText('Applied: 1 accepted, 0 set aside, 0 duplicate.')).toBeInTheDocument();
     expect(refresh).toHaveBeenCalled();
   });
 
@@ -164,7 +164,7 @@ describe('TestRunFieldMappingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
     fireEvent.change(screen.getByLabelText('Sample source'), { target: { value: 'delivery-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    await screen.findByText('Mapped record is valid for the target schema.');
+    await screen.findByText('The mapped record looks good.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply to delivery' }));
 
@@ -194,12 +194,12 @@ describe('TestRunFieldMappingPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test run' }));
     fireEvent.change(screen.getByLabelText('Sample source'), { target: { value: 'delivery-1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
-    await screen.findByText('Mapped record is valid for the target schema.');
+    await screen.findByText('The mapped record looks good.');
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply to delivery' }));
 
     expect(await screen.findByText("This delivery no longer maps cleanly (see errors above) — nothing was applied.")).toBeInTheDocument();
-    expect(screen.getByText('Schema validation errors: unregistered_field:x')).toBeInTheDocument();
+    expect(screen.getByText('Problems found in the record: unregistered_field:x')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
   });
 });
