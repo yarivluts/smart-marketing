@@ -5062,9 +5062,9 @@
         "invalid_country": "השתמשו בקודי מדינה בני 2 אותיות, למשל IL, US",
         "invalid_age": "הגילאים הם 18 עד 65+, וגיל ההתחלה לא גדול מגיל הסיום",
         "invalid_gender": "מגדר לא מוכר",
-        "too_many_audiences": "עד 10 קהלים",
+        "too_many_audiences": "עד 10 קבוצות אנשים",
         "too_many_interests": "עד 25 תחומי עניין",
-        "invalid_audience": "קהל או תחום עניין שאינו של מטא",
+        "invalid_audience": "קבוצה או תחום עניין ש-Facebook ו-Instagram לא מציעים - בחרו מהרשימה",
         "unknown": "משהו במודעה דורש תיקון - בדקו את הטקסט ונסו שוב"
       }
     },
