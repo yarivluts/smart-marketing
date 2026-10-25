@@ -40,7 +40,7 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Data fields' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/schema-defs$`));
-    await expect(page.getByText('No schemas registered for this project yet.')).toBeVisible();
+    await expect(page.getByText('No data types set up for this project yet.')).toBeVisible();
 
     // Register v1: an "order_completed" event with one required field.
     await page.getByLabel('Kind', { exact: true }).selectOption('event');
