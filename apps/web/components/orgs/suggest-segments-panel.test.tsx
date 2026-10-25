@@ -107,7 +107,7 @@ describe('SuggestSegmentsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
-    expect(await screen.findByText('No confident suggestions for this entity schema yet.')).toBeInTheDocument();
+    expect(await screen.findByText('No confident suggestions for this type of record yet.')).toBeInTheDocument();
   });
 
   it('shows an inline error when the request fails', async () => {
