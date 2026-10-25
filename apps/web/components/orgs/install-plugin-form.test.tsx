@@ -51,7 +51,7 @@ describe('InstallPluginForm', () => {
 
   it('shows a message instead of a gallery when there is nothing to install', () => {
     renderForm([]);
-    expect(screen.getByText("No plugin manifests are registered in this organization yet. Register one from the org's plugin registry first.")).toBeInTheDocument();
+    expect(screen.getByText("No ready-made connections have been added to this organization yet. Add one from the organization's connection library first.")).toBeInTheDocument();
   });
 
   it('renders a card per distinct plugin id, showing display name, type, scopes and what it registers', () => {
