@@ -111,7 +111,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
 
     await page.getByRole('button', { name: 'Run now' }).click();
     await expect(page.getByText(/Succeeded · started/)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('3 fetched · 0 accepted · 3 quarantined · 0 duplicate')).toBeVisible();
+    await expect(page.getByText('3 fetched · 0 accepted · 3 set aside · 0 duplicate')).toBeVisible();
     // The health summary rolls the same outcome up to a glance, above the run-history detail.
     await expect(page.getByText('Healthy')).toBeVisible();
     await expect(page.getByText(/Last succeeded/)).toBeVisible();

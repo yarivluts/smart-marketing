@@ -69,7 +69,7 @@ describe('TriggerSourcePluginRunButton', () => {
 
   it('shows a fallback message and no button when the project has no environments', () => {
     renderButton([]);
-    expect(screen.getByText('No environments exist for this project yet.')).toBeInTheDocument();
+    expect(screen.getByText('This project has no data space yet. Open the project settings to add one.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Run now' })).not.toBeInTheDocument();
   });
 });
