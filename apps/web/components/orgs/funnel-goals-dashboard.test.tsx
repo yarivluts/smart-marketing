@@ -199,12 +199,12 @@ describe('FunnelGoalsDashboard Component', () => {
       fireEvent.click(screen.getByTestId('apply-funnel-rec-btn'));
 
       await waitFor(() => {
-        expect(screen.getByTestId('rec-applied-badge')).toHaveTextContent('Optimization active!');
+        expect(screen.getByTestId('rec-applied-badge')).toHaveTextContent('Done - the suggestion was applied');
       });
     });
 
     it('does NOT claim the recommendation was applied when the request fails', async () => {
-      // This used to set "Optimization active!" on a failed request too.
+      // This used to set "Done - the suggestion was applied" on a failed request too.
       global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
       renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] }));
 

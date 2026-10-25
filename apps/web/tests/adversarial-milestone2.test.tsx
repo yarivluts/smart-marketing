@@ -695,7 +695,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       // After clicking, should show applied badge
       const badge = await screen.findByTestId('rec-applied-badge');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveTextContent('Optimization active!');
+      expect(badge).toHaveTextContent('Done - the suggestion was applied');
     });
   });
 });
