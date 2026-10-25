@@ -46,7 +46,7 @@ describe('ReplayQuarantinedRecordButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
 
-    expect(await screen.findByText('Still quarantined: missing_required_field:plan')).toBeInTheDocument();
+    expect(await screen.findByText('Still rejected: missing_required_field:plan')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
   });
 

@@ -77,7 +77,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     // Replaying without first fixing the schema (KAN-34) leaves the record quarantined, with its
     // reasons re-surfaced inline rather than silently no-op'ing.
     await page.getByRole('button', { name: 'Replay' }).click();
-    await expect(page.getByText('Still quarantined: missing_required_field:amount')).toBeVisible();
+    await expect(page.getByText('Still rejected: missing_required_field:amount')).toBeVisible();
 
     // Orchestration (KAN-38): before triggering a run, there's no history and no freshness snapshot yet.
     await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
@@ -113,11 +113,11 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Data health' }).first().click();
-    await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
+    await expect(page.getByText(/No data has arrived for this project yet/)).toBeVisible();
     // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
     await expect(page.getByText('0 of 6 setup requirements connected in the Prod environment.')).toBeVisible();
-    await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
-    await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
+    await expect(page.getByText('No rejected records for this project. Everything that arrived was usable.')).toBeVisible();
+    await expect(page.getByText('Nothing is stuck. All data was passed on.')).toBeVisible();
     await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();
     await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
     // KAN-201: with no runs, one message rather than two near-identical ones.
