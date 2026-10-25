@@ -5060,11 +5060,11 @@
         "no_countries": "choose at least one country",
         "too_many_countries": "at most 25 countries",
         "invalid_country": "use 2-letter country codes, e.g. IL, US",
-        "invalid_age": "ages run 18 to 65+, from not above to",
+        "invalid_age": "ages run from 18 to 65+, and the first age cannot be higher than the last",
         "invalid_gender": "unknown gender",
-        "too_many_audiences": "at most 10 audiences",
+        "too_many_audiences": "at most 10 groups of people",
         "too_many_interests": "at most 25 interests",
-        "invalid_audience": "an audience or interest is not a Meta one",
+        "invalid_audience": "a group or interest is not one that Facebook & Instagram offers - pick it from the list",
         "unknown": "something in the ad needs a fix - check the text and try again"
       }
     },
