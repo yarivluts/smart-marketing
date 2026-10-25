@@ -125,7 +125,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     // environment), but it must not claim no funnel is defined.
     await page.getByTestId('onboarding-confirmed-funnel').getByRole('link', { name: 'See how many people get through' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
-    await expect(page.getByRole('heading', { name: 'Funnel, Goals & Revenue Health' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Customer journey, goals & returning customers' })).toBeVisible();
     await expect(page.getByText('Your customer path is not set up yet')).toHaveCount(0);
   });
 });
