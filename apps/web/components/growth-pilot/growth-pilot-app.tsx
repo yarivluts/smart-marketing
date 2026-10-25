@@ -468,7 +468,7 @@ function ProposalCard({
             </p>
           )}
           <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-reject-hint">
-            {t('rejectHint')}
+            {t(proposal.kind === 'publish' ? 'rejectHintPublish' : proposal.kind === 'activate' ? 'rejectHintActivate' : 'rejectHint')}
           </p>
         </div>
       )}

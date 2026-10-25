@@ -5806,6 +5806,8 @@
       "approve": "Approve",
       "reject": "Reject",
       "rejectHint": "Not for you? Reject it - nothing is published and no money is spent.",
+      "rejectHintPublish": "Not now? Reject it - the ads are not sent to Facebook and Instagram and no money is spent.",
+      "rejectHintActivate": "Not now? Reject it - the ads stay switched off and no money is spent.",
       "approveHint": {
         "target": "Approve and the AI starts making ads, a landing page and a list of who to reach for it. Nothing goes live yet.",
         "ads": "Approve to keep these ads. They are not published yet - you will be asked before anything is sent.",
