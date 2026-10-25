@@ -631,6 +631,20 @@ describe('GrowthPilotApp', () => {
       expect(screen.queryByTestId('growth-pilot-budget')).toBeNull();
     });
 
+    it('Reject on the publish and turn-on cards says what it really does, in English and Hebrew', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const published = [{ ...TARGET, publishStatus: 'published' as const }];
+      const publish = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent('the ads are not sent to Facebook and Instagram and no money is spent');
+      publish.unmount();
+      const activate = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent('the ads stay switched off and no money is spent');
+      expect(screen.getByTestId('growth-pilot-reject-hint')).not.toHaveTextContent('nothing is published');
+      activate.unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.rejectHintActivate);
+    });
+
     it('turning on asks once more, naming the daily spend, and sends nothing until the person says yes', async () => {
       const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'running' }] }) });
