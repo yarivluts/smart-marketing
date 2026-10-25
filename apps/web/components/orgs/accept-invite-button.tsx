@@ -27,6 +27,8 @@ export function AcceptInviteButton({ orgId, membershipId }: AcceptInviteButtonPr
         return;
       }
       router.push(`/orgs/${orgId}`);
+    } catch {
+      setErrorMessage(t('networkError'));
     } finally {
       setSubmitting(false);
     }

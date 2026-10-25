@@ -40,7 +40,7 @@ describe('AcceptInviteButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't accept this invite. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("We could not accept this invite just now. You have not joined yet - please try again in a moment.");
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -56,6 +56,17 @@ describe('AcceptInviteButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Verify your email address before accepting this invite. Check your inbox for the verification link.',
     );
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('explains a lost connection instead of doing nothing', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection and try again - you have not joined yet.');
+    expect(screen.getByRole('button', { name: 'Accept invite' })).toBeEnabled();
     expect(push).not.toHaveBeenCalled();
   });
 });
