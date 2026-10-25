@@ -60,10 +60,10 @@ test.describe('Customer search (KAN-108)', () => {
     // Register a "customer" entity schema so the search form itself renders.
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Data fields' }).click();
-    await page.getByLabel('Kind').selectOption('entity');
+    await page.getByLabel('Kind', { exact: true }).selectOption('entity');
     await page.getByLabel('Name', { exact: true }).fill('customer');
     await page.getByLabel('Field name').fill('email');
-    await page.getByRole('button', { name: 'Register schema' }).click();
+    await page.getByRole('button', { name: 'Save data type' }).click();
     await expect(page.getByText('entity: customer')).toBeVisible();
 
     await openMoreTools(page);

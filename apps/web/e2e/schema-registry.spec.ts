@@ -40,21 +40,21 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Data fields' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/schema-defs$`));
-    await expect(page.getByText('No schemas registered for this project yet.')).toBeVisible();
+    await expect(page.getByText('No data types set up for this project yet.')).toBeVisible();
 
     // Register v1: an "order_completed" event with one required field.
-    await page.getByLabel('Kind').selectOption('event');
+    await page.getByLabel('Kind', { exact: true }).selectOption('event');
     await page.getByLabel('Name', { exact: true }).fill('order_completed');
     await page.getByLabel('Field name').fill('order_id');
     await page.getByRole('checkbox', { name: 'Required' }).check();
-    await page.getByRole('button', { name: 'Register schema' }).click();
+    await page.getByRole('button', { name: 'Save data type' }).click();
 
     await expect(page.getByText('event: order_completed')).toBeVisible();
     await expect(page.getByText('v1 — Active')).toBeVisible();
     await expect(page.getByText('order_id')).toBeVisible();
 
     // Everything from here on scopes to the schema family's own list item —
-    // the always-visible "Register a new schema" form below has its own
+    // the always-visible "Set up a new data type" form below has its own
     // "Add field"/"Field name"/"Remove" controls that would otherwise match too.
     const familyCard = page.getByRole('listitem');
 
@@ -63,7 +63,7 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await expect(page.getByRole('heading', { name: 'Evolve event "order_completed" to a new version' })).toBeVisible();
     await familyCard.getByRole('button', { name: 'Add field' }).click();
     await familyCard.getByLabel('Field name').last().fill('currency');
-    await page.getByRole('button', { name: 'Evolve schema' }).click();
+    await page.getByRole('button', { name: 'Save new version' }).click();
 
     await expect(page.getByText('v1 — Superseded')).toBeVisible();
     await expect(page.getByText('v2 — Active')).toBeVisible();
@@ -72,7 +72,7 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     // Attempt a breaking evolution: remove the pre-existing required field.
     await page.getByRole('button', { name: 'Evolve' }).click();
     await familyCard.getByRole('button', { name: 'Remove' }).first().click();
-    await page.getByRole('button', { name: 'Evolve schema' }).click();
+    await page.getByRole('button', { name: 'Save new version' }).click();
 
     await expect(page.getByText(/This change would break existing consumers/)).toBeVisible();
     // Rejected — still only two versions, v2 still the active one.
