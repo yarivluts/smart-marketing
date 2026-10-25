@@ -4292,9 +4292,9 @@
     "exportNotConnected": "Not connected",
     "exportVia": "Using the connection \"{name}\".",
     "exportUnavailable": {
-      "not_attached": "No connection is attached to this project.",
-      "read_only": "The attached connection is read-only. An org admin can change its write level.",
-      "no_secret": "The attached connection has no credentials saved yet."
+      "not_attached": "Your ad account is not connected to this project yet. Connect it under Ad platform connections, then try again.",
+      "read_only": "Your ad account is connected for viewing only, so nothing can be sent to it. Reconnect it with edit access under Ad platform connections.",
+      "no_secret": "Your ad account is connected but its sign-in details are missing. Save and check it again under Ad platform connections."
     },
     "exportOpenResources": "Open project resources",
     "exportPrivacy": "Visibility on YouTube",
