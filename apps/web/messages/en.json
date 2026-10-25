@@ -2399,11 +2399,11 @@
       "bar": "Bar chart",
       "big_number": "Big number",
       "table": "Table",
-      "funnel": "Funnel",
+      "funnel": "Customer path",
       "heatmap": "Who came back, by sign-up month",
       "histogram": "Histogram"
     },
-    "funnelStepsLabel": "Funnel steps (in order)",
+    "funnelStepsLabel": "Customer path steps (in order)",
     "funnelStepLabel": "Step {step}",
     "removeFunnelStepButton": "Remove step",
     "addFunnelStepButton": "Add step",

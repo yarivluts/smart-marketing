@@ -2399,11 +2399,11 @@
       "bar": "תרשים עמודות",
       "big_number": "מספר גדול",
       "table": "טבלה",
-      "funnel": "משפך",
+      "funnel": "מסלול הלקוח",
       "heatmap": "מי חזר, לפי חודש הרשמה",
       "histogram": "היסטוגרמה"
     },
-    "funnelStepsLabel": "שלבי המשפך (לפי סדר)",
+    "funnelStepsLabel": "שלבי מסלול הלקוח (לפי סדר)",
     "funnelStepLabel": "שלב {step}",
     "removeFunnelStepButton": "הסר שלב",
     "addFunnelStepButton": "הוסף שלב",
