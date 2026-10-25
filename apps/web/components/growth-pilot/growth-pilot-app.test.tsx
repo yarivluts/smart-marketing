@@ -209,6 +209,19 @@ describe('GrowthPilotApp', () => {
     expect(await screen.findByTestId('growth-pilot-center')).toBeInTheDocument();
   });
 
+  it('tells the person when checking on the reading fails, and clears it once it works again', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchMock = vi.fn();
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(page({ status: 'analyzing' })), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'analyzing' })} />, { locale: 'en' });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    await vi.advanceTimersByTimeAsync(5000);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
   it('shows a failed read with the reason, and tries the same address again', async () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_http_error' })} />, { locale: 'en' });

@@ -175,7 +175,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
 }
 
 /** While the site is read: what is happening, honestly - one moving bar, no invented progress. */
-function AnalyzingCard({ host }: { host: string }): React.ReactElement {
+function AnalyzingCard({ host, error }: { host: string; error: string | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.analyzing');
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-soft" aria-busy="true" data-testid="growth-pilot-analyzing">
@@ -201,6 +201,7 @@ function AnalyzingCard({ host }: { host: string }): React.ReactElement {
           </li>
         ))}
       </ul>
+      <ErrorLine code={error} />
     </section>
   );
 }
@@ -701,8 +702,10 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
     const tick = async () => {
       const result = await callPilot(base, '/advance');
       if (cancelled) return;
-      if (result.ok) setData(result.data);
-      else setError(result.error);
+      if (result.ok) {
+        setData(result.data);
+        setError(null);
+      } else setError(result.error);
       const more = result.ok && result.data !== null && (result.data.pilot.status === 'analyzing' || growthPilotHasPendingWork(result.data));
       if (!result.ok || more) timer = setTimeout(() => void tick(), result.ok && result.data?.pilot.status !== 'analyzing' ? GROWTH_PILOT_STEP_MS : GROWTH_PILOT_POLL_MS);
     };
@@ -721,7 +724,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
     return <StartScreen onStart={(url) => void start(url)} pending={busy === 'start'} error={error} onCancel={data ? () => setStartingOver(false) : undefined} />;
   }
   const host = siteHost(data.pilot.siteUrl);
-  if (data.pilot.status === 'analyzing') return <AnalyzingCard host={host} />;
+  if (data.pilot.status === 'analyzing') return <AnalyzingCard host={host} error={error} />;
   if (data.pilot.status === 'failed') {
     return <FailedCard host={host} code={data.pilot.failureCode} pending={busy === 'start'} onRetry={() => void start(data.pilot.siteUrl)} onOther={() => setStartingOver(true)} />;
   }
