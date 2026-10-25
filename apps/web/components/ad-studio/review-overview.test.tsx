@@ -46,7 +46,7 @@ describe('ReviewOverview', () => {
     const video = screen.getByTestId('ad-studio-creative-video');
     expect(video).toHaveAttribute('href', '/r?item=video');
     expect(video.querySelector('video')).toHaveAttribute('src', '/m/clips/k1/media#t=0.1');
-    expect(video).toHaveTextContent('2 of 3 scenes rendered');
+    expect(video).toHaveTextContent('2 of 3 scenes made');
     expect(video).not.toHaveTextContent('assemble the video');
 
     const search = screen.getByTestId('ad-studio-creative-search');

@@ -54,7 +54,7 @@ describe('ClipQaNote', () => {
     expect(screen.getByText('Stutter on the first word')).toBeInTheDocument();
     expect(screen.getByText('at 0.4s')).toBeInTheDocument();
     expect(screen.getByText('Gibberish letters on the phone screen')).toBeInTheDocument();
-    expect(screen.getByText(/Re-render the scene/)).toBeInTheDocument();
+    expect(screen.getByText(/Make the scene again/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('1 small note'));
     expect(screen.getByText('Slight blur')).toBeVisible();
     fireEvent.click(screen.getByText('What the AI heard'));
