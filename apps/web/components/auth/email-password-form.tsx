@@ -133,6 +133,11 @@ export function EmailPasswordForm({
     }
   }
 
+  // A failed attempt or a reset request with no email is about these fields: say so to assistive tech.
+  const resetNeedsEmail = resetNotice?.tone === 'error';
+  const emailDescribedBy = errorKey ? 'auth-error' : resetNeedsEmail ? 'auth-reset-notice' : undefined;
+  const passwordHints = [mode === 'signup' ? 'password-hint' : null, errorKey ? 'auth-error' : null].filter(Boolean);
+
   return (
     <div
       data-testid="auth-form-card"
@@ -215,7 +220,7 @@ export function EmailPasswordForm({
           must never put the credentials in the URL, where history and request logs keep them. */}
       <form method="post" className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
         {resetNotice ? (
-          <p role="status" className={cn('text-xs', resetNotice.tone === 'ok' ? 'text-success' : 'text-destructive')}>
+          <p id="auth-reset-notice" role="status" className={cn('text-xs', resetNotice.tone === 'ok' ? 'text-success' : 'text-destructive')}>
             {resetNotice.text}
           </p>
         ) : null}
@@ -229,6 +234,8 @@ export function EmailPasswordForm({
               name="email"
               type="email"
               autoComplete="email"
+              aria-invalid={errorKey || resetNeedsEmail ? true : undefined}
+              aria-describedby={emailDescribedBy}
               required
               placeholder="you@company.com"
               value={email}
@@ -255,7 +262,8 @@ export function EmailPasswordForm({
               name="password"
               type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-              aria-describedby={mode === 'signup' ? 'password-hint' : undefined}
+              aria-invalid={errorKey ? true : undefined}
+              aria-describedby={passwordHints.length > 0 ? passwordHints.join(' ') : undefined}
               required
               placeholder="••••••••"
               value={password}
@@ -273,6 +281,7 @@ export function EmailPasswordForm({
         {/* Error Alert Box */}
         {errorKey ? (
           <div
+            id="auth-error"
             role="alert"
             className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium"
           >
