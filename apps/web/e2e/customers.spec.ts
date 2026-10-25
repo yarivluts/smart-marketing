@@ -42,7 +42,7 @@ test.describe('Customer search (KAN-108)', () => {
     await page.getByRole('link', { name: 'Customers' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/customers$`));
     await expect(page.getByRole('heading', { name: 'Customer search for Client Epsilon' })).toBeVisible();
-    await expect(page.getByText('Register an entity schema first to search customers.')).toBeVisible();
+    await expect(page.getByText('No customer data has been set up yet. Add a data source first, then you can search your customers here.')).toBeVisible();
   });
 
   test('an org owner registers an entity schema, searches, and sees the search degrade cleanly with no warehouse configured', async ({ page }) => {
