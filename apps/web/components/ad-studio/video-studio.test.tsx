@@ -72,21 +72,21 @@ afterEach(() => {
 describe('VideoStudio', () => {
   it('shows progress on the ruler, the render-all cost against what is left today, and asks to render every scene', () => {
     renderStudio({ initialClips: [clip('c1', 'a', 1, 'ready', fp(0))], videoSecondsLeft: 20 });
-    expect(screen.getByTestId('ad-studio-video-progress')).toHaveTextContent('1 of 2 scenes rendered');
-    expect(screen.getByRole('button', { name: 'Render all scenes (8s)' })).toBeEnabled();
+    expect(screen.getByTestId('ad-studio-video-progress')).toHaveTextContent('1 of 2 scenes made');
+    expect(screen.getByRole('button', { name: 'Make all scenes (8s)' })).toBeEnabled();
     expect(screen.getByTestId('ad-studio-render-all-cost')).toHaveTextContent('Uses 8s of the 20s of video left today.');
     const scene1 = within(screen.getByTestId('ad-studio-video-scene-1'));
     expect(scene1.getByTestId('ad-studio-clip-player')).toHaveAttribute('src', `${BASE}/clips/c1/media#t=0.1`);
     expect(scene1.getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Ready');
-    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByText('Not rendered yet.')).toBeInTheDocument();
+    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByText('Not made yet.')).toBeInTheDocument();
     expect(screen.getByText(/On-screen text is not drawn into the video/)).toBeInTheDocument();
   });
 
   it('refuses render-all over the daily limit and says why', () => {
     renderStudio({ videoSecondsLeft: 6 });
-    expect(screen.getByRole('button', { name: 'Render all scenes (13s)' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Make all scenes (13s)' })).toBeDisabled();
     expect(screen.getByTestId('ad-studio-render-all-cost')).toHaveTextContent('Needs 13s of video, but only 6s are left today.');
-    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByRole('button', { name: 'Render (8s)' })).toBeDisabled();
+    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByRole('button', { name: 'Make (8s)' })).toBeDisabled();
   });
 
   it('marks a clip made from an older version of the scene as out of date', () => {
@@ -94,7 +94,7 @@ describe('VideoStudio', () => {
     const scene1 = within(screen.getByTestId('ad-studio-video-scene-1'));
     expect(scene1.getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Out of date');
     expect(scene1.getByTestId('ad-studio-out-of-date-badge')).toHaveTextContent('Out of date');
-    expect(scene1.getByRole('button', { name: 'Re-render (5s)' })).toBeEnabled();
+    expect(scene1.getByRole('button', { name: 'Make again (5s)' })).toBeEnabled();
   });
 
   it('starts a render, then polls the status route while it generates until the clip is ready', async () => {
@@ -108,7 +108,7 @@ describe('VideoStudio', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderStudio();
     const scene1 = within(screen.getByTestId('ad-studio-video-scene-1'));
-    fireEvent.click(scene1.getByRole('button', { name: 'Render (5s)' }));
+    fireEvent.click(scene1.getByRole('button', { name: 'Make (5s)' }));
     await waitFor(() => expect(scene1.getByRole('status')).toHaveTextContent('Generating'));
     expect(fetchMock).toHaveBeenCalledWith(`${BASE}/scenes/a/render`, { method: 'POST' });
     await act(async () => {
@@ -129,7 +129,7 @@ describe('VideoStudio', () => {
       ),
     );
     renderStudio();
-    fireEvent.click(within(screen.getByTestId('ad-studio-video-scene-2')).getByRole('button', { name: 'Render (8s)' }));
+    fireEvent.click(within(screen.getByTestId('ad-studio-video-scene-2')).getByRole('button', { name: 'Make (8s)' }));
     await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent('The AI service stopped because its account is out of credit'));
     expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByTestId('ad-studio-clip-failure')).toHaveTextContent('Failed: the AI service is not available on our side right now, so please contact GrowthOS support');
   });
@@ -191,7 +191,7 @@ describe('VideoStudio', () => {
     unmount();
     const second = renderStudio({ videoAvailable: false });
     expect(screen.getByText(/Making video clips is not switched on yet/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Render all scenes (13s)' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Make all scenes (13s)' })).toBeDisabled();
     second.unmount();
     renderStudio({}, 'he');
     expect(screen.getByTestId('ad-studio-video-progress')).toHaveTextContent(heMessages.AdStudio.video.progress.replace('{rendered}', '0').replace('{total}', '2'));

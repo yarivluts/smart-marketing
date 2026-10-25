@@ -84,7 +84,7 @@ describe('ImageStudio', () => {
     expect(screen.getByTestId('ad-studio-image-summary-attention')).toHaveTextContent('1');
     expect(screen.getByTestId('ad-studio-image-summary-ready')).toHaveTextContent('2 of 2');
     expect(screen.getByTestId('ad-studio-image-summary-left')).toHaveTextContent('38');
-    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-passed')).toHaveTextContent('AI check passed after 2 renders');
+    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-passed')).toHaveTextContent('AI check passed after 2 tries');
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-minor')).toHaveTextContent('A little blur in the corner');
     expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByTestId('ad-studio-image-qa-overlay')).toHaveTextContent('The headline was set by the studio');
     const issues = within(screen.getByTestId('ad-studio-image-slot-story')).getByTestId('ad-studio-image-qa-issues');
@@ -139,9 +139,9 @@ describe('ImageStudio', () => {
     expect(within(square).getByText('Ready')).toBeInTheDocument();
     expect(within(square).getByRole('img')).toHaveAttribute('src', `${BASE}/images/i1/media`);
     const story = screen.getByTestId('ad-studio-image-slot-story');
-    expect(within(story).getByText('Not rendered')).toBeInTheDocument();
+    expect(within(story).getByText('Not made')).toBeInTheDocument();
 
-    fireEvent.click(within(story).getByRole('button', { name: 'Render' }));
+    fireEvent.click(within(story).getByRole('button', { name: 'Make' }));
     await waitFor(() => expect(within(screen.getByTestId('ad-studio-image-slot-story')).getByText('Ready')).toBeInTheDocument());
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(`${BASE}/images`);
@@ -166,7 +166,7 @@ describe('ImageStudio', () => {
     fireEvent.change(screen.getByLabelText('Headline in the image (optional)'), { target: { value: 'Signed before lunch' } });
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     // Rendering waits for the save, so a render always uses the idea as saved.
-    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByRole('button', { name: 'Render again' })).toBeDisabled();
+    expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByRole('button', { name: 'Make again' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Save ideas' }));
 
     await waitFor(() => expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByText('Out of date')).toBeInTheDocument());
