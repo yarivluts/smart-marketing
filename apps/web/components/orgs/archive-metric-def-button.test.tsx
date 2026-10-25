@@ -55,7 +55,7 @@ describe('ArchiveMetricDefButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Still referenced by active formula metric(s): cost_per_signup. Evolve or archive those first.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Other metrics still use this one: cost_per_signup. Edit or archive those first.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });

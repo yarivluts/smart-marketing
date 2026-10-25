@@ -38,7 +38,7 @@ describe('MetricFamilyCard', () => {
     expect(screen.getByText('v2 — Active').closest('details')).toBeNull();
     expect(screen.getByText('Dimensions: channel')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Trace lineage' })).toHaveAttribute('href', '/lineage');
-    expect(screen.getByRole('button', { name: 'Evolve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
   it('shows no lineage link when none is given', () => {
