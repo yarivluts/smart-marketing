@@ -59,8 +59,8 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     const familyCard = page.getByRole('listitem');
 
     // Evolve to v2: add a new optional field.
-    await page.getByRole('button', { name: 'Evolve' }).click();
-    await expect(page.getByRole('heading', { name: 'Evolve event "order_completed" to a new version' })).toBeVisible();
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByRole('heading', { name: 'Edit event "order_completed" (saves a new version)' })).toBeVisible();
     await familyCard.getByRole('button', { name: 'Add field' }).click();
     await familyCard.getByLabel('Field name').last().fill('currency');
     await page.getByRole('button', { name: 'Save new version' }).click();
@@ -70,7 +70,7 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await expect(page.getByText('currency')).toBeVisible();
 
     // Attempt a breaking evolution: remove the pre-existing required field.
-    await page.getByRole('button', { name: 'Evolve' }).click();
+    await page.getByRole('button', { name: 'Edit' }).click();
     await familyCard.getByRole('button', { name: 'Remove' }).first().click();
     await page.getByRole('button', { name: 'Save new version' }).click();
 

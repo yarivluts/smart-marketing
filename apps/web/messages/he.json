@@ -955,7 +955,7 @@
     "fieldIdentityKeyHeader": "מפתח זהות",
     "yes": "כן",
     "no": "לא",
-    "evolve": "פיתוח גרסה",
+    "evolve": "עריכה",
     "cancel": "ביטול",
     "registerHeading": "הגדרת סוג נתונים חדש",
     "kindLabel": "סוג",
@@ -972,7 +972,7 @@
     "registerError": "לא הצלחנו לשמור, ושום דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב.",
     "networkError": "לא הצלחנו להתחבר ל-GrowthOS. בדקו את החיבור לאינטרנט ונסו שוב - שום דבר לא נשמר.",
     "duplicateSchemaError": "סוג נתונים עם סוג ושם אלה כבר קיים בפרויקט זה.",
-    "evolveHeading": "פיתוח {kind} \"{name}\" לגרסה חדשה",
+    "evolveHeading": "עריכת {kind} \"{name}\" (תישמר גרסה חדשה)",
     "evolveSubmit": "שמירת גרסה חדשה",
     "evolveError": "לא הצלחנו לשמור, ושום דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב.",
     "breakingChangeError": "השינוי הזה היה שובר צרכנים קיימים: {violations}",
@@ -1047,7 +1047,7 @@
       "entity": "ישות - פריט עם מאפיינים",
       "measure": "מדד - מספר לאורך זמן"
     },
-    "familyMeta": "{fields, plural, one {שדה אחד} other {# שדות}} · {versions, plural, one {גרסה אחת} other {# גרסאות}}{pii, plural, =0 {} other { · # PII}}"
+    "familyMeta": "{fields, plural, one {שדה אחד} other {# שדות}} · {versions, plural, one {גרסה אחת} other {# גרסאות}}{pii, plural, =0 {} other { · # אישיים}}"
   },
   "MetricRegistry": {
     "metaTitle": "המספרים החשובים שלך",

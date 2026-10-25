@@ -58,9 +58,9 @@ describe('SchemaFamilyCard', () => {
 
   it('opens an evolve form prefilled from the latest version when Evolve is clicked', () => {
     renderCard();
-    fireEvent.click(screen.getByRole('button', { name: 'Evolve' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
-    expect(screen.getByRole('heading', { name: 'Evolve event "order_completed" to a new version' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Edit event "order_completed" (saves a new version)' })).toBeInTheDocument();
     const nameInputs = screen.getAllByLabelText('Field name');
     expect(nameInputs).toHaveLength(2);
     expect((nameInputs[0] as HTMLInputElement).value).toBe('order_id');
