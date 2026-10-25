@@ -48,7 +48,7 @@ describe('EvolveSchemaDefForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
     fireEvent.change(screen.getAllByLabelText('Field name')[1], { target: { value: 'currency' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Evolve schema' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save new version' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -77,10 +77,10 @@ describe('EvolveSchemaDefForm', () => {
     } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Evolve schema' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save new version' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This change would break existing consumers: Field "order_id" was removed.',
+      'This change would break existing reports and connections: Field "order_id" was removed.',
     );
     expect(refresh).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();

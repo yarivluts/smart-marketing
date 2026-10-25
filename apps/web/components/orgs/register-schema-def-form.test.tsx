@@ -35,7 +35,7 @@ describe('RegisterSchemaDefForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'order_id' } });
     fireEvent.click(screen.getByRole('checkbox', { name: 'Required' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Register schema' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add this kind of data' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -70,10 +70,10 @@ describe('RegisterSchemaDefForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'order_id' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Register schema' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add this kind of data' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'A schema with this kind and name is already registered in this project.',
+      'A kind of data with this type and name already exists in this project.',
     );
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -84,10 +84,10 @@ describe('RegisterSchemaDefForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'order_id' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Register schema' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add this kind of data' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('We cannot reach GrowthOS');
-    expect(screen.getByRole('button', { name: 'Register schema' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add this kind of data' })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 
@@ -97,7 +97,7 @@ describe('RegisterSchemaDefForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'order_completed' } });
     fireEvent.change(screen.getByLabelText('Field name'), { target: { value: 'order_id' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Register schema' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add this kind of data' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed');
   });
