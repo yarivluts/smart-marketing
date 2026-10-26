@@ -70,7 +70,7 @@ describe('schema-defs: never-received schemas are "not connected yet", and are n
   it('en: says never-received schemas are not alerted, and alerts are for schemas that stopped', () => {
     expect(en.SchemaRegistry.eventNeverSeen).toMatch(/not connected yet/i);
     expect(en.SchemaRegistry.eventVolumeDescription).toMatch(/not alerted/i);
-    expect(en.SchemaRegistry.eventVolumeDescription).toMatch(/was receiving records/i);
+    expect(en.SchemaRegistry.eventVolumeDescription).toMatch(/was receiving data/i);
     // The old copy promised an alert for any silent schema, which the alert service never raises
     // for a schema that never landed a record.
     expect(en.SchemaRegistry.eventVolumeDescription).not.toMatch(/A schema silent for over an hour raises/);

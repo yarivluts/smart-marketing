@@ -99,14 +99,14 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
 
     // KAN-57: one-click "set up touchpoint capture" — idempotently registers the
     // `touchpoint` event schema so the tracking snippet's events aren't quarantined.
-    await expect(page.getByRole('button', { name: 'Set up touchpoint capture' })).toBeVisible();
-    await page.getByRole('button', { name: 'Set up touchpoint capture' }).click();
+    await expect(page.getByRole('button', { name: 'Set up website visit tracking' })).toBeVisible();
+    await page.getByRole('button', { name: 'Set up website visit tracking' }).click();
     // A longer timeout than the default 5s: this round-trips a POST -> Firestore
     // write -> full server-component re-render, the same class of slower
     // operation `createOrganization`'s own heading check above already budgets
     // 15s for.
-    await expect(page.getByText('The touchpoint schema is registered for this project.')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByRole('button', { name: 'Set up touchpoint capture' })).toHaveCount(0);
+    await expect(page.getByText('Website visit tracking is already set up for this project.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'Set up website visit tracking' })).toHaveCount(0);
     await expect(page.getByText('event: touchpoint')).toBeVisible();
 
     // KAN-196: picking another environment in the project shell's picker re-scopes the
