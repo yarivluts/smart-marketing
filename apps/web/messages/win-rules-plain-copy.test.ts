@@ -18,4 +18,11 @@ describe('Win rules: plain words', () => {
   it('the empty state says what to do next', () => {
     expect((en as unknown as Record<string, Section>).WinRules.noEventSchemas).toMatch(/Connect your website/);
   });
+
+  it('the filter field example says what the technical name means, in en and he', () => {
+    const en_ = (en as unknown as Record<string, Section>).WinRules.filterFieldPlaceholder as string;
+    const he_ = (he as unknown as Record<string, Section>).WinRules.filterFieldPlaceholder as string;
+    expect(en_).toMatch(/properties\.amount \(the order amount\)/);
+    expect(he_).toMatch(/properties\.amount \(.+\)/);
+  });
 });
