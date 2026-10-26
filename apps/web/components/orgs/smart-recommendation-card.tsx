@@ -81,8 +81,8 @@ export function SmartRecommendationCard({
     try {
       await onApprove(actionProposal);
       setIsExecuted(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('proposeError'));
+    } catch {
+      setError(t('approveError'));
     } finally {
       setIsPending(false);
     }

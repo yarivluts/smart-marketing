@@ -2928,6 +2928,7 @@
     "proposeButton": "הצע שינוי",
     "proposeInvalidBudgetError": "התקציב היומי החדש חייב להיות מספר לא שלילי.",
     "proposeError": "לא ניתן היה להציע את השינוי. נסו שוב.",
+    "approveError": "לא הצלחנו לבצע את השינוי, ולכן לא שונה דבר. נסו שוב בעוד דקה.",
     "proposeDraftHeading": "הצעת קמפיין חדש (טיוטה)",
     "proposeDraftNoTargetsNote": "הוסיפו קמפיין למעלה לפני יצירת טיוטה — לכל קמפיין אפשר ליצור קמפיין אחד בלבד.",
     "proposeDraftTargetLabel": "יעד",
