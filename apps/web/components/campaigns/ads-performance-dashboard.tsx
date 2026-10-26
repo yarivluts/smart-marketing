@@ -65,6 +65,7 @@ export function AdsPerformanceDashboard({
   // Proactive recommendation state
   const [recommendationApplied, setRecommendationApplied] = useState(false);
   const [isApplyingRec, setIsApplyingRec] = useState(false);
+  const [recommendationFailed, setRecommendationFailed] = useState(false);
 
   // Filtered campaigns for overview table
   const filteredItems = useMemo(() => {
@@ -95,6 +96,7 @@ export function AdsPerformanceDashboard({
   async function handleApplyRecommendation(): Promise<void> {
     if (!topCampaign || !canExecute || isApplyingRec) return;
     setIsApplyingRec(true);
+    setRecommendationFailed(false);
 
     try {
       const nextBudget = Math.round(topCampaign.dailyBudgetUsd * 1.2);
@@ -112,9 +114,11 @@ export function AdsPerformanceDashboard({
       );
       if (res.ok) {
         setRecommendationApplied(true);
+      } else {
+        setRecommendationFailed(true);
       }
     } catch {
-      // Best effort
+      setRecommendationFailed(true);
     } finally {
       setIsApplyingRec(false);
     }
@@ -184,6 +188,11 @@ export function AdsPerformanceDashboard({
                     <span>{t('applyRecommendationButton')}</span>
                   </button>
                 )
+              )}
+              {recommendationFailed && (
+                <p role="alert" data-testid="rec-failed" className="text-xs text-destructive">
+                  {t('recommendationFailed')}
+                </p>
               )}
             </div>
           </div>
