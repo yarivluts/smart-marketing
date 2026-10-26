@@ -2748,7 +2748,7 @@
     "filterJoiner": "וגם",
     "noFilters": "אין מסננים — כל התרחשות של האירוע הזה היא ניצחון.",
     "filterFieldLabel": "שדה",
-    "filterFieldPlaceholder": "לדוגמה: properties.amount",
+    "filterFieldPlaceholder": "לדוגמה: properties.amount (סכום ההזמנה)",
     "filterOperatorLabel": "תנאי",
     "filterValueLabel": "ערך",
     "filterValuePlaceholder": "לדוגמה: 100",

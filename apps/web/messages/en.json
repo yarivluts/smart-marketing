@@ -2748,7 +2748,7 @@
     "filterJoiner": "AND",
     "noFilters": "No filters — any occurrence of this event is a win.",
     "filterFieldLabel": "Field",
-    "filterFieldPlaceholder": "e.g. properties.amount",
+    "filterFieldPlaceholder": "e.g. properties.amount (the order amount)",
     "filterOperatorLabel": "Condition",
     "filterValueLabel": "Value",
     "filterValuePlaceholder": "e.g. 100",
