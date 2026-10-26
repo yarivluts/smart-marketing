@@ -2928,6 +2928,7 @@
     "proposeButton": "Propose change",
     "proposeInvalidBudgetError": "New daily budget must be a non-negative number.",
     "proposeError": "Couldn't propose the change. Please try again.",
+    "approveError": "We could not make this change, so nothing was changed. Please try again in a minute.",
     "proposeDraftHeading": "Propose a new campaign draft",
     "proposeDraftNoTargetsNote": "Add a campaign above before drafting a new one — each can only have one campaign created.",
     "proposeDraftTargetLabel": "Target",
