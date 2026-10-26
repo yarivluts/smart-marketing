@@ -395,7 +395,7 @@
     "metaTitle": "Get started",
     "title": "Get {projectName} set up",
     "genericError": "We could not save this step. Check your internet connection and try again - your earlier steps are kept.",
-    "introBody": "Let's connect your website data and set up a page of results you can share — this takes about ten minutes.",
+    "introBody": "Answer a few short questions and GrowthOS sets up your results page for you. It takes about ten minutes, and your answers are saved as you go.",
     "startButton": "Start onboarding",
     "pilotShortcutTitle": "Prefer not to set anything up?",
     "pilotShortcutBody": "Growth Pilot reads your website, suggests what to promote and writes the ads for you. You only approve or say no. Nothing goes live without you.",
