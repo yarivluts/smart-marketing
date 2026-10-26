@@ -44,7 +44,7 @@ describe('EditWinRuleForm', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('Big order');
     expect(screen.getByLabelText('Win type')).toHaveValue('generic');
     expect(screen.getByLabelText('Field')).toHaveValue('properties.amount');
-    expect(screen.getByLabelText('Operator')).toHaveValue('>');
+    expect(screen.getByLabelText('Condition')).toHaveValue('>');
     expect(screen.getByLabelText('Value')).toHaveValue('100');
   });
 

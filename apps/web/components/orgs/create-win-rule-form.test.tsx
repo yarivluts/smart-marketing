@@ -56,7 +56,7 @@ describe('CreateWinRuleForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reactivated customer' } });
     fireEvent.change(screen.getByLabelText('Win type'), { target: { value: 'reactivation' } });
-    expect(screen.getByText('Typically fires on an event marking a previously churned customer as active again.')).toBeInTheDocument();
+    expect(screen.getByText('Usually celebrates a customer who had left and is active again.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
 
@@ -77,7 +77,7 @@ describe('CreateWinRuleForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add filter' }));
 
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'properties.amount' } });
-    fireEvent.change(screen.getByLabelText('Operator'), { target: { value: '>' } });
+    fireEvent.change(screen.getByLabelText('Condition'), { target: { value: '>' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
 
