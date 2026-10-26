@@ -4847,7 +4847,7 @@
     },
     "search": {
       "keywordsTitle": "Keywords for a search ad",
-      "keywordsDescription": "What people type into Google when they look for what you sell - with Google's own monthly searches, competition and the typical cost per click to show first. Pick the keywords the search ad bids on.",
+      "keywordsDescription": "What people type into Google when they look for what you sell - with Google's own monthly searches, competition and what a click typically costs. Pick the searches you want your ad to show up for.",
       "countryLabel": "Country",
       "languageLabel": "Language",
       "countries": {
@@ -4906,7 +4906,7 @@
       },
       "bidNote": "Monthly searches: how often people look this up. Competition: how many advertisers want it (high means pricier clicks). Typical price per click: the low-high range advertisers pay to appear at the top of Google results, in your Google Ads account currency.",
       "addKeyword": "Add {keyword}",
-      "selectedTitle": "Keywords the ad bids on ({count})",
+      "selectedTitle": "Searches your ad will show up for ({count})",
       "selectedSearches": "{searches} searches a month in all",
       "selectedEmpty": "None yet - add keywords from the list or your own.",
       "matchTypeLabel": "Match type for {keyword}",
