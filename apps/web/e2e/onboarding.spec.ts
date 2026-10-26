@@ -122,9 +122,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.getByRole('checkbox', { name: 'signup' }).uncheck();
     await page.getByRole('button', { name: 'Confirm customer path' }).click();
 
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/growth-pilot$`));
-    // The setup wizard is still there for anyone who wants it; it is no longer the first screen.
-    await page.goto(page.url().replace(/growth-pilot$/, 'onboarding'));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/onboarding$`));
     await expect(page.getByTestId('onboarding-confirmed-funnel').getByRole('listitem')).toHaveText([/touchpoint/, /document_signed/]);
 
     // The Funnel page reads the same funnel: it may be unable to COUNT it (no warehouse in this
