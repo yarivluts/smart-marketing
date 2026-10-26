@@ -5778,7 +5778,7 @@
       "site": "The site did not open for us (it may block automated readers, or the address is wrong).",
       "slow": "The site took too long to answer. Try again in a few minutes, or try another page of your site.",
       "looping": "The address keeps sending visitors in a circle, so we could not reach a page. Open your site in a browser and copy the address you end up on.",
-      "blocked": "That address is not a public website page, so we did not read it. Enter your website address, starting with https://.",
+      "blocked": "That address is not a public website page, so we did not read it. Enter your website address, like example.com.",
       "unreadable": "The page has no text we can read (it may be built only from images or scripts). Try the page that lists what you sell.",
       "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
       "nothing_found": "We read the site but found nothing to promote. Try the page that lists what you sell.",
