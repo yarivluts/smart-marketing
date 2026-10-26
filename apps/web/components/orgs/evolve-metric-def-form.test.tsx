@@ -48,7 +48,7 @@ describe('EvolveMetricDefForm', () => {
     expect(screen.getByLabelText('Unit')).toHaveValue('currency');
     fireEvent.change(screen.getByLabelText('Dimensions (comma-separated)'), { target: { value: 'channel, campaign' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Evolve metric' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save new version' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -78,7 +78,7 @@ describe('EvolveMetricDefForm', () => {
     } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Evolve metric' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save new version' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Formula references unknown metric "x".');
     expect(refresh).not.toHaveBeenCalled();
@@ -114,7 +114,7 @@ describe('EvolveMetricDefForm', () => {
     // Edit the SECOND instance through its own label-resolved input, then
     // submit the second form — the body must carry the edited table.
     fireEvent.change(tableInputs[1], { target: { value: 'brand_new_table_name_v2' } });
-    const submitButtons = screen.getAllByRole('button', { name: 'Evolve metric' });
+    const submitButtons = screen.getAllByRole('button', { name: 'Save new version' });
     fireEvent.click(submitButtons[1]);
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
