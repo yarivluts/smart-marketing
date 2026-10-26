@@ -5401,7 +5401,7 @@
     "statusExpired": "expired {date} - renew it",
     "statusNoExpiry": "does not expire",
     "errors": {
-      "not_configured": "This deployment has no Meta app configured yet (META_APP_ID and META_APP_SECRET).",
+      "not_configured": "Connecting with Facebook is not available on our side yet, so trying again will not help. Please contact GrowthOS support.",
       "declined": "Facebook did not grant access. Connect again and allow the requested permissions.",
       "session_not_found": "This connection attempt was not found or was already used. Start again.",
       "session_expired": "This connection attempt expired. Start again.",
