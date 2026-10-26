@@ -68,7 +68,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     const billingRequirement = page.getByTestId('setup-requirement-billing');
     await expect(billingRequirement).toContainText('Connected');
     await expect(billingRequirement).toContainText('Accepted records for "order_completed"');
-    await expect(billingRequirement).toContainText('1 record is rejected and open in quarantine ("order_completed"): missing_required_field:amount');
+    await expect(billingRequirement).toContainText('1 record was set aside because something was wrong with it ("order_completed"): missing_required_field:amount');
     await expect(page.getByTestId('setup-requirement-ad_spend')).toContainText('Not connected');
 
     await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
