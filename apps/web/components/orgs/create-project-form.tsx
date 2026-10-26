@@ -38,7 +38,7 @@ export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.Reac
         return;
       }
       const { projectId } = (await response.json()) as { projectId: string };
-      router.push(`/orgs/${orgId}/projects/${projectId}/onboarding`);
+      router.push(`/orgs/${orgId}/projects/${projectId}`);
     } catch {
       setError('offline');
     } finally {

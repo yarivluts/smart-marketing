@@ -114,7 +114,7 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page
     // directly — this spec is about the project switcher/env badge, not the wizard, so navigate
     // straight to the org page with the new project selected.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/growth-pilot$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 

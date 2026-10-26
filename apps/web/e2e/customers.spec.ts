@@ -33,8 +33,8 @@ test.describe('Customer search (KAN-108)', () => {
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Epsilon');
     await page.getByRole('button', { name: 'Create project' }).click();
-    // Creating a project lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    // Creating a project opens the project home, which sends newcomers to Growth Pilot.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/growth-pilot$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
@@ -53,7 +53,7 @@ test.describe('Customer search (KAN-108)', () => {
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Zeta');
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/growth-pilot$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 

@@ -24,7 +24,7 @@ async function createBrief(page: Page): Promise<{ orgId: string; projectId: stri
   await page.getByRole('link', { name: 'New project' }).click();
   await page.getByLabel('Project name').fill('Law Firm Studio');
   await page.getByRole('button', { name: 'Create project' }).click();
-  await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+  await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/growth-pilot$`));
   const projectId = new URL(page.url()).pathname.split('/').slice(-2)[0];
 
   await page.goto(`/en/orgs/${orgId}/projects/${projectId}/ad-studio`);

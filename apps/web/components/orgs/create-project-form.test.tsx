@@ -31,7 +31,7 @@ describe('CreateProjectForm', () => {
     fireEvent.change(screen.getByLabelText('Project name'), { target: { value: 'Growth' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
 
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/proj-123/onboarding'));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/proj-123'));
     expect(fetch).toHaveBeenCalledWith(
       '/api/orgs/org-1/projects',
       expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'Growth' }) }),

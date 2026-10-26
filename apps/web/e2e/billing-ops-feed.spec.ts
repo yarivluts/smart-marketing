@@ -33,8 +33,8 @@ test.describe('Billing ops feed (KAN-80)', () => {
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    // Creating a project lands on the onboarding wizard (KAN-68) rather than the org page.
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    // Creating a project opens the project home, which sends newcomers to Growth Pilot.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/growth-pilot$`));
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 

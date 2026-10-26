@@ -10,9 +10,21 @@ describe('new project page copy', () => {
     expect(he.NewProjectPage.formDescription).not.toMatch(/תחום/);
   });
 
-  it('tells a newcomer they can let the AI do the setup guide, matching the guide button', () => {
-    expect(en.NewProjectPage.nextDescription).toMatch(/AI do it/);
-    expect(he.NewProjectPage.nextDescription).toMatch(/AI/);
-    expect(he.NewProjectPage.nextDescription).not.toMatch(/הזן|בחר|לחץ/);
+  it('describes Growth Pilot, not the technical setup guide, as what happens next', () => {
+    const keys = [
+      'nextDescription',
+      'nextPackTitle',
+      'nextSourceTitle',
+      'nextFunnelTitle',
+      'nextBoardTitle',
+    ] as const;
+    expect(en.NewProjectPage.nextPackTitle).toMatch(/website/i);
+    expect(en.NewProjectPage.nextFunnelDescription).toMatch(/switched off/);
+    for (const key of keys) {
+      expect(en.NewProjectPage[key]).not.toMatch(/setup guide|data source|customer path|dashboard/i);
+      expect(he.NewProjectPage[key]).not.toMatch(/מדריך|הלוח|מסלול הלקוח/);
+    }
+    expect(he.NewProjectPage.nextPackTitle).toMatch(/אתר/);
+    expect(he.NewProjectPage.nextFunnelDescription).toMatch(/כבויה/);
   });
 });
