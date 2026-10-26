@@ -316,6 +316,30 @@ describe('SearchAdEditor', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('explains the two optional address-words fields in plain words, in English and Hebrew', () => {
+    vi.stubGlobal('fetch', vi.fn());
+    for (const [locale, msgs] of [['en', en], ['he', he]] as const) {
+      const { unmount } = renderWithIntl(
+        <SearchAdEditor
+          orgId="o"
+          projectId="p"
+          briefId="b1"
+          initial={AD}
+          keywordCount={2}
+          linkUrl={null}
+          advertiser="EasySign"
+          aiAvailable
+        />,
+        { locale },
+      );
+      expect(screen.getByLabelText(msgs.path1Label)).toHaveValue('sign');
+      expect(screen.getByLabelText(msgs.path2Label)).toHaveValue('lawyers');
+      expect(screen.getByText(msgs.pathHint)).toBeInTheDocument();
+      expect(`${msgs.path1Label}${msgs.pathHint}`).not.toMatch(/display path|נתיב/i);
+      unmount();
+    }
+  });
+
   it('without keywords, says Google will not show the ad and links to choosing them with AI', () => {
     vi.stubGlobal('fetch', vi.fn());
     renderWithIntl(

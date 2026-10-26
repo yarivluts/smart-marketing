@@ -316,6 +316,7 @@ export function SearchAdEditor({
               </label>
             ))}
           </div>
+          <p className="text-xs text-muted-foreground">{t('pathHint')}</p>
         </div>
 
         <div className="flex flex-col gap-2">
