@@ -2740,7 +2740,7 @@
     "editRuleError": "Couldn't save this win rule. Please try again.",
     "actionError": "Could not update this win rule. Please try again.",
     "createHeading": "New win rule",
-    "noEventSchemas": "Register an event schema first to create a win rule.",
+    "noEventSchemas": "Nothing to celebrate yet - no events are coming in. Connect your website or another data source first, then come back to set up a win.",
     "nameLabel": "Name",
     "namePlaceholder": "e.g. Big order",
     "schemaLabel": "Event",
@@ -2749,7 +2749,7 @@
     "noFilters": "No filters — any occurrence of this event is a win.",
     "filterFieldLabel": "Field",
     "filterFieldPlaceholder": "e.g. properties.amount",
-    "filterOperatorLabel": "Operator",
+    "filterOperatorLabel": "Condition",
     "filterValueLabel": "Value",
     "filterValuePlaceholder": "e.g. 100",
     "removeFilter": "Remove",
@@ -2762,9 +2762,9 @@
       "good_review": "Good review"
     },
     "winTypeHint": {
-      "reactivation": "Typically fires on an event marking a previously churned customer as active again.",
-      "trial_conversion": "Typically fires on an event marking a trial subscription converting to a paid plan.",
-      "good_review": "Typically fires on a support ticket resolution whose CSAT score crosses a chosen threshold."
+      "reactivation": "Usually celebrates a customer who had left and is active again.",
+      "trial_conversion": "Usually celebrates a free trial turning into a paid plan.",
+      "good_review": "Usually celebrates a solved support request where the customer's satisfaction score is high enough."
     },
     "createButton": "Create win rule",
     "createError": "Could not create the win rule. Please try again.",
