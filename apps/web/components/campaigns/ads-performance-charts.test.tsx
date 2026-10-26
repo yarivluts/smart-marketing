@@ -46,7 +46,7 @@ describe('AdsPerformanceCharts', () => {
     expect(screen.getByText('No ad spend connected yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Connect an ad source/ })).toHaveAttribute('href', '/orgs/o/projects/p/plugins');
     expect(screen.queryByRole('region', { name: 'Spend by channel' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Spend efficiency' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'How much of your budget you used' })).not.toBeInTheDocument();
 
     // Channel mix and budget come from the campaign rows themselves, so they still render.
     const budget = screen.getByRole('region', { name: 'Daily budget by channel' });
@@ -71,11 +71,23 @@ describe('AdsPerformanceCharts', () => {
     expect(screen.queryByText('No ad spend connected yet')).not.toBeInTheDocument();
     const byCampaign = screen.getByRole('region', { name: 'Spend by campaign' });
     expect(within(byCampaign).getByRole('link', { name: /Meta LP/ })).toHaveAttribute('href', '/orgs/o/projects/p/campaigns/Meta%20LP');
-    const efficiency = screen.getByRole('region', { name: 'Spend efficiency' });
+    const efficiency = screen.getByRole('region', { name: 'How much of your budget you used' });
     // $300 over 30 days against 2 x $10/day x 30 days of budget.
     expect(within(efficiency).getByText('$10')).toBeInTheDocument();
     expect(within(efficiency).getByText('50%')).toBeInTheDocument();
     expect(within(efficiency).getByText('2 of 2 campaigns')).toBeInTheDocument();
+    expect(within(efficiency).getByText('Budget used')).toBeInTheDocument();
+    expect(within(efficiency).getByText('of your budget was spent in 30 days')).toBeInTheDocument();
+  });
+
+  it('explains in plain words that spend appears once an ad account is connected', () => {
+    renderWithIntl(
+      <AdsPerformanceCharts orgId="o" projectId="p" items={[campaign({ id: 'Brand' })]} spendOutcome={{ ok: true, rows: [] }} spendWindowDays={30} />,
+    );
+    expect(
+      screen.getByText(/Once your Facebook, Instagram or Google ad account is connected, what you spent shows up here/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/per-channel|efficiency figures/)).not.toBeInTheDocument();
   });
 
   it('renders nothing without campaigns', () => {
