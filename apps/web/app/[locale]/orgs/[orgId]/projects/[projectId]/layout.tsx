@@ -98,11 +98,13 @@ export default async function ProjectLayout({
     {
       href: `${base}/campaigns`,
       label: tShell('adsAndPerformance'),
+      hint: tShell('adsAndPerformanceHint'),
       icon: 'Megaphone',
     },
     {
       href: `${base}/funnel`,
       label: tShell('funnelAndGoals'),
+      hint: tShell('funnelAndGoalsHint'),
       icon: 'Target',
     },
     {

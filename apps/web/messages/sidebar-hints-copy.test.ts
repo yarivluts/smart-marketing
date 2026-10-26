@@ -6,11 +6,11 @@ import he from './he.json';
 
 describe('sidebar hints say what Ad Studio and the AI helper do', () => {
   it('has a one-line hint in English and Hebrew, in plain words', () => {
-    for (const hint of [en.AppShell.adStudioHint, en.AppShell.aiCopilotAndAutomationHint]) {
+    for (const hint of [en.AppShell.adStudioHint, en.AppShell.aiCopilotAndAutomationHint, en.AppShell.adsAndPerformanceHint, en.AppShell.funnelAndGoalsHint]) {
       expect(hint.length).toBeGreaterThan(10);
-      expect(hint).not.toMatch(/copilot|automation|creative|ad set/i);
+      expect(hint).not.toMatch(/copilot|automation|creative|ad set|funnel|CTR|CPC/i);
     }
-    for (const hint of [he.AppShell.adStudioHint, he.AppShell.aiCopilotAndAutomationHint]) {
+    for (const hint of [he.AppShell.adStudioHint, he.AppShell.aiCopilotAndAutomationHint, he.AppShell.adsAndPerformanceHint, he.AppShell.funnelAndGoalsHint]) {
       expect(hint).toMatch(/[֐-׿]/);
     }
   });
@@ -19,5 +19,7 @@ describe('sidebar hints say what Ad Studio and the AI helper do', () => {
     const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
     expect(layout).toContain("hint: tShell('adStudioHint')");
     expect(layout).toContain("hint: tShell('aiCopilotAndAutomationHint')");
+    expect(layout).toContain("hint: tShell('adsAndPerformanceHint')");
+    expect(layout).toContain("hint: tShell('funnelAndGoalsHint')");
   });
 });
