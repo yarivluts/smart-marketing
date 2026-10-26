@@ -42,12 +42,12 @@ describe('SetupHealthPanel (KAN-197)', () => {
 
     const billing = within(screen.getByTestId('setup-requirement-billing'));
     expect(billing.getByText('Rejected records only')).toBeInTheDocument();
-    expect(billing.getByText(/2 records are rejected and open in quarantine \("subscription_state_change"\)/)).toBeInTheDocument();
+    expect(billing.getByText(/2 records were set aside because something was wrong with them \("subscription_state_change"\)/)).toBeInTheDocument();
     expect(billing.getByText(/subscription_state_change events or the Stripe connector/)).toBeInTheDocument();
 
     const adSpend = within(screen.getByTestId('setup-requirement-ad_spend'));
     expect(adSpend.getByText('Not connected')).toBeInTheDocument();
-    expect(adSpend.getByText('Registered but never received in this environment: "ad_spend".')).toBeInTheDocument();
+    expect(adSpend.getByText('Set up, but nothing has arrived yet for: "ad_spend".')).toBeInTheDocument();
   });
 
   it('says the schema-to-requirement match is inferred from names, in both locales', () => {
@@ -143,7 +143,7 @@ describe('SetupHealthPanel: customer coverage and the backfill hint', () => {
     expect(row.getByTestId('setup-customer-coverage')).toHaveTextContent('5 of 100 customers seen in events have a customer record (5%).');
     const hint = within(row.getByTestId('setup-backfill-hint'));
     expect(hint.getByText(/^95 of 100 customers seen in events have no customer record \(5% covered\)/)).toBeInTheDocument();
-    expect(hint.getByRole('link', { name: 'Request a backfill' })).toHaveAttribute('href', '#backfill-heading');
+    expect(hint.getByRole('link', { name: 'Ask for a resend' })).toHaveAttribute('href', '#backfill-heading');
   });
 
   it('full coverage shows the count and no hint', () => {
@@ -155,9 +155,9 @@ describe('SetupHealthPanel: customer coverage and the backfill hint', () => {
   it('without the warehouse: no count is shown, and the hint falls back to naming the events when no customer entity ever arrived', () => {
     renderHealth(NO_CUSTOMERS, { coverage: null });
     expect(screen.queryByTestId('setup-customer-coverage')).toBeNull();
-    expect(within(screen.getByTestId('setup-backfill-hint')).getByText(/Events are already accepted here \("signup"\)/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('setup-backfill-hint')).getByText(/Events are already arriving here \("signup"\)/)).toBeInTheDocument();
     // No Backfill panel for this viewer: the hint explains the fix but links nowhere.
-    expect(screen.queryByRole('link', { name: 'Request a backfill' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Ask for a resend' })).toBeNull();
   });
 
   it('without the warehouse, an entity that has arrived shows no hint (no count to go on)', () => {

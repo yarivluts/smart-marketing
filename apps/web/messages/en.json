@@ -1261,15 +1261,15 @@
       "gap": "Not connected"
     },
     "acceptedLine": "Accepted records for {schemas}, latest at {lastAcceptedAt}.",
-    "rejectedLine": "{count, plural, one {# record is} other {# records are}} rejected and open in quarantine ({schemas}): {reasons}",
-    "silentRegisteredLine": "Registered but never received in this environment: {schemas}.",
-    "nothingReceivedLine": "Nothing received in this environment, accepted or rejected.",
+    "rejectedLine": "{count, plural, one {# record was} other {# records were}} set aside because something was wrong with {count, plural, one {it} other {them}} ({schemas}): {reasons}",
+    "silentRegisteredLine": "Set up, but nothing has arrived yet for: {schemas}.",
+    "nothingReceivedLine": "Nothing has arrived yet.",
     "sourceNote": "This is worked out only from the data that actually arrived, so nothing can be marked as connected by hand. For step-by-step help fixing a gap, ask the AI helper to check your setup.",
-    "mappingNote": "Schemas are matched to requirements by their names, so check the schemas listed under each one: a name like \"order_viewed\" would be counted as billing.",
+    "mappingNote": "Each item is matched by the name of the data it receives, so check the names listed under each one: a name like \"order_viewed\" would be counted as billing.",
     "requirements": {
       "landing_page_attribution": {
-        "title": "Landing-page attribution (touchpoints)",
-        "impact": "Without touchpoints no signup or customer can be traced back to the campaign, channel or landing page that brought it."
+        "title": "Which page and campaign brought each visitor",
+        "impact": "Without visit records no signup or customer can be traced back to the campaign, channel or landing page that brought it."
       },
       "signups": {
         "title": "Signups",
@@ -1280,8 +1280,8 @@
         "impact": "Without product events we cannot tell whether new customers start using your product and keep coming back."
       },
       "customer_profiles": {
-        "title": "Customer entity",
-        "impact": "Without customer entities Customer 360 is empty and segments cannot filter on customer attributes."
+        "title": "Customer records",
+        "impact": "Without customer records the full customer view is empty and segments cannot filter on customer attributes."
       },
       "billing": {
         "title": "Billing and subscriptions",
@@ -1292,7 +1292,7 @@
         "impact": "Without ad spend we cannot tell what each customer or signup costs you, or whether your ads earn their money back."
       }
     },
-    "panelDescription": "Which data streams your reports need, and whether each one is flowing in this environment.",
+    "panelDescription": "Which data your reports need, and whether each kind has started arriving.",
     "ringLabel": "{connected} of {total} setup requirements connected",
     "ringCenter": "requirements",
     "coreLabel": "Core requirements",
@@ -1301,10 +1301,10 @@
       "core": "Core",
       "recommended": "Recommended"
     },
-    "backfillHint": "Events are already accepted here ({schemas}), so these customers exist in your system but none has arrived as a customer entity. Ask the integrator to resend them once with a backfill.",
-    "backfillLink": "Request a backfill",
+    "backfillHint": "Events are already arriving here ({schemas}), so these customers exist in your system but none has arrived as a customer record. Ask whoever set up the connection to resend them once.",
+    "backfillLink": "Ask for a resend",
     "coverageLine": "{covered} of {total} customers seen in events have a customer record ({percent}%).",
-    "backfillCoverageHint": "{missing} of {total} customers seen in events have no customer record ({percent}% covered). They most likely signed up before the integration started sending customers. Ask the integrator to resend them once with a backfill."
+    "backfillCoverageHint": "{missing} of {total} customers seen in events have no customer record ({percent}% covered). They most likely signed up before the connection started sending customers. Ask whoever set up the connection to resend them once."
   },
   "BillingOpsFeed": {
     "metaTitle": "Payments & refunds",
