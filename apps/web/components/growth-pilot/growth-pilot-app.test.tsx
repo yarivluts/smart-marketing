@@ -100,6 +100,20 @@ describe('GrowthPilotApp', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter a website address, like example.com.');
   });
 
+  it.each([
+    ['not_configured', 'will not help. Please contact GrowthOS support.'],
+    ['provider_billing', 'will not help. Please contact GrowthOS support.'],
+    ['quota_exceeded', "Today's AI limit is used up. It resets tomorrow."],
+  ])('does not say "try again in a minute" when the AI refusal is %s', async (code, text) => {
+    stubFetch({ status: 503, body: { error: 'provider_failed', code } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'easysign.co.il' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(text);
+    expect(alert).not.toHaveTextContent('Try again in a minute');
+  });
+
   it('tells someone who pasted an email to enter the website, without calling the server', () => {
     const fetchMock = stubFetch();
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });

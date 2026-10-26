@@ -26,10 +26,14 @@ type ApiResult = { ok: true; data: GrowthPilotPageData | null } | { ok: false; e
 async function callPilot(base: string, path: string, body?: unknown): Promise<ApiResult> {
   try {
     const response = await fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) });
-    const json = (await response.json().catch(() => ({}))) as GrowthPilotPageData & { error?: string; pilot: unknown };
+    const json = (await response.json().catch(() => ({}))) as GrowthPilotPageData & { error?: string; code?: string; pilot: unknown };
     if (response.status === 401) return { ok: false, error: 'unauthorized' };
     if (response.status === 403) return { ok: false, error: 'forbidden' };
-    if (!response.ok) return { ok: false, error: typeof json.error === 'string' ? json.error : 'generic' };
+    if (!response.ok) {
+      if (json.error === 'provider_failed' && (json.code === 'not_configured' || json.code === 'provider_billing')) return { ok: false, error: 'ai_unavailable' };
+      if (json.error === 'provider_failed' && json.code === 'quota_exceeded') return { ok: false, error: 'quota_exceeded' };
+      return { ok: false, error: typeof json.error === 'string' ? json.error : 'generic' };
+    }
     return { ok: true, data: json.pilot ? json : null };
   } catch {
     return { ok: false, error: 'offline' };
@@ -75,7 +79,7 @@ const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 function ErrorLine({ code, id }: { code: string | null; id?: string }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   if (!code) return null;
-  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized', 'forbidden'].includes(code);
+  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'ai_unavailable', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized', 'forbidden'].includes(code);
   return (
     <p id={id} role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />

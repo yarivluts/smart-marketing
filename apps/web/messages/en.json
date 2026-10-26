@@ -5882,6 +5882,7 @@
       "empty_request": "Write what you want first.",
       "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
       "provider_failed": "The AI service did not answer. Try again in a minute.",
+      "ai_unavailable": "The AI service is not available on our side right now, so trying again will not help. Please contact GrowthOS support.",
       "not_pending": "You already decided on this one. Reload the page to see what is next.",
       "not_ready": "We are still reading your site. Give it a minute, then try again.",
       "not_found": "We could not find that any more. Reload the page to see the latest.",
