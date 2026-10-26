@@ -3628,8 +3628,8 @@
     "calibrationMixCenter": "הרשמות"
   },
   "Copilot": {
-    "actionExecuted": "הפעולה נשלחה. ניתן לבטל אותה מיומן הביקורת.",
-    "actionFailed": "הפעולה לא בוצעה. שום דבר לא שונה - בדקו ביומן הביקורת ונסו שוב.",
+    "actionExecuted": "בוצע - השינוי נשלח. אפשר לבטל אותו מהיסטוריית שינויים.",
+    "actionFailed": "השינוי לא עבר. שום דבר לא שונה. נסו שוב, או הציצו בהיסטוריית שינויים.",
     "close": "סגירה",
     "drawerTitle": "עוזר ה-AI שלכם",
     "drawerSubtitle": "שאלו בשפה פשוטה - העוזר מסביר את התוצאות ומכין שינויים לאישורכם",
@@ -3637,14 +3637,14 @@
     "emptySubtitle": "שאלו איך המודעות מתקדמות, או בקשו שינוי כמו להוציא יותר או פחות. שום דבר לא משתנה עד שתאשרו.",
     "beforeLabel": "לפני",
     "afterLabel": "אחרי",
-    "executing": "מבצע...",
+    "executing": "מחיל...",
     "chipTopAds": "מודעות מובילות",
     "chipIncreaseBudget": "הגדלת תקציב",
     "chipNewCampaign": "קמפיין חדש",
     "chipRebalance": "איזון גוגל ← מטא",
     "chipOptimizeFunnel": "ייעול משפך",
     "impactBadgeLabel": "השפעת {impact, select, high {גבוהה} medium {בינונית} low {נמוכה} other {השפעה}}",
-    "actionExecutedSuccess": "הפעולה בוצעה בהצלחה! ניתן לבטל ביומן הביקורת.",
+    "actionExecutedSuccess": "בוצע! אפשר לבטל את השינוי מהיסטוריית שינויים.",
     "approveAndExecute": "אישור וביצוע השינוי",
     "inputPlaceholder": "שאלו שאלה או תנו פקודה...",
     "sendButton": "שלח"

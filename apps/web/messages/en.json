@@ -3628,8 +3628,8 @@
     "calibrationMixCenter": "signups"
   },
   "Copilot": {
-    "actionExecuted": "Action submitted. You can roll it back from the audit log.",
-    "actionFailed": "The action did not go through. Nothing was changed - check the audit log and try again.",
+    "actionExecuted": "Done - the change was sent. You can undo it from Change history.",
+    "actionFailed": "The change did not go through. Nothing was changed. Try again, or look in Change history.",
     "close": "Close",
     "drawerTitle": "Your AI helper",
     "drawerSubtitle": "Ask in plain words - it explains your results and prepares changes for you to approve",
@@ -3637,14 +3637,14 @@
     "emptySubtitle": "Ask how your ads are doing, or ask for a change like spending more or less. Nothing changes until you approve it.",
     "beforeLabel": "Before",
     "afterLabel": "After",
-    "executing": "Executing...",
+    "executing": "Applying...",
     "chipTopAds": "Top Ads",
     "chipIncreaseBudget": "Scale Budget",
     "chipNewCampaign": "New Campaign",
     "chipRebalance": "Rebalance Google → Meta",
     "chipOptimizeFunnel": "Optimize Funnel",
     "impactBadgeLabel": "{impact} impact",
-    "actionExecutedSuccess": "Action executed successfully! Rollback is available in audit log.",
+    "actionExecutedSuccess": "Done! You can undo this change from Change history.",
     "approveAndExecute": "Approve and apply",
     "inputPlaceholder": "Ask a question or issue a command...",
     "sendButton": "Send"

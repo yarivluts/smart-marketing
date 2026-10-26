@@ -55,7 +55,7 @@ describe('CopilotChatPanel Component', () => {
 
     await waitFor(() => {
       expect(onExecuteProposal).toHaveBeenCalled();
-      expect(screen.getByText(/Action submitted\./)).toBeInTheDocument();
+      expect(screen.getByText(/Done - the change was sent\./)).toBeInTheDocument();
     });
   });
 
@@ -96,7 +96,7 @@ describe('CopilotChatPanel Component', () => {
     await waitFor(() => {
       expect(screen.getByText(/did not go through/i)).toBeInTheDocument();
     });
-    expect(screen.queryByText(/Action submitted\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Done - the change was sent\./)).not.toBeInTheDocument();
   });
 
   it('treats a non-ok HTTP response from the propose endpoint as a failure', async () => {

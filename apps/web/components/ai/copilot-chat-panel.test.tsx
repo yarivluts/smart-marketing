@@ -53,7 +53,7 @@ describe('CopilotChatPanel Component', () => {
       // This file tests a re-export of components/automation/copilot-chat-panel, so it moves
       // with that component's wording. The message changed when the panel stopped reporting
       // failures as successes - see KAN-90.
-      expect(screen.getByText(/Action submitted\./)).toBeInTheDocument();
+      expect(screen.getByText(/Done - the change was sent\./)).toBeInTheDocument();
     });
   });
 
