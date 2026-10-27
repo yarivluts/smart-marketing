@@ -79,7 +79,7 @@ describe('VideoStudio', () => {
     expect(scene1.getByTestId('ad-studio-clip-player')).toHaveAttribute('src', `${BASE}/clips/c1/media#t=0.1`);
     expect(scene1.getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Ready');
     expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByText('Not made yet.')).toBeInTheDocument();
-    expect(screen.getByText(/On-screen text is not drawn into the video/)).toBeInTheDocument();
+    expect(screen.getByText(/Words on the screen are not put into the video itself/)).toBeInTheDocument();
   });
 
   it('refuses render-all over the daily limit and says why', () => {
