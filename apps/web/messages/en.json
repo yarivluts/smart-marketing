@@ -17,7 +17,7 @@
     "homeLink": "Home",
     "adsAndPerformance": "Ads & results",
     "funnelAndGoals": "Customer journey & goals",
-    "aiCopilotAndAutomation": "AI helper & automation",
+    "aiCopilotAndAutomation": "AI helper",
     "settings": "Settings",
     "dataSection": "Data",
     "automationSection": "Automation",
@@ -88,7 +88,7 @@
         "description": "Set growth targets and see whether you are on pace to reach them"
       },
       "automation": {
-        "title": "AI helper & automation",
+        "title": "AI helper",
         "description": "Get suggestions from the AI and approve them in one click"
       },
       "tv": {
@@ -5893,7 +5893,7 @@
       "not_found": "We could not find that any more. Reload the page to see the latest.",
       "generic": "We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.",
       "invalid_budget": "Enter a daily budget above zero.",
-      "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper & automation and choose Resume automation, then try again.",
+      "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper and choose Resume automation, then try again.",
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
       "unauthorized": "You were signed out. Reload the page and sign in again - nothing was lost.",
       "forbidden": "You do not have permission to make this change in this project. Ask the project owner to give you access, then try again.",
