@@ -88,7 +88,7 @@ describe('KeywordResearch', () => {
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'Add electronic signature' }));
-    fireEvent.change(screen.getByLabelText('Match type for electronic signature'), {
+    fireEvent.change(screen.getByLabelText('Which searches should match electronic signature'), {
       target: { value: 'EXACT' },
     });
     fireEvent.change(screen.getByLabelText(en.ownKeywordPlaceholder), {
