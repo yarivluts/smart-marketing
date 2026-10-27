@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import React from 'react';
@@ -45,14 +46,14 @@ describe('AdsPerformanceCharts', () => {
     );
     expect(screen.getByText('No ad spend connected yet')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Connect an ad source/ })).toHaveAttribute('href', '/orgs/o/projects/p/plugins');
-    expect(screen.queryByRole('region', { name: 'Spend by channel' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Spend by platform' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'How much of your budget you used' })).not.toBeInTheDocument();
 
     // Channel mix and budget come from the campaign rows themselves, so they still render.
-    const budget = screen.getByRole('region', { name: 'Daily budget by channel' });
+    const budget = screen.getByRole('region', { name: 'Daily budget by platform' });
     const rows = within(budget).getAllByRole('row');
     expect(rows.map((row) => row.textContent)).toEqual(['channelActivePaused', 'Facebook & Instagram$50$0', 'Google Ads$0$20']);
-    expect(within(screen.getByRole('region', { name: 'Campaigns by channel' })).getByText('2')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Ads by platform' })).getByText('2')).toBeInTheDocument();
   });
 
   it('charts measured spend per channel and campaign with efficiency figures', () => {
@@ -69,7 +70,7 @@ describe('AdsPerformanceCharts', () => {
       />,
     );
     expect(screen.queryByText('No ad spend connected yet')).not.toBeInTheDocument();
-    const byCampaign = screen.getByRole('region', { name: 'Spend by campaign' });
+    const byCampaign = screen.getByRole('region', { name: 'Spend by ad' });
     expect(within(byCampaign).getByRole('link', { name: /Meta LP/ })).toHaveAttribute('href', '/orgs/o/projects/p/campaigns/Meta%20LP');
     const efficiency = screen.getByRole('region', { name: 'How much of your budget you used' });
     // $300 over 30 days against 2 x $10/day x 30 days of budget.
@@ -88,6 +89,16 @@ describe('AdsPerformanceCharts', () => {
       screen.getByText(/Once your Facebook, Instagram or Google ad account is connected, what you spent shows up here/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/per-channel|efficiency figures/)).not.toBeInTheDocument();
+  });
+
+  it('labels the charts with ads and platforms, not campaigns and channels (en + he)', () => {
+    for (const file of ['en', 'he']) {
+      const m = JSON.parse(readFileSync(`messages/${file}.json`, 'utf8'));
+      const ns = Object.values(m).find((v) => typeof v === 'object' && v !== null && 'chartsCampaignsByChannel' in (v as object)) as Record<string, string>;
+      for (const key of ['chartsSpendByChannel', 'chartsSpendByCampaign', 'chartsMoreCampaigns', 'chartsCampaignsByChannel', 'chartsCampaignsByChannelDescription', 'chartsCampaignsCenterLabel', 'chartsBudgetByChannel', 'chartsBudgetByChannelDescription']) {
+        expect(ns[key]).not.toMatch(file === 'en' ? /campaign|channel/i : /קמפיין|ערוץ/);
+      }
+    }
   });
 
   it('renders nothing without campaigns', () => {
