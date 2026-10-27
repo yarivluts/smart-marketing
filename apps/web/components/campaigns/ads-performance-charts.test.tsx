@@ -75,7 +75,7 @@ describe('AdsPerformanceCharts', () => {
     // $300 over 30 days against 2 x $10/day x 30 days of budget.
     expect(within(efficiency).getByText('$10')).toBeInTheDocument();
     expect(within(efficiency).getByText('50%')).toBeInTheDocument();
-    expect(within(efficiency).getByText('2 of 2 campaigns')).toBeInTheDocument();
+    expect(within(efficiency).getByText('We know what 2 of your 2 ads spent')).toBeInTheDocument();
     expect(within(efficiency).getByText('Budget used')).toBeInTheDocument();
     expect(within(efficiency).getByText('of your budget was spent in 30 days')).toBeInTheDocument();
   });
