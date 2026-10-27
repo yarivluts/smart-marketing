@@ -20,3 +20,17 @@ describe('Ads & results spend tiles and empty states use plain words', () => {
     expect(c.he.spendCockpitDegraded.query_error).toMatch(/פייסבוק, באינסטגרם או בגוגל/);
   });
 });
+
+describe('Ads & results coverage tile and zero-spend message use plain words', () => {
+  it('says "ads" and what is known, not "measured campaigns"', () => {
+    for (const l of ['en', 'he'] as const) {
+      for (const k of ['effMeasuredCoverage', 'effMeasuredCoverageSub', 'chartsNoPositiveSpend']) {
+        expect(String(c[l][k]).replace(/\{\w+\}/g, '')).not.toMatch(/measured|window|נמדד/i);
+      }
+      expect(c[l].effMeasuredCoverageSub).toContain('{measured}');
+      expect(c[l].effMeasuredCoverageSub).toContain('{total}');
+    }
+    expect(c.en.effMeasuredCoverage).toBe('Ads with spend figures');
+    expect(c.he.chartsNoPositiveSpend).toMatch(/מודעות/);
+  });
+});
