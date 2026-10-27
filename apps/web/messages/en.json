@@ -3468,8 +3468,8 @@
     "spendCockpitDegraded": {
       "warehouse_not_configured": "Your ad numbers are not connected yet, so ad spend cannot be shown. Connect your ad account to see spend by channel and campaign.",
       "quota_exceeded": "GrowthOS has reached today's limit for loading your numbers. The spend charts come back tomorrow.",
-      "not_yet_backed": "Your ad spend has not arrived yet. Connect Meta Ads or Google Ads and wait for the first update.",
-      "query_error": "We could not load your ad spend - no spend has been collected for this project yet. Connect Meta Ads or Google Ads to start measuring spend."
+      "not_yet_backed": "Your ad spend has not arrived yet. Connect your Facebook, Instagram or Google ad account and wait for the first update.",
+      "query_error": "We could not load your ad spend - no spend has been collected for this project yet. Connect your Facebook, Instagram or Google ad account to start measuring spend."
     },
     "connectAdSourceCta": "Connect an ad source",
     "chartsSpendByChannel": "Spend by channel",
@@ -3480,13 +3480,13 @@
     "chartsMoreCampaigns": "+{count} more campaigns",
     "chartsEfficiencyTitle": "How much of your budget you used",
     "chartsEfficiencyDescription": "Worked out from what you actually spent and the daily budget set on each campaign.",
-    "effAvgDailySpend": "Avg. daily spend",
+    "effAvgDailySpend": "Spent per day, on average",
     "effBudgetUtilization": "Budget used",
     "effBudgetUtilizationHint": "of your budget was spent in {days} days",
     "effMeasuredCoverage": "Campaigns measured",
     "effMeasuredCoverageSub": "{measured} of {total} campaigns",
-    "effLiveBudget": "Live daily budget",
-    "effLiveBudgetSub": "across active campaigns",
+    "effLiveBudget": "Daily budget of running ads",
+    "effLiveBudgetSub": "added up across your running ads",
     "chartsCampaignsByChannel": "Campaigns by channel",
     "chartsCampaignsByChannelDescription": "How your {count} tracked campaigns split across ad platforms.",
     "chartsCampaignsCenterLabel": "campaigns",
