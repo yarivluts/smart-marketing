@@ -124,7 +124,7 @@
     "emailInUseError": "An account with this email already exists. Sign in instead, or choose \"Forgot password?\" if you do not remember it.",
     "weakPasswordError": "Choose a password with at least 6 characters.",
     "passwordHint": "At least 6 characters.",
-    "tooManyAttemptsError": "Too many tries. Wait a few minutes and try again, or use \"Forgot password\".",
+    "tooManyAttemptsError": "Too many tries. Wait a few minutes and try again, or choose \"Forgot password?\".",
     "networkError": "We cannot reach GrowthOS. Check your internet connection and try again.",
     "popupBlockedError": "Your browser blocked the Google window. Allow pop-ups for this site, or sign in with your email.",
     "accountExistsOtherMethodError": "This email already has a GrowthOS account made another way. Sign in with your email and password instead.",
@@ -148,7 +148,8 @@
     "signInSubtitle": "Sign in to see your ads, results and suggestions.",
     "orWithEmail": "or with email",
     "forgotPassword": "Forgot password?",
-    "processing": "Processing...",
+    "signingIn": "Signing you in...",
+    "creatingAccount": "Creating your account...",
     "resetNeedsEmail": "Enter your email above first, then choose \"Forgot password?\".",
     "resetSent": "If an account exists for {email}, a password reset link is on its way.",
     "resetError": "Could not send a reset link right now. Please try again."

@@ -299,7 +299,7 @@ export function EmailPasswordForm({
           {submitting ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{t('processing')}</span>
+              <span>{t(mode === 'signup' ? 'creatingAccount' : 'signingIn')}</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
