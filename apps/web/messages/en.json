@@ -1073,15 +1073,15 @@
     "unitOption": {
       "number": "Number",
       "count": "Count",
-      "ratio": "Ratio (0-1, shown as %)",
-      "percent": "Percent (0-100)",
+      "ratio": "Rate (shown as a percent, like 8%)",
+      "percent": "Percent (already a number from 0 to 100)",
       "currency": "Currency",
       "duration_seconds": "Duration (seconds)"
     },
     "unitCurrencyWithCode": "Currency ({code})",
     "currencyCodeLabel": "Currency code",
     "currencyCodePlaceholder": "Project currency",
-    "unitHelp": "How values are displayed and which goal targets make sense. A conversion rate computed as a 0-1 fraction is a ratio: 0.08 displays as 8%.",
+    "unitHelp": "Decides how a number is shown and which goals make sense for it. For a rate, such as the share of visitors who sign up, pick Rate: it is shown as a percent, so 0.08 appears as 8%.",
     "unitSummary": "Unit: {unit}",
     "evolve": "Edit",
     "cancel": "Cancel",
