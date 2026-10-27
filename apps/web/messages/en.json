@@ -2780,8 +2780,8 @@
     "historyEmpty": "No wins recorded yet.",
     "historyListCapNote": "Showing the most recent {count} win(s).",
     "historyListCapNoteTruncated": "Showing the most recent {count} win(s) — more exist than are shown.",
-    "eyebrow": "War room",
-    "description": "Rules that turn a matching event into a celebrated win - on this page, in the live feed and on the war-room TV.",
+    "eyebrow": "Celebrate wins",
+    "description": "Rules that turn a matching event into a celebrated win - on this page, in the live feed and on your TV screen.",
     "kpiActiveRules": "Active rules",
     "kpiOfTotalRules": "of {count, plural, one {# rule} other {# rules}}",
     "kpiRecentWins": "Recent wins",
@@ -2845,7 +2845,7 @@
     "claimButton": "Pair TV",
     "claimError": "Could not pair this TV. Check the code and try again.",
     "claimErrorInvalidCode": "That pairing code is invalid, expired, or already used. Ask the TV to display a new one.",
-    "eyebrow": "Big screen",
+    "eyebrow": "TV screen",
     "kpiPaired": "Paired screens",
     "kpiBoards": "Boards available",
     "kpiRotation": "Boards in rotation",
@@ -2862,7 +2862,7 @@
     "emptyPairedDescription": "Open TV mode on a screen, then enter the code it shows in the pairing form."
   },
   "TvMode": {
-    "metaTitle": "War room",
+    "metaTitle": "Results on a TV screen",
     "loading": "Loading…",
     "pairingHeading": "Pair this TV",
     "pairingCodeAriaLabel": "Pairing code {code}",
