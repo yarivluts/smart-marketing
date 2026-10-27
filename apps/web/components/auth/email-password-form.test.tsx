@@ -59,6 +59,24 @@ describe('EmailPasswordForm Component', () => {
     expect(screen.queryByText(enMessages.Auth.passwordHint)).toBeNull();
   });
 
+  it('while waiting, the button says signing in or creating the account', async () => {
+    mockSignInWithEmail.mockReturnValue(new Promise(() => {}));
+    const { unmount } = renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    const email = screen.getByLabelText(enMessages.Auth.emailLabel);
+    fireEvent.change(email, { target: { value: 'a@b.co' } });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.passwordLabel), { target: { value: 'secret1' } });
+    fireEvent.submit(email.closest('form') as HTMLFormElement);
+    expect(await screen.findByText(enMessages.Auth.signingIn)).toBeTruthy();
+    unmount();
+    mockSignUpWithEmail.mockReturnValue(new Promise(() => {}));
+    renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    const email2 = screen.getByLabelText(enMessages.Auth.emailLabel);
+    fireEvent.change(email2, { target: { value: 'a@b.co' } });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.passwordLabel), { target: { value: 'secret1' } });
+    fireEvent.submit(email2.closest('form') as HTMLFormElement);
+    expect(await screen.findByText(enMessages.Auth.creatingAccount)).toBeTruthy();
+  });
+
   it('links a failed sign-in to both fields so screen readers hear why', async () => {
     mockSignInWithEmail.mockRejectedValue({ code: 'auth/invalid-credential' });
     renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
