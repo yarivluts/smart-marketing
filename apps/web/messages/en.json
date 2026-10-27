@@ -5280,7 +5280,7 @@
     "reasons": {
       "invalid_details": "Some details are missing or malformed. Enter them again.",
       "auth_failed": "The platform refused the sign-in: the access key is wrong, expired or was revoked. Create a new one and save it again.",
-      "developer_token_not_approved": "Google has not approved this developer token for real accounts yet. Apply for Basic access in the Google Ads API Center, then check again.",
+      "developer_token_not_approved": "Google has not yet approved your connection to real ad accounts (it is still in test mode). In your Google Ads manager account, open Tools, API Center, and ask for Basic access. Once Google says yes, check again.",
       "account_not_found": "The platform did not find this account, or the access key has no account access. Check the account ID, and that the person who created the key can open the account.",
       "permission_denied": "The access key reaches the account but is not allowed to manage ads. Give the user or system user full control of the account and create the key again.",
       "account_disabled": "The account exists but cannot run ads right now (disabled, closed or unpaid). Fix it on the platform, then check again.",
