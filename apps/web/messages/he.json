@@ -3468,8 +3468,8 @@
     "spendCockpitDegraded": {
       "warehouse_not_configured": "נתוני הפרסום שלכם עדיין לא מחוברים, ולכן אי אפשר להציג הוצאה. חברו את חשבון המודעות כדי לראות הוצאה לפי ערוץ וקמפיין.",
       "quota_exceeded": "GrowthOS הגיע היום למגבלת טעינת הנתונים. גרפי ההוצאה יחזרו מחר.",
-      "not_yet_backed": "הוצאת הפרסום שלכם עדיין לא הגיעה. חברו את Meta Ads או Google Ads והמתינו לעדכון הראשון.",
-      "query_error": "לא הצלחנו לטעון את הוצאת הפרסום - עדיין לא נאספה הוצאה לפרויקט הזה. חברו את Meta Ads או Google Ads כדי להתחיל למדוד הוצאה."
+      "not_yet_backed": "הוצאת הפרסום שלכם עדיין לא הגיעה. חברו את חשבון המודעות בפייסבוק, באינסטגרם או בגוגל והמתינו לעדכון הראשון.",
+      "query_error": "לא הצלחנו לטעון את הוצאת הפרסום - עדיין לא נאספה הוצאה לפרויקט הזה. חברו את חשבון המודעות בפייסבוק, באינסטגרם או בגוגל כדי להתחיל למדוד הוצאה."
     },
     "connectAdSourceCta": "חיבור מקור מודעות",
     "chartsSpendByChannel": "הוצאה לפי ערוץ",
@@ -3480,13 +3480,13 @@
     "chartsMoreCampaigns": "+{count} קמפיינים נוספים",
     "chartsEfficiencyTitle": "כמה מהתקציב שלכם נוצל",
     "chartsEfficiencyDescription": "מחושב לפי מה שהוצאתם בפועל ולפי התקציב היומי שהוגדר לכל קמפיין.",
-    "effAvgDailySpend": "הוצאה יומית ממוצעת",
+    "effAvgDailySpend": "כמה הוצאתם ביום, בממוצע",
     "effBudgetUtilization": "תקציב שנוצל",
     "effBudgetUtilizationHint": "מהתקציב הוצאתם ב-{days} ימים",
     "effMeasuredCoverage": "קמפיינים שנמדדו",
     "effMeasuredCoverageSub": "{measured} מתוך {total} קמפיינים",
-    "effLiveBudget": "תקציב יומי פעיל",
-    "effLiveBudgetSub": "בכל הקמפיינים הפעילים",
+    "effLiveBudget": "התקציב היומי של מודעות פעילות",
+    "effLiveBudgetSub": "סכום של כל המודעות הפעילות שלכם",
     "chartsCampaignsByChannel": "קמפיינים לפי ערוץ",
     "chartsCampaignsByChannelDescription": "איך {count} הקמפיינים שבמעקב מתחלקים בין פלטפורמות הפרסום.",
     "chartsCampaignsCenterLabel": "קמפיינים",
