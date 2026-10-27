@@ -130,8 +130,7 @@ export function AutomationHubDashboard({
     );
 
     if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || t('proposeError'));
+      throw new Error(`quick-execute failed with ${res.status}`);
     }
 
     setToastMessage(t('actionExecutedSuccess'));

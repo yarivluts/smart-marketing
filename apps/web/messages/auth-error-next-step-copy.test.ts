@@ -14,6 +14,13 @@ describe('sign-in and sign-up errors point to the next step', () => {
       expect(auth.forgotPassword).toBe(forgot);
       expect(auth.invalidCredentialsError).toContain(forgot);
       expect(auth.emailInUseError).toContain(forgot);
+      expect(auth.tooManyAttemptsError).toContain(forgot);
+    });
+
+    it(`the waiting button says what is happening, not "processing" (${name})`, () => {
+      expect(auth).not.toHaveProperty('processing');
+      expect(auth.signingIn).toMatch(name === 'en' ? /Signing you in/ : /מתחברים/);
+      expect(auth.creatingAccount).toMatch(name === 'en' ? /Creating your account/ : /יוצרים את החשבון/);
     });
 
     it(`existing email tells the person to sign in instead (${name})`, () => {

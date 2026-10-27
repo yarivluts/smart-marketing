@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { AdsPerformanceDashboard } from './ads-performance-dashboard';
 import messages from '../../messages/en.json';
@@ -75,7 +75,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.getAllByText('$2,600').length).toBeGreaterThan(0);
     expect(screen.getAllByText('3.8x').length).toBeGreaterThan(0);
     expect(screen.getByTestId('proactive-recommendation-banner')).toBeInTheDocument();
-    expect(screen.getByText('1-Click Apply')).toBeInTheDocument();
+    expect(screen.getByText('Raise the daily budget')).toBeInTheDocument();
   });
 
   it('switches between Overview, Ad gallery, and Analytics tabs', () => {
@@ -104,5 +104,28 @@ describe('AdsPerformanceDashboard', () => {
     // Click Analytics tab
     fireEvent.click(screen.getByRole('button', { name: /Spend and results/i }));
     expect(screen.getByTestId('analytics-tab')).toBeInTheDocument();
+  });
+  it('says nothing changed when raising the budget fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AdsPerformanceDashboard
+          orgId="org-1"
+          projectId="proj-1"
+          projectName="Growth Project"
+          items={mockItems}
+          summary={mockSummary}
+          rawTargets={[]}
+          connections={[]}
+          canExecute={true}
+        />
+      </NextIntlClientProvider>,
+    );
+    fireEvent.click(screen.getByTestId('apply-ads-rec-btn'));
+    await waitFor(() => expect(screen.getByTestId('rec-failed')).toBeInTheDocument());
+    expect(screen.getByRole('alert')).toHaveTextContent('nothing was changed');
+    expect(screen.queryByTestId('rec-applied-badge')).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });
