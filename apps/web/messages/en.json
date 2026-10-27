@@ -5076,7 +5076,7 @@
     },
     "errorPlatformOperator": "Only a GrowthOS operator can change these limits.",
     "formatVerticalHint": "For Reels, Stories and Shorts.",
-    "formatHorizontalHint": "For YouTube and in-stream video.",
+    "formatHorizontalHint": "For YouTube and other wide (landscape) videos.",
     "voiceoverWords": "{words}/{budget} words",
     "voiceoverTooLong": "Longer than fits in this scene: the narrator will rush or be cut off. Shorten it or lengthen the scene.",
     "editing": {

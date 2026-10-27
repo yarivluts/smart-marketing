@@ -5076,7 +5076,7 @@
     },
     "errorPlatformOperator": "רק מפעיל של GrowthOS יכול לשנות את המגבלות האלה.",
     "formatVerticalHint": "ל-Reels, סטוריז ו-Shorts.",
-    "formatHorizontalHint": "ליוטיוב ולסרטוני in-stream.",
+    "formatHorizontalHint": "ליוטיוב ולסרטונים לרוחב.",
     "voiceoverWords": "{words}/{budget} מילים",
     "voiceoverTooLong": "ארוך ממה שנכנס בסצנה: הקריין ימהר או ייקטע. קצרו את הטקסט או האריכו את הסצנה.",
     "editing": {
