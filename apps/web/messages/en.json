@@ -4914,13 +4914,13 @@
       "selectedTitle": "Searches your ad will show up for ({count})",
       "selectedSearches": "{searches} searches a month in all",
       "selectedEmpty": "None yet - add keywords from the list or your own.",
-      "matchTypeLabel": "Match type for {keyword}",
+      "matchTypeLabel": "Which searches should match {keyword}",
       "matchTypes": {
-        "BROAD": "Broad",
-        "PHRASE": "Phrase",
-        "EXACT": "Exact"
+        "BROAD": "Related searches too",
+        "PHRASE": "Same meaning",
+        "EXACT": "Only this search"
       },
-      "matchTypesHint": "Exact: only that search. Phrase: searches that include its meaning. Broad: related searches too - most reach, least control.",
+      "matchTypesHint": "Only this search: the fewest people, the most relevant. Same meaning: searches that mean the same thing. Related searches too: the most people, but some may not fit your offer.",
       "removeKeyword": "Remove {keyword}",
       "ownKeywordPlaceholder": "Add your own keyword",
       "addOwn": "Add",
