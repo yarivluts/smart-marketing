@@ -47,7 +47,7 @@ test.describe('Intent & Quality Scoring (KAN-83)', () => {
     ).toBeVisible();
 
     await page.getByRole('button', { name: 'Install' }).click();
-    await expect(page.getByText('No onboarding-survey answers landed for this project yet.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('No sign-up answers have arrived yet.')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('No quality-drop alerts yet.')).toBeVisible();
   });
 });
