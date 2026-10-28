@@ -11,17 +11,21 @@ export function CreateOrganizationForm(): React.ReactElement {
   const router = useRouter();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<'generic' | 'offline' | null>(null);
+  const [error, setError] = useState<'generic' | 'offline' | 'name' | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
+    if (name.trim() === '') {
+      setError('name');
+      return;
+    }
     setSubmitting(true);
     try {
       const response = await fetch('/api/orgs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: name.trim() }),
       });
       if (!response.ok) {
         setError('generic');
@@ -42,11 +46,19 @@ export function CreateOrganizationForm(): React.ReactElement {
         <label className="text-sm font-medium" htmlFor="org-name">
           {t('nameLabel')}
         </label>
-        <Input id="org-name" name="name" required value={name} onChange={(event) => setName(event.target.value)} />
+        <Input
+          id="org-name"
+          name="name"
+          required
+          aria-invalid={error === 'name'}
+          aria-describedby={error === 'name' ? 'org-name-error' : undefined}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
       </div>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {t(error === 'offline' ? 'networkError' : 'genericError')}
+        <p id={error === 'name' ? 'org-name-error' : undefined} role="alert" className="text-sm text-destructive">
+          {t(error === 'offline' ? 'networkError' : error === 'name' ? 'nameRequired' : 'genericError')}
         </p>
       ) : null}
       <Button type="submit" disabled={submitting}>
