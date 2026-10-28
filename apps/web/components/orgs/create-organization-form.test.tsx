@@ -60,4 +60,22 @@ describe('CreateOrganizationForm', () => {
     expect(screen.getByRole('button', { name: 'Create organization' })).toBeEnabled();
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('asks for a name instead of sending an empty one, and trims the name it sends', async () => {
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Type a name for your business first');
+    expect(screen.getByLabelText('Organization name')).toHaveAttribute('aria-invalid', 'true');
+    expect(fetch).not.toHaveBeenCalled();
+
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ organizationId: 'org-9' }) } as Response);
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: '  Acme ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-9'));
+    expect(fetch).toHaveBeenCalledWith('/api/orgs', expect.objectContaining({ body: JSON.stringify({ name: 'Acme' }) }));
+  });
 });
