@@ -97,7 +97,7 @@ describe('DashboardContent', () => {
     expect(within(hero).getByText('100')).toBeInTheDocument();
     // Core streams are incomplete, so the one readable project is not "fully flowing".
     expect(within(hero).getByText('0/1')).toBeInTheDocument();
-    expect(screen.getByText('2 records rejected in the same window')).toBeInTheDocument();
+    expect(screen.getByText('2 items set aside as unusable in the same window')).toBeInTheDocument();
   });
 
   it('links each org to its page and renders a health card per project', () => {
@@ -127,7 +127,7 @@ describe('DashboardContent', () => {
     renderDashboard({ orgs: [], pendingInviteCount: 0 });
     expect(screen.getByText(/one step away/)).toBeInTheDocument();
     // A newcomer has no numbers yet: empty tiles would only show jargon and dashes.
-    expect(screen.queryByText(/setup health|records accepted|all data arriving/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/data setup|data received|all data arriving/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/boards|data sources/i)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Create your first organization' })).toHaveAttribute('href', '/orgs/new');
     expect(screen.queryByRole('link', { name: /pending invite/ })).not.toBeInTheDocument();
