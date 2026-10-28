@@ -158,7 +158,7 @@ export function AdsPerformanceDashboard({
                       it says so rather than inventing one. */}
                   {t('proactiveRecommendationDesc', {
                     campaignLabel: topCampaign.label,
-                    roas: topCampaign.roas.toFixed(1),
+                    roas: topCampaign.roas.toFixed(2),
                     currentBudget: topCampaign.dailyBudgetUsd,
                     nextBudget: Math.round(topCampaign.dailyBudgetUsd * 1.2),
                   })}

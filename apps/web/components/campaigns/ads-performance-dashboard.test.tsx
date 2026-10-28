@@ -106,10 +106,11 @@ describe('AdsPerformanceDashboard', () => {
     );
 
     const banner = screen.getByTestId('proactive-recommendation-banner');
-    // The highest measured ROAS in the fixture is 3.8x on a $150/day budget, so
+    // The highest measured return in the fixture is $3.80 per $1 on a $150/day budget, so
     // 20% takes it to $180. Every figure shown has to be one of those.
     expect(banner).toHaveTextContent('Meta Retargeting Leads');
-    expect(banner).toHaveTextContent('3.8x');
+    expect(banner).toHaveTextContent('$3.80 for every $1');
+    expect(banner).not.toHaveTextContent('3.8x');
     expect(banner).toHaveTextContent('$150');
     expect(banner).toHaveTextContent('$180');
   });

@@ -3381,7 +3381,7 @@
     "keywordsLabel": "Keywords",
     "noCreativesFound": "No ads match your filter.",
     "proactiveRecommendationHeading": "A suggestion to get more from your best ad",
-    "proactiveRecommendationDesc": "{campaignLabel} earns the most back for every $1 spent: {roas}x. Applying raises its daily budget from ${currentBudget} to ${nextBudget}, a 20% increase. We do not predict more sign-ups or sales - none is measured.",
+    "proactiveRecommendationDesc": "{campaignLabel} brings back the most money: ${roas} for every $1 you spend on it. Applying raises its daily budget from ${currentBudget} to ${nextBudget}, a 20% increase. We do not predict more sign-ups or sales - none is measured.",
     "applyRecommendationButton": "Raise the daily budget",
     "recommendationApplied": "Done - the daily budget was raised",
     "recommendationFailed": "We could not raise the budget, so nothing was changed. Please try again in a minute.",

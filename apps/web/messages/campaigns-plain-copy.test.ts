@@ -31,6 +31,11 @@ describe('Campaigns spend, tab and recommendation copy', () => {
       expect(bundle.Campaigns.tabAnalytics).not.toMatch(/ROAS/);
       expect(bundle.Campaigns.proactiveRecommendationDesc).not.toMatch(/ROAS/);
     });
+    it(`${name}: the best-ad suggestion states money back in dollars, not a bare "3.8x" multiplier`, () => {
+      const text = bundle.Campaigns.proactiveRecommendationDesc;
+      expect(text).toContain('${roas}');
+      expect(text).not.toContain('{roas}x');
+    });
   }
 });
 
