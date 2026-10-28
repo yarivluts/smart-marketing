@@ -25,9 +25,9 @@ describe('dashboard setup-health KPI names the environment it averages', () => {
     });
   }
 
-  it('en: says the average is production', () => {
-    expect(en.DashboardPage.kpiAverageHealth).toMatch(/prod/i);
-    expect(en.DashboardPage.kpiAverageHealthSubtext).toMatch(/production/i);
+  it('en: says the average covers the live site, in plain words', () => {
+    expect(en.DashboardPage.kpiAverageHealthSubtext).toMatch(/live/i);
+    expect(en.DashboardPage.kpiAverageHealthEmpty).toMatch(/live/i);
   });
 });
 
