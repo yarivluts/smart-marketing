@@ -19,7 +19,7 @@ describe('CampaignSpendPanel', () => {
 
   it('says no spend was recorded rather than charting zeros', () => {
     renderWithIntl(<CampaignSpendPanel spend={{ ok: true, totalSpendUsd: 0, days: [] }} />);
-    expect(screen.getByText('No spend recorded for this campaign yet - the platform has not reported any delivery.')).toBeInTheDocument();
+    expect(screen.getByText('No spend recorded for this ad yet - the platform has not reported any delivery.')).toBeInTheDocument();
     expect(screen.queryByTestId('trend-chart')).not.toBeInTheDocument();
   });
 

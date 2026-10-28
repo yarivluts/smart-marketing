@@ -91,7 +91,7 @@ describe('CampaignListTable', () => {
       <CampaignListTable orgId="org-1" projectId="proj-1" items={mockItems} canExecute={true} />,
     );
 
-    expect(screen.getAllByTitle('Open this campaign').length).toBe(mockItems.length);
+    expect(screen.getAllByTitle('Open this ad').length).toBe(mockItems.length);
     expect(screen.queryByTitle('Inspect target')).not.toBeInTheDocument();
 
     for (const m of [en, he]) {

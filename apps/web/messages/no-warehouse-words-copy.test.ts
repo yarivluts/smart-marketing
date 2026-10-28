@@ -9,7 +9,7 @@ const PLAIN = [
   'from your connected data',
   "Once your ad spend is connected",
   "your data isn't connected yet)",
-  'Daily spend measured for this campaign.',
+  'Daily spend measured for this ad.',
   'no collected revenue has reached this project',
   'give it a little while to bring in your numbers',
 ];

@@ -3339,13 +3339,13 @@
     "refreshStateButton": "רענון מהפלטפורמה",
     "refreshStateInProgress": "מרענן...",
     "refreshStateError": "לא ניתן היה לרענן מפלטפורמת הפרסום. המצב האחרון שנרשם עדיין מוצג.",
-    "objectiveLabel": "מטרת הקמפיין",
+    "objectiveLabel": "מטרת המודעה",
     "importedAdCta": "טקסט הכפתור: {cta, select, LEARN_MORE {למידע נוסף} SHOP_NOW {לקנייה עכשיו} SIGN_UP {הרשמה} CONTACT_US {יצירת קשר} GET_QUOTE {קבלת הצעת מחיר} BOOK_TRAVEL {הזמנה} DOWNLOAD {הורדה} SUBSCRIBE {הרשמה לעדכונים} APPLY_NOW {להגשת בקשה} ORDER_NOW {להזמנה עכשיו} GET_OFFER {לקבלת ההצעה} CALL_NOW {התקשרו עכשיו} SEND_MESSAGE {שליחת הודעה} WHATSAPP_MESSAGE {הודעה בוואטסאפ} WATCH_MORE {לצפייה} other {{ctaFallback}}}",
     "spendHeading": "הוצאה על מודעות (28 הימים האחרונים)",
     "spendTotalLabel": "סך ההוצאה",
     "spendAmount": "${amount}",
     "spendChartLabel": "הוצאה יומית על מודעות",
-    "spendNoData": "טרם נרשמה הוצאה לקמפיין הזה - הפלטפורמה לא דיווחה על הצגות.",
+    "spendNoData": "טרם נרשמה הוצאה למודעה הזאת - הפלטפורמה לא דיווחה על הצגות.",
     "cockpitTitle": "מודעות וביצועים",
     "cockpitDescription": "כל המודעות שלך בפייסבוק, באינסטגרם ובגוגל במקום אחד: המודעות, כמה הוצאת, וכמה הרווחת בחזרה על כל דולר.",
     "tabOverview": "מודעות ותוצאות",
@@ -3389,18 +3389,18 @@
     "statusActive": "פעיל",
     "statusPaused": "מושהה",
     "statusSyncing": "מעדכן...",
-    "statusToggleLabel": "שנה סטטוס קמפיין עבור {name}",
+    "statusToggleLabel": "שנו סטטוס מודעה עבור {name}",
     "dailyBudgetEditLabel": "תקציב יומי עבור {name}",
     "budgetPresetIncrease": "+{percent}%",
     "budgetPresetDecrease": "-{percent}%",
-    "actionSuccessToast": "סטטוס הקמפיין \"{name}\" עודכן ל-{status, select, enabled {פעיל} paused {מושהה} other {{status}}}.",
+    "actionSuccessToast": "סטטוס המודעה \"{name}\" עודכן ל-{status, select, enabled {פעיל} paused {מושהה} other {{status}}}.",
     "budgetSuccessToast": "התקציב היומי עבור \"{name}\" עודכן ל-{amount}$ ליום.",
     "undoButton": "בטל",
     "undoSuccessToast": "הפעולה בוטלה בהצלחה.",
     "undoError": "לא ניתן לבטל את הפעולה. אנא נסו שוב.",
     "guardrailMaxChange": "זה שינוי גדול ממה שמגבלת הבטיחות מאפשרת ביום אחד. נסו צעד קטן יותר.",
     "guardrailSpendCeiling": "התקציב הזה גבוה ממגבלת ההוצאה שהוגדרה לפרויקט. נסו סכום נמוך יותר.",
-    "guardrailProtected": "הקמפיין הזה מוגן, ולכן שינויים מהירים כבויים עבורו.",
+    "guardrailProtected": "המודעה הזאת מוגנת, ולכן שינויים מהירים כבויים עבורו.",
     "guardrailOutsideHours": "שינויים אוטומטיים מותרים רק בשעות שהוגדרו. נסו שוב מאוחר יותר.",
     "guardrailDailyLimit": "הגעתם למגבלת השינויים האוטומטיים להיום. נסו שוב מחר.",
     "guardrailPaused": "השינויים האוטומטיים מושהים בארגון שלכם. בעלי הארגון יכולים להפעיל אותם מחדש.",
@@ -3408,7 +3408,7 @@
     "guardrailGeneric": "כלל בטיחות חסם את השינוי. שום דבר לא השתנה.",
     "quickActionNotConnected": "חשבון המודעות הזה עדיין לא מחובר. חברו אותו בחיבורי פלטפורמות הפרסום ונסו שוב.",
     "quickActionError": "השינוי לא נשמר. שום דבר לא השתנה - נסו שוב.",
-    "quickActionPermissionDenied": "נדרשת הרשאת עריכה כדי לשנות קמפיין. פנו לבעלי הפרויקט.",
+    "quickActionPermissionDenied": "נדרשת הרשאת עריכה כדי לשנות מודעה. פנו לבעלי הפרויקט.",
     "ctrBenchmarkComparison": "‎{diff} מעל הממוצע",
     "liveDeliveryCount": "{count} פעילים בשידור",
     "analyticsSpendByChannel": "הוצאה לפי ערוץ",
@@ -3425,7 +3425,7 @@
     "conversionsCountShort": "{count, plural, one {הרשמה או מכירה אחת} other {# הרשמות או מכירות}}",
     "ctrLabel": "לחצו",
     "cpaLabel": "למכירה",
-    "inspectTarget": "פתיחת הקמפיין",
+    "inspectTarget": "פתיחת המודעה",
     "confirmBudget": "אישור תקציב",
     "cancel": "ביטול",
     "perDay": "/יום",
@@ -3436,7 +3436,7 @@
       "metric_not_registered": "הפרויקט הזה עדיין לא עוקב אחרי הוצאות הפרסום. סיימו את שלבי ההגדרה וההוצאה תופיע כאן.",
       "not_yet_backed": "נתוני ההוצאה עדיין בהכנה. נסו שוב עוד קצת.",
       "quota_exceeded": "השתמשתם במכסה היומית לטעינת נתונים. ההוצאה תוצג שוב כשהמכסה תתאפס.",
-      "query_error": "אי אפשר להציג הוצאה לקמפיין הזה עדיין. הקמפיין עצמו לא מושפע."
+      "query_error": "אי אפשר להציג הוצאה למודעה הזאת עדיין. המודעה עצמה לא מושפעת."
     },
     "platform": {
       "google_ads": "Google Ads",
@@ -3451,7 +3451,7 @@
       "enabled": "פעיל",
       "paused": "מושהה",
       "removed": "הוסר",
-      "none": "אין קמפיין עדיין"
+      "none": "אין מודעה עדיין"
     },
     "cta": {
       "learn_more": "מידע נוסף",
@@ -3468,7 +3468,7 @@
     "spendEmptyTitle": "עדיין לא חוברה הוצאת פרסום",
     "spendEmptyNoRows": "אף חשבון מודעות לא דיווח על הוצאה ב-{days} הימים האחרונים. אחרי שתחברו את חשבון המודעות בפייסבוק, באינסטגרם או בגוגל, תראו כאן כמה הוצאתם.",
     "spendCockpitDegraded": {
-      "warehouse_not_configured": "נתוני הפרסום שלכם עדיין לא מחוברים, ולכן אי אפשר להציג הוצאה. חברו את חשבון המודעות כדי לראות הוצאה לפי ערוץ וקמפיין.",
+      "warehouse_not_configured": "נתוני הפרסום שלכם עדיין לא מחוברים, ולכן אי אפשר להציג הוצאה. חברו את חשבון המודעות כדי לראות הוצאה לפי ערוץ ומודעה.",
       "quota_exceeded": "GrowthOS הגיע היום למגבלת טעינת הנתונים. גרפי ההוצאה יחזרו מחר.",
       "not_yet_backed": "הוצאת הפרסום שלכם עדיין לא הגיעה. חברו את חשבון המודעות בפייסבוק, באינסטגרם או בגוגל והמתינו לעדכון הראשון.",
       "query_error": "לא הצלחנו לטעון את הוצאת הפרסום - עדיין לא נאספה הוצאה לפרויקט הזה. חברו את חשבון המודעות בפייסבוק, באינסטגרם או בגוגל כדי להתחיל למדוד הוצאה."
@@ -3500,11 +3500,11 @@
     "spendAvgDailyLabel": "ממוצע ליום",
     "spendPeakDayLabel": "יום השיא",
     "spendActiveDays": "{count, plural, one {יום אחד עם הוצאה} other {# ימים עם הוצאה}}",
-    "spendDescription": "ההוצאה היומית שנמדדה עבור הקמפיין הזה.",
+    "spendDescription": "ההוצאה היומית שנמדדה עבור המודעה הזאת.",
     "kpiActionsTaken": "פעולות שבוצעו",
     "lifecycleTitle": "מצב חי",
-    "lifecycleDescription": "מטיוטה ועד הוצאה - כל שלב צבוע לפי מה שקרה בפועל לקמפיין הזה.",
-    "historyDescription": "כל פעולות GrowthOS שהוצעו לקמפיין הזה והמצב של כל אחת.",
+    "lifecycleDescription": "מטיוטה ועד הוצאה - כל שלב צבוע לפי מה שקרה בפועל למודעה הזאת.",
+    "historyDescription": "כל פעולות GrowthOS שהוצעו למודעה הזאת והמצב של כל אחת.",
     "historyStatusSummary": "פעולות לפי סטטוס",
     "lifecycle": {
       "draft": {
@@ -3526,7 +3526,7 @@
         "enabled": "פעיל",
         "paused": "מושהה",
         "removed": "הוסר",
-        "none": "עדיין אין קמפיין"
+        "none": "עדיין אין מודעה"
       },
       "sync": {
         "title": "סנכרון מהפלטפורמה",
@@ -3540,8 +3540,8 @@
         "unavailable": "עדיין לא זמין לשליפה"
       }
     },
-    "euPoliticalDeclaredYes": "הוצהר לגוגל: הקמפיין כולל פרסום פוליטי המכוון לאיחוד האירופי.",
-    "euPoliticalDeclaredNo": "הוצהר לגוגל: הקמפיין אינו כולל פרסום פוליטי המכוון לאיחוד האירופי."
+    "euPoliticalDeclaredYes": "הוצהר לגוגל: המודעה כוללת פרסום פוליטי המכוון לאיחוד האירופי.",
+    "euPoliticalDeclaredNo": "הוצהר לגוגל: המודעה אינה כוללת פרסום פוליטי המכוון לאיחוד האירופי."
   },
   "FunnelGoals": {
     "noData": "אין נתונים",
