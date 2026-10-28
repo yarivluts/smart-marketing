@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { siteHost } from '@growthos/shared';
+import { normalizeSiteUrl, siteHost } from '@growthos/shared';
 import { AlertTriangle, ArrowLeft, Check, ExternalLink, Eye, FileText, Globe, ImageIcon, Loader2, MapPin, Power, Send, UserRound, Megaphone, Package, Pause, Play, Plus, ShieldCheck, Sparkles, Target, Users, Wand2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
@@ -115,6 +115,11 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           // An email is the commonest wrong paste: say so at once instead of a round trip to a vague refusal.
           if (EMAIL_PATTERN.test(url.trim())) {
             setMistake('invalid_site_email');
+            return;
+          }
+          // The same check the server makes: a word that is not an address ("my shop") is answered at once.
+          if (!normalizeSiteUrl(url)) {
+            setMistake('invalid_site');
             return;
           }
           setMistake(null);
