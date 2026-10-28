@@ -37,7 +37,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     renderForm();
 
     expect(screen.getByLabelText('Platform')).toHaveValue('google_ads');
-    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Winning Themes' } });
+    fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
     fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
     fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
@@ -50,12 +50,12 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText(/^Keywords/), { target: { value: 'blue widgets' } });
 
     // Unanswered EU political advertising declaration: blocked, nothing is sent.
-    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
     expect(await screen.findByText('Answer whether the campaign contains EU political advertising. Google Ads requires it.')).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText('No, it does not'));
-    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { targetId: string; draft: Record<string, unknown> };
@@ -75,7 +75,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
-    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Summer Sale' } });
+    fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Summer Sale' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
     fireEvent.change(screen.getByLabelText('Objective'), { target: { value: 'OUTCOME_LEADS' } });
     fireEvent.change(screen.getByLabelText('Audience group name'), { target: { value: 'Ad Set 1' } });
@@ -88,7 +88,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Primary text'), { target: { value: 'Big summer savings.' } });
     fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Sale' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { draft: Record<string, unknown> };
@@ -108,7 +108,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
-    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Summer Sale' } });
+    fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Summer Sale' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
     fireEvent.change(screen.getByLabelText('Audience group name'), { target: { value: 'Ad Set 1' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
@@ -124,7 +124,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     await screen.findByAltText('Preview of the selected ad image');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     const body = lastRequestBody() as { draft: Record<string, unknown> };
@@ -159,10 +159,10 @@ describe('AutomationProposeCampaignDraftForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
-    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Summer Sale' } });
+    fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Summer Sale' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Enter at least one country code.');
     expect(fetch).not.toHaveBeenCalled();
@@ -172,7 +172,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Winning Themes' } });
+    fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
     fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
     fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
@@ -185,9 +185,9 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText(/^Keywords/), { target: { value: 'blue widgets' } });
     fireEvent.click(screen.getByLabelText('Yes, it does'));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the campaign draft. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the ad draft. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

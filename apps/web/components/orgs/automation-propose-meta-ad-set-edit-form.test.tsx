@@ -48,7 +48,7 @@ describe('AutomationProposeMetaAdSetEditForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/create and run a campaign draft/)).toBeInTheDocument();
+    expect(screen.getByText(/create and run an ad draft/)).toBeInTheDocument();
   });
 
   it('submits a budget-only edit for the selected target and ad set', async () => {
