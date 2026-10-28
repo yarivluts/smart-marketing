@@ -64,3 +64,20 @@ describe('Ads & results counts say sign-ups or sales, not conversions', () => {
     });
   }
 });
+
+describe('Ads & results page says ads, not campaigns', () => {
+  const KEYS = [
+    'metaTitle', 'title', 'backToCampaigns', 'noCampaigns', 'seedTargetHeading',
+    'newCampaignHeading', 'noHistory', 'noCreativesYet', 'pauseButton', 'pauseError',
+    'tabOverview', 'metricActiveCampaigns', 'searchPlaceholder', 'columnCampaign',
+  ] as const;
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it.each(KEYS)(`${name}: %s avoids the word campaign`, (key) => {
+      expect(bundle.Campaigns[key]).not.toMatch(/campaign|קמפיין/i);
+    });
+  }
+  it('the page title keeps the project name', () => {
+    expect(en.Campaigns.title).toContain('{projectName}');
+    expect(he.Campaigns.title).toContain('{projectName}');
+  });
+});
