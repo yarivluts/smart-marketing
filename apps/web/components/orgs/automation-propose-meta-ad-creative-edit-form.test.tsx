@@ -48,7 +48,7 @@ describe('AutomationProposeMetaAdCreativeEditForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/create and execute a campaign draft/)).toBeInTheDocument();
+    expect(screen.getByText(/create and run an ad draft/)).toBeInTheDocument();
   });
 
   it('submits a creative edit for the selected target and ad', async () => {

@@ -51,7 +51,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
 
     // Unanswered EU political advertising declaration: blocked, nothing is sent.
     fireEvent.click(screen.getByRole('button', { name: 'Propose ad draft' }));
-    expect(await screen.findByText('Answer whether the campaign contains EU political advertising. Google Ads requires it.')).toBeInTheDocument();
+    expect(await screen.findByText('Answer whether the ad contains EU political advertising. Google Ads requires it.')).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByLabelText('No, it does not'));
