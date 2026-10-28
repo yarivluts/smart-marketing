@@ -114,6 +114,15 @@ describe('GrowthPilotApp', () => {
     expect(alert).not.toHaveTextContent('Try again in a minute');
   });
 
+  it('tells someone who typed something that is not an address so at once, without calling the server', () => {
+    const fetchMock = stubFetch();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    fireEvent.change(screen.getByTestId('growth-pilot-site-input'), { target: { value: 'my shop' } });
+    fireEvent.click(screen.getByTestId('growth-pilot-start-button'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a website address, like example.com.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('tells someone who pasted an email to enter the website, without calling the server', () => {
     const fetchMock = stubFetch();
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
