@@ -62,7 +62,7 @@ describe('PlanningPanel', () => {
     const rows = within(checklist).getAllByRole('listitem');
     expect(rows.map((row) => row.getAttribute('data-status'))).toEqual(['ok', 'ok', 'unavailable', 'unavailable', 'model']);
     expect(within(rows[0]).getByText('Read example.com/lawyers')).toBeInTheDocument();
-    expect(within(rows[2]).getByText('The project has no campaigns yet.')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('The project has no ads yet.')).toBeInTheDocument();
     expect(within(rows[3]).getByText('Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.')).toBeInTheDocument();
     expect(within(rows[4]).getByText('General knowledge from the AI model. Not measured.')).toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe('PlanningPanel', () => {
     // No empty chart repeats the reason: it is said once, next to the source.
     expect(screen.queryByText(/^Not available:/)).toBeNull();
     expect(screen.getAllByText('Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.')).toHaveLength(1);
-    expect(within(screen.getByTestId('ad-studio-plan-sources')).getByText('The project has no campaigns yet.')).toBeInTheDocument();
+    expect(within(screen.getByTestId('ad-studio-plan-sources')).getByText('The project has no ads yet.')).toBeInTheDocument();
   });
 
   it('shows recommendations high priority first with the evidence they cite, flags unsupported ones, and labels market notes as not measured', () => {

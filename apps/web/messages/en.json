@@ -4168,11 +4168,11 @@
     "stagePlanValue": "{count, plural, one {# recommendation} other {# recommendations}}",
     "plan": {
       "title": "Deep analysis",
-      "description": "Reads your landing page, measured results, campaigns and Google keyword volumes, then plans the ad from that evidence.",
+      "description": "Reads your landing page, measured results, existing ads and Google keyword volumes, then plans the ad from that evidence.",
       "run": "Run deep analysis",
       "rerun": "Run again",
       "running": "Analyzing...",
-      "runningHint": "Reading the landing page, results, campaigns and keyword volumes. This can take up to a minute.",
+      "runningHint": "Reading the landing page, results, existing ads and keyword volumes. This can take up to a minute.",
       "noProvider": "The AI helper is not switched on yet, so it cannot analyze your ads. Contact GrowthOS support to switch it on.",
       "emptyTitle": "No analysis yet",
       "emptyDescription": "Run a deep analysis to see what the evidence says before writing the script. The script writer then builds on it.",
@@ -4183,7 +4183,7 @@
       "source": {
         "landing_page": "Landing page",
         "results": "Measured results",
-        "campaigns": "Existing campaigns",
+        "campaigns": "Your existing ads",
         "keywords": "Keyword volumes",
         "market": "Market knowledge"
       },
@@ -4211,7 +4211,7 @@
           "no_traffic": "No landing page visits in the last 90 days."
         },
         "campaigns": {
-          "no_campaigns": "The project has no campaigns yet."
+          "no_campaigns": "The project has no ads yet."
         },
         "keywords": {
           "no_google_ads_credential": "Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.",
@@ -4242,8 +4242,8 @@
       "pagesChartTitle": "Visitors per landing page",
       "pagesChartDescription": "Last {days} days. Each sign-up or sale is credited to the last page or ad they came from.",
       "pageSublabel": "{conversions} sign-ups or sales · {rate} of visitors",
-      "campaignsRateTitle": "Share of visitors who convert, by campaign",
-      "campaignsRateDescription": "For each campaign, how many visitors did what you want, over the same days.",
+      "campaignsRateTitle": "Share of visitors who sign up or buy, by ad",
+      "campaignsRateDescription": "For each ad, how many visitors did what you want, over the same days.",
       "campaignRateSublabel": "{visitors} visitors · {conversions} sign-ups or sales",
       "noRate": "no visitors",
       "totals": "{visitors} visitors · {conversions} sign-ups or sales · {rate} overall",
@@ -4258,8 +4258,8 @@
       "keywordSublabel": "{competition}",
       "keywordSublabelBid": "{competition} · typical cost per click {low}-{high}",
       "volumeUnknown": "not reported",
-      "campaignsTitle": "Existing campaigns",
-      "campaignsDescription": "Your campaigns by daily budget (USD), with their imported ads.",
+      "campaignsTitle": "Your existing ads",
+      "campaignsDescription": "Your ads by daily budget (USD).",
       "campaignSublabel": "{platform} · {status} · {ads, plural, one {# ad} other {# ads}}",
       "platform": {
         "google_ads": "Google Ads",
@@ -5014,7 +5014,7 @@
       "estimateValue": "About {range} people a month",
       "estimateNone": "Meta gave no estimate for this audience.",
       "pastTitle": "What worked before",
-      "pastDescription": "Your Meta ad account's last 90 days, every campaign: money spent, clicks, and sign-ups or sales for each group of people.",
+      "pastDescription": "Your Facebook & Instagram ad account's last 90 days, every ad: money spent, clicks, and sign-ups or sales for each group of people.",
       "breakdowns": {
         "age_gender": "Age & gender",
         "placement": "Where the ad showed",
