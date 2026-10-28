@@ -48,3 +48,28 @@ describe('the AI helper confirmations point to Change history, not the audit log
     expect(he.Copilot.actionExecuted).toContain('היסטוריית שינויים');
   });
 });
+
+describe('the AI helper chips say ad, like the rest of the app', () => {
+  const PANEL_KEYS = ['chipScaleBudgetQuery', 'chipNewCampaignLabel', 'chipNewCampaignQuery'] as const;
+  const panels = [
+    ['en', en.CopilotEngine, en.CopilotChatPanel],
+    ['he', he.CopilotEngine, he.CopilotChatPanel],
+  ] as const;
+
+  it('no chip says campaign / קמפיין', () => {
+    expect(en.Copilot.chipNewCampaign).not.toMatch(/campaign/i);
+    expect(he.Copilot.chipNewCampaign).not.toContain('קמפיין');
+    for (const key of PANEL_KEYS) {
+      expect(en.CopilotChatPanel[key], key).not.toMatch(/campaign/i);
+      expect(he.CopilotChatPanel[key], key).not.toContain('קמפיין');
+    }
+  });
+
+  it('the new-ad chip prompt is still understood as a new-ad request', () => {
+    for (const [lang, copilot, panel] of panels) {
+      const phrases = (copilot.intents.newCampaign as string[]).map((p) => p.toLowerCase());
+      const query = panel.chipNewCampaignQuery.toLowerCase();
+      expect(phrases.some((p) => query.includes(p)), lang).toBe(true);
+    }
+  });
+});

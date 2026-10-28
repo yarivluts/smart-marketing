@@ -3646,7 +3646,7 @@
     "executing": "מחיל...",
     "chipTopAds": "מודעות מובילות",
     "chipIncreaseBudget": "הגדלת תקציב",
-    "chipNewCampaign": "קמפיין חדש",
+    "chipNewCampaign": "מודעה חדשה",
     "chipRebalance": "איזון גוגל ← מטא",
     "chipOptimizeFunnel": "ייעול משפך",
     "impactBadgeLabel": "השפעת {impact, select, high {גבוהה} medium {בינונית} low {נמוכה} other {השפעה}}",
@@ -3792,9 +3792,15 @@
         "צור קמפיין",
         "צרו קמפיין",
         "קמפיין חדש",
+        "מודעה חדשה",
+        "צרו מודעה",
+        "הכינו מודעה",
         "new campaign",
         "create campaign",
-        "search campaign"
+        "search campaign",
+        "new ad",
+        "create ad",
+        "create a new ad"
       ],
       "rebalance": [
         "איזון תקציב",
@@ -3827,9 +3833,9 @@
     "chipTopAdsLabel": "מודעות מובילות",
     "chipTopAdsQuery": "אילו מודעות הכי רווחיות השבוע?",
     "chipScaleBudgetLabel": "הגדלת תקציב",
-    "chipScaleBudgetQuery": "הגדילו תקציב ל-$250 לקמפיין שלי",
-    "chipNewCampaignLabel": "קמפיין חדש",
-    "chipNewCampaignQuery": "הכינו קמפיין חדש לעסק שלי",
+    "chipScaleBudgetQuery": "הגדילו תקציב ל-$250 למודעה שלי",
+    "chipNewCampaignLabel": "מודעה חדשה",
+    "chipNewCampaignQuery": "הכינו מודעה חדשה לעסק שלי",
     "chipRebalanceLabel": "העברת תקציב",
     "chipRebalanceQuery": "העבירו תקציב מגוגל למטא",
     "clearChat": "ניקוי השיחה"
