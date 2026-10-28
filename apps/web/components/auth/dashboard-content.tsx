@@ -76,6 +76,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
           </>
         }
       >
+        {overview.orgs.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiOrganizations')} value={numberFormat.format(overview.orgs.length)} icon={Building2} subtext={t('kpiProjectsSubtext', { count: projectCount })} />
           <StatCard
@@ -93,6 +94,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
             subtext={totalRejected > 0 ? t('kpiRejectedSubtext', { count: totalRejected }) : t('kpiFlowingSubtext')}
           />
         </div>
+        ) : null}
       </PageHero>
 
       {overview.orgs.length === 0 ? (
