@@ -3661,12 +3661,12 @@
     "badgeAction": "Ask AI",
     "badgeNav": "Navigate",
     "askSpendLabel": "Where is ad spend returning the least?",
-    "askSpendQuery": "Using this project's data, which campaigns or channels return the least for their spend, and what does the data say about why?",
+    "askSpendQuery": "Using this project's data, which ads or platforms return the least for their spend, and what does the data say about why?",
     "askFunnelLabel": "At which step do people leave before buying?",
     "askFunnelQuery": "Using this project's customer path (the steps from first visit to buying), at which step do the most people leave, and what is known about them?",
     "askGoalsLabel": "Which goals are off pace?",
     "askGoalsQuery": "Using this project's goals, which ones are off pace, by how much, and which metrics are driving the gap?",
-    "navAds": "Your ad campaigns and what they earn",
+    "navAds": "Your ads and what they earn",
     "navFunnel": "Where people drop off",
     "navAutomation": "Changes GrowthOS suggests",
     "navSettings": "Organization Settings",
@@ -3847,7 +3847,7 @@
     "pendingCount": "{count} pending"
   },
   "ActionAuditTrail": {
-    "searchPlaceholder": "Search by campaign or ID...",
+    "searchPlaceholder": "Search by ad or ID...",
     "filterAll": "All ({count})",
     "filterExecuted": "Done",
     "filterRolledBack": "Undone",
