@@ -53,7 +53,7 @@ describe('AdsKpiScorecards', () => {
     expect(screen.getByText('$44.05')).toBeInTheDocument();
 
     // 6. Active Campaigns
-    expect(screen.getByText('Active Campaigns')).toBeInTheDocument();
+    expect(screen.getByText('Active ads')).toBeInTheDocument();
     expect(screen.getByText('5 / 6')).toBeInTheDocument();
     expect(screen.getByText('5 live delivery')).toBeInTheDocument();
   });
