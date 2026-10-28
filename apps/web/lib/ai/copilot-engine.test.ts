@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import enMessages from '@/messages/en.json';
+import heMessages from '@/messages/he.json';
 import {
   COPILOT_INTENTS,
   buildCopilotEngineMessages,
@@ -68,7 +70,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
         EN,
       );
       expect(result.message.content).toBe(
-        'The largest drop-off is at "Document Viewed", losing 62% of the visitors who reach it. Ask me to draft a campaign that wins those visitors back, and name a daily budget.',
+        'The largest drop-off is at "Document Viewed", losing 62% of the visitors who reach it. Ask me to draft an ad that brings those visitors back, and name a daily budget.',
       );
     });
   });
@@ -101,7 +103,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
       };
       const result = processCopilotQuery('Increase budget to $250', ambiguous, EN);
       expect(result.actionProposal).toBeUndefined();
-      expect(result.message.content).toMatch(/which campaign/i);
+      expect(result.message.content).toMatch(/which ad/i);
     });
 
     it('proposes nothing at all when the project has no campaigns', () => {
@@ -129,7 +131,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
       expect(result.actionProposal?.actionType).toBe('campaign_draft_create');
       expect(result.actionProposal?.payload.dailyBudgetUsd).toBe(200);
       expect(result.actionProposal?.estimatedImpact).toBeUndefined();
-      expect(result.message.content).toBe('Prepared a campaign draft at $200/day. Look over the ads before approving.');
+      expect(result.message.content).toBe('Prepared a new ad draft at $200/day. Look over the ads before approving.');
     });
 
     it('asks for a budget rather than inventing one for a new campaign', () => {
@@ -141,7 +143,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
 
   it('returns a fallback message when the intent is unrecognized', () => {
     const result = processCopilotQuery('hello growthos', CONTEXT, EN);
-    expect(result.message.content).toBe('How can I help you with your campaigns today?');
+    expect(result.message.content).toBe('How can I help you with your ads today?');
     expect(result.actionProposal).toBeUndefined();
   });
 
@@ -263,5 +265,17 @@ describe('CopilotEngine NLP & Action Proposals', () => {
         expect(result.actionProposal?.payload.dailyBudgetUsd).toBe(amount);
       }
     });
+  });
+});
+
+describe('copilot replies speak of ads, not campaigns', () => {
+  it.each([
+    ['en', enMessages],
+    ['he', heMessages],
+  ] as const)('%s replies avoid the word campaign', (_locale, bundle) => {
+    const c = bundle.CopilotEngine;
+    for (const reply of [c.noPerformanceData, c.noCampaign, c.askNewCampaignBudget, c.campaignDraftProposed, c.largestDropOff, c.fallback]) {
+      expect(reply).not.toMatch(/campaign|קמפיין/i);
+    }
   });
 });
