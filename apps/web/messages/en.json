@@ -5946,7 +5946,7 @@
         "female": "Women"
       },
       "reach": "Facebook and Instagram estimate {lower}-{upper} people a month",
-      "metaMissing": "Connect your Facebook and Instagram (Meta) ad account to see how many people the ads can reach and to match what they care about. Until then, the ads use the countries, ages and genders above.",
+      "metaMissing": "Connect your Facebook and Instagram ad account to see how many people the ads can reach and to match what they care about. Until then, the ads use the countries, ages and genders above.",
       "metaFailed": "Facebook and Instagram did not answer, so we could not match what these people care about yet. You can approve the rest now.",
       "revising": "The AI is updating who the ads reach...",
       "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
@@ -5960,7 +5960,7 @@
     "publish": {
       "title": "Publish the ads for {name}",
       "activateTitle": "Turn on the ads for {name}",
-      "description": "{count, plural, one {The approved image goes to Facebook and Instagram (Meta) as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
+      "description": "{count, plural, one {The approved image goes to Facebook and Instagram as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
       "activateDescription": "The ads are on Facebook and Instagram, switched off. Turning them on makes them visible and starts spending - up to {budget} a day in your ad account currency.",
       "link": "Where people land after clicking",
       "countries": "Countries",
@@ -5970,7 +5970,7 @@
       "approve": "Publish (switched off)",
       "activate": "Turn on the ads",
       "status": {
-        "needs_meta": "Ready to publish once your Facebook and Instagram (Meta) ad account is connected.",
+        "needs_meta": "Ready to publish once your Facebook and Instagram ad account is connected.",
         "ready": "Publishing waits for your approval",
         "published": "On Facebook and Instagram, switched off - not showing to anyone",
         "running": "Ads are running",
@@ -5987,7 +5987,7 @@
       "days": "Last {count} days",
       "loading": "Reading the numbers from Facebook and Instagram...",
       "unavailable": "Facebook and Instagram did not return the numbers right now. Try again in a few minutes.",
-      "unavailableMeta": "Connect your Facebook and Instagram (Meta) ad account to see how the ads are doing.",
+      "unavailableMeta": "Connect your Facebook and Instagram ad account to see how the ads are doing.",
       "noDelivery": "The ads have not been shown yet in this period - switched-off ads show no results until you turn them on.",
       "chart": "Clicks, sign-ups and sales per day",
       "ctr": "{value} of the people who saw an ad clicked it",
