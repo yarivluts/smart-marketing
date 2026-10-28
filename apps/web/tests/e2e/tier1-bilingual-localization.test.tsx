@@ -96,8 +96,8 @@ describe('Tier 1: Bilingual Symmetrical Localization & RTL/LTR (R4)', () => {
   it('7.6 localizes core navigation labels accurately across both languages', () => {
     expect(en.AppShell.brandName).toBe('GrowthOS');
     expect(he.AppShell.brandName).toBe('GrowthOS');
-    expect(en.Campaigns.metaTitle).toBe('Campaigns');
-    expect(he.Campaigns.metaTitle).toBe('קמפיינים');
+    expect(en.Campaigns.metaTitle).toBe('Ads & results');
+    expect(he.Campaigns.metaTitle).toBe(he.Campaigns.tabOverview);
     expect(en.Automation.metaTitle).toBe('Automation');
     expect(he.Automation.metaTitle).toBe('אוטומציה');
   });
