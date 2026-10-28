@@ -50,6 +50,6 @@ test.describe('Campaign ops (KAN-86)', () => {
     await expect(page.getByText('No payback data available yet — it will show here once your data is connected.')).not.toBeVisible();
     await page.getByRole('button', { name: 'Install' }).click();
     await expect(page.getByText('No payback data available yet — it will show here once your data is connected.')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('No per-campaign payback data available yet — it will show here once your data is connected.')).toBeVisible();
+    await expect(page.getByText('No per-ad payback data available yet — it will show here once your data is connected.')).toBeVisible();
   });
 });
