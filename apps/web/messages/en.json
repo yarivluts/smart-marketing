@@ -3979,6 +3979,17 @@
     },
     "quotaExceeded": "You have used today's AI allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
     "errorInvalidBrief": "Check what the ad is about: {reasons}",
+    "briefIssues": {
+      "name": "Give the ad a short name (up to 120 characters).",
+      "objective": "Say what you want this ad to achieve (up to 2000 characters).",
+      "productDescription": "Describe what you sell (up to 4000 characters).",
+      "landingPageUrl": "Check the website address, for example mysite.com/offer.",
+      "format": "Choose tall or wide.",
+      "language": "Choose the language of the ad.",
+      "targetSeconds": "Choose how long the video should be.",
+      "limits": "Use whole numbers inside the allowed range for the daily limits.",
+      "unknown": "Something you typed needs a second look."
+    },
     "errorInvalidScript": "Some scenes in the script need a change before it can be saved. Fix the scenes marked in red and save again.",
     "errorSignedOut": "You were signed out. Reload the page and sign in again - nothing was lost.",
     "errorForbidden": "You do not have permission to do this in this project. Ask the project owner to give you access, then try again.",

@@ -29,4 +29,25 @@ describe('useAdStudioErrorMessage', () => {
     renderWithIntl(<Message error="boom" />, { locale: 'en' });
     expect(screen.getByRole('alert')).toHaveTextContent(enMessages.AdStudio.errorGeneric);
   });
+
+  it.each([
+    ['en', enMessages.AdStudio],
+    ['he', heMessages.AdStudio],
+  ] as const)('%s: a rejected ad form names the field in plain words, not the server sentence', (locale, studio) => {
+    function Invalid(): React.ReactElement {
+      const errorMessage = useAdStudioErrorMessage();
+      return (
+        <p role="alert">
+          {errorMessage({ error: 'invalid_brief', reasons: ['name must be 1-120 characters', 'landingPageUrl must be an http(s) URL', 'dailyImages must be a whole number from 0 to 50', 'mystery'] })}
+        </p>
+      );
+    }
+    renderWithIntl(<Invalid />, { locale });
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent(studio.briefIssues.name);
+    expect(alert).toHaveTextContent(studio.briefIssues.landingPageUrl);
+    expect(alert).toHaveTextContent(studio.briefIssues.limits);
+    expect(alert).toHaveTextContent(studio.briefIssues.unknown);
+    expect(alert).not.toHaveTextContent(/must be|http\(s\)|from 0 to|landingPageUrl|dailyImages/);
+  });
 });

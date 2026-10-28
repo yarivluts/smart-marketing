@@ -39,6 +39,16 @@ const SEARCH_CODES = new Set([
   'description_too_long',
   'path_too_long',
 ]);
+const BRIEF_FIELDS = new Set(['name', 'objective', 'productDescription', 'landingPageUrl', 'format', 'language', 'targetSeconds']);
+const LIMIT_FIELDS = new Set(['dailyTextGenerations', 'dailyVideoSeconds', 'dailyImages', 'videoQa.retries', 'imageSize']);
+
+/** A server validation sentence ("name must be 1-120 characters") as the translated key for its field. */
+function briefIssueKey(reason: string): string {
+  const field = reason.split(' ')[0] ?? '';
+  if (BRIEF_FIELDS.has(field)) return field;
+  return LIMIT_FIELDS.has(field) ? 'limits' : 'unknown';
+}
+
 const REFERENCE_REQUEST_CODES = new Set([
   'unsupported_image',
   'image_too_large',
@@ -56,7 +66,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
   return (body) => {
     if (body.error === 'provider_failed' && body.code && PROVIDER_CODES.has(body.code)) return t(`providerErrors.${body.code}`);
     if (body.error === 'quota_exceeded') return t(body.limitKind === 'image' ? 'images.quotaExceeded' : 'quotaExceeded', { used: body.used ?? 0, limit: body.limit ?? 0 });
-    if (body.error === 'invalid_brief') return t('errorInvalidBrief', { reasons: (body.reasons ?? []).join('; ') });
+    if (body.error === 'invalid_brief') return t('errorInvalidBrief', { reasons: [...new Set((body.reasons ?? []).map((reason) => t(`briefIssues.${briefIssueKey(reason)}`)))].join(' ') });
     if (body.error === 'invalid_script') return t('errorInvalidScript');
     if (body.error === 'video_request' && body.code && VIDEO_REQUEST_CODES.has(body.code)) return t(`videoRequestErrors.${body.code}`);
     if (body.error === 'assembly_failed' && body.code && ASSEMBLY_CODES.has(body.code)) return t(`assemblyErrors.${body.code}`);
