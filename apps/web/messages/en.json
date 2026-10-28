@@ -3345,7 +3345,7 @@
     "spendTotalLabel": "Total spend",
     "spendAmount": "${amount}",
     "spendChartLabel": "Daily ad spend",
-    "spendNoData": "No spend recorded for this campaign yet - the platform has not reported any delivery.",
+    "spendNoData": "No spend recorded for this ad yet - the platform has not reported any delivery.",
     "cockpitTitle": "Ads & Performance",
     "cockpitDescription": "All your Facebook, Instagram and Google ads in one place: the ads, what you spent, and how much you earned back for each dollar.",
     "tabOverview": "Ads & results",
@@ -3389,18 +3389,18 @@
     "statusActive": "Active",
     "statusPaused": "Paused",
     "statusSyncing": "Updating...",
-    "statusToggleLabel": "Toggle campaign status for {name}",
+    "statusToggleLabel": "Toggle ad status for {name}",
     "dailyBudgetEditLabel": "Daily budget for {name}",
     "budgetPresetIncrease": "+{percent}%",
     "budgetPresetDecrease": "-{percent}%",
-    "actionSuccessToast": "Campaign \"{name}\" status updated to {status, select, enabled {Active} paused {Paused} other {{status}}}.",
+    "actionSuccessToast": "Ad \"{name}\" status updated to {status, select, enabled {Active} paused {Paused} other {{status}}}.",
     "budgetSuccessToast": "Daily budget for \"{name}\" updated to ${amount}/day.",
     "undoButton": "Undo",
     "undoSuccessToast": "Action undone successfully.",
     "undoError": "Could not undo action. Please try again.",
     "guardrailMaxChange": "That is a bigger change than your safety limit allows in one day. Try a smaller step.",
     "guardrailSpendCeiling": "That budget is above the spending limit set for this project. Try a lower amount.",
-    "guardrailProtected": "This campaign is protected, so quick changes are switched off for it.",
+    "guardrailProtected": "This ad is protected, so quick changes are switched off for it.",
     "guardrailOutsideHours": "Changes are only allowed during the hours set for automatic changes. Try again later.",
     "guardrailDailyLimit": "You have reached today's limit of automatic changes. Try again tomorrow.",
     "guardrailPaused": "Automatic changes are paused for your organization. An owner can switch them back on.",
@@ -3408,7 +3408,7 @@
     "guardrailGeneric": "A safety rule blocked this change. Nothing was changed.",
     "quickActionNotConnected": "This ad account is not connected yet. Connect it under Ad platform connections, then try again.",
     "quickActionError": "The change was not saved. Nothing was changed - please try again.",
-    "quickActionPermissionDenied": "You need edit access to change a campaign. Ask the project owner.",
+    "quickActionPermissionDenied": "You need edit access to change an ad. Ask the project owner.",
     "ctrBenchmarkComparison": "{diff} vs benchmark",
     "liveDeliveryCount": "{count} live delivery",
     "analyticsSpendByChannel": "Spend by Channel",
@@ -3425,7 +3425,7 @@
     "conversionsCountShort": "{count, plural, one {# sign-up or sale} other {# sign-ups or sales}}",
     "ctrLabel": "clicked",
     "cpaLabel": "per sale",
-    "inspectTarget": "Open this campaign",
+    "inspectTarget": "Open this ad",
     "confirmBudget": "Confirm budget",
     "cancel": "Cancel",
     "perDay": "/day",
@@ -3436,7 +3436,7 @@
       "metric_not_registered": "This project is not tracking ad spend yet. Finish the setup steps and spend will show up here.",
       "not_yet_backed": "Spend numbers are still being prepared. Check back a little later.",
       "quota_exceeded": "You have used today's limit for loading numbers. Spend will show again when the limit resets.",
-      "query_error": "We cannot show spend for this campaign yet. The campaign itself is not affected."
+      "query_error": "We cannot show spend for this ad yet. The ad itself is not affected."
     },
     "platform": {
       "google_ads": "Google Ads",
@@ -3451,7 +3451,7 @@
       "enabled": "Active",
       "paused": "Paused",
       "removed": "Removed",
-      "none": "No campaign yet"
+      "none": "No ad yet"
     },
     "cta": {
       "learn_more": "Learn More",
@@ -3468,7 +3468,7 @@
     "spendEmptyTitle": "No ad spend connected yet",
     "spendEmptyNoRows": "None of your ad accounts has reported spend in the last {days} days. Once your Facebook, Instagram or Google ad account is connected, what you spent shows up here.",
     "spendCockpitDegraded": {
-      "warehouse_not_configured": "Your ad numbers are not connected yet, so ad spend cannot be shown. Connect your ad account to see spend by channel and campaign.",
+      "warehouse_not_configured": "Your ad numbers are not connected yet, so ad spend cannot be shown. Connect your ad account to see spend by channel and ad.",
       "quota_exceeded": "GrowthOS has reached today's limit for loading your numbers. The spend charts come back tomorrow.",
       "not_yet_backed": "Your ad spend has not arrived yet. Connect your Facebook, Instagram or Google ad account and wait for the first update.",
       "query_error": "We could not load your ad spend - no spend has been collected for this project yet. Connect your Facebook, Instagram or Google ad account to start measuring spend."
@@ -3500,11 +3500,11 @@
     "spendAvgDailyLabel": "Avg. per day",
     "spendPeakDayLabel": "Peak day",
     "spendActiveDays": "{count, plural, one {# day with spend} other {# days with spend}}",
-    "spendDescription": "Daily spend measured for this campaign.",
+    "spendDescription": "Daily spend measured for this ad.",
     "kpiActionsTaken": "Actions taken",
     "lifecycleTitle": "Live state",
-    "lifecycleDescription": "From draft to spend - each stage is colored by what actually happened to this campaign.",
-    "historyDescription": "Every GrowthOS action proposed for this campaign and where it stands.",
+    "lifecycleDescription": "From draft to spend - each stage is colored by what actually happened to this ad.",
+    "historyDescription": "Every GrowthOS action proposed for this ad and where it stands.",
     "historyStatusSummary": "Actions by status",
     "lifecycle": {
       "draft": {
@@ -3526,7 +3526,7 @@
         "enabled": "Delivering",
         "paused": "Paused",
         "removed": "Removed",
-        "none": "No campaign yet"
+        "none": "No ad yet"
       },
       "sync": {
         "title": "Platform sync",
@@ -3540,8 +3540,8 @@
         "unavailable": "Not queryable yet"
       }
     },
-    "euPoliticalDeclaredYes": "Declared to Google: this campaign contains political advertising aimed at the EU.",
-    "euPoliticalDeclaredNo": "Declared to Google: this campaign does not contain political advertising aimed at the EU."
+    "euPoliticalDeclaredYes": "Declared to Google: this ad contains political advertising aimed at the EU.",
+    "euPoliticalDeclaredNo": "Declared to Google: this ad does not contain political advertising aimed at the EU."
   },
   "FunnelGoals": {
     "noData": "No data",

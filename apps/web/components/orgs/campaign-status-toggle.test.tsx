@@ -97,7 +97,7 @@ describe('CampaignStatusToggle', () => {
     await waitFor(() => {
       // Reverted to original
       expect(button).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('alert')).toHaveTextContent('This campaign is protected, so quick changes are switched off for it.');
+      expect(screen.getByRole('alert')).toHaveTextContent('This ad is protected, so quick changes are switched off for it.');
     });
   });
 

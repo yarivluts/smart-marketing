@@ -81,3 +81,21 @@ describe('Ads & results page says ads, not campaigns', () => {
     expect(he.Campaigns.title).toContain('{projectName}');
   });
 });
+
+describe('Ad details copy says ad, not campaign', () => {
+  const KEYS = [
+    'objectiveLabel', 'spendNoData', 'statusToggleLabel', 'actionSuccessToast',
+    'guardrailProtected', 'quickActionPermissionDenied', 'inspectTarget', 'spendDescription',
+    'lifecycleDescription', 'historyDescription', 'euPoliticalDeclaredYes', 'euPoliticalDeclaredNo',
+  ] as const;
+  for (const [name, bundle] of [['en', en], ['he', he]] as const) {
+    it.each(KEYS)(`${name}: %s avoids the word campaign`, (key) => {
+      expect(bundle.Campaigns[key]).not.toMatch(/campaign|קמפיין/i);
+    });
+    it(`${name}: spend and status fallbacks avoid the word campaign`, () => {
+      expect(bundle.Campaigns.spendDegraded.query_error).not.toMatch(/campaign|קמפיין/i);
+      expect(bundle.Campaigns.spendCockpitDegraded.warehouse_not_configured).not.toMatch(/campaign|קמפיין/i);
+      expect(bundle.Campaigns.status.none).not.toMatch(/campaign|קמפיין/i);
+    });
+  }
+});
