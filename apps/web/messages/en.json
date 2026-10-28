@@ -452,7 +452,7 @@
     "finishButton": "Finish",
     "doneMessage": "You're all set!",
     "packLandingPageTitle": "Landing Page Performance",
-    "packLandingPageDescription": "Track conversion per landing page across campaigns.",
+    "packLandingPageDescription": "See which of your pages turns visitors into sign-ups or sales, whichever ad brought them.",
     "sourceStepPushYourOwnIntro": "Works right now, with nothing to install — create a key below and start sending your data (like signups and purchases) straight away.",
     "eyebrow": "Setup",
     "journeyStep_start": "Start",
@@ -1272,8 +1272,8 @@
     "mappingNote": "Each item is matched by the name of the data it receives, so check the names listed under each one: a name like \"order_viewed\" would be counted as billing.",
     "requirements": {
       "landing_page_attribution": {
-        "title": "Which page and campaign brought each visitor",
-        "impact": "Without visit records no signup or customer can be traced back to the campaign, channel or landing page that brought it."
+        "title": "Which page and ad brought each visitor",
+        "impact": "Without visit records no signup or customer can be traced back to the ad, channel or landing page that brought it."
       },
       "signups": {
         "title": "Signups",
