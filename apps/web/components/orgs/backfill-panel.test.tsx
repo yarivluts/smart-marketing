@@ -85,9 +85,9 @@ describe('BackfillPanel', () => {
       />,
       { locale: 'he' },
     );
-    expect(within(screen.getByTestId('backfill-a')).getByText(/שגיאה בצד הנקודה שלך \(HTTP 502\)/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('backfill-a')).getByText(/שגיאה בצד הנקודה שלכם \(HTTP 502\)/)).toBeInTheDocument();
     const generic = within(screen.getByTestId('backfill-b'));
-    expect(generic.getByText(/לא הצלחנו להגיע לנקודה שלך/)).toBeInTheDocument();
+    expect(generic.getByText(/לא הצלחנו להגיע לנקודה שלכם/)).toBeInTheDocument();
     expect(screen.queryByText(/ECONNREFUSED/)).toBeNull();
   });
 

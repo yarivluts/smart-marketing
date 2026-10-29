@@ -30,7 +30,7 @@ describe('Data health page avoids warehouse jargon', () => {
   it('page and billing eyebrows are plain in both languages', () => {
     expect(en.IngestHealth.eyebrow).toBe('Your data');
     expect(en.BillingOpsFeed.eyebrow).toBe('Failed payments');
-    expect(he.IngestHealth.eyebrow).toBe('הנתונים שלך');
+    expect(he.IngestHealth.eyebrow).toBe('הנתונים שלכם');
     expect(he.BillingOpsFeed.eyebrow).toBe('תשלומים שנכשלו');
   });
 });
