@@ -59,6 +59,18 @@ describe('EmailPasswordForm Component', () => {
     expect(screen.queryByText(enMessages.Auth.passwordHint)).toBeNull();
   });
 
+  it('lets people reveal and hide the password they typed', () => {
+    renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    const input = screen.getByLabelText(enMessages.Auth.passwordLabel) as HTMLInputElement;
+    expect(input.type).toBe('password');
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.showPassword }));
+    expect(input.type).toBe('text');
+    const hide = screen.getByRole('button', { name: enMessages.Auth.hidePassword });
+    expect(hide.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(hide);
+    expect(input.type).toBe('password');
+  });
+
   it('while waiting, the button says signing in or creating the account', async () => {
     mockSignInWithEmail.mockReturnValue(new Promise(() => {}));
     const { unmount } = renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });

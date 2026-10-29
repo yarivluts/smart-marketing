@@ -66,6 +66,7 @@ export function EmailPasswordForm({
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorKey, setErrorKey] = useState<AuthErrorMessageKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -260,7 +261,7 @@ export function EmailPasswordForm({
             <Input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               aria-invalid={errorKey ? true : undefined}
               aria-describedby={passwordHints.length > 0 ? passwordHints.join(' ') : undefined}
@@ -268,8 +269,17 @@ export function EmailPasswordForm({
               placeholder="••••••••"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="h-10 rounded-xl bg-card text-xs focus:ring-1 focus:ring-primary shadow-inner"
+              className="h-10 rounded-xl bg-card pe-24 text-xs focus:ring-1 focus:ring-primary shadow-inner"
             />
+            {/* A hidden password is the usual reason a first sign-up fails: let people check what they typed. */}
+            <button
+              type="button"
+              aria-pressed={showPassword}
+              onClick={() => setShowPassword((shown) => !shown)}
+              className="absolute inset-y-0 end-3 text-[11px] font-medium text-primary hover:underline"
+            >
+              {showPassword ? t('hidePassword') : t('showPassword')}
+            </button>
           </div>
           {mode === 'signup' ? (
             <p id="password-hint" className="text-[11px] text-muted-foreground">
