@@ -557,7 +557,7 @@ describe('GrowthPilotApp', () => {
     it('shows the page it proposes, as visitors will see it, with the button leading to the tagged site', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PROPOSAL_LP], targets: [TARGET], landingPages: [PAGE] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
-      expect(card).toHaveTextContent(`Landing page for ${isolate('Pro plan')}`);
+      expect(card).toHaveTextContent(`Web page for ${isolate('Pro plan')}`);
       expect(card).toHaveTextContent('The page people see after they click your ad.');
       expect(card).toHaveTextContent('Sign 20 documents a month - On WhatsApp, for 20 ILS.');
       expect(screen.queryByTestId('growth-pilot-landing-preview')).toBeNull();
@@ -566,7 +566,7 @@ describe('GrowthPilotApp', () => {
       expect(within(preview).getByRole('heading', { level: 1 })).toHaveTextContent('Sign 20 documents a month');
       expect(within(preview).getByTestId('growth-landing-cta')).toHaveAttribute('href', PAGE.ctaUrl);
       expect(preview).toHaveTextContent('/lp/abcDEF123456');
-      expect(screen.getByTestId('growth-pilot-target-landing')).toHaveTextContent('Landing page waiting for your approval');
+      expect(screen.getByTestId('growth-pilot-target-landing')).toHaveTextContent('Web page waiting for your approval');
     });
 
     it('links a published page from its target, and says why one could not be written', () => {
@@ -579,9 +579,9 @@ describe('GrowthPilotApp', () => {
         { locale: 'en' },
       );
       const [live, failed] = screen.getAllByTestId('growth-pilot-target-landing');
-      expect(live).toHaveTextContent('Landing page live');
+      expect(live).toHaveTextContent('Web page live');
       expect(within(live).getByTestId('growth-pilot-landing-link')).toHaveAttribute('href', '/lp/abcDEF123456');
-      expect(failed).toHaveTextContent('The landing page could not be written (today\'s AI limit is used up, it resets tomorrow)');
+      expect(failed).toHaveTextContent('The web page could not be written (today\'s AI limit is used up, it resets tomorrow)');
     });
   });
 

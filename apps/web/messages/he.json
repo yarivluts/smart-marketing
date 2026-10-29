@@ -5892,9 +5892,9 @@
         "ads_building": "התחיל להכין מודעות ל{subject}",
         "ads_ready": "{count, plural, one {הכין תמונת מודעה אחת} other {הכין # תמונות מודעה}} ל{subject}",
         "ads_failed": "לא הצליח להכין מודעות ל{subject}",
-        "landing_ready": "כתב דף נחיתה ל{subject}",
-        "landing_published": "פרסמתם את דף הנחיתה ל{subject}",
-        "landing_failed": "לא הצליח לכתוב דף נחיתה ל{subject}",
+        "landing_ready": "כתב דף אינטרנט ל{subject}",
+        "landing_published": "פרסמתם את דף האינטרנט ל{subject}",
+        "landing_failed": "לא הצליח לכתוב דף אינטרנט ל{subject}",
         "audience_ready": "בירר למי להגיע עבור {subject}",
         "audience_failed": "לא הצליח לברר למי להגיע עבור {subject}",
         "ads_published": "{count, plural, one {שלח מודעה כבויה אחת לפייסבוק ולאינסטגרם} other {שלח # מודעות כבויות לפייסבוק ולאינסטגרם}} ל{subject}",
@@ -5936,17 +5936,17 @@
       }
     },
     "landing": {
-      "title": "דף נחיתה ל{name}",
+      "title": "דף אינטרנט ל{name}",
       "explain": "הדף שאנשים רואים אחרי שהם לוחצים על המודעה. התפקיד שלו הוא להפוך מבקרים להרשמות או למכירות.",
       "preview": "הצגת הדף",
       "hidePreview": "הסתרת הדף",
       "revising": "ה-AI כותב מחדש את הדף...",
       "changePlaceholder": "מה לשנות בדף? למשל: כותרת קצרה יותר, להזכיר קודם את המסלול החינמי",
       "status": {
-        "ready": "דף נחיתה מחכה לאישור שלכם",
-        "published": "דף הנחיתה באוויר",
-        "rejected": "דחיתם את דף הנחיתה",
-        "failed": "לא הצלחנו לכתוב את דף הנחיתה ({reason})",
+        "ready": "דף אינטרנט מחכה לאישור שלכם",
+        "published": "דף האינטרנט באוויר",
+        "rejected": "דחיתם את דף האינטרנט",
+        "failed": "לא הצלחנו לכתוב את דף האינטרנט ({reason})",
         "open": "פתיחה"
       }
     },
