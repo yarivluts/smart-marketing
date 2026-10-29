@@ -4736,7 +4736,7 @@
         "copy_primary_text_too_long": "הטקסט הראשי ארוך מ-90 תווים.",
         "copy_description_too_long": "התיאור ארוך מ-90 תווים."
       },
-      "claimsToCheck": "בדקו לפני פרסום - לא מופיע במה שכתבתם או בדף הנחיתה: {claims}",
+      "claimsToCheck": "בדקו לפני פרסום - לא מופיע במה שכתבתם או בדף האינטרנט: {claims}",
       "undoRewrite": "ביטול השכתוב"
     },
     "preview": {
