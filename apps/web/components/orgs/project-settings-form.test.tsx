@@ -30,6 +30,18 @@ describe('ProjectSettingsForm', () => {
     expect(screen.getByLabelText('Business type')).toHaveValue('ecommerce');
   });
 
+  it('suggests currency codes and time zones so nobody has to type them from memory', async () => {
+    const supported = vi.spyOn(Intl as unknown as { supportedValuesOf: (key: string) => string[] }, 'supportedValuesOf');
+    supported.mockImplementation((key: string) => (key === 'currency' ? ['ILS', 'USD'] : ['Asia/Jerusalem']));
+    renderForm();
+
+    await waitFor(() => expect(document.querySelectorAll('#project-settings-currency-options option')).toHaveLength(2));
+    expect(screen.getByLabelText('Currency')).toHaveAttribute('list', 'project-settings-currency-options');
+    expect(screen.getByLabelText('Time zone')).toHaveAttribute('list', 'project-settings-timezone-options');
+    expect(document.querySelector('#project-settings-timezone-options option')).toHaveAttribute('value', 'Asia/Jerusalem');
+    supported.mockRestore();
+  });
+
   it('submits the edited fields and refreshes on success', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
     renderForm();
