@@ -74,6 +74,7 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
         <Input
           id="invite-email"
           type="email"
+          dir="ltr"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}

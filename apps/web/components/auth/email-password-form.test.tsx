@@ -4,6 +4,7 @@ import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { EmailPasswordForm } from './email-password-form';
 import enMessages from '@/messages/en.json';
+import heMessages from '@/messages/he.json';
 
 const mockUseSearchParams = vi.fn();
 const mockRouterPush = vi.fn();
@@ -122,6 +123,11 @@ describe('EmailPasswordForm Component', () => {
     fireEvent.submit(password.closest('form') as HTMLFormElement);
     await screen.findByRole('alert');
     expect(password.getAttribute('aria-describedby')).toBe('password-hint auth-error');
+  });
+
+  it('keeps the email address left-to-right, also in the Hebrew (right-to-left) app', () => {
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'he' });
+    expect(screen.getByLabelText(heMessages.Auth.emailLabel)).toHaveAttribute('dir', 'ltr');
   });
 
   it('posts, so a submit before hydration never puts the password in the URL', () => {
