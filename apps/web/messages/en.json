@@ -5073,7 +5073,7 @@
       "unavailable": {
         "no_meta_credential": "No Meta ad account is connected to this project. Connect one in the Publish step.",
         "credential_not_configured": "The Meta account attached to this project is not logged in properly. Reconnect it.",
-        "vault_not_configured": "Saved logins cannot be read right now, so there are no search volumes. Try again later.",
+        "vault_not_configured": "Saved logins cannot be read right now, so we cannot load your groups of people. Try again later.",
         "meta_auth_failed": "Meta refused the connection - the access may have expired. Reconnect the Meta account.",
         "meta_permission_denied": "The Meta connection is not allowed to read this. Reconnect it and accept every permission it asks for.",
         "meta_rate_limited": "Meta is limiting requests right now. Try again in a few minutes.",
