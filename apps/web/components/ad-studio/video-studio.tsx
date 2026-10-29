@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   AlertTriangle,
   Clapperboard,
@@ -126,6 +126,7 @@ export function VideoStudio({
   videoSettings = null,
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
+  const locale = useLocale();
   // The script as saved: a narration edit here comes back vocalized before the page refreshes.
   const [scenes, setScenes] = React.useState(sceneProp);
   React.useEffect(() => setScenes(sceneProp), [sceneProp]);
@@ -170,6 +171,7 @@ export function VideoStudio({
   const assembling = pending === 'assemble' || newestVideo?.status === 'assembling';
   // Scenes whose clip in the video failed the AI check: assembling asks first instead of shipping them silently.
   const flaggedScenes = states.flatMap((state, index) => (state.usable?.qa?.status === 'issues' ? [index + 1] : []));
+  const flaggedScenesText = new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(flaggedScenes.map(String));
   const [confirmAssemble, setConfirmAssemble] = React.useState(false);
 
   const apply = React.useCallback((listing: Listing) => {
@@ -724,8 +726,8 @@ export function VideoStudio({
             ) : null}
           </div>
           {confirmAssemble ? (
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm" role="alertdialog" aria-label={t('video.assembleFlagged', { scenes: flaggedScenes.join(', ') })}>
-              <span>{t('video.assembleFlagged', { scenes: flaggedScenes.join(', ') })}</span>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm" role="alertdialog" aria-label={t('video.assembleFlagged', { scenes: flaggedScenesText, count: flaggedScenes.length })}>
+              <span>{t('video.assembleFlagged', { scenes: flaggedScenesText, count: flaggedScenes.length })}</span>
               <button
                 type="button"
                 autoFocus
