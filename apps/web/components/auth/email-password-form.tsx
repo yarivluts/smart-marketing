@@ -234,6 +234,7 @@ export function EmailPasswordForm({
               id="email"
               name="email"
               type="email"
+              dir="ltr"
               autoComplete="email"
               aria-invalid={errorKey || resetNeedsEmail ? true : undefined}
               aria-describedby={emailDescribedBy}

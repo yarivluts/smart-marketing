@@ -66,6 +66,7 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
         <Input
           id="person-email"
           type="email"
+          dir="ltr"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />

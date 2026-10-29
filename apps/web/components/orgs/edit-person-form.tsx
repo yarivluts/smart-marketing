@@ -92,6 +92,7 @@ export function EditPersonForm({
         <Input
           id={`edit-person-email-${personId}`}
           type="email"
+          dir="ltr"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
         />

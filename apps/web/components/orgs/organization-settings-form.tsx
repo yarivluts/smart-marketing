@@ -86,6 +86,7 @@ export function OrganizationSettingsForm({
         <Input
           id="org-settings-billing-email"
           type="email"
+          dir="ltr"
           value={billingEmail}
           onChange={(event) => setBillingEmail(event.target.value)}
         />
