@@ -698,7 +698,7 @@
     "cancelRename": "ביטול",
     "renameError": "לא ניתן היה לשנות את שם המפתח. נסו שוב.",
     "touchpointSnippetHeading": "קטע מעקב לאתר",
-    "touchpointSnippetIntro": "הדביקו את זה פעם אחת באזור ה-head של כל עמוד. הוא נטען בלי להאט את העמוד, שולח touchpoint (קמפיין, מזהה קליק, דף נחיתה) בתחילת כל ביקור, ומאפשר GrowthOS.track(name, properties) ו-GrowthOS.identify(userId) אחרי התחברות.",
+    "touchpointSnippetIntro": "הדביקו את זה פעם אחת באזור ה-head של כל עמוד. הוא נטען בלי להאט את העמוד, רושם מאיפה כל מבקר הגיע (מאיזו מודעה או קישור, ולאיזה עמוד נחת) בתחילת כל ביקור, ומאפשר GrowthOS.track(name, properties) ו-GrowthOS.identify(userId) אחרי התחברות.",
     "copySnippet": "העתקת הקטע",
     "mcpConnectionsHeading": "חיבורי MCP",
     "mcpEndpointIntro": "חברו לקוח MCP (Claude Desktop,‏ claude.ai, או סוכן ללא ממשק) לפרויקט זה.",
