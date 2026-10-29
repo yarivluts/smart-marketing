@@ -5836,7 +5836,7 @@
       "rejectHintPublish": "Not now? Reject it - the ads are not sent to Facebook and Instagram and no money is spent.",
       "rejectHintActivate": "Not now? Reject it - the ads stay switched off and no money is spent.",
       "approveHint": {
-        "target": "Approve and the AI starts making ads, a landing page and a list of who to reach for it. Nothing goes live yet.",
+        "target": "Approve and the AI starts making ads, a web page for the people who click them and a list of who to reach. Nothing goes live yet.",
         "ads": "Approve to keep these ads. They are not published yet - you will be asked before anything is sent.",
         "landing": "Approve and the page goes online at a public address that anyone with the link can open.",
         "audience": "Approve to show the ads to these people. Nothing is published yet."
@@ -5865,7 +5865,7 @@
         "rejected": "Rejected"
       },
       "requested": "You asked for it",
-      "next": "Next: ads, a landing page and who to reach for this one."
+      "next": "Next: ads, a web page for people who click them and who to reach for this one."
     },
     "newTarget": {
       "title": "What else should we grow?",
