@@ -8,6 +8,7 @@ import { CommandDialog } from './command-dialog';
 import { LanguageSwitcher } from './language-switcher';
 import { NavShell } from './nav-shell';
 import messages from '../../messages/en.json';
+import heMessages from '../../messages/he.json';
 
 const pushMock = vi.fn();
 const replaceMock = vi.fn();
@@ -55,12 +56,14 @@ describe('App Shell Suite', () => {
   it('renders WorkspaceSwitcher with selected org and project, and switches on selection', async () => {
     const user = userEvent.setup();
     render(
-      <WorkspaceSwitcher
-        organizations={sampleOrgs}
-        currentOrgId="org-1"
-        projects={sampleProjects}
-        currentProjectId="p-1"
-      />,
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <WorkspaceSwitcher
+          organizations={sampleOrgs}
+          currentOrgId="org-1"
+          projects={sampleProjects}
+          currentProjectId="p-1"
+        />
+      </NextIntlClientProvider>,
     );
 
     const combobox = screen.getByRole('combobox', { name: /switch workspace/i });
@@ -74,6 +77,28 @@ describe('App Shell Suite', () => {
 
     await user.click(betaOrgBtn);
     expect(pushMock).toHaveBeenCalledWith('/orgs/org-2');
+  });
+
+  it('shows the workspace switcher in Hebrew, with no English left in its labels', async () => {
+    const user = userEvent.setup();
+    render(
+      <NextIntlClientProvider locale="he" messages={heMessages}>
+        <WorkspaceSwitcher organizations={sampleOrgs} currentOrgId="org-1" projects={sampleProjects} currentProjectId="p-1" />
+      </NextIntlClientProvider>,
+    );
+
+    const combobox = screen.getByRole('combobox', { name: heMessages.WorkspaceSwitcher.switchLabel });
+    await user.click(combobox);
+
+    const dialog = screen.getByRole('dialog', { name: heMessages.WorkspaceSwitcher.dialogLabel });
+    expect(dialog).toHaveTextContent(heMessages.WorkspaceSwitcher.organizations);
+    expect(dialog).toHaveTextContent(heMessages.WorkspaceSwitcher.projects);
+    expect(screen.getByPlaceholderText(heMessages.WorkspaceSwitcher.searchPlaceholder)).toBeInTheDocument();
+    for (const text of Object.values(heMessages.WorkspaceSwitcher)) expect(text).not.toMatch(/[A-Za-z]{3,}/);
+  });
+
+  it('has the same workspace switcher keys in English and Hebrew', () => {
+    expect(Object.keys(heMessages.WorkspaceSwitcher).sort()).toEqual(Object.keys(messages.WorkspaceSwitcher).sort());
   });
 
   it('renders CommandDialog trigger button and opens modal with instant previews', async () => {

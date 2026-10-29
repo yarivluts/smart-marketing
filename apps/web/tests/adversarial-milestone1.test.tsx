@@ -6,7 +6,6 @@ import { NextIntlClientProvider } from 'next-intl';
 import { CommandDialog, type CommandItem } from '@/components/shell/command-dialog';
 import { WorkspaceSwitcher } from '@/components/shell/workspace-switcher';
 import { LanguageSwitcher } from '@/components/shell/language-switcher';
-import { Header } from '@/components/shell/header';
 import { NavShell } from '@/components/shell/nav-shell';
 import messages from '../messages/en.json';
 
@@ -248,7 +247,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
 
     it('4.1 toggles popover, filters orgs & projects by search input, and closes on Escape', async () => {
       const user = userEvent.setup();
-      render(
+      renderDialog(
         <WorkspaceSwitcher
           organizations={orgs}
           currentOrgId="org-1"
@@ -281,7 +280,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
 
     it('4.2 switches organization and project with proper route dispatching', async () => {
       const user = userEvent.setup();
-      render(
+      renderDialog(
         <WorkspaceSwitcher
           organizations={orgs}
           currentOrgId="org-1"
@@ -309,7 +308,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
 
     it('4.3 closes popover on outside click', async () => {
       const user = userEvent.setup();
-      render(
+      renderDialog(
         <div>
           <div data-testid="outside-area">Outside</div>
           <WorkspaceSwitcher organizations={orgs} currentOrgId="org-1" />
@@ -325,7 +324,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 1 (App Shell & Navig
     });
 
     it('4.4 gracefully handles empty organizations and projects without errors', () => {
-      render(<WorkspaceSwitcher organizations={[]} projects={[]} />);
+      renderDialog(<WorkspaceSwitcher organizations={[]} projects={[]} />);
 
       const combobox = screen.getByRole('combobox');
       expect(combobox).toHaveTextContent('Select Organization');

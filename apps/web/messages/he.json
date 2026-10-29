@@ -335,6 +335,16 @@
   "ProjectSwitcher": {
     "label": "פרויקט"
   },
+  "WorkspaceSwitcher": {
+    "switchLabel": "החלפת ארגון או פרויקט",
+    "dialogLabel": "בחירת ארגון ופרויקט",
+    "searchPlaceholder": "חיפוש ארגונים ופרויקטים...",
+    "searchLabel": "חיפוש ארגונים ופרויקטים",
+    "selectOrganization": "בחירת ארגון",
+    "allProjects": "כל הפרויקטים",
+    "organizations": "ארגונים",
+    "projects": "פרויקטים"
+  },
   "EnvBadge": {
     "label": "סביבה",
     "dev": "פיתוח",
