@@ -4736,7 +4736,7 @@
         "copy_primary_text_too_long": "The main text is longer than 90 characters.",
         "copy_description_too_long": "The description is longer than 90 characters."
       },
-      "claimsToCheck": "Check before publishing - not in what you told us or the landing page: {claims}",
+      "claimsToCheck": "Check before publishing - not in what you told us or the web page: {claims}",
       "undoRewrite": "Undo rewrite"
     },
     "preview": {
