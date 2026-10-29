@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,17 @@ export interface ProjectSettingsFormProps {
   initialCurrency?: string;
   /** IANA time zone or empty when the project has never declared one. */
   initialTimezone?: string;
+}
+
+type IntlWithValues = typeof Intl & { supportedValuesOf?: (key: 'currency' | 'timeZone') => string[] };
+
+/** Codes the browser knows, offered as suggestions so nobody has to remember "Asia/Jerusalem" by heart. */
+function supportedValues(key: 'currency' | 'timeZone'): string[] {
+  try {
+    return (Intl as IntlWithValues).supportedValuesOf?.(key) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -41,6 +52,13 @@ export function ProjectSettingsForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  // Filled after mount: the browser's list can differ from the server's, which would break hydration.
+  const [currencies, setCurrencies] = useState<string[]>([]);
+  const [timezones, setTimezones] = useState<string[]>([]);
+  useEffect(() => {
+    setCurrencies(supportedValues('currency'));
+    setTimezones(supportedValues('timeZone'));
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -103,7 +121,12 @@ export function ProjectSettingsForm({
         <label className="text-sm font-medium" htmlFor="project-settings-currency">
           {t('currencyLabel')}
         </label>
-        <Input id="project-settings-currency" value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} maxLength={3} dir="ltr" />
+        <Input id="project-settings-currency" value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} maxLength={3} dir="ltr" list="project-settings-currency-options" autoComplete="off" />
+        <datalist id="project-settings-currency-options">
+          {currencies.map((code) => (
+            <option key={code} value={code} />
+          ))}
+        </datalist>
         <p className="text-xs text-muted-foreground">{t('currencyHelp')}</p>
       </div>
 
@@ -111,7 +134,12 @@ export function ProjectSettingsForm({
         <label className="text-sm font-medium" htmlFor="project-settings-timezone">
           {t('timezoneLabel')}
         </label>
-        <Input id="project-settings-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} dir="ltr" />
+        <Input id="project-settings-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} dir="ltr" list="project-settings-timezone-options" autoComplete="off" />
+        <datalist id="project-settings-timezone-options">
+          {timezones.map((zone) => (
+            <option key={zone} value={zone} />
+          ))}
+        </datalist>
         <p className="text-xs text-muted-foreground">{t('timezoneHelp')}</p>
       </div>
 
