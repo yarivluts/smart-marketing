@@ -335,6 +335,16 @@
   "ProjectSwitcher": {
     "label": "Project"
   },
+  "WorkspaceSwitcher": {
+    "switchLabel": "Switch workspace or project",
+    "dialogLabel": "Workspace and Project Selector",
+    "searchPlaceholder": "Search workspaces...",
+    "searchLabel": "Search workspaces",
+    "selectOrganization": "Select Organization",
+    "allProjects": "All Projects",
+    "organizations": "Organizations",
+    "projects": "Projects"
+  },
   "EnvBadge": {
     "label": "Environment",
     "dev": "Dev",

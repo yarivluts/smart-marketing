@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Building2, Check, ChevronsUpDown, FolderOpen, Search } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,7 @@ export function WorkspaceSwitcher({
   currentEnv = 'dev',
   className,
 }: WorkspaceSwitcherProps): React.ReactElement {
+  const t = useTranslations('WorkspaceSwitcher');
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -89,7 +91,7 @@ export function WorkspaceSwitcher({
         type="button"
         role="combobox"
         aria-expanded={open}
-        aria-label="Switch workspace or project"
+        aria-label={t('switchLabel')}
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center justify-between gap-2.5 rounded-xl border border-border/80 bg-card p-2 text-start shadow-soft transition-all hover:bg-muted/50 hover:border-border focus:outline-none focus:ring-2 focus:ring-ring"
       >
@@ -98,10 +100,10 @@ export function WorkspaceSwitcher({
         </div>
         <div className="flex flex-1 flex-col min-w-0">
           <span className="truncate text-xs font-medium text-muted-foreground leading-tight">
-            {currentOrg?.name ?? 'Select Organization'}
+            {currentOrg?.name ?? t('selectOrganization')}
           </span>
           <span className="truncate text-sm font-semibold text-foreground leading-tight">
-            {currentProject?.name ?? 'All Projects'}
+            {currentProject?.name ?? t('allProjects')}
           </span>
         </div>
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground/60" />
@@ -110,7 +112,7 @@ export function WorkspaceSwitcher({
       {open ? (
         <div
           role="dialog"
-          aria-label="Workspace and Project Selector"
+          aria-label={t('dialogLabel')}
           className="absolute start-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-border/80 bg-card p-2 text-card-foreground shadow-soft-xl animate-zoom-in-95"
         >
           <div className="relative mb-2">
@@ -119,8 +121,8 @@ export function WorkspaceSwitcher({
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search workspaces..."
-              aria-label="Search workspaces"
+              placeholder={t('searchPlaceholder')}
+              aria-label={t('searchLabel')}
               className="h-9 w-full rounded-lg border border-input bg-background ps-8 pe-3 text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
@@ -129,7 +131,7 @@ export function WorkspaceSwitcher({
             {organizations.length > 0 ? (
               <div>
                 <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Organizations
+                  {t('organizations')}
                 </div>
                 <div className="space-y-0.5">
                   {filteredOrgs.map((org) => {
@@ -161,7 +163,7 @@ export function WorkspaceSwitcher({
             {projects.length > 0 ? (
               <div>
                 <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Projects
+                  {t('projects')}
                 </div>
                 <div className="space-y-0.5">
                   {filteredProjects.map((project) => {
