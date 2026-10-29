@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Loader2, Pencil, Sparkles, Undo2 } from 'lucide-react';
 import {
   AD_STUDIO_COPY_FIELDS,
@@ -55,6 +55,7 @@ export function AdCopyCard({
   onSaved,
 }: AdCopyCardProps): React.ReactElement {
   const t = useTranslations('AdStudio.copy');
+  const locale = useLocale();
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}`;
@@ -210,7 +211,7 @@ export function AdCopyCard({
 
       {claims.length ? (
         <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning" data-testid="ad-studio-copy-claims">
-          {t('claimsToCheck', { claims: claims.join(', ') })}
+          {t('claimsToCheck', { claims: new Intl.ListFormat(locale, { style: 'long', type: 'conjunction' }).format(claims.map((claim) => `"${claim}"`)) })}
         </p>
       ) : null}
       {draft ? (
