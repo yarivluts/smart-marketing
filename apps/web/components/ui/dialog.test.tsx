@@ -41,4 +41,15 @@ describe('Dialog', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('names the close button with the given label', () => {
+    render(
+      <Dialog defaultOpen>
+        <DialogContent closeLabel="Close window">
+          <DialogTitle>Edit Campaign</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByRole('button', { name: 'Close window' })).toBeInTheDocument();
+  });
 });

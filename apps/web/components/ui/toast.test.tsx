@@ -25,4 +25,15 @@ describe('Toast & Toaster', () => {
 
     expect(screen.queryByText('Campaign Saved')).not.toBeInTheDocument();
   });
+
+  it('uses the translated names for the region and the dismiss button when given', () => {
+    render(<Toaster labels={{ region: 'Alerts region', dismiss: 'Close alert' }} />);
+
+    act(() => {
+      toast({ title: 'Saved', variant: 'success' });
+    });
+
+    expect(screen.getByLabelText('Alerts region')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close alert' })).toBeInTheDocument();
+  });
 });

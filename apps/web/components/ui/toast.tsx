@@ -37,9 +37,11 @@ export interface ToastProps
     VariantProps<typeof toastVariants> {
   toast: ToastItem;
   onDismiss: () => void;
+  /** Screen-reader name of the dismiss button; callers pass a translated one. */
+  dismissLabel?: string;
 }
 
-export function Toast({ toast: item, onDismiss, className, ...props }: ToastProps): React.ReactElement {
+export function Toast({ toast: item, onDismiss, dismissLabel = 'Dismiss notification', className, ...props }: ToastProps): React.ReactElement {
   const variant = item.variant ?? 'default';
   const icon = toastIcons[variant];
 
@@ -73,7 +75,7 @@ export function Toast({ toast: item, onDismiss, className, ...props }: ToastProp
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Dismiss notification"
+        aria-label={dismissLabel}
         className="rounded-lg p-1 text-muted-foreground opacity-60 hover:opacity-100 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
       >
         <X className="h-4 w-4" />
