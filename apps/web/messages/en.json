@@ -4143,7 +4143,7 @@
           "error": "Check failed"
         }
       },
-      "assembleFlagged": "The AI check found problems in scene {scenes}. Assemble the video anyway?",
+      "assembleFlagged": "{count, plural, one {The AI check spotted something off in scene {scenes}.} other {The AI check spotted something off in scenes {scenes}.}} You can assemble the video anyway, or go back and make that part again first.",
       "assembleAnyway": "Assemble anyway",
       "inVideo": "In the video",
       "useInVideo": "Use in the video",

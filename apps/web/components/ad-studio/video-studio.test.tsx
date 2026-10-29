@@ -171,7 +171,7 @@ describe('VideoStudio', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderStudio({ initialClips: clips });
     fireEvent.click(screen.getByRole('button', { name: 'Assemble video' }));
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('The AI check found problems in scene 2.');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('The AI check spotted something off in scene 2.');
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Assemble video' })).toBeInTheDocument();
