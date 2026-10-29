@@ -63,3 +63,11 @@ describe('MetaAdPreviewCard', () => {
     expect(screen.getByText('הרשמה')).toBeInTheDocument();
   });
 });
+
+describe('MetaAdPreviewCard screen-reader names', () => {
+  it('names the options button in the page language', () => {
+    renderWithIntl(<MetaAdPreviewCard campaignName="X" ad={mockAd} />, { locale: 'he' });
+    expect(screen.getByRole('button', { name: 'אפשרויות המודעה' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ad options' })).not.toBeInTheDocument();
+  });
+});

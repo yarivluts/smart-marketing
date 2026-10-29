@@ -314,7 +314,7 @@ export function ExecutiveBlendedReport({
           <div className="h-4 w-full overflow-hidden rounded-full bg-muted flex" data-testid="channel-split-bar">
             <button
               type="button"
-              aria-label="Filter Meta Ads Allocation"
+              aria-label={t('filterMetaShare')}
               onClick={() => setSelectedChannel(selectedChannel === 'meta_ads' ? 'all' : 'meta_ads')}
               className={`h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all cursor-pointer hover:opacity-90 ${
                 selectedChannel === 'google_ads' ? 'opacity-30' : ''
@@ -323,7 +323,7 @@ export function ExecutiveBlendedReport({
             />
             <button
               type="button"
-              aria-label="Filter Google Ads Allocation"
+              aria-label={t('filterGoogleShare')}
               onClick={() => setSelectedChannel(selectedChannel === 'google_ads' ? 'all' : 'google_ads')}
               className={`h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all cursor-pointer hover:opacity-90 ${
                 selectedChannel === 'meta_ads' ? 'opacity-30' : ''

@@ -3393,6 +3393,7 @@
     "toggleActive": "פעיל",
     "togglePaused": "מושהה",
     "quickViewCreatives": "הצג מודעות",
+    "metaAdOptions": "אפשרויות המודעה",
     "metaSponsoredLabel": "ממומן",
     "googleSponsoredLabel": "ממומן",
     "metaAdVisualPreviewPlaceholder": "תצוגה מקדימה של המודעה",
@@ -3729,6 +3730,8 @@
     "cacChangeLabel": "שינוי בעלות ללקוח",
     "roasChangeLabel": "שינוי במכירות על כל $1",
     "rebalanceAction": "איזון תקציב בלחיצה",
+    "filterMetaShare": "הצגת מודעות פייסבוק ואינסטגרם בלבד",
+    "filterGoogleShare": "הצגת מודעות גוגל בלבד",
     "channelAllocationEmpty": "עדיין לא נמדדה הוצאת פרסום, ולכן אין חלוקה בין ערוצים להציג."
   },
   "Backfill": {
