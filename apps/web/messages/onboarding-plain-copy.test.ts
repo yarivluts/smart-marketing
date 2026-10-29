@@ -26,7 +26,9 @@ describe('onboarding intro copy explains itself to a beginner', () => {
       expect(he.Onboarding[key]).not.toMatch(/\b(CAC|MRR|DAU|WAU|MAU)\b/);
     }
     expect(en.Onboarding.packStepIntro).toMatch(/Not sure\?/);
-    expect(en.Onboarding.sourceStepIntro).toMatch(/access key \(API key\)/);
+    expect(en.Onboarding.sourceStepIntro).toMatch(/using an access key/);
+    expect(en.Onboarding.sourceStepIntro).not.toMatch(/\bAPI\b/);
+    expect(he.Onboarding.sourceStepIntro).not.toMatch(/\bAPI\b/);
   });
 
   it('does not lead with plugin / ingest / funnel jargon', () => {
