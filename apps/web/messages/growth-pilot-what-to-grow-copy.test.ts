@@ -28,3 +28,13 @@ describe('Growth Pilot start steps avoid marketing jargon', () => {
     expect(he.GrowthPilot.start.steps.watch).toBe('בודק את התוצאות ומציע תיקונים');
   });
 });
+
+describe('Growth Pilot list of things to grow reads the same in Hebrew and English', () => {
+  it('does not call it "goals" in Hebrew, where goals is a different page', () => {
+    const t = he.GrowthPilot.targets;
+    expect(t.title).toBe('מה אנחנו מקדמים');
+    for (const text of [t.title, t.empty, t.next]) {
+      expect(text).not.toContain('יעד');
+    }
+  });
+});
