@@ -148,6 +148,8 @@
     "signInSubtitle": "התחברו כדי לראות את המודעות, התוצאות וההצעות שלכם.",
     "orWithEmail": "או באמצעות אימייל",
     "forgotPassword": "שכחת סיסמה?",
+    "showPassword": "הצגת הסיסמה",
+    "hidePassword": "הסתרת הסיסמה",
     "signingIn": "מתחברים...",
     "creatingAccount": "יוצרים את החשבון...",
     "resetNeedsEmail": "הזינו קודם את האימייל למעלה, ואז בחרו \"שכחת סיסמה?\".",

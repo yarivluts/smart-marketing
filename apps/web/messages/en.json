@@ -148,6 +148,8 @@
     "signInSubtitle": "Sign in to see your ads, results and suggestions.",
     "orWithEmail": "or with email",
     "forgotPassword": "Forgot password?",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
     "signingIn": "Signing you in...",
     "creatingAccount": "Creating your account...",
     "resetNeedsEmail": "Enter your email above first, then choose \"Forgot password?\".",
