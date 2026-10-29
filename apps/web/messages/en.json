@@ -3393,6 +3393,7 @@
     "toggleActive": "Active",
     "togglePaused": "Paused",
     "quickViewCreatives": "View ads",
+    "metaAdOptions": "Ad options",
     "metaSponsoredLabel": "Sponsored",
     "googleSponsoredLabel": "Sponsored",
     "metaAdVisualPreviewPlaceholder": "Ad preview",
@@ -3729,6 +3730,8 @@
     "cacChangeLabel": "Cost per customer change",
     "roasChangeLabel": "Sales per $1 change",
     "rebalanceAction": "1-Click Rebalance",
+    "filterMetaShare": "Show only Facebook and Instagram ads",
+    "filterGoogleShare": "Show only Google ads",
     "channelAllocationEmpty": "No ad spend has been measured yet, so there is no channel split to show."
   },
   "Backfill": {

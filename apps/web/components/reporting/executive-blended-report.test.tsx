@@ -74,4 +74,12 @@ describe('ExecutiveBlendedReport (Reporting Module)', () => {
     expect(screen.queryByText(/dunning/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Blended ROAS')).not.toBeInTheDocument();
   });
+
+  it('names the channel split filters in the page language', () => {
+    const metrics = createMockExecutiveMetrics({ metaSpendUsd: 12000, googleSpendUsd: 8000, totalSpendUsd: 20000 });
+    renderWithIntl(<ExecutiveBlendedReport metrics={metrics} canExecute={true} />, { locale: 'he' });
+    expect(screen.getByRole('button', { name: 'הצגת מודעות פייסבוק ואינסטגרם בלבד' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'הצגת מודעות גוגל בלבד' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Filter/ })).not.toBeInTheDocument();
+  });
 });

@@ -76,7 +76,7 @@ export function MetaAdPreviewCard({
           ) : null}
           <button
             type="button"
-            aria-label="Ad options"
+            aria-label={t('metaAdOptions')}
             className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
           >
             <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
