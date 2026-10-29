@@ -12,6 +12,11 @@
     "en": "English",
     "he": "Hebrew"
   },
+  "Ui": {
+    "close": "Close",
+    "dismissNotification": "Dismiss notification",
+    "notifications": "Notifications"
+  },
   "AppShell": {
     "brandName": "GrowthOS",
     "homeLink": "Home",

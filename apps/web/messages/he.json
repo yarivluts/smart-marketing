@@ -12,6 +12,11 @@
     "en": "אנגלית",
     "he": "עברית"
   },
+  "Ui": {
+    "close": "סגירה",
+    "dismissNotification": "סגירת ההודעה",
+    "notifications": "הודעות"
+  },
   "AppShell": {
     "brandName": "GrowthOS",
     "homeLink": "בית",

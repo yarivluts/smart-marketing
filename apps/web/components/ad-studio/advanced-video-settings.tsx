@@ -85,6 +85,7 @@ export function AdvancedVideoSettings({
   disabled = false,
 }: AdvancedVideoSettingsProps): React.ReactElement {
   const t = useTranslations('AdStudio.advanced');
+  const tUi = useTranslations('Ui');
   const errorMessage = useAdStudioErrorMessage();
   const saved = normalizeVideoSettings(settings);
   const [open, setOpen] = React.useState(false);
@@ -153,6 +154,7 @@ export function AdvancedVideoSettings({
         ) : null}
       </DialogTrigger>
       <DialogContent
+        closeLabel={tUi('close')}
         className="max-h-[90vh] max-w-xl overflow-y-auto"
         aria-labelledby="ad-studio-advanced-title"
       >

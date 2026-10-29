@@ -76,10 +76,12 @@ DialogTrigger.displayName = 'DialogTrigger';
 
 export interface DialogContentProps extends React.HTMLAttributes<HTMLDivElement> {
   hideCloseButton?: boolean;
+  /** Screen-reader name of the close button; callers pass a translated one. */
+  closeLabel?: string;
 }
 
 export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
-  ({ className, children, hideCloseButton = false, ...props }, ref) => {
+  ({ className, children, hideCloseButton = false, closeLabel = 'Close', ...props }, ref) => {
     const { open, setOpen } = useDialogContext();
 
     React.useEffect(() => {
@@ -117,7 +119,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close"
+              aria-label={closeLabel}
               className="absolute end-4 top-4 rounded-lg p-1.5 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <X className="h-4 w-4" aria-hidden="true" />
