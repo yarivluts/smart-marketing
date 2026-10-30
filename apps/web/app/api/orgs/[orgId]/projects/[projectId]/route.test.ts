@@ -119,4 +119,32 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]', () => {
     expect(body.project.name).toBe('Renamed Project');
     expect(body.project.vertical).toBe('fintech');
   });
+
+  it('allows a project-scoped project_admin on their own project and denies them on a sibling project (KAN-143)', async () => {
+    const { owner, organization, project } = await setupOrgProject('Project Settings Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Sibling Project' });
+    const adminEmail = uniqueEmail('settings-proj-admin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = await PATCH(patchRequest(organization.id, project.id, { name: 'Updated by Project Admin' }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id }),
+    });
+    expect(allowed.status).toBe(200);
+
+    const denied = await PATCH(patchRequest(organization.id, otherProject.id, { name: 'Should Fail' }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: otherProject.id }),
+    });
+    expect(denied.status).toBe(403);
+  });
 });

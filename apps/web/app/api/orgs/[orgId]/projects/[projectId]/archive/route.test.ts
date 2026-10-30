@@ -105,4 +105,28 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/archive', () => {
     expect(((await restoreResponse.json()) as { project: { archivedAt: string | null } }).project.archivedAt).toBeNull();
     expect((await listOrgProjects(organization.id)).map((candidate) => candidate.id)).toEqual([project.id]);
   });
+
+  it('allows a project-scoped project_admin on their own project and denies them on a sibling project (KAN-143)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Archive Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other' });
+    const adminEmail = `${unique('archive-proj-admin')}@example.com`;
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = postRequest(organization.id, project.id, JSON.stringify({ archived: true }));
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const denied = postRequest(organization.id, otherProject.id, JSON.stringify({ archived: true }));
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

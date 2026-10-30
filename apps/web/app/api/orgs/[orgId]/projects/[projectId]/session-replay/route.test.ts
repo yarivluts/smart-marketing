@@ -194,4 +194,29 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/session-replay', () => {
     expect(response.status).toBe(200);
     expect((await response.json()) as { template: string; filtersByPage: boolean }).toEqual({ template: '', filtersByPage: false });
   });
+
+  it('allows a project-scoped project_admin on their own project and denies them on a sibling project (KAN-143)', async () => {
+    const { organization, project } = await setupOrgProject('Session Replay Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other' });
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('replay-proj-owner') });
+    const adminEmail = uniqueEmail('replay-proj-admin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = replayRequest(organization.id, project.id, { template: 'https://replay.example.com/{landing_page}' });
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const denied = replayRequest(organization.id, otherProject.id, { template: 'https://replay.example.com/{landing_page}' });
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

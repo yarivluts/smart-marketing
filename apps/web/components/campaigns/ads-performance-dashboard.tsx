@@ -59,6 +59,8 @@ export function AdsPerformanceDashboard({
 
   const [activeTab, setActiveTab] = useState<'overview' | 'creatives' | 'analytics'>('overview');
   const [platformFilter, setPlatformFilter] = useState<'all' | 'meta_ads' | 'google_ads' | 'simulated'>('all');
+  // Only offer "Sample data" when simulated campaigns exist; a newcomer has no use for a filter with nothing behind it.
+  const showSimulated = platformFilter === 'simulated' || initialItems.some((item) => item.platform === 'simulated');
   const [statusFilter, setStatusFilter] = useState<'all' | 'enabled' | 'paused'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -296,17 +298,19 @@ export function AdsPerformanceDashboard({
                 >
                   {t('filterGoogleAds')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPlatformFilter('simulated')}
-                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
-                    platformFilter === 'simulated'
-                      ? 'bg-primary text-primary-foreground shadow-2xs'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {t('filterSimulated')}
-                </button>
+                {showSimulated && (
+                  <button
+                    type="button"
+                    onClick={() => setPlatformFilter('simulated')}
+                    className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
+                      platformFilter === 'simulated'
+                        ? 'bg-primary text-primary-foreground shadow-2xs'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {t('filterSimulated')}
+                  </button>
+                )}
               </div>
 
               {/* Status Filters */}
