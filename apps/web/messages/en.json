@@ -1290,7 +1290,7 @@
     "requirements": {
       "landing_page_attribution": {
         "title": "Which page and ad brought each visitor",
-        "impact": "Without visit records no signup or customer can be traced back to the ad, channel or landing page that brought it."
+        "impact": "Without visit records no signup or customer can be traced back to the ad, channel or web page that brought it."
       },
       "signups": {
         "title": "Signups",
@@ -4319,7 +4319,7 @@
       "credential_not_configured": "Google Ads is connected but the setup is not finished. Finish it under ad platform connections to get real search numbers.",
       "vault_not_configured": "We could not open the saved Google Ads login right now, so there are no real search numbers. Your ad is not affected."
     },
-    "planningAdminHint": "Deep analysis also reads the landing page (public https pages only) and the last 90 days of landing page results from the warehouse. A missing source is shown as missing, never estimated.",
+    "planningAdminHint": "Deep analysis also reads the web page (public https pages only) and the last 90 days of web page results from the warehouse. A missing source is shown as missing, never estimated.",
     "exportTitle": "Export",
     "exportDescription": "Send the finished {seconds}-second video to your Meta ad account or your YouTube channel.",
     "exportNeedsVideo": "Assemble the video first. Only the current finished video can be exported.",
