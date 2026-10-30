@@ -5905,7 +5905,7 @@
       "back": "Back to the pilot"
     },
     "failure": {
-      "site": "The site did not open for us (it may block automated readers, or the address is wrong).",
+      "site": "The site did not open for us (it may block automated readers, or the address is wrong). Check the address, or try another page of your site.",
       "slow": "The site took too long to answer. Try again in a few minutes, or try another page of your site.",
       "looping": "The address keeps sending visitors in a circle, so we could not reach a page. Open your site in a browser and copy the address you end up on.",
       "blocked": "That address is not a public website page, so we did not read it. Enter your website address, like example.com.",
