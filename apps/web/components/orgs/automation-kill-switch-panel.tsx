@@ -10,10 +10,16 @@ import type { AutomationKillSwitchStatus } from '@/lib/orgs/automation-view';
 export interface AutomationKillSwitchPanelProps {
   orgId: string;
   status: AutomationKillSwitchStatus;
+  /** Whether the caller holds org-wide `automation.execute` to engage/disengage the org-wide kill switch. Defaults to `true`. */
+  canManage?: boolean;
 }
 
 /** The org's KAN-71 "pause all automation" kill switch — engage (with a required reason) or disengage. */
-export function AutomationKillSwitchPanel({ orgId, status }: AutomationKillSwitchPanelProps): React.ReactElement {
+export function AutomationKillSwitchPanel({
+  orgId,
+  status,
+  canManage = true,
+}: AutomationKillSwitchPanelProps): React.ReactElement {
   const t = useTranslations('Automation');
   const router = useRouter();
   const [reason, setReason] = useState('');
@@ -50,9 +56,11 @@ export function AutomationKillSwitchPanel({ orgId, status }: AutomationKillSwitc
     return (
       <div className="flex flex-col gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-4">
         <p className="text-sm font-medium text-destructive">{t('killSwitchEngagedNote', { reason: status.reason ?? '' })}</p>
-        <Button type="button" variant="outline" disabled={submitting} onClick={() => toggle(false)}>
-          {t('killSwitchDisengageButton')}
-        </Button>
+        {canManage ? (
+          <Button type="button" variant="outline" disabled={submitting} onClick={() => toggle(false)}>
+            {t('killSwitchDisengageButton')}
+          </Button>
+        ) : null}
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -60,6 +68,10 @@ export function AutomationKillSwitchPanel({ orgId, status }: AutomationKillSwitc
         ) : null}
       </div>
     );
+  }
+
+  if (!canManage) {
+    return <p className="text-sm text-muted-foreground">{t('killSwitchDisengagedNote')}</p>;
   }
 
   return (

@@ -160,10 +160,15 @@ export function SmartRecommendationCard({
         </div>
 
         {/* Projected Impact */}
-        <div className="flex items-center gap-1 text-[11px] font-medium text-purple-700 dark:text-purple-300">
-          <TrendingUp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>{projectedImpact}</span>
-        </div>
+        {projectedImpact.trim().length > 0 && (
+          <div
+            data-testid="projected-impact"
+            className="flex items-center gap-1 text-[11px] font-medium text-purple-700 dark:text-purple-300"
+          >
+            <TrendingUp className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>{projectedImpact}</span>
+          </div>
+        )}
       </div>
 
       {/* Error Callout */}

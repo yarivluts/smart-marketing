@@ -57,4 +57,26 @@ describe('permission checks under project routes', () => {
   it('actually scans the project routes (a moved directory must not make this pass vacuously)', () => {
     expect(ROOTS.flatMap(sourceFiles).length).toBeGreaterThan(50);
   });
+
+  it('ProjectLayout gates automation, settings, and org-level nav links on matching permissions (KAN-148)', () => {
+    const layout = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'),
+      'utf8',
+    );
+    expect(layout).toContain("can(bindings, principal, 'automation.execute', { orgId, projectId })");
+    expect(layout).toContain("can(bindings, principal, 'audit.read', orgScope)");
+    expect(layout).toContain("can(bindings, principal, 'plugin.install', orgScope)");
+    expect(layout).toMatch(/canExecuteAutomation\s*\?\s*\[\s*\{\s*href:\s*`\$\{base\}\/automation`/);
+    expect(layout).toMatch(/canManageProjects\s*\?\s*\[\{\s*href:\s*`\$\{base\}\/settings`/);
+  });
+
+  it('AutomationPage gates the org-wide kill switch on org-scoped automation.execute (KAN-148)', () => {
+    const page = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/automation/page.tsx'),
+      'utf8',
+    );
+    expect(page).toContain("const orgScope = { orgId };");
+    expect(page).toContain("can(bindings, principal, 'automation.execute', orgScope)");
+    expect(page).toContain('canManageKillSwitch={canManageKillSwitch}');
+  });
 });

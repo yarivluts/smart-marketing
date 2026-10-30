@@ -181,4 +181,55 @@ describe('AutomationHubDashboard Component', () => {
     ].join(' ');
     expect(shown).not.toMatch(/guardrail|audit|funnel|pacing|fatigue|1-click|engine/i);
   });
+
+  it('hides org-wide kill switch controls on the rules tab when canManageKillSwitch is false', () => {
+    renderWithIntl(
+      <AutomationHubDashboard
+        orgId="org-1"
+        projectId="proj-1"
+        projectName="GrowthOS Web"
+        killSwitchStatus={mockKillSwitch}
+        policy={mockPolicy}
+        targets={[]}
+        actions={mockActions}
+        connections={[]}
+        proactiveRecommendations={mockRecs}
+        canExecute={true}
+        canApprove={true}
+        canManageKillSwitch={false}
+      />,
+      { locale: 'en' },
+    );
+
+    fireEvent.click(screen.getByTestId('tab-rules'));
+    expect(screen.getAllByText(en.Automation.killSwitchDisengagedNote).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByRole('button', { name: en.Automation.killSwitchEngageButton })).not.toBeInTheDocument();
+  });
+
+  it('omits the projected-impact badge when projectedImpact is empty', () => {
+    renderWithIntl(
+      <AutomationHubDashboard
+        orgId="org-1"
+        projectId="proj-1"
+        projectName="GrowthOS Web"
+        killSwitchStatus={mockKillSwitch}
+        policy={mockPolicy}
+        targets={[]}
+        actions={mockActions}
+        connections={[]}
+        proactiveRecommendations={[
+          {
+            ...mockRecs[0]!,
+            projectedImpact: '',
+          },
+        ]}
+        canExecute={true}
+        canApprove={true}
+      />,
+      { locale: 'en' },
+    );
+
+    expect(screen.getByTestId('smart-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('projected-impact')).not.toBeInTheDocument();
+  });
 });

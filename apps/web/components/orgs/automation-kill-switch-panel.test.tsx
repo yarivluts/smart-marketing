@@ -23,4 +23,27 @@ describe('AutomationKillSwitchPanel', () => {
     expect(heMessages.Automation.killSwitchReasonHint).toBeTruthy();
     expect(heMessages.Automation.killSwitchReasonPlaceholder).toBeTruthy();
   });
+
+  it('renders a read-only status note without engage/disengage controls when canManage is false', () => {
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <AutomationKillSwitchPanel orgId="o1" status={{ engaged: false } as never} canManage={false} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(enMessages.Automation.killSwitchDisengagedNote)).toBeInTheDocument();
+    expect(screen.queryByLabelText(enMessages.Automation.killSwitchReasonLabel)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: enMessages.Automation.killSwitchEngageButton })).not.toBeInTheDocument();
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <AutomationKillSwitchPanel
+          orgId="o1"
+          status={{ engaged: true, reason: 'Billing audit' } as never}
+          canManage={false}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText(/Billing audit/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: enMessages.Automation.killSwitchDisengageButton })).not.toBeInTheDocument();
+  });
 });

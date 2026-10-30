@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T22:15Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-148)
+
+- **Last completed:**
+  - **Security & RBAC (`KAN-148` — Project navigation & org-wide kill-switch RBAC alignment):**
+    - `ProjectLayout` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx`) previously added `${base}/automation` (`automation.execute`) and `${base}/settings` (`project.manage`) unconditionally to the sidebar and mobile tab bar, and gated the org-wide `/orgs/${orgId}/audit-log` and `/orgs/${orgId}/plugins` links on project-scoped `can()` instead of org-scoped `can(..., { orgId })`, exposing dead `404` links to `viewer`/`editor`/`operator` and project-scoped `project_admin` users. Gated each nav item on its exact destination permission (`canExecuteAutomation`, `canManageProjects`, `canViewOrgAuditLog`, `canManageOrgPlugins`) and kept `connectionsItem` stable in `buildOmniSearchPageShortcuts`.
+    - `AutomationPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/automation/page.tsx`) previously rendered `AutomationKillSwitchPanel`'s interactive engage/disengage form to any caller with project-level `automation.execute`, even though `POST /api/orgs/[orgId]/automation/kill-switch` pauses automation across the entire organization and requires org-wide `automation.execute` (`{ orgId }`), causing a project-scoped `project_admin` to hit `403 Forbidden`. Added `canManage?: boolean` to `AutomationKillSwitchPanel` and `canManageKillSwitch?: boolean` to `AutomationHubDashboard` so callers without org-scoped `automation.execute` see a read-only kill-switch status note; also fixed `AutomationPage` to preserve `tv.externalPlatform` (`'google_ads'` vs `'meta_ads'`) when synthesizing proactive recommendations.
+  - **UI/UX (`SmartRecommendationCard`):**
+    - Hid the `<TrendingUp />` projected-impact badge in `SmartRecommendationCard` (`apps/web/components/orgs/smart-recommendation-card.tsx`) when `projectedImpact` is empty, eliminating the stray icon next to an empty `<span>` on recommendations without a measured forecast.
+  - **Infra:**
+    - Built and deployed `1d7d193` (Iteration 5 / `KAN-147`) across `api-prod`, `api-preprod`, `web-prod`, and `web-preprod`.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-30T21:25Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-147)
 
 - **Last completed:**
