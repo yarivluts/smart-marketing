@@ -17,6 +17,22 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T23:08Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-149)
+
+- **Last completed:**
+  - **UI/UX & Accessibility (`KAN-149` / `KAN-234` follow-up — Single `<main>` landmark across all `<OrgShell>` pages):**
+    - `OrgShell` (`apps/web/components/orgs/org-shell.tsx`) renders `<AppShell>`, which already renders `<main>`, yet all 6 org-level pages (`orgs/[orgId]/page.tsx`, `audit-log/page.tsx`, `plugins/page.tsx`, `projects/new/page.tsx`, `resources/page.tsx`, `settings/page.tsx`) still rendered a nested `<main>` inside `{children}` because `single-main-landmark.test.ts` only scanned `projects/[projectId]`.
+    - Replaced `<main>` with `<div>` across all 6 org-level pages and widened `apps/web/components/single-main-landmark.test.ts` to scan the entire `app/[locale]/orgs/[orgId]` tree.
+  - **Security & RBAC (`KAN-149` — `OrgDetailPage` & `ProjectLayout` module/quick-link permission parity + default project selection):**
+    - On `OrgDetailPage` (`apps/web/app/[locale]/orgs/[orgId]/page.tsx`), preferred the first project matching a project-scoped role binding when `?project=` is omitted so a project-scoped `project_admin`/`editor`/`operator` lands on their assigned project by default instead of `projects[0]`.
+    - Gated `campaigns` and `funnel` on `canExecuteAutomation || canViewBoards` in both `OrgDetailPage` (`moduleLinks`) and `ProjectLayout` (`primaryModuleItems`), gated `automation` on `canExecuteAutomation` and `settings` on `canManageProjectSettings` in `OrgDetailPage`, and added the 5 missing per-feature links (`install`, `support`, `demos`, `win-rules`, `rep-collections`) to `OrgDetailPage`'s `quickLinkGroups`.
+  - **Infra:**
+    - Built and deployed `1d6bd0f` (Iteration 6 / `KAN-148`) across `api-prod`, `api-preprod`, `web-prod`, and `web-preprod`.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-30T22:15Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-148)
 
 - **Last completed:**

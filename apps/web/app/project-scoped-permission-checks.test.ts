@@ -79,4 +79,13 @@ describe('permission checks under project routes', () => {
     expect(page).toContain("can(bindings, principal, 'automation.execute', orgScope)");
     expect(page).toContain('canManageKillSwitch={canManageKillSwitch}');
   });
+
+  it('OrgDetailPage gates moduleLinks on matching project permissions and defaults to the caller project binding (KAN-149)', () => {
+    const orgPage = readFileSync(resolve(__dirname, '[locale]/orgs/[orgId]/page.tsx'), 'utf8');
+    expect(orgPage).toContain("can(bindings, principal, 'automation.execute', projectScope)");
+    expect(orgPage).toContain('const canViewCockpit = canExecuteAutomation || canViewBoards;');
+    expect(orgPage).toContain("binding.scopeLevel === 'project' && binding.scopeId === project.id");
+    expect(orgPage).toMatch(/canExecuteAutomation\s*\?\s*\[\{\s*href:\s*'automation'/);
+    expect(orgPage).toMatch(/canManageProjectSettings\s*\?\s*\[\{\s*href:\s*'settings'/);
+  });
 });

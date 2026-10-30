@@ -93,7 +93,11 @@ export default async function OrgDetailPage({
     listOrgMembers(orgId),
     canViewAuditLog ? listAuditLogEntriesForOrg(orgId, RECENT_ACTIVITY_LIMIT) : Promise.resolve([]),
   ]);
-  const currentProjectId = projectIdParam ?? projects[0]?.id;
+  const defaultProject =
+    projects.find((project) =>
+      bindings.some((binding) => binding.scopeLevel === 'project' && binding.scopeId === project.id),
+    ) ?? projects[0];
+  const currentProjectId = projectIdParam ?? defaultProject?.id;
   const currentProject = projects.find((project) => project.id === currentProjectId);
   const currentEnv: Environment = envParam && isEnvironment(envParam) ? envParam : 'dev';
 
@@ -114,6 +118,8 @@ export default async function OrgDetailPage({
   const canManageBoards = can(bindings, principal, 'dashboards.write', projectScope);
   const canViewBoards = can(bindings, principal, 'dashboards.read', projectScope) || canManageBoards;
   const canUseAi = can(bindings, principal, 'ai.use', projectScope);
+  const canExecuteAutomation = can(bindings, principal, 'automation.execute', projectScope);
+  const canViewCockpit = canExecuteAutomation || canViewBoards;
 
   // Projects the signed-in inviter administers (KAN-135) — scopes the
   // invite form's project picker to only the projects a project-scoped
@@ -132,8 +138,9 @@ export default async function OrgDetailPage({
     ? await loadDashboardProject({ orgId, project: currentProject, userId: user.id, bindings, now })
     : null;
 
-  const [t, tShell] = await Promise.all([
+  const [t, tWinRules, tShell] = await Promise.all([
     getTranslations('OrgDetailPage'),
+    getTranslations('WinRules'),
     getTranslations('AppShell'),
   ]);
 
@@ -158,6 +165,7 @@ export default async function OrgDetailPage({
             ...(canManageMetrics ? [{ href: 'metric-defs', label: t('projectMetricRegistryLink') }] : []),
             ...(canViewIngestHealth
               ? [
+                  { href: 'install', label: t('projectInstallLink') },
                   { href: 'ingest-health', label: t('projectIngestHealthLink') },
                   { href: 'hooks', label: t('projectHooksLink') },
                   { href: 'field-mappings', label: t('projectFieldMappingsLink') },
@@ -179,6 +187,8 @@ export default async function OrgDetailPage({
                 { href: 'intent-quality', label: t('projectIntentQualityLink') },
                 { href: 'firmographics', label: t('projectFirmographicsLink') },
                 { href: 'experiments', label: t('projectExperimentsLink') },
+                { href: 'support', label: t('projectSupportLink') },
+                { href: 'demos', label: t('projectDemosLink') },
               ]
             : [],
         },
@@ -192,11 +202,13 @@ export default async function OrgDetailPage({
               ? [
                   { href: 'goals', label: t('projectGoalsLink') },
                   { href: 'segments', label: t('projectSegmentsLink') },
+                  { href: 'win-rules', label: tWinRules('metaTitle') },
                   { href: 'funnel', label: t('projectFunnelLink') },
                   { href: 'cohorts', label: t('projectCohortsLink') },
                   { href: 'insights', label: t('projectInsightsLink') },
                   { href: 'tv', label: t('projectTvLink') },
                   { href: 'campaign-ops', label: t('projectCampaignOpsLink') },
+                  { href: 'rep-collections', label: t('projectRepCollectionsLink') },
                 ]
               : []),
           ],
@@ -230,10 +242,18 @@ export default async function OrgDetailPage({
               { href: 'ad-studio', label: t('projectAdStudioLink'), icon: Clapperboard },
             ]
           : []),
-        { href: 'campaigns', label: tShell('adsAndPerformance'), icon: Megaphone },
-        { href: 'funnel', label: tShell('funnelAndGoals'), icon: Target },
-        { href: 'automation', label: tShell('aiCopilotAndAutomation'), icon: Bot },
-        { href: 'settings', label: tShell('settings'), icon: Settings },
+        ...(canViewCockpit
+          ? [
+              { href: 'campaigns', label: tShell('adsAndPerformance'), icon: Megaphone },
+              { href: 'funnel', label: tShell('funnelAndGoals'), icon: Target },
+            ]
+          : []),
+        ...(canExecuteAutomation
+          ? [{ href: 'automation', label: tShell('aiCopilotAndAutomation'), icon: Bot }]
+          : []),
+        ...(canManageProjectSettings
+          ? [{ href: 'settings', label: tShell('settings'), icon: Settings }]
+          : []),
       ]
     : [];
 
@@ -248,7 +268,7 @@ export default async function OrgDetailPage({
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
-      <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
         <PageHero
           icon={Building2}
           eyebrow={t('eyebrow')}
@@ -424,7 +444,7 @@ export default async function OrgDetailPage({
             ) : null}
           </div>
         </div>
-      </main>
+      </div>
     </OrgShell>
   );
 }

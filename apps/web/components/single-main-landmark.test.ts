@@ -42,9 +42,9 @@ describe('one main landmark per page (KAN-234)', () => {
     expect(shell.match(/<main[\s>]/g)).toHaveLength(1);
   });
 
-  it('no project page renders its own <main> inside the shell', () => {
-    const projectRoutes = path.join(WEB_ROOT, 'app/[locale]/orgs/[orgId]/projects/[projectId]');
-    const offenders = sourceFiles(projectRoutes)
+  it('no org or project page renders its own <main> inside OrgShell/AppShell (KAN-234, KAN-149)', () => {
+    const orgRoutes = path.join(WEB_ROOT, 'app/[locale]/orgs/[orgId]');
+    const offenders = sourceFiles(orgRoutes)
       .filter((file) => !file.endsWith(`${path.sep}layout.tsx`))
       .filter((file) => MAIN_TAG.test(readFileSync(file, 'utf8')))
       .map(relative);
