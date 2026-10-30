@@ -1014,7 +1014,7 @@
     "trackingAlertStatusResolved": "נפתרה",
     "trackingAlertCheckButton": "בדוק עכשיו",
     "trackingAlertCheckError": "לא הצלחנו לבדוק כרגע. בדקו את החיבור לאינטרנט ונסו שוב. שום דבר לא השתנה.",
-    "touchpointCaptureHeading": "לכידת נקודות מגע",
+    "touchpointCaptureHeading": "מעקב אחר ביקורים באתר",
     "touchpointSchemaIntro": "הגדירו זאת פעם אחת כדי שביקורים מקטע המעקב לאתר (ראו בעמוד מפתחות הגישה) יתקבלו ולא יושארו בצד כסוג אירוע לא מוכר.",
     "touchpointSchemaAlreadyRegistered": "מעקב ביקורים באתר כבר מוגדר בפרויקט הזה.",
     "touchpointSchemaSetupButton": "הגדרת מעקב ביקורים באתר",
@@ -1061,7 +1061,7 @@
     "eventLastSeenRelative": "נראה לאחרונה {relative}",
     "eventVolumeWeekUnit": "7 ימים",
     "registeredDescription": "הגרסה הנוכחית של כל סוג נתונים; גרסאות קודמות נשארות זמינות ונפתחות בלחיצה.",
-    "noSchemasDetail": "רשמו את הראשונה למטה, או הגדירו לכידת נקודות מגע למעלה.",
+    "noSchemasDetail": "רשמו את הראשונה למטה, או הגדירו מעקב אחר ביקורים באתר למעלה.",
     "registerDescription": "כתבו איך הנתונים נראים ואילו שדות יש בהם. רשומות שלא תואמות נשמרות בצד כדי שתבדקו אותן, ולא נמחקות.",
     "typeHint": {
       "event": "אירוע - משהו שקרה",

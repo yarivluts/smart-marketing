@@ -1014,7 +1014,7 @@
     "trackingAlertStatusResolved": "Resolved",
     "trackingAlertCheckButton": "Check now",
     "trackingAlertCheckError": "Could not check right now. Check your internet connection and try again. Nothing was changed.",
-    "touchpointCaptureHeading": "Touchpoint capture",
+    "touchpointCaptureHeading": "Website visit tracking",
     "touchpointSchemaIntro": "Set this up once so visits from the website tracking snippet (see the Access keys page) are accepted instead of being set aside as an unknown type of event.",
     "touchpointSchemaAlreadyRegistered": "Website visit tracking is already set up for this project.",
     "touchpointSchemaSetupButton": "Set up website visit tracking",
@@ -1061,7 +1061,7 @@
     "eventLastSeenRelative": "Last seen {relative}",
     "eventVolumeWeekUnit": "7 days",
     "registeredDescription": "The current version of each data type; earlier versions stay available and open on click.",
-    "noSchemasDetail": "Register the first one below, or set up touchpoint capture above.",
+    "noSchemasDetail": "Register the first one below, or set up website visit tracking above.",
     "registerDescription": "Say what the data looks like and which fields it has. Records that do not match are set aside for you to review, not deleted.",
     "typeHint": {
       "event": "Event - something that happened",
