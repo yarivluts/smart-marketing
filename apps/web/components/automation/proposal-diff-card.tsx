@@ -186,7 +186,7 @@ export function ProposalDiffCard({
                 impactColor,
               )}
             >
-              {proposal.impactBadge} impact
+              {t('impactBadgeLabel', { impact: proposal.impactBadge })}
             </span>
           )}
         </div>
@@ -210,7 +210,7 @@ export function ProposalDiffCard({
             <React.Fragment key={index}>
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t('beforeLabel') || 'Before'}:
+                  {t('beforeLabel')}:
                 </span>
                 <span
                   data-testid="before-diff"
@@ -222,7 +222,7 @@ export function ProposalDiffCard({
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  {t('afterLabel') || 'After'}:
+                  {t('afterLabel')}:
                 </span>
                 <span
                   data-testid="after-diff"
@@ -287,7 +287,7 @@ export function ProposalDiffCard({
                 )}
                 <span>
                   {actionLoading === 'approve' || isLoading
-                    ? t('executing') || 'Executing...'
+                    ? t('executing')
                     : tCard('approveAndExecute')}
                 </span>
               </button>

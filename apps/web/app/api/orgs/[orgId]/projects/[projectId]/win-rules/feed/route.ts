@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { createWinFeedStream } from '@/lib/orgs/win-feed-stream';
 
@@ -27,7 +27,7 @@ function firstNonEmpty(value: string | null): string | null {
  */
 export async function GET(request: NextRequest, { params }: RouteParams): Promise<Response> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

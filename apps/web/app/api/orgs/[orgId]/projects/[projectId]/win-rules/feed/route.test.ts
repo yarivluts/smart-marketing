@@ -144,4 +144,30 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/win-rules/feed', () => {
     expect(text).not.toContain('evt_prod');
     expect(text).not.toContain('evt_staging');
   });
+
+  it('lets a project-scoped project_admin open the SSE feed on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project } = await setupOrgProject('Win Feed Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('win-feed-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = feedRequest(organization.id, project.id);
+    const allowedResponse = await GET(allowed.request, { params: allowed.params });
+    expect(allowedResponse.status).toBe(200);
+    await allowedResponse.body?.cancel();
+
+    const blocked = feedRequest(organization.id, siblingProject.id);
+    expect((await GET(blocked.request, { params: blocked.params })).status).toBe(403);
+  });
 });

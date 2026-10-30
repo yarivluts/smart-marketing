@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ProjectNotFoundError, type OnboardingFunnelStep } from '@growthos/firebase-orm-models';
 import { isFunnelStageKey } from '@growthos/shared';
 import { confirmOnboardingFunnelSteps } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { toOnboardingStateView } from '@/lib/orgs/onboarding-view';
 
@@ -34,7 +34,7 @@ function parseSteps(value: unknown): OnboardingFunnelStep[] | null {
 /** The wizard's "confirm the AI-proposed funnel mapping" step (KAN-68 AC: "user confirms"). The proposal itself (`proposeOnboardingFunnelSteps`) is read fresh server-side by the onboarding page on every render — no GET route needed here, only this confirm action. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'project.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'project.manage');
   if (error) {
     return error;
   }

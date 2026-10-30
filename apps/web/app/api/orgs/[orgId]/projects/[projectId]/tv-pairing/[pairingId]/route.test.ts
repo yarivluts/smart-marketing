@@ -2,11 +2,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   claimTvPairing,
   createBoard,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
   requestTvPairing,
   revokeTvPairing,
 } from '@growthos/firebase-orm-models';
@@ -249,5 +251,70 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/tv-pairing/[pairingId]', 
     expect(response.status).toBe(200);
     const body = (await response.json()) as { pairing: { id: string; label: string; rotationSeconds: number; reducedMotion: boolean } };
     expect(body.pairing).toMatchObject({ id: pairing.id, label: 'Updated label', rotationSeconds: 90, reducedMotion: true });
+  });
+
+  it('lets a project-scoped project_admin update and revoke a TV pairing on their bound project but returns 403 on a sibling project', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('update-tv-pa-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Update TV PA Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'War room', createdByUserId: owner.id });
+    const siblingBoard = await createBoard({ organizationId: organization.id, projectId: siblingProject.id, name: 'Sibling room', createdByUserId: owner.id });
+    const { code } = await requestTvPairing();
+    const pairing = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 30,
+      reducedMotion: false,
+      label: 'Bound TV',
+      claimedByUserId: owner.id,
+    });
+    const { code: siblingCode } = await requestTvPairing();
+    const siblingPairing = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      code: siblingCode,
+      boardIds: [siblingBoard.id],
+      rotationSeconds: 30,
+      reducedMotion: false,
+      label: 'Sibling TV',
+      claimedByUserId: owner.id,
+    });
+
+    const adminEmail = uniqueEmail('tv-pairing-item-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const patchAllowed = updateSettingsRequest(organization.id, project.id, pairing.id, {
+      label: 'Updated Bound TV',
+      boardIds: [board.id],
+      rotationSeconds: 60,
+      reducedMotion: false,
+    });
+    expect((await PATCH(patchAllowed.request, { params: patchAllowed.params })).status).toBe(200);
+    const deleteAllowed = revokeRequest(organization.id, project.id, pairing.id);
+    expect((await DELETE(deleteAllowed.request, { params: deleteAllowed.params })).status).toBe(200);
+
+    const patchBlocked = updateSettingsRequest(organization.id, siblingProject.id, siblingPairing.id, {
+      label: 'Updated Sibling TV',
+      boardIds: [siblingBoard.id],
+      rotationSeconds: 60,
+      reducedMotion: false,
+    });
+    expect((await PATCH(patchBlocked.request, { params: patchBlocked.params })).status).toBe(403);
+    const deleteBlocked = revokeRequest(organization.id, siblingProject.id, siblingPairing.id);
+    expect((await DELETE(deleteBlocked.request, { params: deleteBlocked.params })).status).toBe(403);
   });
 });

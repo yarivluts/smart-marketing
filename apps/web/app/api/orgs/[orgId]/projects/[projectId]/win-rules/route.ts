@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidWinRuleError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { createWinRule } from '@/lib/orgs/mutations';
 import { listWinRulesForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseCreateWinRuleRequestBody } from '@/lib/orgs/parse-win-rule-fields';
 import { toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
 
@@ -13,7 +13,7 @@ interface RouteParams {
 /** Lists every win rule in a project (KAN-65), newest-first — gated on `dashboards.write`, reusing the boards/goals feature's permission (see this story's PR description for why a dedicated `wins.manage` permission is out of scope). */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Creates a win rule (KAN-65, E12.2): an event pattern that fires a win, e.g. "first_charge" (no filters) or "order > 100" (`properties.amount > 100`). */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

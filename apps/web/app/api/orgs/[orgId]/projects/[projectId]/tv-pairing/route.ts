@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidTvPairingError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { claimTvPairing } from '@/lib/orgs/mutations';
 import { listTvPairingsForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseClaimTvPairingRequestBody } from '@/lib/orgs/parse-tv-pairing-fields';
 import { toTvPairingSummaryView } from '@/lib/orgs/tv-pairing-view';
 import { checkClaimPairingRateLimit } from '@/lib/orgs/tv-pairing-rate-limit';
@@ -14,7 +14,7 @@ interface RouteParams {
 /** Every TV currently paired to this project (KAN-67) — gated on `dashboards.write`, the same permission every other war-room admin surface (boards, goals, win rules) in this codebase reuses. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -41,7 +41,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

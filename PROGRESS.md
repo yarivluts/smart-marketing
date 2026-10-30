@@ -17,6 +17,19 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T20:10Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-146)
+
+- **Last completed:**
+  - **Security & Engineering (`KAN-146` — Project-scope RBAC reachability across Onboarding, War Room TV / Win Rules, Rep Collections, Campaign Ops Targets, Firmographics & Intent Quality):**
+    - All 6 corresponding project pages (`onboarding/page.tsx`, `tv/page.tsx`, `rep-collections/page.tsx`, `campaign-ops/page.tsx`, `firmographics/page.tsx`, `intent-quality/page.tsx`) already checked `can(..., { orgId, projectId })`, rendering their full interactive wizards, forms, and action buttons to a project-scoped `project_admin`, while all 15 backing API routes (`onboarding/route.ts` GET/POST, `onboarding/source/route.ts` POST, `onboarding/pack/route.ts` POST, `onboarding/funnel/route.ts` POST, `onboarding/complete/route.ts` POST, `campaign-ops/targets/[campaignId]/route.ts` PATCH/DELETE, `rep-collections/route.ts` GET/POST, `rep-collections/[entryId]/route.ts` PATCH/DELETE, `tv-pairing/route.ts` GET/POST, `tv-pairing/[pairingId]/route.ts` PATCH/DELETE, `win-rules/route.ts` GET/POST, `win-rules/[winRuleId]/route.ts` PATCH/DELETE, `win-rules/feed/route.ts` GET, `firmographics/check-composition-alerts/route.ts` POST, `quality-score/check-mix-alerts/route.ts` POST) still called `requireOrgPermission(orgId, ...)` without `projectId` and returned `403 Forbidden`.
+    - Swapped all 15 routes to `requireProjectPermission(orgId, projectId, ...)` and added emulator-backed `project_admin` allow + sibling-project `403` isolation tests across all 15 `route.test.ts` suites.
+  - **UI/UX & i18n (`ProposalDiffCard`, `he.json`):**
+    - Replaced hardcoded `{proposal.impactBadge} impact` and English fallback literals in `ProposalDiffCard` (`apps/web/components/automation/proposal-diff-card.tsx`) with `t('impactBadgeLabel', { impact: proposal.impactBadge })`, `t('beforeLabel')`, `t('afterLabel')`, and `t('executing')`, and fixed the Hebrew ICU select grammar in `Copilot.impactBadgeLabel` (`"השפעה גבוהה / בינונית / נמוכה"`), verified in `proposal-diff-card.test.tsx`.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review (`KAN-147`: wire `requireProjectPermission` through the remaining `automation` project routes).
+- **Waiting on human:** None.
+
 ## 2026-10-30T19:05Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-145)
 
 - **Last completed:**

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidWinRuleError, WinRuleNotFoundError } from '@growthos/firebase-orm-models';
 import { deleteWinRule, updateWinRule } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseUpdateWinRuleRequestBody } from '@/lib/orgs/parse-win-rule-fields';
 import { toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
 
@@ -12,7 +12,7 @@ interface RouteParams {
 /** Updates a win rule's name/filters/active flag (KAN-65) — a full replace of whichever fields are present in the body, the same "current = only" shape `PATCH .../boards/[boardId]` uses. */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, winRuleId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
 /** Deletes a win rule outright (see `deleteWinRule`'s own doc comment for why past wins it already fired are unaffected). */
 export async function DELETE(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, winRuleId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

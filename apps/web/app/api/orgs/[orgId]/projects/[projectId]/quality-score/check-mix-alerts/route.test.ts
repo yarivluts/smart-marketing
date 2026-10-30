@@ -95,4 +95,28 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/quality-score/check-mix-al
     expect(body.ok).toBe(false);
     expect(typeof body.reason).toBe('string');
   });
+
+  it('lets a project-scoped project_admin trigger mix alerts check on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project } = await setupOrgProject('Mix Alerts Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('mix-alerts-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = checkMixAlertsRequest(organization.id, project.id);
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = checkMixAlertsRequest(organization.id, siblingProject.id);
+    expect((await POST(blocked.request, { params: blocked.params })).status).toBe(403);
+  });
 });

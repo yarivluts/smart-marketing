@@ -155,4 +155,32 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/campaign-ops/targets/[ca
     const second = deleteRequest(organization.id, project.id, 'brand');
     expect((await DELETE(second.request, { params: second.params })).status).toBe(204);
   });
+
+  it('lets a project-scoped project_admin set and clear targets on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project } = await setupOrgProject('Campaign Target Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('campaign-target-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const patchAllowed = patchRequest(organization.id, project.id, 'brand', { monthlyBudget: 300 });
+    expect((await PATCH(patchAllowed.request, { params: patchAllowed.params })).status).toBe(200);
+    const deleteAllowed = deleteRequest(organization.id, project.id, 'brand');
+    expect((await DELETE(deleteAllowed.request, { params: deleteAllowed.params })).status).toBe(204);
+
+    const patchBlocked = patchRequest(organization.id, siblingProject.id, 'brand', { monthlyBudget: 300 });
+    expect((await PATCH(patchBlocked.request, { params: patchBlocked.params })).status).toBe(403);
+    const deleteBlocked = deleteRequest(organization.id, siblingProject.id, 'brand');
+    expect((await DELETE(deleteBlocked.request, { params: deleteBlocked.params })).status).toBe(403);
+  });
 });

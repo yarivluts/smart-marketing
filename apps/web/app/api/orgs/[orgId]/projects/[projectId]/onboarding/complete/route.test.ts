@@ -1,7 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST } from './route';
 
@@ -62,5 +68,30 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/onboarding/complete', () =
     const body = (await response.json()) as { state: { step: string; completedAt: string | null } };
     expect(body.state.step).toBe('done');
     expect(body.state.completedAt).not.toBeNull();
+  });
+
+  it('lets a project-scoped project_admin complete onboarding on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Onboarding Complete Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('onboarding-complete-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = completeRequest(organization.id, project.id);
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = completeRequest(organization.id, siblingProject.id);
+    expect((await POST(blocked.request, { params: blocked.params })).status).toBe(403);
   });
 });
