@@ -31,7 +31,7 @@ async function createBrief(page: Page): Promise<{ orgId: string; projectId: stri
   await page.getByLabel('Ad name').fill('Sign in 30 seconds');
   await page.getByLabel('What should the ad achieve?').fill('Trial signups from small law firms');
   await page.getByLabel('What is being sold, and to whom?').fill('E-signatures for lawyers');
-  await page.getByLabel('Landing page (optional)').fill('https://example.com/lawyers');
+  await page.getByLabel('Web page people should open (optional)').fill('https://example.com/lawyers');
   await page.getByRole('button', { name: 'Create ad' }).click();
   await expect(page).toHaveURL(/\?brief=/);
   const briefId = new URL(page.url()).searchParams.get('brief') as string;
