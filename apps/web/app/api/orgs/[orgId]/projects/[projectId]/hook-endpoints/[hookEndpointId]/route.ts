@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { HookEndpointNotFoundError, MissingSignatureHeaderNameError } from '@growthos/firebase-orm-models';
 import { disableHookEndpoint, updateHookEndpoint } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; hookEndpointId: string }>;
@@ -10,7 +10,7 @@ interface RouteParams {
 /** Disables a hook endpoint's receive URL immediately (KAN-53) — gated on `ingest.write`, same as creating one. */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, hookEndpointId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }
@@ -42,7 +42,7 @@ interface UpdateHookEndpointRequestBody {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, hookEndpointId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }

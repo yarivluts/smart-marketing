@@ -1,7 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, registerSchemaDefinition } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+  registerSchemaDefinition,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST } from './route';
 
@@ -115,5 +122,31 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/field-mappings/suggest', (
     const response = await POST(request, { params });
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe('invalid_sample_payload');
+  });
+
+  it('lets a project-scoped project_admin suggest on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project } = await setupOrgProject('Suggest Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    await registerOrderCompletedSchema(organization.id, siblingProject.id, owner.id);
+
+    const adminEmail = uniqueEmail('suggest-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = suggestRequest(organization.id, project.id, { kind: 'event', schemaName: 'order_completed', samplePayload: SAMPLE_PAYLOAD });
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = suggestRequest(organization.id, siblingProject.id, { kind: 'event', schemaName: 'order_completed', samplePayload: SAMPLE_PAYLOAD });
+    expect((await POST(blocked.request, { params: blocked.params })).status).toBe(403);
   });
 });

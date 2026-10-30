@@ -2,12 +2,14 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   createFieldMapping,
   createHookEndpoint,
   disableFieldMapping,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
   receiveHookPayload,
   registerSchemaDefinition,
   setHookDeliveryStatus,
@@ -194,5 +196,51 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/field-mappings/[fieldMappi
     const response = await POST(second.request, { params: second.params });
     expect(response.status).toBe(409);
     expect((await response.json()).error).toBe('already_applied');
+  });
+
+  it('lets a project-scoped project_admin apply on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project, mapping, delivery } = await setupMappingAndDelivery('Apply Project Admin Org');
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    await registerOrderCompletedSchema(organization.id, siblingProject.id, owner.id);
+    const siblingMapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 's',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+    const siblingEndpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 's',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+    const siblingReceived = await receiveHookPayload({ hookId: siblingEndpoint.hook_id, rawBody: SAMPLE_PAYLOAD, headers: {} });
+    if (!siblingReceived.ok) throw new Error('expected sibling delivery');
+
+    const adminEmail = uniqueEmail('apply-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = applyRequest(organization.id, project.id, mapping.id, { hookDeliveryId: delivery.id });
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = applyRequest(organization.id, siblingProject.id, siblingMapping.id, { hookDeliveryId: siblingReceived.value.delivery.id });
+    expect((await POST(blocked.request, { params: blocked.params })).status).toBe(403);
   });
 });

@@ -2,7 +2,14 @@ import { randomBytes } from 'node:crypto';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createHookEndpoint, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createHookEndpoint,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { PUT } from './route';
 
@@ -123,5 +130,40 @@ describe('PUT /api/orgs/[orgId]/projects/[projectId]/hook-endpoints/[hookEndpoin
     } finally {
       process.env.GROWTHOS_VAULT_KEYS = previousVaultKeys;
     }
+  });
+
+  it('lets a project-scoped project_admin set a secret on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project, endpoint } = await setupEndpoint('Hooks Secret Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    const siblingEndpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 's',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Signature',
+      createdByUserId: owner.id,
+    });
+
+    const adminEmail = uniqueEmail('hooks-secret-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = secretRequest(organization.id, project.id, endpoint.id);
+    expect((await PUT(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = secretRequest(organization.id, siblingProject.id, siblingEndpoint.id);
+    expect((await PUT(blocked.request, { params: blocked.params })).status).toBe(403);
   });
 });

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { EnvironmentNotFoundError, InvalidFieldMappingError, ProjectNotFoundError, TargetSchemaNotRegisteredError } from '@growthos/firebase-orm-models';
 import { createFieldMapping } from '@/lib/orgs/mutations';
 import { listFieldMappingsForProject, listOrgProjects } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseCreateFieldMappingRequestBody } from '@/lib/orgs/parse-field-mapping-rules';
 import { toFieldMappingView } from '@/lib/orgs/field-mapping-view';
 
@@ -13,7 +13,7 @@ interface RouteParams {
 /** Lists every saved field mapping (active or disabled) for one project (KAN-54) — gated on `ingest.write`, the same permission the sibling Hooks admin surface (KAN-53) reuses for inbound-data management. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }
@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Saves a new field mapping (KAN-54 AC: "saved field-mappings"). Requires the target schema to already have an active version registered (KAN-31). */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }

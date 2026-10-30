@@ -1,7 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createHookEndpoint, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createHookEndpoint,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { DELETE, PATCH } from './route';
 
@@ -171,5 +178,53 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/hook-endpoints/[hookEndpo
       params: Promise.resolve({ orgId: organization.id, projectId: project.id, hookEndpointId: 'does-not-exist' }),
     });
     expect(response.status).toBe(404);
+  });
+
+  it('lets a project-scoped project_admin update and disable on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project, endpoint } = await setupEndpoint('Hooks Item Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    const siblingEndpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 's',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+
+    const adminEmail = uniqueEmail('hooks-item-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const patchAllowed = await PATCH(patchRequest(organization.id, project.id, endpoint.id, { name: 'Renamed' }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id, hookEndpointId: endpoint.id }),
+    });
+    expect(patchAllowed.status).toBe(200);
+
+    const deleteAllowed = await DELETE(new Request('https://growthos.test'), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id, hookEndpointId: endpoint.id }),
+    });
+    expect(deleteAllowed.status).toBe(200);
+
+    const patchBlocked = await PATCH(patchRequest(organization.id, siblingProject.id, siblingEndpoint.id, { name: 'Renamed' }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: siblingProject.id, hookEndpointId: siblingEndpoint.id }),
+    });
+    expect(patchBlocked.status).toBe(403);
+
+    const deleteBlocked = await DELETE(new Request('https://growthos.test'), {
+      params: Promise.resolve({ orgId: organization.id, projectId: siblingProject.id, hookEndpointId: siblingEndpoint.id }),
+    });
+    expect(deleteBlocked.status).toBe(403);
   });
 });

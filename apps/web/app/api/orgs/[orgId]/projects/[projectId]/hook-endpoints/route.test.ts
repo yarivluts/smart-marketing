@@ -150,4 +150,40 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/hook-endpoints', () => {
     expect(listed.hookEndpoints).toHaveLength(1);
     expect(listed.hookEndpoints[0]).toMatchObject({ id: body.hookEndpointId, name: 'Zapier', hookId: body.hookId, signatureMode: 'none' });
   });
+
+  it('lets a project-scoped project_admin create and list on their bound project but returns 403 on a sibling project', async () => {
+    const { organization, project, prodEnvironment } = await setupOrgProject('Hooks Project Admin Org');
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('hooks-pa-inviter') });
+
+    const adminEmail = uniqueEmail('hooks-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowedCreate = hookEndpointsRequest(organization.id, project.id, {
+      name: 'Allowed Hook',
+      environmentId: prodEnvironment.id,
+      signatureMode: 'none',
+    });
+    expect((await POST(allowedCreate.request, { params: allowedCreate.params })).status).toBe(201);
+    expect((await GET(hookEndpointsRequest(organization.id, project.id).request, { params: allowedCreate.params })).status).toBe(200);
+
+    const siblingCreate = hookEndpointsRequest(organization.id, siblingProject.id, {
+      name: 'Blocked Hook',
+      environmentId: siblingProd.id,
+      signatureMode: 'none',
+    });
+    expect((await POST(siblingCreate.request, { params: siblingCreate.params })).status).toBe(403);
+    expect((await GET(hookEndpointsRequest(organization.id, siblingProject.id).request, { params: siblingCreate.params })).status).toBe(403);
+  });
 });

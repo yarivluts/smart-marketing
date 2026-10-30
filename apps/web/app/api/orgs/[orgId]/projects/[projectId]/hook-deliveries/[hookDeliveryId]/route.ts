@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { HookDeliveryNotFoundError } from '@growthos/firebase-orm-models';
 import { setHookDeliveryStatus } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -11,7 +11,7 @@ interface RouteParams {
 /** Marks a queued delivery `reviewed` or `discarded` (KAN-53's review queue) — gated on `ingest.write`. */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, hookDeliveryId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }

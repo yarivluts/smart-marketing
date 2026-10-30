@@ -3971,7 +3971,8 @@
   },
   "ProposalDiffCard": {
     "approveAndExecute": "אישור וביצוע השינוי",
-    "rollbackButton": "ביטול השינוי"
+    "rollbackButton": "ביטול השינוי",
+    "statusLabel": "סטטוס:"
   },
   "AdStudio": {
     "metaTitle": "סטודיו מודעות AI",

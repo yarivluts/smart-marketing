@@ -3971,7 +3971,8 @@
   },
   "ProposalDiffCard": {
     "approveAndExecute": "Approve and apply",
-    "rollbackButton": "Undo this change"
+    "rollbackButton": "Undo this change",
+    "statusLabel": "Status:"
   },
   "AdStudio": {
     "metaTitle": "AI Ad Studio",
