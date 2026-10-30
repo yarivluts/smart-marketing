@@ -68,9 +68,13 @@ export default async function ProjectLayout({
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId, projectId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId, projectId });
   const canUseAi = can(bindings, principal, 'ai.use', { orgId, projectId });
+  const canExecuteAutomation = can(bindings, principal, 'automation.execute', { orgId, projectId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
   const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId, projectId }) || canManageBoards;
-  const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId, projectId });
+  // Org-level destination pages (`/orgs/[orgId]/audit-log` and `/orgs/[orgId]/plugins`) require org-wide scope.
+  const orgScope = { orgId };
+  const canViewOrgAuditLog = can(bindings, principal, 'audit.read', orgScope);
+  const canManageOrgPlugins = can(bindings, principal, 'plugin.install', orgScope);
 
   const [t, tWinRules, tShell, tEnvBadge, tEnvPicker, { selected: selectedEnvironment, environments }] = await Promise.all([
     getTranslations('OrgDetailPage'),
@@ -107,22 +111,26 @@ export default async function ProjectLayout({
       hint: tShell('funnelAndGoalsHint'),
       icon: 'Target',
     },
-    {
-      href: `${base}/automation`,
-      label: tShell('aiCopilotAndAutomation'),
-      hint: tShell('aiCopilotAndAutomationHint'),
-      icon: 'Bot',
-    },
+    ...(canExecuteAutomation
+      ? [
+          {
+            href: `${base}/automation`,
+            label: tShell('aiCopilotAndAutomation'),
+            hint: tShell('aiCopilotAndAutomationHint'),
+            icon: 'Bot' as const,
+          },
+        ]
+      : []),
   ];
 
   // Restored pre-redesign items — see the module doc comment above.
   const orgItems: AppShellNavItem[] = [
     { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
     { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
-    ...(canViewAuditLog
+    ...(canViewOrgAuditLog
       ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: 'ShieldCheck' as const }]
       : []),
-    ...(canManagePlugins
+    ...(canManageOrgPlugins
       ? [{ href: `/orgs/${orgId}/plugins`, label: t('pluginRegistryLink'), icon: 'Puzzle' as const }]
       : []),
   ];
@@ -181,9 +189,14 @@ export default async function ProjectLayout({
 
   // The two setup links a newcomer needs, next to the essentials: the project's settings, and the ad
   // accounts it publishes to.
+  const connectionsItem: AppShellNavItem = {
+    href: `/orgs/${orgId}/connections?projectId=${projectId}`,
+    label: t('connectionsLink'),
+    icon: 'KeyRound',
+  };
   const setupItems: AppShellNavItem[] = [
-    { href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' },
-    { href: `/orgs/${orgId}/connections?projectId=${projectId}`, label: t('connectionsLink'), icon: 'KeyRound' },
+    ...(canManageProjects ? [{ href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' as const }] : []),
+    connectionsItem,
   ];
 
   const secondaryItems: AppShellNavItem[] = [
@@ -215,7 +228,7 @@ export default async function ProjectLayout({
   // The phone tab bar holds five: the two AI makers, the ads, the approvals and the settings.
   const mobileTabItems: AppShellNavItem[] = [
     ...primaryModuleItems.filter((item) => !item.href.endsWith('/funnel')),
-    { href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' },
+    ...(canManageProjects ? [{ href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' as const }] : []),
   ];
 
   // KAN-85 follow-up: every restored nav item above also becomes a "jump to
@@ -226,7 +239,7 @@ export default async function ProjectLayout({
   // shortcut of their own.
   const pageShortcuts = buildOmniSearchPageShortcuts([
     ...(canUseAi ? [adStudioItem] : []),
-    ...setupItems.slice(1),
+    connectionsItem,
     ...orgItems,
     ...insightsItems,
     ...dataItems,

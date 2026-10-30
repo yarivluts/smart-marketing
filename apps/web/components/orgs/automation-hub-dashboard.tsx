@@ -52,6 +52,7 @@ export interface AutomationHubDashboardProps {
   proactiveRecommendations: Omit<SmartRecommendationCardProps, 'onApprove' | 'onDismiss'>[];
   canExecute: boolean;
   canApprove: boolean;
+  canManageKillSwitch?: boolean;
 }
 
 export function AutomationHubDashboard({
@@ -66,6 +67,7 @@ export function AutomationHubDashboard({
   proactiveRecommendations: initialRecommendations,
   canExecute: _canExecute,
   canApprove,
+  canManageKillSwitch = true,
 }: AutomationHubDashboardProps): React.ReactElement {
   const t = useTranslations('Automation');
   const router = useRouter();
@@ -468,7 +470,7 @@ export function AutomationHubDashboard({
           {/* Emergency Kill Switch */}
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">{t('killSwitchHeading')}</h2>
-            <AutomationKillSwitchPanel orgId={orgId} status={killSwitchStatus} />
+            <AutomationKillSwitchPanel orgId={orgId} status={killSwitchStatus} canManage={canManageKillSwitch} />
           </section>
 
           {/* Guardrail Policy */}

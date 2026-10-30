@@ -61,6 +61,8 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     notFound();
   }
   const canApprove = can(bindings, principal, 'automation.approve', { orgId, projectId });
+  const orgScope = { orgId };
+  const canManageKillSwitch = can(bindings, principal, 'automation.execute', orgScope);
 
   const [projects, killSwitchStatus, policy, targets, actions, activeAttachments, credentials] = await Promise.all([
     listOrgProjects(orgId),
@@ -115,7 +117,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
       id: tv.id,
       targetId: tv.id,
       label: tv.label,
-      platform: 'meta_ads' as const,
+      platform: tv.externalPlatform === 'google_ads' ? ('google_ads' as const) : ('meta_ads' as const),
       status: (tv.campaignStatus || 'enabled') as 'enabled' | 'paused' | 'removed' | 'none',
       // Real: it is the budget the campaign is configured with.
       dailyBudgetUsd: tv.dailyBudgetUsd,
@@ -171,6 +173,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
         proactiveRecommendations={proactiveRecs}
         canExecute={true}
         canApprove={canApprove}
+        canManageKillSwitch={canManageKillSwitch}
       />
       <ChartCard title={tAutomation('lifecycleTitle')} description={tAutomation('lifecycleDescription')} icon={Workflow}>
         <FlowDiagram label={tAutomation('lifecycleTitle')} nodes={lifecycleNodes} edges={lifecycleEdges} height={300} />
