@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { InvalidPluginInstallStateError, PluginInstallNotFoundError } from '@growthos/firebase-orm-models';
 import { enablePlugin } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { toPluginInstallView } from '@/lib/orgs/plugin-view';
 
 interface RouteParams {
@@ -11,7 +11,7 @@ interface RouteParams {
 /** Resumes a disabled install (KAN-46 AC: "enable"/disable lifecycle) — gated on `plugin.install`, same as installing. */
 export async function POST(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, installId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'plugin.install');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'plugin.install');
   if (error) {
     return error;
   }

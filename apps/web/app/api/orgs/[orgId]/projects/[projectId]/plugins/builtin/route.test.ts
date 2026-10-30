@@ -2,10 +2,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
   getLatestPluginManifestVersion,
+  inviteMemberToOrganization,
   LANDING_PAGE_PACK_PLUGIN_ID,
   listBoardsForProject,
   listMetricDefinitionsForProject,
@@ -124,5 +126,29 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins/builtin', () => {
     const response = await POST(second.request, { params: second.params });
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: 'already_installed' });
+  });
+
+  it('allows a project-scoped project_admin on their own project and returns 403 on a sibling project (KAN-144)', async () => {
+    const { owner, organization, project } = await setupOrgProject('Builtin Install Route Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('proj-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const ownReq = builtinInstallRequest(organization.id, project.id, { pluginId: LANDING_PAGE_PACK_PLUGIN_ID });
+    expect((await POST(ownReq.request, { params: ownReq.params })).status).toBe(201);
+
+    const siblingReq = builtinInstallRequest(organization.id, otherProject.id, { pluginId: LANDING_PAGE_PACK_PLUGIN_ID });
+    expect((await POST(siblingReq.request, { params: siblingReq.params })).status).toBe(403);
   });
 });

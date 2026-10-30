@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T18:05Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-144)
+
+- **Last completed:**
+  - **Security & Engineering (`KAN-144` — Project-scope RBAC reachability for the Plugins feature family):**
+    - `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/plugins/page.tsx` already checked `can(..., 'plugin.install', { orgId, projectId })`, rendering the built-in pack gallery, manifest install form, config edit form, enable/disable/uninstall lifecycle buttons, source runtime "Run now" button, and Meta Lookalike Audience controls to a project-scoped `project_admin`, while all 8 backing API routes under `apps/web/app/api/orgs/[orgId]/projects/[projectId]/plugins/` (`route.ts` GET/POST, `builtin/route.ts` POST, `[installId]/route.ts` PATCH, `[installId]/enable/route.ts` POST, `[installId]/disable/route.ts` POST, `[installId]/uninstall/route.ts` POST, `[installId]/run/route.ts` POST, `[installId]/lookalike-audiences/route.ts` POST) still called `requireOrgPermission(orgId, 'plugin.install')` without `projectId` and returned `403 Forbidden`.
+    - Swapped all 8 routes to `requireProjectPermission(orgId, projectId, 'plugin.install')` and added emulator-backed `project_admin` allow + sibling-project `403` isolation tests across all 8 `route.test.ts` suites.
+  - **UI/UX & i18n (`Developers.clientSide.intro` in `en.json` and `he.json`):**
+    - Replaced leftover `"touchpoint"` / `"landing page"` (`"touchpoint"` / `"דף נחיתה"`) jargon in `Developers.clientSide.intro` with plain visit-attribution and `"web page"` (`"דף אינטרנט"`) wording matching `Keys.touchpointSnippetIntro`, `SchemaRegistry`, and `SetupHealth`, pinned by `developers-client-side-plain-copy.test.ts`.
+  - **PM & Infra:**
+    - Synced `TASKS.md` (`KAN-144`) and verified all 4 Cloud Run services (`api-prod`, `api-preprod`, `web-prod`, `web-preprod`) are healthy and within the drift grace window.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review (`KAN-145`: wire `requireProjectPermission` through `field-mappings` and `hook-endpoints` / `hook-deliveries` routes).
+- **Waiting on human:** None.
+
 ## 2026-10-30T17:15Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-143)
 
 - **Last completed:**

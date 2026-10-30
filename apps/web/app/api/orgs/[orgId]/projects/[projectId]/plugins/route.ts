@@ -8,7 +8,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { listPluginInstallsForProject } from '@/lib/orgs/queries';
 import { installPlugin } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { toPluginInstallView } from '@/lib/orgs/plugin-view';
 
@@ -19,7 +19,7 @@ interface RouteParams {
 /** Lists a project's plugin installs (any status) — gated on `plugin.install`. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'plugin.install');
+  const { error } = await requireProjectPermission(orgId, projectId, 'plugin.install');
   if (error) {
     return error;
   }
@@ -38,7 +38,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Installs a registered manifest version into this project (KAN-46 AC: "scope consent screen"). */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'plugin.install');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'plugin.install');
   if (error) {
     return error;
   }

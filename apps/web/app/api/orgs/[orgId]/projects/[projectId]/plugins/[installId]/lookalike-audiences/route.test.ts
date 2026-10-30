@@ -215,4 +215,33 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins/[installId]/lookal
     expect(body.audience.country).toBe('US');
     expect(body.audience.ratio).toBe(0.05);
   });
+
+  it('allows a project-scoped project_admin on their own project and returns 403 on a sibling project (KAN-144)', async () => {
+    const { owner, organization, project } = await setupOrgProject('Lookalike Route Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const install = await setupInstalledMetaCustomAudiencePlugin(organization.id, project.id, owner.id, { seedAudienceId: 'audience-seed-1' });
+
+    const adminEmail = uniqueEmail('proj-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ id: 'audience-lookalike-2' }), text: async () => '{}' }) as unknown as Response),
+    );
+
+    const ownReq = lookalikeRequest(organization.id, project.id, install.id, { name: 'Admin Lookalike', country: 'US', ratio: 0.05 });
+    expect((await POST(ownReq.request, { params: ownReq.params })).status).toBe(200);
+
+    const siblingReq = lookalikeRequest(organization.id, otherProject.id, install.id, { name: 'Sibling Lookalike', country: 'US', ratio: 0.05 });
+    expect((await POST(siblingReq.request, { params: siblingReq.params })).status).toBe(403);
+  });
 });

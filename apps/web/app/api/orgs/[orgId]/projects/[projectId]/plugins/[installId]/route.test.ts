@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import { NextRequest } from 'next/server';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, installPlugin, registerPluginManifest, uninstallPlugin } from '@growthos/firebase-orm-models';
+import { acceptInvite, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, installPlugin, inviteMemberToOrganization, registerPluginManifest, uninstallPlugin } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { PATCH } from './route';
 
@@ -134,5 +134,33 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/plugins/[installId]', () 
     expect(response.status).toBe(200);
     const body = (await response.json()) as { install: { config: Record<string, unknown> } };
     expect(body.install.config).toEqual({ shop_domain: 'new-shop.myshopify.com' });
+  });
+
+  it('allows a project-scoped project_admin on their own project and returns 403 on a sibling project (KAN-144)', async () => {
+    const { owner, organization, project, install } = await setupInstalledPlugin('Plugin Config Route Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('proj-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const ownRes = await PATCH(patchRequest(organization.id, project.id, install.id, { config: { shop_domain: 'admin-shop.myshopify.com' } }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id, installId: install.id }),
+    });
+    expect(ownRes.status).toBe(200);
+
+    const siblingRes = await PATCH(patchRequest(organization.id, otherProject.id, install.id, { config: { shop_domain: 'other.myshopify.com' } }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: otherProject.id, installId: install.id }),
+    });
+    expect(siblingRes.status).toBe(403);
   });
 });
