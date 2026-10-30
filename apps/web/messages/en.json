@@ -6165,5 +6165,13 @@
       "no_concepts": "the AI could not come up with ideas for this, ask for a change worded differently",
       "generic": "something went wrong, try again in a minute"
     }
+  },
+  "ErrorPage": {
+    "title": "Something went wrong on our side",
+    "body": "This page could not load. Nothing you did caused it and nothing was changed. Try again, and if it keeps happening, go back to the start.",
+    "retry": "Try again",
+    "home": "Back to the start",
+    "notFoundTitle": "We could not find that page",
+    "notFoundBody": "The address may have a typo, or the page was moved. Go back to the start to continue."
   }
 }
