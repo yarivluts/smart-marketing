@@ -164,3 +164,16 @@ describe('AutomationHub Component', () => {
     expect(text).not.toMatch(/diff|audit|rolled back|proactive|executed|פרואקטיב/i);
   });
 });
+
+describe('Automation pause panel copy', () => {
+  it.each(['en', 'he'] as const)('has no "kill switch" wording in %s', (locale) => {
+    const a = (locale === 'en' ? enMessages : heMessages).Automation;
+    const text = [a.killSwitchReasonRequiredError, a.killSwitchError].join(' | ');
+    expect(text).not.toMatch(/kill switch|מתג החירום/i);
+  });
+
+  it('uses the same Hebrew label for resuming in the button and in the Growth Pilot hint', () => {
+    expect(heMessages.Automation.killSwitchDisengageButton).toBe('המשך את האוטומציה');
+    expect(heMessages.GrowthPilot.errors.automation_stopped).toContain(`'${heMessages.Automation.killSwitchDisengageButton}'`);
+  });
+});
