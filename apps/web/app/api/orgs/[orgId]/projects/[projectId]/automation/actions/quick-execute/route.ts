@@ -22,7 +22,7 @@ import {
   rollbackAutomationAction,
 } from '@/lib/orgs/mutations';
 import { listAutomationActionsForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
 
@@ -38,7 +38,7 @@ export interface QuickExecuteRequestBody {
 
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }

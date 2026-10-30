@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidAutomationActionError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { setAutomationGuardrailPolicy } from '@/lib/orgs/mutations';
 import { getActiveAutomationGuardrailPolicy } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -12,7 +12,7 @@ interface RouteParams {
 /** A project's KAN-71 automation guardrail policy — gated on `automation.execute`, the same permission approving/executing an action itself requires. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }
@@ -40,7 +40,7 @@ interface GuardrailPolicyBody {
 
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }

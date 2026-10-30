@@ -226,4 +226,32 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/[action
     expect(body.id).toBe(proposed.id);
     expect(body.status).toBe('approved');
   });
+
+  it('allows a project-scoped project_admin on their assigned project and denies them on a sibling project (KAN-147)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Approve Route Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const proposed = await proposedBudgetChangeAction(organization.id, project.id, target.id, owner.id);
+    const siblingTarget = await seedTarget(organization.id, siblingProject.id, owner.id);
+    const siblingProposed = await proposedBudgetChangeAction(organization.id, siblingProject.id, siblingTarget.id, owner.id);
+
+    const adminEmail = uniqueEmail('projadmin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+    const allowed = approveRequest(organization.id, project.id, proposed.id);
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const denied = approveRequest(organization.id, siblingProject.id, siblingProposed.id);
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

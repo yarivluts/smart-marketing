@@ -11,7 +11,7 @@ import {
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
 import { rollbackAutomationAction } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
 
 interface RouteParams {
@@ -21,7 +21,7 @@ interface RouteParams {
 /** Manually rolls back an `executed` or `verified` action (KAN-71's rollback step) — restores the target to its pre-action state. KAN-72: resolves the same real-vs-simulated executor `execute` does. */
 export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, actionId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }

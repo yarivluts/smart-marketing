@@ -17,6 +17,19 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T21:25Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-147)
+
+- **Last completed:**
+  - **Security & Engineering (`KAN-147` — Complete project-scope RBAC reachability across all 18 Automation & Campaign API routes + permanent guard):**
+    - `automation/page.tsx`, `campaigns/page.tsx`, and `campaigns/[targetId]/page.tsx` already checked `can(..., { orgId, projectId })`, rendering the Automation Hub, Guardrail Policy form, Seed Target form, Propose Action forms, Approve/Reject/Execute/Rollback/Verify buttons, and Campaign quick-actions to a project-scoped `project_admin`, while all 18 backing API routes (`automation/actions/route.ts` GET/POST, `automation/actions/[actionId]/approve/route.ts` POST, `automation/actions/[actionId]/reject/route.ts` POST, `automation/actions/[actionId]/execute/route.ts` POST, `automation/actions/[actionId]/rollback/route.ts` POST, `automation/actions/[actionId]/verify/route.ts` POST, `automation/actions/ad-edits/route.ts` POST, `automation/actions/campaign-activations/route.ts` POST, `automation/actions/campaign-drafts/route.ts` POST, `automation/actions/keyword-edits/route.ts` POST, `automation/actions/meta-ad-creative-edits/route.ts` POST, `automation/actions/meta-ad-set-edits/route.ts` POST, `automation/actions/meta-ad-set-targeting-edits/route.ts` POST, `automation/actions/quick-execute/route.ts` POST, `automation/guardrail-policy/route.ts` GET/POST, `automation/targets/route.ts` GET/POST, `automation/targets/import/route.ts` POST, `automation/targets/[targetId]/refresh/route.ts` POST) still called `requireOrgPermission(orgId, ...)` without `projectId` and returned `403 Forbidden`.
+    - Swapped all 18 routes to `requireProjectPermission(orgId, projectId, ...)`, added emulator-backed `project_admin` allow + sibling-project `403` isolation tests across all 18 `route.test.ts` suites (206/206 passing), and extended `apps/web/app/project-scoped-permission-checks.test.ts` to assert that zero non-test `.ts`/`.tsx` files under `apps/web/app/api/orgs/[orgId]/projects/[projectId]` call `requireOrgPermission(...)` — closing out the `KAN-136..KAN-147` project-scope reachability slice plan.
+  - **UI/UX & i18n (`ActionAuditTrail`, `ProposalDiffCard`, `en.json`, `he.json`):**
+    - Replaced raw snake_case English `act.actionType.replace(/_/g, ' ')` and `proposal.platform.replace(/_/g, ' ')` in `ActionAuditTrail` and `ProposalDiffCard` with localized `ActionAuditTrail.actionType_*` and `ProposalDiffCard.platform_*` keys in `en.json` and `he.json`, verified in `action-audit-trail.test.tsx` and `proposal-diff-card.test.tsx`.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-30T20:10Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-146)
 
 - **Last completed:**

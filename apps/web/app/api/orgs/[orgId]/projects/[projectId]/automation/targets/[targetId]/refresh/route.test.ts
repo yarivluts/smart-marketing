@@ -118,4 +118,39 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/targets/[target
     expect(body.dailyBudgetUsd).toBe(40);
     expect(body.lastReadStateAt).toEqual(expect.any(String));
   });
+
+  it('allows a project-scoped project_admin on their assigned project and denies them on a sibling project (KAN-147)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Refresh Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const targetId = unique('campaign');
+    await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId,
+      targetType: 'campaign',
+      label: 'Summer Sale',
+      initialDailyBudgetUsd: 40,
+      seededByUserId: owner.id,
+    });
+
+    const adminEmail = `${unique('projadmin')}@example.com`;
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+    const allowed = postRequest(organization.id, project.id, targetId);
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const denied = postRequest(organization.id, siblingProject.id, targetId);
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

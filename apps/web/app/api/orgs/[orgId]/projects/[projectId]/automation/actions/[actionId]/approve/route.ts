@@ -7,7 +7,7 @@ import {
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
 import { approveAutomationAction } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; actionId: string }>;
@@ -16,7 +16,7 @@ interface RouteParams {
 /** Approves an `awaiting_approval` action — requires `automation.approve`, distinct from the `automation.execute` every other automation route requires. */
 export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, actionId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.approve');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.approve');
   if (error) {
     return error;
   }

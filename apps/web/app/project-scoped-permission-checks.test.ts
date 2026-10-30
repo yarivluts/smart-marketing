@@ -42,6 +42,18 @@ describe('permission checks under project routes', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('never call org-only requireOrgPermission under api/orgs/[orgId]/projects/[projectId] (KAN-136..KAN-147)', () => {
+    const apiProjectRoot = resolve(__dirname, 'api/orgs/[orgId]/projects/[projectId]');
+    const offenders = sourceFiles(apiProjectRoot).flatMap((file) =>
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .map((line, index) => ({ line, index }))
+        .filter(({ line }) => /\brequireOrgPermission\s*\(/.test(line))
+        .map(({ index }) => `${relative(resolve(__dirname), file)}:${index + 1}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
   it('actually scans the project routes (a moved directory must not make this pass vacuously)', () => {
     expect(ROOTS.flatMap(sourceFiles).length).toBeGreaterThan(50);
   });

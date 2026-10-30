@@ -13,6 +13,15 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ACTION_TYPE_LABEL_KEYS } from './action-audit-trail';
+
+const PLATFORM_LABEL_KEYS: Record<string, string> = {
+  meta_ads: 'platform_meta_ads',
+  google_ads: 'platform_google_ads',
+  tiktok_ads: 'platform_tiktok_ads',
+  linkedin_ads: 'platform_linkedin_ads',
+  generic: 'platform_generic',
+};
 
 export interface DiffEntry {
   key: string;
@@ -61,6 +70,7 @@ export function ProposalDiffCard({
 }: ProposalDiffCardProps): React.ReactElement {
   const t = useTranslations('Copilot');
   const tCard = useTranslations('ProposalDiffCard');
+  const tAudit = useTranslations('ActionAuditTrail');
   const locale = useLocale();
   const isRtl = locale === 'he';
 
@@ -166,11 +176,19 @@ export function ProposalDiffCard({
               {proposal.targetLabel}
             </h4>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-              <span className="capitalize">{proposal.actionType.replace(/_/g, ' ')}</span>
+              <span className="capitalize">
+                {ACTION_TYPE_LABEL_KEYS[proposal.actionType]
+                  ? tAudit(ACTION_TYPE_LABEL_KEYS[proposal.actionType])
+                  : proposal.actionType.replace(/_/g, ' ')}
+              </span>
               {proposal.platform && (
                 <>
                   <span>•</span>
-                  <span className="capitalize">{proposal.platform.replace(/_/g, ' ')}</span>
+                  <span className="capitalize">
+                    {PLATFORM_LABEL_KEYS[proposal.platform]
+                      ? tCard(PLATFORM_LABEL_KEYS[proposal.platform])
+                      : proposal.platform.replace(/_/g, ' ')}
+                  </span>
                 </>
               )}
             </div>

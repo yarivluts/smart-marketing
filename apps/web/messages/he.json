@@ -3969,12 +3969,26 @@
     "columnActions": "פעולות",
     "emptyFiltered": "לא נמצאו פעולות התואמות לחיפוש",
     "emptyNone": "עוד לא בוצעו שינויים. כשה-AI ישנה משהו, תראו זאת כאן ותוכלו לבטל.",
-    "rollbackButton": "ביטול השינוי"
+    "rollbackButton": "ביטול השינוי",
+    "actionType_budget_change": "שינוי תקציב",
+    "actionType_bid_strategy_change": "שינוי אסטרטגיית הצעת מחיר",
+    "actionType_status_toggle": "שינוי סטטוס",
+    "actionType_campaign_activation": "הפעלת מודעה",
+    "actionType_campaign_pause": "השהיית מודעה",
+    "actionType_campaign_draft_create": "טיוטת מודעה חדשה",
+    "actionType_campaign_draft": "טיוטת מודעה",
+    "actionType_keyword_edit": "עריכת מילות מפתח",
+    "actionType_ad_edit": "עריכת מודעה"
   },
   "ProposalDiffCard": {
     "approveAndExecute": "אישור וביצוע השינוי",
     "rollbackButton": "ביטול השינוי",
-    "statusLabel": "סטטוס:"
+    "statusLabel": "סטטוס:",
+    "platform_meta_ads": "פייסבוק ואינסטגרם",
+    "platform_google_ads": "גוגל אדס",
+    "platform_tiktok_ads": "טיקטוק",
+    "platform_linkedin_ads": "לינקדאין",
+    "platform_generic": "כללי"
   },
   "AdStudio": {
     "metaTitle": "סטודיו מודעות AI",

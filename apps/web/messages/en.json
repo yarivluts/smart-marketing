@@ -3969,12 +3969,26 @@
     "columnActions": "Actions",
     "emptyFiltered": "No actions matching your filter",
     "emptyNone": "No changes have been made yet. When the AI changes something, you will see it here and can undo it.",
-    "rollbackButton": "Undo this change"
+    "rollbackButton": "Undo this change",
+    "actionType_budget_change": "Budget change",
+    "actionType_bid_strategy_change": "Bid strategy change",
+    "actionType_status_toggle": "Status toggle",
+    "actionType_campaign_activation": "Turn on ad",
+    "actionType_campaign_pause": "Pause ad",
+    "actionType_campaign_draft_create": "New ad draft",
+    "actionType_campaign_draft": "Ad draft",
+    "actionType_keyword_edit": "Keyword edit",
+    "actionType_ad_edit": "Ad edit"
   },
   "ProposalDiffCard": {
     "approveAndExecute": "Approve and apply",
     "rollbackButton": "Undo this change",
-    "statusLabel": "Status:"
+    "statusLabel": "Status:",
+    "platform_meta_ads": "Facebook & Instagram",
+    "platform_google_ads": "Google Ads",
+    "platform_tiktok_ads": "TikTok Ads",
+    "platform_linkedin_ads": "LinkedIn Ads",
+    "platform_generic": "General"
   },
   "AdStudio": {
     "metaTitle": "AI Ad Studio",
