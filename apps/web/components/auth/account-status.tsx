@@ -26,7 +26,7 @@ export function AccountStatus(): React.ReactElement | null {
         <span className="text-muted-foreground">{t('signedInAs', { email: user.email ?? '' })}</span>
         <div className="flex gap-3">
           <Button asChild size="sm">
-            <Link href="/dashboard">{t('goToDashboard')}</Link>
+            <Link href="/start">{t('goToDashboard')}</Link>
           </Button>
           <Button size="sm" variant="outline" onClick={handleSignOut}>
             {t('signOut')}
