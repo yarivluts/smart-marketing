@@ -69,7 +69,16 @@ export function AutomationKillSwitchPanel({ orgId, status }: AutomationKillSwitc
         <label className="text-sm font-medium" htmlFor="kill-switch-reason">
           {t('killSwitchReasonLabel')}
         </label>
-        <Input id="kill-switch-reason" value={reason} onChange={(event) => setReason(event.target.value)} />
+        <Input
+          id="kill-switch-reason"
+          value={reason}
+          placeholder={t('killSwitchReasonPlaceholder')}
+          aria-describedby="kill-switch-reason-hint"
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <p id="kill-switch-reason-hint" className="text-xs text-muted-foreground">
+          {t('killSwitchReasonHint')}
+        </p>
       </div>
       {error ? (
         <p role="alert" className="text-sm text-destructive">

@@ -2986,6 +2986,8 @@
     "killSwitchEngagedNote": "האוטומציה מושהית עבור ארגון זה: {reason}",
     "killSwitchDisengagedNote": "האוטומציה פועלת כרגיל עבור ארגון זה.",
     "killSwitchReasonLabel": "סיבה",
+    "killSwitchReasonPlaceholder": "למשל: בודקים קודם את התקציב",
+    "killSwitchReasonHint": "בזמן ההשהיה GrowthOS לא משנה שום דבר מעצמה. אפשר להמשיך בכל רגע, בלי לכתוב סיבה.",
     "killSwitchReasonRequiredError": "כתבו סיבה קצרה כדי שהצוות יֵדע למה האוטומציה הושהתה.",
     "killSwitchEngageButton": "השהה את כל האוטומציה",
     "killSwitchDisengageButton": "המשך את האוטומציה",

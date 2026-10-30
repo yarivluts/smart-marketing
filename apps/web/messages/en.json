@@ -2986,6 +2986,8 @@
     "killSwitchEngagedNote": "Automation is paused for this organization: {reason}",
     "killSwitchDisengagedNote": "Automation is running normally for this organization.",
     "killSwitchReasonLabel": "Reason",
+    "killSwitchReasonPlaceholder": "e.g. Checking the budget first",
+    "killSwitchReasonHint": "While it is paused, GrowthOS makes no changes on its own. You can resume any time, no reason needed.",
     "killSwitchReasonRequiredError": "Write a short reason so your team knows why automation was paused.",
     "killSwitchEngageButton": "Pause all automation",
     "killSwitchDisengageButton": "Resume automation",
