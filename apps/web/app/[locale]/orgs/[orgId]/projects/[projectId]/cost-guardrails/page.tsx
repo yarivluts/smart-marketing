@@ -257,35 +257,45 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
           <EmptyState compact icon={ScrollText} title={t('noLogEntries')} />
         ) : (
           <div className="max-h-[32rem] overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-card">
+            <table className="block w-full text-sm md:table">
+              <thead className="sr-only bg-card md:not-sr-only md:sticky md:top-0 md:table-header-group">
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnTime')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnOutcome')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnMetrics')}</th>
-                  <th className="py-2 text-end font-medium">{t('columnCost')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnTime')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnOutcome')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnMetrics')}</th>
+                  <th className="whitespace-nowrap py-2 text-end font-medium">{t('columnCost')}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="flex flex-col divide-y divide-border/60 md:table-row-group">
                 {logViews.map((entry) => {
                   const tone = STATUS_TOKENS[OUTCOME_TONE[entry.outcome]];
                   const definitions = Object.values(entry.definitionRefs);
                   return (
-                    <tr key={entry.id} className="border-b border-border/60 align-top last:border-0">
-                      <td className="whitespace-nowrap py-2 pe-3 tabular-nums text-muted-foreground" title={entry.executedAt}>
-                        {formatAt(entry.executedAt)}
+                    <tr key={entry.id} className="flex flex-col gap-1.5 py-3 last:border-0 md:table-row md:border-b md:border-border/60 md:py-0 md:align-top">
+                      <td
+                        data-label={t('columnTime')}
+                        className="flex items-center justify-between gap-2 whitespace-nowrap text-xs tabular-nums text-muted-foreground before:content-[attr(data-label)] before:font-sans before:text-xs before:text-muted-foreground md:table-cell md:py-2 md:pe-3 md:text-sm md:before:content-none"
+                        title={entry.executedAt}
+                      >
+                        <span>{formatAt(entry.executedAt)}</span>
                       </td>
-                      <td className="py-2 pe-3">
-                        <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', tone.soft, tone.text)}>
-                          <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} aria-hidden="true" />
+                      <td
+                        data-label={t('columnOutcome')}
+                        className="flex items-center justify-between gap-2 before:content-[attr(data-label)] before:text-xs before:text-muted-foreground md:table-cell md:py-2 md:pe-3 md:before:content-none"
+                      >
+                        <span className={cn('inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', tone.soft, tone.text)}>
+                          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', tone.dot)} aria-hidden="true" />
                           {t(outcomeLabelKey(entry.outcome))}
                         </span>
                       </td>
-                      <td className="py-2 pe-3">
+                      <td
+                        data-label={t('columnMetrics')}
+                        className="flex flex-wrap items-center justify-between gap-2 before:content-[attr(data-label)] before:text-xs before:text-muted-foreground md:table-cell md:py-2 md:pe-3 md:before:content-none"
+                      >
                         {definitions.length > 0 ? (
                           <span className="flex flex-wrap gap-1" dir="ltr">
                             {definitions.map((definition) => (
-                              <span key={definition} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+                              <span key={definition} className="whitespace-nowrap rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
                                 {definition}
                               </span>
                             ))}
@@ -294,8 +304,14 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
                           <span className="text-muted-foreground">{t('logEntryNoDefinitions')}</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap py-2 text-end tabular-nums" dir="ltr">
-                        {entry.estimatedCostUsd !== null ? formatCost(entry.estimatedCostUsd) :<span className="text-muted-foreground">{t('costUnknownShort')}</span>}
+                      <td
+                        data-label={t('columnCost')}
+                        className="flex items-center justify-between gap-2 whitespace-nowrap text-end tabular-nums before:content-[attr(data-label)] before:text-xs before:text-muted-foreground md:table-cell md:py-2 md:before:content-none"
+                        dir="ltr"
+                      >
+                        <span>
+                          {entry.estimatedCostUsd !== null ? formatCost(entry.estimatedCostUsd) : <span className="text-muted-foreground">{t('costUnknownShort')}</span>}
+                        </span>
                       </td>
                     </tr>
                   );

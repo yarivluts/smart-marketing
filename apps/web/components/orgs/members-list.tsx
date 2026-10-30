@@ -39,18 +39,22 @@ export async function MembersList({
         return (
           <li
             key={member.membershipId}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-background/60 px-3 py-2 text-sm"
+            className="flex flex-col items-stretch gap-2.5 rounded-xl border border-border bg-background/60 px-3.5 py-3 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:py-2.5"
           >
             <span className="flex min-w-0 items-center gap-3">
               <InitialsAvatar name={member.displayName || member.email} seed={member.userId} size="sm" />
-              <span className="truncate">{member.email}</span>
+              <span className="min-w-0 break-all font-medium text-foreground sm:truncate" dir="ltr">
+                {member.email}
+              </span>
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end sm:gap-3">
               {canManageMembers && changeableRole ? (
-                <>
+                <div className="flex items-center gap-2">
                   <ChangeRoleControl orgId={orgId} membershipId={member.membershipId} role={changeableRole} />
-                  <span className="text-xs text-muted-foreground">{t('statusLabel', { status: member.status })}</span>
-                </>
+                  <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                    {t('statusLabel', { status: member.status })}
+                  </span>
+                </div>
               ) : (
                 <span className="text-muted-foreground">
                   {memberProjectName
@@ -58,13 +62,15 @@ export async function MembersList({
                     : t('roleAndStatus', { role: member.role, status: member.status })}
                 </span>
               )}
-              {canManageMembers && member.status === 'active' ? (
-                <SuspendMemberButton orgId={orgId} membershipId={member.membershipId} />
-              ) : null}
-              {canManageMembers && member.status === 'suspended' ? (
-                <ReactivateMemberButton orgId={orgId} membershipId={member.membershipId} />
-              ) : null}
-              {canManageMembers ? <RemoveMemberButton orgId={orgId} membershipId={member.membershipId} /> : null}
+              <div className="flex items-center gap-2">
+                {canManageMembers && member.status === 'active' ? (
+                  <SuspendMemberButton orgId={orgId} membershipId={member.membershipId} />
+                ) : null}
+                {canManageMembers && member.status === 'suspended' ? (
+                  <ReactivateMemberButton orgId={orgId} membershipId={member.membershipId} />
+                ) : null}
+                {canManageMembers ? <RemoveMemberButton orgId={orgId} membershipId={member.membershipId} /> : null}
+              </div>
             </div>
           </li>
         );

@@ -143,7 +143,7 @@ export function CampaignDailyBudgetControl({
 
   return (
     <div className="flex flex-col gap-1.5" data-testid="campaign-daily-budget-control">
-      <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex flex-wrap items-center justify-end gap-1.5 md:justify-start">
         {isEditing ? (
           <div className="flex items-center gap-1">
             <div className="relative flex items-center">
@@ -234,11 +234,11 @@ export function CampaignDailyBudgetControl({
 
         {/* 1-Click Preset Pills */}
         {!disabled && !isEditing && !isSyncing && (
-          <div className="flex items-center gap-1 ms-1">
+          <div className="ms-1 flex items-center gap-1" dir="ltr">
             <button
               type="button"
               onClick={() => handlePreset(10)}
-              className="rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 dark:hover:bg-emerald-950 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+              className="shrink-0 cursor-pointer whitespace-nowrap rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-emerald-100 hover:text-emerald-800 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
               title={t('increaseBudgetBy', { percent: 10 })}
             >
               {'+10%'}
@@ -246,7 +246,7 @@ export function CampaignDailyBudgetControl({
             <button
               type="button"
               onClick={() => handlePreset(20)}
-              className="rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:bg-emerald-100 hover:text-emerald-800 dark:hover:bg-emerald-950 dark:hover:text-emerald-300 transition-colors cursor-pointer"
+              className="shrink-0 cursor-pointer whitespace-nowrap rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-emerald-100 hover:text-emerald-800 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
               title={t('increaseBudgetBy', { percent: 20 })}
             >
               {'+20%'}
@@ -254,7 +254,7 @@ export function CampaignDailyBudgetControl({
             <button
               type="button"
               onClick={() => handlePreset(-20)}
-              className="rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground hover:bg-rose-100 hover:text-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-300 transition-colors cursor-pointer"
+              className="shrink-0 cursor-pointer whitespace-nowrap rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground transition-colors hover:bg-rose-100 hover:text-rose-800 dark:hover:bg-rose-950 dark:hover:text-rose-300"
               title={t('decreaseBudgetBy', { percent: 20 })}
             >
               {'-20%'}

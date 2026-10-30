@@ -92,7 +92,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
   return (
     <form className="flex flex-col gap-3" onSubmit={handleSubmit} noValidate>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-company-${signal?.rawRecordId ?? 'manual'}`}>
             {t('companyLabel')}
           </label>
@@ -105,7 +105,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-rep-${signal?.rawRecordId ?? 'manual'}`}>
             {t('repLabel')}
           </label>
@@ -113,7 +113,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
             id={`rep-collection-rep-${signal?.rawRecordId ?? 'manual'}`}
             value={orgPersonId}
             onChange={(event) => setOrgPersonId(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             <option value={UNASSIGNED_VALUE}>{t('unassignedOption')}</option>
             {people.map((person) => (
@@ -124,7 +124,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
           </select>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-type-${signal?.rawRecordId ?? 'manual'}`}>
             {t('typeLabel')}
           </label>
@@ -132,7 +132,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
             id={`rep-collection-type-${signal?.rawRecordId ?? 'manual'}`}
             value={collectionType}
             onChange={(event) => setCollectionType(event.target.value as RepCollectionType)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             {REP_COLLECTION_TYPES.map((type) => (
               <option key={type} value={type}>
@@ -144,7 +144,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-plan-from-${signal?.rawRecordId ?? 'manual'}`}>
             {t('planFromLabel')}
           </label>
@@ -155,7 +155,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
             onChange={(event) => setPlanFrom(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-plan-to-${signal?.rawRecordId ?? 'manual'}`}>
             {t('planToLabel')}
           </label>
@@ -166,7 +166,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
             onChange={(event) => setPlanTo(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-amount-${signal?.rawRecordId ?? 'manual'}`}>
             {t('amountLabel')}
           </label>
@@ -181,7 +181,7 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal 
             onChange={(event) => setAmount(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor={`rep-collection-occurred-at-${signal?.rawRecordId ?? 'manual'}`}>
             {t('occurredAtLabel')}
           </label>

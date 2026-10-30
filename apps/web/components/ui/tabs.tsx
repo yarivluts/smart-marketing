@@ -60,6 +60,7 @@ const TabsList = React.forwardRef<HTMLDivElement, TabsListProps>(({ className, .
       ref={ref}
       role="tablist"
       className={cn(
+        'max-w-full overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         variant === 'pills'
           ? 'inline-flex h-11 items-center justify-start rounded-xl bg-muted/80 p-1 text-muted-foreground shadow-inner'
           : 'flex items-center gap-6 border-b border-border',
@@ -92,7 +93,7 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
         disabled={disabled}
         onClick={() => onValueChange(value)}
         className={cn(
-          'inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+          'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
           variant === 'pills'
             ? cn(
                 'h-9 rounded-lg px-3.5 py-1.5',
@@ -115,7 +116,7 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(
         {count !== undefined ? (
           <span
             className={cn(
-              'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+              'shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold',
               isActive
                 ? 'bg-primary/10 text-primary'
                 : 'bg-muted text-muted-foreground',

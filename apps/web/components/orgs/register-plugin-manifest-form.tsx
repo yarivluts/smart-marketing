@@ -53,7 +53,8 @@ export function RegisterPluginManifestForm({ orgId }: RegisterPluginManifestForm
         </label>
         <textarea
           id="plugin-manifest-yaml"
-          className="min-h-48 rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-sm"
+          dir="ltr"
+          className="min-h-48 rounded-md border border-input bg-transparent px-3 py-2 text-left font-mono text-sm shadow-sm"
           placeholder={t('manifestYamlPlaceholder')}
           value={manifestYaml}
           onChange={(event) => setManifestYaml(event.target.value)}

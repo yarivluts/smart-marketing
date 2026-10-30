@@ -214,21 +214,21 @@ export function AutomationHubDashboard({
 
       {/* 2. Primary Sub-Navigation Tabs */}
       <div className="flex border-b border-border">
-        <div className="flex gap-4">
+        <div className="flex gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             data-testid="tab-proposals"
             onClick={() => setActiveSubTab('proposals')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-semibold transition-colors cursor-pointer ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-xs font-semibold transition-colors ${
               activeSubTab === 'proposals'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Sparkles className="h-4 w-4" aria-hidden="true" />
+            <Sparkles className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('tabProposals')}</span>
             {totalPendingCount > 0 && (
-              <span className="rounded-full bg-primary/15 text-primary px-2 py-0.5 text-[10px] font-bold">
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
                 {totalPendingCount}
               </span>
             )}
@@ -238,15 +238,15 @@ export function AutomationHubDashboard({
             type="button"
             data-testid="tab-audit"
             onClick={() => setActiveSubTab('audit')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-semibold transition-colors cursor-pointer ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-xs font-semibold transition-colors ${
               activeSubTab === 'audit'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <History className="h-4 w-4" aria-hidden="true" />
+            <History className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('tabHistory')}</span>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span className="shrink-0 whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
               {historicalActions.length}
             </span>
           </button>
@@ -255,13 +255,13 @@ export function AutomationHubDashboard({
             type="button"
             data-testid="tab-rules"
             onClick={() => setActiveSubTab('rules')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-semibold transition-colors cursor-pointer ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-xs font-semibold transition-colors ${
               activeSubTab === 'rules'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+            <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('tabGuardrails')}</span>
           </button>
         </div>
@@ -271,7 +271,7 @@ export function AutomationHubDashboard({
       {activeSubTab === 'proposals' && (
         <div data-testid="proposals-tab-content" className="flex flex-col gap-6">
           {/* Category Filter Chips */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {[
               { key: 'all', label: t('categoryAll') },
               { key: 'budget', label: t('categoryBudget') },
@@ -283,9 +283,9 @@ export function AutomationHubDashboard({
                 key={cat.key}
                 type="button"
                 onClick={() => setCategoryFilter(cat.key)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
                   categoryFilter === cat.key
-                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    ? 'bg-primary font-semibold text-primary-foreground shadow-xs'
                     : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >

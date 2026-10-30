@@ -298,12 +298,12 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
 
   return (
     <section
-      className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm"
+      className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5"
       aria-labelledby="ad-studio-publish-heading"
       data-testid="ad-studio-publish"
     >
       <header className="flex items-start gap-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Megaphone className="h-4 w-4" aria-hidden="true" />
         </span>
         <div>
@@ -319,7 +319,7 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
       ) : null}
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 text-sm font-semibold">{t('publish.chooseCreative')}</legend>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
           {creatives.map((entry) => (
             <label
               key={entry.key}

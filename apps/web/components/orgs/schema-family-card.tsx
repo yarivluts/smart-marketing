@@ -27,8 +27,8 @@ export interface SchemaFamilyCardProps {
 
 function Flag({ on, label }: { on: boolean; label: string }): React.ReactElement {
   return (
-    <span className={cn('inline-flex items-center gap-1 text-xs', on ? 'font-medium text-foreground' : 'text-muted-foreground')}>
-      {on ? <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" /> : <Minus className="h-3.5 w-3.5 opacity-40" aria-hidden="true" />}
+    <span className={cn('inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs', on ? 'font-medium text-foreground' : 'text-muted-foreground')}>
+      {on ? <Check className="h-3.5 w-3.5 shrink-0 text-success" aria-hidden="true" /> : <Minus className="h-3.5 w-3.5 shrink-0 opacity-40" aria-hidden="true" />}
       {label}
     </span>
   );
@@ -48,32 +48,34 @@ export function SchemaFamilyCard({ orgId, projectId, kind, name, versions }: Sch
   function versionTable(version: SchemaVersionView): React.ReactElement {
     return (
       <div className="overflow-x-auto rounded-lg border border-border/70">
-        <table className="w-full text-start text-sm">
+        <table className="w-full min-w-[420px] text-start text-sm">
           <thead className="bg-muted/40 text-xs text-muted-foreground">
             <tr>
-              <th className="px-2.5 py-1.5 text-start font-medium">{t('fieldNameHeader')}</th>
-              <th className="px-2.5 py-1.5 text-start font-medium">{t('fieldTypeHeader')}</th>
-              <th className="px-2.5 py-1.5 text-start font-medium">{t('fieldRequiredHeader')}</th>
-              <th className="px-2.5 py-1.5 text-start font-medium">{t('fieldPiiHeader')}</th>
-              <th className="px-2.5 py-1.5 text-start font-medium">{t('fieldIdentityKeyHeader')}</th>
+              <th className="whitespace-nowrap px-2.5 py-1.5 text-start font-medium">{t('fieldNameHeader')}</th>
+              <th className="whitespace-nowrap px-2.5 py-1.5 text-start font-medium">{t('fieldTypeHeader')}</th>
+              <th className="whitespace-nowrap px-2.5 py-1.5 text-start font-medium">{t('fieldRequiredHeader')}</th>
+              <th className="whitespace-nowrap px-2.5 py-1.5 text-start font-medium">{t('fieldPiiHeader')}</th>
+              <th className="whitespace-nowrap px-2.5 py-1.5 text-start font-medium">{t('fieldIdentityKeyHeader')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
             {version.fields.map((field) => (
               <tr key={field.name}>
-                <td className="px-2.5 py-1.5 font-mono text-xs text-foreground" dir="ltr">
+                <td className="whitespace-nowrap px-2.5 py-1.5 font-mono text-xs text-foreground" dir="ltr">
                   {field.name}
                 </td>
-                <td className="px-2.5 py-1.5">
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{field.type}</span>
+                <td className="whitespace-nowrap px-2.5 py-1.5">
+                  <span className="inline-block whitespace-nowrap rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground" dir="ltr">
+                    {field.type}
+                  </span>
                 </td>
-                <td className="px-2.5 py-1.5">
+                <td className="whitespace-nowrap px-2.5 py-1.5">
                   <Flag on={field.isRequired} label={field.isRequired ? t('yes') : t('no')} />
                 </td>
-                <td className="px-2.5 py-1.5">
+                <td className="whitespace-nowrap px-2.5 py-1.5">
                   <Flag on={field.isPii} label={field.isPii ? t('yes') : t('no')} />
                 </td>
-                <td className="px-2.5 py-1.5">
+                <td className="whitespace-nowrap px-2.5 py-1.5">
                   <Flag on={field.isIdentityKey} label={field.isIdentityKey ? t('yes') : t('no')} />
                 </td>
               </tr>

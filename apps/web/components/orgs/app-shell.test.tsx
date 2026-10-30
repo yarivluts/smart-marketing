@@ -54,6 +54,15 @@ describe('AppShell', () => {
     }
   });
 
+  it('does not mark the org root Home link active on an unindexed project sub-page such as onboarding (KAN-372)', () => {
+    renderShell('/orgs/org-1/projects/p1/onboarding');
+    const homeLinks = screen.getAllByRole('link', { name: 'Home' });
+    for (const link of homeLinks) {
+      expect(link).not.toHaveClass('text-primary');
+      expect(link).not.toHaveAttribute('aria-current', 'page');
+    }
+  });
+
   it('the mobile menu is closed by default and opens on toggle, exposing the same nav a third time alongside the always-present sidebar and bottom tab bar copies', () => {
     renderShell('/orgs/org-1');
     // Closed: the sidebar's copy and the bottom tab bar's copy both exist regardless of menu state.

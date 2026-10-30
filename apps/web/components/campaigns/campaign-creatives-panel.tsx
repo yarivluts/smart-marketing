@@ -219,7 +219,7 @@ export function CampaignCreativesPanel({
                 <p key={description}>{description}</p>
               ))}
             </div>
-            <span className="mt-1 font-mono text-[11px] text-muted-foreground" dir="ltr">
+            <span className="mt-1 truncate font-mono text-[11px] text-muted-foreground" dir="ltr">
               {adGroup.responsiveSearchAd.finalUrl}
             </span>
           </div>

@@ -184,7 +184,7 @@ export function SegmentConditionEditor({
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">{t('filtersLabel')}</span>
         {filters.map((row, index) => (
-          <div key={index} className="flex flex-wrap items-end gap-2">
+          <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-center">
             <Input
               aria-label={t('filterFieldLabel')}
               placeholder={t('filterFieldPlaceholder')}
@@ -273,7 +273,7 @@ export function SegmentConditionEditor({
               <div className="flex flex-col gap-1.5 ps-4">
                 <span className="text-xs font-medium text-muted-foreground">{t('eventConditionFiltersLabel')}</span>
                 {row.filters.map((filter, filterIndex) => (
-                  <div key={filterIndex} className="flex flex-wrap items-end gap-2">
+                  <div key={filterIndex} className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_1fr_auto] sm:items-center">
                     <Input
                       aria-label={t('eventConditionFilterFieldLabel')}
                       placeholder={t('filterFieldPlaceholder')}

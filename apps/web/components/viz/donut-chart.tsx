@@ -57,7 +57,9 @@ export function DonutChart({ data, label, centerValue, centerLabel, valueFormat 
           <li key={slice.label} className="flex items-center justify-between gap-3">
             <span className="flex min-w-0 items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: slice.fill }} />
-              <span className="truncate text-foreground">{slice.label}</span>
+              <span className="truncate text-foreground" dir="auto">
+                {slice.label}
+              </span>
             </span>
             <span className="shrink-0 tabular-nums text-muted-foreground" dir="ltr">
               {valueFormatter(slice.value)}

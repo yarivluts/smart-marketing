@@ -400,7 +400,11 @@ export function FunnelGoalsDashboard({
       )}
 
       {/* 3. Sub-Navigation Tabs */}
-      <div role="tablist" aria-label={t('cockpitTitle')} className="flex w-full flex-wrap gap-1 rounded-2xl border border-border bg-muted/40 p-1 sm:w-fit">
+      <div
+        role="tablist"
+        aria-label={t('cockpitTitle')}
+        className="flex w-full max-w-full gap-1 overflow-x-auto rounded-2xl border border-border bg-muted/40 p-1 [scrollbar-width:none] sm:w-fit [&::-webkit-scrollbar]:hidden"
+      >
         {tabs.map((tab) => {
           const active = activeTab === tab.id;
           const Icon = tab.icon;
@@ -413,14 +417,14 @@ export function FunnelGoalsDashboard({
               data-testid={tab.testId}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors sm:flex-none',
+                'flex flex-1 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors sm:flex-none',
                 active ? 'bg-card text-primary shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:bg-card/60 hover:text-foreground',
               )}
             >
-              <Icon className="h-4 w-4" aria-hidden="true" />
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span>{tab.label}</span>
               {tab.count !== undefined ? (
-                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+                <span className={cn('shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium', active ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
                   {tab.count}
                 </span>
               ) : null}
@@ -598,7 +602,7 @@ export function FunnelGoalsDashboard({
           ) : filteredGoals.length === 0 ? (
             <EmptySection testId="empty-goals" icon={Target} title={t('goalsNoMatch')} />
           ) : (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2" data-testid="goals-cards-grid">
+            <div className={cn('grid grid-cols-1 gap-6', filteredGoals.length > 1 && 'md:grid-cols-2')} data-testid="goals-cards-grid">
               {/*
                 No `onOptimizeRequested`: the card's "AI Copilot recommends budget reallocation"
                 callout used to be wired to the FUNNEL recommendation's apply handler, so it

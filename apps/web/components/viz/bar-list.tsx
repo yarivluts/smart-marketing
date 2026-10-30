@@ -37,8 +37,14 @@ export function BarList({ items, valueFormatter = (value) => value.toLocaleStrin
             <div className="relative flex items-center justify-between gap-3 overflow-hidden rounded-lg px-3 py-2">
               <div className="absolute inset-y-0 start-0 rounded-lg opacity-15" style={{ width: `${(item.value / max) * 100}%`, backgroundColor: color }} aria-hidden="true" />
               <span className="relative min-w-0">
-                <span className="block truncate text-sm font-medium text-foreground">{item.label}</span>
-                {item.sublabel ? <span className="block truncate text-xs text-muted-foreground">{item.sublabel}</span> : null}
+                <span className="block truncate text-sm font-medium text-foreground" dir="auto">
+                  {item.label}
+                </span>
+                {item.sublabel ? (
+                  <span className="block truncate text-xs text-muted-foreground" dir="auto">
+                    {item.sublabel}
+                  </span>
+                ) : null}
               </span>
               <span className="relative shrink-0 text-sm font-semibold tabular-nums text-foreground" dir="ltr">
                 {valueFormatter(item.value)}

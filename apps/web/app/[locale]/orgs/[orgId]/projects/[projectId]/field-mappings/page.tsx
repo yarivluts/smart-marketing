@@ -255,10 +255,10 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
                   </div>
 
                   <div className="overflow-hidden rounded-xl border border-border/70">
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                      <span>{t('rulesSourceHeader')}</span>
-                      <span className="text-center">{t('transformHeader')}</span>
-                      <span className="text-end">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                      <span className="truncate">{t('rulesSourceHeader')}</span>
+                      <span className="shrink-0 whitespace-nowrap text-center">{t('transformHeader')}</span>
+                      <span className="truncate text-end" dir="auto">
                         {t('rulesTargetHeader', { schemaName: mapping.schema_name })}
                         {!schemaRegistered ? <span className="ms-1 text-destructive">{t('rulesTargetMissing')}</span> : null}
                       </span>
@@ -268,14 +268,14 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
                     ) : (
                       <ol className="divide-y divide-border/60">
                         {mapping.rules.map((rule) => (
-                          <li key={rule.targetField} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-1.5 text-xs">
+                          <li key={rule.targetField} className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 py-1.5 text-xs">
                             <code className={cn('truncate font-mono', rule.transform === 'static' ? 'text-muted-foreground' : 'text-foreground')} dir="ltr" title={ruleSource(rule)}>
                               {ruleSource(rule)}
                             </code>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
                               {rule.transform}
                               {rule.castType ? ` ${rule.castType}` : ''}
-                              <ArrowRight className="h-3 w-3 rtl:rotate-180" aria-hidden="true" />
+                              <ArrowRight className="h-3 w-3 shrink-0 rtl:rotate-180" aria-hidden="true" />
                             </span>
                             <code className="truncate text-end font-mono text-foreground" dir="ltr" title={rule.targetField}>
                               {rule.targetField}

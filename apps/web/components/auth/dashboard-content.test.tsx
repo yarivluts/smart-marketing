@@ -11,6 +11,7 @@ const push = vi.fn();
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ replace, push }),
+  usePathname: () => '/dashboard',
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={typeof href === 'string' ? href : String(href)} {...props}>
       {children}

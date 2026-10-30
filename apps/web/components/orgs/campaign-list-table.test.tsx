@@ -69,4 +69,30 @@ describe('CampaignListTable', () => {
     expect(screen.getByText('3.8x')).toBeInTheDocument();
     expect(screen.getByText('3.2x')).toBeInTheDocument();
   });
+
+  it('uses a mobile-first stacked card layout below md with data-label attributes and LTR budget presets', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <CampaignListTable
+          orgId="org-1"
+          projectId="proj-1"
+          items={mockItems}
+          canExecute={true}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    const container = screen.getByTestId('campaign-list-table');
+    const table = container.querySelector('table');
+    expect(table).toHaveClass('block', 'md:table');
+
+    const row = screen.getByTestId('campaign-row-c1');
+    expect(row).toHaveClass('flex', 'flex-col', 'md:table-row');
+
+    const labelledCells = row.querySelectorAll('td[data-label]');
+    expect(labelledCells.length).toBeGreaterThanOrEqual(6);
+
+    const plusTenButtons = screen.getAllByRole('button', { name: '+10%' });
+    expect(plusTenButtons[0]?.parentElement).toHaveAttribute('dir', 'ltr');
+  });
 });

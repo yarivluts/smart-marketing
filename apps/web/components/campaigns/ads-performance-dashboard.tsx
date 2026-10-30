@@ -131,21 +131,21 @@ export function AdsPerformanceDashboard({
     >
       {/* 1. Hero with the executive blended KPI cards */}
       <PageHero icon={Megaphone} eyebrow={t('heroEyebrow')} title={t('cockpitTitle')} description={t('cockpitDescription')}>
-        <AdsKpiScorecards summary={summary} className="grid grid-cols-2 gap-3 md:grid-cols-3" />
+        <AdsKpiScorecards summary={summary} className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-6" />
       </PageHero>
 
       {/* 2. AI Proactive Growth Recommendation Banner */}
       {topCampaign && (
         <div
           data-testid="proactive-recommendation-banner"
-          className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-emerald-500/10 p-5 shadow-xs transition-all"
+          className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/10 via-background to-emerald-500/10 p-4 shadow-xs transition-all sm:p-5"
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3.5">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
                 <Sparkles className="h-5 w-5" aria-hidden="true" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-foreground">
                   {t('proactiveRecommendationHeading')}
                 </h3>
@@ -166,7 +166,7 @@ export function AdsPerformanceDashboard({
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
               {recommendationApplied ? (
                 <span
                   data-testid="rec-applied-badge"
@@ -182,7 +182,7 @@ export function AdsPerformanceDashboard({
                     onClick={handleApplyRecommendation}
                     disabled={isApplyingRec}
                     data-testid="apply-ads-rec-btn"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all cursor-pointer disabled:opacity-50"
+                    className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 disabled:opacity-50 sm:w-auto"
                   >
                     <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
                     <span>{t('applyRecommendationButton')}</span>
@@ -210,19 +210,19 @@ export function AdsPerformanceDashboard({
 
       {/* 4. Sub-Navigation Tabs */}
       <div className="border-b border-border">
-        <div className="flex gap-4">
+        <div className="flex gap-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-xs font-bold transition-colors ${
               activeTab === 'overview'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Layers className="h-4 w-4" aria-hidden="true" />
+            <Layers className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('tabOverview')}</span>
-            <span className="ms-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+            <span className="ms-1 shrink-0 whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
               {initialItems.length}
             </span>
           </button>
@@ -230,26 +230,26 @@ export function AdsPerformanceDashboard({
           <button
             type="button"
             onClick={() => setActiveTab('creatives')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-xs font-bold transition-colors ${
               activeTab === 'creatives'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <ImageIcon className="h-4 w-4" aria-hidden="true" />
+            <ImageIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('tabCreatives')}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('analytics')}
-            className={`flex items-center gap-2 border-b-2 py-3 px-1 text-xs font-bold transition-colors cursor-pointer ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-xs font-bold transition-colors ${
               activeTab === 'analytics'
                 ? 'border-primary text-primary'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <BarChart3 className="h-4 w-4" aria-hidden="true" />
+            <BarChart3 className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{t('tabAnalytics')}</span>
           </button>
         </div>
@@ -260,13 +260,13 @@ export function AdsPerformanceDashboard({
         <div className="flex flex-col gap-4">
           {/* Filters Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex max-w-full flex-wrap items-center gap-2">
               {/* Platform Filters */}
-              <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
+              <div className="flex max-w-full items-center overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-2xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('all')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     platformFilter === 'all'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -277,7 +277,7 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('meta_ads')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     platformFilter === 'meta_ads'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -288,7 +288,7 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('google_ads')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     platformFilter === 'google_ads'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -299,7 +299,7 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setPlatformFilter('simulated')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     platformFilter === 'simulated'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -310,11 +310,11 @@ export function AdsPerformanceDashboard({
               </div>
 
               {/* Status Filters */}
-              <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
+              <div className="flex max-w-full items-center overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-2xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <button
                   type="button"
                   onClick={() => setStatusFilter('all')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     statusFilter === 'all'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -325,7 +325,7 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('enabled')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     statusFilter === 'enabled'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -336,7 +336,7 @@ export function AdsPerformanceDashboard({
                 <button
                   type="button"
                   onClick={() => setStatusFilter('paused')}
-                  className={`rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer ${
+                  className={`shrink-0 cursor-pointer whitespace-nowrap rounded-lg px-3 py-1 text-xs font-semibold transition-colors ${
                     statusFilter === 'paused'
                       ? 'bg-primary text-primary-foreground shadow-2xs'
                       : 'text-muted-foreground hover:text-foreground'
@@ -348,7 +348,7 @@ export function AdsPerformanceDashboard({
             </div>
 
             {/* Search Input */}
-            <div className="relative min-w-[220px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[220px]">
               <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <input
                 type="text"
@@ -376,7 +376,7 @@ export function AdsPerformanceDashboard({
           {/* Creation Section / Action Drawers */}
           {canExecute && (
             <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
                 <h3 className="text-sm font-bold text-foreground mb-4">{t('seedTargetHeading')}</h3>
                 <AutomationSeedTargetForm
                   orgId={orgId}
@@ -385,7 +385,7 @@ export function AdsPerformanceDashboard({
                 />
               </div>
 
-              <div className="rounded-2xl border border-border bg-card p-6 shadow-xs">
+              <div className="rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6">
                 <h3 className="text-sm font-bold text-foreground mb-4">{t('newCampaignHeading')}</h3>
                 <AutomationProposeCampaignDraftForm
                   orgId={orgId}

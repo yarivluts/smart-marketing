@@ -91,7 +91,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-name">
             {t('nameLabel')}
           </label>
@@ -104,7 +104,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
           />
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-metric">
             {t('metricLabel')}
           </label>
@@ -112,7 +112,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             id="create-goal-metric"
             value={metricName}
             onChange={(event) => setMetricName(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             {metricCatalog.map((entry) => (
               <option key={entry.name} value={entry.name}>
@@ -122,7 +122,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
           </select>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-direction">
             {t('directionLabel')}
           </label>
@@ -130,7 +130,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             id="create-goal-direction"
             value={direction}
             onChange={(event) => setDirection(event.target.value as GoalDirection)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             {GOAL_DIRECTIONS.map((value) => (
               <option key={value} value={value}>
@@ -142,7 +142,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
 
         {direction === 'range' ? (
           <>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto">
               <label className="text-sm font-medium" htmlFor="create-goal-range-min">
                 {t('rangeMinLabel')}
               </label>
@@ -154,7 +154,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
                 onChange={(event) => setRangeMin(event.target.value)}
               />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto">
               <label className="text-sm font-medium" htmlFor="create-goal-range-max">
                 {t('rangeMaxLabel')}
               </label>
@@ -168,7 +168,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             </div>
           </>
         ) : (
-          <div className="flex flex-col gap-1.5">
+          <div className="flex w-full flex-col gap-1.5 sm:w-auto">
             <label className="text-sm font-medium" htmlFor="create-goal-target-value">
               {t('targetValueLabel')}
             </label>
@@ -185,7 +185,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-start-date">
             {t('startDateLabel')}
           </label>
@@ -197,7 +197,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             onChange={(event) => setStartDate(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-deadline">
             {t('deadlineLabel')}
           </label>
@@ -209,7 +209,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             onChange={(event) => setDeadline(event.target.value)}
           />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-rhythm">
             {t('rhythmLabel')}
           </label>
@@ -217,7 +217,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             id="create-goal-rhythm"
             value={rhythm}
             onChange={(event) => setRhythm(event.target.value as GoalRhythm)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             {GOAL_RHYTHMS.map((value) => (
               <option key={value} value={value}>
@@ -226,7 +226,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto">
           <label className="text-sm font-medium" htmlFor="create-goal-owner">
             {t('ownerLabel')}
           </label>
@@ -234,7 +234,7 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
             id="create-goal-owner"
             value={ownerPersonId}
             onChange={(event) => setOwnerPersonId(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             {people.map((person) => (
               <option key={person.id} value={person.id}>
