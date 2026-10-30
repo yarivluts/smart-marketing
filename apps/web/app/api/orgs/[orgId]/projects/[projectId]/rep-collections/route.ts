@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidRepCollectionEntryError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { createRepCollectionEntry } from '@/lib/orgs/mutations';
 import { listRepCollectionEntriesForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseCreateRepCollectionEntryRequestBody } from '@/lib/orgs/parse-rep-collection-fields';
 import { toRepCollectionEntryRow } from '@/lib/orgs/rep-collection-view';
 
@@ -13,7 +13,7 @@ interface RouteParams {
 /** Lists a project's rep-attributed collections ledger (KAN-88), newest-`occurredAt`-first — gated on `dashboards.write`, the same permission Goals/Segments/Campaign Ops use for a project-scoped editable-attribution admin surface. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Logs one entry to the ledger (KAN-88) — either a fully manual entry, or a confirmed billing signal (`sourceRawRecordId` set), from this page's own create form. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

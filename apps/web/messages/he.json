@@ -3748,7 +3748,7 @@
     "beforeLabel": "לפני",
     "afterLabel": "אחרי",
     "executing": "מחיל...",
-    "impactBadgeLabel": "השפעת {impact, select, high {גבוהה} medium {בינונית} low {נמוכה} other {השפעה}}",
+    "impactBadgeLabel": "השפעה {impact, select, high {גבוהה} medium {בינונית} low {נמוכה} other {רגילה}}",
     "actionExecutedSuccess": "בוצע! אפשר לבטל את השינוי מהיסטוריית שינויים.",
     "approveAndExecute": "אישור וביצוע השינוי",
     "inputPlaceholder": "שאלו שאלה או תנו פקודה...",

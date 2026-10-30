@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidCampaignTargetError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { deleteCampaignTargetBudget, setCampaignTargetBudget } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; campaignId: string }>;
@@ -15,7 +15,7 @@ interface RouteParams {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, campaignId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -48,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
 /** Clears a campaign's spend target (KAN-86) — reverts to "no target" rather than a zero budget. */
 export async function DELETE(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, campaignId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

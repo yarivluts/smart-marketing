@@ -105,4 +105,33 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/onboarding', () => {
     const secondBody = (await secondResponse.json()) as { state: { step: string } | null };
     expect(secondBody.state?.step).toBe('pack');
   });
+
+  it('lets a project-scoped project_admin start and read onboarding on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Onboarding Route Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('onboarding-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const startAllowed = onboardingRequest(organization.id, project.id, 'POST');
+    expect((await POST(startAllowed.request, { params: startAllowed.params })).status).toBe(201);
+    const getAllowed = onboardingRequest(organization.id, project.id, 'GET');
+    expect((await GET(getAllowed.request, { params: getAllowed.params })).status).toBe(200);
+
+    const startBlocked = onboardingRequest(organization.id, siblingProject.id, 'POST');
+    expect((await POST(startBlocked.request, { params: startBlocked.params })).status).toBe(403);
+    const getBlocked = onboardingRequest(organization.id, siblingProject.id, 'GET');
+    expect((await GET(getBlocked.request, { params: getBlocked.params })).status).toBe(403);
+  });
 });

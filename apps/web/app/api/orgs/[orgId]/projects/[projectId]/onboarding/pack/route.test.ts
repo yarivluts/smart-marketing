@@ -125,4 +125,29 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/onboarding/pack', () => {
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
   }, 120_000);
+
+  it('lets a project-scoped project_admin select a pack on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Onboarding Pack Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('onboarding-pack-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = packRequest(organization.id, project.id, { packKey: 'custom' });
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = packRequest(organization.id, siblingProject.id, { packKey: 'custom' });
+    expect((await POST(blocked.request, { params: blocked.params })).status).toBe(403);
+  });
 });

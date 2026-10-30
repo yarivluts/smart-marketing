@@ -184,4 +184,45 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/tv-pairing', () => {
     expect(listed.pairings).toHaveLength(1);
     expect(listed.pairings[0].id).toBe(body.pairing.id);
   });
+
+  it('lets a project-scoped project_admin claim and list TV pairings on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project, board } = await setupOrgProjectBoard('TV Pairing Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingBoard = await createBoard({ organizationId: organization.id, projectId: siblingProject.id, name: 'Sibling board', createdByUserId: owner.id });
+    const { code } = await requestTvPairing();
+    const { code: siblingCode } = await requestTvPairing();
+
+    const adminEmail = uniqueEmail('tv-pairing-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowedClaim = tvPairingRequest(organization.id, project.id, {
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 30,
+      reducedMotion: false,
+      label: 'Allowed TV',
+    });
+    expect((await POST(allowedClaim.request, { params: allowedClaim.params })).status).toBe(201);
+    expect((await GET(tvPairingRequest(organization.id, project.id).request, { params: allowedClaim.params })).status).toBe(200);
+
+    const blockedClaim = tvPairingRequest(organization.id, siblingProject.id, {
+      code: siblingCode,
+      boardIds: [siblingBoard.id],
+      rotationSeconds: 30,
+      reducedMotion: false,
+      label: 'Blocked TV',
+    });
+    expect((await POST(blockedClaim.request, { params: blockedClaim.params })).status).toBe(403);
+    expect((await GET(tvPairingRequest(organization.id, siblingProject.id).request, { params: blockedClaim.params })).status).toBe(403);
+  });
 });

@@ -92,6 +92,7 @@ describe('ProposalDiffCard Component', () => {
   it('renders its Hebrew button labels from he.json', () => {
     const { unmount } = renderWithIntl(<ProposalDiffCard proposal={mockProposal} />, { locale: 'he' });
     expect(screen.getByTestId('quick-execute-button')).toHaveTextContent(heMessages.ProposalDiffCard.approveAndExecute);
+    expect(screen.getByTestId('impact-badge')).not.toHaveTextContent(/impact/i);
     unmount();
 
     renderWithIntl(

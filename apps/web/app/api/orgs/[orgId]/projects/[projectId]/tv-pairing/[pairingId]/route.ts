@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidTvPairingError, TvPairingNotFoundError, TvPairingRevokedError } from '@growthos/firebase-orm-models';
 import { revokeTvPairing, updateTvPairingSettings } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseUpdateTvPairingSettingsRequestBody } from '@/lib/orgs/parse-tv-pairing-fields';
 import { toTvPairingSummaryView } from '@/lib/orgs/tv-pairing-view';
 
@@ -12,7 +12,7 @@ interface RouteParams {
 /** Revokes a paired TV immediately (KAN-67) — gated on `dashboards.write`, same as claiming. */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, pairingId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -39,7 +39,7 @@ export async function DELETE(_request: Request, { params }: RouteParams): Promis
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, pairingId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

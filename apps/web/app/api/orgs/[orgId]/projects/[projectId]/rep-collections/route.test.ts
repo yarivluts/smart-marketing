@@ -177,4 +177,40 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/rep-collections', () => {
     const body = (await response.json()) as { entry: { orgPersonId: string | null; planFrom: string | null; planTo: string | null; note: string | null } };
     expect(body.entry).toMatchObject({ orgPersonId: rep.id, planFrom: 'Starter', planTo: 'Pro', note: 'Upsell after QBR' });
   });
+
+  it('lets a project-scoped project_admin create and list entries on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project } = await setupOrgProject('Rep Collections Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('rep-collections-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowedCreate = repCollectionsRequest(organization.id, project.id, {
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 500,
+      occurredAt: '2026-08-24',
+    });
+    expect((await POST(allowedCreate.request, { params: allowedCreate.params })).status).toBe(201);
+    expect((await GET(repCollectionsRequest(organization.id, project.id).request, { params: allowedCreate.params })).status).toBe(200);
+
+    const siblingCreate = repCollectionsRequest(organization.id, siblingProject.id, {
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 500,
+      occurredAt: '2026-08-24',
+    });
+    expect((await POST(siblingCreate.request, { params: siblingCreate.params })).status).toBe(403);
+    expect((await GET(repCollectionsRequest(organization.id, siblingProject.id).request, { params: siblingCreate.params })).status).toBe(403);
+  });
 });

@@ -1,7 +1,15 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, createWinRule, ensureUserForFirebaseSession, registerSchemaDefinition } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createOrganizationWithOwner,
+  createProject,
+  createWinRule,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+  registerSchemaDefinition,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { DELETE, PATCH } from './route';
 
@@ -148,5 +156,49 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/win-rules/[winRuleId]', 
     const { request, params } = winRuleRequest(organization.id, project.id, rule.id, 'DELETE');
     const response = await DELETE(request, { params });
     expect(response.status).toBe(204);
+  });
+
+  it('lets a project-scoped project_admin update and delete win rules on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project, rule } = await setupOrgProjectWithRule('Win Rule Item Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    const siblingRule = await createWinRule({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      name: 'Sibling signup',
+      schemaName: 'signup',
+      filters: [],
+      createdByUserId: owner.id,
+    });
+
+    const adminEmail = uniqueEmail('win-rule-item-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const patchAllowed = winRuleRequest(organization.id, project.id, rule.id, 'PATCH', { active: false });
+    expect((await PATCH(patchAllowed.request, { params: patchAllowed.params })).status).toBe(200);
+    const deleteAllowed = winRuleRequest(organization.id, project.id, rule.id, 'DELETE');
+    expect((await DELETE(deleteAllowed.request, { params: deleteAllowed.params })).status).toBe(204);
+
+    const patchBlocked = winRuleRequest(organization.id, siblingProject.id, siblingRule.id, 'PATCH', { active: false });
+    expect((await PATCH(patchBlocked.request, { params: patchBlocked.params })).status).toBe(403);
+    const deleteBlocked = winRuleRequest(organization.id, siblingProject.id, siblingRule.id, 'DELETE');
+    expect((await DELETE(deleteBlocked.request, { params: deleteBlocked.params })).status).toBe(403);
   });
 });
