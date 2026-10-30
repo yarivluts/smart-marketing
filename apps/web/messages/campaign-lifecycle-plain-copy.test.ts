@@ -20,3 +20,21 @@ describe('the campaign progress steps speak plain words', () => {
     }
   });
 });
+
+describe('the turn-on and platform steps speak plain words', () => {
+  it('English avoids "activation" and "platform status"', () => {
+    const { activation, live } = en.Campaigns.lifecycle;
+    const text = JSON.stringify([activation, live.title]);
+    expect(text).not.toMatch(/activat|status/i);
+    expect(activation.pending).toBe('Waiting for you to turn it on');
+    expect(live.title).toBe('On the ad platform');
+  });
+
+  it('Hebrew is Hebrew and avoids "סטטוס"', () => {
+    const { activation, live } = he.Campaigns.lifecycle;
+    for (const value of [activation.title, activation.none, activation.done, activation.pending, live.title]) {
+      expect(value).toMatch(HEBREW);
+      expect(value).not.toMatch(/סטטוס/);
+    }
+  });
+});
