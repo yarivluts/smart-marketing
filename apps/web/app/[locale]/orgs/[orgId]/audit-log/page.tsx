@@ -93,7 +93,7 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
-      <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
         <PageHero icon={History} eyebrow={t('eyebrow')} title={t('title')} description={t('heroDescription')}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard
@@ -230,7 +230,7 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
             </div>
           </>
         )}
-      </main>
+      </div>
     </OrgShell>
   );
 }

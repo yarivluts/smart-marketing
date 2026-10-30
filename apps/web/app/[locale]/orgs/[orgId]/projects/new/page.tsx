@@ -42,7 +42,7 @@ export default async function NewProjectPage({ params }: PageProps): Promise<Rea
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
-      <main className="container mx-auto flex max-w-5xl flex-col gap-6 py-10">
+      <div className="container mx-auto flex max-w-5xl flex-col gap-6 py-10">
         <PageHero icon={FolderPlus} eyebrow={membership.organizationName} title={t('title')} description={t('heroDescription')} />
         <div className="grid gap-6 lg:grid-cols-5">
           <div className="flex flex-col gap-6 lg:col-span-3">
@@ -79,7 +79,7 @@ export default async function NewProjectPage({ params }: PageProps): Promise<Rea
             />
           </div>
         </div>
-      </main>
+      </div>
     </OrgShell>
   );
 }

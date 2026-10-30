@@ -71,6 +71,7 @@ export default async function ProjectLayout({
   const canExecuteAutomation = can(bindings, principal, 'automation.execute', { orgId, projectId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
   const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId, projectId }) || canManageBoards;
+  const canViewCockpit = canExecuteAutomation || canViewBoards;
   // Org-level destination pages (`/orgs/[orgId]/audit-log` and `/orgs/[orgId]/plugins`) require org-wide scope.
   const orgScope = { orgId };
   const canViewOrgAuditLog = can(bindings, principal, 'audit.read', orgScope);
@@ -99,18 +100,22 @@ export default async function ProjectLayout({
     // The one-input autopilot comes first: enter the site, approve what the AI proposes.
     ...(canUseAi ? [{ href: `${base}/growth-pilot`, label: tShell('growthPilot'), hint: tShell('growthPilotHint'), icon: 'Sparkles' as const }] : []),
     ...(canUseAi ? [adStudioItem] : []),
-    {
-      href: `${base}/campaigns`,
-      label: tShell('adsAndPerformance'),
-      hint: tShell('adsAndPerformanceHint'),
-      icon: 'Megaphone',
-    },
-    {
-      href: `${base}/funnel`,
-      label: tShell('funnelAndGoals'),
-      hint: tShell('funnelAndGoalsHint'),
-      icon: 'Target',
-    },
+    ...(canViewCockpit
+      ? [
+          {
+            href: `${base}/campaigns`,
+            label: tShell('adsAndPerformance'),
+            hint: tShell('adsAndPerformanceHint'),
+            icon: 'Megaphone' as const,
+          },
+          {
+            href: `${base}/funnel`,
+            label: tShell('funnelAndGoals'),
+            hint: tShell('funnelAndGoalsHint'),
+            icon: 'Target' as const,
+          },
+        ]
+      : []),
     ...(canExecuteAutomation
       ? [
           {
