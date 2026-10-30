@@ -2,9 +2,11 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
   listBoardsForProject,
   listMetricDefinitionsForProject,
   SAAS_METRIC_PACK_MANIFEST_YAML,
@@ -162,6 +164,47 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins', () => {
     const listResponse = await GET(pluginInstallsRequest(organization.id, project.id).request, { params });
     const listed = (await listResponse.json()) as { installs: Array<Record<string, unknown>> };
     expect(listed.installs).toHaveLength(1);
+  });
+
+  it('allows a project-scoped project_admin on their own project and returns 403 on a sibling project (KAN-144)', async () => {
+    const { owner, organization, project } = await setupOrgProject('Plugin Installs Route Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: VALID_MANIFEST_YAML, registeredByUserId: owner.id });
+
+    const adminEmail = uniqueEmail('proj-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const installReq = pluginInstallsRequest(organization.id, project.id, {
+      pluginId: 'com.example.shopify-pack',
+      version: '1.0.0',
+      consentedScopes: ['ingest:write', 'schema:write'],
+      config: { shop_domain: 'my-shop' },
+    });
+    expect((await POST(installReq.request, { params: installReq.params })).status).toBe(201);
+
+    const listReq = pluginInstallsRequest(organization.id, project.id);
+    expect((await GET(listReq.request, { params: listReq.params })).status).toBe(200);
+
+    const siblingListReq = pluginInstallsRequest(organization.id, otherProject.id);
+    expect((await GET(siblingListReq.request, { params: siblingListReq.params })).status).toBe(403);
+
+    const siblingInstallReq = pluginInstallsRequest(organization.id, otherProject.id, {
+      pluginId: 'com.example.shopify-pack',
+      version: '1.0.0',
+      consentedScopes: ['ingest:write', 'schema:write'],
+      config: { shop_domain: 'my-shop' },
+    });
+    expect((await POST(siblingInstallReq.request, { params: siblingInstallReq.params })).status).toBe(403);
   });
 
   it(

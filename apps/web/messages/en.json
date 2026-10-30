@@ -5731,7 +5731,7 @@
     },
     "clientSide": {
       "title": "Client side: the browser SDK",
-      "intro": "About 9 KB, no dependencies, never blocks the page. It sends a touchpoint at the start of each visit - campaign, ad click id, landing page and referrer - and the events you track.",
+      "intro": "About 9 KB, no dependencies, never blocks the page. It notes where each visitor came from at the start of each visit - campaign, ad click id, web page and referring site - and sends the events you track.",
       "keyTitle": "Browser keys",
       "keyBody": "Create a <strong>browser key</strong> for the environment and list your site's domains. It can only send events, and only from those domains - a page anywhere else gets 403. <code>http://localhost</code> is allowed, so a test key works on your own machine.",
       "secretWarning": "Never put a server key (<code>gos_test_...</code> or <code>gos_live_...</code>) in a page. GrowthOS refuses a server key sent from a browser.",

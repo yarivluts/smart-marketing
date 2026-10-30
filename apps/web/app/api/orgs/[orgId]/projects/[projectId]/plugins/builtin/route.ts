@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { PluginAlreadyInstalledError, ProjectNotFoundError, UnknownBuiltinMetricPackError } from '@growthos/firebase-orm-models';
 import { installBuiltinMetricPack } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { toPluginInstallView } from '@/lib/orgs/plugin-view';
 
@@ -21,7 +21,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'plugin.install');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'plugin.install');
   if (error) {
     return error;
   }

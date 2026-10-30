@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidPluginConfigError, InvalidPluginInstallStateError, PluginInstallNotFoundError, PluginManifestNotFoundError } from '@growthos/firebase-orm-models';
 import { updatePluginInstallConfig } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { toPluginInstallView } from '@/lib/orgs/plugin-view';
 
@@ -18,7 +18,7 @@ interface RouteParams {
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, installId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'plugin.install');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'plugin.install');
   if (error) {
     return error;
   }

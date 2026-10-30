@@ -2,10 +2,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   createOrganizationWithOwner,
   createProject,
   disablePlugin,
   ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
   registerSchemaDefinition,
   GA4_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   GA4_PLUGIN_ID,
@@ -85,7 +87,7 @@ async function setupInstalledSourcePlugin(orgName: string) {
     fields: [{ name: 'counter', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
     createdByUserId: owner.id,
   });
-  return { ownerSession, organization, project, environment, install };
+  return { owner, ownerSession, organization, project, environment, install };
 }
 
 function runRequest(
@@ -223,5 +225,29 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins/[installId]/run', 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
     expect(body.error).toBe('ga4_credential_not_configured');
+  });
+
+  it('allows a project-scoped project_admin on their own project and returns 403 on a sibling project (KAN-144)', async () => {
+    const { owner, organization, project, environment, install } = await setupInstalledSourcePlugin('Source Run Route Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+
+    const adminEmail = uniqueEmail('proj-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const ownReq = runRequest(organization.id, project.id, install.id, { environmentId: environment.id });
+    expect((await POST(ownReq.request, { params: ownReq.params })).status).toBe(200);
+
+    const siblingReq = runRequest(organization.id, otherProject.id, install.id, { environmentId: environment.id });
+    expect((await POST(siblingReq.request, { params: siblingReq.params })).status).toBe(403);
   });
 });
