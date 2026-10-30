@@ -21,3 +21,13 @@ describe('onboarding starter-set copy stays in plain words', () => {
     expect(new Set(titles).size).toBe(3);
   });
 });
+
+describe('onboarding journey "nothing chosen" line uses the step name', () => {
+  it.each([
+    ['en', en.Onboarding, /starting point/i, /pack/i],
+    ['he', he.Onboarding, /נקודת התחלה/, /חבילה/],
+  ])('%s says starting point, not pack', (_locale, section, want, avoid) => {
+    expect(section.journeyPackNone).toMatch(want);
+    expect(section.journeyPackNone).not.toMatch(avoid);
+  });
+});

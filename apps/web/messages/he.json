@@ -566,7 +566,7 @@
     "journeyStep_done": "פעיל",
     "journeyStartedOn": "התחיל ב-{date}",
     "journeyNotStarted": "עדיין לא התחיל",
-    "journeyPackNone": "לא נבחרה חבילה",
+    "journeyPackNone": "עדיין לא נבחרה נקודת התחלה",
     "journeySourcePlugin": "חיבור מוכן",
     "journeySourcePush": "הנתונים שלכם, נשלחים עם מפתח גישה",
     "journeySourceNone": "שום דבר לא מחובר",
