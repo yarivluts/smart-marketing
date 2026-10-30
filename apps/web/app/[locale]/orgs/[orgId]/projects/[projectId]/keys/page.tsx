@@ -25,7 +25,7 @@ import { EnvironmentPill } from '@/components/orgs/environment-pill';
 import { StatCard } from '@/components/ui/stat-card';
 import { BarList, ChartCard, DonutChart, EmptyState, PageHero } from '@/components/viz';
 import { cn } from '@/lib/utils';
-import { Activity, Ban, Bot, Clock, KeyRound, Layers3, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { Activity, Ban, Bot, ChevronDown, Clock, KeyRound, Layers3, Plug, ShieldCheck, Sparkles } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -257,10 +257,13 @@ export default async function ProjectApiKeysPage({ params, searchParams }: PageP
           <div className="flex flex-col gap-5">
             {activeKeys.length > 0 ? <ul className="grid gap-3 lg:grid-cols-2">{activeKeys.map(keyCard)}</ul> : null}
             {revokedKeys.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                <h3 className="text-sm font-medium text-muted-foreground">{t('deactivatedHeading', { count: revokedKeys.length })}</h3>
-                <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{revokedKeys.map(keyCard)}</ul>
-              </div>
+              <details open={activeKeys.length === 0 || revokedKeys.length <= 2} className="group flex flex-col gap-3">
+                <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-border/60 bg-muted/30 px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
+                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+                  <span>{t('deactivatedHeading', { count: revokedKeys.length })}</span>
+                </summary>
+                <ul className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{revokedKeys.map(keyCard)}</ul>
+              </details>
             ) : null}
           </div>
         )}

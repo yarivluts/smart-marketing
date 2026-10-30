@@ -181,7 +181,7 @@ export function CampaignStatusToggle({
         />
 
         <span
-          className={`inline-flex items-center gap-1 text-xs font-semibold ${
+          className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold ${
             isEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
           }`}
         >
@@ -212,14 +212,16 @@ export function CampaignStatusToggle({
       {toast?.visible ? (
         <div
           data-testid="undo-toast"
-          className="fixed bottom-6 end-6 z-50 flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-xs text-card-foreground shadow-xl animate-in fade-in slide-in-from-bottom-3"
+          className="fixed inset-x-4 bottom-4 z-50 flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-4 text-xs text-card-foreground shadow-xl animate-in fade-in slide-in-from-bottom-3 sm:inset-x-auto sm:bottom-6 sm:end-6"
         >
-          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" aria-hidden="true" />
-          <span className="max-w-[280px] truncate">{toast.message}</span>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+            <span className="max-w-[280px] truncate">{toast.message}</span>
+          </div>
           <button
             type="button"
             onClick={handleUndo}
-            className="flex items-center gap-1 rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground hover:bg-secondary/80 focus:outline-hidden transition-colors"
+            className="flex shrink-0 items-center gap-1 rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold text-secondary-foreground transition-colors hover:bg-secondary/80 focus:outline-hidden"
           >
             <RotateCcw className="h-3 w-3" aria-hidden="true" />
             <span>{t('undoButton')}</span>

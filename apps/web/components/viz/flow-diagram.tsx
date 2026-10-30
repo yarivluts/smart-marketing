@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useLocale } from 'next-intl';
+import { ArrowDown } from 'lucide-react';
 import { Background, Controls, Handle, MarkerType, Position, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
 import '@xyflow/react/dist/base.css';
 import { useRouter } from '@/i18n/navigation';
@@ -167,6 +168,14 @@ export function FlowDiagram({ nodes, edges, label, height = 320, className }: Fl
     };
   });
   const byId = new Map(nodes.map((node) => [node.id, node]));
+  const orderedNodes = React.useMemo(() => {
+    return [...nodes].sort((a, b) => {
+      const posA = positions.get(a.id) ?? { column: 0, row: 0 };
+      const posB = positions.get(b.id) ?? { column: 0, row: 0 };
+      if (posA.column !== posB.column) return posA.column - posB.column;
+      return posA.row - posB.row;
+    });
+  }, [nodes, positions]);
   // The drawing is hidden from assistive tech (the list below says the same in words), so nothing
   // inside it may take keyboard focus either: zoom buttons and nodes stay mouse-only.
   const canvas = React.useRef<HTMLDivElement>(null);
@@ -182,7 +191,63 @@ export function FlowDiagram({ nodes, edges, label, height = 320, className }: Fl
 
   return (
     <figure className={cn('w-full', className)} aria-label={label} data-testid="flow-diagram">
-      <div ref={canvas} style={{ height }} className="overflow-hidden rounded-xl border border-border bg-muted/20" aria-hidden="true">
+      {/* Mobile vertical step cards (< md) */}
+      <div className="flex flex-col gap-2 md:hidden" aria-hidden="true">
+        {orderedNodes.map((node, index) => {
+          const tokens = STATUS_TOKENS[node.status ?? 'idle'];
+          const outgoingEdges = edges.filter((edge) => edge.source === node.id && edge.label);
+          return (
+            <React.Fragment key={node.id}>
+              <div
+                onClick={() => {
+                  if (node.href) router.push(node.href);
+                }}
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3.5 py-2.5 text-start shadow-2xs ring-1',
+                  tokens.ring,
+                  node.href && 'cursor-pointer hover:bg-muted/30',
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tokens.dot)} />
+                    <span className="truncate text-sm font-semibold text-foreground" dir="auto">
+                      {node.label}
+                    </span>
+                  </div>
+                  {node.sublabel ? (
+                    <div className="mt-0.5 truncate ps-4 text-xs text-muted-foreground" dir="auto">
+                      {node.sublabel}
+                    </div>
+                  ) : null}
+                </div>
+                {node.value ? (
+                  <div className="shrink-0 text-base font-bold tabular-nums text-foreground" dir="ltr">
+                    {node.value}
+                  </div>
+                ) : null}
+              </div>
+              {index < orderedNodes.length - 1 ? (
+                <div className="flex items-center justify-center gap-2 py-0.5 text-xs text-muted-foreground">
+                  <ArrowDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
+                  {outgoingEdges.map((edge) => (
+                    <span
+                      key={`${edge.source}->${edge.target}`}
+                      className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium tabular-nums text-foreground"
+                      dir="ltr"
+                    >
+                      {edge.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Desktop interactive canvas (md+) */}
+      <div ref={canvas} style={{ height }} className="hidden overflow-hidden rounded-xl border border-border bg-muted/20 md:block" aria-hidden="true">
         <ReactFlow
           nodes={flowNodes}
           edges={flowEdges}

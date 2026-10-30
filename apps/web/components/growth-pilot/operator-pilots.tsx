@@ -57,11 +57,11 @@ export function OperatorPilots({ rows: initial }: { rows: OperatorPilotRow[] }):
         </p>
       ) : null}
       <div className="overflow-x-auto rounded-3xl border border-border/60 bg-card shadow-soft">
-        <table className="w-full text-start text-sm" data-testid="operator-pilots">
+        <table className="w-full min-w-[560px] text-start text-sm" data-testid="operator-pilots">
           <thead>
             <tr className="border-b border-border/60 text-xs text-muted-foreground">
               {(['site', 'organization', 'status', 'lastRun', 'action'] as const).map((column) => (
-                <th key={column} className="px-4 py-3 text-start font-medium">
+                <th key={column} className="whitespace-nowrap px-4 py-3 text-start font-medium">
                   {t(`column.${column}`)}
                 </th>
               ))}
@@ -73,23 +73,23 @@ export function OperatorPilots({ rows: initial }: { rows: OperatorPilotRow[] }):
               const canToggle = row.status === 'active' || row.status === 'paused';
               return (
                 <tr key={key} className="border-b border-border/40 last:border-0" data-testid="operator-pilot-row">
-                  <td className="px-4 py-3 font-medium" dir="ltr">
+                  <td className="whitespace-nowrap px-4 py-3 font-medium" dir="ltr">
                     <Link href={`/orgs/${row.organizationId}/projects/${row.projectId}/growth-pilot`} className="text-primary hover:underline">
                       {siteHost(row.siteUrl)}
                     </Link>
                   </td>
-                  <td className="px-4 py-3" dir="auto">
+                  <td className="whitespace-nowrap px-4 py-3" dir="auto">
                     {row.organizationName}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-semibold', row.status === 'active' ? 'bg-success/10 text-success' : row.status === 'failed' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground')}>{t(`status.${row.status}`)}</span>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span className={cn('inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold', row.status === 'active' ? 'bg-success/10 text-success' : row.status === 'failed' ? 'bg-warning/10 text-warning' : 'bg-muted text-muted-foreground')}>{t(`status.${row.status}`)}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                  <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                     {row.lastRunOn ? `${when(row.lastRunOn)} · ${row.lastRunOutcome ?? ''}` : t('never')}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     {canToggle ? (
-                      <button type="button" disabled={busy === key} onClick={() => void toggle(row)} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-semibold hover:bg-muted disabled:opacity-60" data-testid="operator-pilot-toggle">
+                      <button type="button" disabled={busy === key} onClick={() => void toggle(row)} className="inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3 text-xs font-semibold hover:bg-muted disabled:opacity-60" data-testid="operator-pilot-toggle">
                         {busy === key ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : row.status === 'paused' ? <Play className="h-3.5 w-3.5" aria-hidden="true" /> : <Pause className="h-3.5 w-3.5" aria-hidden="true" />}
                         {t(row.status === 'paused' ? 'resume' : 'pause')}
                       </button>

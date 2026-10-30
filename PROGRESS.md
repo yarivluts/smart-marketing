@@ -17,6 +17,32 @@ Template for each entry:
 
 ---
 
+## 2026-10-30 — Native mobile web app layout & RTL polish across all system pages (Stitch Pastel Pulse, KAN-319..KAN-377)
+
+- **Last completed:**
+  - **Root-cause CSS & container fixes (`apps/web/app/globals.css`, `apps/web/tailwind.config.ts`, `Card`, `ChartCard`):**
+    - Replaced inherited `main { overflow-wrap: anywhere }` with `overflow-wrap: break-word` and explicit `overflow-wrap: normal` on `table`, `th`, `td`, `button`, `label`, `[role='tab']`, and `[role='status']`, eliminating 1-character-wide vertical text columns across tables, chips, and badges on `390px` mobile screens.
+    - Made `.container` padding responsive (`1rem` mobile, `1.5rem` `sm`, `2rem` `lg`) and compacted mobile card/container padding (`p-4 sm:p-6`), reclaiming `+80px` of usable horizontal width on `390px` viewports.
+  - **Responsive mobile card-tables & horizontal scroll guards (`KAN-319`, `KAN-320`, `KAN-322`, `KAN-334`, `KAN-339`):**
+    - Converted `CampaignListTable` and `CostGuardrailsPage` query log tables into single-DOM responsive card-tables on `< md` (`block md:table`, `tr` as mobile cards with `data-label` pseudo-headers, `md:table-row` on desktop), and added `min-w-[...]` + `whitespace-nowrap` guards on `SchemaFamilyCard`, `BillingOpsFeedPage`, `CampaignOpsPage`, `ExperimentsPage`, `RepCollectionsPage`, `RecoveredPaymentsSection`, and `OperatorPilots`.
+  - **Shared visual primitives & RTL/bidi polish (`KAN-321`, `KAN-334..346`, `KAN-359`, `KAN-364`, `KAN-369`, `KAN-372`, `KAN-373`, `KAN-376`, `KAN-377`):**
+    - `FlowDiagram`: added a mobile vertical step-card layout (`md:hidden`) while keeping the interactive ReactFlow canvas on `md+` (`KAN-338`).
+    - `Timeline`: reduced mobile rail indentation, hid duplicate mobile avatar column, and pinned `<time>` to the inline-end column (`KAN-346`, `KAN-377`).
+    - `Tabs`, `AdsPerformanceDashboard`, `FunnelGoalsDashboard`, `AutomationHubDashboard`: made tab bars and filter bars single-line horizontally scrollable with `shrink-0 whitespace-nowrap` (`KAN-340`).
+    - `Badge` & `FieldMappingsPage`: added `shrink-0 whitespace-nowrap` so status/transform pills never break mid-word (`KAN-341`).
+    - `BarList`, `DonutChart`, `GoalsPage`, `MembersList`, `SessionReplaySettingsForm`, `RegisterPluginManifestForm`: added `dir="auto"` / `dir="ltr"` for proper RTL bidi rendering (`KAN-321`, `KAN-335`, `KAN-336`).
+    - `AppShell`: prevented org-root Home link from prefix-matching unindexed project sub-routes like `/onboarding` (`KAN-372`).
+    - `DashboardContent`: added sticky Pastel Pulse top header bar with brand mark, `LanguageSwitcher`, and user avatar (`KAN-364`).
+    - `KeysPage`: wrapped deactivated keys in a collapsible `<details>` disclosure (`KAN-359`).
+    - `CreateGoalForm`, `CreateRepCollectionEntryForm`, `SegmentConditionEditor`, `AutomationSeedTargetForm`, `AutomationProposeCampaignDraftForm`: made form controls and selects full-width on mobile (`KAN-345`, `KAN-369`).
+    - `StatCard`, `AdsKpiScorecards`, `CreativePreviewGallery`, `CampaignCreativesPanel`, `ExecutiveBlendedReport`, `CampaignSpendPanel`, `PublishPanel`: compacted mobile KPI cards (`p-4 sm:p-pp-lg`, 2-column grid), made creative filter bars horizontally scrollable, stacked campaign spend summary cards on `< sm`, and prevented long resource names/URLs from overflowing on `390px` viewports.
+    - `GoalsPage`, `FunnelGoalsDashboard`, `VisualFunnelSteps`: rendered `0%` progress bars as `0%` width (`KAN-373`) and single goal cards at full width (`KAN-376`).
+  - **Verification:** `pnpm --filter @growthos/web typecheck` (0 errors), `pnpm --filter @growthos/web lint` (0 errors), all Vitest unit/component test suites passed (including new mobile-first assertions in `campaign-list-table.test.tsx`), and Playwright E2E suites (`auth`, `orgs`, `boards`, `keys`, `cost-guardrails`, `campaign-ops` including a 19-page `390x844` RTL mobile audit) passed against the production build.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Pick up next prioritized item from `TASKS.md`.
+- **Waiting on human:** None.
+
 ## 2026-10-15 - Ad editor for beginners + ad platform connections (KAN-401..403)
 
 - **Last completed:**

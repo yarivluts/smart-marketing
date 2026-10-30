@@ -69,6 +69,8 @@ export function SessionReplaySettingsForm({
         </label>
         <Input
           id="session-replay-template"
+          dir="ltr"
+          className="text-left font-mono"
           value={template}
           placeholder={t('templatePlaceholder')}
           onChange={(event) => setTemplate(event.target.value)}

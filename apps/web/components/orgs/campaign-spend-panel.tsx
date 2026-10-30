@@ -43,7 +43,7 @@ export function CampaignSpendPanel({ spend }: CampaignSpendPanelProps): React.Re
 
   return (
     <div className="flex flex-col gap-4">
-      <dl className="grid grid-cols-3 gap-3 text-sm">
+      <dl className="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-3 sm:gap-3">
         <div className="rounded-xl bg-muted/40 px-3 py-2">
           <dt className="text-xs text-muted-foreground">{t('spendTotalLabel')}</dt>
           <dd className="text-lg font-semibold tabular-nums" dir="ltr">

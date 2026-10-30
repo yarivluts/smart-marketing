@@ -218,7 +218,7 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
             </span>
           ) : null}
           {target.campaignResourceName ? (
-            <span className="font-mono" dir="ltr">
+            <span className="break-all font-mono" dir="ltr">
               {target.campaignResourceName}
             </span>
           ) : null}

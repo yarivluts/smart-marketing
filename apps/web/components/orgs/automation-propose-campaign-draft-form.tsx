@@ -255,7 +255,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
   return (
     <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[150px] sm:flex-1">
           <label className="text-sm font-medium" htmlFor="draft-target">
             {t('proposeDraftTargetLabel')}
           </label>
@@ -263,7 +263,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
             id="draft-target"
             value={targetId}
             onChange={(event) => setTargetId(event.target.value)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full max-w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             {targets.map((target) => (
               <option key={target.id} value={target.id}>
@@ -272,7 +272,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[150px] sm:flex-1">
           <label className="text-sm font-medium" htmlFor="draft-platform">
             {t('proposeDraftPlatformLabel')}
           </label>
@@ -280,19 +280,19 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
             id="draft-platform"
             value={platform}
             onChange={(event) => setPlatform(event.target.value as Platform)}
-            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-10 w-full max-w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             <option value="google_ads">{t('proposeDraftPlatformGoogleAdsOption')}</option>
             <option value="meta">{t('proposeDraftPlatformMetaOption')}</option>
           </select>
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[150px] sm:flex-1">
           <label className="text-sm font-medium" htmlFor="draft-campaign-name">
             {t('proposeDraftCampaignNameLabel')}
           </label>
           <Input id="draft-campaign-name" value={campaignName} onChange={(event) => setCampaignName(event.target.value)} required />
         </div>
-        <div className="flex flex-col gap-1.5">
+        <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[130px] sm:flex-1">
           <label className="text-sm font-medium" htmlFor="draft-budget">
             {t('proposeDraftBudgetLabel')}
           </label>
@@ -303,13 +303,13 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
       {platform === 'google_ads' ? (
         <>
           <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[150px] sm:flex-1">
               <label className="text-sm font-medium" htmlFor="draft-ad-group-name">
                 {t('proposeDraftAdGroupNameLabel')}
               </label>
               <Input id="draft-ad-group-name" value={adGroupName} onChange={(event) => setAdGroupName(event.target.value)} required />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[180px] sm:flex-1">
               <label className="text-sm font-medium" htmlFor="draft-final-url">
                 {t('proposeDraftFinalUrlLabel')}
               </label>
@@ -388,7 +388,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
       ) : (
         <>
           <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[150px] sm:flex-1">
               <label className="text-sm font-medium" htmlFor="draft-objective">
                 {t('proposeDraftObjectiveLabel')}
               </label>
@@ -396,7 +396,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
                 id="draft-objective"
                 value={objective}
                 onChange={(event) => setObjective(event.target.value as MetaObjective)}
-                className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+                className="h-10 w-full max-w-full rounded-md border border-input bg-background px-2 text-sm"
               >
                 {META_OBJECTIVES.map((option) => (
                   <option key={option} value={option}>
@@ -405,19 +405,19 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
                 ))}
               </select>
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[150px] sm:flex-1">
               <label className="text-sm font-medium" htmlFor="draft-ad-set-name">
                 {t('proposeDraftAdSetNameLabel')}
               </label>
               <Input id="draft-ad-set-name" value={adSetName} onChange={(event) => setAdSetName(event.target.value)} required />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[100px] sm:flex-1">
               <label className="text-sm font-medium" htmlFor="draft-age-min">
                 {t('proposeDraftAgeMinLabel')}
               </label>
               <Input id="draft-age-min" type="number" min={13} max={65} value={ageMin} onChange={(event) => setAgeMin(event.target.value)} required />
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[100px] sm:flex-1">
               <label className="text-sm font-medium" htmlFor="draft-age-max">
                 {t('proposeDraftAgeMaxLabel')}
               </label>
@@ -497,7 +497,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
                 type="file"
                 accept="image/png,image/jpeg"
                 onChange={handleImageChange}
-                className="text-sm"
+                className="w-full max-w-full text-sm"
               />
               <p className="text-xs text-muted-foreground">{t('proposeDraftImageHelp')}</p>
               {imageError ? (
@@ -513,8 +513,8 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
         </>
       )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={submitting}>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
           {t('proposeDraftButton')}
         </Button>
         {error ? (

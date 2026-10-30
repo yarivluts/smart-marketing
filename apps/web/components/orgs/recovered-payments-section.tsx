@@ -103,31 +103,31 @@ export function RecoveredPaymentsSection({ summary }: RecoveredPaymentsSectionPr
           <EmptyState compact icon={HandCoins} title={t('recoveryNoneYet')} />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[540px] text-sm">
               <caption className="sr-only">{t('recoveryHeading')}</caption>
               <thead>
                 <tr className="border-b border-border text-xs text-muted-foreground">
-                  <th className="py-2 pe-3 text-start font-medium">{t('recoveryColumnCustomer')}</th>
-                  <th className="py-2 pe-3 text-end font-medium">{t('recoveryColumnAmount')}</th>
-                  <th className="py-2 pe-3 text-end font-medium">{t('recoveryColumnAttempts')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('recoveryColumnFailedAt')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('recoveryColumnRecoveredAt')}</th>
-                  <th className="py-2 pe-3 text-end font-medium">{t('recoveryColumnTime')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('recoveryColumnCustomer')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('recoveryColumnAmount')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('recoveryColumnAttempts')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('recoveryColumnFailedAt')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('recoveryColumnRecoveredAt')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('recoveryColumnTime')}</th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map((recovery) => (
                   <tr key={recovery.id} className="border-b border-border/60 last:border-0">
-                    <td className="py-2 pe-3 font-mono text-xs" dir="ltr">
+                    <td className="whitespace-nowrap py-2 pe-3 font-mono text-xs" dir="ltr">
                       {recovery.customerId}
                     </td>
-                    <td className="py-2 pe-3 text-end font-semibold tabular-nums" dir="ltr">
+                    <td className="whitespace-nowrap py-2 pe-3 text-end font-semibold tabular-nums" dir="ltr">
                       {formatStripeAmount(recovery.amountMinorUnits, recovery.currency, locale)}
                     </td>
-                    <td className="py-2 pe-3 text-end tabular-nums">{integer.format(recovery.failedAttempts)}</td>
-                    <td className="py-2 pe-3">{formatDate(recovery.firstFailedAt)}</td>
-                    <td className="py-2 pe-3">{formatDate(recovery.recoveredAt)}</td>
-                    <td className="py-2 pe-3 text-end tabular-nums">{formatDuration(recovery.hoursToRecover)}</td>
+                    <td className="whitespace-nowrap py-2 pe-3 text-end tabular-nums">{integer.format(recovery.failedAttempts)}</td>
+                    <td className="whitespace-nowrap py-2 pe-3">{formatDate(recovery.firstFailedAt)}</td>
+                    <td className="whitespace-nowrap py-2 pe-3">{formatDate(recovery.recoveredAt)}</td>
+                    <td className="whitespace-nowrap py-2 pe-3 text-end tabular-nums">{formatDuration(recovery.hoursToRecover)}</td>
                   </tr>
                 ))}
               </tbody>

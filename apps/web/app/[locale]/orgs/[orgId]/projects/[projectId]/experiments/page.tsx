@@ -187,15 +187,15 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
                   </ul>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="w-full min-w-[520px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-xs text-muted-foreground">
-                        <th className="py-2 pe-3 text-start font-medium">{t('columnVariant')}</th>
-                        <th className="py-2 pe-3 text-end font-medium">{t('columnExposures')}</th>
-                        <th className="py-2 pe-3 text-end font-medium">{t('columnConversions')}</th>
-                        <th className="py-2 pe-3 text-end font-medium">{t('columnConversionRate')}</th>
-                        <th className="py-2 pe-3 text-end font-medium">{t('columnUplift')}</th>
-                        <th className="py-2 text-start font-medium">{t('columnResult')}</th>
+                        <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnVariant')}</th>
+                        <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('columnExposures')}</th>
+                        <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('columnConversions')}</th>
+                        <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('columnConversionRate')}</th>
+                        <th className="whitespace-nowrap py-2 pe-3 text-end font-medium">{t('columnUplift')}</th>
+                        <th className="whitespace-nowrap py-2 text-start font-medium">{t('columnResult')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -203,14 +203,14 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
                         const badge = experimentVariantBadge(variant);
                         return (
                           <tr key={variant.variantKey} className="border-b border-border/60 last:border-0">
-                            <td className="py-2 pe-3 font-medium">{variant.variantKey}</td>
-                            <td className="py-2 pe-3 text-end tabular-nums">{integer.format(variant.exposures)}</td>
-                            <td className="py-2 pe-3 text-end tabular-nums">{integer.format(variant.conversions)}</td>
-                            <td className="py-2 pe-3 text-end tabular-nums">{variant.conversionRate === null ? t('noData') : `${(variant.conversionRate * 100).toFixed(1)}%`}</td>
-                            <td className="py-2 pe-3 text-end tabular-nums" dir="ltr">
+                            <td className="whitespace-nowrap py-2 pe-3 font-medium">{variant.variantKey}</td>
+                            <td className="whitespace-nowrap py-2 pe-3 text-end tabular-nums">{integer.format(variant.exposures)}</td>
+                            <td className="whitespace-nowrap py-2 pe-3 text-end tabular-nums">{integer.format(variant.conversions)}</td>
+                            <td className="whitespace-nowrap py-2 pe-3 text-end tabular-nums">{variant.conversionRate === null ? t('noData') : `${(variant.conversionRate * 100).toFixed(1)}%`}</td>
+                            <td className="whitespace-nowrap py-2 pe-3 text-end tabular-nums" dir="ltr">
                               {variant.upliftVsControlPct === null ? t('noData') : `${variant.upliftVsControlPct >= 0 ? '+' : ''}${variant.upliftVsControlPct.toFixed(1)}%`}
                             </td>
-                            <td className={cn('py-2', STATUS_TOKENS[BADGE_TONE[badge]].text)}>{t(experimentVariantBadgeLabelKey(badge))}</td>
+                            <td className={cn('whitespace-nowrap py-2', STATUS_TOKENS[BADGE_TONE[badge]].text)}>{t(experimentVariantBadgeLabelKey(badge))}</td>
                           </tr>
                         );
                       })}

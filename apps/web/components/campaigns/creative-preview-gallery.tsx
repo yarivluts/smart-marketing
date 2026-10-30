@@ -126,11 +126,11 @@ export function CreativePreviewGallery({
     <div className={`flex flex-col gap-6 ${className}`} data-testid="creative-preview-gallery">
       {/* Controls Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex max-w-full items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <button
             type="button"
             onClick={() => setPlatformFilter('all')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               platformFilter === 'all'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -141,7 +141,7 @@ export function CreativePreviewGallery({
           <button
             type="button"
             onClick={() => setPlatformFilter('meta_ads')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               platformFilter === 'meta_ads'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -152,7 +152,7 @@ export function CreativePreviewGallery({
           <button
             type="button"
             onClick={() => setPlatformFilter('google_ads')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               platformFilter === 'google_ads'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -163,7 +163,7 @@ export function CreativePreviewGallery({
           <button
             type="button"
             onClick={() => setPlatformFilter('simulated')}
-            className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               platformFilter === 'simulated'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
@@ -173,7 +173,7 @@ export function CreativePreviewGallery({
           </button>
         </div>
 
-        <div className="relative min-w-[240px]">
+        <div className="relative w-full sm:w-auto sm:min-w-[240px]">
           <Search className="absolute start-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input
             type="text"

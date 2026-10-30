@@ -95,10 +95,20 @@
   }
   /*
    * Long unbroken values (email addresses, plugin ids, metric names, URLs) must wrap rather than
-   * push a phone layout sideways: `anywhere` also lowers the min-content width flex/grid items use.
+   * push a phone layout sideways, while tables, buttons, tabs, and status pills keep normal word
+   * boundaries so intrinsic column sizing never collapses to 1 character per line on mobile.
    */
   main {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+  }
+  main table,
+  main th,
+  main td,
+  main button,
+  main label,
+  main [role='tab'],
+  main [role='status'] {
+    overflow-wrap: normal;
   }
   /*
    * Grid items default to min-width:auto, so one nowrap line (a key prefix, a schema's field list)
@@ -106,6 +116,13 @@
    */
   main .grid > * {
     min-width: 0;
+  }
+  @media (max-width: 639px) {
+    .container.py-10,
+    .container.py-8 {
+      padding-top: 1.25rem;
+      padding-bottom: 1.5rem;
+    }
   }
   h1,
   h2,

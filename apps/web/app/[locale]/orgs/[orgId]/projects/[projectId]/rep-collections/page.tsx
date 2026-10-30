@@ -203,25 +203,25 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
           <EmptyState icon={BookOpenCheck} title={t('noEntries')} description={t('noEntriesDetail')} compact />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-border text-start text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnCompany')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnType')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnPlan')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnWhen')}</th>
-                  <th className="py-2 pe-3 text-start font-medium">{t('columnNote')}</th>
-                  <th className="py-2 text-start font-medium">{t('columnRepAndAmount')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnCompany')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnType')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnPlan')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnWhen')}</th>
+                  <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnNote')}</th>
+                  <th className="whitespace-nowrap py-2 text-start font-medium">{t('columnRepAndAmount')}</th>
                 </tr>
               </thead>
               <tbody>
                 {entries.map((entry) => (
                   <tr key={entry.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/30">
-                    <td className="py-2 pe-3 font-medium">{entry.company}</td>
-                    <td className="py-2 pe-3">
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{t(repCollectionTypeLabelKey(entry.collectionType))}</span>
+                    <td className="whitespace-nowrap py-2 pe-3 font-medium">{entry.company}</td>
+                    <td className="whitespace-nowrap py-2 pe-3">
+                      <span className="inline-block whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{t(repCollectionTypeLabelKey(entry.collectionType))}</span>
                     </td>
-                    <td className="py-2 pe-3 text-xs text-muted-foreground">
+                    <td className="whitespace-nowrap py-2 pe-3 text-xs text-muted-foreground">
                       {entry.planFrom && entry.planTo
                         ? t('planSummary', { from: entry.planFrom, to: entry.planTo })
                         : entry.planFrom
@@ -230,7 +230,7 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
                             ? t('planToOnly', { to: entry.planTo })
                             : ''}
                     </td>
-                    <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.occurredAt}</td>
+                    <td className="whitespace-nowrap py-2 pe-3 text-xs text-muted-foreground">{entry.occurredAt}</td>
                     <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.note ?? ''}</td>
                     <td className="py-2">
                       <RepCollectionEntryControls orgId={orgId} projectId={projectId} entryId={entry.id} orgPersonId={entry.orgPersonId} amount={entry.amount} people={repPickerOptions(entry.orgPersonId)} />

@@ -66,27 +66,27 @@ export function StatCard({
   return (
     <Card
       hoverable
-      className={cn('relative flex flex-col justify-between overflow-hidden p-pp-lg transition-all duration-200', className)}
+      className={cn('relative flex flex-col justify-between overflow-hidden p-4 transition-all duration-200 sm:p-pp-lg', className)}
       {...props}
     >
       {/* Accent bar on the inline-start edge, clipped by the card's radius (a border would curve past the corners). */}
       <span aria-hidden="true" className="absolute inset-y-0 start-0 w-1 bg-pp-primary" />
       <div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-pp-label-sm uppercase tracking-wider text-pp-outline">{title}</span>
-          <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-start justify-between gap-2">
+          <span className="min-w-0 break-words text-pp-label-sm uppercase tracking-wider text-pp-outline">{title}</span>
+          <div className="flex shrink-0 items-center gap-1.5">
             {badge}
             {Icon ? (
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
-                <Icon className="h-5 w-5" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary sm:h-9 sm:w-9">
+                <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
             ) : null}
           </div>
         </div>
 
-        <div className="mt-3 flex items-baseline gap-2">
+        <div className="mt-2.5 flex items-baseline gap-2 sm:mt-3">
           {isTextValue ? (
-            <span dir="auto" className="inline-block text-pp-headline-md font-semibold text-pp-on-surface-variant">
+            <span dir="auto" className="inline-block text-base font-semibold text-pp-on-surface-variant sm:text-pp-headline-md">
               {value}
             </span>
           ) : (

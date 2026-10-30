@@ -145,8 +145,10 @@ export interface AppShellProps {
 function bestMatchingHref(pathname: string, hrefs: readonly string[]): string | undefined {
   let best: string | undefined;
   for (const href of hrefs) {
-    const matches = pathname === href || pathname.startsWith(`${href}/`);
-    if (matches && (!best || href.length > best.length)) {
+    const baseHref = href.split('?')[0]!;
+    const isOrgRoot = /^\/orgs\/[^/]+$/.test(baseHref);
+    const matches = pathname === baseHref || (!isOrgRoot && pathname.startsWith(`${baseHref}/`));
+    if (matches && (!best || baseHref.length > best.split('?')[0]!.length)) {
       best = href;
     }
   }

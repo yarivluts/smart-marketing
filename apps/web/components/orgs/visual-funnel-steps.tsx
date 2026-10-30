@@ -146,7 +146,7 @@ export function VisualFunnelSteps({
                   <div
                     data-testid={`bar-${step.stageKey}`}
                     className="h-full rounded-full bg-gradient-to-r from-primary to-[hsl(var(--gradient-to))] transition-all duration-500 ease-out"
-                    style={{ width: `${Math.max(2, Math.min(100, step.conversionPercent))}%` }}
+                    style={{ width: `${step.conversionPercent <= 0 ? 0 : Math.max(2, Math.min(100, step.conversionPercent))}%` }}
                   />
                 </div>
               </div>

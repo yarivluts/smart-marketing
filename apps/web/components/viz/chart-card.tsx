@@ -24,23 +24,23 @@ export function ChartCard({ title, description, icon: Icon, actions, footer, chi
       )}
       aria-label={title}
     >
-      <header className="flex flex-wrap items-start justify-between gap-3 px-pp-lg pt-pp-lg">
+      <header className="flex flex-col gap-3 px-4 pt-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:px-pp-lg sm:pt-pp-lg">
         <div className="flex min-w-0 items-start gap-3">
           {Icon ? (
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
               <Icon className="h-5 w-5" />
             </div>
           ) : null}
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h2 className="font-pp-display text-pp-headline-md text-pp-on-surface">{title}</h2>
             {description ? <p className="mt-0.5 text-pp-body-sm text-pp-on-surface-variant">{description}</p> : null}
           </div>
         </div>
-        {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+        {actions ? <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div> : null}
       </header>
-      <div className={cn('p-pp-lg pt-pp-md', fill && 'flex-1')}>{children}</div>
+      <div className={cn('p-4 pt-3 sm:p-pp-lg sm:pt-pp-md', fill && 'flex-1')}>{children}</div>
       {footer ? (
-        <footer className="border-t border-pp-outline-variant/30 px-pp-lg py-3 text-pp-body-sm text-pp-on-surface-variant">
+        <footer className="border-t border-pp-outline-variant/30 px-4 py-3 text-pp-body-sm text-pp-on-surface-variant sm:px-pp-lg">
           {footer}
         </footer>
       ) : null}

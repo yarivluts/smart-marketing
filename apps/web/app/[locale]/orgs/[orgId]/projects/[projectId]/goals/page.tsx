@@ -177,7 +177,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
         {items.length === 0 ? (
           <EmptyState icon={Target} title={t('noGoals')} description={t('noGoalsDetail')} />
         ) : (
-          <ul className="grid gap-4 md:grid-cols-2" data-testid="goal-pace-cards">
+          <ul className={cn('grid gap-4', items.length > 1 && 'md:grid-cols-2')} data-testid="goal-pace-cards">
             {items.map((goal) => {
               const measuredGoal = goal.progressKind === 'ok' && goal.percentFilled !== null && goal.status !== null && !goal.isPaused;
               const tone = goal.status ? STATUS_TONE[goal.status] : null;
@@ -189,7 +189,11 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
                       <span className="inline-flex max-w-full truncate rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground" dir="ltr">
                         {goal.metricName}
                       </span>
-                      <Link className="mt-1 block truncate text-base font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline" href={`/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`}>
+                      <Link
+                        className="mt-1 block truncate text-base font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline"
+                        href={`/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`}
+                        dir="auto"
+                      >
                         {goal.name}
                       </Link>
                     </div>
@@ -216,7 +220,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
                         aria-valuemin={0}
                         aria-valuemax={100}
                       >
-                        <div className={cn('h-full rounded-full', tone?.bar)} style={{ width: `${Math.max(2, goal.percentFilled ?? 0)}%` }} />
+                        <div className={cn('h-full rounded-full', tone?.bar)} style={{ width: `${(goal.percentFilled ?? 0) <= 0 ? 0 : Math.max(2, goal.percentFilled ?? 0)}%` }} />
                         <span className="absolute -top-1 h-4 w-0.5 rounded-full bg-foreground/60" style={{ insetInlineStart: `${elapsedPercent}%` }} title={t('elapsedMarker', { percent: elapsedPercent })} aria-hidden="true" />
                       </div>
                       <div className="flex justify-between text-[11px] text-muted-foreground">

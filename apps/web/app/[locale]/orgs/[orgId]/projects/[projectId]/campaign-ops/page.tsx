@@ -263,13 +263,13 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
                 }))}
             />
             <div className="overflow-x-auto lg:col-span-2">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[520px] text-sm">
                 <thead>
                   <tr className="border-b border-border text-start text-xs text-muted-foreground">
-                    <th className="py-2 pe-3 text-start font-medium">{t('columnCampaign')}</th>
-                    <th className="py-2 pe-3 text-start font-medium">{t('columnActualSpend')}</th>
-                    <th className="py-2 pe-3 text-start font-medium">{t('columnTarget')}</th>
-                    <th className="py-2 text-start font-medium">{t('columnStatus')}</th>
+                    <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnCampaign')}</th>
+                    <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnActualSpend')}</th>
+                    <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnTarget')}</th>
+                    <th className="whitespace-nowrap py-2 text-start font-medium">{t('columnStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,8 +296,8 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
                           <CampaignTargetInput orgId={orgId} projectId={projectId} campaignId={row.campaignId} monthlyBudget={row.monthlyBudget} />
                         </td>
                         <td className="py-3">
-                          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium', tone.soft, tone.text)}>
-                            <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} aria-hidden="true" />
+                          <span className={cn('inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', tone.soft, tone.text)}>
+                            <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', tone.dot)} aria-hidden="true" />
                             {t(campaignSpendStatusLabelKey(row.status))}
                           </span>
                         </td>

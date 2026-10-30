@@ -58,22 +58,22 @@ export function Timeline({ groups, label, className }: TimelineProps): React.Rea
             {group.sublabel ? <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{group.sublabel}</span> : null}
             <span className="h-px flex-1 bg-border" aria-hidden="true" />
           </div>
-          <ol className="relative flex flex-col gap-1 border-s-2 border-border/70 ms-4">
+          <ol className="relative ms-3 flex flex-col gap-1 border-s-2 border-border/70 sm:ms-4">
             {group.items.map((item) => {
               const Icon = item.icon;
               return (
-                <li key={item.key} id={item.anchorId} className="relative scroll-mt-24 rounded-xl ps-7 target:bg-warning/10 target:ring-2 target:ring-warning/40">
+                <li key={item.key} id={item.anchorId} className="relative scroll-mt-24 rounded-xl ps-5 target:bg-warning/10 target:ring-2 target:ring-warning/40 sm:ps-7">
                   <span
                     className={cn('absolute -start-[15px] top-2.5 flex h-7 w-7 items-center justify-center rounded-full bg-card ring-2', TONES[item.tone ?? 'primary'])}
                     aria-hidden="true"
                   >
                     {Icon ? <Icon className="h-3.5 w-3.5" /> : <span className="h-2 w-2 rounded-full bg-current" />}
                   </span>
-                  <div className="flex items-start gap-3 rounded-xl px-3 py-2 transition-colors hover:bg-muted/50">
-                    {item.leading}
+                  <div className="flex items-start gap-2.5 rounded-xl px-2 py-2 transition-colors hover:bg-muted/50 sm:gap-3 sm:px-3">
+                    {item.leading ? <div className="hidden shrink-0 sm:block">{item.leading}</div> : null}
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                        <div className="min-w-0 text-sm text-foreground">{item.title}</div>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className="min-w-0 flex-1 text-sm text-foreground">{item.title}</div>
                         {item.time ? (
                           <time className="shrink-0 text-xs tabular-nums text-muted-foreground" dir="ltr">
                             {item.time}

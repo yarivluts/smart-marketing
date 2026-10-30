@@ -87,12 +87,12 @@ export function ExecutiveBlendedReport({
   return (
     <div
       data-testid="executive-blended-report"
-      className={`flex flex-col gap-6 rounded-2xl border border-border bg-card p-6 shadow-xs ${className}`}
+      className={`flex flex-col gap-6 rounded-2xl border border-border bg-card p-4 shadow-xs sm:p-6 ${className}`}
     >
       {/* 1. Header & Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
               {t('title', { defaultMessage: 'How your ads are doing' })}
             </h2>
@@ -116,7 +116,7 @@ export function ExecutiveBlendedReport({
 
         <span
           data-testid="report-window-label"
-          className="rounded-xl border border-border bg-muted/50 px-3 py-1.5 text-xs font-semibold text-foreground"
+          className="shrink-0 rounded-xl border border-border bg-muted/50 px-3 py-1.5 text-xs font-semibold text-foreground"
         >
           {t('timeRange30d')}
         </span>
@@ -275,7 +275,7 @@ export function ExecutiveBlendedReport({
       </div>
 
       {/* 3. Interactive Channel Spend Allocation Visualizer */}
-      <div className="rounded-2xl border border-border bg-background p-6">
+      <div className="rounded-2xl border border-border bg-background p-4 sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
           <div className="flex items-center gap-2">
             <PieChart className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -284,7 +284,7 @@ export function ExecutiveBlendedReport({
             </h3>
           </div>
           {channels.length > 0 ? (
-            <div className="flex items-center gap-4 text-xs">
+            <div className="flex flex-wrap items-center gap-4 text-xs">
               <span className="flex items-center gap-1.5 font-semibold text-foreground">
                 <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
                 <span>{'Meta Ads'}</span>

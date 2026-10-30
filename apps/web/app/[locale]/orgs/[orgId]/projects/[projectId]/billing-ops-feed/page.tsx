@@ -251,12 +251,12 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
           {summary.totalsByCurrency.length > 0 ? (
             <ChartCard title={t('totalsTitle')} description={t('totalsDescription')} icon={Wallet} footer={t('amountUnitNote')}>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[440px] text-sm">
                   <thead>
                     <tr className="border-b border-border text-xs text-muted-foreground">
-                      <th className="py-2 pe-3 text-start font-medium">{t('columnCurrency')}</th>
+                      <th className="whitespace-nowrap py-2 pe-3 text-start font-medium">{t('columnCurrency')}</th>
                       {BILLING_OPS_TYPES.map((type) => (
-                        <th key={type} className="py-2 pe-3 text-end font-medium">
+                        <th key={type} className="whitespace-nowrap py-2 pe-3 text-end font-medium">
                           {t(billingOpsFeedEntryTypeLabelKey(type))}
                         </th>
                       ))}
@@ -265,9 +265,9 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
                   <tbody>
                     {summary.totalsByCurrency.map((row) => (
                       <tr key={row.currency} className="border-b border-border/60 last:border-0">
-                        <td className="py-2 pe-3 font-semibold">{row.currency}</td>
+                        <td className="whitespace-nowrap py-2 pe-3 font-semibold">{row.currency}</td>
                         {BILLING_OPS_TYPES.map((type) => (
-                          <td key={type} className="py-2 pe-3 text-end tabular-nums" dir="ltr">
+                          <td key={type} className="whitespace-nowrap py-2 pe-3 text-end tabular-nums" dir="ltr">
                             {formatMinorUnits(row[type], row.currency, locale)}
                           </td>
                         ))}
