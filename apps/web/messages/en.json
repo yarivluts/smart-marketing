@@ -566,7 +566,7 @@
     "journeyStep_done": "Live",
     "journeyStartedOn": "Started {date}",
     "journeyNotStarted": "Not started yet",
-    "journeyPackNone": "No pack chosen",
+    "journeyPackNone": "No starting point chosen yet",
     "journeySourcePlugin": "Ready-made connection",
     "journeySourcePush": "Your own data, sent with an access key",
     "journeySourceNone": "Nothing connected",
