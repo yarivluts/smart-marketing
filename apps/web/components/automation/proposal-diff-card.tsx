@@ -251,7 +251,7 @@ export function ProposalDiffCard({
       {/* Status Pill for Executed / Rolled Back / Rejected */}
       {localStatus && localStatus !== 'awaiting_approval' && localStatus !== 'approved' && (
         <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-2.5 text-xs">
-          <span className="text-muted-foreground text-[11px]">Status:</span>
+          <span className="text-muted-foreground text-[11px]">{tCard('statusLabel')}</span>
           <span
             data-testid="proposal-status-badge"
             className={cn(

@@ -220,4 +220,45 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/field-mappings', () => {
     expect(listed.fieldMappings).toHaveLength(1);
     expect(listed.fieldMappings[0]).toMatchObject({ id: body.fieldMapping.id, name: 'Shopify orders -> order_completed', kind: 'event', schemaName: 'order_completed' });
   });
+
+  it('lets a project-scoped project_admin create and list on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupOrgProject('Field Mapping Project Admin Org');
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    await registerOrderCompletedSchema(organization.id, siblingProject.id, owner.id);
+
+    const adminEmail = uniqueEmail('fm-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowedCreate = fieldMappingsRequest(organization.id, project.id, {
+      name: 'Allowed mapping',
+      environmentId: prodEnvironment.id,
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+    });
+    expect((await POST(allowedCreate.request, { params: allowedCreate.params })).status).toBe(201);
+    expect((await GET(fieldMappingsRequest(organization.id, project.id).request, { params: allowedCreate.params })).status).toBe(200);
+
+    const siblingCreate = fieldMappingsRequest(organization.id, siblingProject.id, {
+      name: 'Blocked mapping',
+      environmentId: siblingProd.id,
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+    });
+    expect((await POST(siblingCreate.request, { params: siblingCreate.params })).status).toBe(403);
+    expect((await GET(fieldMappingsRequest(organization.id, siblingProject.id).request, { params: siblingCreate.params })).status).toBe(403);
+  });
 });

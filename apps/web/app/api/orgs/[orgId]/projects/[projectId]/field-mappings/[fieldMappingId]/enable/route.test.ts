@@ -1,11 +1,13 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   createOrganizationWithOwner,
   createFieldMapping,
   createProject,
   disableFieldMapping,
   ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
   registerSchemaDefinition,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -99,5 +101,69 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/field-mappings/[fieldMappi
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'enabled' });
+  });
+
+  it('lets a project-scoped project_admin re-enable on their bound project but returns 403 on a sibling project', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupOrgProject('Field Mapping Enable Project Admin Org');
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+
+    for (const p of [project, siblingProject]) {
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: p.id,
+        kind: 'event',
+        name: 'order_completed',
+        fields: [{ name: 'order_id', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      });
+    }
+
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'X',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+    await disableFieldMapping({ organizationId: organization.id, projectId: project.id, fieldMappingId: mapping.id, disabledByUserId: owner.id });
+
+    const siblingMapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 'Y',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+    await disableFieldMapping({ organizationId: organization.id, projectId: siblingProject.id, fieldMappingId: siblingMapping.id, disabledByUserId: owner.id });
+
+    const adminEmail = uniqueEmail('fm-enable-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = await POST(new Request('https://growthos.test'), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id, fieldMappingId: mapping.id }),
+    });
+    expect(allowed.status).toBe(200);
+
+    const blocked = await POST(new Request('https://growthos.test'), {
+      params: Promise.resolve({ orgId: organization.id, projectId: siblingProject.id, fieldMappingId: siblingMapping.id }),
+    });
+    expect(blocked.status).toBe(403);
   });
 });

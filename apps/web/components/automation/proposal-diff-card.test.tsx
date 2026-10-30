@@ -99,6 +99,7 @@ describe('ProposalDiffCard Component', () => {
       { locale: 'he' },
     );
     expect(screen.getByTestId('proposal-rollback-button')).toHaveTextContent(heMessages.ProposalDiffCard.rollbackButton);
+    expect(screen.getByText(heMessages.ProposalDiffCard.statusLabel)).toBeInTheDocument();
   });
 
 });

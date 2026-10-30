@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { listHookDeliveriesForProject, listOrgProjects } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string }>;
@@ -9,7 +9,7 @@ interface RouteParams {
 /** Lists every delivery (any status) landed for one project's hook endpoints — the review queue (KAN-53 AC: "unknown payloads visible in queue"), gated on `ingest.write`. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }

@@ -86,7 +86,7 @@ function countHardcodedStrings(): { total: number; byDirectory: Record<string, n
  * survived into another decorative one, which is the failure this test exists
  * to record.
  */
-const HARDCODED_STRING_BASELINE = 183;
+const HARDCODED_STRING_BASELINE = 114;
 
 describe('hard-coded UI strings (CLAUDE.md: "no hard-coded UI strings")', () => {
   it(`has no more than the ${HARDCODED_STRING_BASELINE} known at the time this ratchet was added`, () => {

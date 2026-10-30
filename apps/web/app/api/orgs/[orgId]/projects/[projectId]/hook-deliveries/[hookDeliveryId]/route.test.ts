@@ -1,7 +1,15 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createHookEndpoint, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, receiveHookPayload } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createHookEndpoint,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+  receiveHookPayload,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { PATCH } from './route';
 
@@ -110,5 +118,41 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/hook-deliveries/[hookDeli
     const { request, params } = statusRequest(organization.id, project.id, 'does-not-exist', 'reviewed');
     const response = await PATCH(request, { params });
     expect(response.status).toBe(404);
+  });
+
+  it('lets a project-scoped project_admin update delivery status on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project, delivery } = await setupDelivery('Hook Delivery Status Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    const siblingEndpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 's',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+    const siblingReceived = await receiveHookPayload({ hookId: siblingEndpoint.hook_id, rawBody: '{}', headers: {} });
+    if (!siblingReceived.ok) throw new Error('expected sibling delivery');
+
+    const adminEmail = uniqueEmail('hook-delivery-status-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = statusRequest(organization.id, project.id, delivery.id, 'reviewed');
+    expect((await PATCH(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const blocked = statusRequest(organization.id, siblingProject.id, siblingReceived.value.delivery.id, 'reviewed');
+    expect((await PATCH(blocked.request, { params: blocked.params })).status).toBe(403);
   });
 });

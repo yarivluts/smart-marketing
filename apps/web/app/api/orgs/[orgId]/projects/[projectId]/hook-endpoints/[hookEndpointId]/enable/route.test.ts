@@ -1,6 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createHookEndpoint, createOrganizationWithOwner, createProject, disableHookEndpoint, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createHookEndpoint,
+  createOrganizationWithOwner,
+  createProject,
+  disableHookEndpoint,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST } from './route';
 
@@ -76,5 +84,44 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/hook-endpoints/[hookEndpoi
       params: Promise.resolve({ orgId: organization.id, projectId: project.id, hookEndpointId: 'does-not-exist' }),
     });
     expect(response.status).toBe(404);
+  });
+
+  it('lets a project-scoped project_admin re-enable on their bound project but returns 403 on a sibling project', async () => {
+    const { ownerSession, organization, project, endpoint } = await setupDisabledEndpoint('Hooks Enable Project Admin Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: siblingProject, environments: siblingEnvs } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const siblingProd = siblingEnvs.find((e) => e.name === 'prod')!;
+    const siblingEndpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: siblingProject.id,
+      environmentId: siblingProd.id,
+      name: 's',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+    await disableHookEndpoint({ organizationId: organization.id, projectId: siblingProject.id, hookEndpointId: siblingEndpoint.id, disabledByUserId: owner.id });
+
+    const adminEmail = uniqueEmail('hooks-enable-project-admin');
+    const invite = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invite.id, userId: adminUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = await POST(new Request('https://growthos.test'), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id, hookEndpointId: endpoint.id }),
+    });
+    expect(allowed.status).toBe(200);
+
+    const blocked = await POST(new Request('https://growthos.test'), {
+      params: Promise.resolve({ orgId: organization.id, projectId: siblingProject.id, hookEndpointId: siblingEndpoint.id }),
+    });
+    expect(blocked.status).toBe(403);
   });
 });

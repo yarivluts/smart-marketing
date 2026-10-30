@@ -17,6 +17,20 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T19:05Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-145)
+
+- **Last completed:**
+  - **Security & Engineering (`KAN-145` — Project-scope RBAC reachability for Field Mappings & Inbound Webhooks):**
+    - `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/field-mappings/page.tsx` and `hooks/page.tsx` already checked `can(..., 'ingest.write', { orgId, projectId })`, rendering all creation, edit, test-run, apply, secret-rotation, and delivery-review controls to a project-scoped `project_admin`, while all 12 backing API routes (`field-mappings/route.ts` GET/POST, `field-mappings/suggest/route.ts` POST, `field-mappings/test-run/route.ts` POST, `field-mappings/[fieldMappingId]/route.ts` DELETE/PATCH, `field-mappings/[fieldMappingId]/apply/route.ts` POST, `field-mappings/[fieldMappingId]/enable/route.ts` POST, `hook-endpoints/route.ts` GET/POST, `hook-endpoints/[hookEndpointId]/route.ts` DELETE/PATCH, `hook-endpoints/[hookEndpointId]/enable/route.ts` POST, `hook-endpoints/[hookEndpointId]/secret/route.ts` PUT, `hook-deliveries/route.ts` GET, `hook-deliveries/[hookDeliveryId]/route.ts` PATCH) still called `requireOrgPermission(orgId, 'ingest.write')` without `projectId` and returned `403 Forbidden`.
+    - Swapped all 12 routes to `requireProjectPermission(orgId, projectId, 'ingest.write')` and added emulator-backed `project_admin` allow + sibling-project `403` isolation tests across all 12 `route.test.ts` suites.
+  - **UI/UX & i18n (`ProposalDiffCard`, `en.json`, `he.json`, `hardcoded-strings.test.ts`):**
+    - Replaced hardcoded `"Status:"` JSX text in `ProposalDiffCard` (`apps/web/components/automation/proposal-diff-card.tsx`) with `tCard('statusLabel')` (`"Status:"` in `en.json`, `"סטטוס:"` in `he.json`), verified in `proposal-diff-card.test.tsx`.
+    - Ratcheted `HARDCODED_STRING_BASELINE` in `apps/web/messages/hardcoded-strings.test.ts` down from `183` to `114`, locking in 69 eliminated hardcoded strings so they cannot regress.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review (`KAN-146`: wire `requireProjectPermission` through remaining `ingest.write` / `experiment.write` / `campaign_ops.write` project routes).
+- **Waiting on human:** None.
+
 ## 2026-10-30T18:05Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-144)
 
 - **Last completed:**

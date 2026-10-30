@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { EnvironmentNotFoundError, HOOK_SIGNATURE_MODES, MissingSignatureHeaderNameError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { createHookEndpoint } from '@/lib/orgs/mutations';
 import { listHookEndpointsForProject, listOrgProjects } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -12,7 +12,7 @@ interface RouteParams {
 /** Lists every hook endpoint (active or disabled) for one project — gated on `ingest.write`, the same permission KAN-35's ingest-health page already reuses for inbound-data admin surfaces. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }
@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Creates a new per-project+environment inbound webhook receiver (KAN-53). An `hmac_sha256`-mode endpoint is created without a secret — see the `.../secret` route to set one. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }

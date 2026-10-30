@@ -7,7 +7,7 @@ import {
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
 import { testRunFieldMapping } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { parseFieldMappingRulesBody } from '@/lib/orgs/parse-field-mapping-rules';
 
@@ -24,7 +24,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }
