@@ -3547,15 +3547,15 @@
         "none": "No ad yet"
       },
       "sync": {
-        "title": "Platform sync",
-        "done": "Synced",
-        "none": "Not synced yet"
+        "title": "Results from the platform",
+        "done": "Received",
+        "none": "None received yet"
       },
       "spend": {
         "title": "Spend",
         "measured": "Spend measured",
         "none": "No spend recorded",
-        "unavailable": "Not queryable yet"
+        "unavailable": "Not available yet"
       }
     },
     "euPoliticalDeclaredYes": "Declared to Google: this ad contains political advertising aimed at the EU.",
