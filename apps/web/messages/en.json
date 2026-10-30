@@ -4,8 +4,94 @@
     "description": "Multi-vertical growth analytics platform"
   },
   "HomePage": {
-    "title": "GrowthOS",
-    "subtitle": "Tell us your website. We write your ads and show how they do; nothing goes live until you say yes."
+    "metaTitle": "GrowthOS - enter your website, the AI does the marketing",
+    "metaDescription": "GrowthOS reads your website, works out what you sell and to whom, and prepares ads, landing pages and audiences for you. You only approve.",
+    "navLabel": "Home page sections",
+    "navHow": "How it works",
+    "navFeatures": "What you get",
+    "navFaq": "Questions",
+    "signIn": "Sign in",
+    "startFree": "Start free",
+    "goToAccount": "Go to my account",
+    "eyebrow": "Marketing for people who are not marketers",
+    "title": "Enter your website. GrowthOS does the rest.",
+    "subtitle": "The AI reads your site, works out what you sell and to whom, and prepares ads, landing pages and audiences for you. You only approve.",
+    "howItWorksLink": "How it works",
+    "heroNote": "Nothing is published and no money is spent without your approval.",
+    "illustrationSite": "your-site.com",
+    "illustrationCard1": "Goal: your best-selling product",
+    "illustrationCard2": "Ads ready for your approval",
+    "illustrationApprove": "Approve",
+    "illustrationChange": "Ask for a change",
+    "illustrationReject": "Reject",
+    "howTitle": "How it works",
+    "howIntro": "Three steps. The professional work in between is done for you.",
+    "step1Title": "Enter your website",
+    "step1Body": "The AI reads your site and suggests goals: your products, your services and the people most likely to buy them.",
+    "step2Title": "The AI prepares everything",
+    "step2Body": "Ads with images and a video, a landing page, the right audience and search keywords - written in the language of your site.",
+    "step3Title": "You approve",
+    "step3Body": "You see everything before it goes anywhere: approve, ask for a change in your own words, or reject.",
+    "featuresTitle": "What you get",
+    "featuresIntro": "Four tools that work together, in plain language.",
+    "feature": {
+      "pilot": {
+        "title": "Growth Pilot",
+        "body": "From your website to goals, ads, landing pages and audiences waiting for your approval."
+      },
+      "studio": {
+        "title": "AI Ad Studio",
+        "body": "Images, a video and a Google search ad, made from your website in Hebrew or English."
+      },
+      "results": {
+        "title": "Ads & results",
+        "body": "What you spent and what it brought in, explained simply."
+      },
+      "helper": {
+        "title": "AI helper & automation",
+        "body": "Suggestions to do better, for you to approve with one click."
+      }
+    },
+    "controlTitle": "You stay in control",
+    "control": {
+      "paused": {
+        "title": "Ads are created paused",
+        "body": "They only start running when you turn them on."
+      },
+      "budget": {
+        "title": "A daily budget you set",
+        "body": "The most that can be spent in a day, decided by you."
+      },
+      "connections": {
+        "title": "Checked connections",
+        "body": "Facebook, Instagram and Google Ads accounts are checked with the platform before anything is saved."
+      }
+    },
+    "faqTitle": "Common questions",
+    "faq": {
+      "knowledge": {
+        "q": "Do I need to know marketing?",
+        "a": "No. GrowthOS reads your site and does the professional work - goals, ads, landing pages, audiences and keywords. You decide: approve, ask for a change or reject."
+      },
+      "spend": {
+        "q": "Will you spend money without asking me?",
+        "a": "No. Every ad is created paused, and it only starts running when you approve it, within the daily budget you set."
+      },
+      "platforms": {
+        "q": "Where can I advertise?",
+        "a": "On Facebook and Instagram, and on Google (search and images). You connect your ad accounts once, and every connection is checked with the platform."
+      },
+      "developers": {
+        "q": "I'm a developer - is there an API?",
+        "a": "Yes. You can send events, customers and sales from your site or your server, with a script for the browser and an SDK for Node.",
+        "link": "Developer guides"
+      }
+    },
+    "ctaTitle": "Ready to try?",
+    "ctaBody": "Enter your website and see what the AI prepares for you. Nothing goes live without you.",
+    "footerLabel": "Site links",
+    "footerPrivacy": "Privacy policy",
+    "footerDevelopers": "Developer guides"
   },
   "LocaleSwitcher": {
     "label": "Language",
