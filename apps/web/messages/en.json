@@ -4205,11 +4205,11 @@
     "stagePlanValue": "{count, plural, one {# recommendation} other {# recommendations}}",
     "plan": {
       "title": "Deep analysis",
-      "description": "Reads your landing page, measured results, existing ads and Google keyword volumes, then plans the ad from that evidence.",
+      "description": "Reads your web page, measured results, existing ads and Google keyword volumes, then plans the ad from that evidence.",
       "run": "Run deep analysis",
       "rerun": "Run again",
       "running": "Analyzing...",
-      "runningHint": "Reading the landing page, results, existing ads and keyword volumes. This can take up to a minute.",
+      "runningHint": "Reading your web page, results, existing ads and keyword volumes. This can take up to a minute.",
       "noProvider": "The AI helper is not switched on yet, so it cannot analyze your ads. Contact GrowthOS support to switch it on.",
       "emptyTitle": "No analysis yet",
       "emptyDescription": "Run a deep analysis to see what the evidence says before writing the script. The script writer then builds on it.",
@@ -4218,7 +4218,7 @@
       "sourcesTitle": "Data sources",
       "sourcesDescription": "What the analysis could read. Anything missing is left out, never estimated.",
       "source": {
-        "landing_page": "Landing page",
+        "landing_page": "Web page",
         "results": "Measured results",
         "campaigns": "Your existing ads",
         "keywords": "Keyword volumes",
@@ -4245,7 +4245,7 @@
           "warehouse_not_configured": "Site results are not connected to this project yet.",
           "warehouse_error": "Site results could not be loaded right now; the plan was made without them.",
           "query_quota_exceeded": "The project's daily query limit is reached.",
-          "no_traffic": "No landing page visits in the last 90 days."
+          "no_traffic": "No visits to your web page in the last 90 days."
         },
         "campaigns": {
           "no_campaigns": "The project has no ads yet."
@@ -4263,7 +4263,7 @@
       },
       "summaryTitle": "Plan",
       "audience": "Audience",
-      "landingPageSummary": "What the landing page says",
+      "landingPageSummary": "What your web page says",
       "anglesTitle": "Messaging angles",
       "themesTitle": "Keyword themes",
       "recommendationsTitle": "Recommended next steps",
@@ -4276,7 +4276,7 @@
       "unsupported": "No available evidence behind this - treat it as a suggestion.",
       "marketTitle": "Market notes",
       "marketDescription": "General model knowledge, not measured data. Check it before relying on it.",
-      "pagesChartTitle": "Visitors per landing page",
+      "pagesChartTitle": "Visitors per web page",
       "pagesChartDescription": "Last {days} days. Each sign-up or sale is credited to the last page or ad they came from.",
       "pageSublabel": "{conversions} sign-ups or sales · {rate} of visitors",
       "campaignsRateTitle": "Share of visitors who sign up or buy, by ad",

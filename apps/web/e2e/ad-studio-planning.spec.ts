@@ -56,7 +56,7 @@ test.describe('AI Ad Studio deep analysis (KAN-230)', () => {
     const sources = page.getByTestId('ad-studio-plan-sources');
     await expect(sources.locator('[data-status="ok"]')).toHaveCount(4);
     await expect(sources.locator('[data-source="market"]')).toContainText('General knowledge from the AI model. Not measured.');
-    await expect(page.getByText('Visitors per landing page')).toBeVisible();
+    await expect(page.getByText('Visitors per web page')).toBeVisible();
     await expect(page.getByText('example.com/lawyers').first()).toBeVisible();
     await expect(page.getByText('Keyword ideas by monthly searches')).toBeVisible();
     await expect(page.getByText('12,100', { exact: true })).toBeVisible();
