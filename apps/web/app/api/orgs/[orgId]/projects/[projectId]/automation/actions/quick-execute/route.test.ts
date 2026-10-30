@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { POST } from './route';
 
 const {
-  requireOrgPermissionMock,
+  requireProjectPermissionMock,
   proposeAutomationBudgetChangeActionMock,
   proposeCampaignActivationActionMock,
   approveAutomationActionMock,
@@ -11,7 +11,7 @@ const {
   rollbackAutomationActionMock,
   listAutomationActionsForProjectMock,
 } = vi.hoisted(() => ({
-  requireOrgPermissionMock: vi.fn(),
+  requireProjectPermissionMock: vi.fn(),
   proposeAutomationBudgetChangeActionMock: vi.fn(),
   proposeCampaignActivationActionMock: vi.fn(),
   approveAutomationActionMock: vi.fn(),
@@ -21,7 +21,7 @@ const {
 }));
 
 vi.mock('@/lib/orgs/access', () => ({
-  requireOrgPermission: requireOrgPermissionMock,
+  requireProjectPermission: requireProjectPermissionMock,
 }));
 
 vi.mock('@/lib/orgs/mutations', () => ({
@@ -52,8 +52,8 @@ function postRequest(body: string) {
 }
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/quick-execute', () => {
-  it('returns permission error when requireOrgPermission fails', async () => {
-    requireOrgPermissionMock.mockResolvedValue({
+  it('returns permission error when requireProjectPermission fails (KAN-147)', async () => {
+    requireProjectPermissionMock.mockResolvedValue({
       error: NextResponse.json({ error: 'forbidden' }, { status: 403 }),
     });
 
@@ -63,10 +63,11 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/quick-e
 
     const res = await POST(request, { params });
     expect(res.status).toBe(403);
+    expect(requireProjectPermissionMock).toHaveBeenCalledWith('org-1', 'proj-1', 'automation.execute');
   });
 
   it('returns 400 when targetId or actionType is missing', async () => {
-    requireOrgPermissionMock.mockResolvedValue({
+    requireProjectPermissionMock.mockResolvedValue({
       user: { id: 'user-1' },
       error: null,
     });
@@ -79,7 +80,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/quick-e
   });
 
   it('atomically proposes, approves, and executes budget_change', async () => {
-    requireOrgPermissionMock.mockResolvedValue({
+    requireProjectPermissionMock.mockResolvedValue({
       user: { id: 'user-1' },
       error: null,
     });
@@ -121,7 +122,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/quick-e
   });
 
   it('returns 422 with violations when budget_change is blocked by guardrails', async () => {
-    requireOrgPermissionMock.mockResolvedValue({
+    requireProjectPermissionMock.mockResolvedValue({
       user: { id: 'user-1' },
       error: null,
     });
@@ -144,7 +145,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/quick-e
   });
 
   it('atomically proposes, approves, and executes campaign_activation', async () => {
-    requireOrgPermissionMock.mockResolvedValue({
+    requireProjectPermissionMock.mockResolvedValue({
       user: { id: 'user-1' },
       error: null,
     });
@@ -175,7 +176,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/quick-e
   });
 
   it('pauses a campaign by rolling back active activation action if present', async () => {
-    requireOrgPermissionMock.mockResolvedValue({
+    requireProjectPermissionMock.mockResolvedValue({
       user: { id: 'user-1' },
       error: null,
     });

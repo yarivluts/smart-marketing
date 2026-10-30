@@ -297,4 +297,35 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions', () =>
     expect(body.status).toBe('blocked');
     expect(body.guardrailViolations.length).toBeGreaterThan(0);
   });
+
+  it('allows a project-scoped project_admin on their assigned project (GET and POST) and denies them on a sibling project (KAN-147)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Actions Route Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const target = await seedTarget(organization.id, project.id, owner.id, 100);
+
+    const adminEmail = uniqueEmail('projadmin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+    const allowedGet = getRequest(organization.id, project.id);
+    expect((await GET(allowedGet.request, { params: allowedGet.params })).status).toBe(200);
+
+    const allowedPost = postRequest(organization.id, project.id, JSON.stringify({ targetId: target.id, afterDailyBudgetUsd: 120 }));
+    expect((await POST(allowedPost.request, { params: allowedPost.params })).status).toBe(201);
+
+    const deniedGet = getRequest(organization.id, siblingProject.id);
+    expect((await GET(deniedGet.request, { params: deniedGet.params })).status).toBe(403);
+
+    const deniedPost = postRequest(organization.id, siblingProject.id, JSON.stringify({ targetId: target.id, afterDailyBudgetUsd: 120 }));
+    expect((await POST(deniedPost.request, { params: deniedPost.params })).status).toBe(403);
+  });
 });

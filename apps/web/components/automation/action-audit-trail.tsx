@@ -38,6 +38,18 @@ export interface AuditActionItem {
   reason?: string;
 }
 
+export const ACTION_TYPE_LABEL_KEYS: Record<string, string> = {
+  budget_change: 'actionType_budget_change',
+  bid_strategy_change: 'actionType_bid_strategy_change',
+  status_toggle: 'actionType_status_toggle',
+  campaign_activation: 'actionType_campaign_activation',
+  campaign_pause: 'actionType_campaign_pause',
+  campaign_draft_create: 'actionType_campaign_draft_create',
+  campaign_draft: 'actionType_campaign_draft',
+  keyword_edit: 'actionType_keyword_edit',
+  ad_edit: 'actionType_ad_edit',
+};
+
 export interface ActionAuditTrailProps {
   actions: AuditActionItem[];
   onRollback?: (actionId: string) => Promise<void> | void;
@@ -258,7 +270,9 @@ export function ActionAuditTrail({
 
                     <TableCell>
                       <span className="rounded-lg bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground capitalize">
-                        {act.actionType.replace(/_/g, ' ')}
+                        {ACTION_TYPE_LABEL_KEYS[act.actionType]
+                          ? t(ACTION_TYPE_LABEL_KEYS[act.actionType])
+                          : act.actionType.replace(/_/g, ' ')}
                       </span>
                     </TableCell>
 

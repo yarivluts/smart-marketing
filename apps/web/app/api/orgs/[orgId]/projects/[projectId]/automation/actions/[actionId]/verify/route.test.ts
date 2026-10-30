@@ -417,4 +417,32 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/[action
       process.env.GROWTHOS_VAULT_KEYS = previousVaultKeys;
     }
   });
+
+  it('allows a project-scoped project_admin on their assigned project and denies them on a sibling project (KAN-147)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Verify Route Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const executed = await executedBudgetChangeAction(organization.id, project.id, target.id, owner.id);
+    const siblingTarget = await seedTarget(organization.id, siblingProject.id, owner.id);
+    const siblingExecuted = await executedBudgetChangeAction(organization.id, siblingProject.id, siblingTarget.id, owner.id);
+
+    const adminEmail = uniqueEmail('projadmin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+    const allowed = verifyRequest(organization.id, project.id, executed.id);
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(200);
+
+    const denied = verifyRequest(organization.id, siblingProject.id, siblingExecuted.id);
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AutomationActionInvalidStateError, AutomationActionNotFoundError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { rejectAutomationAction } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; actionId: string }>;
@@ -10,7 +10,7 @@ interface RouteParams {
 /** Rejects a `blocked` or `awaiting_approval` action, same `automation.approve` gate as approving one. */
 export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, actionId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.approve');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.approve');
   if (error) {
     return error;
   }

@@ -10,7 +10,7 @@ import {
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
 import { refreshAutomationTargetState } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
 
 interface RouteParams {
@@ -28,7 +28,7 @@ interface RouteParams {
 export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, targetId: rawTargetId } = await params;
   const targetId = decodeURIComponent(rawTargetId);
-  const { user, error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }

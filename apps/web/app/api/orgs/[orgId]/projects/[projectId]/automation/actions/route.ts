@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { AutomationTargetNotFoundError, InvalidAutomationActionError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { proposeAutomationBudgetChangeAction } from '@/lib/orgs/mutations';
 import { listAutomationActionsForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -12,7 +12,7 @@ interface RouteParams {
 /** A project's KAN-71 automation action queue/history, newest-proposal-first. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }
@@ -49,7 +49,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Proposes a simulated budget-change action — KAN-71's dry-run-diff step. Lands as `blocked` or `awaiting_approval` depending on the project's guardrail policy. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }

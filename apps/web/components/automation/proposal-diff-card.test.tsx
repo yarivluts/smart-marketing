@@ -93,6 +93,10 @@ describe('ProposalDiffCard Component', () => {
     const { unmount } = renderWithIntl(<ProposalDiffCard proposal={mockProposal} />, { locale: 'he' });
     expect(screen.getByTestId('quick-execute-button')).toHaveTextContent(heMessages.ProposalDiffCard.approveAndExecute);
     expect(screen.getByTestId('impact-badge')).not.toHaveTextContent(/impact/i);
+    expect(screen.getByText(heMessages.ActionAuditTrail.actionType_budget_change)).toBeInTheDocument();
+    expect(screen.getByText(heMessages.ProposalDiffCard.platform_meta_ads)).toBeInTheDocument();
+    expect(screen.queryByText(/budget change/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/meta ads/i)).not.toBeInTheDocument();
     unmount();
 
     renderWithIntl(

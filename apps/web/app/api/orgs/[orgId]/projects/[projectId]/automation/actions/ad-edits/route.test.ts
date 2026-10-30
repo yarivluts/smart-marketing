@@ -264,4 +264,34 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/ad-edit
     expect(body.status).toBe('awaiting_approval');
     expect(body.guardrailViolations).toEqual([]);
   });
+
+  it('allows a project-scoped project_admin on their assigned project and denies them on a sibling project (KAN-147)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Ad Edits POST Project Admin Org');
+    const { project: siblingProject } = await createProject({ organizationId: organization.id, name: 'Sibling' });
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+
+    const adminEmail = uniqueEmail('projadmin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+    const payload = JSON.stringify({
+      targetId: target.id,
+      previousAdResourceName: target.ad_resource_names?.[0],
+      responsiveSearchAd: RESPONSIVE_SEARCH_AD,
+    });
+    const allowed = postRequest(organization.id, project.id, payload);
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(201);
+
+    const denied = postRequest(organization.id, siblingProject.id, payload);
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

@@ -94,6 +94,10 @@ describe('ActionAuditTrail Component', () => {
     expect(screen.getByText(t('columnTarget'))).toBeInTheDocument();
     expect(screen.getByText(t('columnExecutedAt'))).toBeInTheDocument();
     expect(screen.getByTestId('rollback-btn-act-1')).toHaveTextContent(t('rollbackButton'));
+    expect(screen.getByText(t('actionType_budget_change'))).toBeInTheDocument();
+    expect(screen.getByText(t('actionType_bid_strategy_change'))).toBeInTheDocument();
+    expect(screen.getByText(t('actionType_status_toggle'))).toBeInTheDocument();
+    expect(screen.queryByText(/budget change/i)).not.toBeInTheDocument();
   });
 
   it('distinguishes an empty log from an empty filter result, in English', () => {

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidAutomationActionError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { ensureAutomationTargetSeeded } from '@/lib/orgs/mutations';
 import { listAutomationTargetStatesForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -12,7 +12,7 @@ interface RouteParams {
 /** Every simulated automation target seeded for a project (KAN-71's buildable-today stand-in for "the ad platform's own campaign list" — see `AutomationTargetStateModel`'s own doc comment). */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }
@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Seeds (idempotent get-or-create) a new simulated target — the demo/test-data step a real KAN-72/73 connector would replace by discovering the org's actual live campaigns. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'automation.execute');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'automation.execute');
   if (error) {
     return error;
   }
