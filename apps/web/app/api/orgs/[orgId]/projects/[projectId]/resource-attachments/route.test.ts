@@ -214,4 +214,47 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/resource-attachments', () 
       ],
     });
   });
+
+  it('allows a project-scoped project_admin to request an attachment on their own project and denies them on a sibling project (KAN-143)', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('attach-proj-admin-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Admin Attach Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Project A' });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Project B' });
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Cred',
+      provider: 'generic',
+      availableScopes: ['scope-1'],
+      createdByUserId: owner.id,
+    });
+
+    const adminEmail = uniqueEmail('attach-proj-admin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = attachmentsRequest(organization.id, project.id, {
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      scopeSelection: ['scope-1'],
+    });
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(201);
+
+    const denied = attachmentsRequest(organization.id, otherProject.id, {
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      scopeSelection: ['scope-1'],
+    });
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

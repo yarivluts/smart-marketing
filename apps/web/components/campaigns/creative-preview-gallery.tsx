@@ -47,6 +47,9 @@ export function CreativePreviewGallery({
    * gallery whose entire purpose is showing what is genuinely running on the ad platforms.
    * A campaign with no creatives now contributes no cards, and the empty state below says so.
    */
+  // Only offer "Sample data" when simulated campaigns exist.
+  const showSimulated = platformFilter === 'simulated' || items.some((item) => item.platform === 'simulated');
+
   const creatives = useMemo(() => {
     const list: CreativeCardItem[] = [];
 
@@ -160,17 +163,19 @@ export function CreativePreviewGallery({
           >
             {t('filterGoogleAds')}
           </button>
-          <button
-            type="button"
-            onClick={() => setPlatformFilter('simulated')}
-            className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-              platformFilter === 'simulated'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-          >
-            {t('filterSimulated')}
-          </button>
+          {showSimulated && (
+            <button
+              type="button"
+              onClick={() => setPlatformFilter('simulated')}
+              className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                platformFilter === 'simulated'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {t('filterSimulated')}
+            </button>
+          )}
         </div>
 
         <div className="relative w-full sm:w-auto sm:min-w-[240px]">

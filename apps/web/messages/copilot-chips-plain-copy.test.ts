@@ -56,9 +56,11 @@ describe('the AI helper chips say ad, like the rest of the app', () => {
     ['he', he.CopilotEngine, he.CopilotChatPanel],
   ] as const;
 
-  it('no chip says campaign / קמפיין', () => {
-    expect(en.Copilot.chipNewCampaign).not.toMatch(/campaign/i);
-    expect(he.Copilot.chipNewCampaign).not.toContain('קמפיין');
+  it('no chip says campaign / קמפיין, and dead Copilot.chip* keys stay removed', () => {
+    for (const deadKey of ['chipTopAds', 'chipIncreaseBudget', 'chipNewCampaign', 'chipRebalance', 'chipOptimizeFunnel']) {
+      expect(en.Copilot).not.toHaveProperty(deadKey);
+      expect(he.Copilot).not.toHaveProperty(deadKey);
+    }
     for (const key of PANEL_KEYS) {
       expect(en.CopilotChatPanel[key], key).not.toMatch(/campaign/i);
       expect(he.CopilotChatPanel[key], key).not.toContain('קמפיין');

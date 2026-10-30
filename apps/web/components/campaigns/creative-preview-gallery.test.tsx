@@ -47,6 +47,16 @@ const mockItems: UnifiedCampaignItem[] = [
 ];
 
 describe('CreativePreviewGallery', () => {
+  it('hides the Sample data filter unless simulated campaigns exist', () => {
+    const { unmount } = renderWithIntl(<CreativePreviewGallery items={mockItems} />);
+    expect(screen.queryByRole('button', { name: 'Sample data' })).not.toBeInTheDocument();
+    unmount();
+    renderWithIntl(
+      <CreativePreviewGallery items={[...mockItems, { ...mockItems[0], id: 'c3', platform: 'simulated' }]} />,
+    );
+    expect(screen.getByRole('button', { name: 'Sample data' })).toBeInTheDocument();
+  });
+
   it('renders gallery with platform filter buttons and the real imported creative', () => {
     renderWithIntl(<CreativePreviewGallery items={mockItems} />);
 

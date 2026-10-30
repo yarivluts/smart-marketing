@@ -121,4 +121,29 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/cost-guardrails/quota', ()
     const quota = await getProjectCostQuota(organization.id, project.id);
     expect(quota.dailyQueryLimit).toBe(25);
   });
+
+  it('allows a project-scoped project_admin on their own project and denies them on a sibling project (KAN-143)', async () => {
+    const { organization, project } = await setupOrgProject('Quota Route Project Admin Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other' });
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('quota-proj-owner') });
+    const adminEmail = uniqueEmail('quota-proj-admin');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: adminEmail,
+      role: 'project_admin',
+      projectId: project.id,
+      invitedByUserId: owner.id,
+    });
+    const adminSession = await sessionFor(unique('uid'), adminEmail);
+    const adminUser = await ensureUserForFirebaseSession({ firebaseUid: adminSession.uid, email: adminEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: adminUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(adminSession);
+
+    const allowed = quotaRequest(organization.id, project.id, { dailyQueryLimit: 40, labels: { env: 'prod' } });
+    expect((await POST(allowed.request, { params: allowed.params })).status).toBe(201);
+
+    const denied = quotaRequest(organization.id, otherProject.id, { dailyQueryLimit: 40, labels: { env: 'prod' } });
+    expect((await POST(denied.request, { params: denied.params })).status).toBe(403);
+  });
 });

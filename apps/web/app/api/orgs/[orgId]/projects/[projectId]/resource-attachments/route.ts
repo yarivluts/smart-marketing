@@ -7,7 +7,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { requestResourceAttachment } from '@/lib/orgs/mutations';
 import { listAttachmentsForProject } from '@/lib/orgs/queries';
-import { requireOrgMembership, requireOrgPermission } from '@/lib/orgs/access';
+import { requireOrgMembership, requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -48,7 +48,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'project.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'project.manage');
   if (error) {
     return error;
   }

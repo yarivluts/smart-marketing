@@ -17,6 +17,24 @@ Template for each entry:
 
 ---
 
+## 2026-10-30T17:15Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-143)
+
+- **Last completed:**
+  - **Security & Engineering (`KAN-143` — Project-scope RBAC reachability for `project.manage` routes):**
+    - Audited all project pages vs. API routes for KAN-135/136 project-scoped role reachability: `cost-guardrails/page.tsx`, `session-replay/page.tsx`, `settings/page.tsx`, and `resources/page.tsx` already checked `can(..., 'project.manage', { orgId, projectId })`, rendering their forms to a project-scoped `project_admin`, while the 5 backing mutation routes (`cost-guardrails/quota/route.ts`, `session-replay/route.ts`, `resource-attachments/route.ts`, `projects/[projectId]/route.ts`, `projects/[projectId]/archive/route.ts`) still called `requireOrgPermission(orgId, 'project.manage')` without `projectId` and returned `403 Forbidden` on submit.
+    - Swapped all 5 routes to `requireProjectPermission(orgId, projectId, 'project.manage')` and added emulator-backed `project_admin` allow + sibling-project `403` isolation tests to all 5 `route.test.ts` suites.
+  - **UI/UX & i18n (`AdsPerformanceDashboard`, `CreativePreviewGallery`, `en.json`, `he.json`):**
+    - Folded in the improvement from conflicted PR #890: hid the `"Sample data"` (`filterSimulated`) platform filter pill on `/campaigns` (`AdsPerformanceDashboard` and `CreativePreviewGallery`) when no simulated campaigns exist, saving mobile filter-bar space and removing a dead-end filter for newcomers, with unit tests in `ads-performance-dashboard.test.tsx` and `creative-preview-gallery.test.tsx`.
+    - Removed the 5 dead `Copilot.chip*` keys (`chipTopAds`, `chipIncreaseBudget`, `chipNewCampaign`, `chipRebalance`, `chipOptimizeFunnel`) from `apps/web/messages/{en,he}.json` and pinned their absence in `copilot-chips-plain-copy.test.ts`.
+  - **PM & Repo Hygiene:**
+    - Triaged and closed all 11 stale, conflicting open PRs (`#583`, `#680`, `#682`, `#684`, `#689`, `#719`, `#757`, `#831`, `#890`, `#896`, `#968`) that had accumulated since Oct 3–26 and were superseded on `main`.
+  - **Infra & CI Reliability:**
+    - Added a 1-time build retry in `apps/web/scripts/e2e-sharded.mjs` (cleaning `.next` on failure) to guard against transient `next/font/google` fetch hiccups during the e2e production build step.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review (`KAN-144`: wire `requireProjectPermission` through `plugins` / `campaign-ops` / `hooks` / `field-mappings`, and localize raw server `reasons` in admin forms).
+- **Waiting on human:** None.
+
 ## 2026-10-30 — Native mobile web app layout & RTL polish across all system pages (Stitch Pastel Pulse, KAN-319..KAN-377)
 
 - **Last completed:**
