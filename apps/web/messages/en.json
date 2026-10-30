@@ -3619,14 +3619,14 @@
         "stopped": "Draft stopped"
       },
       "activation": {
-        "title": "Activation",
-        "none": "Not activated yet",
-        "done": "Activated",
-        "pending": "Activation pending",
+        "title": "Turning on",
+        "none": "Not turned on yet",
+        "done": "Turned on",
+        "pending": "Waiting for you to turn it on",
         "stopped": "Stopped"
       },
       "live": {
-        "title": "Platform status",
+        "title": "On the ad platform",
         "enabled": "Delivering",
         "paused": "Paused",
         "removed": "Removed",
