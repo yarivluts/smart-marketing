@@ -85,7 +85,7 @@ describe('PlanningPanel', () => {
     const cards = screen.getAllByTestId('ad-studio-recommendation');
     expect(cards.map((card) => within(card).getByText(/Open on|Push the|Add captions/).textContent)).toEqual(['Open on the claim', 'Push the pricing page', 'Add captions']);
     expect(within(cards[0]).getByText('High priority')).toBeInTheDocument();
-    expect(within(cards[0]).getByText('Landing page')).toBeInTheDocument();
+    expect(within(cards[0]).getByText('Web page')).toBeInTheDocument();
     expect(within(cards[1]).getByText('No available evidence behind this - treat it as a suggestion.')).toBeInTheDocument();
     expect(within(cards[2]).getByText('Market knowledge')).toBeInTheDocument();
     const market = screen.getByTestId('ad-studio-market-notes');
