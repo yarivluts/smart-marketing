@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
 import { AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
@@ -33,8 +33,11 @@ const EMPTY: BriefFormValues = { name: '', objective: '', productDescription: ''
 const inputClass = 'rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring';
 
 /** Creates an ad from a brief, or edits the brief's details. The server validates; its reasons are shown as they come. */
-export function BriefForm({ orgId, projectId, briefId, initial = EMPTY, studioHref }: BriefFormProps): React.ReactElement {
+export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: BriefFormProps): React.ReactElement {
   const t = useTranslations('AdStudio');
+  const locale = useLocale();
+  // A new ad starts in the language the person is reading GrowthOS in, so nobody has to find that choice first.
+  initial ??= { ...EMPTY, language: locale === 'he' ? 'he' : 'en' };
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
   const [values, setValues] = React.useState<BriefFormValues>(initial);
