@@ -35,7 +35,7 @@ describe('InstallBuiltinPackSection', () => {
     renderSection();
     expect(screen.getByText('SaaS & Marketing Metrics')).toBeInTheDocument();
     expect(screen.getByText('Engagement Pack')).toBeInTheDocument();
-    expect(screen.getByText('Landing Page Performance')).toBeInTheDocument();
+    expect(screen.getByText('Web Page Performance')).toBeInTheDocument();
     expect(screen.getByText('Feedback & NPS')).toBeInTheDocument();
     expect(screen.getByText(/Ad spend, signups, what each new customer costs you/)).toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe('InstallBuiltinPackSection', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
     renderSection();
 
-    fireEvent.click(screen.getByText('Landing Page Performance'));
+    fireEvent.click(screen.getByText('Web Page Performance'));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/plugins/builtin', {
