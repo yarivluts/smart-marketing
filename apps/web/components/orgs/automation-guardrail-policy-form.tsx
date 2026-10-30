@@ -120,6 +120,7 @@ export function AutomationGuardrailPolicyForm({ orgId, projectId, policy }: Auto
           </label>
           <Input
             id="policy-allowed-hours-start"
+            aria-describedby="policy-allowed-hours-hint"
             type="number"
             min={0}
             max={23}
@@ -133,6 +134,7 @@ export function AutomationGuardrailPolicyForm({ orgId, projectId, policy }: Auto
           </label>
           <Input
             id="policy-allowed-hours-end"
+            aria-describedby="policy-allowed-hours-hint"
             type="number"
             min={0}
             max={23}
@@ -158,13 +160,20 @@ export function AutomationGuardrailPolicyForm({ orgId, projectId, policy }: Auto
           </label>
           <Input
             id="policy-max-guarded-metric-regression-pct"
+            aria-describedby="policy-max-guarded-metric-regression-hint"
             type="number"
             min={0}
             value={maxGuardedMetricRegressionPct}
             onChange={(event) => setMaxGuardedMetricRegressionPct(event.target.value)}
           />
+          <p id="policy-max-guarded-metric-regression-hint" className="text-xs text-muted-foreground">
+            {t('policyMaxGuardedMetricRegressionPctHint')}
+          </p>
         </div>
       </div>
+      <p id="policy-allowed-hours-hint" className="-mt-2 text-xs text-muted-foreground">
+        {t('policyAllowedHoursHint')}
+      </p>
 
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium" htmlFor="policy-protected-target-ids">
