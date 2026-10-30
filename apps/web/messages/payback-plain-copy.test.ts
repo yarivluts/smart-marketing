@@ -19,3 +19,17 @@ describe('Ad payback and report-pack copy uses plain words', () => {
     expect(ops.he.calibrationDescription).toContain('40');
   });
 });
+
+describe('Report packs and board rows say web page, not landing page', () => {
+  it('uses the same words as Growth Pilot', () => {
+    for (const l of ['en', 'he'] as const) {
+      const m = l === 'en' ? en : he;
+      const b = m.Boards as unknown as Record<string, string>;
+      const p = m.ProjectPlugins as unknown as Record<string, string>;
+      for (const t of [p.builtinPackLandingPageTitle, p.builtinPackLandingPageDescription, b.sessionReplayLinkTitle, (m.SessionReplaySettings as unknown as Record<string, string>).flowBoardRowSub]) {
+        expect(t).toBeTruthy();
+        expect(t).not.toMatch(/landing page|דף נחיתה|דף הנחיתה|עמוד נחיתה|דפי נחיתה/i);
+      }
+    }
+  });
+});

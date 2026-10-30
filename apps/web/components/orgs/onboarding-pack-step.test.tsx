@@ -58,11 +58,11 @@ describe('OnboardingPackStep', () => {
     );
   });
 
-  it('selecting the Landing Page Performance pack posts its packKey', async () => {
+  it('selecting the Web Page Performance pack posts its packKey', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'sources' } }) } as Response);
     renderStep();
 
-    fireEvent.click(screen.getByRole('button', { name: /Landing Page Performance/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Web Page Performance/ }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
