@@ -6190,5 +6190,15 @@
     "home": "Back to the start",
     "notFoundTitle": "We could not find that page",
     "notFoundBody": "The address may have a typo, or the page was moved. Go back to the start to continue."
+  },
+  "Roles": {
+    "platform_admin": "GrowthOS operator",
+    "org_owner": "Owner",
+    "org_admin": "Admin",
+    "project_admin": "Project admin",
+    "editor": "Editor",
+    "operator": "Operator",
+    "viewer": "Viewer (view only)",
+    "ingest_only": "Data sender only"
   }
 }

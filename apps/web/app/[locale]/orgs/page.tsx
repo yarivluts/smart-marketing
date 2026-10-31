@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { isRole } from '@growthos/shared';
 import { ArrowRight, Building2, FolderKanban, Mail, Plus, Users } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,8 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
   const active = memberships.filter((membership) => isActiveMembershipStatus(membership.status));
   const pending = memberships.filter((membership) => membership.status === 'invited');
   const t = await getTranslations('OrgsPage');
+  const tRoles = await getTranslations('Roles');
+  const roleName = (role: string): string => (isRole(role) ? tRoles(role) : role);
 
   // Real counts for each org the user is an active member of (any member can already see both on the org's own page).
   const stats = await Promise.all(
@@ -99,7 +102,7 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-base font-semibold text-foreground">{membership.organizationName}</p>
                     <Badge variant="secondary" size="sm" className="mt-1">
-                      {t('roleLabel', { role: membership.role })}
+                      {t('roleLabel', { role: roleName(membership.role) })}
                     </Badge>
                   </div>
                 </div>
@@ -155,7 +158,7 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
                   <InitialsAvatar name={membership.organizationName} seed={membership.organizationId} />
                   <div>
                     <p className="font-medium">{membership.organizationName}</p>
-                    <p className="text-sm text-muted-foreground">{t('roleLabel', { role: membership.role })}</p>
+                    <p className="text-sm text-muted-foreground">{t('roleLabel', { role: roleName(membership.role) })}</p>
                   </div>
                 </div>
                 <Button asChild size="sm">
