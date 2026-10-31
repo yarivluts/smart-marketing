@@ -125,6 +125,18 @@ describe('EmailPasswordForm Component', () => {
     expect(password.getAttribute('aria-describedby')).toBe('password-hint auth-error');
   });
 
+  it('weak-password error adds a next step instead of repeating the rule shown under the field', async () => {
+    mockSignUpWithEmail.mockRejectedValue({ code: 'auth/weak-password' });
+    renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    const password = screen.getByLabelText(enMessages.Auth.passwordLabel);
+    fireEvent.submit(password.closest('form') as HTMLFormElement);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain(enMessages.Auth.weakPasswordError);
+    expect(enMessages.Auth.weakPasswordError).not.toBe(enMessages.Auth.passwordHint);
+    expect(heMessages.Auth.weakPasswordError).not.toBe(heMessages.Auth.passwordHint);
+    expect(enMessages.Auth.weakPasswordError).not.toMatch(/at least 6/);
+  });
+
   it('keeps the email address left-to-right, also in the Hebrew (right-to-left) app', () => {
     renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'he' });
     expect(screen.getByLabelText(heMessages.Auth.emailLabel)).toHaveAttribute('dir', 'ltr');
