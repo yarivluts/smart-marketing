@@ -24,6 +24,6 @@ describe('Hebrew copy writes the product name cleanly and in one gender', () => 
 
   it('fixes the ad details source note', () => {
     const note = (he as { Campaigns: { stateSourceNote: string } }).Campaigns.stateSourceNote;
-    expect(note).toContain('הו GrowthOS'.slice(0, 0) + 'GrowthOS עשה');
+    expect(note).toContain('GrowthOS \u05e2\u05e9\u05d4');
   });
 });
