@@ -450,6 +450,9 @@
   "Members": {
     "roleAndStatus": "{role} ({status})",
     "statusLabel": "({status})",
+    "status_invited": "הוזמן – ממתין לאישור",
+    "status_active": "פעיל",
+    "status_suspended": "מושעה",
     "changeRoleLabel": "תפקיד",
     "changeRoleError": "לא ניתן היה לשנות את תפקיד החבר. נסו שוב.",
     "inviteEmailLabel": "אימייל",

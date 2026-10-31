@@ -450,6 +450,9 @@
   "Members": {
     "roleAndStatus": "{role} ({status})",
     "statusLabel": "({status})",
+    "status_invited": "Invited – waiting for them to accept",
+    "status_active": "Active",
+    "status_suspended": "Suspended",
     "changeRoleLabel": "Role",
     "changeRoleError": "Couldn't change this member's role. Please try again.",
     "inviteEmailLabel": "Email",
