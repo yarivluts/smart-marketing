@@ -5,7 +5,7 @@
   },
   "HomePage": {
     "metaTitle": "GrowthOS - enter your website, the AI does the marketing",
-    "metaDescription": "GrowthOS reads your website, works out what you sell and to whom, and prepares ads, landing pages and audiences for you. You only approve.",
+    "metaDescription": "GrowthOS reads your website, works out what you sell and to whom, and prepares ads, web pages and audiences for you. You only approve.",
     "navLabel": "Home page sections",
     "navHow": "How it works",
     "navFeatures": "What you get",
@@ -15,7 +15,7 @@
     "goToAccount": "Go to my account",
     "eyebrow": "Marketing for people who are not marketers",
     "title": "Enter your website. GrowthOS does the rest.",
-    "subtitle": "The AI reads your site, works out what you sell and to whom, and prepares ads, landing pages and audiences for you. You only approve.",
+    "subtitle": "The AI reads your site, works out what you sell and to whom, and prepares ads, web pages and audiences for you. You only approve.",
     "howItWorksLink": "How it works",
     "heroNote": "Nothing is published and no money is spent without your approval.",
     "illustrationSite": "your-site.com",
@@ -29,7 +29,7 @@
     "step1Title": "Enter your website",
     "step1Body": "The AI reads your site and suggests goals: your products, your services and the people most likely to buy them.",
     "step2Title": "The AI prepares everything",
-    "step2Body": "Ads with images and a video, a landing page, the right audience and search keywords - written in the language of your site.",
+    "step2Body": "Ads with images and a video, a web page, the right audience and search keywords - written in the language of your site.",
     "step3Title": "You approve",
     "step3Body": "You see everything before it goes anywhere: approve, ask for a change in your own words, or reject.",
     "featuresTitle": "What you get",
@@ -37,7 +37,7 @@
     "feature": {
       "pilot": {
         "title": "Growth Pilot",
-        "body": "From your website to goals, ads, landing pages and audiences waiting for your approval."
+        "body": "From your website to goals, ads, web pages and audiences waiting for your approval."
       },
       "studio": {
         "title": "AI Ad Studio",
@@ -71,7 +71,7 @@
     "faq": {
       "knowledge": {
         "q": "Do I need to know marketing?",
-        "a": "No. GrowthOS reads your site and does the professional work - goals, ads, landing pages, audiences and keywords. You decide: approve, ask for a change or reject."
+        "a": "No. GrowthOS reads your site and does the professional work - goals, ads, web pages, audiences and keywords. You decide: approve, ask for a change or reject."
       },
       "spend": {
         "q": "Will you spend money without asking me?",
