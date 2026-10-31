@@ -78,7 +78,10 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  if (!membership || !can(bindings, principal, 'automation.execute', { orgId, projectId })) {
+  const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
+  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
+  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
+  if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
   }
   const canApprove = can(bindings, principal, 'automation.approve', { orgId, projectId });
@@ -223,15 +226,17 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
             </span>
           ) : null}
         </div>
-        <div className="mt-4 flex flex-wrap items-start gap-2">
-          {target.campaignResourceName && target.campaignStatus === 'paused' ? (
-            <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
-          ) : null}
-          {target.campaignStatus === 'enabled' && executedActivation ? (
-            <PauseCampaignButton orgId={orgId} projectId={projectId} activationActionId={executedActivation.id} />
-          ) : null}
-          <RefreshCampaignStateButton orgId={orgId} projectId={projectId} targetId={target.id} />
-        </div>
+        {canExecute ? (
+          <div className="mt-4 flex flex-wrap items-start gap-2">
+            {target.campaignResourceName && target.campaignStatus === 'paused' ? (
+              <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
+            ) : null}
+            {target.campaignStatus === 'enabled' && executedActivation ? (
+              <PauseCampaignButton orgId={orgId} projectId={projectId} activationActionId={executedActivation.id} />
+            ) : null}
+            <RefreshCampaignStateButton orgId={orgId} projectId={projectId} targetId={target.id} />
+          </div>
+        ) : null}
       </PageHero>
 
       <ChartCard title={t('lifecycleTitle')} description={t('lifecycleDescription')} icon={GitBranch}>
@@ -260,7 +265,7 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
                 </li>
               ))}
             </ul>
-            <AutomationActionList orgId={orgId} projectId={projectId} actions={actionViews} canApprove={canApprove} />
+            <AutomationActionList orgId={orgId} projectId={projectId} actions={actionViews} canApprove={canApprove} canExecute={canExecute} />
           </div>
         )}
       </ChartCard>

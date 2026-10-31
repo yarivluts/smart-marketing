@@ -81,5 +81,8 @@ describe('ExecutiveBlendedReport (Reporting Module)', () => {
     expect(screen.getByRole('button', { name: 'הצגת מודעות פייסבוק ואינסטגרם בלבד' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'הצגת מודעות גוגל בלבד' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Filter/ })).not.toBeInTheDocument();
+    expect(screen.getByText('60% מהסך הכולל')).toBeInTheDocument();
+    expect(screen.getByText('40% מהסך הכולל')).toBeInTheDocument();
+    expect(screen.queryByText(/% of total/)).not.toBeInTheDocument();
   });
 });

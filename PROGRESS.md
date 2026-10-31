@@ -17,6 +17,22 @@ Template for each entry:
 
 ---
 
+## 2026-10-31T09:10Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-151)
+
+- **Last completed:**
+  - **Security & RBAC (`KAN-151` — `CampaignsPage`, `CampaignDetailPage`, `AutomationActionList`, `AdsPerformanceDashboard`, and `AdsPerformanceCharts` permission alignment):**
+    - `CampaignsPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/campaigns/page.tsx`) admits callers holding `automation.execute`, `dashboards.read`, or `dashboards.write` and renders `CampaignListTable` and `AdsPerformanceCharts`, both of which link every campaign to `/orgs/[orgId]/projects/[projectId]/campaigns/[targetId]`. However, `CampaignDetailPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/campaigns/[targetId]/page.tsx`) previously checked only `automation.execute`, causing `viewer` (`dashboards.read`) and `editor` (`dashboards.write`) users clicking any campaign from `/campaigns` to hit `404 Not Found`.
+    - Aligned `CampaignDetailPage` read access with `CampaignsPage` (`canExecute || canReadDashboards || canWriteDashboards`), gated `AutomationActivateCampaignButton`, `PauseCampaignButton`, and `RefreshCampaignStateButton` on `canExecute`, and added `canExecute?: boolean` to `AutomationActionList` (`apps/web/components/orgs/automation-action-list.tsx`) to gate `executeButton`, `VerifyControls`, and `rollbackButton`.
+    - Added `canManagePlugins?: boolean` (`plugin.install`) to `AdsPerformanceDashboard` and `AdsPerformanceCharts` (`apps/web/components/campaigns/ads-performance-charts.tsx`) and wired it from `CampaignsPage` so `viewer`, `editor`, and `operator` users without `plugin.install` do not see a dead `404` link to `/orgs/[orgId]/projects/[projectId]/plugins` (`connectAdSourceCta`).
+  - **UI/UX & i18n (`ExecutiveBlendedReport`, `en.json`, `he.json`):**
+    - Replaced hardcoded `{`${channel.percentage}% of total`}` in `ExecutiveBlendedReport` (`apps/web/components/reporting/executive-blended-report.tsx`) with localized `ExecutiveReport.shareOfTotal` in `en.json` and `he.json`.
+  - **Infra:**
+    - Built and deployed `7dda36e` (Iteration 8 / `KAN-150`) across `api-prod` (`api-prod-00145-vtf`), `api-preprod` (`api-preprod-00130-chc`), `web-prod` (`web-prod-00195-pbv`), and `web-preprod` (`web-preprod-00228-zd8`) with `0` drift.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-31T08:11Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-150)
 
 - **Last completed:**

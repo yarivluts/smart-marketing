@@ -36,6 +36,7 @@ export interface AdsPerformanceDashboardProps {
   rawTargets: AutomationTargetView[];
   connections: AutomationConnectionOption[];
   canExecute: boolean;
+  canManagePlugins?: boolean;
   spendOutcome?: CampaignSpendBreakdownOutcome | null;
   /** The trailing window the per-campaign spend figures cover, in days. */
   spendWindowDays?: number;
@@ -51,6 +52,7 @@ export function AdsPerformanceDashboard({
   rawTargets,
   connections,
   canExecute,
+  canManagePlugins = true,
   spendOutcome = null,
   spendWindowDays = 30,
   className = '',
@@ -208,6 +210,7 @@ export function AdsPerformanceDashboard({
         items={initialItems}
         spendOutcome={spendOutcome}
         spendWindowDays={spendWindowDays}
+        canManagePlugins={canManagePlugins}
       />
 
       {/* 4. Sub-Navigation Tabs */}
