@@ -22,4 +22,12 @@ describe('sidebar hints say what Ad Studio and the AI helper do', () => {
     expect(layout).toContain("hint: tShell('adsAndPerformanceHint')");
     expect(layout).toContain("hint: tShell('funnelAndGoalsHint')");
   });
+
+  it('the ad platform connections link explains itself and promises paused ads', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('connectionsHint')");
+    expect(en.AppShell.connectionsHint).toMatch(/paused/i);
+    expect(en.AppShell.connectionsHint).not.toMatch(/oauth|api|token|connector/i);
+    expect(he.AppShell.connectionsHint).toMatch(/[\u0590-\u05ff]/);
+  });
 });
