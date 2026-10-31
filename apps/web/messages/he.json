@@ -3670,6 +3670,7 @@
     "kpiDunningRecovery": "תשלומים שנכשלו ושוחזרו",
     "daysUnit": "ימים",
     "proactiveRecommendationHeading": "הרבה אנשים עוזבים בשלב הזה",
+    "proactiveRecommendationBody": "{percent}% מהאנשים שהגיעו ל-\"{from}\" לא המשיכו ל-\"{to}\".",
     "applyRecommendationButton": "להחיל את ההצעה",
     "recommendationApplied": "בוצע - ההצעה הוחלה",
     "paybackHeading": "כמה מהר לקוחות חדשים מחזירים את ההשקעה (40 הימים הראשונים)",

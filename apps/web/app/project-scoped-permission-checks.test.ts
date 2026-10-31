@@ -88,4 +88,16 @@ describe('permission checks under project routes', () => {
     expect(orgPage).toMatch(/canExecuteAutomation\s*\?\s*\[\{\s*href:\s*'automation'/);
     expect(orgPage).toMatch(/canManageProjectSettings\s*\?\s*\[\{\s*href:\s*'settings'/);
   });
+
+  it('FunnelPage passes distinct permissions for goals, onboarding, and ingest setup (KAN-150)', () => {
+    const funnelPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/funnel/page.tsx'),
+      'utf8',
+    );
+    expect(funnelPage).toContain("can(bindings, principal, 'project.manage', { orgId, projectId })");
+    expect(funnelPage).toContain("can(bindings, principal, 'ingest.write', { orgId, projectId })");
+    expect(funnelPage).toContain('canManageGoals={canWriteDashboards}');
+    expect(funnelPage).toContain('canManageOnboarding={canManageOnboarding}');
+    expect(funnelPage).toContain('canManageIngest={canManageIngest}');
+  });
 });

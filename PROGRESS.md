@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-10-31T08:11Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-150)
+
+- **Last completed:**
+  - **Security & RBAC (`KAN-150` — `FunnelPage` & `FunnelGoalsDashboard` permission separation for `dashboards.write`, `automation.execute`, `project.manage`, and `ingest.write`):**
+    - `FunnelPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/funnel/page.tsx`) admits callers holding `automation.execute`, `dashboards.read`, or `dashboards.write`, but previously only passed `canExecute={canExecute}` (`automation.execute`) to `FunnelGoalsDashboard` (`apps/web/components/orgs/funnel-goals-dashboard.tsx`). `FunnelGoalsDashboard` used `canExecute` not only for `apply-funnel-rec-btn` (`automation.execute`), but also for `create-new-goal-btn` and `GoalThermometerCard` inline target editing (`dashboards.write`), while rendering links to `/goals`, `/goals/[goalId]` (`dashboards.write`), `/onboarding` (`project.manage`), and `/install` (`ingest.write`) unconditionally — hiding goal management from `editor` users while showing `403` goal mutation controls and dead `404` links to `operator` and `viewer` users.
+    - Added `canManageGoals?: boolean`, `canManageOnboarding?: boolean`, and `canManageIngest?: boolean` to `FunnelGoalsDashboardProps` and wired them from `FunnelPage`, covered by unit tests in `funnel-goals-dashboard.test.tsx` and `project-scoped-permission-checks.test.ts`.
+  - **UI/UX & i18n (`FunnelGoalsDashboard`, `en.json`, `he.json`):**
+    - Localized the proactive drop-off recommendation body (`FunnelGoals.proactiveRecommendationBody` in `en.json` and `he.json`) so `/he/.../funnel` renders localized Hebrew copy instead of hardcoded English from `proactiveRecommendation.description`.
+  - **Infra:**
+    - Built and deployed `a5983be` (Iteration 7 / `KAN-149`) across `api-prod`, `api-preprod`, `web-prod`, and `web-preprod`.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-30T23:08Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-149)
 
 - **Last completed:**
