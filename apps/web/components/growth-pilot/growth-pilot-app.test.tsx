@@ -350,6 +350,12 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.approveHint.target);
   });
 
+  it('addresses the person, not a third party, in the Hebrew approve hint and the protected-ad note', () => {
+    expect(heMessages.GrowthPilot.waiting.approveHint.target).toContain('עבורכם');
+    expect(heMessages.GrowthPilot.waiting.approveHint.target).not.toContain('עבורו');
+    expect(JSON.stringify(heMessages)).not.toContain('כבויים עבורו');
+  });
+
   it('sends a change request to the AI and shows it while the AI rewrites', async () => {
     const fetchMock = stubFetch({ body: page({ proposals: [{ ...PROPOSAL, status: 'revising', changes: [{ text: 'Only Tel Aviv', on: 'x', outcome: 'pending', failureCode: null }] }] }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
