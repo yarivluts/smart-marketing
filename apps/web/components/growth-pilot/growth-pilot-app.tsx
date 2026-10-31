@@ -267,6 +267,7 @@ function ProposalCard({
   studio,
   landing,
   host,
+  canExecute = true,
 }: {
   proposal: GrowthProposalView;
   busy: boolean;
@@ -277,6 +278,8 @@ function ProposalCard({
   /** The landing page a `landing_page` proposal is about. */
   landing?: GrowthLandingPageView | null;
   host: string;
+  /** Whether the caller holds `automation.execute` — required by `/proposals/[proposalId]` to approve `publish` or `activate`. */
+  canExecute?: boolean;
 }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.waiting');
   const ta = useTranslations('GrowthPilot.ads');
@@ -432,7 +435,7 @@ function ProposalCard({
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {proposal.kind === 'publish' ? (
+          {proposal.kind === 'publish' && canExecute ? (
             <label className="flex flex-col gap-1 text-sm">
               <span className="flex items-center gap-2">
                 <span className="font-medium">{tp('budget')}</span>
@@ -453,10 +456,12 @@ function ProposalCard({
               </span>
             </label>
           ) : null}
-          <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-            {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : t('approve')}
-          </button>
+          {!platform || canExecute ? (
+            <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
+              {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : t('approve')}
+            </button>
+          ) : null}
           {confirmingOn && !busy ? (
             <button type="button" onClick={() => setConfirmingOn(false)} className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted" data-testid="growth-pilot-activate-cancel">
               {tp('confirmCancel')}
@@ -666,6 +671,8 @@ export interface GrowthPilotAppProps {
   initial: GrowthPilotPageData | null;
   /** Where connecting a Meta ad account starts (and returns here); null when the person cannot connect accounts. */
   metaConnectHref?: string | null;
+  /** Whether the caller holds `automation.execute` — required to approve `publish` and `activate` proposals. */
+  canExecute?: boolean;
 }
 
 /**
@@ -673,7 +680,7 @@ export interface GrowthPilotAppProps {
  * and proposes what to grow, and every proposal waits for the person - approve, reject, or ask the AI
  * for a change. The person can pause the pilot or ask for more targets at any time.
  */
-export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: GrowthPilotAppProps): React.ReactElement {
+export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, canExecute = true }: GrowthPilotAppProps): React.ReactElement {
   const t = useTranslations('GrowthPilot');
   const base = `/api/orgs/${orgId}/projects/${projectId}/growth-pilot`;
   const studio = { media: `/api/orgs/${orgId}/projects/${projectId}/ad-studio`, page: `/orgs/${orgId}/projects/${projectId}/ad-studio` };
@@ -841,6 +848,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
                     studio={studio}
                     host={host}
                     landing={proposal.landingPageId ? data.landingPages.find((page) => page.id === proposal.landingPageId) : null}
+                    canExecute={canExecute}
                   />
                 ))}
               </ul>

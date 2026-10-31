@@ -118,4 +118,22 @@ describe('permission checks under project routes', () => {
     expect(detailPage).toContain('!canExecute && !canReadDashboards && !canWriteDashboards');
     expect(detailPage).toContain('canExecute={canExecute}');
   });
+
+  it('ProjectRootPage and GrowthPilotPage route by role permission and gate platform publish/activate approvals on automation.execute (KAN-152)', () => {
+    const projectRootPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/page.tsx'),
+      'utf8',
+    );
+    expect(projectRootPage).toContain("can(bindings, principal, 'ingest.write', scope)");
+    expect(projectRootPage).toContain("can(bindings, principal, 'project.manage', scope)");
+    expect(projectRootPage).toContain('redirect(`${base}/install`)');
+    expect(projectRootPage).toContain('redirect(`${base}/resources`)');
+
+    const growthPilotPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/growth-pilot/page.tsx'),
+      'utf8',
+    );
+    expect(growthPilotPage).toContain("can(bindings, { type: 'user', id: user.id }, 'automation.execute', { orgId, projectId })");
+    expect(growthPilotPage).toContain('canExecute={canExecute}');
+  });
 });
