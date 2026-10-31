@@ -201,7 +201,7 @@ export default async function ProjectLayout({
     icon: 'KeyRound',
   };
   const setupItems: AppShellNavItem[] = [
-    ...(canManageProjects ? [{ href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' as const }] : []),
+    ...(canManageProjects ? [{ href: `${base}/settings`, label: tShell('settings'), hint: tShell('settingsHint'), icon: 'Settings' as const }] : []),
     connectionsItem,
   ];
 

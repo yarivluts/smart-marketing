@@ -124,6 +124,7 @@
     "developersLink": "Developers",
     "growthPilot": "Growth Pilot",
     "growthPilotHint": "Enter your website; we do the rest",
+    "settingsHint": "Project name, currency and time zone. Quick to set, and GrowthOS uses them for your reports.",
     "connectionsHint": "Link your Google or Meta ad account so GrowthOS can add your ads (paused until you say go)",
     "adsAndPerformanceHint": "See which ads work and what they cost",
     "funnelAndGoalsHint": "See where visitors drop off before they buy",
