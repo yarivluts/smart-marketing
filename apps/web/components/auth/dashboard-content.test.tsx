@@ -118,6 +118,32 @@ describe('DashboardContent', () => {
     expect(within(restricted).queryByRole('link', { name: /Data health/ })).not.toBeInTheDocument();
   });
 
+  it('uses openHref when a project card overrides the default /campaigns destination (KAN-155)', () => {
+    renderDashboard({
+      pendingInviteCount: 0,
+      orgs: [
+        {
+          orgId: 'org-1',
+          name: 'Acme',
+          role: 'ingest_only',
+          hiddenProjectCount: 0,
+          projects: [
+            {
+              orgId: 'org-1',
+              projectId: 'p-ingest',
+              name: 'Ingest Project',
+              vertical: null,
+              health: null,
+              openHref: '/orgs/org-1/projects/p-ingest',
+            },
+          ],
+        },
+      ],
+    });
+    const card = screen.getByTestId('project-card-p-ingest');
+    expect(within(card).getByRole('link', { name: /Open project/ })).toHaveAttribute('href', '/orgs/org-1/projects/p-ingest');
+  });
+
   it('shows the role in plain words, never the internal id', () => {
     renderDashboard(healthyOverview);
     expect(screen.getByText('Role: Owner')).toBeInTheDocument();
