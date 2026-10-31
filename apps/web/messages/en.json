@@ -4123,7 +4123,7 @@
     "fieldProductHint": "The product, its main benefit, and the people it is for",
     "fieldLandingPage": "Web page people should open (optional)",
     "landingPagePlaceholder": "https://",
-    "fieldFormat": "Frame",
+    "fieldFormat": "Video shape",
     "fieldLanguage": "Ad language",
     "languageEn": "English",
     "languageHe": "Hebrew",
