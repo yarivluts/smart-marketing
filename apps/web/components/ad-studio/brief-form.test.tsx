@@ -37,3 +37,14 @@ describe('BriefForm ad language default', () => {
     expect(screen.getByLabelText(heMessages.AdStudio.fieldLanguage)).toHaveValue('en');
   });
 });
+
+describe('BriefForm video shape label', () => {
+  it('names the shape field in plain words with its hint, in both languages', () => {
+    const { unmount } = renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'en' });
+    expect(enMessages.AdStudio.fieldFormat).toBe('Video shape');
+    expect(screen.getByLabelText(new RegExp(enMessages.AdStudio.fieldFormat))).toHaveAccessibleDescription(enMessages.AdStudio.formatVerticalHint);
+    unmount();
+    renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'he' });
+    expect(screen.getByLabelText(new RegExp(heMessages.AdStudio.fieldFormat))).toBeInTheDocument();
+  });
+});
