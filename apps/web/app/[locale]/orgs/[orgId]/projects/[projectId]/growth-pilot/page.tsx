@@ -26,10 +26,11 @@ export default async function GrowthPilotPage({ params }: PageProps): Promise<Re
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ai.use', { orgId, projectId })) notFound();
   const initial = await loadGrowthPilotPage(orgId, projectId);
   const canConnect = can(bindings, { type: 'user', id: user.id }, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
+  const canExecute = can(bindings, { type: 'user', id: user.id }, 'automation.execute', { orgId, projectId });
   const connectHref = canConnect ? metaConnectHref({ orgId, projectId, locale, returnTo: `/${locale}/orgs/${orgId}/projects/${projectId}/growth-pilot` }) : null;
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
-      <GrowthPilotApp orgId={orgId} projectId={projectId} initial={initial} metaConnectHref={connectHref} />
+      <GrowthPilotApp orgId={orgId} projectId={projectId} initial={initial} metaConnectHref={connectHref} canExecute={canExecute} />
     </div>
   );
 }

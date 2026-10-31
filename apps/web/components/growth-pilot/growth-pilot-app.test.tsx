@@ -712,6 +712,28 @@ describe('GrowthPilotApp', () => {
       expect(line).toHaveTextContent('Ready to publish once your Facebook and Instagram (Meta) ad account is connected.');
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
     });
+
+    it('hides publish and activate approval controls when canExecute is false while keeping reject and non-platform approvals available (KAN-152)', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const publishView = renderWithIntl(
+        <GrowthPilotApp orgId="o" projectId="p" canExecute={false} initial={page({ proposals: [PUBLISH, PROPOSAL], targets: [TARGET] })} />,
+        { locale: 'en' },
+      );
+      const [publishCard, targetCard] = screen.getAllByTestId('growth-pilot-proposal');
+      expect(within(publishCard).queryByTestId('growth-pilot-budget')).toBeNull();
+      expect(within(publishCard).queryByTestId('growth-pilot-approve')).toBeNull();
+      expect(within(publishCard).getByTestId('growth-pilot-reject')).toBeInTheDocument();
+      expect(within(targetCard).getByTestId('growth-pilot-approve')).toBeInTheDocument();
+      publishView.unmount();
+
+      renderWithIntl(
+        <GrowthPilotApp orgId="o" projectId="p" canExecute={false} initial={page({ proposals: [ACTIVATE], targets: [{ ...TARGET, publishStatus: 'published' }] })} />,
+        { locale: 'en' },
+      );
+      const activateCard = screen.getByTestId('growth-pilot-proposal');
+      expect(within(activateCard).queryByTestId('growth-pilot-approve')).toBeNull();
+      expect(within(activateCard).getByTestId('growth-pilot-reject')).toBeInTheDocument();
+    });
   });
 
   it('shows each published target its own clicks and spend from Meta', async () => {

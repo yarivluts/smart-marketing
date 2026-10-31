@@ -17,6 +17,19 @@ Template for each entry:
 
 ---
 
+## 2026-10-31T10:15Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-152)
+
+- **Last completed:**
+  - **Security, RBAC & UI/UX (`KAN-152` — `GrowthPilotPage`, `GrowthPilotApp`, and `ProjectRootPage` permission alignment):**
+    - `GrowthPilotPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/growth-pilot/page.tsx`) admits any active member holding `ai.use` (including `editor`), while `POST /api/orgs/[orgId]/projects/[projectId]/growth-pilot/proposals/[proposalId]` additionally requires `automation.execute` when approving `publish` or `activate` proposals. Added `canExecute?: boolean` (`automation.execute`) to `GrowthPilotAppProps` and `ProposalCard` (`apps/web/components/growth-pilot/growth-pilot-app.tsx`) and wired it from `GrowthPilotPage` so `growth-pilot-budget` and `growth-pilot-approve` are only shown for `publish`/`activate` proposals when the caller holds `automation.execute` (while `growth-pilot-reject` and non-platform proposal approvals remain available).
+    - `ProjectRootPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/page.tsx`) previously redirected every authenticated member without `ai.use` unconditionally to `${base}/campaigns`, sending `ingest_only` (`ingest.write`) and settings-only (`project.manage`) members to a `404 Not Found` page. Updated `ProjectRootPage` to route to the first workspace screen the caller is permitted to open (`ai.use` -> `/growth-pilot`, `automation.execute || dashboards.read || dashboards.write` -> `/campaigns`, `ingest.write` -> `/install`, `project.manage` -> `/settings`, fallback -> `/resources`), covered by unit tests in `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/page.test.tsx`, `apps/web/components/growth-pilot/growth-pilot-app.test.tsx`, and `apps/web/app/project-scoped-permission-checks.test.ts`.
+  - **Infra:**
+    - Built and deployed `e393077` (Iteration 9 / `KAN-151`) across `api-prod` (`api-prod-00146-w42`), `api-preprod` (`api-preprod-00131-mpc`), `web-prod` (`web-prod-00196-gst`), and `web-preprod` (`web-preprod-00229-6f5`) with `0` drift.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-31T09:10Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-151)
 
 - **Last completed:**
