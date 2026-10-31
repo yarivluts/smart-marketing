@@ -220,7 +220,7 @@ export default async function ProjectLayout({
 
   // A newcomer sees the essentials and the setup links; every other tool folds under "More tools"
   // (opened by itself when the current page is one of them).
-  const more = { id: 'more', label: tShell('moreTools') };
+  const more = { id: 'more', label: tShell('moreTools'), hint: tShell('moreToolsHint') };
   const sections: AppShellNavSection[] = [
     { items: primaryModuleItems },
     { items: setupItems },

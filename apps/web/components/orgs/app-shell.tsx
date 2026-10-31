@@ -120,7 +120,7 @@ export interface AppShellNavSection {
    * Sections that share a group fold together under one toggle, closed by default, so a newcomer
    * sees only the essentials. The group opens by itself when the current page is inside it.
    */
-  group?: { id: string; label: string };
+  group?: { id: string; label: string; hint?: string };
 }
 
 export interface AppShellProps {
@@ -305,6 +305,7 @@ function NavGroup({
       </button>
       {open ? (
         <div id={panelId} className="flex flex-col gap-pp-md">
+          {group.hint ? <p className="px-pp-md text-pp-label-sm text-pp-outline">{group.hint}</p> : null}
           {sections.map((section, index) => (
             <div key={section.heading ?? index} className="flex flex-col gap-1">
               {section.heading ? <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">{section.heading}</span> : null}

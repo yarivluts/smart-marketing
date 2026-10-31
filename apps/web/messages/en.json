@@ -114,6 +114,7 @@
     "automationSection": "Automation",
     "settingsSection": "Settings",
     "moreTools": "More tools",
+    "moreToolsHint": "Extra tools for later. You don't need any of them to get started.",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "userMenu": "Account menu",
