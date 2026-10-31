@@ -93,6 +93,7 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'metrics.write', { orgId, projectId })) {
     notFound();
   }
+  const canWriteSchemas = can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId });
 
   const [projects, metricDefs, schemaDefs] = await Promise.all([
     listOrgProjects(orgId),
@@ -122,7 +123,13 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
 
   const lineageNode = (node: LineageNode): FlowNodeSpec => {
     if (node.type === 'schema') {
-      return { id: node.id, label: node.name, sublabel: t('lineageSchemaSub'), status: 'ok', href: `/orgs/${orgId}/projects/${projectId}/schema-defs` };
+      return {
+        id: node.id,
+        label: node.name,
+        sublabel: t('lineageSchemaSub'),
+        status: 'ok',
+        href: canWriteSchemas ? `/orgs/${orgId}/projects/${projectId}/schema-defs` : undefined,
+      };
     }
     if (node.type === 'table') {
       return { id: node.id, label: node.name, sublabel: t('lineageTableSub'), status: 'idle' };

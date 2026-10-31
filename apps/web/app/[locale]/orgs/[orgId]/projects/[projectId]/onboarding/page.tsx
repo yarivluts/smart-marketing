@@ -150,6 +150,8 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
   // Growth Pilot needs `ai.use`; without it the shortcut would lead to a page the person cannot open.
   const pilotShortcut = can(bindings, { type: 'user', id: user.id }, 'ai.use', { orgId, projectId }) ? <OnboardingPilotShortcut orgId={orgId} projectId={projectId} /> : null;
+  const orgScope = { orgId };
+  const canManageOrgPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', orgScope);
   const hero = (
     <PageHero icon={Route} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('introBody')}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -210,7 +212,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
       {view.step === 'sources' ? (
         <StepCard>
-          <SourcesStep orgId={orgId} projectId={projectId} />
+          <SourcesStep orgId={orgId} projectId={projectId} canManageOrgPlugins={canManageOrgPlugins} />
         </StepCard>
       ) : null}
 
@@ -256,7 +258,15 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
  * first-time user reads the plugin dead end as *the* path and the API-key
  * form as an unlabeled afterthought, when it's the faster of the two.
  */
-async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: string }): Promise<React.ReactElement> {
+async function SourcesStep({
+  orgId,
+  projectId,
+  canManageOrgPlugins,
+}: {
+  orgId: string;
+  projectId: string;
+  canManageOrgPlugins: boolean;
+}): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
 
   const [manifests, installs, environments, apiKeys, batches] = await Promise.all([
@@ -307,9 +317,11 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
           ) : installableSourceManifests.length === 0 ? (
             <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-input p-3">
               <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
-              </Button>
+              {canManageOrgPlugins ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
+                </Button>
+              ) : null}
             </div>
           ) : (
             <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableSourceManifests} />

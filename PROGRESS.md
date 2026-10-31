@@ -17,6 +17,20 @@ Template for each entry:
 
 ---
 
+## 2026-10-31T12:12Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-154)
+
+- **Last completed:**
+  - **Security & RBAC (`KAN-154` — Cross-page destination permission gating across `CustomersPage`, `IngestHealthPage`, `MetricRegistryPage`, `ProjectFieldMappingsPage`, and `OnboardingPage`):**
+    - `CustomersPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/customers/page.tsx`, gated on `ingest.write`), `MetricRegistryPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/metric-defs/page.tsx`, gated on `metrics.write`), and `ProjectFieldMappingsPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/field-mappings/page.tsx`, gated on `ingest.write`) previously rendered links and flow-diagram node `href`s to `/orgs/[orgId]/projects/[projectId]/schema-defs` unconditionally, even though `SchemaRegistryPage` requires `schema.write` (withheld from both `ingest_only` and `editor`). Gated all three links on `can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })`.
+    - `IngestHealthPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ingest-health/page.tsx`, gated on `ingest.write`) previously set `href: '/orgs/${orgId}/projects/${projectId}/boards'` unconditionally on the `reports` flow node, sending `ingest_only` callers without `dashboards.read` or `dashboards.write` to a `404 Not Found` page. Gated `href` on `canViewBoards` (`dashboards.read || dashboards.write`).
+    - `OnboardingPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/onboarding/page.tsx`, gated on `project.manage` at `{ orgId, projectId }`, admitting project-scoped `project_admin`) previously rendered `sourceStepNoManifestsLink` (`/orgs/[orgId]/plugins`) unconditionally when no source manifests were registered, even though `/orgs/[orgId]/plugins` requires org-scoped `plugin.install` (`{ orgId }`). Gated `sourceStepNoManifestsLink` on `can(bindings, { type: 'user', id: user.id }, 'plugin.install', orgScope)` and added permanent regression assertions in `apps/web/app/project-scoped-permission-checks.test.ts`.
+  - **Infra:**
+    - Built and deployed `c0828e6` (Iteration 11 / `KAN-153`) across `api-prod` (`api-prod-00148-dqf`), `api-preprod` (`api-preprod-00133-qz6`), `web-prod` (`web-prod-00198-9t9`), and `web-preprod` (`web-preprod-00231-5ch`) with `0` drift.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-31T11:12Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-153)
 
 - **Last completed:**
