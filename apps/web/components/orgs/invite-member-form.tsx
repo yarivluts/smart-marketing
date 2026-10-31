@@ -31,6 +31,7 @@ export interface InviteMemberFormProps {
 
 export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFormProps): React.ReactElement {
   const t = useTranslations('Members');
+  const tRoles = useTranslations('Roles');
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<InviteRole>('viewer');
@@ -92,7 +93,7 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
         >
           {ALL_INVITE_ROLES.map((value) => (
             <option key={value} value={value}>
-              {value}
+              {tRoles(value)}
             </option>
           ))}
         </select>
