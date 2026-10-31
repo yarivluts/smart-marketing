@@ -222,7 +222,7 @@
     "accountExistsOtherMethodError": "This email already has a GrowthOS account made another way. Sign in with your email and password instead.",
     "accountDisabledError": "This account has been switched off. Contact GrowthOS support and we will help you.",
     "tokenSignInPending": "Signing you in...",
-    "invalidOrExpiredTokenError": "This sign-in link is invalid or has expired.",
+    "invalidOrExpiredTokenError": "This sign-in link has expired or was already used. Go back to sign in, or ask whoever sent it to you for a new link.",
     "backToSignIn": "Back to sign in",
     "brandTagline": "Marketing that runs itself",
     "brandEyebrow": "No marketing experience needed",
