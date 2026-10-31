@@ -17,6 +17,22 @@ Template for each entry:
 
 ---
 
+## 2026-10-31T13:18Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-155)
+
+- **Last completed:**
+  - **Security, RBAC & UI/UX (`KAN-155` — Cross-page destination permission gating in `BillingOpsFeedPage`, `SessionReplaySettingsPage`, `SchemaRegistryPage`, and `ProjectHealthCard` + localized Team Mix role labels in `OrgDetailPage`):**
+    - `BillingOpsFeedPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/billing-ops-feed/page.tsx`, gated on `ingest.write`) previously rendered `connectAction` (`/orgs/[orgId]/projects/[projectId]/plugins`) unconditionally in its empty state, sending `ingest_only` callers without `plugin.install` to a `404 Not Found` page. Gated `connectAction` on `can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId })`.
+    - `SessionReplaySettingsPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/session-replay/page.tsx`, gated on `project.manage`) and `SchemaRegistryPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/schema-defs/page.tsx`, gated on `schema.write`) previously rendered cross-page links to `/boards` (`dashboards.read || dashboards.write`), `/record-feed` (`ingest.write`), and `/ingest-health` (`ingest.write`) unconditionally. Gated those links on `canViewBoards` and `canManageIngest`.
+    - `loadDashboardProject` (`apps/web/lib/orgs/dashboard-overview.ts`) and `ProjectHealthCard` (`apps/web/components/orgs/project-health-card.tsx`) previously linked `cardOpenProject` unconditionally to `/orgs/[orgId]/projects/[projectId]/campaigns`, causing `ingest_only` and non-cockpit roles without `automation.execute || dashboards.read || dashboards.write` to hit a `404 Not Found` page. Added `openHref?: string` to `DashboardProject` (defaulting to `/orgs/${orgId}/projects/${project.id}` when the caller cannot open `/campaigns`, so `ProjectRootPage` routes them to their first permitted screen).
+    - `OrgDetailPage` (`apps/web/app/[locale]/orgs/[orgId]/page.tsx`) previously rendered raw role IDs (`org_owner`, `org_admin`, `project_admin`, `viewer`) in the Team Mix `DonutChart` (`data={roleMix.map((entry) => ({ label: entry.key, ... }))}`). Updated `OrgDetailPage` to translate `entry.key` through the `Roles` namespace (`isRole(entry.key) ? tRoles(entry.key) : entry.key`).
+    - Added unit tests and regression guards in `apps/web/app/project-scoped-permission-checks.test.ts` and `apps/web/components/auth/dashboard-content.test.tsx`.
+  - **Infra:**
+    - Built and deployed `c307c8e` (Iteration 12 / `KAN-154`) across `api-prod` (`api-prod-00149-zw2`), `api-preprod` (`api-preprod-00134-t7q`), `web-prod` (`web-prod-00199-wv9`), and `web-preprod` with `0` drift.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-31T12:12Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-154)
 
 - **Last completed:**

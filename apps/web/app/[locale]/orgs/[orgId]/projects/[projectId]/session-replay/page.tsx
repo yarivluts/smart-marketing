@@ -49,6 +49,9 @@ export default async function SessionReplaySettingsPage({ params }: PageProps): 
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId, projectId })) {
     notFound();
   }
+  const canViewBoards =
+    can(bindings, { type: 'user', id: user.id }, 'dashboards.read', { orgId, projectId }) ||
+    can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId });
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -75,7 +78,13 @@ export default async function SessionReplaySettingsPage({ params }: PageProps): 
             label={t('flowTitle')}
             height={220}
             nodes={[
-              { id: 'row', label: t('flowBoardRow'), sublabel: t('flowBoardRowSub'), status: 'ok', href: `/orgs/${orgId}/projects/${projectId}/boards` },
+              {
+                id: 'row',
+                label: t('flowBoardRow'),
+                sublabel: t('flowBoardRowSub'),
+                status: 'ok',
+                href: canViewBoards ? `/orgs/${orgId}/projects/${projectId}/boards` : undefined,
+              },
               { id: 'template', label: t('flowTemplate'), sublabel: t('flowTemplateSub'), status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle' },
               {
                 id: 'tool',

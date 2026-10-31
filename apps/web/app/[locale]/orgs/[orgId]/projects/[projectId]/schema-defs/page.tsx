@@ -126,6 +126,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })) {
     notFound();
   }
+  const canManageIngest = can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId });
 
   // KAN-196: tracking alerts, event volume, setup health and the rejected-record tally are scoped to
   // the environment picked in the project shell (prod by default). Schema definitions themselves are
@@ -215,13 +216,15 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
         title={t('title', { projectName: project.name })}
         description={t('heroDescription')}
         actions={
-          <Link
-            href={`/orgs/${orgId}/projects/${projectId}/record-feed`}
-            className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
-          >
-            <Rows3 className="h-4 w-4" aria-hidden="true" />
-            {t('heroRecordFeedLink')}
-          </Link>
+          canManageIngest ? (
+            <Link
+              href={`/orgs/${orgId}/projects/${projectId}/record-feed`}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-background px-3 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted"
+            >
+              <Rows3 className="h-4 w-4" aria-hidden="true" />
+              {t('heroRecordFeedLink')}
+            </Link>
+          ) : undefined
         }
       >
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -299,9 +302,11 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
         description={t('coverageDescription', { environment: selectedEnvironmentLabel })}
         icon={ListChecks}
         actions={
-          <Link href={`/orgs/${orgId}/projects/${projectId}/ingest-health`} className="text-xs font-medium text-primary underline-offset-4 hover:underline">
-            {t('coverageIngestHealthLink')}
-          </Link>
+          canManageIngest ? (
+            <Link href={`/orgs/${orgId}/projects/${projectId}/ingest-health`} className="text-xs font-medium text-primary underline-offset-4 hover:underline">
+              {t('coverageIngestHealthLink')}
+            </Link>
+          ) : undefined
         }
         footer={
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -395,10 +400,15 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
                       </span>
                       {rejectedCount > 0 ? (
                         <span className="text-xs text-amber-600 dark:text-amber-400">
-                          {t('eventRejectedCount', { count: rejectedCount })}{' '}
-                          <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/ingest-health`}>
-                            {t('eventRejectedLink')}
-                          </Link>
+                          {t('eventRejectedCount', { count: rejectedCount })}
+                          {canManageIngest ? (
+                            <>
+                              {' '}
+                              <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/ingest-health`}>
+                                {t('eventRejectedLink')}
+                              </Link>
+                            </>
+                          ) : null}
                         </span>
                       ) : null}
                     </div>

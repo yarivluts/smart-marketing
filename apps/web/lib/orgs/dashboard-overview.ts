@@ -16,6 +16,8 @@ export interface DashboardProject {
   onboardingStep?: OnboardingStep | null;
   /** True when this project's health read failed, so the card says so instead of showing zeros. */
   healthUnavailable?: boolean;
+  /** Override for the card's primary "Open project" link when the caller lacks permission to view `/campaigns`. */
+  openHref?: string;
 }
 
 export interface DashboardOrg {
@@ -88,7 +90,19 @@ export async function loadDashboardProject(input: {
   const scope = { orgId, projectId: project.id };
   const canViewHealth = can([...input.bindings], principal, 'ingest.write', scope);
   const canManage = can([...input.bindings], principal, 'project.manage', scope);
-  const base: DashboardProject = { orgId, projectId: project.id, name: project.name, vertical: project.vertical ?? null, health: null };
+  const canOpenCampaigns =
+    can([...input.bindings], principal, 'automation.execute', scope) ||
+    can([...input.bindings], principal, 'dashboards.read', scope) ||
+    can([...input.bindings], principal, 'dashboards.write', scope);
+  const openHref = canOpenCampaigns ? undefined : `/orgs/${orgId}/projects/${project.id}`;
+  const base: DashboardProject = {
+    orgId,
+    projectId: project.id,
+    name: project.name,
+    vertical: project.vertical ?? null,
+    health: null,
+    ...(openHref ? { openHref } : {}),
+  };
   try {
     const [report, batches, onboarding] = await Promise.all([
       canViewHealth ? evaluateProjectSetupHealth(orgId, project.id) : Promise.resolve(null),
