@@ -222,7 +222,7 @@
     "accountExistsOtherMethodError": "לכתובת האימייל הזו כבר יש חשבון ב-GrowthOS שנוצר בדרך אחרת. היכנסו עם האימייל והסיסמה.",
     "accountDisabledError": "החשבון הזה הושבת. פנו לתמיכה של GrowthOS ונעזור לכם.",
     "tokenSignInPending": "מחברים אתכם...",
-    "invalidOrExpiredTokenError": "קישור ההתחברות הזה לא תקף או פג תוקף.",
+    "invalidOrExpiredTokenError": "קישור ההתחברות הזה פג תוקף או שכבר נעשה בו שימוש. חזרו להתחברות, או בקשו מי ששלח לכם אותו קישור חדש.",
     "backToSignIn": "חזרה להתחברות",
     "brandTagline": "שיווק שרץ לבד",
     "brandEyebrow": "לא צריך ניסיון בשיווק",

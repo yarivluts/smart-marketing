@@ -73,7 +73,7 @@ describe('TokenSignIn', () => {
 
     renderPage();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('This sign-in link is invalid or has expired.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('This sign-in link has expired or was already used.');
     expect(push).not.toHaveBeenCalled();
   });
 
