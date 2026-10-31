@@ -4035,7 +4035,7 @@
     "newAdDescription": "Describe the ad. The AI writes a script from it, and you can edit every scene.",
     "adsListTitle": "Your ads",
     "adsListEmptyTitle": "No ads yet",
-    "adsListEmpty": "Create the first one with the form.",
+    "adsListEmpty": "Nothing here yet. The quickest start: type your website address in the \"New ad\" box and press the button. GrowthOS reads your site and writes the ad for you.",
     "status": {
       "draft": "Draft",
       "planned": "Planned",
