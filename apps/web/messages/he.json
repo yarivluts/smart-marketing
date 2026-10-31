@@ -6190,5 +6190,15 @@
     "home": "חזרה להתחלה",
     "notFoundTitle": "לא מצאנו את הדף הזה",
     "notFoundBody": "ייתכן שיש טעות בכתובת או שהדף הועבר. חזרו להתחלה כדי להמשיך."
+  },
+  "Roles": {
+    "platform_admin": "מפעיל GrowthOS",
+    "org_owner": "בעלים",
+    "org_admin": "מנהל",
+    "project_admin": "מנהל פרויקט",
+    "editor": "עורך",
+    "operator": "מפעיל",
+    "viewer": "צופה (צפייה בלבד)",
+    "ingest_only": "שולח נתונים בלבד"
   }
 }
