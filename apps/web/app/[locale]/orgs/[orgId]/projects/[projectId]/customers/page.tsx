@@ -56,6 +56,7 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
+  const canWriteSchemas = can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId });
 
   const [projects, schemaDefs] = await Promise.all([listOrgProjects(orgId), listSchemaDefinitionsForProject(orgId, projectId)]);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -119,9 +120,11 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
           title={t('noEntitySchemasRegistered')}
           description={t('noEntitySchemasDetail')}
           action={
-            <Link href={`/orgs/${orgId}/projects/${projectId}/schema-defs`} className="inline-flex rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90">
-              {t('registerSchemaCta')}
-            </Link>
+            canWriteSchemas ? (
+              <Link href={`/orgs/${orgId}/projects/${projectId}/schema-defs`} className="inline-flex rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90">
+                {t('registerSchemaCta')}
+              </Link>
+            ) : undefined
           }
         />
       ) : (

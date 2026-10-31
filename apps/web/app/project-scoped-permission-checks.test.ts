@@ -178,4 +178,43 @@ describe('permission checks under project routes', () => {
     );
     expect(goalDetailPage).toContain('!person.archived_at || person.id === goal.owner_person_id');
   });
+
+  it('gates cross-page schema, board, and org-plugin links on destination permissions (KAN-154)', () => {
+    const customersPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/customers/page.tsx'),
+      'utf8',
+    );
+    expect(customersPage).toContain("can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })");
+    expect(customersPage).toContain('canWriteSchemas ?');
+
+    const ingestHealthPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/ingest-health/page.tsx'),
+      'utf8',
+    );
+    expect(ingestHealthPage).toContain("can(bindings, { type: 'user', id: user.id }, 'dashboards.read', { orgId, projectId })");
+    expect(ingestHealthPage).toContain("can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })");
+    expect(ingestHealthPage).toContain('href: canViewBoards ?');
+
+    const metricDefsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/metric-defs/page.tsx'),
+      'utf8',
+    );
+    expect(metricDefsPage).toContain("can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })");
+    expect(metricDefsPage).toContain('href: canWriteSchemas ?');
+
+    const fieldMappingsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/field-mappings/page.tsx'),
+      'utf8',
+    );
+    expect(fieldMappingsPage).toContain("can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })");
+    expect(fieldMappingsPage).toContain('href: canWriteSchemas ?');
+
+    const onboardingPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/onboarding/page.tsx'),
+      'utf8',
+    );
+    expect(onboardingPage).toContain("const orgScope = { orgId };");
+    expect(onboardingPage).toContain("can(bindings, { type: 'user', id: user.id }, 'plugin.install', orgScope)");
+    expect(onboardingPage).toContain('canManageOrgPlugins={canManageOrgPlugins}');
+  });
 });
