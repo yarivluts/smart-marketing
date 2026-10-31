@@ -197,6 +197,7 @@ export default async function ProjectLayout({
   const connectionsItem: AppShellNavItem = {
     href: `/orgs/${orgId}/connections?projectId=${projectId}`,
     label: t('connectionsLink'),
+    hint: tShell('connectionsHint'),
     icon: 'KeyRound',
   };
   const setupItems: AppShellNavItem[] = [
