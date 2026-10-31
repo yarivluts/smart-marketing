@@ -118,6 +118,12 @@ describe('DashboardContent', () => {
     expect(within(restricted).queryByRole('link', { name: /Data health/ })).not.toBeInTheDocument();
   });
 
+  it('shows the role in plain words, never the internal id', () => {
+    renderDashboard(healthyOverview);
+    expect(screen.getByText('Role: Owner')).toBeInTheDocument();
+    expect(screen.queryByText(/org_owner/)).not.toBeInTheDocument();
+  });
+
   it('surfaces pending invites and always offers the all-organizations link', () => {
     renderDashboard(healthyOverview);
     expect(screen.getByRole('link', { name: /pending invite/ })).toHaveAttribute('href', '/orgs');
