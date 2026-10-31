@@ -8,8 +8,8 @@ function strings(value: unknown, out: string[] = []): string[] {
 }
 
 // Hebrew letters are written as escapes: Hebrew stays out of code files.
-const HEBREW_LETTER_BEFORE_PRODUCT_NAME = /[א-ת](GrowthOS|Growth Pilot)/;
-const FEMININE_VERB_AFTER_GROWTHOS = /GrowthOS (עשתה|הצלחה|יכולה)/;
+const HEBREW_LETTER_BEFORE_PRODUCT_NAME = /[\u05d0-\u05ea](GrowthOS|Growth Pilot)/;
+const FEMININE_VERB_AFTER_GROWTHOS = /GrowthOS (\u05e2\u05e9\u05ea\u05d4|\u05d4\u05e6\u05dc\u05d9\u05d7\u05d4|\u05d9\u05db\u05d5\u05dc\u05d4)/;
 
 describe('Hebrew copy writes the product name cleanly and in one gender', () => {
   const all = strings(he);
