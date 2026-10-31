@@ -34,7 +34,11 @@ import type {
   UnifiedGoalItem,
   WarehouseSectionKind,
 } from '@/lib/orgs/funnel-goals-synthesizer';
-import { MIN_FUNNEL_ENTRANTS_FOR_ALERT } from '@/lib/orgs/funnel-goals-synthesizer';
+import {
+  MIN_FUNNEL_ENTRANTS_FOR_ALERT,
+  funnelSupportsDropOffAlert,
+  largestDropOff,
+} from '@/lib/orgs/funnel-goals-synthesizer';
 import {
   averageRetentionCurve,
   buildFunnelConversionRows,
@@ -51,6 +55,12 @@ export interface FunnelGoalsDashboardProps {
   projectName: string;
   cockpitData: FunnelGoalsCockpitData;
   canExecute: boolean;
+  /** Whether the viewer holds `dashboards.write` (goal creation, inline target edits, and `/goals` links). Defaults to `canExecute`. */
+  canManageGoals?: boolean;
+  /** Whether the viewer holds `project.manage` (`/onboarding` link). Defaults to `true`. */
+  canManageOnboarding?: boolean;
+  /** Whether the viewer holds `ingest.write` (`/install` link). Defaults to `true`. */
+  canManageIngest?: boolean;
   metricCatalog?: { name: string; unit?: string }[];
   people?: { id: string; name: string }[];
 }
@@ -134,6 +144,9 @@ export function FunnelGoalsDashboard({
   projectName,
   cockpitData,
   canExecute,
+  canManageGoals = canExecute,
+  canManageOnboarding = true,
+  canManageIngest = true,
   metricCatalog = [],
   people = [],
 }: FunnelGoalsDashboardProps): React.ReactElement {
@@ -186,6 +199,10 @@ export function FunnelGoalsDashboard({
     const first = [...funnelSteps].sort((a, b) => a.stepOrder - b.stepOrder)[0];
     return first !== undefined && first.customerCount > 0;
   }, [funnelSteps]);
+  const topDrop = useMemo(
+    () => (funnelSupportsDropOffAlert(funnelSteps) ? largestDropOff(funnelSteps) : null),
+    [funnelSteps],
+  );
   const funnelNoPeopleState = (testId: string): React.ReactElement => (
     <div data-testid={testId}>
       <EmptyState
@@ -194,13 +211,15 @@ export function FunnelGoalsDashboard({
         title={t('funnelNoPeopleTitle')}
         description={t('funnelNoPeopleBody')}
         action={
-          <Link
-            href={`${projectBase}/install`}
-            data-testid={`${testId}-setup-link`}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
-          >
-            {t('funnelNoPeopleCta')}
-          </Link>
+          canManageIngest ? (
+            <Link
+              href={`${projectBase}/install`}
+              data-testid={`${testId}-setup-link`}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+            >
+              {t('funnelNoPeopleCta')}
+            </Link>
+          ) : undefined
         }
       />
     </div>
@@ -364,7 +383,13 @@ export function FunnelGoalsDashboard({
                 {t('proactiveRecommendationHeading')}
               </span>
               <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">
-                {proactiveRecommendation.description}
+                {topDrop && proactiveRecommendation.category === 'funnel_dropoff'
+                  ? t('proactiveRecommendationBody', {
+                      percent: topDrop.percent,
+                      from: topDrop.from.stageLabel,
+                      to: topDrop.to.stageLabel,
+                    })
+                  : proactiveRecommendation.description}
               </p>
               {recommendationError ? (
                 <p role="alert" data-testid="rec-failed-message" className="mt-1 text-xs text-destructive">
@@ -490,7 +515,7 @@ export function FunnelGoalsDashboard({
               title={funnelViewKind === 'no_funnel' ? t('funnelEmptyTitle') : t('funnelUnavailableTitle')}
               body={t(`funnelUnavailable.${funnelViewKind === 'ok' ? 'no_funnel' : funnelViewKind}`)}
               action={
-                funnelViewKind === 'no_funnel' || funnelViewKind === 'ok' ? (
+                canManageOnboarding && (funnelViewKind === 'no_funnel' || funnelViewKind === 'ok') ? (
                   <Link
                     href={`${projectBase}/onboarding`}
                     data-testid="define-funnel-link"
@@ -528,7 +553,7 @@ export function FunnelGoalsDashboard({
                       label: goal.name,
                       sublabel: goal.status ? tGoals(`paceStatus.${goal.status}`) : goal.metricName,
                       value: goal.percentFilled ?? 0,
-                      href: `${projectBase}/goals/${goal.id}`,
+                      href: canManageGoals ? `${projectBase}/goals/${goal.id}` : undefined,
                     }))}
                     valueFormatter={(value) => `${value}%`}
                   />
@@ -569,7 +594,7 @@ export function FunnelGoalsDashboard({
               </select>
             </div>
 
-            {canExecute && (
+            {canManageGoals && (
               <button
                 type="button"
                 data-testid="create-new-goal-btn"
@@ -590,13 +615,15 @@ export function FunnelGoalsDashboard({
               title={t('goalsEmptyTitle')}
               body={t('goalsEmptyBody')}
               action={
-                <Link
-                  href={`${projectBase}/goals`}
-                  data-testid="goals-page-link"
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  {t('goalsEmptyCta')}
-                </Link>
+                canManageGoals ? (
+                  <Link
+                    href={`${projectBase}/goals`}
+                    data-testid="goals-page-link"
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    {t('goalsEmptyCta')}
+                  </Link>
+                ) : undefined
               }
             />
           ) : filteredGoals.length === 0 ? (
@@ -615,7 +642,7 @@ export function FunnelGoalsDashboard({
                   orgId={orgId}
                   projectId={projectId}
                   goal={goal}
-                  canExecute={canExecute}
+                  canExecute={canManageGoals}
                   onTargetUpdated={handleTargetUpdated}
                 />
               ))}

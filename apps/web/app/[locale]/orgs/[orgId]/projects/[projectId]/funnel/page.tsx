@@ -61,6 +61,8 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
   const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
   const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
+  const canManageOnboarding = can(bindings, principal, 'project.manage', { orgId, projectId });
+  const canManageIngest = can(bindings, principal, 'ingest.write', { orgId, projectId });
 
   if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
@@ -147,6 +149,9 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
         projectName={project.name}
         cockpitData={cockpitData}
         canExecute={canExecute}
+        canManageGoals={canWriteDashboards}
+        canManageOnboarding={canManageOnboarding}
+        canManageIngest={canManageIngest}
         metricCatalog={metricCatalog}
         people={people.filter((p) => !p.archived_at).map((p) => ({ id: p.id, name: p.name }))}
       />

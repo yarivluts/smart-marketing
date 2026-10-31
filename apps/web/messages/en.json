@@ -3669,6 +3669,7 @@
     "kpiDunningRecovery": "Failed payments won back",
     "daysUnit": "days",
     "proactiveRecommendationHeading": "Many people leave at this step",
+    "proactiveRecommendationBody": "{percent}% of the people who reached \"{from}\" did not go on to \"{to}\".",
     "applyRecommendationButton": "Apply this suggestion",
     "recommendationApplied": "Done - the suggestion was applied",
     "paybackHeading": "How fast new customers pay back (first 40 days)",

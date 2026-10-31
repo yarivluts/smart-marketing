@@ -409,5 +409,77 @@ describe('FunnelGoalsDashboard Component', () => {
       expect(screen.queryByRole('table', { name: enMessages.FunnelGoals.retentionCurveTitle })).not.toBeInTheDocument();
       expect(screen.getByTestId('cohort-retention-matrix')).toBeInTheDocument();
     });
+
+    it('separates automation.execute from dashboards.write, project.manage, and ingest.write (KAN-150)', () => {
+      const goal = {
+        id: 'g1',
+        name: 'Signups',
+        metric_name: 'signups',
+        direction: 'maximize',
+        target_value: 100,
+        range_min: null,
+        range_max: null,
+        start_date: '2026-01-01',
+        deadline: '2099-12-31',
+        rhythm: 'even',
+        owner_person_id: 'p1',
+      } as unknown as GoalModel;
+      const outcome = {
+        ok: true,
+        actualValue: 40,
+        hasMeasurements: true,
+        progress: { expectedAtNow: 30, progressRatio: 0.4, projectedFinalValue: 120, status: 'on_track', isGoalMet: false },
+      } as unknown as GoalProgressOutcome;
+      const cockpitWithGoal = buildFunnelGoalsCockpitData({
+        funnelOutcome: REAL_FUNNEL,
+        goals: [goal],
+        goalOutcomes: new Map([['g1', outcome]]),
+      });
+
+      // Editor: dashboards.write=true, automation.execute=false
+      const { unmount } = renderWithIntl(
+        <FunnelGoalsDashboard
+          orgId="org-1"
+          projectId="test-proj"
+          projectName="EasySign"
+          cockpitData={cockpitWithGoal}
+          canExecute={false}
+          canManageGoals={true}
+          canManageOnboarding={false}
+          canManageIngest={false}
+        />,
+      );
+      expect(screen.getByTestId('apply-funnel-rec-btn')).toBeDisabled();
+      fireEvent.click(screen.getByTestId('tab-goals-btn'));
+      expect(screen.getByTestId('create-new-goal-btn')).toBeInTheDocument();
+      expect(screen.getByTestId('adjust-target-btn-g1')).toBeInTheDocument();
+      expect(
+        within(screen.getByRole('region', { name: enMessages.FunnelGoals.goalsProgressTitle })).getAllByRole('link'),
+      ).toHaveLength(1);
+      unmount();
+
+      // Operator: automation.execute=true, dashboards.write=false, project.manage=false, ingest.write=false
+      const emptyFunnel = {
+        ok: true as const,
+        steps: REAL_FUNNEL.steps.map((step) => ({ ...step, customerCount: 0, conversionRateFromFirst: 0 })),
+      };
+      renderWithIntl(
+        <FunnelGoalsDashboard
+          orgId="org-1"
+          projectId="test-proj"
+          projectName="EasySign"
+          cockpitData={buildFunnelGoalsCockpitData({ funnelOutcome: emptyFunnel, goals: [] })}
+          canExecute={true}
+          canManageGoals={false}
+          canManageOnboarding={false}
+          canManageIngest={false}
+        />,
+      );
+      expect(screen.queryByTestId('funnel-losses-no-data-setup-link')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('funnel-conversion-no-data-setup-link')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('tab-goals-btn'));
+      expect(screen.queryByTestId('create-new-goal-btn')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('goals-page-link')).not.toBeInTheDocument();
+    });
   });
 });
