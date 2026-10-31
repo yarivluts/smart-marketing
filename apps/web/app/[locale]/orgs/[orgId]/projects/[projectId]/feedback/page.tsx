@@ -87,6 +87,7 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === FEEDBACK_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <PackSetupLanding
         orgId={orgId}
@@ -98,6 +99,7 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
         featuresTitle={t('setupFeaturesTitle')}
         installTitle={t('setupInstallTitle')}
         packs={installablePacks}
+        canInstall={canInstallPlugins}
         features={[
           { key: 'nps', icon: PieChart, title: t('setupFeatureNpsTitle'), description: t('setupFeatureNpsDescription') },
           { key: 'trend', icon: CalendarRange, title: t('setupFeatureTrendTitle'), description: t('setupFeatureTrendDescription') },

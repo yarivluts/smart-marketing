@@ -136,4 +136,46 @@ describe('permission checks under project routes', () => {
     expect(growthPilotPage).toContain("can(bindings, { type: 'user', id: user.id }, 'automation.execute', { orgId, projectId })");
     expect(growthPilotPage).toContain('canExecute={canExecute}');
   });
+
+  it('gates built-in pack install CTAs, cross-page insight/win-rule links, and archived goal owners (KAN-153)', () => {
+    const packPages = [
+      'campaign-ops/page.tsx',
+      'demos/page.tsx',
+      'support/page.tsx',
+      'feedback/page.tsx',
+      'experiments/page.tsx',
+      'churn-reasons/page.tsx',
+      'firmographics/page.tsx',
+      'intent-quality/page.tsx',
+    ];
+    for (const relPath of packPages) {
+      const content = readFileSync(
+        resolve(__dirname, `[locale]/orgs/[orgId]/projects/[projectId]/${relPath}`),
+        'utf8',
+      );
+      expect(content, relPath).toContain("can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId })");
+      expect(content, relPath).toContain('canInstall={canInstallPlugins}');
+    }
+
+    const insightsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/insights/page.tsx'),
+      'utf8',
+    );
+    expect(insightsPage).toContain("tracking_alert: can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })");
+    expect(insightsPage).toContain("metric_health: can(bindings, { type: 'user', id: user.id }, 'metrics.write', { orgId, projectId })");
+    expect(insightsPage).toContain('canFollowUp[kind]');
+
+    const winRulesPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/win-rules/page.tsx'),
+      'utf8',
+    );
+    expect(winRulesPage).toContain("can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })");
+    expect(winRulesPage).toContain('schemaHref: canReadRecordFeed');
+
+    const goalDetailPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/goals/[goalId]/page.tsx'),
+      'utf8',
+    );
+    expect(goalDetailPage).toContain('!person.archived_at || person.id === goal.owner_person_id');
+  });
 });

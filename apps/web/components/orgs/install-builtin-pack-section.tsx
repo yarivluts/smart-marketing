@@ -13,6 +13,8 @@ export interface InstallBuiltinPackSectionProps {
   projectId: string;
   /** Built-in packs not yet actively installed in this project — the caller filters with the same `hasActiveInstall` check `InstallPluginForm`'s registered-manifest gallery uses. */
   packs: readonly InstallBuiltinPackOption[];
+  /** Whether the viewer holds `plugin.install` for this project. Defaults to `true`. */
+  canInstall?: boolean;
 }
 
 const PACK_LABEL_KEYS: Record<string, { title: string; description: string }> = {
@@ -39,7 +41,7 @@ const PACK_LABEL_KEYS: Record<string, { title: string; description: string }> = 
  * for a human to actually decide — the same "one click, no form" posture
  * the onboarding wizard's own pack step already has (`onboarding-pack-step.tsx`).
  */
-export function InstallBuiltinPackSection({ orgId, projectId, packs }: InstallBuiltinPackSectionProps): React.ReactElement {
+export function InstallBuiltinPackSection({ orgId, projectId, packs, canInstall = true }: InstallBuiltinPackSectionProps): React.ReactElement {
   const t = useTranslations('ProjectPlugins');
   const router = useRouter();
   const [installingPluginId, setInstallingPluginId] = useState<string | null>(null);
@@ -79,6 +81,17 @@ export function InstallBuiltinPackSection({ orgId, projectId, packs }: InstallBu
         {packs.map((pack) => {
           const labels = PACK_LABEL_KEYS[pack.pluginId];
           const installing = installingPluginId === pack.pluginId;
+          if (!canInstall) {
+            return (
+              <div
+                key={pack.pluginId}
+                className="flex flex-col gap-2 rounded-md border border-input p-4 text-start shadow-sm"
+              >
+                <span className="font-medium">{labels ? t(labels.title) : pack.pluginId}</span>
+                <span className="text-sm text-muted-foreground">{labels ? t(labels.description) : null}</span>
+              </div>
+            );
+          }
           return (
             <button
               key={pack.pluginId}

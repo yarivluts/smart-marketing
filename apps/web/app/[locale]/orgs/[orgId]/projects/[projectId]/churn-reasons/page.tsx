@@ -94,6 +94,7 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === CHURN_REASON_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <PackSetupLanding
         orgId={orgId}
@@ -105,6 +106,7 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
         featuresTitle={t('setupFeaturesTitle')}
         installTitle={t('setupInstallTitle')}
         packs={installablePacks}
+        canInstall={canInstallPlugins}
         features={[
           { key: 'reasons', icon: PieChart, title: t('setupFeatureReasonsTitle'), description: t('setupFeatureReasonsDescription') },
           { key: 'trend', icon: TrendingDown, title: t('setupFeatureTrendTitle'), description: t('setupFeatureTrendDescription') },
