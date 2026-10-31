@@ -70,6 +70,7 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === SUPPORT_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <PackSetupLanding
         orgId={orgId}
@@ -81,6 +82,7 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
         featuresTitle={t('setupFeaturesTitle')}
         installTitle={t('setupInstallTitle')}
         packs={installablePacks}
+        canInstall={canInstallPlugins}
         features={[
           { key: 'backlog', icon: Inbox, title: t('setupFeatureBacklogTitle'), description: t('setupFeatureBacklogDescription') },
           { key: 'speed', icon: Timer, title: t('setupFeatureSpeedTitle'), description: t('setupFeatureSpeedDescription') },

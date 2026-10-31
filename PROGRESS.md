@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-10-31T11:12Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-153)
+
+- **Last completed:**
+  - **Security, RBAC & Data Integrity (`KAN-153` — `InstallBuiltinPackSection`, `PackSetupLanding`, `InsightsPage`, `WinRulesPage`, and `GoalDetailPage`):**
+    - `POST /api/orgs/[orgId]/projects/[projectId]/plugins/builtin` requires `plugin.install`, while 8 pack-backed analytics pages (`campaign-ops` gated on `dashboards.write`, plus `demos`, `support`, `feedback`, `experiments`, `churn-reasons`, `firmographics`, and `intent-quality` gated on `ingest.write`) rendered interactive one-click install buttons via `InstallBuiltinPackSection` and `PackSetupLanding` unconditionally — causing `editor` and `ingest_only` users without `plugin.install` to hit `403 Forbidden` when clicking install. Added `canInstall?: boolean` to `InstallBuiltinPackSectionProps` (`apps/web/components/orgs/install-builtin-pack-section.tsx`) and `PackSetupLandingProps` (`apps/web/components/orgs/pack-setup-landing.tsx`) to render read-only pack cards when `canInstall` is `false`, and wired `can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId })` across all 8 pages.
+    - `InsightsPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/insights/page.tsx`, gated on `dashboards.write`) and `WinRulesPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/win-rules/page.tsx`, gated on `dashboards.write`) previously rendered cross-page links to `/ingest-health` (`ingest.write`), `/metric-defs` (`metrics.write`), and `/record-feed` (`ingest.write`) unconditionally, sending `editor` callers without `ingest.write` to a `404 Not Found` page. Gated those follow-up links on the destination page permissions.
+    - `GoalDetailPage` (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/goals/[goalId]/page.tsx`) previously passed archived people into `EditGoalForm` (`people.map(...)`). Filtered `peopleRows` to `!person.archived_at || person.id === goal.owner_person_id` while still resolving `ownerName` from the full `people` list.
+    - Added unit tests and regression guards in `apps/web/components/orgs/install-builtin-pack-section.test.tsx`, `apps/web/components/orgs/pack-setup-landing.test.tsx`, and `apps/web/app/project-scoped-permission-checks.test.ts`.
+  - **Infra:**
+    - Built and deployed `9c23f4a` (Iteration 10 / `KAN-152`) across `api-prod` (`api-prod-00147-jnd`), `api-preprod` (`api-preprod-00132-nk6`), `web-prod` (`web-prod-00197-zn9`), and `web-preprod` (`web-preprod-00230-8wh`) with `0` drift.
+- **In progress (exact stopping point):** None — complete.
+- **Blocked + why:** None.
+- **Next step:** Continue hourly 5-hat review on the next trigger.
+- **Waiting on human:** None.
+
 ## 2026-10-31T10:15Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-152)
 
 - **Last completed:**

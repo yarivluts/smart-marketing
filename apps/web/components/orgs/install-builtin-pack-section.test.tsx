@@ -86,4 +86,15 @@ describe('InstallBuiltinPackSection', () => {
     renderSection([{ pluginId: 'com.example.future-pack' }]);
     expect(screen.getByText('com.example.future-pack')).toBeInTheDocument();
   });
+
+  it('renders read-only pack cards without install buttons when canInstall is false', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <InstallBuiltinPackSection orgId="org-1" projectId="project-1" packs={PACKS} canInstall={false} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText('SaaS & Marketing Metrics')).toBeInTheDocument();
+    expect(screen.getByText(/Ad spend, signups, what each new customer costs you/)).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

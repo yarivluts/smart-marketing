@@ -99,12 +99,13 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === EXPERIMENT_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
         <PageHero icon={FlaskConical} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('setupIntro')} />
         {pipeline(null, 'idle')}
         <ChartCard title={t('installTitle')} description={t('installDescription')} icon={PackagePlus}>
-          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} canInstall={canInstallPlugins} />
         </ChartCard>
       </div>
     );

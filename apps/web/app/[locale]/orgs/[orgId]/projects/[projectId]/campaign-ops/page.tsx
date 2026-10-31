@@ -128,8 +128,14 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
     return { ...edge, status: reached ? ('ok' as const) : ('idle' as const), animated: reached };
   });
 
+  const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
   const installSection = (
-    <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={builtinMetricPacks().filter((pack) => pack.pluginId === CAMPAIGN_OPS_PACK_PLUGIN_ID)} />
+    <InstallBuiltinPackSection
+      orgId={orgId}
+      projectId={projectId}
+      packs={builtinMetricPacks().filter((pack) => pack.pluginId === CAMPAIGN_OPS_PACK_PLUGIN_ID)}
+      canInstall={canInstallPlugins}
+    />
   );
 
   return (
