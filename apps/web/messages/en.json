@@ -3819,7 +3819,8 @@
     "rebalanceAction": "1-Click Rebalance",
     "filterMetaShare": "Show only Facebook and Instagram ads",
     "filterGoogleShare": "Show only Google ads",
-    "channelAllocationEmpty": "No ad spend has been measured yet, so there is no channel split to show."
+    "channelAllocationEmpty": "No ad spend has been measured yet, so there is no channel split to show.",
+    "shareOfTotal": "{percent}% of total"
   },
   "Backfill": {
     "heading": "Backfill existing records",

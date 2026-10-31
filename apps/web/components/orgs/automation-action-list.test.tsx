@@ -38,4 +38,16 @@ describe('AutomationActionList failure', () => {
     expect(screen.queryByTestId('automation-failure-a1')).toBeNull();
     expect(enMessages.Automation.failureNextStep).toBeTruthy();
   });
+
+  it('hides execute, verify, and rollback controls when canExecute is false (KAN-151)', () => {
+    const actions: AutomationActionView[] = [
+      { ...failed, id: 'a-approved', status: 'approved', failureReason: undefined },
+      { ...failed, id: 'a-executed', status: 'executed', failureReason: undefined },
+      { ...failed, id: 'a-verified', status: 'verified', failureReason: undefined },
+    ];
+    renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={actions} canApprove={false} canExecute={false} />);
+    expect(screen.queryByRole('button', { name: enMessages.Automation.executeButton })).toBeNull();
+    expect(screen.queryByRole('button', { name: enMessages.Automation.verifyButton })).toBeNull();
+    expect(screen.queryByRole('button', { name: enMessages.Automation.rollbackButton })).toBeNull();
+  });
 });

@@ -17,6 +17,7 @@ export interface AdsPerformanceChartsProps {
   spendOutcome: CampaignSpendBreakdownOutcome | null;
   /** The trailing window the spend figures cover, in days. */
   spendWindowDays: number;
+  canManagePlugins?: boolean;
 }
 
 const USD = { currency: 'USD' } as const;
@@ -27,7 +28,14 @@ const USD = { currency: 'USD' } as const;
  * channel mix and budget charts below come from the campaign rows themselves (their platform,
  * status and configured budget), so they are real even before any spend is measured.
  */
-export function AdsPerformanceCharts({ orgId, projectId, items, spendOutcome, spendWindowDays }: AdsPerformanceChartsProps): React.ReactElement | null {
+export function AdsPerformanceCharts({
+  orgId,
+  projectId,
+  items,
+  spendOutcome,
+  spendWindowDays,
+  canManagePlugins = true,
+}: AdsPerformanceChartsProps): React.ReactElement | null {
   const t = useTranslations('Campaigns');
   const locale = useLocale();
   if (items.length === 0) {
@@ -111,13 +119,15 @@ export function AdsPerformanceCharts({ orgId, projectId, items, spendOutcome, sp
           title={t('spendEmptyTitle')}
           description={emptyDescription}
           action={
-            <Link
-              href={`/orgs/${orgId}/projects/${projectId}/plugins`}
-              className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-            >
-              <PlugZap className="h-4 w-4" aria-hidden="true" />
-              {t('connectAdSourceCta')}
-            </Link>
+            canManagePlugins ? (
+              <Link
+                href={`/orgs/${orgId}/projects/${projectId}/plugins`}
+                className="inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              >
+                <PlugZap className="h-4 w-4" aria-hidden="true" />
+                {t('connectAdSourceCta')}
+              </Link>
+            ) : undefined
           }
         />
       )}

@@ -3819,7 +3819,8 @@
     "rebalanceAction": "איזון תקציב בלחיצה",
     "filterMetaShare": "הצגת מודעות פייסבוק ואינסטגרם בלבד",
     "filterGoogleShare": "הצגת מודעות גוגל בלבד",
-    "channelAllocationEmpty": "עדיין לא נמדדה הוצאת פרסום, ולכן אין חלוקה בין ערוצים להציג."
+    "channelAllocationEmpty": "עדיין לא נמדדה הוצאת פרסום, ולכן אין חלוקה בין ערוצים להציג.",
+    "shareOfTotal": "{percent}% מהסך הכולל"
   },
   "Backfill": {
     "heading": "השלמת רשומות קיימות",

@@ -100,4 +100,22 @@ describe('permission checks under project routes', () => {
     expect(funnelPage).toContain('canManageOnboarding={canManageOnboarding}');
     expect(funnelPage).toContain('canManageIngest={canManageIngest}');
   });
+
+  it('CampaignsPage and CampaignDetailPage align view access with dashboards.read/write and gate mutations on automation.execute and plugin.install (KAN-151)', () => {
+    const campaignsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/campaigns/page.tsx'),
+      'utf8',
+    );
+    expect(campaignsPage).toContain("can(bindings, principal, 'plugin.install', { orgId, projectId })");
+    expect(campaignsPage).toContain('canManagePlugins={canManagePlugins}');
+
+    const detailPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/campaigns/[targetId]/page.tsx'),
+      'utf8',
+    );
+    expect(detailPage).toContain("can(bindings, principal, 'dashboards.read', { orgId, projectId })");
+    expect(detailPage).toContain("can(bindings, principal, 'dashboards.write', { orgId, projectId })");
+    expect(detailPage).toContain('!canExecute && !canReadDashboards && !canWriteDashboards');
+    expect(detailPage).toContain('canExecute={canExecute}');
+  });
 });
