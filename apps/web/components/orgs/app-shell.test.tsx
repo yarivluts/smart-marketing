@@ -177,6 +177,24 @@ describe('AppShell folded nav group', () => {
     expect(window.localStorage.getItem('growthos.nav.more')).toBe('open');
   });
 
+  it('tells a newcomer the folded tools can wait, once the group is open', () => {
+    mockUsePathname.mockReturnValue('/orgs/org-1/projects/p1/growth-pilot');
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AppShell
+          switchers={<span>switcher</span>}
+          sections={[{ items: [pilot] }, { items: [keys], group: { ...more, hint: "You don't need these to start." } }]}
+          mobileTabItems={[pilot]}
+        >
+          <p>page content</p>
+        </AppShell>
+      </NextIntlClientProvider>,
+    );
+    expect(screen.queryByText("You don't need these to start.")).toBeNull();
+    fireEvent.click(screen.getAllByRole('button', { name: /More tools/ })[0]!);
+    expect(screen.getAllByText("You don't need these to start.").length).toBeGreaterThan(0);
+  });
+
   it('opens by itself on a page inside it, marking that page', () => {
     renderGrouped('/orgs/org-1/projects/p1/keys');
     expect(screen.getAllByRole('button', { name: /More tools/ })[0]).toHaveAttribute('aria-expanded', 'true');
