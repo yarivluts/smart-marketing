@@ -723,6 +723,8 @@ describe('GrowthPilotApp', () => {
       expect(within(publishCard).queryByTestId('growth-pilot-budget')).toBeNull();
       expect(within(publishCard).queryByTestId('growth-pilot-approve')).toBeNull();
       expect(within(publishCard).getByTestId('growth-pilot-reject')).toBeInTheDocument();
+      expect(within(publishCard).getByTestId('growth-pilot-needs-owner')).toHaveTextContent('Only an owner or admin can publish or turn on ads.');
+      expect(within(targetCard).queryByTestId('growth-pilot-needs-owner')).toBeNull();
       expect(within(targetCard).getByTestId('growth-pilot-approve')).toBeInTheDocument();
       publishView.unmount();
 
