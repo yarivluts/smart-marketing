@@ -6125,7 +6125,8 @@
         "running": "Ads are running",
         "rejected": "You chose not to publish",
         "failed": "Publishing failed ({reason}). No ad was switched on, so nothing was spent.",
-        "connect": "Connect Facebook and Instagram"
+        "connect": "Connect Facebook and Instagram",
+        "turnOnWaiting": "When you are ready, turn them on in the \"Turn on the ads\" card waiting for your approval."
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",
       "confirmCancel": "Not yet"

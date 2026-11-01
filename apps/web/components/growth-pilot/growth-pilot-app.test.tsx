@@ -718,6 +718,19 @@ describe('GrowthPilotApp', () => {
       expect(screen.queryByTestId('growth-pilot-budget')).toBeNull();
     });
 
+    it('tells a newcomer where to turn the ads on, only while that card is waiting', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const published = [{ ...TARGET, publishStatus: 'published' as const }];
+      const waiting = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-turn-on-waiting')).toHaveTextContent('turn them on in the "Turn on the ads" card waiting for your approval');
+      waiting.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-turn-on-waiting')).toHaveTextContent('הפעילו אותן בכרטיס');
+      he.unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'en' });
+      expect(screen.queryByTestId('growth-pilot-turn-on-waiting')).toBeNull();
+    });
+
     it('Reject on the publish and turn-on cards says what it really does, in English and Hebrew', () => {
       const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
       const published = [{ ...TARGET, publishStatus: 'published' as const }];
