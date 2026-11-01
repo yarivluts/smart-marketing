@@ -504,7 +504,7 @@ function ProposalCard({
   );
 }
 
-function TargetCard({ target, landingSlug, metaConnectHref, results }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement {
+function TargetCard({ target, landingSlug, metaConnectHref, results, turnOnWaiting = false }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null; turnOnWaiting?: boolean }): React.ReactElement {
   const t = useTranslations('GrowthPilot.targets');
   return (
     <li className="flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-target">
@@ -523,7 +523,7 @@ function TargetCard({ target, landingSlug, metaConnectHref, results }: { target:
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
       <TargetLandingLine target={target} slug={landingSlug} />
       <TargetAudienceLine target={target} />
-      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} results={results} />
+      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} results={results} turnOnWaiting={turnOnWaiting} />
       <TargetAdsLine target={target} />
     </li>
   );
@@ -550,7 +550,7 @@ function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: s
 }
 
 /** Where the target's ads stand on the platform; when Meta is missing, the way to connect it. */
-function TargetPublishLine({ target, metaConnectHref, results }: { target: GrowthTargetView; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement | null {
+function TargetPublishLine({ target, metaConnectHref, results, turnOnWaiting = false }: { target: GrowthTargetView; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null; turnOnWaiting?: boolean }): React.ReactElement | null {
   const reasonOf = useReason();
   const t = useTranslations('GrowthPilot.publish.status');
   const tr = useTranslations('GrowthPilot.performance');
@@ -561,6 +561,7 @@ function TargetPublishLine({ target, metaConnectHref, results }: { target: Growt
     <p className={cn('flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'running' ? 'text-success' : status === 'failed' || status === 'needs_meta' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-publish" data-publish={status}>
       <Send className="h-3.5 w-3.5" aria-hidden="true" />
       {status === 'failed' ? t('failed', { reason: reasonOf(target.publishFailure === 'quota_exceeded' ? 'platform_busy' : target.publishFailure) }) : t(status)}
+      {status === 'published' && turnOnWaiting ? <span data-testid="growth-pilot-turn-on-waiting">{t('turnOnWaiting')}</span> : null}
       {results && (status === 'published' || status === 'running') ? (
         <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
           {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}
@@ -888,7 +889,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {targets.map((target) => (
-                  <TargetCard key={target.id} target={target} results={byTarget?.[target.id] ?? null} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
+                  <TargetCard key={target.id} target={target} turnOnWaiting={waiting.some((proposal) => proposal.kind === 'activate' && proposal.targetId === target.id)} results={byTarget?.[target.id] ?? null} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
                 ))}
               </ul>
             )}
