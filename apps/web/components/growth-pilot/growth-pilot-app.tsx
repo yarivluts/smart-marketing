@@ -456,8 +456,8 @@ function ProposalCard({
                   aria-describedby="growth-pilot-budget-hint"
                 />
               </span>
-              <span id="growth-pilot-budget-hint" className={Number(budget) > 0 ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
-                {Number(budget) > 0 ? tp('budgetHint') : tp('budgetNeeded')}
+              <span id="growth-pilot-budget-hint" className={Number(budget) > 0 || budget.trim() === '' ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
+                {Number(budget) > 0 ? tp('budgetHint') : budget.trim() === '' ? tp('budgetStart') : tp('budgetNeeded')}
               </span>
             </label>
           ) : null}
