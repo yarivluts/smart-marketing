@@ -38,4 +38,11 @@ describe('sidebar hints say what Ad Studio and the AI helper do', () => {
     expect(en.AppShell.settingsHint).not.toMatch(/currency|timezone|time zone|locale|environment|api|token/i);
     expect(he.AppShell.settingsHint).toMatch(/[\u0590-\u05ff]/);
   });
+
+  it('the Home link says it leads to all projects, not to this one', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('homeHint')");
+    expect(en.AppShell.homeHint).toMatch(/projects/i);
+    expect(he.AppShell.homeHint).toMatch(/[\u0590-\u05ff]/);
+  });
 });
