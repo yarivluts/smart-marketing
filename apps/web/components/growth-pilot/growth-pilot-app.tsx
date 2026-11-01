@@ -171,6 +171,11 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
         ))}
       </ol>
       {onCancel ? (
+        <p className="max-w-xl text-sm text-muted-foreground" data-testid="growth-pilot-start-over-note">
+          {t('startOverNote')}
+        </p>
+      ) : null}
+      {onCancel ? (
         <button type="button" onClick={onCancel} className="text-sm font-medium text-muted-foreground hover:text-foreground">
           {tf('back')}
         </button>

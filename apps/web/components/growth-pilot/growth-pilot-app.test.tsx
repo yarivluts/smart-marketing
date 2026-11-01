@@ -84,6 +84,21 @@ describe('GrowthPilotApp', () => {
     expect(await screen.findByTestId('growth-pilot-center')).toBeInTheDocument();
   });
 
+  it('tells someone starting over that the current pilot goes to the archive, and not a first-time visitor', () => {
+    const first = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    expect(screen.queryByTestId('growth-pilot-start-over-note')).not.toBeInTheDocument();
+    first.unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: /Start over with another site/ }));
+    expect(screen.getByTestId('growth-pilot-start-over-note')).toHaveTextContent('moves it to the archive and begins a new one');
+  });
+
+  it('says the same in Hebrew', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
+    fireEvent.click(screen.getByRole('button', { name: heMessages.GrowthPilot.header.startOver }));
+    expect(screen.getByTestId('growth-pilot-start-over-note')).toHaveTextContent(heMessages.GrowthPilot.start.startOverNote);
+  });
+
   it('tells a newcomer which address to enter, and ties the hint to the input', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
     const hint = screen.getByText(/Not sure which address\? Use your home page/).closest('p') as HTMLElement;
