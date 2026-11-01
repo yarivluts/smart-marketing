@@ -853,7 +853,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          {data.targets.some((target) => target.publishStatus === 'published' || target.publishStatus === 'running') ? <GrowthPerformanceSection base={base} onTargets={setByTarget} /> : null}
+          {data.targets.some((target) => target.publishStatus === 'published' || target.publishStatus === 'running') ? <GrowthPerformanceSection base={base} onTargets={setByTarget} metaConnectHref={metaConnectHref ?? null} /> : null}
           <section className="flex flex-col gap-3" aria-labelledby="growth-pilot-waiting">
             <h2 id="growth-pilot-waiting" className="flex items-center gap-2 font-pp-display text-xl font-semibold">
               {t('waiting.title')}
