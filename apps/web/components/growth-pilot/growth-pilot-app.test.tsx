@@ -651,6 +651,18 @@ describe('GrowthPilotApp', () => {
     const PLAN = { destination: 'meta' as const, imageIds: ['i1', 'i2'], dailyBudget: 20, linkUrl: 'https://app.growthos.io/lp/abc', campaignName: 'EasySign - Free plan', countries: ['IL'] };
     const PUBLISH: GrowthProposalView = { ...PROPOSAL, id: 'pub1', kind: 'publish', briefId: 'b1', publish: PLAN, previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Free plan', description: '', audience: '', reason: '' } };
 
+    it('does not scold a newcomer for an empty budget box: a calm hint first, a warning only for zero', () => {
+      const empty: GrowthProposalView = { ...PUBLISH, publish: { ...PLAN, dailyBudget: undefined as unknown as number } };
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [empty], targets: [TARGET] })} />, { locale: 'en' });
+      const box = screen.getByTestId('growth-pilot-budget');
+      expect(box).toHaveValue(null);
+      expect(box).toHaveAccessibleDescription(/^Not sure what to enter\? A small amount is fine to start/);
+      expect(document.getElementById('growth-pilot-budget-hint')).not.toHaveClass('text-destructive');
+      expect(screen.getByTestId('growth-pilot-approve')).toBeDisabled();
+      fireEvent.change(box, { target: { value: '0' } });
+      expect(document.getElementById('growth-pilot-budget-hint')).toHaveClass('text-destructive');
+    });
+
     it('publishes the approved images paused, at the budget the person sets - a yes or no, not a change for the AI', async () => {
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'published' }] }) }, { body: { status: 'ok', since: 'a', until: 'b', summary: { totals: { spend: 0, impressions: 0, clicks: 0, linkClicks: 0, conversions: 0, ctr: null, cpc: null, costPerConversion: null }, daily: [], byTarget: {} } } });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
