@@ -207,3 +207,12 @@ describe('AppShell folded nav group', () => {
     expect(screen.getAllByRole('button', { name: /More tools/ })[0]).toHaveAttribute('aria-expanded', 'true');
   });
 });
+
+describe('AppShell developers link', () => {
+  it('explains in plain words that the Developers link can be skipped', () => {
+    renderShell('/orgs/org-1');
+    const links = screen.getAllByRole('link', { name: 'Developers' });
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(link).toHaveAttribute('title', 'For the people who build your website. You can skip this.');
+  });
+});
