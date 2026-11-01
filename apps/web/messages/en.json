@@ -2280,6 +2280,7 @@
   },
   "PluginRegistry": {
     "metaTitle": "Plugin registry",
+    "invalidInputError": "Nothing was saved. Please fix the following and try again: {reasons}",
     "title": "Plugin registry",
     "registerHeading": "Register a manifest",
     "manifestYamlLabel": "plugin.yaml",

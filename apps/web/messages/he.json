@@ -2280,6 +2280,7 @@
   },
   "PluginRegistry": {
     "metaTitle": "מרשם תוספים",
+    "invalidInputError": "שום דבר לא נשמר. תקנו את הדברים הבאים ונסו שוב: {reasons}",
     "title": "מרשם תוספים",
     "registerHeading": "רישום מניפסט",
     "manifestYamlLabel": "plugin.yaml",

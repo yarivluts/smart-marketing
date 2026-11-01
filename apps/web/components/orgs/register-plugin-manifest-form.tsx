@@ -32,7 +32,7 @@ export function RegisterPluginManifestForm({ orgId }: RegisterPluginManifestForm
         if (body?.error === 'duplicate_manifest') {
           setError(t('duplicateManifestError'));
         } else if (body?.reasons?.length) {
-          setError(body.reasons.join(' '));
+          setError(t('invalidInputError', { reasons: body.reasons.join(' ') }));
         } else {
           setError(t('registerError'));
         }

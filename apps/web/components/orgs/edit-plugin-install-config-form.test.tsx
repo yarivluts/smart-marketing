@@ -120,7 +120,7 @@ describe('EditPluginInstallConfigForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit config' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save config' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Config field "shop_domain" must be of type "string".');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was saved. Please fix the following and try again: Config field "shop_domain" must be of type "string".');
     expect(refresh).not.toHaveBeenCalled();
   });
 
