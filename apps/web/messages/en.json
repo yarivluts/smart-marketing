@@ -106,6 +106,7 @@
   "AppShell": {
     "brandName": "GrowthOS",
     "homeLink": "Home",
+    "homeHint": "All your projects, and the people on your team",
     "adsAndPerformance": "Ads & results",
     "funnelAndGoals": "Customer journey & goals",
     "aiCopilotAndAutomation": "AI helper",
