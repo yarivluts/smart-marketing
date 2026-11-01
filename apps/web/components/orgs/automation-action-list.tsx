@@ -129,7 +129,17 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove, ca
               <p className="text-muted-foreground">{t('failureNextStep')}</p>
             </div>
           ) : null}
-          {action.rollbackReason ? <p className="text-muted-foreground">{t('rollbackReasonLine', { reason: action.rollbackReason })}</p> : null}
+          {action.rollbackReason ? (
+            <p className="text-muted-foreground" data-testid={`automation-rollback-${action.id}`}>
+              {t(
+                action.rollbackReason === 'manual'
+                  ? 'rollbackManual'
+                  : action.rollbackReason === 'guardrail_regression'
+                    ? 'rollbackGuardrail'
+                    : 'rollbackOther',
+              )}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
             {action.status === 'awaiting_approval' && canApprove ? (
