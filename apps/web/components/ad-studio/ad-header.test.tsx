@@ -56,4 +56,25 @@ describe('AdHeader', () => {
     expect(text).not.toHaveTextContent('Limit reached');
     expect(text).toHaveTextContent('12/50');
   });
+
+  it('shows no usage meters while nothing has been used yet', () => {
+    renderWithIntl(
+      <AdHeader
+        studioLabel="AI Ad Studio"
+        allAds={{ label: 'All ads', href: '/ad-studio' }}
+        name="First ad"
+        objective="Get visitors"
+        usage={{
+          label: "Today's AI usage",
+          limitReached: 'Limit reached',
+          meters: [
+            { key: 'images', label: 'Images today', used: 0, limit: 40, icon: ImageIcon },
+            { key: 'text', label: 'Ad texts written today', used: 0, limit: 50, icon: Sparkles },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('First ad');
+    expect(screen.queryByTestId('ad-studio-usage-meters')).not.toBeInTheDocument();
+  });
 });
