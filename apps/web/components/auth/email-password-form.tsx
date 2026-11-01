@@ -301,6 +301,13 @@ export function EmailPasswordForm({
           </div>
         ) : null}
 
+        {/* The error names "Forgot password?", which only exists on the sign-in tab: take them there with their email kept. */}
+        {errorKey === 'emailInUseError' && mode === 'signup' ? (
+          <Button type="button" variant="outline" onClick={() => handleTabChange('signin')} className="w-full h-10 rounded-xl text-xs font-semibold">
+            {t('signInWithThisEmail')}
+          </Button>
+        ) : null}
+
         {/* Submit CTA */}
         <Button
           type="submit"
