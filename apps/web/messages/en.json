@@ -5902,6 +5902,7 @@
       "submit": "Start",
       "hint": "Not sure which address? Use your home page. Any public page works, and you do not need to log in or install anything.",
       "noSite": "No website yet? Any public page that describes what you sell works, such as your online shop or a listing of your business.",
+      "startOverNote": "You already have a pilot. Starting with another site moves it to the archive and begins a new one. To keep going with your current site, go back.",
       "steps": {
         "read": "Reads the site",
         "propose": "Proposes what to grow",
