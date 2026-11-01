@@ -117,7 +117,7 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
         if (body?.error === 'already_installed') {
           setError(t('alreadyInstalledError'));
         } else if (body?.reasons?.length) {
-          setError(body.reasons.join(' '));
+          setError(t('invalidInputError', { reasons: body.reasons.join(' ') }));
         } else {
           setError(t('installError'));
         }
