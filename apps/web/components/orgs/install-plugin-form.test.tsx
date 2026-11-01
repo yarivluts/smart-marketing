@@ -170,6 +170,22 @@ describe('InstallPluginForm', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it('leads server validation reasons with a plain sentence saying nothing was saved', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'invalid_config', reasons: ['shop_domain is not a valid domain.'] }),
+    } as Response);
+    renderForm();
+
+    fireEvent.click(screen.getByLabelText("I allow this"));
+    fireEvent.change(screen.getByLabelText(/shop_domain/), { target: { value: 'my-shop' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nothing was saved. Please fix the following and try again: shop_domain is not a valid domain.',
+    );
+  });
+
   it('offers a version picker when a plugin has more than one registered version', () => {
     const olderShopify: PluginManifestView = { ...SHOPIFY, id: 'manifest-0', version: '0.9.0' };
     renderForm([olderShopify, SHOPIFY]);

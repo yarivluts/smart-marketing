@@ -41,7 +41,7 @@ export function RegisterMetricDefForm({ orgId, projectId }: RegisterMetricDefFor
         if (body?.error === 'duplicate_metric') {
           setError(t('duplicateMetricError'));
         } else if (body?.error === 'invalid_definition' && body.reasons) {
-          setError(body.reasons.join('; '));
+          setError(t('invalidInputError', { reasons: body.reasons.join('; ') }));
         } else {
           setError(t('registerError'));
         }
