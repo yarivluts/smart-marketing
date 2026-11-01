@@ -4945,7 +4945,7 @@
         "custom": "מותאם אישית"
       },
       "descriptionLabel": "תארו את הקול (באנגלית עובד הכי טוב)",
-      "descriptionPlaceholder": "למשל: an older man with a slow, warm, slightly raspy voice",
+      "descriptionPlaceholder": "למשל: גבר מבוגר בקול איטי, חם וקצת צרוד",
       "descriptionHint": "גיל, מגדר, קצב וטון. אותו תיאור משמש בכל הסצנות.",
       "save": "שמירת הקול",
       "saved": "הקול נשמר. סצנות עם קריינות לא מעודכנות עד שייווצרו מחדש.",
@@ -4985,7 +4985,7 @@
         "custom": "תיאור חופשי"
       },
       "musicDescriptionLabel": "איזו מוזיקה? (באנגלית עובד הכי טוב)",
-      "musicDescriptionPlaceholder": "למשל: upbeat acoustic guitar",
+      "musicDescriptionPlaceholder": "למשל: גיטרה אקוסטית עליזה",
       "avoidLabel": "לעולם לא להראות",
       "avoidPlaceholder": "למשל: בעלי חיים, מכוניות, המונים",
       "avoidHint": "דברים שאסור שיופיעו באף סצנה. ה-AI מקבל הוראה להימנע מהם בכל סצנה.",
