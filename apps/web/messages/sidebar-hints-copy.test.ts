@@ -30,4 +30,12 @@ describe('sidebar hints say what Ad Studio and the AI helper do', () => {
     expect(en.AppShell.connectionsHint).not.toMatch(/oauth|api|token|connector/i);
     expect(he.AppShell.connectionsHint).toMatch(/[\u0590-\u05ff]/);
   });
+
+  it('the plain Settings link says what it holds, without jargon', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('settingsHint')");
+    expect(en.AppShell.settingsHint.length).toBeGreaterThan(10);
+    expect(en.AppShell.settingsHint).not.toMatch(/currency|timezone|time zone|locale|environment|api|token/i);
+    expect(he.AppShell.settingsHint).toMatch(/[\u0590-\u05ff]/);
+  });
 });
