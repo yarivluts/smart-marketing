@@ -272,6 +272,7 @@ function ProposalCard({
   studio,
   landing,
   host,
+  metaConnectHref,
   canExecute = true,
 }: {
   proposal: GrowthProposalView;
@@ -283,6 +284,8 @@ function ProposalCard({
   /** The landing page a `landing_page` proposal is about. */
   landing?: GrowthLandingPageView | null;
   host: string;
+  /** Where to connect the Meta ad account, shown when the audience step is waiting for it. */
+  metaConnectHref?: string | null;
   /** Whether the caller holds `automation.execute` — required by `/proposals/[proposalId]` to approve `publish` or `activate`. */
   canExecute?: boolean;
 }): React.ReactElement | null {
@@ -326,7 +329,7 @@ function ProposalCard({
               <span className="font-semibold text-foreground">{page.content.headline}</span> - {page.content.subheadline}
             </p>
           ) : null}
-          {audience ? <AudienceSummary plan={audience} /> : null}
+          {audience ? <AudienceSummary plan={audience} metaConnectHref={metaConnectHref ?? null} /> : null}
           {platform ? (
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground" data-testid="growth-pilot-publish">
               <p>{proposal.kind === 'publish' ? tp('description', { count: platform.imageIds.length }) : tp('activateDescription', { budget: platform.dailyBudget })}</p>
@@ -587,9 +590,11 @@ function TargetAudienceLine({ target }: { target: GrowthTargetView }): React.Rea
 }
 
 /** An audience proposal: who, where, which interests, and how many people Meta says it reaches. */
-function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audience']> }): React.ReactElement {
+function AudienceSummary({ plan, metaConnectHref }: { plan: NonNullable<GrowthProposalView['audience']>; metaConnectHref: string | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.audience');
   const countryNames = useCountryNames();
+  const tc = useTranslations('GrowthPilot.publish.status');
+  const missingMeta = plan.meta === 'no_meta_credential' || plan.meta === 'credential_not_configured';
   const number = new Intl.NumberFormat(useLocale(), { notation: 'compact', maximumFractionDigits: 1 });
   const genders = plan.targeting.genders.length ? plan.targeting.genders.map((gender) => t(`gender.${gender}`)).join(', ') : t('gender.all');
   return (
@@ -626,7 +631,15 @@ function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audie
       ) : null}
       {plan.meta !== 'ok' ? (
         <p className="text-xs text-muted-foreground" data-testid="growth-pilot-audience-meta">
-          {t(plan.meta === 'no_meta_credential' || plan.meta === 'credential_not_configured' ? 'metaMissing' : 'metaFailed')}
+          {t(missingMeta ? 'metaMissing' : 'metaFailed')}
+          {missingMeta && metaConnectHref ? (
+            <>
+              {' '}
+              <a href={metaConnectHref} className="font-semibold text-primary hover:underline" data-testid="growth-pilot-audience-connect-meta">
+                {tc('connect')}
+              </a>
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>
@@ -857,6 +870,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
                     onRevise={(text) => void run(proposal.id, `/proposals/${proposal.id}`, { action: 'revise', request: text })}
                     studio={studio}
                     host={host}
+                    metaConnectHref={metaConnectHref ?? null}
                     landing={proposal.landingPageId ? data.landingPages.find((page) => page.id === proposal.landingPageId) : null}
                     canExecute={canExecute}
                   />

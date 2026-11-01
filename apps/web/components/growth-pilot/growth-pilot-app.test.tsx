@@ -644,6 +644,24 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-audience-meta').textContent ?? '').not.toMatch(/^Meta /);
       expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('We could not work out who to reach (today\'s AI limit is used up, it resets tomorrow)');
     });
+
+    it('puts the connect link right under the "connect your ad account" note, only when that is what is missing', () => {
+      const href = '/api/integrations/meta/start?orgId=o';
+      const noMeta = { ...AUDIENCE, audience: { ...PLAN, meta: 'no_meta_credential', reach: null } };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref={href} initial={page({ proposals: [noMeta], targets: [TARGET] })} />, { locale: 'en' });
+      const link = within(screen.getByTestId('growth-pilot-audience-meta')).getByTestId('growth-pilot-audience-connect-meta');
+      expect(link).toHaveAttribute('href', href);
+      expect(link).toHaveTextContent('Connect Facebook and Instagram');
+      view.unmount();
+      // Meta answered badly: connecting again would not help, so no link.
+      const failed = { ...AUDIENCE, audience: { ...PLAN, meta: 'meta_error', reach: null } };
+      const second = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref={href} initial={page({ proposals: [failed], targets: [TARGET] })} />, { locale: 'en' });
+      expect(screen.queryByTestId('growth-pilot-audience-connect-meta')).toBeNull();
+      second.unmount();
+      // No link available (no permission): the note stays, without a dead link.
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [noMeta], targets: [TARGET] })} />, { locale: 'he' });
+      expect(screen.queryByTestId('growth-pilot-audience-connect-meta')).toBeNull();
+    });
   });
 
   describe('publishing', () => {
