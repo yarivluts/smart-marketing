@@ -347,6 +347,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
         <div className="flex shrink-0 items-center gap-pp-sm">
           <Link
             href="/developers"
+            title={t('developersHint')}
             className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-pp-label-md text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface lg:flex"
           >
             <Code2 className="h-4 w-4" aria-hidden="true" />
@@ -392,6 +393,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
           <NavSections sections={sections} activeHref={activeHref} onNavigate={() => setMobileMenuOpen(false)} />
           <Link
             href="/developers"
+            title={t('developersHint')}
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-pp-sm rounded-pp-lg px-pp-md py-pp-sm text-pp-label-md text-pp-on-surface-variant hover:bg-pp-surface-container-high"
           >
