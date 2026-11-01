@@ -4135,6 +4135,7 @@
     "errorGeneric": "GrowthOS could not finish that. Check your internet connection and try again in a moment.",
     "detailsSaved": "Details saved.",
     "fieldName": "Ad name",
+    "fieldNameHint": "For example: Spring sale video - only you see this name",
     "fieldObjective": "What should the ad achieve?",
     "fieldObjectiveHint": "For example: trial signups from small law firms",
     "fieldProduct": "What is being sold, and to whom?",
