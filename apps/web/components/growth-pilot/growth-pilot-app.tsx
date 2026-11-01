@@ -562,6 +562,7 @@ function TargetPublishLine({ target, metaConnectHref, results, turnOnWaiting = f
       <Send className="h-3.5 w-3.5" aria-hidden="true" />
       {status === 'failed' ? t('failed', { reason: reasonOf(target.publishFailure === 'quota_exceeded' ? 'platform_busy' : target.publishFailure) }) : t(status)}
       {status === 'published' && turnOnWaiting ? <span data-testid="growth-pilot-turn-on-waiting">{t('turnOnWaiting')}</span> : null}
+      {status === 'published' && !turnOnWaiting ? <span data-testid="growth-pilot-turn-on-declined">{t('turnOnDeclined')}</span> : null}
       {results && (status === 'published' || status === 'running') ? (
         <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
           {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}

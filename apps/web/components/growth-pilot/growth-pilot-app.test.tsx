@@ -729,6 +729,17 @@ describe('GrowthPilotApp', () => {
       he.unmount();
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'en' });
       expect(screen.queryByTestId('growth-pilot-turn-on-waiting')).toBeNull();
+      expect(screen.getByTestId('growth-pilot-turn-on-declined')).toHaveTextContent('The ads stay switched off and nothing is spent');
+    });
+
+    it('when no turn-on card is waiting, says the ads stay off and how to turn them on, in English and Hebrew', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const published = [{ ...TARGET, publishStatus: 'published' as const }];
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-turn-on-declined')).toHaveTextContent('נשארות כבויות');
+      he.unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'en' });
+      expect(screen.queryByTestId('growth-pilot-turn-on-declined')).toBeNull();
     });
 
     it('Reject on the publish and turn-on cards says what it really does, in English and Hebrew', () => {
