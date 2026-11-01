@@ -24,6 +24,14 @@ describe('CreateOrganizationForm', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
+  it('shows an example name as a hint, linked to the field', () => {
+    renderForm();
+
+    const hint = screen.getByText(/Your business name is perfect/);
+    expect(hint).toHaveAttribute('id', 'org-name-hint');
+    expect(screen.getByLabelText('Organization name')).toHaveAttribute('aria-describedby', 'org-name-hint');
+  });
+
   it('creates the organization and navigates to it', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ organizationId: 'org-123' }) } as Response);
     renderForm();
