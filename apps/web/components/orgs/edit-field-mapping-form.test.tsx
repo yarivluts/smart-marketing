@@ -104,7 +104,7 @@ describe('EditFieldMappingForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save mapping' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Required field "ts" has no mapping rule.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was saved. Please fix the following and try again: Required field "ts" has no mapping rule.');
     expect(refresh).not.toHaveBeenCalled();
   });
 

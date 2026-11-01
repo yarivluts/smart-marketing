@@ -35,7 +35,7 @@ export function EvolveMetricDefForm({ orgId, projectId, name, initialState, onCl
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string; reasons?: string[] } | null;
-        setError(body?.error === 'invalid_definition' && body.reasons ? body.reasons.join('; ') : t('evolveError'));
+        setError(body?.error === 'invalid_definition' && body.reasons ? t('invalidInputError', { reasons: body.reasons.join('; ') }) : t('evolveError'));
         return;
       }
       // `router.refresh()` alone doesn't unmount this component (same key,

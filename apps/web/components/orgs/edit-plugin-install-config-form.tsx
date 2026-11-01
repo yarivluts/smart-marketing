@@ -85,7 +85,7 @@ export function EditPluginInstallConfigForm({
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string; reasons?: string[] } | null;
         if (body?.reasons?.length) {
-          setError(body.reasons.join(' '));
+          setError(t('invalidInputError', { reasons: body.reasons.join(' ') }));
         } else {
           setError(t('editConfigError'));
         }

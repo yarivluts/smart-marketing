@@ -62,6 +62,6 @@ describe('RegisterPluginManifestForm', () => {
     fireEvent.change(screen.getByLabelText('plugin.yaml'), { target: { value: 'not a manifest' } });
     fireEvent.click(screen.getByRole('button', { name: 'Register manifest' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('`id` is required and must be a non-empty string.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was saved. Please fix the following and try again: `id` is required and must be a non-empty string.');
   });
 });

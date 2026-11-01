@@ -80,7 +80,7 @@ describe('EvolveMetricDefForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Save new version' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Formula references unknown metric "x".');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was saved. Please fix the following and try again: Formula references unknown metric "x".');
     expect(refresh).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
