@@ -37,7 +37,7 @@ describe('AdHeader', () => {
           limitReached: 'Limit reached',
           meters: [
             { key: 'images', label: 'Images today', used: 184, limit: 40, icon: ImageIcon },
-            { key: 'text', label: 'AI text calls today', used: 12, limit: 50, icon: Sparkles },
+            { key: 'text', label: 'Ad texts written today', used: 12, limit: 50, icon: Sparkles },
             { key: 'video', label: 'Video seconds today', used: 15, limit: 300, icon: Clock },
           ],
         }}
