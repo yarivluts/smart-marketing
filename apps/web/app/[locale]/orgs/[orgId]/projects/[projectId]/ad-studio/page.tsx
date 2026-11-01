@@ -15,7 +15,6 @@ import {
   Clapperboard,
   Clock,
   FileText,
-  Film,
   ImageIcon,
   Plus,
   Sparkles,
@@ -56,13 +55,12 @@ import {
   adStudioImageSlots,
   adStudioStages,
   currentAssembledVideo,
-  limitUsedPercent,
   summarizeAdStudio,
   type AdStudioStageStatus,
   type AdStudioVideoStageProgress,
 } from '@/lib/ad-studio/view';
 import { Link } from '@/i18n/navigation';
-import { StatCard } from '@/components/ui/stat-card';
+import { StudioStats } from '@/components/ad-studio/studio-stats';
 import {
   ChartCard,
   EmptyState,
@@ -432,36 +430,11 @@ export default async function AdStudioPage({
         title={t('title', { project: project.name })}
         description={t('description')}
       >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <StatCard title={t('kpiAds')} value={overview.briefs} icon={FileText} />
-          <StatCard
-            title={t('kpiScripted')}
-            value={overview.scripted}
-            icon={Film}
-            subtext={t('kpiScriptedHint', { seconds: overview.scriptedSeconds })}
-          />
-          <StatCard
-            title={t('kpiTextToday')}
-            value={usageToday.textGenerations}
-            icon={Sparkles}
-            subtext={t('kpiOfLimit', { limit: settings.dailyTextGenerations })}
-            progress={limitUsedPercent(usageToday.textGenerations, settings.dailyTextGenerations)}
-          />
-          <StatCard
-            title={t('kpiVideoToday')}
-            value={usageToday.videoSeconds}
-            icon={Clock}
-            subtext={t('kpiOfLimit', { limit: settings.dailyVideoSeconds })}
-            progress={limitUsedPercent(usageToday.videoSeconds, settings.dailyVideoSeconds)}
-          />
-          <StatCard
-            title={t('usageTodayImages')}
-            value={usageToday.images}
-            icon={ImageIcon}
-            subtext={t('kpiOfLimit', { limit: settings.dailyImages })}
-            progress={limitUsedPercent(usageToday.images, settings.dailyImages)}
-          />
-        </div>
+        <StudioStats
+          overview={overview}
+          usageToday={usageToday}
+          limits={{ text: settings.dailyTextGenerations, video: settings.dailyVideoSeconds, images: settings.dailyImages }}
+        />
       </PageHero>
       )}
 
