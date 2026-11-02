@@ -733,7 +733,7 @@
     "noTemplates": "No templates in this organization yet.",
     "peopleHeading": "People registry",
     "noPeople": "No people registered in this organization yet.",
-    "statusLabel": "Status: {status}",
+    "statusLabel": "Status: {status, select, approved {Approved} pending {Waiting for approval} other {{status}}}",
     "scopeSelectionLabel": "Scopes to request (comma-separated)",
     "requestAttachment": "Request",
     "requestError": "Couldn't send that request. Please try again.",
