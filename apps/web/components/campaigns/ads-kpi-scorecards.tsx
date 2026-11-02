@@ -86,7 +86,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         subtext={
           summary.totalClicks === null || summary.totalConversions === null
             ? undefined
-            : `${t('clicksCount', { count: summary.totalClicks.toLocaleString() })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`
+            : `${t('clicksCount', { count: summary.totalClicks })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`
         }
       />
 
