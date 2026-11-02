@@ -131,6 +131,8 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
         className="flex w-full flex-col gap-2 rounded-3xl border border-border/60 bg-card p-2 shadow-soft-lg sm:flex-row sm:items-center"
         onSubmit={(event) => {
           event.preventDefault();
+          // Pressing Enter again while the site is being sent must not start a second pilot.
+          if (pending) return;
           // An email is the commonest wrong paste: say so at once instead of a round trip to a vague refusal.
           if (EMAIL_PATTERN.test(url.trim())) {
             setMistake('invalid_site_email');
