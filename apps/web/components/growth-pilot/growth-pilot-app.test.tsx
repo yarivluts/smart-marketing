@@ -691,6 +691,16 @@ describe('GrowthPilotApp', () => {
       expect(link).toHaveTextContent(locale === 'en' ? 'Connect Facebook and Instagram' : heMessages.GrowthPilot.publish.status.connect);
     });
 
+    it.each(['en', 'he'] as const)('when publishing fails because automation is paused, the error links to the AI helper (%s)', async (locale) => {
+      stubFetch({ status: 409, body: { error: 'automation_stopped' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale });
+      fireEvent.click(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-approve'));
+      const alert = await screen.findByRole('alert');
+      const link = within(alert).getByTestId('growth-pilot-error-open-automation');
+      expect(link.getAttribute('href')).toMatch(/\/orgs\/o\/projects\/p\/automation$/);
+      expect(link).toHaveTextContent(locale === 'en' ? 'Open AI helper' : heMessages.GrowthPilot.errors.automationOpen);
+    });
+
     it('other errors, and a missing connect link, show no connect link', async () => {
       stubFetch({ status: 409, body: { error: 'meta_unavailable' } });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
