@@ -530,7 +530,7 @@
     "sourceStepHeading": "חיבור מקור נתונים",
     "sourceStepIntro": "חברו כלי שכבר מחזיק את הנתונים שלכם, או שלחו נתונים משלכם מהאתר או מהאפליקציה באמצעות מפתח גישה — שתי הדרכים תקינות.",
     "sourceStepPluginHeading": "שימוש בחיבור מוכן",
-    "sourceStepPluginConnected": "מחובר: {pluginId}",
+    "sourceStepPluginConnected": "מחובר: {name}",
     "sourceStepNoManifests": "עדיין לא נוספו לארגון הזה חיבורים מוכנים.",
     "sourceStepNoManifestsLink": "עיינו בחיבורים המוכנים",
     "sourceStepPushYourOwnHeading": "או שלחו נתונים משלכם",

@@ -129,6 +129,16 @@ export function pluginTypeForInstall(install: PluginInstallView, manifests: read
 }
 
 /**
+ * The human name of the plugin an install came from (its pinned manifest's `displayName`), so
+ * screens for newcomers never show the internal id (`com.example.stripe-pack`). Falls back to the
+ * id only if the manifest version is somehow missing.
+ */
+export function pluginDisplayNameForInstall(install: PluginInstallView, manifests: readonly PluginManifestView[]): string {
+  const manifest = manifests.find((entry) => entry.pluginId === install.pluginId && entry.version === install.version);
+  return manifest?.displayName.trim() || install.pluginId;
+}
+
+/**
  * The `config_schema` an install's own pinned manifest version declares
  * (KAN-125) — resolved the same "match by `pluginId`+`version`" way
  * {@link pluginTypeForInstall} does, since `PluginInstallView` itself only
