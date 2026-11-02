@@ -206,7 +206,7 @@ export default async function ProjectLayout({
   ];
 
   const secondaryItems: AppShellNavItem[] = [
-    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: 'FolderOpen' },
+    { href: `${base}/resources`, label: t('projectResourcesLink'), hint: tShell('resourcesHint'), icon: 'FolderOpen' },
     ...(canManageKeys
       ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: 'KeyRound' as const }]
       : []),
