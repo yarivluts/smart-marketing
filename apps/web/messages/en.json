@@ -530,7 +530,7 @@
     "sourceStepHeading": "Connect a data source",
     "sourceStepIntro": "Connect a tool that already holds your data, or send your own data from your website or app using an access key — either way works.",
     "sourceStepPluginHeading": "Use a ready-made connection",
-    "sourceStepPluginConnected": "Connected: {pluginId}",
+    "sourceStepPluginConnected": "Connected: {name}",
     "sourceStepNoManifests": "No ready-made connections have been added to this organization yet.",
     "sourceStepNoManifestsLink": "Browse ready-made connections",
     "sourceStepPushYourOwnHeading": "Or send your own data",

@@ -20,7 +20,7 @@ import {
   proposeOnboardingFunnelSteps,
 } from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
-import { hasActiveInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
+import { hasActiveInstall, pluginDisplayNameForInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
 import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView } from '@/lib/orgs/onboarding-view';
 import { buildOnboardingJourney, wrapIntoRows } from '@/lib/orgs/onboarding-journey';
 import { onboardingProgress, type OnboardingJourneyStep } from '@/lib/orgs/workspace-view';
@@ -313,7 +313,7 @@ async function SourcesStep({
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4">
           <h3 className="font-medium">{t('sourceStepPluginHeading')}</h3>
           {connectedSourceInstall ? (
-            <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}</p>
+            <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { name: pluginDisplayNameForInstall(connectedSourceInstall, manifestViews) })}</p>
           ) : installableSourceManifests.length === 0 ? (
             <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-input p-3">
               <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
