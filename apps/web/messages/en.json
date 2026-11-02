@@ -6053,6 +6053,7 @@
       "not_found": "We could not find that any more. Reload the page to see the latest.",
       "generic": "We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.",
       "invalid_budget": "Enter a daily budget above zero.",
+      "automationOpen": "Open AI helper",
       "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper and choose Resume automation, then try again.",
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
       "unauthorized": "You were signed out. Reload the page and sign in again - nothing was lost.",

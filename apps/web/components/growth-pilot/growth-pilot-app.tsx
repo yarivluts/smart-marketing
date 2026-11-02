@@ -76,7 +76,7 @@ function useCountryNames(): (codes: string[]) => string {
 
 const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 
-function ErrorLine({ code, id, metaConnectHref }: { code: string | null; id?: string; metaConnectHref?: string | null }): React.ReactElement | null {
+function ErrorLine({ code, id, metaConnectHref, automationHref }: { code: string | null; id?: string; metaConnectHref?: string | null; automationHref?: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
   const tc = useTranslations('GrowthPilot.publish.status');
   if (!code) return null;
@@ -92,6 +92,14 @@ function ErrorLine({ code, id, metaConnectHref }: { code: string | null; id?: st
             <a href={metaConnectHref} className="font-semibold underline" data-testid="growth-pilot-error-connect-meta">
               {tc('connect')}
             </a>
+          </>
+        ) : null}
+        {code === 'automation_stopped' && automationHref ? (
+          <>
+            {' '}
+            <Link href={automationHref} className="font-semibold underline" data-testid="growth-pilot-error-open-automation">
+              {t('automationOpen')}
+            </Link>
           </>
         ) : null}
       </span>
@@ -830,7 +838,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
         </div>
       </header>
 
-      <ErrorLine code={error} metaConnectHref={metaConnectHref ?? null} />
+      <ErrorLine code={error} metaConnectHref={metaConnectHref ?? null} automationHref={canExecute ? `/orgs/${orgId}/projects/${projectId}/automation` : null} />
 
       {newTarget !== null ? (
         <form
