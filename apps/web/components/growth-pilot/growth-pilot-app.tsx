@@ -324,6 +324,11 @@ function ProposalCard({
   const [changing, setChanging] = React.useState(false);
   const [confirmingOn, setConfirmingOn] = React.useState(false);
   const [text, setText] = React.useState('');
+  const changeInput = React.useRef<HTMLTextAreaElement>(null);
+  // Opening "Ask for a change" puts the cursor in the box, so keyboard, screen-reader and phone users can type at once.
+  React.useEffect(() => {
+    if (changing) changeInput.current?.focus();
+  }, [changing]);
   const draft = proposal.draft;
   const revising = proposal.status === 'revising';
   const last = proposal.changes.at(-1);
@@ -441,6 +446,7 @@ function ProposalCard({
           }}
         >
           <textarea
+            ref={changeInput}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={ads ? ta('changePlaceholder') : audience ? tu('changePlaceholder') : page ? tl('changePlaceholder') : t('changePlaceholder')}
