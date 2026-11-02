@@ -83,8 +83,8 @@ describe('NarrationEditor', () => {
     renderEditor({}, 'en');
     fireEvent.click(screen.getByRole('button', { name: 'Edit the scene' }));
     fireEvent.change(screen.getByLabelText('Narration'), { target: { value: `${PLAIN}!` } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add nikud' }));
-    await waitFor(() => expect((screen.getByLabelText('With nikud (what the narrator reads)') as HTMLTextAreaElement).value).toBe(`${VOCALIZED}!`));
+    fireEvent.click(screen.getByRole('button', { name: 'Add vowel marks' }));
+    await waitFor(() => expect((screen.getByLabelText('With vowel marks (what the narrator reads)') as HTMLTextAreaElement).value).toBe(`${VOCALIZED}!`));
     expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(`${BASE}/vocalize`);
     expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body))).toEqual({ text: `${PLAIN}!` });
     // Fresh nikud for the new words: no "will be redone" warning, and it is what gets saved.
@@ -118,7 +118,7 @@ describe('NarrationEditor', () => {
     expect((screen.getByLabelText(/^What the camera shows/) as HTMLTextAreaElement).value).toBe('A lawyer smiles at a phone');
     expect((screen.getByLabelText('Narration') as HTMLTextAreaElement).value).toBe(`${PLAIN} ${PLAIN}`);
     // New words: the old nikud is cleared, so it is added again (by the button or on save).
-    expect((screen.getByLabelText('With nikud (what the narrator reads)') as HTMLTextAreaElement).value).toBe('');
+    expect((screen.getByLabelText('With vowel marks (what the narrator reads)') as HTMLTextAreaElement).value).toBe('');
   });
 
   it('says a scene without narration has none', () => {
