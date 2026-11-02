@@ -371,6 +371,13 @@ describe('GrowthPilotApp', () => {
     expect(JSON.stringify(heMessages)).not.toContain('כבויים עבורו');
   });
 
+  it('puts the cursor in the change box as soon as "Ask for a change" is pressed', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    expect(screen.queryByTestId('growth-pilot-change-input')).toBeNull();
+    fireEvent.click(screen.getByTestId('growth-pilot-change'));
+    expect(screen.getByTestId('growth-pilot-change-input')).toHaveFocus();
+  });
+
   it('sends a change request to the AI and shows it while the AI rewrites', async () => {
     const fetchMock = stubFetch({ body: page({ proposals: [{ ...PROPOSAL, status: 'revising', changes: [{ text: 'Only Tel Aviv', on: 'x', outcome: 'pending', failureCode: null }] }] }) });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
