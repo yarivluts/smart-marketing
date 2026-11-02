@@ -111,6 +111,11 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
     return Number.isNaN(date.getTime()) ? value : format.format(date);
   };
   const projectBase = `/orgs/${orgId}/projects/${projectId}`;
+  const canFollowUp: Record<InsightKind, boolean> = {
+    tracking_alert: can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId }),
+    win_event: true,
+    metric_health: can(bindings, { type: 'user', id: user.id }, 'metrics.write', { orgId, projectId }),
+  };
 
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
@@ -201,9 +206,11 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
                                   {t('timeUtc', { time: formatDate(insight.occurredAt, timeFormat) })}
                                 </time>
                               </span>
-                              <Link href={`${projectBase}/${KIND_ROUTE[kind]}`} className="font-medium text-primary underline-offset-4 hover:underline">
-                                {t(`kindAction.${kind}`)}
-                              </Link>
+                              {canFollowUp[kind] ? (
+                                <Link href={`${projectBase}/${KIND_ROUTE[kind]}`} className="font-medium text-primary underline-offset-4 hover:underline">
+                                  {t(`kindAction.${kind}`)}
+                                </Link>
+                              ) : null}
                             </div>
                           </div>
                         </li>

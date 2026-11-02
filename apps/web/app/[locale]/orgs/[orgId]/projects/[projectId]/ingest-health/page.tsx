@@ -105,6 +105,9 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   // The backfill loop (resend pre-existing records) for the picked environment. Configuring it
   // needs project.configure; ingest.write holders who reach this page can follow its progress.
   const canConfigureBackfill = can(bindings, { type: 'user', id: user.id }, 'project.configure', { orgId, projectId });
+  const canViewBoards =
+    can(bindings, { type: 'user', id: user.id }, 'dashboards.read', { orgId, projectId }) ||
+    can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId });
   const setupFocus = setupHealth?.environments[0];
   const [backfillOverview, schemaDefsForBackfill, customerCoverage] =
     environmentId !== undefined
@@ -161,7 +164,13 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
       status: warehouseFreshness.status === 'error' ? 'error' : warehouseCount ? 'ok' : 'idle',
       href: `${base}#orchestration`,
     },
-    { id: 'reports', label: t('flowReports'), sublabel: t('flowReportsSub'), status: warehouseCount ? 'ok' : 'idle', href: `/orgs/${orgId}/projects/${projectId}/boards` },
+    {
+      id: 'reports',
+      label: t('flowReports'),
+      sublabel: t('flowReportsSub'),
+      status: warehouseCount ? 'ok' : 'idle',
+      href: canViewBoards ? `/orgs/${orgId}/projects/${projectId}/boards` : undefined,
+    },
   ];
   const flowEdges: FlowEdgeSpec[] = [
     { source: 'received', target: 'accepted', label: t('flowEdgeValidated'), animated: overall.acceptedCount > 0, status: 'ok' },

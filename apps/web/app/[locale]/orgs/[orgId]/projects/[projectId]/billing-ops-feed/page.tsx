@@ -86,6 +86,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
+  const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
 
   // Each feed is fetched one row beyond its cap so truncation is MEASURED rather
   // than inferred. `entries.length === cap` cannot distinguish "exactly 100
@@ -220,7 +221,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
       </PageHero>
 
       {entries.length === 0 ? (
-        <EmptyState icon={Receipt} title={t('empty')} description={t('emptyHint')} action={connectAction} />
+        <EmptyState icon={Receipt} title={t('empty')} description={t('emptyHint')} action={canInstallPlugins ? connectAction : undefined} />
       ) : (
         <>
           <div className="grid gap-6 lg:grid-cols-5">

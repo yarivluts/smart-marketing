@@ -130,7 +130,7 @@ export default async function ProjectLayout({
 
   // Restored pre-redesign items — see the module doc comment above.
   const orgItems: AppShellNavItem[] = [
-    { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
+    { href: `/orgs/${orgId}`, label: tShell('homeLink'), hint: tShell('homeHint'), icon: 'Home' },
     { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
     ...(canViewOrgAuditLog
       ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: 'ShieldCheck' as const }]
@@ -197,15 +197,16 @@ export default async function ProjectLayout({
   const connectionsItem: AppShellNavItem = {
     href: `/orgs/${orgId}/connections?projectId=${projectId}`,
     label: t('connectionsLink'),
+    hint: tShell('connectionsHint'),
     icon: 'KeyRound',
   };
   const setupItems: AppShellNavItem[] = [
-    ...(canManageProjects ? [{ href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' as const }] : []),
+    ...(canManageProjects ? [{ href: `${base}/settings`, label: tShell('settings'), hint: tShell('settingsHint'), icon: 'Settings' as const }] : []),
     connectionsItem,
   ];
 
   const secondaryItems: AppShellNavItem[] = [
-    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: 'FolderOpen' },
+    { href: `${base}/resources`, label: t('projectResourcesLink'), hint: tShell('resourcesHint'), icon: 'FolderOpen' },
     ...(canManageKeys
       ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: 'KeyRound' as const }]
       : []),
@@ -219,7 +220,7 @@ export default async function ProjectLayout({
 
   // A newcomer sees the essentials and the setup links; every other tool folds under "More tools"
   // (opened by itself when the current page is one of them).
-  const more = { id: 'more', label: tShell('moreTools') };
+  const more = { id: 'more', label: tShell('moreTools'), hint: tShell('moreToolsHint') };
   const sections: AppShellNavSection[] = [
     { items: primaryModuleItems },
     { items: setupItems },

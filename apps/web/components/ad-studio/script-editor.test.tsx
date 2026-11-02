@@ -193,10 +193,12 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     renderEditor();
     fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText(/What the camera shows/), { target: { value: 'Edited' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save script' }));
-    expect(await screen.findByText('GrowthOS could not finish that. Check your internet connection and try again in a moment.')).toBeInTheDocument();
+    expect(await screen.findByText('GrowthOS could not finish that. Try again in a minute. If it keeps happening, check your internet connection and reload the page.')).toBeInTheDocument();
   });
 
-  it('words the generic Ad Studio failure around the connection in both languages', () => {
+  it('words the generic Ad Studio failure as retry first, connection second, in both languages', () => {
+    expect(enMessages.AdStudio.errorGeneric.indexOf('Try again')).toBeLessThan(enMessages.AdStudio.errorGeneric.indexOf('internet'));
+    expect(heMessages.AdStudio.errorGeneric.indexOf('נסו שוב')).toBeLessThan(heMessages.AdStudio.errorGeneric.indexOf('האינטרנט'));
     for (const text of [enMessages.AdStudio.errorGeneric, heMessages.AdStudio.errorGeneric]) {
       expect(text).toContain('GrowthOS');
       expect(text).not.toMatch(/Something went wrong|משהו השתבש/);

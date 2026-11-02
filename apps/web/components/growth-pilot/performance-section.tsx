@@ -15,8 +15,9 @@ const PERIODS = [7, 30, 90] as const;
  * How the published ads are doing, straight from Meta: spend, reach, clicks and what they cost, and
  * a day-by-day chart - for the period the person picks. Nothing is shown that Meta did not report.
  */
-export function GrowthPerformanceSection({ base, onTargets }: { base: string; onTargets?: (byTarget: GrowthPerformanceSummary['byTarget'] | null) => void }): React.ReactElement | null {
+export function GrowthPerformanceSection({ base, onTargets, metaConnectHref }: { base: string; onTargets?: (byTarget: GrowthPerformanceSummary['byTarget'] | null) => void; metaConnectHref?: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.performance');
+  const tPublish = useTranslations('GrowthPilot.publish.status');
   const locale = useLocale();
   const [days, setDays] = React.useState<(typeof PERIODS)[number]>(30);
   const [data, setData] = React.useState<Performance | null>(null);
@@ -49,6 +50,7 @@ export function GrowthPerformanceSection({ base, onTargets }: { base: string; on
   const money = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const number = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
   const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 2 });
+  const missingMeta = data?.status === 'unavailable' && (data.reason === 'no_meta_credential' || data.reason === 'credential_not_configured');
   const totals = data?.status === 'ok' ? data.summary.totals : null;
   const cards = totals
     ? [
@@ -88,7 +90,15 @@ export function GrowthPerformanceSection({ base, onTargets }: { base: string; on
         </p>
       ) : data?.status === 'unavailable' ? (
         <p className="rounded-2xl bg-warning/10 px-4 py-3 text-sm text-warning" data-testid="growth-pilot-performance-unavailable">
-          {t(data.reason === 'no_meta_credential' || data.reason === 'credential_not_configured' ? 'unavailableMeta' : 'unavailable')}
+          {t(missingMeta ? 'unavailableMeta' : 'unavailable')}
+          {missingMeta && metaConnectHref ? (
+            <>
+              {' '}
+              <a href={metaConnectHref} className="font-semibold underline" data-testid="growth-pilot-performance-connect-meta">
+                {tPublish('connect')}
+              </a>
+            </>
+          ) : null}
         </p>
       ) : data?.status === 'ok' ? (
         <>

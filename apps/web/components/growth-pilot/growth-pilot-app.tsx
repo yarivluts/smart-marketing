@@ -76,14 +76,33 @@ function useCountryNames(): (codes: string[]) => string {
 
 const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 
-function ErrorLine({ code, id }: { code: string | null; id?: string }): React.ReactElement | null {
+function ErrorLine({ code, id, metaConnectHref, automationHref }: { code: string | null; id?: string; metaConnectHref?: string | null; automationHref?: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
+  const tc = useTranslations('GrowthPilot.publish.status');
   if (!code) return null;
   const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'ai_unavailable', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized', 'forbidden'].includes(code);
   return (
     <p id={id} role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {t(known ? (code as 'generic') : 'generic')}
+      <span>
+        {t(known ? (code as 'generic') : 'generic')}
+        {code === 'meta_unavailable' && metaConnectHref ? (
+          <>
+            {' '}
+            <a href={metaConnectHref} className="font-semibold underline" data-testid="growth-pilot-error-connect-meta">
+              {tc('connect')}
+            </a>
+          </>
+        ) : null}
+        {code === 'automation_stopped' && automationHref ? (
+          <>
+            {' '}
+            <Link href={automationHref} className="font-semibold underline" data-testid="growth-pilot-error-open-automation">
+              {t('automationOpen')}
+            </Link>
+          </>
+        ) : null}
+      </span>
     </p>
   );
 }
@@ -170,6 +189,11 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           </li>
         ))}
       </ol>
+      {onCancel ? (
+        <p className="max-w-xl text-sm text-muted-foreground" data-testid="growth-pilot-start-over-note">
+          {t('startOverNote')}
+        </p>
+      ) : null}
       {onCancel ? (
         <button type="button" onClick={onCancel} className="text-sm font-medium text-muted-foreground hover:text-foreground">
           {tf('back')}
@@ -267,6 +291,8 @@ function ProposalCard({
   studio,
   landing,
   host,
+  metaConnectHref,
+  canExecute = true,
 }: {
   proposal: GrowthProposalView;
   busy: boolean;
@@ -277,6 +303,10 @@ function ProposalCard({
   /** The landing page a `landing_page` proposal is about. */
   landing?: GrowthLandingPageView | null;
   host: string;
+  /** Where to connect the Meta ad account, shown when the audience step is waiting for it. */
+  metaConnectHref?: string | null;
+  /** Whether the caller holds `automation.execute` — required by `/proposals/[proposalId]` to approve `publish` or `activate`. */
+  canExecute?: boolean;
 }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.waiting');
   const ta = useTranslations('GrowthPilot.ads');
@@ -318,7 +348,7 @@ function ProposalCard({
               <span className="font-semibold text-foreground">{page.content.headline}</span> - {page.content.subheadline}
             </p>
           ) : null}
-          {audience ? <AudienceSummary plan={audience} /> : null}
+          {audience ? <AudienceSummary plan={audience} metaConnectHref={metaConnectHref ?? null} /> : null}
           {platform ? (
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground" data-testid="growth-pilot-publish">
               <p>{proposal.kind === 'publish' ? tp('description', { count: platform.imageIds.length }) : tp('activateDescription', { budget: platform.dailyBudget })}</p>
@@ -432,7 +462,7 @@ function ProposalCard({
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
-          {proposal.kind === 'publish' ? (
+          {proposal.kind === 'publish' && canExecute ? (
             <label className="flex flex-col gap-1 text-sm">
               <span className="flex items-center gap-2">
                 <span className="font-medium">{tp('budget')}</span>
@@ -448,15 +478,17 @@ function ProposalCard({
                   aria-describedby="growth-pilot-budget-hint"
                 />
               </span>
-              <span id="growth-pilot-budget-hint" className={Number(budget) > 0 ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
-                {Number(budget) > 0 ? tp('budgetHint') : tp('budgetNeeded')}
+              <span id="growth-pilot-budget-hint" className={Number(budget) > 0 || budget.trim() === '' ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
+                {Number(budget) > 0 ? tp('budgetHint') : budget.trim() === '' ? tp('budgetStart') : tp('budgetNeeded')}
               </span>
             </label>
           ) : null}
-          <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-            {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : t('approve')}
-          </button>
+          {!platform || canExecute ? (
+            <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
+              {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : t('approve')}
+            </button>
+          ) : null}
           {confirmingOn && !busy ? (
             <button type="button" onClick={() => setConfirmingOn(false)} className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted" data-testid="growth-pilot-activate-cancel">
               {tp('confirmCancel')}
@@ -472,6 +504,11 @@ function ProposalCard({
             <X className="h-4 w-4" aria-hidden="true" />
             {t('reject')}
           </button>
+          {platform && !canExecute ? (
+            <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-needs-owner">
+              {t('needsOwner')}
+            </p>
+          ) : null}
           {platform ? null : (
             <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-approve-hint">
               {t(`approveHint.${ads ? 'ads' : audience ? 'audience' : page ? 'landing' : 'target'}`)}
@@ -486,7 +523,7 @@ function ProposalCard({
   );
 }
 
-function TargetCard({ target, landingSlug, metaConnectHref, results }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement {
+function TargetCard({ target, landingSlug, metaConnectHref, results, turnOnWaiting = false }: { target: GrowthTargetView; landingSlug: string | null; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null; turnOnWaiting?: boolean }): React.ReactElement {
   const t = useTranslations('GrowthPilot.targets');
   return (
     <li className="flex flex-col gap-2 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" data-testid="growth-pilot-target">
@@ -505,7 +542,7 @@ function TargetCard({ target, landingSlug, metaConnectHref, results }: { target:
       {target.origin === 'request' ? <span className="text-[11px] text-muted-foreground">{t('requested')}</span> : null}
       <TargetLandingLine target={target} slug={landingSlug} />
       <TargetAudienceLine target={target} />
-      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} results={results} />
+      <TargetPublishLine target={target} metaConnectHref={metaConnectHref} results={results} turnOnWaiting={turnOnWaiting} />
       <TargetAdsLine target={target} />
     </li>
   );
@@ -532,7 +569,7 @@ function TargetLandingLine({ target, slug }: { target: GrowthTargetView; slug: s
 }
 
 /** Where the target's ads stand on the platform; when Meta is missing, the way to connect it. */
-function TargetPublishLine({ target, metaConnectHref, results }: { target: GrowthTargetView; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null }): React.ReactElement | null {
+function TargetPublishLine({ target, metaConnectHref, results, turnOnWaiting = false }: { target: GrowthTargetView; metaConnectHref: string | null; results?: GrowthPerformanceTotals | null; turnOnWaiting?: boolean }): React.ReactElement | null {
   const reasonOf = useReason();
   const t = useTranslations('GrowthPilot.publish.status');
   const tr = useTranslations('GrowthPilot.performance');
@@ -543,6 +580,8 @@ function TargetPublishLine({ target, metaConnectHref, results }: { target: Growt
     <p className={cn('flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2 text-xs', status === 'running' ? 'text-success' : status === 'failed' || status === 'needs_meta' ? 'text-warning' : 'text-muted-foreground')} data-testid="growth-pilot-target-publish" data-publish={status}>
       <Send className="h-3.5 w-3.5" aria-hidden="true" />
       {status === 'failed' ? t('failed', { reason: reasonOf(target.publishFailure === 'quota_exceeded' ? 'platform_busy' : target.publishFailure) }) : t(status)}
+      {status === 'published' && turnOnWaiting ? <span data-testid="growth-pilot-turn-on-waiting">{t('turnOnWaiting')}</span> : null}
+      {status === 'published' && !turnOnWaiting ? <span data-testid="growth-pilot-turn-on-declined">{t('turnOnDeclined')}</span> : null}
       {results && (status === 'published' || status === 'running') ? (
         <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
           {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}
@@ -572,9 +611,11 @@ function TargetAudienceLine({ target }: { target: GrowthTargetView }): React.Rea
 }
 
 /** An audience proposal: who, where, which interests, and how many people Meta says it reaches. */
-function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audience']> }): React.ReactElement {
+function AudienceSummary({ plan, metaConnectHref }: { plan: NonNullable<GrowthProposalView['audience']>; metaConnectHref: string | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.audience');
   const countryNames = useCountryNames();
+  const tc = useTranslations('GrowthPilot.publish.status');
+  const missingMeta = plan.meta === 'no_meta_credential' || plan.meta === 'credential_not_configured';
   const number = new Intl.NumberFormat(useLocale(), { notation: 'compact', maximumFractionDigits: 1 });
   const genders = plan.targeting.genders.length ? plan.targeting.genders.map((gender) => t(`gender.${gender}`)).join(', ') : t('gender.all');
   return (
@@ -611,7 +652,15 @@ function AudienceSummary({ plan }: { plan: NonNullable<GrowthProposalView['audie
       ) : null}
       {plan.meta !== 'ok' ? (
         <p className="text-xs text-muted-foreground" data-testid="growth-pilot-audience-meta">
-          {t(plan.meta === 'no_meta_credential' || plan.meta === 'credential_not_configured' ? 'metaMissing' : 'metaFailed')}
+          {t(missingMeta ? 'metaMissing' : 'metaFailed')}
+          {missingMeta && metaConnectHref ? (
+            <>
+              {' '}
+              <a href={metaConnectHref} className="font-semibold text-primary hover:underline" data-testid="growth-pilot-audience-connect-meta">
+                {tc('connect')}
+              </a>
+            </>
+          ) : null}
         </p>
       ) : null}
     </div>
@@ -666,6 +715,8 @@ export interface GrowthPilotAppProps {
   initial: GrowthPilotPageData | null;
   /** Where connecting a Meta ad account starts (and returns here); null when the person cannot connect accounts. */
   metaConnectHref?: string | null;
+  /** Whether the caller holds `automation.execute` — required to approve `publish` and `activate` proposals. */
+  canExecute?: boolean;
 }
 
 /**
@@ -673,7 +724,7 @@ export interface GrowthPilotAppProps {
  * and proposes what to grow, and every proposal waits for the person - approve, reject, or ask the AI
  * for a change. The person can pause the pilot or ask for more targets at any time.
  */
-export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: GrowthPilotAppProps): React.ReactElement {
+export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, canExecute = true }: GrowthPilotAppProps): React.ReactElement {
   const t = useTranslations('GrowthPilot');
   const base = `/api/orgs/${orgId}/projects/${projectId}/growth-pilot`;
   const studio = { media: `/api/orgs/${orgId}/projects/${projectId}/ad-studio`, page: `/orgs/${orgId}/projects/${projectId}/ad-studio` };
@@ -787,7 +838,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
         </div>
       </header>
 
-      <ErrorLine code={error} />
+      <ErrorLine code={error} metaConnectHref={metaConnectHref ?? null} automationHref={canExecute ? `/orgs/${orgId}/projects/${projectId}/automation` : null} />
 
       {newTarget !== null ? (
         <form
@@ -821,7 +872,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          {data.targets.some((target) => target.publishStatus === 'published' || target.publishStatus === 'running') ? <GrowthPerformanceSection base={base} onTargets={setByTarget} /> : null}
+          {data.targets.some((target) => target.publishStatus === 'published' || target.publishStatus === 'running') ? <GrowthPerformanceSection base={base} onTargets={setByTarget} metaConnectHref={metaConnectHref ?? null} /> : null}
           <section className="flex flex-col gap-3" aria-labelledby="growth-pilot-waiting">
             <h2 id="growth-pilot-waiting" className="flex items-center gap-2 font-pp-display text-xl font-semibold">
               {t('waiting.title')}
@@ -840,7 +891,9 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
                     onRevise={(text) => void run(proposal.id, `/proposals/${proposal.id}`, { action: 'revise', request: text })}
                     studio={studio}
                     host={host}
+                    metaConnectHref={metaConnectHref ?? null}
                     landing={proposal.landingPageId ? data.landingPages.find((page) => page.id === proposal.landingPageId) : null}
+                    canExecute={canExecute}
                   />
                 ))}
               </ul>
@@ -856,7 +909,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref }: G
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {targets.map((target) => (
-                  <TargetCard key={target.id} target={target} results={byTarget?.[target.id] ?? null} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
+                  <TargetCard key={target.id} target={target} turnOnWaiting={waiting.some((proposal) => proposal.kind === 'activate' && proposal.targetId === target.id)} results={byTarget?.[target.id] ?? null} metaConnectHref={metaConnectHref ?? null} landingSlug={data.landingPages.find((page) => page.id === target.landingPageId)?.slug ?? null} />
                 ))}
               </ul>
             )}

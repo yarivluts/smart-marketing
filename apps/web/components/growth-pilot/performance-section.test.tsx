@@ -64,4 +64,24 @@ describe('GrowthPerformanceSection', () => {
     renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
     expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Facebook and Instagram did not return the numbers');
   });
+
+  it('offers a way to connect Meta when that is what is missing, and not for other failures', async () => {
+    stub({ status: 'unavailable', reason: 'no_meta_credential' });
+    const first = renderWithIntl(<GrowthPerformanceSection base="/b" metaConnectHref="/api/integrations/meta/start?orgId=o" />, { locale: 'en' });
+    const link = await screen.findByTestId('growth-pilot-performance-connect-meta');
+    expect(link).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
+    expect(link).toHaveTextContent('Connect Facebook and Instagram');
+    first.unmount();
+
+    stub({ status: 'unavailable', reason: 'no_meta_credential' });
+    const second = renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
+    await screen.findByTestId('growth-pilot-performance-unavailable');
+    expect(screen.queryByTestId('growth-pilot-performance-connect-meta')).toBeNull();
+    second.unmount();
+
+    stub({ status: 'unavailable', reason: 'error' });
+    renderWithIntl(<GrowthPerformanceSection base="/b" metaConnectHref="/x" />, { locale: 'en' });
+    await screen.findByTestId('growth-pilot-performance-unavailable');
+    expect(screen.queryByTestId('growth-pilot-performance-connect-meta')).toBeNull();
+  });
 });

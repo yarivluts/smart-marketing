@@ -84,6 +84,21 @@ describe('GrowthPilotApp', () => {
     expect(await screen.findByTestId('growth-pilot-center')).toBeInTheDocument();
   });
 
+  it('tells someone starting over that the current pilot goes to the archive, and not a first-time visitor', () => {
+    const first = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    expect(screen.queryByTestId('growth-pilot-start-over-note')).not.toBeInTheDocument();
+    first.unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: /Start over with another site/ }));
+    expect(screen.getByTestId('growth-pilot-start-over-note')).toHaveTextContent('moves it to the archive and begins a new one');
+  });
+
+  it('says the same in Hebrew', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
+    fireEvent.click(screen.getByRole('button', { name: heMessages.GrowthPilot.header.startOver }));
+    expect(screen.getByTestId('growth-pilot-start-over-note')).toHaveTextContent(heMessages.GrowthPilot.start.startOverNote);
+  });
+
   it('tells a newcomer which address to enter, and ties the hint to the input', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
     const hint = screen.getByText(/Not sure which address\? Use your home page/).closest('p') as HTMLElement;
@@ -348,6 +363,12 @@ describe('GrowthPilotApp', () => {
     unmount();
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
     expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.approveHint.target);
+  });
+
+  it('addresses the person, not a third party, in the Hebrew approve hint and the protected-ad note', () => {
+    expect(heMessages.GrowthPilot.waiting.approveHint.target).toContain('עבורכם');
+    expect(heMessages.GrowthPilot.waiting.approveHint.target).not.toContain('עבורו');
+    expect(JSON.stringify(heMessages)).not.toContain('כבויים עבורו');
   });
 
   it('sends a change request to the AI and shows it while the AI rewrites', async () => {
@@ -623,12 +644,70 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-audience-meta').textContent ?? '').not.toMatch(/^Meta /);
       expect(screen.getByTestId('growth-pilot-target-audience')).toHaveTextContent('We could not work out who to reach (today\'s AI limit is used up, it resets tomorrow)');
     });
+
+    it('puts the connect link right under the "connect your ad account" note, only when that is what is missing', () => {
+      const href = '/api/integrations/meta/start?orgId=o';
+      const noMeta = { ...AUDIENCE, audience: { ...PLAN, meta: 'no_meta_credential', reach: null } };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref={href} initial={page({ proposals: [noMeta], targets: [TARGET] })} />, { locale: 'en' });
+      const link = within(screen.getByTestId('growth-pilot-audience-meta')).getByTestId('growth-pilot-audience-connect-meta');
+      expect(link).toHaveAttribute('href', href);
+      expect(link).toHaveTextContent('Connect Facebook and Instagram');
+      view.unmount();
+      // Meta answered badly: connecting again would not help, so no link.
+      const failed = { ...AUDIENCE, audience: { ...PLAN, meta: 'meta_error', reach: null } };
+      const second = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref={href} initial={page({ proposals: [failed], targets: [TARGET] })} />, { locale: 'en' });
+      expect(screen.queryByTestId('growth-pilot-audience-connect-meta')).toBeNull();
+      second.unmount();
+      // No link available (no permission): the note stays, without a dead link.
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [noMeta], targets: [TARGET] })} />, { locale: 'he' });
+      expect(screen.queryByTestId('growth-pilot-audience-connect-meta')).toBeNull();
+    });
   });
 
   describe('publishing', () => {
     const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'ready' as const, publishFailure: null };
     const PLAN = { destination: 'meta' as const, imageIds: ['i1', 'i2'], dailyBudget: 20, linkUrl: 'https://app.growthos.io/lp/abc', campaignName: 'EasySign - Free plan', countries: ['IL'] };
     const PUBLISH: GrowthProposalView = { ...PROPOSAL, id: 'pub1', kind: 'publish', briefId: 'b1', publish: PLAN, previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Free plan', description: '', audience: '', reason: '' } };
+
+    it('does not scold a newcomer for an empty budget box: a calm hint first, a warning only for zero', () => {
+      const empty: GrowthProposalView = { ...PUBLISH, publish: { ...PLAN, dailyBudget: undefined as unknown as number } };
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [empty], targets: [TARGET] })} />, { locale: 'en' });
+      const box = screen.getByTestId('growth-pilot-budget');
+      expect(box).toHaveValue(null);
+      expect(box).toHaveAccessibleDescription(/^Not sure what to enter\? A small amount is fine to start/);
+      expect(document.getElementById('growth-pilot-budget-hint')).not.toHaveClass('text-destructive');
+      expect(screen.getByTestId('growth-pilot-approve')).toBeDisabled();
+      fireEvent.change(box, { target: { value: '0' } });
+      expect(document.getElementById('growth-pilot-budget-hint')).toHaveClass('text-destructive');
+    });
+
+    it.each(['en', 'he'] as const)('when publishing fails because Meta is not connected, the error offers the connect link (%s)', async (locale) => {
+      stubFetch({ status: 409, body: { error: 'meta_unavailable' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref="/api/integrations/meta/start?orgId=o" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale });
+      fireEvent.click(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-approve'));
+      const alert = await screen.findByRole('alert');
+      const link = within(alert).getByTestId('growth-pilot-error-connect-meta');
+      expect(link).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
+      expect(link).toHaveTextContent(locale === 'en' ? 'Connect Facebook and Instagram' : heMessages.GrowthPilot.publish.status.connect);
+    });
+
+    it.each(['en', 'he'] as const)('when publishing fails because automation is paused, the error links to the AI helper (%s)', async (locale) => {
+      stubFetch({ status: 409, body: { error: 'automation_stopped' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale });
+      fireEvent.click(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-approve'));
+      const alert = await screen.findByRole('alert');
+      const link = within(alert).getByTestId('growth-pilot-error-open-automation');
+      expect(link.getAttribute('href')).toMatch(/\/orgs\/o\/projects\/p\/automation$/);
+      expect(link).toHaveTextContent(locale === 'en' ? 'Open AI helper' : heMessages.GrowthPilot.errors.automationOpen);
+    });
+
+    it('other errors, and a missing connect link, show no connect link', async () => {
+      stubFetch({ status: 409, body: { error: 'meta_unavailable' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
+      fireEvent.click(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-approve'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Ad platform connections');
+      expect(screen.queryByTestId('growth-pilot-error-connect-meta')).toBeNull();
+    });
 
     it('publishes the approved images paused, at the budget the person sets - a yes or no, not a change for the AI', async () => {
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'published' }] }) }, { body: { status: 'ok', since: 'a', until: 'b', summary: { totals: { spend: 0, impressions: 0, clicks: 0, linkClicks: 0, conversions: 0, ctr: null, cpc: null, costPerConversion: null }, daily: [], byTarget: {} } } });
@@ -665,6 +744,30 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Turning them on makes them visible and starts spending - up to 20 a day');
       expect(screen.getByTestId('growth-pilot-approve')).toHaveTextContent('Turn on the ads');
       expect(screen.queryByTestId('growth-pilot-budget')).toBeNull();
+    });
+
+    it('tells a newcomer where to turn the ads on, only while that card is waiting', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const published = [{ ...TARGET, publishStatus: 'published' as const }];
+      const waiting = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-turn-on-waiting')).toHaveTextContent('turn them on in the "Turn on the ads" card waiting for your approval');
+      waiting.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-turn-on-waiting')).toHaveTextContent('הפעילו אותן בכרטיס');
+      he.unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'en' });
+      expect(screen.queryByTestId('growth-pilot-turn-on-waiting')).toBeNull();
+      expect(screen.getByTestId('growth-pilot-turn-on-declined')).toHaveTextContent('The ads stay switched off and nothing is spent');
+    });
+
+    it('when no turn-on card is waiting, says the ads stay off and how to turn them on, in English and Hebrew', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const published = [{ ...TARGET, publishStatus: 'published' as const }];
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-turn-on-declined')).toHaveTextContent('נשארות כבויות');
+      he.unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ACTIVATE], targets: published })} />, { locale: 'en' });
+      expect(screen.queryByTestId('growth-pilot-turn-on-declined')).toBeNull();
     });
 
     it('Reject on the publish and turn-on cards says what it really does, in English and Hebrew', () => {
@@ -711,6 +814,30 @@ describe('GrowthPilotApp', () => {
       const line = screen.getByTestId('growth-pilot-target-publish');
       expect(line).toHaveTextContent('Ready to publish once your Facebook and Instagram (Meta) ad account is connected.');
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
+    });
+
+    it('hides publish and activate approval controls when canExecute is false while keeping reject and non-platform approvals available (KAN-152)', () => {
+      const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
+      const publishView = renderWithIntl(
+        <GrowthPilotApp orgId="o" projectId="p" canExecute={false} initial={page({ proposals: [PUBLISH, PROPOSAL], targets: [TARGET] })} />,
+        { locale: 'en' },
+      );
+      const [publishCard, targetCard] = screen.getAllByTestId('growth-pilot-proposal');
+      expect(within(publishCard).queryByTestId('growth-pilot-budget')).toBeNull();
+      expect(within(publishCard).queryByTestId('growth-pilot-approve')).toBeNull();
+      expect(within(publishCard).getByTestId('growth-pilot-reject')).toBeInTheDocument();
+      expect(within(publishCard).getByTestId('growth-pilot-needs-owner')).toHaveTextContent('Only an owner or admin can publish or turn on ads.');
+      expect(within(targetCard).queryByTestId('growth-pilot-needs-owner')).toBeNull();
+      expect(within(targetCard).getByTestId('growth-pilot-approve')).toBeInTheDocument();
+      publishView.unmount();
+
+      renderWithIntl(
+        <GrowthPilotApp orgId="o" projectId="p" canExecute={false} initial={page({ proposals: [ACTIVATE], targets: [{ ...TARGET, publishStatus: 'published' }] })} />,
+        { locale: 'en' },
+      );
+      const activateCard = screen.getByTestId('growth-pilot-proposal');
+      expect(within(activateCard).queryByTestId('growth-pilot-approve')).toBeNull();
+      expect(within(activateCard).getByTestId('growth-pilot-reject')).toBeInTheDocument();
     });
   });
 

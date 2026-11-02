@@ -51,10 +51,15 @@ export function CreateOrganizationForm(): React.ReactElement {
           name="name"
           required
           aria-invalid={error === 'name'}
-          aria-describedby={error === 'name' ? 'org-name-error' : undefined}
+          aria-describedby={error === 'name' ? 'org-name-error' : 'org-name-hint'}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
+        {error === 'name' ? null : (
+          <p id="org-name-hint" className="text-sm text-muted-foreground">
+            {t('nameHint')}
+          </p>
+        )}
       </div>
       {error ? (
         <p id={error === 'name' ? 'org-name-error' : undefined} role="alert" className="text-sm text-destructive">

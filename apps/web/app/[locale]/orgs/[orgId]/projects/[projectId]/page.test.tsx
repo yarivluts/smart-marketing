@@ -30,9 +30,22 @@ describe('project root', () => {
     expect(can).toHaveBeenCalledWith([], { type: 'user', id: 'u1' }, 'ai.use', { orgId: 'o1', projectId: 'p1' });
   });
 
-  it('keeps Campaigns for someone who cannot open Growth Pilot', async () => {
-    can.mockReturnValue(false);
+  it('keeps Campaigns for someone who cannot open Growth Pilot but can read dashboards', async () => {
+    can.mockImplementation((_bindings, _principal, permission) => permission === 'dashboards.read');
     await expect(ProjectRootPage(params)).rejects.toThrow('REDIRECT:/he/orgs/o1/projects/p1/campaigns');
+  });
+
+  it('routes ingest-only members to Installation instead of a 404 Campaigns page', async () => {
+    can.mockImplementation((_bindings, _principal, permission) => permission === 'ingest.write');
+    await expect(ProjectRootPage(params)).rejects.toThrow('REDIRECT:/he/orgs/o1/projects/p1/install');
+  });
+
+  it('routes project-settings-only members to Settings and falls back to Resources', async () => {
+    can.mockImplementation((_bindings, _principal, permission) => permission === 'project.manage');
+    await expect(ProjectRootPage(params)).rejects.toThrow('REDIRECT:/he/orgs/o1/projects/p1/settings');
+
+    can.mockReturnValue(false);
+    await expect(ProjectRootPage(params)).rejects.toThrow('REDIRECT:/he/orgs/o1/projects/p1/resources');
   });
 
   it('falls back to Campaigns without a session', async () => {

@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { can, isEnvironment, type Environment } from '@growthos/shared';
+import { can, isEnvironment, isRole, type Environment } from '@growthos/shared';
 import {
   Bot,
   Building2,
@@ -138,10 +138,11 @@ export default async function OrgDetailPage({
     ? await loadDashboardProject({ orgId, project: currentProject, userId: user.id, bindings, now })
     : null;
 
-  const [t, tWinRules, tShell] = await Promise.all([
+  const [t, tWinRules, tShell, tRoles] = await Promise.all([
     getTranslations('OrgDetailPage'),
     getTranslations('WinRules'),
     getTranslations('AppShell'),
+    getTranslations('Roles'),
   ]);
 
   // Restored pre-tri-module-redesign per-feature quick links (see
@@ -395,7 +396,7 @@ export default async function OrgDetailPage({
                   label={t('teamMixTitle')}
                   centerValue={numberFormat.format(activeMembers.length)}
                   centerLabel={t('teamMixCenter')}
-                  data={roleMix.map((entry) => ({ label: entry.key, value: entry.count }))}
+                  data={roleMix.map((entry) => ({ label: isRole(entry.key) ? tRoles(entry.key) : entry.key, value: entry.count }))}
                   size={150}
                   layout="stacked"
                 />

@@ -55,7 +55,28 @@ describe('AdsKpiScorecards', () => {
     // 6. Active Campaigns
     expect(screen.getByText('Active ads')).toBeInTheDocument();
     expect(screen.getByText('5 / 6')).toBeInTheDocument();
-    expect(screen.getByText('5 live delivery')).toBeInTheDocument();
+    expect(screen.getByText('5 ads showing now')).toBeInTheDocument();
+  });
+
+  it('uses singular wording for a count of one', () => {
+    renderWithIntl(
+      <AdsKpiScorecards
+        summary={{ ...mockSummary, totalClicks: 1, totalConversions: 1, activeCampaignsCount: 1 }}
+      />,
+    );
+    expect(screen.getByText('1 click · 1 sign-up or sale')).toBeInTheDocument();
+    expect(screen.getByText('1 ad showing now')).toBeInTheDocument();
+  });
+
+  it('uses Hebrew singular wording for a count of one', () => {
+    renderWithIntl(
+      <AdsKpiScorecards
+        summary={{ ...mockSummary, totalClicks: 1, totalConversions: 1, activeCampaignsCount: 1 }}
+      />,
+      { locale: 'he' },
+    );
+    expect(screen.getByText(/^\u05D4\u05E7\u05DC\u05E7\u05D4 \u05D0\u05D7\u05EA/)).toBeInTheDocument();
+    expect(screen.getByText('\u05DE\u05D5\u05D3\u05E2\u05D4 \u05D0\u05D7\u05EA \u05DE\u05D5\u05E6\u05D2\u05EA \u05E2\u05DB\u05E9\u05D9\u05D5')).toBeInTheDocument();
   });
 
   it('renders correctly in Hebrew RTL locale with numeric isolation', () => {

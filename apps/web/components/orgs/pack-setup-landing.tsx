@@ -24,6 +24,8 @@ export interface PackSetupLandingProps {
   featuresTitle: string;
   installTitle: string;
   packs: readonly InstallBuiltinPackOption[];
+  /** Whether the viewer holds `plugin.install` for this project. Defaults to `true`. */
+  canInstall?: boolean;
 }
 
 /**
@@ -32,7 +34,7 @@ export interface PackSetupLandingProps {
  * one-click install card. The tour is words and icons only - no illustrative numbers, because a
  * preview chart filled with made-up values reads as this project's data (Jira B15).
  */
-export function PackSetupLanding({ orgId, projectId, icon, eyebrow, title, intro, features, featuresTitle, installTitle, packs }: PackSetupLandingProps): React.ReactElement {
+export function PackSetupLanding({ orgId, projectId, icon, eyebrow, title, intro, features, featuresTitle, installTitle, packs, canInstall = true }: PackSetupLandingProps): React.ReactElement {
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={icon} eyebrow={eyebrow} title={title} description={intro} />
@@ -55,7 +57,7 @@ export function PackSetupLanding({ orgId, projectId, icon, eyebrow, title, intro
       </section>
 
       <ChartCard title={installTitle} icon={PackageOpen}>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={packs} />
+        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={packs} canInstall={canInstall} />
       </ChartCard>
     </div>
   );
