@@ -129,7 +129,7 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderEditor({ initialScenes: HEBREW, language: 'he' });
     const field = within(screen.getByTestId('ad-studio-pronunciation-1'));
-    fireEvent.click(field.getByRole('button', { name: 'Add nikud' }));
+    fireEvent.click(field.getByRole('button', { name: 'Add vowel marks' }));
     await waitFor(() => expect((field.getByLabelText(/Pronunciation/) as HTMLTextAreaElement).value).toBe(vocalized));
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/orgs/o/projects/p/ad-studio/briefs/b1/vocalize');

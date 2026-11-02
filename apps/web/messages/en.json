@@ -4186,7 +4186,7 @@
       "image": "Image",
       "image_edit": "Image edit",
       "video_qa": "AI video check",
-      "vocalize": "Narration nikud",
+      "vocalize": "Narration vowel marks",
       "reference_image": "Scene illustration",
       "ad_copy": "Ad text",
       "search_ad": "Search ad",
@@ -4789,8 +4789,8 @@
       },
       "qaRetriesImagesHint": "Images get at least 2 guided re-renders when re-renders are on: an image costs a fraction of a clip, and each retry is told what to fix."
     },
-    "pronunciation": "Pronunciation (with nikud)",
-    "pronunciationAuto": "Added automatically when you save: the same words with full nikud and numbers written as words, so the AI narrator reads them right.",
+    "pronunciation": "Pronunciation (with Hebrew vowel marks)",
+    "pronunciationAuto": "Added automatically when you save: the same words with full Hebrew vowel marks (nikud) and numbers written as words, so the AI narrator reads them right.",
     "pronunciationHint": "This is what the narrator reads. Fix any word that is vocalized wrong.",
     "pronunciationStale": "The narration changed - the pronunciation will be redone when you save.",
     "references": {
@@ -4902,16 +4902,16 @@
     },
     "narration": {
       "label": "Narration",
-      "readWithNikud": "What the narrator reads (with nikud)",
+      "readWithNikud": "What the narrator reads (with Hebrew vowel marks)",
       "edit": "Edit the scene",
       "none": "No narration in this scene.",
-      "willVocalize": "Nikud is added automatically on save and before the scene is made.",
+      "willVocalize": "Hebrew vowel marks (nikud) are added automatically on save and before the scene is made.",
       "textLabel": "Narration",
-      "nikudLabel": "With nikud (what the narrator reads)",
+      "nikudLabel": "With vowel marks (what the narrator reads)",
       "nikudHint": "You can correct a vowel here; the narrator reads exactly this.",
-      "nikudWillRedo": "The words changed - the nikud is redone automatically when you save.",
+      "nikudWillRedo": "The words changed - the vowel marks are redone automatically when you save.",
       "save": "Save narration",
-      "savingWithNikud": "Saving and adding nikud…",
+      "savingWithNikud": "Saving and adding vowel marks…",
       "cancel": "Cancel",
       "saved": "Saved. Make the scene again to see and hear the change.",
       "sceneLabel": "What the camera shows",
@@ -4926,8 +4926,8 @@
       "discardProposal": "Discard"
     },
     "nikud": {
-      "add": "Add nikud",
-      "adding": "Adding nikud…"
+      "add": "Add vowel marks",
+      "adding": "Adding vowel marks…"
     },
     "speaker": {
       "label": "Who says the narration",
