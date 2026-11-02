@@ -65,6 +65,19 @@ afterEach(() => {
 });
 
 describe('GrowthPilotApp', () => {
+  it('pressing Enter again while the site is being sent does not start a second pilot', async () => {
+    const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const input = screen.getByTestId('growth-pilot-site-input');
+    fireEvent.change(input, { target: { value: 'easysign.co.il' } });
+    const form = input.closest('form') as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(screen.queryByTestId('growth-pilot-start')).not.toBeInTheDocument());
+    expect(fetchMock.mock.calls.filter(([url, init]) => url === BASE && (init as RequestInit | undefined)?.method === 'POST')).toHaveLength(1);
+  });
+
   it('starts with one input, the website, and sends it', async () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
