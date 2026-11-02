@@ -61,7 +61,7 @@ describe('CreativePreviewGallery', () => {
     renderWithIntl(<CreativePreviewGallery items={mockItems} />);
 
     expect(screen.getByTestId('creative-preview-gallery')).toBeInTheDocument();
-    expect(screen.getByText('All Platforms')).toBeInTheDocument();
+    expect(screen.getByText('All platforms')).toBeInTheDocument();
     expect(screen.getByText('Facebook & Instagram')).toBeInTheDocument();
     expect(screen.getByText('Google Ads')).toBeInTheDocument();
 
