@@ -4133,7 +4133,7 @@
     "errorSignedOut": "You were signed out. Reload the page and sign in again - nothing was lost.",
     "errorForbidden": "You do not have permission to do this in this project. Ask the project owner to give you access, then try again.",
     "errorNotFound": "This ad, picture or video is no longer here - it may have been removed. Reload the page to see what is there now.",
-    "errorGeneric": "GrowthOS could not finish that. Check your internet connection and try again in a moment.",
+    "errorGeneric": "GrowthOS could not finish that. Try again in a minute. If it keeps happening, check your internet connection and reload the page.",
     "detailsSaved": "Details saved.",
     "fieldName": "Ad name",
     "fieldNameHint": "For example: Spring sale video - only you see this name",
