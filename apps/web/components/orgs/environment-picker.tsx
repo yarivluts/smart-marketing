@@ -16,6 +16,8 @@ export interface EnvironmentPickerProps {
   optionLabels: Record<Environment, string>;
   /** Shown whenever a non-prod environment is selected, so test data is never mistaken for live traffic. */
   nonProdNotice: string;
+  /** One plain line saying which option is the real data, so a newcomer can ignore the test ones. */
+  hint?: string;
 }
 
 /** The selected pill's colour per environment: prod reads as the normal, calm state, and each non-prod environment gets its own loud colour. */
@@ -31,7 +33,7 @@ const SELECTED_CLASS: Record<Environment, string> = {
  * `gos_env_<projectId>` cookie and refreshes the current route, so the server components re-read
  * with the new scope without a full navigation.
  */
-export function EnvironmentPicker({ projectId, options, current, label, optionLabels, nonProdNotice }: EnvironmentPickerProps): React.ReactElement | null {
+export function EnvironmentPicker({ projectId, options, current, label, optionLabels, nonProdNotice, hint }: EnvironmentPickerProps): React.ReactElement | null {
   const router = useRouter();
   const labelId = useId();
 
@@ -74,6 +76,7 @@ export function EnvironmentPicker({ projectId, options, current, label, optionLa
           );
         })}
       </div>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       {isNonProd ? (
         <p
           role="status"
