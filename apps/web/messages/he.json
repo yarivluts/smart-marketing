@@ -3002,6 +3002,7 @@
     "title": "אוטומציה עבור {projectName}",
     "killSwitchHeading": "עצירת חירום",
     "killSwitchEngagedNote": "האוטומציה מושהית עבור ארגון זה: {reason}",
+    "killSwitchEngagedNoReasonNote": "האוטומציה מושהית עבור ארגון זה. שום דבר לא משתנה מעצמו עד שמישהו ימשיך אותה.",
     "killSwitchDisengagedNote": "האוטומציה פועלת כרגיל עבור ארגון זה.",
     "killSwitchReasonLabel": "סיבה",
     "killSwitchReasonPlaceholder": "למשל: בודקים קודם את התקציב",

@@ -3002,6 +3002,7 @@
     "title": "Automation for {projectName}",
     "killSwitchHeading": "Emergency stop",
     "killSwitchEngagedNote": "Automation is paused for this organization: {reason}",
+    "killSwitchEngagedNoReasonNote": "Automation is paused for this organization. Nothing changes by itself until someone resumes it.",
     "killSwitchDisengagedNote": "Automation is running normally for this organization.",
     "killSwitchReasonLabel": "Reason",
     "killSwitchReasonPlaceholder": "e.g. Checking the budget first",
