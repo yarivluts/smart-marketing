@@ -681,6 +681,24 @@ describe('GrowthPilotApp', () => {
       expect(document.getElementById('growth-pilot-budget-hint')).toHaveClass('text-destructive');
     });
 
+    it.each(['en', 'he'] as const)('when publishing fails because Meta is not connected, the error offers the connect link (%s)', async (locale) => {
+      stubFetch({ status: 409, body: { error: 'meta_unavailable' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref="/api/integrations/meta/start?orgId=o" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale });
+      fireEvent.click(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-approve'));
+      const alert = await screen.findByRole('alert');
+      const link = within(alert).getByTestId('growth-pilot-error-connect-meta');
+      expect(link).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
+      expect(link).toHaveTextContent(locale === 'en' ? 'Connect Facebook and Instagram' : heMessages.GrowthPilot.publish.status.connect);
+    });
+
+    it('other errors, and a missing connect link, show no connect link', async () => {
+      stubFetch({ status: 409, body: { error: 'meta_unavailable' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
+      fireEvent.click(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-approve'));
+      expect(await screen.findByRole('alert')).toHaveTextContent('Ad platform connections');
+      expect(screen.queryByTestId('growth-pilot-error-connect-meta')).toBeNull();
+    });
+
     it('publishes the approved images paused, at the budget the person sets - a yes or no, not a change for the AI', async () => {
       const fetchMock = stubFetch({ body: page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'published' }] }) }, { body: { status: 'ok', since: 'a', until: 'b', summary: { totals: { spend: 0, impressions: 0, clicks: 0, linkClicks: 0, conversions: 0, ctr: null, cpc: null, costPerConversion: null }, daily: [], byTarget: {} } } });
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });

@@ -76,14 +76,25 @@ function useCountryNames(): (codes: string[]) => string {
 
 const EMAIL_PATTERN = /^(mailto:)?[^\s@/]+@[^\s@/]+\.[^\s@/]+$/i;
 
-function ErrorLine({ code, id }: { code: string | null; id?: string }): React.ReactElement | null {
+function ErrorLine({ code, id, metaConnectHref }: { code: string | null; id?: string; metaConnectHref?: string | null }): React.ReactElement | null {
   const t = useTranslations('GrowthPilot.errors');
+  const tc = useTranslations('GrowthPilot.publish.status');
   if (!code) return null;
   const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'ai_unavailable', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized', 'forbidden'].includes(code);
   return (
     <p id={id} role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {t(known ? (code as 'generic') : 'generic')}
+      <span>
+        {t(known ? (code as 'generic') : 'generic')}
+        {code === 'meta_unavailable' && metaConnectHref ? (
+          <>
+            {' '}
+            <a href={metaConnectHref} className="font-semibold underline" data-testid="growth-pilot-error-connect-meta">
+              {tc('connect')}
+            </a>
+          </>
+        ) : null}
+      </span>
     </p>
   );
 }
@@ -819,7 +830,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
         </div>
       </header>
 
-      <ErrorLine code={error} />
+      <ErrorLine code={error} metaConnectHref={metaConnectHref ?? null} />
 
       {newTarget !== null ? (
         <form
