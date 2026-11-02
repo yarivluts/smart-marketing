@@ -452,6 +452,7 @@
   },
   "EnvironmentPicker": {
     "label": "Viewing data from",
+    "hint": "Prod is your real data. Dev and Staging are only for testing, so you can leave them alone.",
     "nonProdNotice": "Showing {environment} data, not production. Pages without environment support still show production."
   },
   "Members": {

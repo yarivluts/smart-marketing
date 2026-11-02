@@ -270,6 +270,7 @@ export default async function ProjectLayout({
             current={selectedEnvironment?.name ?? null}
             label={tEnvPicker('label')}
             optionLabels={environmentLabels}
+            hint={tEnvPicker('hint')}
             nonProdNotice={tEnvPicker('nonProdNotice', { environment: environmentLabels[currentEnv] })}
           />
         </>
