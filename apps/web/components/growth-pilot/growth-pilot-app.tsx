@@ -741,6 +741,12 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
   const [busy, setBusy] = React.useState<string | null>(null);
   const [startingOver, setStartingOver] = React.useState(false);
   const [newTarget, setNewTarget] = React.useState<string | null>(null);
+  const newTargetInput = React.useRef<HTMLInputElement>(null);
+  const newTargetOpen = newTarget !== null;
+  // Opening "Something else to grow" puts the cursor in the box, so the person can type at once.
+  React.useEffect(() => {
+    if (newTargetOpen) newTargetInput.current?.focus();
+  }, [newTargetOpen]);
   const [byTarget, setByTarget] = React.useState<Record<string, GrowthPerformanceTotals> | null>(null);
 
   const run = React.useCallback(
@@ -859,11 +865,14 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
         >
           <div className="flex flex-col gap-1">
             <h2 className="font-pp-display text-base font-semibold">{t('newTarget.title')}</h2>
-            <p className="text-sm text-muted-foreground">{t('newTarget.hint')}</p>
+            <p id="growth-pilot-new-target-hint" className="text-sm text-muted-foreground">{t('newTarget.hint')}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <input
+              ref={newTargetInput}
               value={newTarget}
+              aria-describedby="growth-pilot-new-target-hint"
+              data-testid="growth-pilot-new-target-input"
               onChange={(event) => setNewTarget(event.target.value)}
               placeholder={t('newTarget.placeholder')}
               dir="auto"
