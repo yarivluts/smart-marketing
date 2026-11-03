@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { adStatusKey } from './ad-status';
 
 /** Unknown platform codes (e.g. BUY_NOW) still read as words, never as SHOUTING_SNAKE_CASE. */
 function readableCode(code: string): string {
@@ -87,13 +88,13 @@ export function CampaignCreativesPanel({
                     <span dir="auto">{ad.adSetName}</span>
                   </Badge>
                 ) : null}
-                {ad.status ? (
+                {adStatusKey(ad.status) ? (
                   <Badge
-                    variant={ad.status === 'ACTIVE' || ad.status === 'enabled' ? 'success' : 'secondary'}
+                    variant={adStatusKey(ad.status) === 'statusActive' ? 'success' : 'secondary'}
                     size="sm"
-                    className="uppercase font-semibold text-[10px]"
+                    className="font-semibold text-[10px]"
                   >
-                    {ad.status}
+                    {t(adStatusKey(ad.status)!)}
                   </Badge>
                 ) : null}
               </div>

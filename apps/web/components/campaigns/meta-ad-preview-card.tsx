@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
+import { adStatusKey } from './ad-status';
 import { Megaphone, MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { ImportedAdView } from './campaign-creatives-panel';
@@ -39,7 +40,8 @@ export function MetaAdPreviewCard({
     defaultMessage: ad.callToActionType?.replace(/_/g, ' ') || 'Learn More',
   });
 
-  const isActive = ad.status === 'ACTIVE' || ad.status === 'enabled';
+  const statusKey = adStatusKey(ad.status);
+  const isActive = statusKey === 'statusActive';
 
   return (
     <div
@@ -65,13 +67,13 @@ export function MetaAdPreviewCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {ad.status ? (
+          {statusKey ? (
             <Badge
               variant={isActive ? 'success' : 'secondary'}
               size="sm"
-              className="uppercase font-semibold text-[10px]"
+              className="font-semibold text-[10px]"
             >
-              {ad.status}
+              {t(statusKey)}
             </Badge>
           ) : null}
           <button

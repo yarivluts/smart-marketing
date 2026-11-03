@@ -25,7 +25,7 @@ describe('MetaAdPreviewCard', () => {
 
     expect(screen.getByText('Growth Retargeting')).toBeInTheDocument();
     expect(screen.getByText('Sponsored')).toBeInTheDocument();
-    expect(screen.getByText('ACTIVE')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Automate your entire growth funnel with GrowthOS.')).toBeInTheDocument();
     expect(screen.getByText('Scale Your SaaS 10x Faster')).toBeInTheDocument();
     expect(screen.getByText('Start free trial today')).toBeInTheDocument();
