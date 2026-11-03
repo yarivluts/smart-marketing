@@ -29,13 +29,15 @@ export function CreateOrganizationForm(): React.ReactElement {
       });
       if (!response.ok) {
         setError('generic');
+        setSubmitting(false);
         return;
       }
       const { organizationId } = (await response.json()) as { organizationId: string };
+      // Stay disabled on success: the page is about to change, and re-enabling the button here would
+      // let a second click create a second organization before it does.
       router.push(`/orgs/${organizationId}`);
     } catch {
       setError('offline');
-    } finally {
       setSubmitting(false);
     }
   }

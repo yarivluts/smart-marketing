@@ -86,4 +86,28 @@ describe('CreateOrganizationForm', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-9'));
     expect(fetch).toHaveBeenCalledWith('/api/orgs', expect.objectContaining({ body: JSON.stringify({ name: 'Acme' }) }));
   });
+
+  it('keeps the button off after success so a second click cannot create a second organization', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ organizationId: 'org-5' }) } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-5'));
+    expect(screen.getByRole('button', { name: 'Create organization' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-enables the button after a failed request so the person can try again', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Create organization' })).toBeEnabled();
+  });
 });
