@@ -56,6 +56,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
   const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
   const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
+  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId, projectId });
 
   if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
@@ -130,6 +131,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
         rawTargets={targetViews}
         connections={connections}
         canExecute={canExecute}
+        canManagePlugins={canManagePlugins}
         spendOutcome={spendOutcome}
         spendWindowDays={CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS}
       />

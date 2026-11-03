@@ -72,4 +72,12 @@ describe('EnvironmentPicker', () => {
     const { container } = render(<EnvironmentPicker {...baseProps} options={[]} current={null} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('shows the plain hint under the picker when one is given, and nothing otherwise', () => {
+    const { rerender } = render(<EnvironmentPicker {...baseProps} current="prod" />);
+    expect(screen.queryByText(/real data/)).not.toBeInTheDocument();
+
+    rerender(<EnvironmentPicker {...baseProps} current="prod" hint="Prod is your real data." />);
+    expect(screen.getByText('Prod is your real data.')).toBeInTheDocument();
+  });
 });

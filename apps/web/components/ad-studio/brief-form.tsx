@@ -87,7 +87,7 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
     <form method="post" onSubmit={submit} className="flex flex-col gap-3" data-testid={briefId ? 'ad-studio-brief-edit' : 'ad-studio-brief-create'}>
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         {t('fieldName')}
-        <input value={values.name} onChange={(event) => set('name', event.target.value)} maxLength={120} required className={inputClass} />
+        <input value={values.name} onChange={(event) => set('name', event.target.value)} maxLength={120} required placeholder={t('fieldNameHint')} className={inputClass} />
       </label>
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         {t('fieldObjective')}

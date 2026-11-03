@@ -107,7 +107,7 @@ describe('CreateFieldMappingForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create mapping' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Field "landing_page" is not valid for kind "entity" (expected one of id, or "attributes.<name>"). Required field "id" has no mapping rule.',
+      'Nothing was saved. Please fix the following and try again: Field "landing_page" is not valid for kind "entity" (expected one of id, or "attributes.<name>"). Required field "id" has no mapping rule.',
     );
     expect(refresh).not.toHaveBeenCalled();
   });

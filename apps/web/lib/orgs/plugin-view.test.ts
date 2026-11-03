@@ -3,6 +3,7 @@ import {
   configSchemaForInstall,
   groupManifestsByPluginId,
   hasActiveInstall,
+  pluginDisplayNameForInstall,
   pluginInstallHealth,
   pluginInstallHealthLabelKey,
   pluginTypeForInstall,
@@ -360,5 +361,22 @@ describe('pluginInstallHealthLabelKey', () => {
     expect(pluginInstallHealthLabelKey('installed')).toBe('statusInstalled');
     expect(pluginInstallHealthLabelKey('disabled')).toBe('statusDisabled');
     expect(pluginInstallHealthLabelKey('uninstalled')).toBe('statusUninstalled');
+  });
+});
+
+describe('pluginDisplayNameForInstall', () => {
+  const manifests: PluginManifestView[] = [
+    toPluginManifestView(manifest({ id: 'm1', plugin_id: 'com.example.stripe-pack', version: '1.0.0', display_name: 'Stripe payments' })),
+    toPluginManifestView(manifest({ id: 'm2', plugin_id: 'com.example.stripe-pack', version: '2.0.0', display_name: 'Stripe payments v2' })),
+  ];
+
+  it("shows the pinned manifest's human name, not the internal id", () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.stripe-pack', status: 'installed', version: '2.0.0' }));
+    expect(pluginDisplayNameForInstall(view, manifests)).toBe('Stripe payments v2');
+  });
+
+  it('falls back to the id only when no manifest matches', () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.gone', status: 'installed', version: '1.0.0' }));
+    expect(pluginDisplayNameForInstall(view, manifests)).toBe('com.example.gone');
   });
 });

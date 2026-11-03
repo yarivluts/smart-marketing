@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { InitialsAvatar } from '@/components/viz/initials-avatar';
 import type { OrgMemberSummary } from '@growthos/firebase-orm-models';
-import { isInvitableRole } from '@growthos/shared';
+import { isInvitableRole, isRole } from '@growthos/shared';
 import { RemoveMemberButton } from './remove-member-button';
 import { ChangeRoleControl } from './change-role-control';
 import { SuspendMemberButton } from './suspend-member-button';
@@ -28,6 +28,10 @@ export async function MembersList({
   projects,
 }: MembersListProps): Promise<React.ReactElement> {
   const t = await getTranslations('Members');
+  const tRoles = await getTranslations('Roles');
+  const roleName = (role: string): string => (isRole(role) ? tRoles(role) : role);
+  const statusName = (status: string): string =>
+    status === 'invited' || status === 'active' || status === 'suspended' ? t(`status_${status}`) : status;
 
   return (
     <ul className="flex flex-col gap-2">
@@ -52,14 +56,14 @@ export async function MembersList({
                 <div className="flex items-center gap-2">
                   <ChangeRoleControl orgId={orgId} membershipId={member.membershipId} role={changeableRole} />
                   <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-                    {t('statusLabel', { status: member.status })}
+                    {t('statusLabel', { status: statusName(member.status) })}
                   </span>
                 </div>
               ) : (
                 <span className="text-muted-foreground">
                   {memberProjectName
-                    ? t('projectRoleAndStatus', { role: member.role, project: memberProjectName, status: member.status })
-                    : t('roleAndStatus', { role: member.role, status: member.status })}
+                    ? t('projectRoleAndStatus', { role: roleName(member.role), project: memberProjectName, status: statusName(member.status) })
+                    : t('roleAndStatus', { role: roleName(member.role), status: statusName(member.status) })}
                 </span>
               )}
               <div className="flex items-center gap-2">

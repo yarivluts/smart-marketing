@@ -12,6 +12,7 @@ export interface AutomationActionListProps {
   projectId: string;
   actions: AutomationActionView[];
   canApprove: boolean;
+  canExecute?: boolean;
 }
 
 function VerifyControls({ orgId, projectId, actionId }: { orgId: string; projectId: string; actionId: string }): React.ReactElement {
@@ -71,7 +72,7 @@ function VerifyControls({ orgId, projectId, actionId }: { orgId: string; project
 }
 
 /** A project's KAN-71 automation action queue/history — the approve/execute/verify/rollback controls for each action's current status. */
-export function AutomationActionList({ orgId, projectId, actions, canApprove }: AutomationActionListProps): React.ReactElement {
+export function AutomationActionList({ orgId, projectId, actions, canApprove, canExecute = true }: AutomationActionListProps): React.ReactElement {
   const t = useTranslations('Automation');
   const router = useRouter();
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
@@ -128,7 +129,17 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove }: 
               <p className="text-muted-foreground">{t('failureNextStep')}</p>
             </div>
           ) : null}
-          {action.rollbackReason ? <p className="text-muted-foreground">{t('rollbackReasonLine', { reason: action.rollbackReason })}</p> : null}
+          {action.rollbackReason ? (
+            <p className="text-muted-foreground" data-testid={`automation-rollback-${action.id}`}>
+              {t(
+                action.rollbackReason === 'manual'
+                  ? 'rollbackManual'
+                  : action.rollbackReason === 'guardrail_regression'
+                    ? 'rollbackGuardrail'
+                    : 'rollbackOther',
+              )}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2">
             {action.status === 'awaiting_approval' && canApprove ? (
@@ -152,12 +163,12 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove }: 
                 {t('rejectButton')}
               </Button>
             ) : null}
-            {action.status === 'approved' ? (
+            {action.status === 'approved' && canExecute ? (
               <Button type="button" size="sm" disabled={pendingActionId === action.id} onClick={() => runTransition(action.id, 'execute')}>
                 {t('executeButton')}
               </Button>
             ) : null}
-            {action.status === 'executed' ? (
+            {action.status === 'executed' && canExecute ? (
               <>
                 <VerifyControls orgId={orgId} projectId={projectId} actionId={action.id} />
                 <Button
@@ -171,7 +182,7 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove }: 
                 </Button>
               </>
             ) : null}
-            {action.status === 'verified' ? (
+            {action.status === 'verified' && canExecute ? (
               <Button type="button" size="sm" variant="outline" disabled={pendingActionId === action.id} onClick={() => runTransition(action.id, 'rollback')}>
                 {t('rollbackButton')}
               </Button>

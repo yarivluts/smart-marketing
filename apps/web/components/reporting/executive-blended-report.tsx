@@ -349,8 +349,8 @@ export function ExecutiveBlendedReport({
                   <span className={`h-3 w-3 rounded-full ${channel.colorClass}`} />
                   <span className="text-xs font-bold text-foreground">{channel.label}</span>
                 </div>
-                <span className="text-xs font-semibold text-muted-foreground" dir="ltr">
-                  {`${channel.percentage}% of total`}
+                <span className="text-xs font-semibold text-muted-foreground">
+                  {t('shareOfTotal', { percent: channel.percentage, defaultMessage: `${channel.percentage}% of total` })}
                 </span>
               </div>
 

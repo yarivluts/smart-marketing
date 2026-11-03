@@ -29,13 +29,15 @@ export function CreateOrganizationForm(): React.ReactElement {
       });
       if (!response.ok) {
         setError('generic');
+        setSubmitting(false);
         return;
       }
       const { organizationId } = (await response.json()) as { organizationId: string };
+      // Stay disabled on success: the page is about to change, and re-enabling the button here would
+      // let a second click create a second organization before it does.
       router.push(`/orgs/${organizationId}`);
     } catch {
       setError('offline');
-    } finally {
       setSubmitting(false);
     }
   }
@@ -51,10 +53,15 @@ export function CreateOrganizationForm(): React.ReactElement {
           name="name"
           required
           aria-invalid={error === 'name'}
-          aria-describedby={error === 'name' ? 'org-name-error' : undefined}
+          aria-describedby={error === 'name' ? 'org-name-error' : 'org-name-hint'}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
+        {error === 'name' ? null : (
+          <p id="org-name-hint" className="text-sm text-muted-foreground">
+            {t('nameHint')}
+          </p>
+        )}
       </div>
       {error ? (
         <p id={error === 'name' ? 'org-name-error' : undefined} role="alert" className="text-sm text-destructive">

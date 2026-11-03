@@ -87,6 +87,7 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === QUALITY_SCORE_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <PackSetupLanding
         orgId={orgId}
@@ -98,6 +99,7 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
         featuresTitle={t('setupFeaturesTitle')}
         installTitle={t('setupInstallTitle')}
         packs={installablePacks}
+        canInstall={canInstallPlugins}
         features={[
           { key: 'tiers', icon: Gauge, title: t('setupFeatureTiersTitle'), description: t('setupFeatureTiersDescription') },
           { key: 'channels', icon: Radio, title: t('setupFeatureChannelsTitle'), description: t('setupFeatureChannelsDescription') },

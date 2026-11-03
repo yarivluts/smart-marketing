@@ -54,7 +54,7 @@ test.describe('Org Resource Library: create, request, approve, detach (KAN-27)',
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/resources`);
     await page.getByLabel('Scopes to request (comma-separated)').fill('act_111');
     await page.getByRole('button', { name: 'Request' }).click();
-    await expect(page.getByText('Status: pending')).toBeVisible();
+    await expect(page.getByText('Status: Waiting for approval')).toBeVisible();
 
     // Approve it from the org resource library's pending-requests queue.
     await page.goto(`/en/orgs/${orgId}/resources`);
@@ -65,7 +65,7 @@ test.describe('Org Resource Library: create, request, approve, detach (KAN-27)',
     // The project sees only its granted slice (act_111, never act_222), and can detach it —
     // detaching frees the resource back up for a fresh request.
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/resources`);
-    await expect(page.getByText('Status: approved (act_111)')).toBeVisible();
+    await expect(page.getByText('Status: Approved (act_111)')).toBeVisible();
     await page.getByRole('button', { name: 'Detach' }).click();
     await expect(page.getByRole('button', { name: 'Request' })).toBeVisible();
   });

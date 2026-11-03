@@ -108,7 +108,7 @@ export function CreateFieldMappingForm({
         if (body?.error === 'target_schema_not_registered') {
           setError(t('targetSchemaNotRegisteredError'));
         } else if (body?.reasons?.length) {
-          setError(body.reasons.join(' '));
+          setError(t('invalidInputError', { reasons: body.reasons.join(' ') }));
         } else {
           setError(t('createError'));
         }

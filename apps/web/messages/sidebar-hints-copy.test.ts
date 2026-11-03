@@ -22,4 +22,35 @@ describe('sidebar hints say what Ad Studio and the AI helper do', () => {
     expect(layout).toContain("hint: tShell('adsAndPerformanceHint')");
     expect(layout).toContain("hint: tShell('funnelAndGoalsHint')");
   });
+
+  it('the ad platform connections link explains itself and promises paused ads', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('connectionsHint')");
+    expect(en.AppShell.connectionsHint).toMatch(/paused/i);
+    expect(en.AppShell.connectionsHint).not.toMatch(/oauth|api|token|connector/i);
+    expect(he.AppShell.connectionsHint).toMatch(/[\u0590-\u05ff]/);
+  });
+
+  it('the plain Settings link says what it holds, without jargon', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('settingsHint')");
+    expect(en.AppShell.settingsHint.length).toBeGreaterThan(10);
+    expect(en.AppShell.settingsHint).not.toMatch(/currency|timezone|time zone|locale|environment|api|token/i);
+    expect(he.AppShell.settingsHint).toMatch(/[\u0590-\u05ff]/);
+  });
+
+  it('the Home link says it leads to all projects, not to this one', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('homeHint')");
+    expect(en.AppShell.homeHint).toMatch(/projects/i);
+    expect(he.AppShell.homeHint).toMatch(/[\u0590-\u05ff]/);
+  });
+
+  it('the Project resources link says it needs no action from a newcomer', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('resourcesHint')");
+    expect(en.AppShell.resourcesHint).toMatch(/nothing to do/i);
+    expect(en.AppShell.resourcesHint).not.toMatch(/credential|oauth|api|token/i);
+    expect(he.AppShell.resourcesHint).toMatch(/[\u0590-\u05ff]/);
+  });
 });

@@ -87,6 +87,7 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === SALES_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <PackSetupLanding
         orgId={orgId}
@@ -98,6 +99,7 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
         featuresTitle={t('setupFeaturesTitle')}
         installTitle={t('setupInstallTitle')}
         packs={installablePacks}
+        canInstall={canInstallPlugins}
         features={[
           { key: 'pipeline', icon: GitBranch, title: t('setupFeaturePipelineTitle'), description: t('setupFeaturePipelineDescription') },
           { key: 'show-rate', icon: Target, title: t('setupFeatureShowRateTitle'), description: t('setupFeatureShowRateDescription') },

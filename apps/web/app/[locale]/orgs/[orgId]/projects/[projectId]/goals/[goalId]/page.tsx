@@ -94,8 +94,12 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
   const metricUnit = metricUnits[goal.metric_name];
   const thermometerView = buildGoalThermometerView(outcome, metricUnit);
   const formatTarget = (value: number | null): string => (value === null ? '' : formatMetricValue(value, metricUnit, locale));
-  const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
-  const ownerName = peopleRows.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;
+  const ownerName = people.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;
+  // An archived person (KAN-129) drops out of the owner picker — except the goal's current owner
+  // stays selectable so the form still renders the goal's real owner without forcing a reassignment.
+  const peopleRows = people
+    .filter((person) => !person.archived_at || person.id === goal.owner_person_id)
+    .map((person) => ({ id: person.id, name: person.name }));
   const isPaused = (goal.status ?? 'active') === 'paused';
 
   const t = await getTranslations('Goals');

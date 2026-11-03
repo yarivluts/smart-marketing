@@ -23,6 +23,7 @@ export interface ChangeRoleControlProps {
  */
 export function ChangeRoleControl({ orgId, membershipId, role }: ChangeRoleControlProps): React.ReactElement {
   const t = useTranslations('Members');
+  const tRoles = useTranslations('Roles');
   const router = useRouter();
   const [value, setValue] = useState<InvitableRole>(role);
   const [pending, setPending] = useState(false);
@@ -65,7 +66,7 @@ export function ChangeRoleControl({ orgId, membershipId, role }: ChangeRoleContr
       >
         {INVITABLE_ROLES.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {tRoles(option)}
           </option>
         ))}
       </select>
