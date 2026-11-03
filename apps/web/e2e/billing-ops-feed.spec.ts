@@ -42,7 +42,7 @@ test.describe('Billing ops feed (KAN-80)', () => {
     await page.getByRole('link', { name: 'Payments & refunds' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/billing-ops-feed$`));
     await expect(page.getByRole('heading', { name: `Payments & refunds for Client Alpha` })).toBeVisible();
-    await expect(page.getByText('No billing events landed for this project yet.')).toBeVisible();
+    await expect(page.getByText('No payments, failed payments or refunds yet for this project.')).toBeVisible();
     // KAN-94: a third section for subscriptions currently in dunning, alongside the existing churn one.
     await expect(page.getByRole('heading', { name: 'Subscriptions with a failed payment' })).toBeVisible();
     await expect(page.getByText('No subscriptions with a failed payment yet. That is good news.')).toBeVisible();
