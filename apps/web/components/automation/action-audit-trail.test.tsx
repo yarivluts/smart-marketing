@@ -44,8 +44,22 @@ describe('ActionAuditTrail Component', () => {
     expect(screen.getByText('Google Search Campaign')).toBeInTheDocument();
     expect(screen.getByText('Meta Retargeting Campaign')).toBeInTheDocument();
     expect(screen.getByText('TikTok Lead Gen')).toBeInTheDocument();
-    expect(screen.getByTestId('status-act-1')).toHaveTextContent('executed');
-    expect(screen.getByTestId('status-act-2')).toHaveTextContent('rolled_back');
+    expect(screen.getByTestId('status-act-1')).toHaveTextContent('Done');
+    expect(screen.getByTestId('status-act-2')).toHaveTextContent('Undone');
+  });
+
+  it('shows plain words for waiting and unknown statuses, never raw codes', () => {
+    renderWithIntl(
+      <ActionAuditTrail
+        actions={[
+          { id: 'w', targetId: 't', targetLabel: 'A', actionType: 'ad_edit', status: 'awaiting_approval' },
+          { id: 'x', targetId: 't', targetLabel: 'B', actionType: 'ad_edit', status: 'weird_code' },
+        ]}
+      />,
+      { locale: 'en' },
+    );
+    expect(screen.getByTestId('status-w')).toHaveTextContent('Waiting for your OK');
+    expect(screen.getByTestId('status-x')).toHaveTextContent('In progress');
   });
 
   it('filters actions using search query input', () => {

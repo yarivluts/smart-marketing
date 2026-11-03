@@ -4002,7 +4002,15 @@
     "actionType_campaign_draft_create": "New ad draft",
     "actionType_campaign_draft": "Ad draft",
     "actionType_keyword_edit": "Keyword edit",
-    "actionType_ad_edit": "Ad edit"
+    "actionType_ad_edit": "Ad edit",
+    "status_awaiting_approval": "Waiting for your OK",
+    "status_approved": "Approved",
+    "status_executed": "Done",
+    "status_verified": "Done and checked",
+    "status_rolled_back": "Undone",
+    "status_failed": "Did not work",
+    "status_rejected": "Rejected",
+    "status_unknown": "In progress"
   },
   "ProposalDiffCard": {
     "approveAndExecute": "Approve and apply",
