@@ -37,6 +37,9 @@ describe('AdFromSite', () => {
     renderWithIntl(<AdFromSite orgId="o" projectId="p" studioHref="/s" defaultSiteUrl={null} />, { locale: 'en' });
     fireEvent.click(screen.getByRole('button', { name: en.submit }));
     expect(screen.getByRole('alert')).toHaveTextContent(en.reasons.invalid_url);
+    const box = screen.getByLabelText(en.label);
+    expect(box).toHaveAttribute('aria-invalid', 'true');
+    expect(box).toHaveAccessibleDescription(en.reasons.invalid_url);
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText(en.label), { target: { value: 'easysign.co.il' } });
     fireEvent.click(screen.getByRole('button', { name: en.submit }));

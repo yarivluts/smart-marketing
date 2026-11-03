@@ -87,6 +87,8 @@ export function AdFromSite({ orgId, projectId, studioHref, defaultSiteUrl }: AdF
             onChange={(event) => setSiteUrl(event.target.value)}
             placeholder="example.com"
             disabled={pending}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? 'ad-studio-from-site-error' : undefined}
             className="h-11 w-full rounded-xl border border-input bg-background ps-9 pe-3 text-sm"
           />
         </div>
@@ -101,7 +103,7 @@ export function AdFromSite({ orgId, projectId, studioHref, defaultSiteUrl }: AdF
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p id="ad-studio-from-site-error" role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
