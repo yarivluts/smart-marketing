@@ -4002,7 +4002,15 @@
     "actionType_campaign_draft_create": "טיוטת מודעה חדשה",
     "actionType_campaign_draft": "טיוטת מודעה",
     "actionType_keyword_edit": "עריכת מילות מפתח",
-    "actionType_ad_edit": "עריכת מודעה"
+    "actionType_ad_edit": "עריכת מודעה",
+    "status_awaiting_approval": "ממתין לאישור שלכם",
+    "status_approved": "אושר",
+    "status_executed": "בוצע",
+    "status_verified": "בוצע ונבדק",
+    "status_rolled_back": "בוטל",
+    "status_failed": "לא הצליח",
+    "status_rejected": "נדחה",
+    "status_unknown": "בתהליך"
   },
   "ProposalDiffCard": {
     "approveAndExecute": "אישור וביצוע השינוי",
