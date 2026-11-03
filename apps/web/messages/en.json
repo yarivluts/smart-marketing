@@ -1408,7 +1408,7 @@
       },
       "billing": {
         "title": "Billing and subscriptions",
-        "impact": "Without billing records (subscription_state_change events or the Stripe connector) we cannot show your income, or how many customers cancel."
+        "impact": "Without billing records (from your payment system, such as Stripe) we cannot show your income, or how many customers cancel."
       },
       "ad_spend": {
         "title": "Ad spend",

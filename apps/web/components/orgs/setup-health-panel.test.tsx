@@ -43,7 +43,7 @@ describe('SetupHealthPanel (KAN-197)', () => {
     const billing = within(screen.getByTestId('setup-requirement-billing'));
     expect(billing.getByText('Rejected records only')).toBeInTheDocument();
     expect(billing.getByText(/2 records were set aside because something was wrong with them \("subscription_state_change"\)/)).toBeInTheDocument();
-    expect(billing.getByText(/subscription_state_change events or the Stripe connector/)).toBeInTheDocument();
+    expect(billing.getByText(/from your payment system, such as Stripe/)).toBeInTheDocument();
 
     const adSpend = within(screen.getByTestId('setup-requirement-ad_spend'));
     expect(adSpend.getByText('Not connected')).toBeInTheDocument();
