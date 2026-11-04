@@ -47,7 +47,7 @@ describe('EditSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
     expect(screen.getByLabelText('Name')).toHaveValue('Pro customers');
-    expect(screen.getByLabelText('Entity')).toHaveValue('customer');
+    expect(screen.getByLabelText('Applies to')).toHaveValue('customer');
     expect(screen.getByLabelText('Field')).toHaveValue('plan');
     expect(screen.getByLabelText('Value')).toHaveValue('pro');
   });
@@ -74,7 +74,7 @@ describe('EditSegmentForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pro customers, renamed' } });
-    fireEvent.change(screen.getByLabelText('Entity'), { target: { value: 'stripe_subscription' } });
+    fireEvent.change(screen.getByLabelText('Applies to'), { target: { value: 'stripe_subscription' } });
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'status' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'active' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
