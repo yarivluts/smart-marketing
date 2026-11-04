@@ -282,6 +282,7 @@ Template for each entry:
 
 ## UX hourly
 
+- 2026-11-04 - (f/c) Segments (customer groups) page audited. The name example said "MRR > $200" and the labels said "Entity" (he: ישות); they now say "spends over $200 a month" and "Applies to" (en + he) with a test. PR #1144. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) Hebrew developer/connection steps; (3) Segments filter field/operator labels still technical.
 - 2026-11-04 - (a/b) Growth Pilot copy audited end to end (en: plain; "(Meta)" after Facebook and Instagram kept on purpose, a past test pins it). The publish card said "Where people land after clicking" (landing jargon); it now says "The page people open after clicking" (en only, he already plain) with a test. PR #1143. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) Hebrew developer/connection steps mix English UI names; (3) decide whether "(Meta)" tags should go now that connection pages say Facebook and Instagram.
 - 2026-11-04 - (b) Automation change summaries audited (Growth Pilot and Ad Studio copy scanned for jargon: clean). The change box was labelled "Diff" and a row "Targeting" (en); now "Change" and "Who sees the ads" (he row: מי רואה את המודעות) with a test. PR #1142. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) Hebrew developer/connection steps mix English UI names.
 

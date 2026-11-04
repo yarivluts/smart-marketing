@@ -186,3 +186,14 @@ describe('Payments and Demos empty states speak plainly', () => {
     expect(messageAt(he, namespace, key)).not.toMatch(/אירועי/);
   });
 });
+
+describe('Segments plain wording', () => {
+  it('uses no MRR or "Entity" jargon in the segment name example and labels (en + he)', () => {
+    for (const messages of [en, he]) {
+      for (const key of ['namePlaceholder', 'schemaLabel', 'schemaPickerLabel']) {
+        const text = messageAt(messages, 'Segments', key);
+        expect(text).not.toMatch(/MRR|Entity|ישות/);
+      }
+    }
+  });
+});
