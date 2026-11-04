@@ -4987,7 +4987,7 @@
       "resolution": {
         "360p": "360p - quick drafts",
         "720p": "720p - standard",
-        "1080p": "1080p - full HD"
+        "1080p": "1080p - sharp, high quality"
       },
       "resolutionHint": "The finished video is assembled in 1080p when the clips are 1080p, otherwise in 720p.",
       "styleLabel": "Visual style",
@@ -5207,7 +5207,7 @@
         "unknown": "unknown",
         "facebook": "Facebook",
         "instagram": "Instagram",
-        "audience_network": "Audience Network",
+        "audience_network": "Partner apps and sites",
         "messenger": "Messenger",
         "feed": "feed",
         "story": "stories",
