@@ -536,6 +536,7 @@
     "sourceStepNoManifestsLink": "Browse ready-made connections",
     "sourceStepPushYourOwnHeading": "Or send your own data",
     "sourceStepNoEnvironments": "This project has no data space yet, so a key cannot be created. Open the project settings to add one.",
+    "sourceStepNoEnvironmentsLink": "Open project settings",
     "sourceStepContinueHint": "Connect a source above to continue.",
     "sourceContinueButton": "Continue",
     "funnelStepHeading": "Confirm your customer path",

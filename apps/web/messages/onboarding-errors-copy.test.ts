@@ -24,4 +24,10 @@ describe('Onboarding plain copy', () => {
     expect(he.Onboarding.sourceStepNoEnvironments).not.toContain('סביבות');
     expect(he.Onboarding.sourceStepNoManifestsLink).not.toContain('תוספים');
   });
+
+  it('gives the "no data space" dead end a button label in both languages', () => {
+    expect(en.Onboarding.sourceStepNoEnvironmentsLink).toBe('Open project settings');
+    expect(he.Onboarding.sourceStepNoEnvironmentsLink).toMatch(/[\u0590-\u05ff]/);
+    expect(en.Onboarding.sourceStepNoEnvironmentsLink).not.toMatch(/environment/i);
+  });
 });

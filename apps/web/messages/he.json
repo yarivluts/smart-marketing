@@ -536,6 +536,7 @@
     "sourceStepNoManifestsLink": "עיינו בחיבורים המוכנים",
     "sourceStepPushYourOwnHeading": "או שלחו נתונים משלכם",
     "sourceStepNoEnvironments": "לפרויקט הזה אין עדיין מרחב נתונים, ולכן אי אפשר ליצור מפתח. פתחו את הגדרות הפרויקט כדי להוסיף אחד.",
+    "sourceStepNoEnvironmentsLink": "פתחו את הגדרות הפרויקט",
     "sourceStepContinueHint": "חברו מקור נתונים למעלה כדי להמשיך.",
     "sourceContinueButton": "המשך",
     "funnelStepHeading": "אישור מסלול הלקוחות שלכם",
