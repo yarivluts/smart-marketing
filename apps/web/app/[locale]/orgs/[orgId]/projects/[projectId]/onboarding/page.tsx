@@ -333,7 +333,12 @@ async function SourcesStep({
           <h3 className="font-medium">{t('sourceStepPushYourOwnHeading')}</h3>
           <p className="text-sm text-muted-foreground">{t('sourceStepPushYourOwnIntro')}</p>
           {environmentOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/orgs/${orgId}/projects/${projectId}/settings`}>{t('sourceStepNoEnvironmentsLink')}</Link>
+              </Button>
+            </div>
           ) : (
             <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
           )}
