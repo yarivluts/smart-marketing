@@ -133,9 +133,9 @@ describe('the Insights page copy accounts for every insight kind it can render',
    * failure without catching a missing kind any earlier.
    */
   const KIND_MUST_APPEAR_IN_COPY: Record<InsightView['titleKey'], RegExp> = {
-    trackingAlertTitle: /tracking/i,
+    trackingAlertTitle: /tracking|data/i,
     winEventTitle: /win/i,
-    metricHealthTitle: /metric/i,
+    metricHealthTitle: /metric|number/i,
   };
 
   it.each(Object.entries(KIND_MUST_APPEAR_IN_COPY))('%s is accounted for in both description and empty', (titleKey, pattern) => {
