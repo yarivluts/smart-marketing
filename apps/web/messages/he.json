@@ -3331,6 +3331,7 @@
     "currencyHelp": "המטבע שבו יוצגו ההוצאה על מודעות והמכירות, כקוד של שלוש אותיות כמו ILS או USD. השאירו ריק אם אינכם בטוחים.",
     "timezoneLabel": "אזור זמן",
     "timezoneHelp": "היכן העסק נמצא, כדי שכל יום יתחיל וייגמר בשעה הנכונה. כתבו למשל Asia/Jerusalem או America/New_York. השאירו ריק אם אינכם בטוחים.",
+    "timezoneUseDevice": "השתמשו באזור הזמן של המכשיר ({zone})",
     "invalidCurrencyError": "כתבו את המטבע כקוד של שלוש אותיות, למשל ILS או USD.",
     "invalidTimezoneError": "כתבו את אזור הזמן כמו Asia/Jerusalem או America/New_York.",
     "archiveHeading": "ארכיון",

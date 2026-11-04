@@ -55,9 +55,15 @@ export function ProjectSettingsForm({
   // Filled after mount: the browser's list can differ from the server's, which would break hydration.
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [timezones, setTimezones] = useState<string[]>([]);
+  const [deviceTimezone, setDeviceTimezone] = useState('');
   useEffect(() => {
     setCurrencies(supportedValues('currency'));
     setTimezones(supportedValues('timeZone'));
+    try {
+      setDeviceTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone ?? '');
+    } catch {
+      setDeviceTimezone('');
+    }
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -140,6 +146,11 @@ export function ProjectSettingsForm({
             <option key={zone} value={zone} />
           ))}
         </datalist>
+        {deviceTimezone && timezone.trim() !== deviceTimezone ? (
+          <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setTimezone(deviceTimezone)}>
+            {t('timezoneUseDevice', { zone: deviceTimezone })}
+          </Button>
+        ) : null}
         <p className="text-xs text-muted-foreground">{t('timezoneHelp')}</p>
       </div>
 
