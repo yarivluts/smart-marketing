@@ -25,6 +25,7 @@ import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView 
 import { buildOnboardingJourney, wrapIntoRows } from '@/lib/orgs/onboarding-journey';
 import { onboardingProgress, type OnboardingJourneyStep } from '@/lib/orgs/workspace-view';
 import { StartOnboardingButton } from '@/components/orgs/start-onboarding-button';
+import { OnboardingDoneNextStep } from '@/components/orgs/onboarding-done-next-step';
 import { OnboardingPilotShortcut } from '@/components/orgs/onboarding-pilot-shortcut';
 import { OnboardingPackStep } from '@/components/orgs/onboarding-pack-step';
 import { OnboardingSourceContinueButton } from '@/components/orgs/onboarding-source-continue-button';
@@ -236,7 +237,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
       {view.step === 'board' || view.step === 'done' ? (
         <StepCard>
-          <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} />
+          <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} canUsePilot={pilotShortcut !== null} />
         </StepCard>
       ) : null}
     </div>
@@ -436,7 +437,7 @@ async function ConfirmedFunnelSummary({
 }
 
 /** The wizard's final screen (KAN-68 AC: "starter board" + plan `10 §2.6` step 5's invite/goal/war-room CTAs, folded together — see `OnboardingStateModel.step`'s own doc comment for why `board` carries both). */
-async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId: string; done: boolean }): Promise<React.ReactElement> {
+async function FinalStep({ orgId, projectId, done, canUsePilot }: { orgId: string; projectId: string; done: boolean; canUsePilot: boolean }): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
   const boards = await listBoardsForProject(orgId, projectId);
 
@@ -474,10 +475,7 @@ async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId:
       </div>
 
       {done ? (
-        <p className="flex items-center gap-2 font-medium">
-          <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" />
-          {t('doneMessage')}
-        </p>
+        <OnboardingDoneNextStep orgId={orgId} projectId={projectId} canUsePilot={canUsePilot} />
       ) : (
         <CompleteOnboardingButton orgId={orgId} projectId={projectId} />
       )}
