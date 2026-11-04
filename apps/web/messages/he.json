@@ -1361,7 +1361,7 @@
     "flowDelivery": "משלוח בצינור",
     "flowDeliverySub": "{failed} נכשלו · {queued} בתור",
     "flowWarehouse": "מחסן נתונים",
-    "flowWarehouseSub": "{count} רשומות נחתו",
+    "flowWarehouseSub": "{count} רשומות נקלטו",
     "flowWarehouseUnknown": "לא זמין",
     "flowReports": "לוחות ומדדים",
     "flowReportsSub": "מתרעננים כל שעה",
