@@ -3177,7 +3177,7 @@
     "diffFieldAdSetStatus": "סטטוס קבוצת הקהל",
     "diffFieldAdResourceName": "מודעה",
     "diffFieldCreative": "תמונה וטקסט של המודעה",
-    "diffFieldTargeting": "מיקוד",
+    "diffFieldTargeting": "מי רואה את המודעות",
     "diffFieldPreviousCreativeResourceName": "מזהה תמונה וטקסט קודם",
     "diffFieldNewCreativeResourceName": "מזהה תמונה וטקסט חדש",
     "diffRowLine": "{label}: {before} ← {after}",
