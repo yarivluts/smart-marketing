@@ -1676,13 +1676,13 @@
   "Insights": {
     "metaTitle": "Alerts and wins",
     "title": "Alerts and wins for {projectName}",
-    "description": "Recent noteworthy findings for this project: tracking that may be broken, metrics that can no longer be queried as defined, and wins your win rules just caught.",
-    "empty": "No insights yet. This fills in once a tracking alert fires, a win rule matches, or a registered metric stops being queryable.",
+    "description": "The latest things worth knowing about this project: data that may have stopped arriving, numbers that can no longer be worked out, and good news your win rules spotted.",
+    "empty": "Nothing to report yet. This fills in when data stops arriving, a win rule is met, or a number you track can no longer be worked out.",
     "trackingAlertTitle": "Tracking may be broken: \"{schemaName}\" has gone silent",
-    "trackingAlertDetail": "No new \"{schemaName}\" records landed since {lastSeenAt}.",
+    "trackingAlertDetail": "Nothing new has come in for \"{schemaName}\" since {lastSeenAt}.",
     "winEventTitle": "Win: {winRuleName}",
     "winEventDetail": "A \"{schemaName}\" record ({clientId}) matched the \"{winRuleName}\" win rule.",
-    "metricHealthTitle": "Metric \"{metricName}\" (v{version}) cannot be queried as defined",
+    "metricHealthTitle": "The number \"{metricName}\" (version {version}) cannot be worked out right now",
     "metricHealthDetail": "{reasons}",
     "severityLabel": {
       "info": "Info",
