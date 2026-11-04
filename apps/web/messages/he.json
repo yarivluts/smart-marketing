@@ -3162,7 +3162,7 @@
     "diffRowLine": "{label}: {before} ← {after}",
     "failureReasonLine": "השינוי הזה לא הוחל. מה שפלטפורמת הפרסום ענתה: {reason}",
     "failureNextStep": "שום דבר לא נוסה שוב אוטומטית. אחרי שהבעיה נפתרת, אפשר להציע את השינוי מחדש.",
-    "rollbackReasonLine": "השינוי בוטל ({reason})",
+    "rollbackReasonLine": "{reason, select, manual {ביטלתם את השינוי הזה.} guardrail_regression {השינוי בוטל אוטומטית: התוצאות הידרדרו אחריו.} other {השינוי הזה בוטל.}}",
     "approveButton": "אשר",
     "rejectButton": "דחה",
     "executeButton": "החלת השינוי",

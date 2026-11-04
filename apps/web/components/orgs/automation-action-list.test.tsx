@@ -39,3 +39,24 @@ describe('AutomationActionList failure', () => {
     expect(enMessages.Automation.failureNextStep).toBeTruthy();
   });
 });
+
+describe('AutomationActionList undone reason', () => {
+  const undone = { ...failed, status: 'rolled_back' as const, failureReason: undefined };
+
+  it('explains an automatic undo in words, not a stored code', () => {
+    renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={[{ ...undone, rollbackReason: 'guardrail_regression' }]} canApprove />);
+    expect(screen.getByText(/Undone automatically: the results got worse/)).toBeInTheDocument();
+    expect(screen.queryByText(/guardrail_regression/)).toBeNull();
+  });
+
+  it('says a manual undo was yours', () => {
+    renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={[{ ...undone, rollbackReason: 'manual' }]} canApprove />);
+    expect(screen.getByText('You undid this change.')).toBeInTheDocument();
+  });
+
+  it('is plain Hebrew with no code or Latin letters', () => {
+    renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={[{ ...undone, rollbackReason: 'guardrail_regression' }]} canApprove />, { locale: 'he' });
+    expect(screen.getByText(/בוטל אוטומטית/)).toBeInTheDocument();
+    expect(screen.queryByText(/guardrail/)).toBeNull();
+  });
+});

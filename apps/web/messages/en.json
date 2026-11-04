@@ -3162,7 +3162,7 @@
     "diffRowLine": "{label}: {before} → {after}",
     "failureReasonLine": "This change was not applied. What the ad platform said: {reason}",
     "failureNextStep": "Nothing was retried for you. Once that is sorted out, propose the change again.",
-    "rollbackReasonLine": "Undone ({reason})",
+    "rollbackReasonLine": "{reason, select, manual {You undid this change.} guardrail_regression {Undone automatically: the results got worse after this change.} other {This change was undone.}}",
     "approveButton": "Approve",
     "rejectButton": "Reject",
     "executeButton": "Apply this change",

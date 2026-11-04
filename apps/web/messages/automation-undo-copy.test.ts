@@ -17,13 +17,15 @@ describe('undoing an AI change is described in plain words', () => {
 
   it('Hebrew has no English word and speaks to everyone', () => {
     for (const key of KEYS) {
-      expect(he.Automation[key].replace(/\{[^}]*\}/g, ""), key).not.toMatch(/[A-Za-z]/);
+      // Drop the ICU select keywords (reason codes) and placeholders; only the shown sentences remain.
+      const shown = he.Automation[key].replace(/\{reason, select,/, '').replace(/\b(?:manual|guardrail_regression|other) \{/g, '{').replace(/\{[^}]*\}/g, '');
+      expect(shown, key).not.toMatch(/[A-Za-z]/);
     }
     expect(he.Automation.rollbackError).toMatch(/נסו/);
   });
 
-  it('keeps the reason placeholder in the reason line', () => {
-    expect(en.Automation.rollbackReasonLine).toContain('{reason}');
-    expect(he.Automation.rollbackReasonLine).toContain('{reason}');
+  it('chooses the sentence by reason, never printing the stored code', () => {
+    expect(en.Automation.rollbackReasonLine).toMatch(/\{reason, select,/);
+    expect(he.Automation.rollbackReasonLine).toMatch(/\{reason, select,/);
   });
 });
