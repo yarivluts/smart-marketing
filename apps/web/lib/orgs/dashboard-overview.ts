@@ -24,6 +24,8 @@ export interface DashboardOrg {
   orgId: string;
   name: string;
   role: string;
+  /** True when the viewer may create a project in this org, so an empty org can offer a button instead of directions. */
+  canCreateProject?: boolean;
   projects: DashboardProject[];
   /** Projects in the org beyond the per-dashboard cap, which are not read here. */
   hiddenProjectCount: number;
@@ -66,7 +68,8 @@ export async function loadDashboardOverview(input: {
       const projects = await Promise.all(
         shown.map((project) => loadDashboardProject({ orgId, project, userId: input.userId, bindings: input.bindings, now: input.now })),
       );
-      return { orgId, name: membership.organizationName, role: membership.role, projects, hiddenProjectCount: all.length - shown.length };
+      const canCreateProject = can([...input.bindings], { type: 'user', id: input.userId }, 'project.manage', { orgId });
+      return { orgId, name: membership.organizationName, role: membership.role, canCreateProject, projects, hiddenProjectCount: all.length - shown.length };
     }),
   );
 

@@ -182,7 +182,19 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
             </div>
           </div>
           {org.projects.length === 0 ? (
-            <EmptyState compact icon={FolderKanban} title={t('orgNoProjects')} description={t('orgNoProjectsHint')} />
+            <EmptyState
+              compact
+              icon={FolderKanban}
+              title={t('orgNoProjects')}
+              description={org.canCreateProject ? t('orgNoProjectsHint') : t('orgNoProjectsAskAdmin')}
+              action={
+                org.canCreateProject ? (
+                  <Button asChild size="sm">
+                    <Link href={`/orgs/${org.orgId}/projects/new`}>{t('createFirstProject')}</Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className={org.projects.length === 1 ? 'grid gap-4' : 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'}>
               {org.projects.map((project) => (

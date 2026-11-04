@@ -79,5 +79,6 @@ describe('loadDashboardOverview', () => {
     expect(overview.orgs[0].projects).toHaveLength(DASHBOARD_PROJECT_CAP);
     expect(overview.orgs[0].hiddenProjectCount).toBe(3);
     expect(overview.orgs[0].projects[0].onboardingStep).toBeNull();
+    expect(overview.orgs[0].canCreateProject).toBe(true);
   });
 });
