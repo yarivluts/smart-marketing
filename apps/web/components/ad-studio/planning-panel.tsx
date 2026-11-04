@@ -381,7 +381,7 @@ export function PlanningPanel({ orgId, projectId, briefId, plan, sources, genera
             </h2>
             <p className="max-w-2xl text-xs text-muted-foreground">{t('plan.description')}</p>
             {generatedBy ? (
-              <p className="mt-1 text-xs text-muted-foreground">{t('plan.generatedBy', { model: generatedBy.model, date: formatWhen(generatedBy.generatedAt) })}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t('plan.generatedBy', { date: formatWhen(generatedBy.generatedAt) })}</p>
             ) : null}
             {!aiAvailable ? <p className="mt-1 text-xs text-warning">{t('plan.noProvider')}</p> : null}
             {pending ? (

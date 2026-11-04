@@ -45,7 +45,7 @@ describe('ScriptEditor', () => {
   it('shows the script on the one-minute ruler and who wrote it', () => {
     renderEditor();
     expect(screen.getByText('13s of 60s')).toBeInTheDocument();
-    expect(screen.getByText('Written by gemini-3.8-flash')).toBeInTheDocument();
+    expect(screen.getByText('Written by the AI helper')).toBeInTheDocument();
     expect(screen.getByTestId('ad-studio-scene-2')).toHaveTextContent('Scene 2');
   });
 

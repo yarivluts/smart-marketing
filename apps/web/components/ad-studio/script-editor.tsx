@@ -213,7 +213,7 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
           </h2>
           <p className="max-w-2xl text-sm text-muted-foreground">{t('scriptDescription')}</p>
           {scenes.length > 0 ? (
-            <p className="text-xs text-muted-foreground">{generatedByModel && !dirty ? t('generatedBy', { model: generatedByModel }) : t('editedAfterAi')}</p>
+            <p className="text-xs text-muted-foreground">{generatedByModel && !dirty ? t('generatedBy') : t('editedAfterAi')}</p>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
