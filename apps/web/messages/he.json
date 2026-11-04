@@ -1676,13 +1676,13 @@
   "Insights": {
     "metaTitle": "התראות והצלחות",
     "title": "התראות והצלחות עבור {projectName}",
-    "description": "ממצאים בולטים אחרונים בפרויקט הזה: מעקב שייתכן שנשבר, מדדים שכבר לא ניתן לתשאל כפי שהוגדרו, וזכיות שכללי הזכייה שלכם זיהו.",
-    "empty": "אין עדיין תובנות. התוכן יופיע כאשר תתריע התראת מעקב, יתאים כלל זכייה, או כאשר מדד רשום יפסיק להיות ניתן לתשאול.",
+    "description": "הדברים האחרונים ששווה לדעת על הפרויקט הזה: נתונים שאולי הפסיקו להגיע, מספרים שאי אפשר לחשב יותר, וחדשות טובות שכללי הזכייה שלכם זיהו.",
+    "empty": "אין עדיין מה לדווח. זה יתמלא כשנתונים יפסיקו להגיע, כלל זכייה יתקיים, או מספר שאתם עוקבים אחריו לא יהיה אפשר לחשב.",
     "trackingAlertTitle": "המעקב עלול להיות תקול: \"{schemaName}\" השתתק",
-    "trackingAlertDetail": "לא נקלטו רשומות \"{schemaName}\" חדשות מאז {lastSeenAt}.",
+    "trackingAlertDetail": "לא הגיע שום דבר חדש עבור \"{schemaName}\" מאז {lastSeenAt}.",
     "winEventTitle": "ניצחון: {winRuleName}",
     "winEventDetail": "רשומת \"{schemaName}\" ({clientId}) התאימה לכלל הניצחון \"{winRuleName}\".",
-    "metricHealthTitle": "לא ניתן לשאול את המדד \"{metricName}\" (גרסה {version}) כפי שהוגדר",
+    "metricHealthTitle": "לא ניתן לחשב כרגע את המספר \"{metricName}\" (גרסה {version})",
     "metricHealthDetail": "{reasons}",
     "severityLabel": {
       "info": "מידע",
