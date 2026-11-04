@@ -566,6 +566,8 @@
     "warRoomLink": "Show your results on a TV screen",
     "finishButton": "Finish",
     "doneMessage": "You're all set!",
+    "doneNextStepBody": "Next, let Growth Pilot read your website and write your first ads. You only approve or say no - nothing goes live without you.",
+    "doneNextStepButton": "Open Growth Pilot",
     "packLandingPageTitle": "Web Page Performance",
     "packLandingPageDescription": "See which of your pages turns visitors into sign-ups or sales, whichever ad brought them.",
     "sourceStepPushYourOwnIntro": "Works right now, with nothing to install — create a key below and start sending your data (like signups and purchases) straight away.",
