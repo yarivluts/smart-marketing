@@ -3331,6 +3331,7 @@
     "currencyHelp": "The currency your ad spend and sales are shown in, as a three-letter code such as ILS or USD. Leave empty if you are not sure.",
     "timezoneLabel": "Time zone",
     "timezoneHelp": "Where your business is, so that each day starts and ends at the right time. Write it like Asia/Jerusalem or America/New_York. Leave empty if you are not sure.",
+    "timezoneUseDevice": "Use this device's time zone ({zone})",
     "invalidCurrencyError": "Write the currency as a three-letter code, for example ILS or USD.",
     "invalidTimezoneError": "Write the time zone like Asia/Jerusalem or America/New_York.",
     "archiveHeading": "Archive",

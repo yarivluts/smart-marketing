@@ -30,6 +30,19 @@ describe('ProjectSettingsForm', () => {
     expect(screen.getByLabelText('Business type')).toHaveValue('ecommerce');
   });
 
+  it('offers one click to use the device time zone instead of typing it', async () => {
+    const resolved = vi
+      .spyOn(Intl.DateTimeFormat.prototype, 'resolvedOptions')
+      .mockReturnValue({ timeZone: 'Asia/Jerusalem' } as Intl.ResolvedDateTimeFormatOptions);
+    renderForm();
+
+    const button = await screen.findByRole('button', { name: "Use this device's time zone (Asia/Jerusalem)" });
+    fireEvent.click(button);
+    expect(screen.getByLabelText('Time zone')).toHaveValue('Asia/Jerusalem');
+    expect(screen.queryByRole('button', { name: /Use this device/ })).toBeNull();
+    resolved.mockRestore();
+  });
+
   it('suggests currency codes and time zones so nobody has to type them from memory', async () => {
     const supported = vi.spyOn(Intl as unknown as { supportedValuesOf: (key: string) => string[] }, 'supportedValuesOf');
     supported.mockImplementation((key: string) => (key === 'currency' ? ['ILS', 'USD'] : ['Asia/Jerusalem']));
