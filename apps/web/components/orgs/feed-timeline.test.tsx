@@ -13,7 +13,7 @@ describe('FeedTimeline', () => {
             key: '2026-08-02',
             label: 'Sun, Aug 2',
             items: [
-              { id: '1', tone: 'error', title: 'Failed payment', aside: '4,999 USD', lines: [{ text: 'Failure: card declined', emphasis: true }], meta: 'Landed 10:00' },
+              { id: '1', tone: 'error', title: 'Failed payment', aside: '4,999 USD', lines: [{ text: 'Failure: card declined', emphasis: true }], meta: 'Received 10:00' },
               { id: '2', tone: 'ok', title: 'Charge' },
             ],
           },
@@ -27,7 +27,7 @@ describe('FeedTimeline', () => {
     expect(within(days[0]).getByText('Sun, Aug 2')).toBeInTheDocument();
     expect(within(days[0]).getByText('4,999 USD')).toHaveAttribute('dir', 'ltr');
     expect(within(days[0]).getByText('Failure: card declined')).toHaveClass('text-destructive');
-    expect(within(days[0]).getByText('Landed 10:00')).toBeInTheDocument();
+    expect(within(days[0]).getByText('Received 10:00')).toBeInTheDocument();
     expect(within(days[1]).getByText('Refund')).toBeInTheDocument();
   });
 });
