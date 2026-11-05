@@ -56,6 +56,18 @@ afterEach(() => {
 });
 
 describe('PlanningPanel', () => {
+  it('uses plain words in both languages: no "model" jargon and Facebook and Instagram instead of Meta', () => {
+    const copy = { en, he } as Record<string, typeof en>;
+    for (const locale of ['en', 'he']) {
+      const plan = copy[locale].AdStudio.plan;
+      expect(plan.platform.meta_ads).not.toMatch(/^Meta$/);
+      expect(plan.sourceModel).not.toMatch(/model|מודל/i);
+      expect(plan.marketHint).not.toMatch(/model|מודל/i);
+      expect(plan.marketDescription).not.toMatch(/model|מודל/i);
+    }
+    expect(en.AdStudio.plan.platform.meta_ads).toBe('Facebook and Instagram');
+  });
+
   it('says the AI helper worked out the plan, without leaking the raw model id', () => {
     renderPanel();
     expect(screen.getByText(/Worked out by the AI helper on/)).toBeInTheDocument();
@@ -70,7 +82,7 @@ describe('PlanningPanel', () => {
     expect(within(rows[0]).getByText('Read example.com/lawyers')).toBeInTheDocument();
     expect(within(rows[2]).getByText('The project has no ads yet.')).toBeInTheDocument();
     expect(within(rows[3]).getByText('Google Ads is not connected to this project, so the plan uses general market knowledge instead of real search numbers. You can connect it in Ad platform connections - it is optional.')).toBeInTheDocument();
-    expect(within(rows[4]).getByText('General knowledge from the AI model. Not measured.')).toBeInTheDocument();
+    expect(within(rows[4]).getByText('General knowledge of the AI helper. Not measured.')).toBeInTheDocument();
   });
 
   it('charts the measured results and explains a source without data once, in the sources list', () => {
@@ -95,7 +107,7 @@ describe('PlanningPanel', () => {
     expect(within(cards[1]).getByText('No available evidence behind this - treat it as a suggestion.')).toBeInTheDocument();
     expect(within(cards[2]).getByText('Market knowledge')).toBeInTheDocument();
     const market = screen.getByTestId('ad-studio-market-notes');
-    expect(within(market).getByText('General model knowledge, not measured data. Check it before relying on it.')).toBeInTheDocument();
+    expect(within(market).getByText('General knowledge of the AI helper, not measured data. Check it before relying on it.')).toBeInTheDocument();
     expect(screen.getByText('Solo lawyers')).toHaveAttribute('dir', 'auto');
   });
 

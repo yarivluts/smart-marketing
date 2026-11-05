@@ -4371,8 +4371,8 @@
       },
       "sourceOk": "בשימוש",
       "sourceUnavailable": "לא זמין",
-      "sourceModel": "ידע של המודל",
-      "marketHint": "ידע כללי של מודל ה-AI. לא נמדד.",
+      "sourceModel": "הידע הכללי של ה-AI",
+      "marketHint": "ידע כללי של עוזר ה-AI. לא נמדד.",
       "landingPageRead": "נקרא {url}",
       "reasons": {
         "landing_page": {
@@ -4420,7 +4420,7 @@
       },
       "unsupported": "אין מאחורי זה ראיה זמינה - התייחסו לזה כהצעה.",
       "marketTitle": "הערות שוק",
-      "marketDescription": "ידע כללי של המודל, לא נתונים שנמדדו. כדאי לבדוק לפני שמסתמכים עליו.",
+      "marketDescription": "ידע כללי של עוזר ה-AI, לא נתונים שנמדדו. כדאי לבדוק לפני שמסתמכים עליו.",
       "pagesChartTitle": "מבקרים לפי דף אינטרנט",
       "pagesChartDescription": "{days} הימים האחרונים. כל הרשמה או מכירה נזקפות לדף או למודעה האחרונים שממנו הגיע.",
       "pageSublabel": "{conversions} הרשמות או מכירות · {rate} מהמבקרים",
@@ -4445,7 +4445,7 @@
       "campaignSublabel": "{platform} · {status} · {ads, plural, one {מודעה אחת} other {# מודעות}}",
       "platform": {
         "google_ads": "Google Ads",
-        "meta_ads": "Meta",
+        "meta_ads": "פייסבוק ואינסטגרם",
         "unknown": "פלטפורמה אחרת"
       },
       "campaignStatus": {
