@@ -52,7 +52,7 @@ describe('AutomationSeedTargetForm short code', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
     expect(screen.getByLabelText(/Short code \(optional/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Spring Sale!' } });
+    fireEvent.change(screen.getByLabelText('Ad name'), { target: { value: 'Spring Sale!' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add ad' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string) as { targetId: string };
@@ -65,10 +65,10 @@ describe('AutomationSeedTargetForm short code', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add ad' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('Label and environment are required.');
+    expect((await screen.findByRole('alert')).textContent).toBe('Ad name and environment are required.');
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText(/Short code/), { target: { value: 'mine' } });
-    fireEvent.change(screen.getByLabelText('Label'), { target: { value: 'Ad' } });
+    fireEvent.change(screen.getByLabelText('Ad name'), { target: { value: 'Ad' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add ad' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect((JSON.parse(fetchMock.mock.calls[0][1].body as string) as { targetId: string }).targetId).toBe('mine');
