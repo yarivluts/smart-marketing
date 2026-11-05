@@ -206,6 +206,38 @@ describe('AutomationHubDashboard Component', () => {
     expect(screen.queryByRole('button', { name: en.Automation.killSwitchEngageButton })).not.toBeInTheDocument();
   });
 
+  it('lists the ads added for automation, or says there are none', () => {
+    const props = {
+      orgId: 'org-1',
+      projectId: 'proj-1',
+      projectName: 'GrowthOS Web',
+      killSwitchStatus: mockKillSwitch,
+      policy: mockPolicy,
+      actions: mockActions,
+      connections: [],
+      proactiveRecommendations: mockRecs,
+      canExecute: true,
+      canApprove: true,
+    };
+    const { unmount } = renderWithIntl(<AutomationHubDashboard {...props} targets={[]} />, { locale: 'en' });
+    fireEvent.click(screen.getByTestId('tab-rules'));
+    expect(screen.getByTestId('targets-empty')).toHaveTextContent(en.Automation.targetsEmptyNote);
+    unmount();
+
+    const targets = [
+      { id: 't1', targetType: 'campaign', label: 'Spring sale', dailyBudgetUsd: 20, environmentId: 'live', campaignStatus: 'paused' as const },
+      { id: 't2', targetType: 'campaign', label: 'Brand ad', dailyBudgetUsd: 5, environmentId: 'live' },
+    ];
+    renderWithIntl(<AutomationHubDashboard {...props} targets={targets} />, { locale: 'he' });
+    fireEvent.click(screen.getByTestId('tab-rules'));
+    const items = screen.getByTestId('targets-list').querySelectorAll('li');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent('Spring sale — $20 ליום');
+    expect(items[0]).toHaveTextContent('מושהה');
+    expect(items[1]).toHaveTextContent('Brand ad — $5 ליום');
+    expect(items[1]).not.toHaveTextContent('—  ');
+  });
+
   it('omits the projected-impact badge when projectedImpact is empty', () => {
     renderWithIntl(
       <AutomationHubDashboard

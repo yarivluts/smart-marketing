@@ -40,6 +40,12 @@ import type {
   AutomationTargetView,
 } from '@/lib/orgs/automation-view';
 
+const TARGET_STATUS_KEYS: Record<string, string> = {
+  paused: 'campaignStatusPaused',
+  enabled: 'campaignStatusEnabled',
+  removed: 'campaignStatusRemoved',
+};
+
 export interface AutomationHubDashboardProps {
   orgId: string;
   projectId: string;
@@ -482,6 +488,21 @@ export function AutomationHubDashboard({
           {/* Seed Target */}
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">{t('targetsHeading')}</h2>
+            {targets.length === 0 ? (
+              <p className="text-sm text-muted-foreground" data-testid="targets-empty">{t('targetsEmptyNote')}</p>
+            ) : (
+              <ul className="flex flex-col gap-1 text-sm" data-testid="targets-list">
+                {targets.map((target) => {
+                  const statusKey = target.campaignStatus ? TARGET_STATUS_KEYS[target.campaignStatus] : undefined;
+                  return (
+                    <li key={target.id}>
+                      {t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}
+                      {statusKey ? ` ${t('targetCampaignStatusLine', { status: t(statusKey) })}` : ''}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <AutomationSeedTargetForm orgId={orgId} projectId={projectId} connections={connections} />
           </section>
 
