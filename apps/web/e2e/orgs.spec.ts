@@ -44,7 +44,8 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
     await createOrganization(page, 'Beta E2E');
 
     // Both orgs must be listed — the switcher lists only this user's memberships.
-    await page.getByLabel('Organization').selectOption({ label: 'Acme E2E' });
+    await page.getByTestId('workspace-switcher').click();
+    await page.getByTestId('workspace-switcher-panel').getByRole('link', { name: 'Acme E2E' }).first().click();
     await expect(page).toHaveURL(/\/en\/orgs\/[^/]+$/);
     await expect(page.getByRole('heading', { name: 'Acme E2E' })).toBeVisible();
 

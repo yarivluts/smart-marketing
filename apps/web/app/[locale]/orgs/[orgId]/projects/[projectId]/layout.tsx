@@ -8,7 +8,8 @@ import {
 } from '@/components/orgs/app-shell';
 import { EnvironmentPicker } from '@/components/orgs/environment-picker';
 import { OmniSearchTrigger } from '@/components/orgs/omni-search';
-import { ProjectSwitcher } from '@/components/orgs/project-switcher';
+import { WorkspaceSwitcher } from '@/components/orgs/workspace-switcher';
+import { loadWorkspaces } from '@/lib/orgs/workspaces';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -54,7 +55,7 @@ export default async function ProjectLayout({
     notFound();
   }
 
-  const projects = await listOrgProjects(orgId);
+  const [projects, workspaces] = await Promise.all([listOrgProjects(orgId), loadWorkspaces(memberships)]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
@@ -257,13 +258,7 @@ export default async function ProjectLayout({
     <AppShell
       switchers={
         <>
-          {/* The switcher's selected pill already names the current project. */}
-          <ProjectSwitcher
-            orgId={orgId}
-            projects={projects}
-            currentProjectId={projectId}
-            currentEnv={currentEnv}
-          />
+          <WorkspaceSwitcher workspaces={workspaces} currentOrgId={orgId} currentProjectId={projectId} canCreateProject={canManageProjects} />
           <EnvironmentPicker
             projectId={projectId}
             options={environmentOptions}

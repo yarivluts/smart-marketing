@@ -117,7 +117,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
     await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
 
-    await openOmnisearch(page, () => page.getByRole('button', { name: /search/i }).click());
+    await openOmnisearch(page, () => page.getByRole('button', { name: /^search/i }).click());
     await expect(page.getByText('Start typing to search this project.')).toBeVisible();
 
     await page.getByPlaceholder(/search your ads, goals/i).fill('nothing-should-match-this-xyz');

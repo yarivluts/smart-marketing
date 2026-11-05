@@ -365,8 +365,15 @@
     "nextTeamTitle": "Invite your team",
     "nextTeamDescription": "Give teammates a role across the organization or on one project."
   },
-  "OrgSwitcher": {
-    "label": "Organization"
+  "SidebarWorkspace": {
+    "open": "Switch organization or project",
+    "current": "Now in: {place}",
+    "organization": "Organization",
+    "organizationHome": "Organization home",
+    "listLabel": "Your organizations and projects",
+    "noProjects": "No projects yet",
+    "newProject": "New project",
+    "allOrganizations": "All organizations"
   },
   "OrgDetailPage": {
     "title": "Organization",
