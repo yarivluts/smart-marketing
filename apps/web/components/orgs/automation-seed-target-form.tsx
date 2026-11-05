@@ -104,7 +104,15 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
         <label className="text-sm font-medium" htmlFor="seed-target-environment">
           {t('seedTargetEnvironmentLabel')}
         </label>
-        <Input id="seed-target-environment" value={environmentId} onChange={(event) => setEnvironmentId(event.target.value)} />
+        <Input
+          id="seed-target-environment"
+          aria-describedby="seed-target-environment-hint"
+          value={environmentId}
+          onChange={(event) => setEnvironmentId(event.target.value)}
+        />
+        <p id="seed-target-environment-hint" className="text-xs text-muted-foreground">
+          {t('seedTargetEnvironmentHint')}
+        </p>
       </div>
       <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[120px] sm:flex-1">
         <label className="text-sm font-medium" htmlFor="seed-target-budget">
