@@ -1,9 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { Building2 } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { AppShell, type AppShellNavItem } from '@/components/orgs/app-shell';
-import { OrgSwitcher } from '@/components/orgs/org-switcher';
+import { WorkspaceSwitcher } from '@/components/orgs/workspace-switcher';
+import { loadWorkspaces } from '@/lib/orgs/workspaces';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -52,9 +52,12 @@ export async function OrgShell({
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
 
-  const [t, tShell] = await Promise.all([
+  const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
+
+  const [t, tShell, workspaces] = await Promise.all([
     getTranslations('OrgDetailPage'),
     getTranslations('AppShell'),
+    loadWorkspaces(memberships),
   ]);
 
   const items: AppShellNavItem[] = [
@@ -83,15 +86,7 @@ export async function OrgShell({
 
   return (
     <AppShell
-      switchers={
-        <>
-          <span className="flex items-center gap-2 px-3 text-sm font-semibold">
-            <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
-            {tShell('brandName')}
-          </span>
-          <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
-        </>
-      }
+      switchers={<WorkspaceSwitcher workspaces={workspaces} currentOrgId={orgId} canCreateProject={canManageProjects} />}
       sections={[{ items }]}
       mobileTabItems={items.slice(0, 4)}
     >

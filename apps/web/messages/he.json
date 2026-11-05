@@ -365,8 +365,14 @@
     "nextTeamTitle": "הזמנת הצוות",
     "nextTeamDescription": "תנו לחברי הצוות תפקיד בכל הארגון או בפרויקט אחד."
   },
-  "OrgSwitcher": {
-    "label": "ארגון"
+  "SidebarWorkspace": {
+    "open": "החלפת ארגון או פרויקט (כעת: {place})",
+    "organization": "ארגון",
+    "organizationHome": "דף הבית של הארגון",
+    "listLabel": "הארגונים והפרויקטים שלכם",
+    "noProjects": "עדיין אין פרויקטים",
+    "newProject": "פרויקט חדש",
+    "allOrganizations": "כל הארגונים"
   },
   "OrgDetailPage": {
     "title": "ארגון",
