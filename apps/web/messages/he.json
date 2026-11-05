@@ -366,7 +366,8 @@
     "nextTeamDescription": "תנו לחברי הצוות תפקיד בכל הארגון או בפרויקט אחד."
   },
   "SidebarWorkspace": {
-    "open": "החלפת ארגון או פרויקט (כעת: {place})",
+    "open": "החלפת ארגון או פרויקט",
+    "current": "כעת ב: {place}",
     "organization": "ארגון",
     "organizationHome": "דף הבית של הארגון",
     "listLabel": "הארגונים והפרויקטים שלכם",

@@ -366,7 +366,8 @@
     "nextTeamDescription": "Give teammates a role across the organization or on one project."
   },
   "SidebarWorkspace": {
-    "open": "Switch organization or project (now: {place})",
+    "open": "Switch organization or project",
+    "current": "Now in: {place}",
     "organization": "Organization",
     "organizationHome": "Organization home",
     "listLabel": "Your organizations and projects",

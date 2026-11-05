@@ -38,7 +38,9 @@ describe('WorkspaceSwitcher', () => {
     expect(trigger).toHaveTextContent('EasySign');
     expect(trigger).toHaveTextContent('EasySign Growth');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(trigger).toHaveAccessibleName(en.open.replace('{place}', 'EasySign / EasySign Growth'));
+    // A fixed name (org names are user content that would collide with page buttons); the place is the description.
+    expect(trigger).toHaveAccessibleName(en.open);
+    expect(trigger).toHaveAccessibleDescription(en.current.replace('{place}', 'EasySign / EasySign Growth'));
     expect(screen.queryByTestId('workspace-switcher-panel')).toBeNull();
   });
 

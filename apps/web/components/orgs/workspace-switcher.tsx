@@ -33,6 +33,7 @@ export function WorkspaceSwitcher({ workspaces, currentOrgId, currentProjectId, 
   const rootRef = React.useRef<HTMLDivElement>(null);
   const buttonRef = React.useRef<HTMLButtonElement>(null);
   const panelId = React.useId();
+  const currentId = React.useId();
   const current = workspaces.find((workspace) => workspace.orgId === currentOrgId);
   const currentProject = current?.projects.find((project) => project.id === currentProjectId);
   const orgName = current?.orgName ?? t('organization');
@@ -64,7 +65,9 @@ export function WorkspaceSwitcher({ workspaces, currentOrgId, currentProjectId, 
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={t('open', { place: currentProject ? `${orgName} / ${currentProject.name}` : orgName })}
+        // A fixed name: the org/project names are user content and would collide with page buttons.
+        aria-label={t('open')}
+        aria-describedby={currentId}
         className="flex w-full items-center gap-3 rounded-pp-lg p-2 text-start transition-colors hover:bg-pp-surface-container-high"
         data-testid="workspace-switcher"
       >
@@ -78,6 +81,9 @@ export function WorkspaceSwitcher({ workspaces, currentOrgId, currentProjectId, 
           <span className="truncate text-pp-body-sm text-pp-on-surface-variant" dir="auto">
             {currentProject ? currentProject.name : t('organizationHome')}
           </span>
+        </span>
+        <span id={currentId} className="sr-only">
+          {t('current', { place: currentProject ? `${orgName} / ${currentProject.name}` : orgName })}
         </span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-pp-on-surface-variant" aria-hidden="true" />
       </button>
