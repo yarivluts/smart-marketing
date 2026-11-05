@@ -24,6 +24,27 @@ describe('CreateProjectForm', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
+  it('starts empty by default', () => {
+    renderForm();
+    expect(screen.getByLabelText('Project name')).toHaveValue('');
+  });
+
+  it('pre-fills the suggested name and creates the project with it in one click', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ projectId: 'proj-9' }) } as Response);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <CreateProjectForm orgId="org-1" defaultName="Dana's Bakery" />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByLabelText('Project name')).toHaveValue("Dana's Bakery");
+    fireEvent.click(screen.getByRole('button', { name: 'Create project' }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/proj-9/onboarding'));
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects',
+      expect.objectContaining({ body: JSON.stringify({ name: "Dana's Bakery" }) }),
+    );
+  });
+
   it('creates the project and navigates to it', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ projectId: 'proj-123' }) } as Response);
     renderForm();
