@@ -78,6 +78,12 @@ describe('GrowthPilotApp', () => {
     expect(fetchMock.mock.calls.filter(([url, init]) => url === BASE && (init as RequestInit | undefined)?.method === 'POST')).toHaveLength(1);
   });
 
+  it('puts the cursor in the website box so a newcomer can just type', () => {
+    stubFetch({ body: page() });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    expect(screen.getByTestId('growth-pilot-site-input')).toHaveFocus();
+  });
+
   it('starts with one input, the website, and sends it', async () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
