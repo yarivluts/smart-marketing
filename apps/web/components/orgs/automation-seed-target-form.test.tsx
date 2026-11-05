@@ -27,3 +27,12 @@ describe('AutomationSeedTargetForm connection picker', () => {
     expect(options.some((text) => text?.startsWith('Meta prod') && text !== 'Meta prod')).toBe(true);
   });
 });
+
+describe('AutomationSeedTargetForm environment box', () => {
+  it('explains in plain words that "live" is right for real ads', () => {
+    renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
+    const box = screen.getByLabelText('Where it runs');
+    expect(box).toHaveValue('live');
+    expect(box).toHaveAccessibleDescription(/real ads/);
+  });
+});
