@@ -4371,8 +4371,8 @@
       },
       "sourceOk": "Used",
       "sourceUnavailable": "Not available",
-      "sourceModel": "Model knowledge",
-      "marketHint": "General knowledge from the AI model. Not measured.",
+      "sourceModel": "The AI's general knowledge",
+      "marketHint": "General knowledge of the AI helper. Not measured.",
       "landingPageRead": "Read {url}",
       "reasons": {
         "landing_page": {
@@ -4420,7 +4420,7 @@
       },
       "unsupported": "No available evidence behind this - treat it as a suggestion.",
       "marketTitle": "Market notes",
-      "marketDescription": "General model knowledge, not measured data. Check it before relying on it.",
+      "marketDescription": "General knowledge of the AI helper, not measured data. Check it before relying on it.",
       "pagesChartTitle": "Visitors per web page",
       "pagesChartDescription": "Last {days} days. Each sign-up or sale is credited to the last page or ad they came from.",
       "pageSublabel": "{conversions} sign-ups or sales · {rate} of visitors",
@@ -4445,7 +4445,7 @@
       "campaignSublabel": "{platform} · {status} · {ads, plural, one {# ad} other {# ads}}",
       "platform": {
         "google_ads": "Google Ads",
-        "meta_ads": "Meta",
+        "meta_ads": "Facebook and Instagram",
         "unknown": "Other platform"
       },
       "campaignStatus": {
