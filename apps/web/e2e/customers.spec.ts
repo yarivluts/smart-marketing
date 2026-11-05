@@ -73,7 +73,7 @@ test.describe('Customer search (KAN-108)', () => {
     // No query yet — a prompt, not a warehouse call.
     await expect(page.getByText('Enter a search term to look up a customer.')).toBeVisible();
 
-    await page.getByLabel('Search').fill('alice@example.com');
+    await page.getByRole('textbox', { name: 'Search', exact: true }).fill('alice@example.com');
     await page.getByRole('button', { name: 'Search customers' }).click();
 
     await expect(page).toHaveURL(/[?&]q=alice%40example\.com/);
