@@ -154,6 +154,10 @@ describe('AudiencePanel', () => {
       { locale: 'he' },
     );
     expect(await screen.findByText(he.unavailable.no_meta_credential)).toBeInTheDocument();
+    for (const text of Object.values(he.unavailable)) expect(text).not.toMatch(/\u05DE\u05D8\u05D0/);
+    for (const text of Object.values(en.unavailable)) expect(text).not.toMatch(/\bMeta\b/);
+    expect(en.saved).not.toMatch(/\bMeta\b/);
+    expect(he.saved).not.toMatch(/\u05DE\u05D8\u05D0/);
     const hebrewCountries = screen.getByTestId('ad-studio-countries');
     expect(hebrewCountries).toHaveTextContent('ישראל');
     expect(hebrewCountries).not.toHaveTextContent('IL');
