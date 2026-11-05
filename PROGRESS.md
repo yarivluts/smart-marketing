@@ -282,6 +282,7 @@ Template for each entry:
 
 ## UX hourly
 
+- 2026-11-05 - (b/f) Automation change-suggestion forms audited. Every picker of which ad to change was labelled "Target" (he: יעד); it now says "Which ad" (he: איזו מודעה) on all seven forms (en + he) with a test. PR #PRNUM. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) Meta/Google Ads platform names in the draft form could say Facebook and Instagram.
 - 2026-11-05 - (b/f) Automation "Add ad" form: the "Label" box (he: תווית) is now "Ad name" (he: שם המודעה), including its error message (en + he) with the test updated. PR #1158. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) Automation "Target" wording in the change-proposal form.
 
 - 2026-11-05 - (b/f) Automation "Add ad" form re-audited. The Environment box was a bare free-text field defaulting to "live"; it is now "Where it runs" with a hint that "live" is right for real ads (en + he) with a test. PR #1157. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) Automation "Label" box on the same form could say "Ad name".
