@@ -55,7 +55,7 @@ test.describe('AI Ad Studio deep analysis (KAN-230)', () => {
 
     const sources = page.getByTestId('ad-studio-plan-sources');
     await expect(sources.locator('[data-status="ok"]')).toHaveCount(4);
-    await expect(sources.locator('[data-source="market"]')).toContainText('General knowledge from the AI model. Not measured.');
+    await expect(sources.locator('[data-source="market"]')).toContainText('General knowledge of the AI helper. Not measured.');
     await expect(page.getByText('Visitors per web page')).toBeVisible();
     await expect(page.getByText('example.com/lawyers').first()).toBeVisible();
     await expect(page.getByText('Keyword ideas by monthly searches')).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('AI Ad Studio deep analysis (KAN-230)', () => {
     const recommendations = page.getByTestId('ad-studio-recommendation');
     await expect(recommendations).toHaveCount(3);
     await expect(recommendations.first()).toContainText('High priority');
-    await expect(page.getByTestId('ad-studio-market-notes')).toContainText('General model knowledge, not measured data.');
+    await expect(page.getByTestId('ad-studio-market-notes')).toContainText('General knowledge of the AI helper, not measured data.');
     await expect(panel.getByRole('button', { name: 'Run again' })).toBeVisible();
   });
 });
