@@ -20,11 +20,12 @@ import {
   proposeOnboardingFunnelSteps,
 } from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
-import { hasActiveInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
+import { hasActiveInstall, pluginDisplayNameForInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
 import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView } from '@/lib/orgs/onboarding-view';
 import { buildOnboardingJourney, wrapIntoRows } from '@/lib/orgs/onboarding-journey';
 import { onboardingProgress, type OnboardingJourneyStep } from '@/lib/orgs/workspace-view';
 import { StartOnboardingButton } from '@/components/orgs/start-onboarding-button';
+import { OnboardingDoneNextStep } from '@/components/orgs/onboarding-done-next-step';
 import { OnboardingPilotShortcut } from '@/components/orgs/onboarding-pilot-shortcut';
 import { OnboardingPackStep } from '@/components/orgs/onboarding-pack-step';
 import { OnboardingSourceContinueButton } from '@/components/orgs/onboarding-source-continue-button';
@@ -150,6 +151,8 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
   // Growth Pilot needs `ai.use`; without it the shortcut would lead to a page the person cannot open.
   const pilotShortcut = can(bindings, { type: 'user', id: user.id }, 'ai.use', { orgId, projectId }) ? <OnboardingPilotShortcut orgId={orgId} projectId={projectId} /> : null;
+  const orgScope = { orgId };
+  const canManageOrgPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', orgScope);
   const hero = (
     <PageHero icon={Route} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('introBody')}>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -210,7 +213,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
       {view.step === 'sources' ? (
         <StepCard>
-          <SourcesStep orgId={orgId} projectId={projectId} />
+          <SourcesStep orgId={orgId} projectId={projectId} canManageOrgPlugins={canManageOrgPlugins} />
         </StepCard>
       ) : null}
 
@@ -234,7 +237,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
       {view.step === 'board' || view.step === 'done' ? (
         <StepCard>
-          <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} />
+          <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} canUsePilot={pilotShortcut !== null} />
         </StepCard>
       ) : null}
     </div>
@@ -256,7 +259,15 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
  * first-time user reads the plugin dead end as *the* path and the API-key
  * form as an unlabeled afterthought, when it's the faster of the two.
  */
-async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: string }): Promise<React.ReactElement> {
+async function SourcesStep({
+  orgId,
+  projectId,
+  canManageOrgPlugins,
+}: {
+  orgId: string;
+  projectId: string;
+  canManageOrgPlugins: boolean;
+}): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
 
   const [manifests, installs, environments, apiKeys, batches] = await Promise.all([
@@ -303,13 +314,15 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
         <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4">
           <h3 className="font-medium">{t('sourceStepPluginHeading')}</h3>
           {connectedSourceInstall ? (
-            <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}</p>
+            <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { name: pluginDisplayNameForInstall(connectedSourceInstall, manifestViews) })}</p>
           ) : installableSourceManifests.length === 0 ? (
             <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-input p-3">
               <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
-              </Button>
+              {canManageOrgPlugins ? (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
+                </Button>
+              ) : null}
             </div>
           ) : (
             <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableSourceManifests} />
@@ -320,7 +333,12 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
           <h3 className="font-medium">{t('sourceStepPushYourOwnHeading')}</h3>
           <p className="text-sm text-muted-foreground">{t('sourceStepPushYourOwnIntro')}</p>
           {environmentOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/orgs/${orgId}/projects/${projectId}/settings`}>{t('sourceStepNoEnvironmentsLink')}</Link>
+              </Button>
+            </div>
           ) : (
             <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
           )}
@@ -424,7 +442,7 @@ async function ConfirmedFunnelSummary({
 }
 
 /** The wizard's final screen (KAN-68 AC: "starter board" + plan `10 §2.6` step 5's invite/goal/war-room CTAs, folded together — see `OnboardingStateModel.step`'s own doc comment for why `board` carries both). */
-async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId: string; done: boolean }): Promise<React.ReactElement> {
+async function FinalStep({ orgId, projectId, done, canUsePilot }: { orgId: string; projectId: string; done: boolean; canUsePilot: boolean }): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
   const boards = await listBoardsForProject(orgId, projectId);
 
@@ -462,10 +480,7 @@ async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId:
       </div>
 
       {done ? (
-        <p className="flex items-center gap-2 font-medium">
-          <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" />
-          {t('doneMessage')}
-        </p>
+        <OnboardingDoneNextStep orgId={orgId} projectId={projectId} canUsePilot={canUsePilot} />
       ) : (
         <CompleteOnboardingButton orgId={orgId} projectId={projectId} />
       )}

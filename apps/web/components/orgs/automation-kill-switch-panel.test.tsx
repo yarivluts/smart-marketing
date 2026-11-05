@@ -46,4 +46,17 @@ describe('AutomationKillSwitchPanel', () => {
     expect(screen.getByText(/Billing audit/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: enMessages.Automation.killSwitchDisengageButton })).not.toBeInTheDocument();
   });
+
+  it.each([
+    ['en', enMessages],
+    ['he', heMessages],
+  ] as const)('does not end on a dangling colon when no reason was saved (%s)', (locale, messages) => {
+    render(
+      <NextIntlClientProvider locale={locale} messages={messages}>
+        <AutomationKillSwitchPanel orgId="o1" status={{ engaged: true, reason: '  ' } as never} canManage={false} />
+      </NextIntlClientProvider>,
+    );
+    const note = screen.getByText(messages.Automation.killSwitchEngagedNoReasonNote);
+    expect(note.textContent?.trim().endsWith(':')).toBe(false);
+  });
 });

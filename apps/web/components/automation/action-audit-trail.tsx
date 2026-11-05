@@ -38,6 +38,16 @@ export interface AuditActionItem {
   reason?: string;
 }
 
+const STATUS_LABEL_KEYS = new Set([
+  'awaiting_approval',
+  'approved',
+  'executed',
+  'verified',
+  'rolled_back',
+  'failed',
+  'rejected',
+]);
+
 export const ACTION_TYPE_LABEL_KEYS: Record<string, string> = {
   budget_change: 'actionType_budget_change',
   bid_strategy_change: 'actionType_bid_strategy_change',
@@ -306,7 +316,7 @@ export function ActionAuditTrail({
                           colors.border,
                         )}
                       >
-                        {act.status}
+                        {STATUS_LABEL_KEYS.has(act.status) ? t(`status_${act.status}`) : t('status_unknown')}
                       </span>
                     </TableCell>
 

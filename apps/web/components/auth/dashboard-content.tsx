@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { isRole } from '@growthos/shared';
 import { Activity, Building2, CheckCircle2, FolderKanban, Gauge, LayoutDashboard, Mail, Network, Plus, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { LanguageSwitcher } from '@/components/shell/language-switcher';
@@ -39,6 +40,7 @@ function trendDays(now: number): string[] {
  */
 export function DashboardContent({ email, overview, now }: DashboardContentProps): React.ReactElement {
   const t = useTranslations('DashboardPage');
+  const tRoles = useTranslations('Roles');
   const tShell = useTranslations('AppShell');
   const locale = useLocale();
   const numberFormat = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
@@ -169,7 +171,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
                 </h2>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <Badge variant="secondary" size="sm">
-                    {t('roleLabel', { role: org.role })}
+                    {t('roleLabel', { role: isRole(org.role) ? tRoles(org.role) : org.role })}
                   </Badge>
                   <span className="inline-flex items-center gap-1">
                     <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" />
@@ -180,7 +182,19 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
             </div>
           </div>
           {org.projects.length === 0 ? (
-            <EmptyState compact icon={FolderKanban} title={t('orgNoProjects')} description={t('orgNoProjectsHint')} />
+            <EmptyState
+              compact
+              icon={FolderKanban}
+              title={t('orgNoProjects')}
+              description={org.canCreateProject ? t('orgNoProjectsHint') : t('orgNoProjectsAskAdmin')}
+              action={
+                org.canCreateProject ? (
+                  <Button asChild size="sm">
+                    <Link href={`/orgs/${org.orgId}/projects/new`}>{t('createFirstProject')}</Link>
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className={org.projects.length === 1 ? 'grid gap-4' : 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'}>
               {org.projects.map((project) => (

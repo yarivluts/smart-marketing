@@ -118,6 +118,51 @@ describe('DashboardContent', () => {
     expect(within(restricted).queryByRole('link', { name: /Data health/ })).not.toBeInTheDocument();
   });
 
+  it('uses openHref when a project card overrides the default /campaigns destination (KAN-155)', () => {
+    renderDashboard({
+      pendingInviteCount: 0,
+      orgs: [
+        {
+          orgId: 'org-1',
+          name: 'Acme',
+          role: 'ingest_only',
+          hiddenProjectCount: 0,
+          projects: [
+            {
+              orgId: 'org-1',
+              projectId: 'p-ingest',
+              name: 'Ingest Project',
+              vertical: null,
+              health: null,
+              openHref: '/orgs/org-1/projects/p-ingest',
+            },
+          ],
+        },
+      ],
+    });
+    const card = screen.getByTestId('project-card-p-ingest');
+    expect(within(card).getByRole('link', { name: /Open project/ })).toHaveAttribute('href', '/orgs/org-1/projects/p-ingest');
+  });
+
+  it('offers a Create your first project button in an empty org to people who can create one, and directions to everyone else', () => {
+    renderDashboard({
+      pendingInviteCount: 0,
+      orgs: [
+        { orgId: 'org-1', name: 'Mine', role: 'org_owner', canCreateProject: true, hiddenProjectCount: 0, projects: [] },
+        { orgId: 'org-2', name: 'Theirs', role: 'viewer', canCreateProject: false, hiddenProjectCount: 0, projects: [] },
+      ],
+    });
+    expect(screen.getByRole('link', { name: 'Create your first project' })).toHaveAttribute('href', '/orgs/org-1/projects/new');
+    expect(screen.getAllByRole('link', { name: 'Create your first project' })).toHaveLength(1);
+    expect(screen.getByText('Ask an owner or admin of this organization to create the first project.')).toBeInTheDocument();
+  });
+
+  it('shows the role in plain words, never the internal id', () => {
+    renderDashboard(healthyOverview);
+    expect(screen.getByText('Role: Owner')).toBeInTheDocument();
+    expect(screen.queryByText(/org_owner/)).not.toBeInTheDocument();
+  });
+
   it('surfaces pending invites and always offers the all-organizations link', () => {
     renderDashboard(healthyOverview);
     expect(screen.getByRole('link', { name: /pending invite/ })).toHaveAttribute('href', '/orgs');

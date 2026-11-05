@@ -55,7 +55,9 @@ export function AutomationKillSwitchPanel({
   if (status.engaged) {
     return (
       <div className="flex flex-col gap-3 rounded-md border border-destructive/50 bg-destructive/10 p-4">
-        <p className="text-sm font-medium text-destructive">{t('killSwitchEngagedNote', { reason: status.reason ?? '' })}</p>
+        <p className="text-sm font-medium text-destructive">{status.reason?.trim()
+            ? t('killSwitchEngagedNote', { reason: status.reason.trim() })
+            : t('killSwitchEngagedNoReasonNote')}</p>
         {canManage ? (
           <Button type="button" variant="outline" disabled={submitting} onClick={() => toggle(false)}>
             {t('killSwitchDisengageButton')}

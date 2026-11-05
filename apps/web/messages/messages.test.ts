@@ -174,3 +174,26 @@ describe('Firmographics page speaks of money, not MRR units', () => {
     }
   });
 });
+
+describe('Payments and Demos empty states speak plainly', () => {
+  it.each([
+    ['BillingOpsFeed', 'empty'],
+    ['BillingOpsFeed', 'emptyHint'],
+    ['Demos', 'funnelEmpty'],
+  ])('%s.%s avoids "events landed" jargon in en and he', (namespace, key) => {
+    const english = messageAt(en, namespace, key);
+    expect(english).not.toMatch(/event|landed|connector/i);
+    expect(messageAt(he, namespace, key)).not.toMatch(/אירועי/);
+  });
+});
+
+describe('Segments plain wording', () => {
+  it('uses no MRR or "Entity" jargon in the segment name example and labels (en + he)', () => {
+    for (const messages of [en, he]) {
+      for (const key of ['namePlaceholder', 'schemaLabel', 'schemaPickerLabel']) {
+        const text = messageAt(messages, 'Segments', key);
+        expect(text).not.toMatch(/MRR|Entity|ישות/);
+      }
+    }
+  });
+});

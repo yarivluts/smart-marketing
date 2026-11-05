@@ -44,3 +44,9 @@ describe('after publishing, Growth Pilot says Facebook and Instagram instead of 
     }
   });
 });
+
+describe('the published page link reads in plain words', () => {
+  it('does not say people "land" on the page', () => {
+    expect(p.en.publish.link).toBe('The page people open after clicking');
+  });
+});

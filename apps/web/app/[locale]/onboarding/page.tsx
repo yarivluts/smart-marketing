@@ -10,6 +10,7 @@ import { ChartCard } from '@/components/viz/chart-card';
 import { EmptyState } from '@/components/viz/empty-state';
 import { FlowDiagram, type FlowEdgeSpec, type FlowNodeSpec } from '@/components/viz/flow-diagram';
 import { InitialsAvatar } from '@/components/viz/initials-avatar';
+import { GrowthPilotHint } from '@/components/orgs/growth-pilot-hint';
 import { PageHero } from '@/components/viz/page-hero';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -114,6 +115,8 @@ export default async function GlobalOnboardingPage({ params }: PageProps): Promi
           <StatCard title={t('globalKpiInProgress')} value={numberFormat.format(projects.filter((project) => project.step !== 'done').length)} icon={ListChecks} />
         </div>
       </PageHero>
+
+      {focus ? <GrowthPilotHint orgId={focus.orgId} projectId={focus.projectId} /> : null}
 
       <ChartCard
         title={t('journeyTitle')}

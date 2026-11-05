@@ -30,7 +30,7 @@ describe('RequestAttachmentForm', () => {
       </NextIntlClientProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Scopes to request (comma-separated)'), { target: { value: 'act_1, act_2' } });
+    fireEvent.change(screen.getByLabelText('Accounts to request (separate with commas)'), { target: { value: 'act_1, act_2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -51,7 +51,7 @@ describe('RequestAttachmentForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.queryByLabelText('Scopes to request (comma-separated)')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Accounts to request (separate with commas)')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Request' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());

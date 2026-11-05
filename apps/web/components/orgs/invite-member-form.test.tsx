@@ -112,3 +112,12 @@ describe('InviteMemberForm', () => {
     );
   });
 });
+
+describe('InviteMemberForm role names', () => {
+  it('offers plain role names instead of internal ids', () => {
+    vi.stubGlobal('fetch', vi.fn());
+    renderForm();
+    expect(screen.getByRole('option', { name: 'Admin' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'org_admin' })).toBeNull();
+  });
+});

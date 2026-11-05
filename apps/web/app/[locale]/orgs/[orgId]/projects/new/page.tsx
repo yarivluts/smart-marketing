@@ -48,7 +48,7 @@ export default async function NewProjectPage({ params }: PageProps): Promise<Rea
           <div className="flex flex-col gap-6 lg:col-span-3">
             <ChartCard title={t('formTitle')} description={t('formDescription')} icon={FolderPlus}>
               <div className="max-w-sm">
-                <CreateProjectForm orgId={orgId} />
+                <CreateProjectForm orgId={orgId} defaultName={projects.length === 0 ? membership.organizationName : ''} />
               </div>
             </ChartCard>
             <ChartCard title={t('existingTitle')} description={t('existingDescription', { count: projects.length })} icon={FolderKanban}>

@@ -120,7 +120,7 @@ export interface AppShellNavSection {
    * Sections that share a group fold together under one toggle, closed by default, so a newcomer
    * sees only the essentials. The group opens by itself when the current page is inside it.
    */
-  group?: { id: string; label: string };
+  group?: { id: string; label: string; hint?: string };
 }
 
 export interface AppShellProps {
@@ -305,6 +305,7 @@ function NavGroup({
       </button>
       {open ? (
         <div id={panelId} className="flex flex-col gap-pp-md">
+          {group.hint ? <p className="px-pp-md text-pp-label-sm text-pp-outline">{group.hint}</p> : null}
           {sections.map((section, index) => (
             <div key={section.heading ?? index} className="flex flex-col gap-1">
               {section.heading ? <span className="px-pp-md py-1 text-pp-label-sm uppercase tracking-wider text-pp-outline">{section.heading}</span> : null}
@@ -346,6 +347,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
         <div className="flex shrink-0 items-center gap-pp-sm">
           <Link
             href="/developers"
+            title={t('developersHint')}
             className="hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-pp-label-md text-pp-on-surface-variant hover:bg-pp-surface-container-high hover:text-pp-on-surface lg:flex"
           >
             <Code2 className="h-4 w-4" aria-hidden="true" />
@@ -391,6 +393,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
           <NavSections sections={sections} activeHref={activeHref} onNavigate={() => setMobileMenuOpen(false)} />
           <Link
             href="/developers"
+            title={t('developersHint')}
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-pp-sm rounded-pp-lg px-pp-md py-pp-sm text-pp-label-md text-pp-on-surface-variant hover:bg-pp-surface-container-high"
           >

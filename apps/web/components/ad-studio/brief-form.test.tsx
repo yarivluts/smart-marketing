@@ -48,3 +48,13 @@ describe('BriefForm video shape label', () => {
     expect(screen.getByLabelText(new RegExp(heMessages.AdStudio.fieldFormat))).toBeInTheDocument();
   });
 });
+
+describe('BriefForm ad name hint', () => {
+  it('shows an example for the name so a newcomer knows what to type, in both languages', () => {
+    const { unmount } = renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'en' });
+    expect(screen.getByLabelText(enMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', enMessages.AdStudio.fieldNameHint);
+    unmount();
+    renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'he' });
+    expect(screen.getByLabelText(heMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', heMessages.AdStudio.fieldNameHint);
+  });
+});

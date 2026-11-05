@@ -16,12 +16,16 @@ export interface DashboardProject {
   onboardingStep?: OnboardingStep | null;
   /** True when this project's health read failed, so the card says so instead of showing zeros. */
   healthUnavailable?: boolean;
+  /** Override for the card's primary "Open project" link when the caller lacks permission to view `/campaigns`. */
+  openHref?: string;
 }
 
 export interface DashboardOrg {
   orgId: string;
   name: string;
   role: string;
+  /** True when the viewer may create a project in this org, so an empty org can offer a button instead of directions. */
+  canCreateProject?: boolean;
   projects: DashboardProject[];
   /** Projects in the org beyond the per-dashboard cap, which are not read here. */
   hiddenProjectCount: number;
@@ -64,7 +68,8 @@ export async function loadDashboardOverview(input: {
       const projects = await Promise.all(
         shown.map((project) => loadDashboardProject({ orgId, project, userId: input.userId, bindings: input.bindings, now: input.now })),
       );
-      return { orgId, name: membership.organizationName, role: membership.role, projects, hiddenProjectCount: all.length - shown.length };
+      const canCreateProject = can([...input.bindings], { type: 'user', id: input.userId }, 'project.manage', { orgId });
+      return { orgId, name: membership.organizationName, role: membership.role, canCreateProject, projects, hiddenProjectCount: all.length - shown.length };
     }),
   );
 
@@ -88,7 +93,19 @@ export async function loadDashboardProject(input: {
   const scope = { orgId, projectId: project.id };
   const canViewHealth = can([...input.bindings], principal, 'ingest.write', scope);
   const canManage = can([...input.bindings], principal, 'project.manage', scope);
-  const base: DashboardProject = { orgId, projectId: project.id, name: project.name, vertical: project.vertical ?? null, health: null };
+  const canOpenCampaigns =
+    can([...input.bindings], principal, 'automation.execute', scope) ||
+    can([...input.bindings], principal, 'dashboards.read', scope) ||
+    can([...input.bindings], principal, 'dashboards.write', scope);
+  const openHref = canOpenCampaigns ? undefined : `/orgs/${orgId}/projects/${project.id}`;
+  const base: DashboardProject = {
+    orgId,
+    projectId: project.id,
+    name: project.name,
+    vertical: project.vertical ?? null,
+    health: null,
+    ...(openHref ? { openHref } : {}),
+  };
   try {
     const [report, batches, onboarding] = await Promise.all([
       canViewHealth ? evaluateProjectSetupHealth(orgId, project.id) : Promise.resolve(null),

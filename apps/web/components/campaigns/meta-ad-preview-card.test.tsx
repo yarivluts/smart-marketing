@@ -23,7 +23,8 @@ describe('MetaAdPreviewCard', () => {
     expect(screen.getByTestId('meta-ad-preview-card')).toBeInTheDocument();
     expect(screen.getByText('Meta Retargeting')).toBeInTheDocument();
     expect(screen.getByText('Sponsored')).toBeInTheDocument();
-    expect(screen.getByText('ACTIVE')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.queryByText('ACTIVE')).not.toBeInTheDocument();
     expect(screen.getByText('Automate contracts and signatures in seconds with GrowthOS.')).toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAttribute('src', 'https://example.com/ad-image.jpg');
     expect(screen.getByText('Sign Documents 10x Faster')).toBeInTheDocument();
@@ -69,5 +70,17 @@ describe('MetaAdPreviewCard screen-reader names', () => {
     renderWithIntl(<MetaAdPreviewCard campaignName="X" ad={mockAd} />, { locale: 'he' });
     expect(screen.getByRole('button', { name: 'אפשרויות המודעה' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Ad options' })).not.toBeInTheDocument();
+  });
+
+  it('shows paused ads in plain words, in Hebrew too, and hides unknown codes', () => {
+    const { unmount } = renderWithIntl(<MetaAdPreviewCard campaignName="C" ad={{ ...mockAd, status: 'PAUSED' }} />);
+    expect(screen.getByText('Paused')).toBeInTheDocument();
+    unmount();
+    renderWithIntl(<MetaAdPreviewCard campaignName="C" ad={{ ...mockAd, status: 'PAUSED' }} />, { locale: 'he' });
+    expect(screen.getByText('מושהה')).toBeInTheDocument();
+    expect(screen.queryByText('PAUSED')).not.toBeInTheDocument();
+    unmount();
+    renderWithIntl(<MetaAdPreviewCard campaignName="C" ad={{ ...mockAd, status: 'WITH_ISSUES' }} />);
+    expect(screen.queryByText('WITH_ISSUES')).not.toBeInTheDocument();
   });
 });

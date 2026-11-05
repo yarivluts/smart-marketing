@@ -202,4 +202,39 @@ describe('AdsPerformanceDashboard', () => {
     fireEvent.click(screen.getByText('Spend and results'));
     expect(screen.getByTestId('executive-blended-report')).toBeInTheDocument();
   });
+
+  it('hides the Connect an ad source CTA when canManagePlugins is false (KAN-151)', () => {
+    const unmeasured = mockItems.map((item) => ({ ...item, spend30dUsd: null, roas: null }));
+    const { unmount } = renderWithIntl(
+      <AdsPerformanceDashboard
+        orgId="org-1"
+        projectId="proj-1"
+        items={unmeasured}
+        summary={{ ...mockSummary, totalSpendUsd: null, campaignsWithSpendCount: 0 }}
+        rawTargets={[]}
+        connections={[]}
+        canExecute={false}
+        canManagePlugins={false}
+      />,
+    );
+    expect(screen.queryByRole('link', { name: /Connect an ad source/i })).not.toBeInTheDocument();
+    unmount();
+
+    renderWithIntl(
+      <AdsPerformanceDashboard
+        orgId="org-1"
+        projectId="proj-1"
+        items={unmeasured}
+        summary={{ ...mockSummary, totalSpendUsd: null, campaignsWithSpendCount: 0 }}
+        rawTargets={[]}
+        connections={[]}
+        canExecute={false}
+        canManagePlugins={true}
+      />,
+    );
+    expect(screen.getByRole('link', { name: /Connect an ad source/i })).toHaveAttribute(
+      'href',
+      '/orgs/org-1/projects/proj-1/plugins',
+    );
+  });
 });

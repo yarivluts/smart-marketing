@@ -77,7 +77,7 @@ describe('CampaignCreativesPanel', () => {
     );
     expect(screen.getByText('lawyers | va | image ad')).toBeInTheDocument();
     expect(screen.getByText('Ad Set A')).toBeInTheDocument();
-    expect(screen.getByText('PAUSED')).toBeInTheDocument();
+    expect(screen.getByText('Paused')).toBeInTheDocument();
     expect(screen.getByText('Sign In Minutes')).toBeInTheDocument();
     expect(screen.getByText('Contracts signed from the phone in the same call.')).toBeInTheDocument();
     expect(screen.getByText('https://easysign.example.com/lawyers')).toBeInTheDocument();

@@ -104,13 +104,16 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
   const topRule = [...winRuleViews].sort((a, b) => (winCounts.get(b.id) ?? 0) - (winCounts.get(a.id) ?? 0))[0];
   const topRuleWins = topRule ? (winCounts.get(topRule.id) ?? 0) : 0;
   const trend = toWinTrend(winEventHistoryViews, { now: new Date(), days: TREND_DAYS, truncated: winEventPage.truncated });
+  const canReadRecordFeed = can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId });
   const flow = buildWinRuleFlow(winRuleViews, winCounts, {
     action: t('flowActionLabel'),
     actionSublabel: t('flowActionSublabel'),
     schemaSublabel: t('flowSchemaSublabel'),
     inactive: t('statusInactive'),
     formatWins: (count) => t('ruleWinCount', { count }),
-    schemaHref: (schemaName) => `/orgs/${orgId}/projects/${projectId}/record-feed?schema=${encodeURIComponent(schemaName)}`,
+    schemaHref: canReadRecordFeed
+      ? (schemaName) => `/orgs/${orgId}/projects/${projectId}/record-feed?schema=${encodeURIComponent(schemaName)}`
+      : undefined,
   });
   const winsLabel = winEventPage.truncated ? t('kpiWinsTruncated', { count: winEventHistoryViews.length }) : numberFormat.format(winEventHistoryViews.length);
   const formatCollectionAmount = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);

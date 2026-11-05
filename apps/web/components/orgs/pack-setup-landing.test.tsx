@@ -41,4 +41,29 @@ describe('PackSetupLanding', () => {
     expect(screen.getByRole('heading', { name: 'Install the pack' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Install/ })).toBeInTheDocument();
   });
+
+  it('omits the one-click install button when canInstall is false', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <PackSetupLanding
+          orgId="org-1"
+          projectId="project-1"
+          icon={Gauge}
+          eyebrow="Signup quality"
+          title="Signup quality for Client Delta"
+          intro="Install the pack to start."
+          featuresTitle="What this page shows"
+          installTitle="Install the pack"
+          packs={[{ pluginId: 'com.growthos.quality-score-pack' }]}
+          canInstall={false}
+          features={[
+            { key: 'tiers', icon: Gauge, title: 'Quality tiers', description: 'Low, medium and high.' },
+          ]}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Signup quality for Client Delta' })).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

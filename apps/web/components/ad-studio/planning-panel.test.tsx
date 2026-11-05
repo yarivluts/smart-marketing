@@ -56,6 +56,12 @@ afterEach(() => {
 });
 
 describe('PlanningPanel', () => {
+  it('says the AI helper worked out the plan, without leaking the raw model id', () => {
+    renderPanel();
+    expect(screen.getByText(/Worked out by the AI helper on/)).toBeInTheDocument();
+    expect(screen.queryByText(/gemini-3\.8-flash/)).not.toBeInTheDocument();
+  });
+
   it('lists every data source with a translated reason for the missing ones and market knowledge as model-only', () => {
     renderPanel();
     const checklist = screen.getByTestId('ad-studio-plan-sources');

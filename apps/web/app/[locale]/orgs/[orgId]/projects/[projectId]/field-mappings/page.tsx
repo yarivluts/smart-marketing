@@ -64,6 +64,7 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
+  const canWriteSchemas = can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId });
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -147,7 +148,7 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
       label: node.name,
       sublabel: node.healthy ? t('flowSchemaSub', { kind: node.kind ?? '' }) : t('flowSchemaMissingSub'),
       status: node.healthy ? 'ok' : 'error',
-      href: `${base}/schema-defs`,
+      href: canWriteSchemas ? `${base}/schema-defs` : undefined,
     };
   };
   const flowColumnHeight = Math.max(

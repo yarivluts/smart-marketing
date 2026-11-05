@@ -42,6 +42,6 @@ test.describe('Insights (list_insights admin surface)', () => {
     await page.getByRole('link', { name: 'Alerts and wins', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/insights$`));
     await expect(page.getByRole('heading', { name: 'Alerts and wins for Client Iota' })).toBeVisible();
-    await expect(page.getByText('No insights yet.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Nothing to report yet.', { exact: false })).toBeVisible();
   });
 });

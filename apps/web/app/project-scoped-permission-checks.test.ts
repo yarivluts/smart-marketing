@@ -88,4 +88,161 @@ describe('permission checks under project routes', () => {
     expect(orgPage).toMatch(/canExecuteAutomation\s*\?\s*\[\{\s*href:\s*'automation'/);
     expect(orgPage).toMatch(/canManageProjectSettings\s*\?\s*\[\{\s*href:\s*'settings'/);
   });
+
+  it('FunnelPage passes distinct permissions for goals, onboarding, and ingest setup (KAN-150)', () => {
+    const funnelPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/funnel/page.tsx'),
+      'utf8',
+    );
+    expect(funnelPage).toContain("can(bindings, principal, 'project.manage', { orgId, projectId })");
+    expect(funnelPage).toContain("can(bindings, principal, 'ingest.write', { orgId, projectId })");
+    expect(funnelPage).toContain('canManageGoals={canWriteDashboards}');
+    expect(funnelPage).toContain('canManageOnboarding={canManageOnboarding}');
+    expect(funnelPage).toContain('canManageIngest={canManageIngest}');
+  });
+
+  it('CampaignsPage and CampaignDetailPage align view access with dashboards.read/write and gate mutations on automation.execute and plugin.install (KAN-151)', () => {
+    const campaignsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/campaigns/page.tsx'),
+      'utf8',
+    );
+    expect(campaignsPage).toContain("can(bindings, principal, 'plugin.install', { orgId, projectId })");
+    expect(campaignsPage).toContain('canManagePlugins={canManagePlugins}');
+
+    const detailPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/campaigns/[targetId]/page.tsx'),
+      'utf8',
+    );
+    expect(detailPage).toContain("can(bindings, principal, 'dashboards.read', { orgId, projectId })");
+    expect(detailPage).toContain("can(bindings, principal, 'dashboards.write', { orgId, projectId })");
+    expect(detailPage).toContain('!canExecute && !canReadDashboards && !canWriteDashboards');
+    expect(detailPage).toContain('canExecute={canExecute}');
+  });
+
+  it('ProjectRootPage and GrowthPilotPage route by role permission and gate platform publish/activate approvals on automation.execute (KAN-152)', () => {
+    const projectRootPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/page.tsx'),
+      'utf8',
+    );
+    expect(projectRootPage).toContain("can(bindings, principal, 'ingest.write', scope)");
+    expect(projectRootPage).toContain("can(bindings, principal, 'project.manage', scope)");
+    expect(projectRootPage).toContain('redirect(`${base}/install`)');
+    expect(projectRootPage).toContain('redirect(`${base}/resources`)');
+
+    const growthPilotPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/growth-pilot/page.tsx'),
+      'utf8',
+    );
+    expect(growthPilotPage).toContain("can(bindings, { type: 'user', id: user.id }, 'automation.execute', { orgId, projectId })");
+    expect(growthPilotPage).toContain('canExecute={canExecute}');
+  });
+
+  it('gates built-in pack install CTAs, cross-page insight/win-rule links, and archived goal owners (KAN-153)', () => {
+    const packPages = [
+      'campaign-ops/page.tsx',
+      'demos/page.tsx',
+      'support/page.tsx',
+      'feedback/page.tsx',
+      'experiments/page.tsx',
+      'churn-reasons/page.tsx',
+      'firmographics/page.tsx',
+      'intent-quality/page.tsx',
+    ];
+    for (const relPath of packPages) {
+      const content = readFileSync(
+        resolve(__dirname, `[locale]/orgs/[orgId]/projects/[projectId]/${relPath}`),
+        'utf8',
+      );
+      expect(content, relPath).toContain("can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId })");
+      expect(content, relPath).toContain('canInstall={canInstallPlugins}');
+    }
+
+    const insightsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/insights/page.tsx'),
+      'utf8',
+    );
+    expect(insightsPage).toContain("tracking_alert: can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })");
+    expect(insightsPage).toContain("metric_health: can(bindings, { type: 'user', id: user.id }, 'metrics.write', { orgId, projectId })");
+    expect(insightsPage).toContain('canFollowUp[kind]');
+
+    const winRulesPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/win-rules/page.tsx'),
+      'utf8',
+    );
+    expect(winRulesPage).toContain("can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })");
+    expect(winRulesPage).toContain('schemaHref: canReadRecordFeed');
+
+    const goalDetailPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/goals/[goalId]/page.tsx'),
+      'utf8',
+    );
+    expect(goalDetailPage).toContain('!person.archived_at || person.id === goal.owner_person_id');
+  });
+
+  it('gates cross-page schema, board, and org-plugin links on destination permissions (KAN-154)', () => {
+    const customersPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/customers/page.tsx'),
+      'utf8',
+    );
+    expect(customersPage).toContain("can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })");
+    expect(customersPage).toContain('canWriteSchemas ?');
+
+    const ingestHealthPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/ingest-health/page.tsx'),
+      'utf8',
+    );
+    expect(ingestHealthPage).toContain("can(bindings, { type: 'user', id: user.id }, 'dashboards.read', { orgId, projectId })");
+    expect(ingestHealthPage).toContain("can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })");
+    expect(ingestHealthPage).toContain('href: canViewBoards ?');
+
+    const metricDefsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/metric-defs/page.tsx'),
+      'utf8',
+    );
+    expect(metricDefsPage).toContain("can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })");
+    expect(metricDefsPage).toContain('href: canWriteSchemas ?');
+
+    const fieldMappingsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/field-mappings/page.tsx'),
+      'utf8',
+    );
+    expect(fieldMappingsPage).toContain("can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })");
+    expect(fieldMappingsPage).toContain('href: canWriteSchemas ?');
+
+    const onboardingPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/onboarding/page.tsx'),
+      'utf8',
+    );
+    expect(onboardingPage).toContain("const orgScope = { orgId };");
+    expect(onboardingPage).toContain("can(bindings, { type: 'user', id: user.id }, 'plugin.install', orgScope)");
+    expect(onboardingPage).toContain('canManageOrgPlugins={canManageOrgPlugins}');
+  });
+
+  it('gates cross-page plugin, board, ingest, and dashboard open links and localizes team mix role labels (KAN-155)', () => {
+    const billingOpsFeedPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/billing-ops-feed/page.tsx'),
+      'utf8',
+    );
+    expect(billingOpsFeedPage).toContain("can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId })");
+    expect(billingOpsFeedPage).toContain('action={canInstallPlugins ? connectAction : undefined}');
+
+    const sessionReplayPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/session-replay/page.tsx'),
+      'utf8',
+    );
+    expect(sessionReplayPage).toContain("can(bindings, { type: 'user', id: user.id }, 'dashboards.read', { orgId, projectId })");
+    expect(sessionReplayPage).toContain("can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })");
+    expect(sessionReplayPage).toContain('href: canViewBoards ?');
+
+    const schemaDefsPage = readFileSync(
+      resolve(__dirname, '[locale]/orgs/[orgId]/projects/[projectId]/schema-defs/page.tsx'),
+      'utf8',
+    );
+    expect(schemaDefsPage).toContain("can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })");
+    expect(schemaDefsPage).toContain('canManageIngest ?');
+
+    const orgPage = readFileSync(resolve(__dirname, '[locale]/orgs/[orgId]/page.tsx'), 'utf8');
+    expect(orgPage).toContain("getTranslations('Roles')");
+    expect(orgPage).toContain('isRole(entry.key) ? tRoles(entry.key) : entry.key');
+  });
 });

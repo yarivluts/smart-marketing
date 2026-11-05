@@ -82,6 +82,7 @@ export default async function FirmographicsPage({ params }: PageProps): Promise<
 
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === FIRMOGRAPHIC_PACK_PLUGIN_ID);
+    const canInstallPlugins = can(bindings, { type: 'user', id: user.id }, 'plugin.install', { orgId, projectId });
     return (
       <PackSetupLanding
         orgId={orgId}
@@ -93,6 +94,7 @@ export default async function FirmographicsPage({ params }: PageProps): Promise<
         featuresTitle={t('setupFeaturesTitle')}
         installTitle={t('setupInstallTitle')}
         packs={installablePacks}
+        canInstall={canInstallPlugins}
         features={[
           { key: 'industry', icon: Factory, title: t('setupFeatureIndustryTitle'), description: t('setupFeatureIndustryDescription') },
           { key: 'composition', icon: Scale, title: t('setupFeatureCompositionTitle'), description: t('setupFeatureCompositionDescription') },

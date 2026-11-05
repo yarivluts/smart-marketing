@@ -24,6 +24,14 @@ describe('CreateOrganizationForm', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
+  it('shows an example name as a hint, linked to the field', () => {
+    renderForm();
+
+    const hint = screen.getByText(/Your business name is perfect/);
+    expect(hint).toHaveAttribute('id', 'org-name-hint');
+    expect(screen.getByLabelText('Organization name')).toHaveAttribute('aria-describedby', 'org-name-hint');
+  });
+
   it('creates the organization and navigates to it', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ organizationId: 'org-123' }) } as Response);
     renderForm();
@@ -77,5 +85,29 @@ describe('CreateOrganizationForm', () => {
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-9'));
     expect(fetch).toHaveBeenCalledWith('/api/orgs', expect.objectContaining({ body: JSON.stringify({ name: 'Acme' }) }));
+  });
+
+  it('keeps the button off after success so a second click cannot create a second organization', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ organizationId: 'org-5' }) } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-5'));
+    expect(screen.getByRole('button', { name: 'Create organization' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-enables the button after a failed request so the person can try again', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Organization name'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create organization' }));
+
+    await screen.findByRole('alert');
+    expect(screen.getByRole('button', { name: 'Create organization' })).toBeEnabled();
   });
 });

@@ -123,4 +123,20 @@ describe('RegisterMetricDefForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('We cannot reach GrowthOS');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('leads server validation reasons with a plain sentence saying nothing was saved', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'invalid_definition', reasons: ['Column is required.', 'Table is required.'] }),
+    } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'ad_spend' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Register metric' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nothing was saved. Please fix the following and try again: Column is required.; Table is required.',
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });
