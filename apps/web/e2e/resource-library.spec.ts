@@ -52,7 +52,7 @@ test.describe('Org Resource Library: create, request, approve, detach (KAN-27)',
 
     // Request attaching it to the project, selecting only one of the two available scopes.
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/resources`);
-    await page.getByLabel('Scopes to request (comma-separated)').fill('act_111');
+    await page.getByLabel('Accounts to request (separate with commas)').fill('act_111');
     await page.getByRole('button', { name: 'Request' }).click();
     await expect(page.getByText('Status: Waiting for approval')).toBeVisible();
 
