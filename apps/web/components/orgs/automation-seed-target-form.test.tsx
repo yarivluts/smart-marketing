@@ -26,4 +26,22 @@ describe('AutomationSeedTargetForm connection picker', () => {
     expect(options).toContain('Legacy Google');
     expect(options.some((text) => text?.startsWith('Meta prod') && text !== 'Meta prod')).toBe(true);
   });
+
+  it('describes each access level in plain words instead of Read / Optimize / Manage', () => {
+    renderWithIntl(
+      <AutomationSeedTargetForm
+        orgId="o"
+        projectId="p"
+        connections={[
+          { id: 'a', label: 'A', tier: 'read' },
+          { id: 'b', label: 'B', tier: 'optimize' },
+          { id: 'c', label: 'C', tier: 'manage' },
+        ]}
+      />,
+    );
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toContain('A (Look only - changes nothing)');
+    expect(options).toContain('B (Adjust budgets, pause or turn on ads)');
+    expect(options).toContain('C (Full control - also create and edit ads)');
+  });
 });
