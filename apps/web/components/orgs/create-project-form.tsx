@@ -8,12 +8,14 @@ import { Input } from '@/components/ui/input';
 
 export interface CreateProjectFormProps {
   orgId: string;
+  /** Pre-filled name, e.g. the business name for a first project. */
+  defaultName?: string;
 }
 
-export function CreateProjectForm({ orgId }: CreateProjectFormProps): React.ReactElement {
+export function CreateProjectForm({ orgId, defaultName = '' }: CreateProjectFormProps): React.ReactElement {
   const t = useTranslations('NewProjectPage');
   const router = useRouter();
-  const [name, setName] = useState('');
+  const [name, setName] = useState(defaultName);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<'generic' | 'offline' | null>(null);
   const [missingName, setMissingName] = useState(false);
