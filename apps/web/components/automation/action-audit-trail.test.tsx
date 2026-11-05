@@ -124,4 +124,12 @@ describe('ActionAuditTrail Component', () => {
     expect(screen.getByText('No actions matching your filter')).toBeInTheDocument();
   });
 
+  it('flips the before/after arrow in right-to-left languages and hides it from screen readers', () => {
+    const { container } = renderWithIntl(<ActionAuditTrail actions={mockActions} />, { locale: 'en' });
+    const arrow = Array.from(container.querySelectorAll('span')).find((el) => el.textContent === '\u2192');
+    expect(arrow).toBeDefined();
+    expect(arrow).toHaveClass('rtl:rotate-180');
+    expect(arrow).toHaveAttribute('aria-hidden', 'true');
+  });
+
 });

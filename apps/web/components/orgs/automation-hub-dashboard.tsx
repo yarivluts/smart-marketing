@@ -430,7 +430,7 @@ export function AutomationHubDashboard({
                           ) : (
                             <>
                               <span className="line-through text-muted-foreground" dir="ltr">{String(diff.before)}</span>
-                              <span>{'→'}</span>
+                              <span aria-hidden="true" className="inline-block rtl:rotate-180">{'→'}</span>
                             </>
                           )}
                           <span className="font-bold text-foreground" dir="ltr">{String(diff.after)}</span>
