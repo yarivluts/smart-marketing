@@ -294,7 +294,7 @@ export function ActionAuditTrail({
                               <span className="line-through text-muted-foreground" dir="ltr">
                                 {String(diff.before)}
                               </span>
-                              <span className="text-muted-foreground">{'→'}</span>
+                              <span aria-hidden="true" className="inline-block text-muted-foreground rtl:rotate-180">{'→'}</span>
                               <span className="font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
                                 {String(diff.after)}
                               </span>
