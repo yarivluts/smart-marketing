@@ -20,6 +20,16 @@ const TIER_LABEL_KEYS: Record<AutomationConnectionOption['tier'], string> = {
   manage: 'tierManage',
 };
 
+/** A short code for an ad whose owner left the box empty: the name's letters and digits plus a random tail, so it stays unique. */
+function generateTargetId(label: string): string {
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+  return `${slug.length > 0 ? slug : 'ad'}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 /**
  * Seeds a new simulated automation target — the buildable-today stand-in for
  * "connect a real ad account and pick a campaign" until KAN-72/73 exist (see
@@ -45,7 +55,7 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
       setError(t('seedTargetInvalidBudgetError'));
       return;
     }
-    if (targetId.trim().length === 0 || label.trim().length === 0 || environmentId.trim().length === 0) {
+    if (label.trim().length === 0 || environmentId.trim().length === 0) {
       setError(t('seedTargetFieldsRequiredError'));
       return;
     }
@@ -56,7 +66,7 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          targetId: targetId.trim(),
+          targetId: targetId.trim().length > 0 ? targetId.trim() : generateTargetId(label),
           environmentId: environmentId.trim(),
           targetType: 'campaign',
           label: label.trim(),
