@@ -5234,16 +5234,16 @@
       },
       "currencyNote": "Amounts are in the ad account currency.",
       "unavailable": {
-        "no_meta_credential": "No Meta ad account is connected to this project. Connect one in the Publish step.",
-        "credential_not_configured": "The Meta account attached to this project is not logged in properly. Reconnect it.",
+        "no_meta_credential": "No Facebook or Instagram ad account is connected to this project. Connect one in the Publish step.",
+        "credential_not_configured": "The Facebook and Instagram account attached to this project is not logged in properly. Reconnect it.",
         "vault_not_configured": "Saved logins cannot be read right now, so we cannot load your groups of people. Try again later.",
-        "meta_auth_failed": "Meta refused the connection - the access may have expired. Reconnect the Meta account.",
-        "meta_permission_denied": "The Meta connection is not allowed to read this. Reconnect it and accept every permission it asks for.",
-        "meta_rate_limited": "Meta is limiting requests right now. Try again in a few minutes.",
-        "meta_error": "Meta could not answer right now. Try again in a minute."
+        "meta_auth_failed": "Facebook refused the connection - the access may have expired. Reconnect your account.",
+        "meta_permission_denied": "The connection to Facebook is not allowed to read this. Reconnect it and accept every permission it asks for.",
+        "meta_rate_limited": "Facebook is limiting requests right now. Try again in a few minutes.",
+        "meta_error": "Facebook could not answer right now. Try again in a minute."
       },
       "save": "Save audience",
-      "saved": "Audience saved. The Meta ad will target it.",
+      "saved": "Audience saved. Your Facebook and Instagram ad will target it.",
       "errorInvalid": "The audience was not saved: {reasons}.",
       "issues": {
         "no_countries": "choose at least one country",
