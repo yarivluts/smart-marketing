@@ -113,6 +113,11 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
   const tf = useTranslations('GrowthPilot.failed');
   const [url, setUrl] = React.useState('');
   const [mistake, setMistake] = React.useState<string | null>(null);
+  // The one thing to do on this screen is type the website: put the cursor there so a newcomer can just type.
+  const siteInput = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    siteInput.current?.focus();
+  }, []);
   const steps = [
     { key: 'read', icon: Globe },
     { key: 'propose', icon: Target },
@@ -151,6 +156,7 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           <Globe className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span className="sr-only">{t('label')}</span>
           <input
+            ref={siteInput}
             type="text"
             inputMode="url"
             autoComplete="url"
