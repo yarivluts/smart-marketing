@@ -79,7 +79,7 @@ describe('DemoAccessPanel', () => {
     vi.stubGlobal('fetch', fetchMock);
     const access = { loginUrl: 'https://app.example.com/login', username: 'trial@example.com', hasPassword: true, notes: '', lastChangedOn: null };
     const { container } = renderWithIntl(<DemoAccessPanel orgId="o" projectId="p" access={access} canEdit recordings={[]} recordingAvailable />, { locale: 'en' });
-    expect(screen.getByText("Takes 1-2 minutes and uses up to 9 AI text calls from today's limit.")).toBeInTheDocument();
+    expect(screen.getByText("Takes 1-2 minutes and uses a small part of today's AI allowance (up to 9 requests).")).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Record a usage video' }));
     await waitFor(() => expect(container.querySelector('video')).not.toBeNull());
     expect(container.querySelector('video')?.getAttribute('src')).toBe('/api/orgs/o/projects/p/ad-studio/demo-recordings/r1/media');
