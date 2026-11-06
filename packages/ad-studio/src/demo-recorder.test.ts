@@ -111,6 +111,10 @@ function fakeBrowser(options: { loginWorks?: boolean; form?: boolean; open?: boo
       return driver;
     }),
     now: () => clock,
+    advance: (ms: number) => {
+      clock += ms;
+      onFrame?.(Buffer.from(`frame-while-waiting@${clock}`));
+    },
     clicks,
     typed,
     closed,
@@ -143,6 +147,23 @@ describe('runDemoTour', () => {
     expect(browser.clicks).toEqual([1]);
     expect(browser.closed).toHaveBeenCalled();
     expect(result.site).toBe('example.com');
+  });
+
+  it('pauses the recording while the guide decides, so the video never shows the wait', async () => {
+    const browser = fakeBrowser();
+    const answers = [{ action: 'scroll' as const, title: 'Dashboard' }, { action: 'click' as const, element: 1, title: 'Invoices' }];
+    const decide = vi.fn(async () => {
+      browser.advance(10_000);
+      const next = answers.shift();
+      return next ? { action: next.action, element: 'element' in next ? next.element : null, title: next.title, description: '' } : { action: 'done' as const, element: null, title: '', description: '' };
+    });
+    const result = await runDemoTour({ launchBrowser: browser.launch, credentials, context, decideStep: decide, checkAddress: allowAddress, now: browser.now, dwellMs: 3000 });
+    expect(result.segments.map((segment) => [segment.startSeconds, segment.endSeconds])).toEqual([
+      [0, 3],
+      [3.5, 6.5],
+    ]);
+    expect(result.durationMs).toBe(6500);
+    expect(result.frames.some((frame) => frame.data.toString().startsWith('frame-while-waiting'))).toBe(false);
   });
 
   it('never offers or clicks a denied, in-form or off-site element, whatever the model answers', async () => {

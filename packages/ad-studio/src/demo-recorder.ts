@@ -296,9 +296,11 @@ export async function runDemoTour(params: {
   const frames: CapturedFrame[] = [];
   let pending: CapturedFrame | null = null;
   let startedAt = 0;
+  // While the guide decides the next step the recording is paused: the video never shows the wait.
+  let pausedMs = 0;
   let capturing = false;
   const minGapMs = 1000 / DEMO_CAPTURE_FPS;
-  const elapsed = () => params.now() - startedAt;
+  const elapsed = () => params.now() - startedAt - pausedMs;
   try {
     if (!(await driver.open(params.credentials.loginUrl))) throw new DemoRecorderError('site_unreachable');
     let outcome: 'submitted' | 'no_form';
@@ -335,30 +337,33 @@ export async function runDemoTour(params: {
     const shown: string[] = [];
     for (let step = 0; step < maxSteps; step += 1) {
       if (elapsed() + dwellMs > maxMs) break;
-      const snapshot = await driver.snapshot();
-      const allowed = clickableForTour(snapshot, sites);
+      const pausedAt = params.now();
+      capturing = false;
       let decision: TourStep;
       try {
+        const snapshot = await driver.snapshot();
+        const allowed = clickableForTour(snapshot, sites);
         decision = await params.decideStep(tourSystemPrompt(), tourUserPrompt(params.context, snapshot, allowed, shown, step));
+        decision = { ...decision, element: decision.action === 'click' ? (allowed.find((element) => element.index === decision.element)?.index ?? null) : null, title: decision.title.trim() || snapshot.title };
       } catch (error) {
         // A guide failure after some moments ends the tour with what it has; before any, it fails it.
         if (segments.length) break;
         throw error;
+      } finally {
+        pausedMs += params.now() - pausedAt;
+        capturing = true;
       }
       if (decision.action === 'done' && segments.length) break;
-      if (decision.action === 'click') {
-        const target = allowed.find((element) => element.index === decision.element);
-        // The model's choice is re-checked here: an element it was not offered is never clicked.
-        if (target && (await driver.click(target.index))) {
-          await driver.settle();
-          if (!isSameSite(driver.url(), sites)) break;
-        }
+      // The model's choice was re-checked above: an element it was not offered is never clicked.
+      if (decision.action === 'click' && decision.element !== null && (await driver.click(decision.element))) {
+        await driver.settle();
+        if (!isSameSite(driver.url(), sites)) break;
       }
       if (elapsed() + dwellMs > maxMs) break;
       const start = elapsed();
       await driver.scroll(DEMO_SCROLL_PX, dwellMs);
       const end = Math.min(elapsed(), maxMs);
-      const title = decision.title.trim().slice(0, 80) || snapshot.title.slice(0, 80);
+      const title = decision.title.slice(0, 80);
       segments.push({ id: newDemoSegmentId(), startSeconds: Math.round(start / 10) / 100, endSeconds: Math.round(end / 10) / 100, title, description: decision.description.trim().slice(0, 240) });
       shown.push(title);
     }
