@@ -144,6 +144,7 @@ describe('ad share links (routes)', () => {
   it('serves only the chosen image of a shared ad, without signing in, and nothing of another project', async () => {
     const ctx = await setup();
     const elsewhere = await setup();
+    getServerSessionMock.mockResolvedValue(ctx.ownerSession);
     const { token } = await makeLink(ctx, { briefIds: [ctx.briefId] });
     getServerSessionMock.mockResolvedValue(null);
 
