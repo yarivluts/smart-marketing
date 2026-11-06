@@ -217,14 +217,16 @@ export function fitAdStudioImageConcepts(
         headline,
         formats: formats.length ? formats : [...defaultFormats],
         ...(copy ? { copy } : {}),
-        style: isAdStudioImageStyle(concept.style) ? concept.style : AD_STUDIO_IMAGE_STYLES[index % AD_STUDIO_IMAGE_STYLES.length],
+        // No style from the model: the model draws the headline, as before styles existed.
+        style: isAdStudioImageStyle(concept.style) ? concept.style : ('free' as const),
         emphasis: fitHeadlineEmphasis(headline, concept.emphasis),
         layout: isAdStudioHeadlineLayout(concept.layout) ? concept.layout : AD_STUDIO_HEADLINE_LAYOUTS[index % AD_STUDIO_HEADLINE_LAYOUTS.length],
       };
     })
     .filter((concept) => concept.visualPrompt.length > 0)
     .slice(0, AD_STUDIO_MAX_IMAGE_CONCEPTS);
-  if (fitted.length > 1 && fitted.every((concept) => concept.style === fitted[0].style)) {
+  // The model chose one style for every idea: switch the last so the set tests both (never when it chose none).
+  if (fitted.length > 1 && concepts.every((concept) => isAdStudioImageStyle(concept.style)) && fitted.every((concept) => concept.style === fitted[0].style)) {
     const last = fitted[fitted.length - 1];
     last.style = last.style === 'designed' ? 'free' : 'designed';
   }

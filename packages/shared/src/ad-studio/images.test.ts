@@ -73,7 +73,7 @@ describe('image concepts', () => {
       visualPrompt: 'A desk',
       headline: 'y'.repeat(AD_STUDIO_IMAGE_HEADLINE_MAX),
       formats: ['square'],
-      style: 'designed',
+      style: 'free',
       emphasis: [],
       layout: 'centered',
     });
