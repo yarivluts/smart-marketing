@@ -515,7 +515,7 @@
   },
   "Onboarding": {
     "sourceStepDataStatusHeading": "נתונים שהתקבלו",
-    "sourceStepNoEventsYet": "עדיין לא הגיעו נתונים לפרויקט הזה. מפתח לבדו אינו מעביר נתונים — האפליקציה שלכם עדיין צריכה לשלוח אירועים (דברים שאנשים עושים, כמו הרשמה) לכתובת שלמעלה.",
+    "sourceStepNoEventsYet": "עדיין לא הגיעו נתונים לפרויקט הזה. מפתח לבדו אינו מעביר נתונים — האתר או האפליקציה שלכם עדיין צריכים לשלוח את הנתונים שלהם (מה שאנשים עושים, כמו הרשמה או קנייה) לכתובת שלמעלה.",
     "sourceStepEventsReceived": "התקבלו {count} רשומות פעילות. הנתונים שלכם מגיעים.",
     "sourceStepQuarantined": "{count} רשומות לא היו שמישות ונשמרו בצד.",
     "sourceStepIngestHealthLink": "בדקו מדוע ב״תקינות הנתונים״",
@@ -580,7 +580,7 @@
     "doneNextStepButton": "פתחו את Growth Pilot",
     "packLandingPageTitle": "ביצועי דפי אינטרנט",
     "packLandingPageDescription": "ראו איזה מהדפים שלכם הופך מבקרים להרשמות או למכירות, בכל מודעה שהביאה אותם.",
-    "sourceStepPushYourOwnIntro": "עובד מיד, בלי צורך בהתקנת תוסף — צרו מפתח למטה והתחילו לשלוח אירועים.",
+    "sourceStepPushYourOwnIntro": "עובד מיד, בלי צורך בהתקנת תוסף — צרו מפתח למטה והתחילו לשלוח את הנתונים שלכם (כמו הרשמות וקניות).",
     "eyebrow": "הגדרה",
     "journeyStep_start": "התחלה",
     "journeyStep_pack": "נקודת התחלה",

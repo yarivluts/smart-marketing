@@ -50,4 +50,11 @@ describe('onboarding intro copy explains itself to a beginner', () => {
       expect(he.Onboarding[key]).toMatch(/[֐-׿]/);
     }
   });
+
+  it('says "data" instead of "events" when no data has arrived yet', () => {
+    expect(en.Onboarding.sourceStepNoEventsYet).not.toMatch(/\bevents?\b/i);
+    expect(en.Onboarding.sourceStepNoEventsYet).toMatch(/send its data/);
+    expect(he.Onboarding.sourceStepNoEventsYet).not.toMatch(/אירוע/);
+    expect(he.Onboarding.sourceStepPushYourOwnIntro).not.toMatch(/אירוע/);
+  });
 });
