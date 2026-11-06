@@ -152,6 +152,9 @@ importers:
       next-intl:
         specifier: ^4.13.1
         version: 4.13.1(next@15.5.20(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
+      playwright-core:
+        specifier: 1.61.1
+        version: 1.61.1
       react:
         specifier: ^19.0.0
         version: 19.2.7
