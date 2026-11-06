@@ -252,6 +252,9 @@ importers:
       '@growthos/shared':
         specifier: workspace:*
         version: link:../shared
+      playwright-core:
+        specifier: 1.61.1
+        version: 1.61.1
       sharp:
         specifier: 0.34.5
         version: 0.34.5

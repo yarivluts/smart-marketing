@@ -50,6 +50,11 @@ export function adStudioVideoObjectPath(ref: BriefRef & { videoId: string }): st
   return `${adStudioBriefMediaPrefix(ref)}videos/${ref.videoId}.mp4`;
 }
 
+/** A recorded product walkthrough: project-level, not tied to one ad. */
+export function adStudioDemoObjectPath(ref: { organizationId: string; projectId: string; recordingId: string }): string {
+  return `orgs/${ref.organizationId}/projects/${ref.projectId}/demo-recordings/${ref.recordingId}.mp4`;
+}
+
 const IMAGE_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 export function adStudioImageObjectPath(ref: BriefRef & { imageId: string; mimeType: string }): string {

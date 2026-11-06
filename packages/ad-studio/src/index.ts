@@ -35,3 +35,6 @@ export * from './parse';
 export * from './view';
 export * from './translate';
 export * from './brand';
+export * from './demo-policy';
+export * from './demo-recorder';
+export * from './demo-browser';

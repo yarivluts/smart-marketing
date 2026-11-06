@@ -57,6 +57,37 @@ export interface ConcatInput {
   /** How long this clip runs in the ad - its scene's length, or less if the clip is shorter. */
   seconds: number;
   hasAudio: boolean;
+  /** Where in the file the clip starts (a moment of a product walkthrough); default 0. */
+  startSeconds?: number;
+  /**
+   * How the picture fills the frame. `pad` (default): scaled to fit, black bars. `screen`: a screen
+   * recording shown inside the frame on a blurred, darkened copy of itself, in either orientation.
+   */
+  fit?: 'pad' | 'screen';
+}
+
+/** The share of the frame a `screen` clip's picture takes, so the blurred backdrop shows around it. */
+const SCREEN_INSET = 0.92;
+
+function even(value: number): number {
+  return Math.max(2, Math.round(value / 2) * 2);
+}
+
+/** The video filter chain for one input, ending in `[v<index>]`. */
+export function clipVideoFilter(input: ConcatInput, index: number, frame: { width: number; height: number }, fps: number): string {
+  const { width, height } = frame;
+  const trim = input.startSeconds ? `trim=start=${seconds(input.startSeconds)}:duration=${seconds(input.seconds)}` : `trim=duration=${seconds(input.seconds)}`;
+  if (input.fit === 'screen') {
+    const innerWidth = even(width * SCREEN_INSET);
+    const innerHeight = even(height * SCREEN_INSET);
+    return [
+      `[${index}:v:0]${trim},setpts=PTS-STARTPTS,fps=${fps},split=2[bgsrc${index}][fgsrc${index}]`,
+      `[bgsrc${index}]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=24:2,eq=brightness=-0.22[bg${index}]`,
+      `[fgsrc${index}]scale=${innerWidth}:${innerHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2[fg${index}]`,
+      `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v${index}]`,
+    ].join(';');
+  }
+  return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[v${index}]`;
 }
 
 function seconds(value: number): string {
@@ -97,9 +128,11 @@ export function buildConcatArgs(params: {
   const filters: string[] = [];
   inputs.forEach((input, index) => {
     const duration = seconds(input.seconds);
+    // A clip's own sound starts where its picture does; a silent track starts at zero.
+    const audioTrim = input.hasAudio && input.startSeconds ? `atrim=start=${seconds(input.startSeconds)}:duration=${duration}` : `atrim=duration=${duration}`;
     filters.push(
-      `[${index}:v:0]trim=duration=${duration},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[v${index}]`,
-      `[${audioSource.get(index)}:a:0]atrim=duration=${duration},asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=${duration}[a${index}]`,
+      clipVideoFilter(input, index, { width, height }, fps),
+      `[${audioSource.get(index)}:a:0]${audioTrim},asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=${duration}[a${index}]`,
     );
   });
   const pairs = inputs.map((_, index) => `[v${index}][a${index}]`).join('');
@@ -227,7 +260,7 @@ export async function probeMedia(file: string, runner: FfmpegRunner): Promise<Re
  * its own length if shorter; a file with no video stream is refused. Returns the output's length.
  */
 export async function concatClips(params: {
-  clips: readonly { file: string; seconds: number }[];
+  clips: readonly { file: string; seconds: number; startSeconds?: number; fit?: ConcatInput['fit'] }[];
   output: string;
   format: AdStudioFormat;
   resolution?: string | null;
@@ -238,7 +271,15 @@ export async function concatClips(params: {
   for (const clip of params.clips) {
     const probe = await probeMedia(clip.file, params.runner);
     if (!probe.hasVideo) throw new FfmpegFailedError('A clip has no video stream.', '');
-    inputs.push({ file: clip.file, seconds: probe.durationSeconds ? Math.min(clip.seconds, probe.durationSeconds) : clip.seconds, hasAudio: probe.hasAudio });
+    const start = clip.startSeconds ?? 0;
+    const available = probe.durationSeconds ? Math.max(0, probe.durationSeconds - start) : null;
+    inputs.push({
+      file: clip.file,
+      seconds: available !== null ? Math.min(clip.seconds, available) : clip.seconds,
+      hasAudio: probe.hasAudio,
+      ...(start ? { startSeconds: start } : {}),
+      ...(clip.fit ? { fit: clip.fit } : {}),
+    });
   }
   const { code, stderr } = await runFfmpeg(buildConcatArgs({ inputs, output: params.output, format: params.format, resolution: params.resolution, overlay: params.overlay }), params.runner);
   if (code !== 0) throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
