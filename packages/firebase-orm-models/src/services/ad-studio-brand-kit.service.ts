@@ -111,7 +111,7 @@ export async function setAdStudioBrandKit(params: {
   kit.organization_id = params.organizationId;
   kit.project_id = params.projectId;
   kit.brand_name = params.kit.brandName;
-  kit.slogan = params.kit.slogan;
+  kit.slogan = params.kit.slogan ?? '';
   kit.tone_of_voice = params.kit.toneOfVoice;
   kit.avoid_words = params.kit.avoidWords;
   kit.colors = params.kit.colors;
