@@ -6061,7 +6061,7 @@
       "unreadable": "The page has no text we can read (it may be built only from images or scripts). Try the page that lists what you sell.",
       "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
       "nothing_found": "We read the site but found nothing to promote. Try the page that lists what you sell.",
-      "unavailable": "The AI service is not available on our side right now, so trying again will not help. Please contact GrowthOS support.",
+      "unavailable": "The AI service was not available on our side. Try again in a few minutes - if it keeps happening, contact GrowthOS support.",
       "provider": "The AI service did not answer. Try again in a minute."
     },
     "header": {

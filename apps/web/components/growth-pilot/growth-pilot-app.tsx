@@ -250,9 +250,10 @@ function AnalyzingCard({ host, error }: { host: string; error: string | null }):
 function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; code: string | null; onRetry: () => void; onOther: () => void; pending: boolean }): React.ReactElement {
   const t = useTranslations('GrowthPilot');
   const kind = failureKey(code);
-  // Trying the same address again cannot help when nothing was found, the address is private or has no text, today's AI limit is gone or the AI is not available on our side - offer only what can work.
-  const canRetry = kind === 'site' || kind === 'slow' || kind === 'provider';
-  const canUseOther = kind !== 'quota_exceeded' && kind !== 'unavailable';
+  // Trying the same address again cannot help when nothing was found, the address is private or has no text, or today's AI limit is gone - offer only what can work.
+  // 'unavailable' (our AI account was out of credit or switched off) is fixed on our side, so a retry must stay possible - without it the card is a dead end that never clears.
+  const canRetry = kind === 'site' || kind === 'slow' || kind === 'provider' || kind === 'unavailable';
+  const canUseOther = kind !== 'quota_exceeded';
   return (
     <section className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-3xl border border-warning/40 bg-card p-6 shadow-soft" data-testid="growth-pilot-failed">
       <div className="flex items-start gap-3">

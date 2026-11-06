@@ -323,9 +323,10 @@ describe('GrowthPilotApp', () => {
     expect(screen.queryByRole('button', { name: 'Use another address' })).toBeNull();
     expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('resets tomorrow');
     quota.unmount();
+    // Fixed on our side (e.g. AI credit topped up): the card must never be a dead end.
     const unavailable = view('provider_billing');
-    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Use another address' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use another address' })).toBeInTheDocument();
     expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('contact GrowthOS support');
     expect(screen.getByTestId('growth-pilot-failed')).not.toHaveTextContent('provider_billing');
     unavailable.unmount();
