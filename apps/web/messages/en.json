@@ -4388,10 +4388,10 @@
           "empty_page": "The page has no readable text."
         },
         "results": {
-          "no_environment": "The project has no environment to read.",
+          "no_environment": "This project has no website or app data to read yet, so the plan was made without it.",
           "warehouse_not_configured": "Site results are not connected to this project yet.",
           "warehouse_error": "Site results could not be loaded right now; the plan was made without them.",
-          "query_quota_exceeded": "The project's daily query limit is reached.",
+          "query_quota_exceeded": "Today's limit for reading your site results is used up. It resets tomorrow; the plan was made without them.",
           "no_traffic": "No visits to your web page in the last 90 days."
         },
         "campaigns": {
@@ -6337,5 +6337,52 @@
     "operator": "Operator",
     "viewer": "Viewer (view only)",
     "ingest_only": "Data sender only"
+  },
+  "AdShare": {
+    "manage": {
+      "title": "Share with client",
+      "intro": "Send your client a link to view the ads. No sign-in needed, and they cannot change anything.",
+      "scopeLabel": "What to share",
+      "allAds": "All ads",
+      "adCount": "{count, plural, one {# ad} other {# ads}}",
+      "labelLabel": "For whom (optional)",
+      "labelPlaceholder": "e.g. Dana from the client",
+      "expiryLabel": "Link works for",
+      "expiryDays": "{days} days",
+      "create": "Create link",
+      "creating": "Creating...",
+      "createdNote": "Link ready. Copy it now - it will not be shown again.",
+      "linkLabel": "Share link",
+      "copy": "Copy link",
+      "copied": "Copied",
+      "error": "Something went wrong. Try again.",
+      "listTitle": "Shared links",
+      "empty": "No links yet.",
+      "noLabel": "Link without a name",
+      "expiresOn": "Until {date}",
+      "revokedOn": "Turned off {date}",
+      "status": {
+        "active": "Active",
+        "expired": "Expired",
+        "revoked": "Turned off"
+      },
+      "revoke": "Turn off",
+      "revokeConfirm": "Turn off this link? The client will no longer see the ads.",
+      "cancel": "Cancel",
+      "shortcut": "Share this ad with the client"
+    },
+    "public": {
+      "title": "Your ads",
+      "titleWithBrand": "Ads for {brand}",
+      "logoAlt": "Logo",
+      "intro": "This is how your ads will look. Pick a placement above each ad to see it on another platform.",
+      "viewOnly": "View only - link valid until {date}",
+      "idea": "Idea {index}",
+      "video": "Video ({seconds} sec)",
+      "videoLabel": "Video ad: {name}",
+      "empty": "No finished ads to show yet. Check back soon.",
+      "inactiveTitle": "This link is no longer active",
+      "inactiveBody": "It may have expired or been turned off. Ask whoever sent it for a new link."
+    }
   }
 }

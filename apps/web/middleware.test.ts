@@ -97,6 +97,15 @@ describe('middleware', () => {
     expect(middleware(requestFor('/en/developers-admin')).headers.get('location')).toContain('/en/login');
   });
 
+  it('lets a client open an ad share link without an account, in every locale, but nothing else under /share', () => {
+    intlMiddlewareMock.mockReturnValue(NextResponse.next());
+    for (const path of ['/en/share/ads/abc', '/he/share/ads/abc']) {
+      expect(middleware(requestFor(path)).headers.get('location')).toBeNull();
+    }
+    expect(middleware(requestFor('/en/share/other')).headers.get('location')).toContain('/en/login');
+    expect(middleware(requestFor('/en/share/ads')).headers.get('location')).toContain('/en/login');
+  });
+
   it('lets an unauthenticated visitor reach the public home page', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en'));

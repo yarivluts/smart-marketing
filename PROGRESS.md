@@ -29,6 +29,13 @@ Template for each entry:
 - **Blocked + why:** None.
 - **Next step:** After deploy, record a walkthrough of a real trial account and check the Debian Chromium + playwright-core pairing and Cloud Run memory/time.
 - **Waiting on human:** A trial account of a customer app to try it end to end in prod.
+## 2026-11-06 — Ad Studio: share the ads with the client (read-only link)
+
+- **Last completed:** "Share with client" for Ad Studio (PR #1177). New `AdShareLinkModel` (top-level `ad_share_links`, doc id = sha256 of a 32-byte base64url token; the token is shown once) + `ad-share-link.service.ts` (create / list / revoke / resolve, 7/30/90-day expiry, default 30, audited). Public page `/[locale]/share/ads/<token>` (no sign-in, noindex, no-referrer) shows the brand logo/name and each shared ad's chosen up-to-date images and current assembled video in the platform mock-ups with their copy; unknown/revoked/expired tokens get one "link no longer active" page. Public media under `/api/share/ads/<token>/{logo,briefs/<id>/images/<id>,briefs/<id>/videos/<id>}` serve only media of the link's project and briefs (chosen images only), `private, max-age=300`. Management: "Share with client" panel on the Ad Studio home and a per-ad shortcut in the publish step, both `project.configure`; API `ad-studio/share-links` (GET/POST) and `share-links/<id>` (DELETE).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** optional: let the client leave comments/approve an ad on the shared page; show "last opened" per link.
+- **Waiting on human:** prod deploy.
 
 ## 2026-10-31T13:18Z — Hourly 5-hat review (PM / Security / Eng / UI-UX / Infra, KAN-155)
 
@@ -295,6 +302,7 @@ Template for each entry:
 
 ## UX hourly
 
+- 2026-11-06 - (d/f) Ad Studio plan screen audited. Why site results were skipped said "no environment to read" and "daily query limit" (he: סביבה, שאילתות); now plain words with when it resets (en + he) with a test. PR #1179. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) Hebrew developer/connection steps mix English UI names.
 - 2026-11-06 - (d) Ad Studio image step audited. The image destination label said "Meta" (he: מטא) and the image-size hint "Meta's recommended sizes"; both now say Facebook and Instagram (en + he) with a test. PR #1176. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) Hebrew developer/connection steps mix English UI names.
 - 2026-11-06 - (d) Ad Studio export step audited. Its description said "your Meta ad account" and the account-verification failure started "Meta needs you..." (he: במטא); they now say Facebook and Instagram (en + he) with a test. PR #1175. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) Ad Studio image-size hint and destination label still say "Meta".
 - 2026-11-06 - (d/f) Ad Studio audience panel and publish step audited. "Reading your Meta ad account...", "Meta gave no estimate", "people Meta finds" and the publish step hint "Meta and Google Ads" (he: מטא, גוגל אדס) now say Facebook and Instagram (en + he) with a test. PR #1174. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card (needs a new endpoint); (2) publish card budget box starts empty (needs a product decision); (3) remaining "Meta" in Ad Studio export/image-size copy.
