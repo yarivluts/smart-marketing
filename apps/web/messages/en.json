@@ -4387,10 +4387,10 @@
           "empty_page": "The page has no readable text."
         },
         "results": {
-          "no_environment": "The project has no environment to read.",
+          "no_environment": "This project has no website or app data to read yet, so the plan was made without it.",
           "warehouse_not_configured": "Site results are not connected to this project yet.",
           "warehouse_error": "Site results could not be loaded right now; the plan was made without them.",
-          "query_quota_exceeded": "The project's daily query limit is reached.",
+          "query_quota_exceeded": "Today's limit for reading your site results is used up. It resets tomorrow; the plan was made without them.",
           "no_traffic": "No visits to your web page in the last 90 days."
         },
         "campaigns": {
