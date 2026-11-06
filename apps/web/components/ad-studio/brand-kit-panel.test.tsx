@@ -6,7 +6,7 @@ import { BrandKitPanel } from './brand-kit-panel';
 
 vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
-const EMPTY = { brandName: '', toneOfVoice: '', avoidWords: [], colors: [] };
+const EMPTY = { brandName: '', slogan: '', toneOfVoice: '', avoidWords: [], colors: [] };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -18,6 +18,7 @@ describe('BrandKitPanel', () => {
     const save = screen.getByRole('button', { name: 'Save brand kit' });
     expect(save).toBeDisabled();
     fireEvent.change(screen.getByLabelText(/^Brand name/), { target: { value: 'EasySign' } });
+    fireEvent.change(screen.getByLabelText(/^Slogan/), { target: { value: 'Sign anywhere' } });
     fireEvent.change(screen.getByRole('textbox', { name: 'Words and phrases never to use' }), { target: { value: 'cheap' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a colour' }));
@@ -25,7 +26,7 @@ describe('BrandKitPanel', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Brand kit saved.'));
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('/api/orgs/o/projects/p/ad-studio/brand-kit');
-    expect(JSON.parse(String(init.body)).brandKit).toEqual({ brandName: 'EasySign', toneOfVoice: '', avoidWords: ['cheap'], colors: ['#5b4fe9'] });
+    expect(JSON.parse(String(init.body)).brandKit).toEqual({ brandName: 'EasySign', slogan: 'Sign anywhere', toneOfVoice: '', avoidWords: ['cheap'], colors: ['#5b4fe9'] });
   });
 
   it('shows the kit read-only to someone who cannot change it', () => {

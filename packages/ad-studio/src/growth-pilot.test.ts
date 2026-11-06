@@ -14,6 +14,8 @@ const orm = vi.hoisted(() => ({
   getGrowthTarget: vi.fn(),
   linkGrowthTargetAds: vi.fn(),
   finishGrowthTargetAds: vi.fn(),
+  linkGrowthTargetVideo: vi.fn(),
+  finishGrowthTargetVideo: vi.fn(),
   createAdStudioBrief: vi.fn(),
   listGrowthPilotIndex: vi.fn(),
   recordGrowthPilotRun: vi.fn(),
@@ -48,9 +50,11 @@ vi.mock('./autopilot', () => ({ startAdStudioAutopilot: studio.startAdStudioAuto
 const meta = vi.hoisted(() => ({ searchAdStudioMetaInterests: vi.fn(), estimateAdStudioMetaReach: vi.fn(), loadAdStudioMetaCampaignInsights: vi.fn() }));
 vi.mock('./audiences', () => meta);
 vi.mock('./image-pipeline', () => ({ listBriefImages: studio.listBriefImages, rewriteAdStudioImageConcept: studio.rewriteAdStudioImageConcept }));
+const brand = vi.hoisted(() => ({ fillAdStudioBrandFromSite: vi.fn(async () => undefined) }));
+vi.mock('./brand', () => brand);
 
 import { AdStudioQuotaExceededError } from '@growthos/firebase-orm-models';
-import { advanceGrowthPilot, approveGrowthActivation, GROWTH_SCHEDULER_UNITS_PER_PILOT, loadGrowthPerformance, runScheduledGrowthPilots, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
+import { advanceGrowthPilot, approveGrowthActivation, GROWTH_SCHEDULER_UNITS_PER_PILOT, loadGrowthPerformance, runScheduledGrowthPilots, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_VIDEO_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
 import { AdStudioProviderError, type AdStudioLlm } from './llm';
 
 const publicResolver = vi.fn(async () => ['93.184.215.14']);
@@ -97,6 +101,13 @@ describe('readGrowthSite', () => {
     if (read.status !== 'ok') return;
     expect(read.pages.map((page) => page.title)).toEqual(['EasySign', 'For lawyers', 'Pricing']);
     expect(read.pages[1].text).toContain('WhatsApp');
+    expect(read.logoUrl).toBeNull();
+  });
+
+  it('points at the logo the home page names', async () => {
+    const page = '<html><head><title>EasySign</title><link rel="apple-touch-icon" href="/touch.png"></head><body><h1>Sign</h1></body></html>';
+    const read = await readGrowthSite('https://easysign.co.il/', { fetchImpl: (async () => html(page)) as unknown as typeof fetch, resolver: publicResolver });
+    expect(read).toMatchObject({ status: 'ok', logoUrl: 'https://easysign.co.il/touch.png' });
   });
 
   it('fails only when the home page cannot be read', async () => {
@@ -116,6 +127,8 @@ describe('advanceGrowthPilot', () => {
     expect(saved.drafts.map((draft: { name: string }) => draft.name)).toEqual(['Digital signature', 'Law firms']);
     expect(saved.pages).toHaveLength(3);
     expect(orm.recordAdStudioUsage).toHaveBeenCalledWith(expect.objectContaining({ kind: 'site_analysis', outcome: 'succeeded', briefId: null }));
+    // The brand kit is filled from what the site said, for the brand strip on every ad.
+    expect(brand.fillAdStudioBrandFromSite).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'p', actorId: 'u' }), expect.objectContaining({ businessName: 'EasySign', logoUrl: null }), expect.anything());
   });
 
   it('does nothing when the site is already read or another caller holds the lease', async () => {
@@ -178,7 +191,7 @@ describe('making ads for approved targets', () => {
     orm.getGrowthPilot.mockResolvedValue(ACTIVE);
   });
 
-  it('opens a brief for the next approved target, in the site language and sending people to the site, and starts image ads without video', async () => {
+  it('opens a brief for the next approved target, in the site language and sending people to the site, and starts image ads (no video model: no video)', async () => {
     orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, status: 'proposed' }, TARGET]);
     orm.createAdStudioBrief.mockResolvedValue({ id: 'b1' });
     studio.startAdStudioAutopilot.mockResolvedValue(run({}));
@@ -186,8 +199,36 @@ describe('making ads for approved targets', () => {
     const input = orm.createAdStudioBrief.mock.calls[0][0].input;
     expect(input).toMatchObject({ name: 'Pro plan', landingPageUrl: 'https://easysign.co.il/', language: 'en' });
     expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_ADS_RUN_OPTIONS }));
-    expect(GROWTH_ADS_RUN_OPTIONS).toMatchObject({ images: true, video: false, confirmPlan: false });
+    expect(GROWTH_ADS_RUN_OPTIONS).toMatchObject({ images: true, video: false });
     expect(orm.linkGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', briefId: 'b1', runId: 'r1' }));
+  });
+
+  it('starts the video ad automatically once the image ads are ready, when a video model is configured, and advances it', async () => {
+    const withVideo = { video: { omni: {} } } as never;
+    orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, ads_status: 'building', brief_id: 'b1', run_id: 'r1' }]);
+    orm.getAdStudioRun.mockResolvedValue(run({ status: 'done' }));
+    studio.listBriefImages.mockResolvedValue([{ id: 'i1', selected: true, status: 'ready' }]);
+    studio.startAdStudioAutopilot.mockResolvedValue(run({ id: 'v1' }));
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot: withVideo });
+    expect(orm.finishGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ previewImageIds: ['i1'] }));
+    expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_VIDEO_RUN_OPTIONS }));
+    expect(orm.linkGrowthTargetVideo).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', runId: 'v1' }));
+
+    // Later calls advance the video run one step, and record how it ended.
+    orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, ads_status: 'ready', brief_id: 'b1', run_id: 'r1', video_status: 'building', video_run_id: 'v1', landing_status: 'ready', audience_status: 'ready' }]);
+    orm.getAdStudioRun.mockResolvedValue(run({ id: 'v1', status: 'running' }));
+    studio.advanceAdStudioAutopilot.mockResolvedValue(run({ id: 'v1', status: 'done', steps: [{ id: 'assemble', status: 'done', reason: null }] }));
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot: withVideo });
+    expect(orm.finishGrowthTargetVideo).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', failureCode: null }));
+  });
+
+  it('makes no video without a video model', async () => {
+    orm.listGrowthTargets.mockResolvedValue([{ ...TARGET, ads_status: 'building', brief_id: 'b1', run_id: 'r1' }]);
+    orm.getAdStudioRun.mockResolvedValue(run({ status: 'done' }));
+    studio.listBriefImages.mockResolvedValue([{ id: 'i1', selected: true, status: 'ready' }]);
+    await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
+    expect(studio.startAdStudioAutopilot).not.toHaveBeenCalled();
+    expect(GROWTH_VIDEO_RUN_OPTIONS).toMatchObject({ images: false, video: true });
   });
 
   it('advances a running autopilot one step, then puts the chosen ready images up for approval', async () => {

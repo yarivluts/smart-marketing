@@ -82,6 +82,8 @@ export function buildScenePrompt(
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
     `This shot is one scene of a short video ad for: ${product}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.`,
     ...referencePromptLines(references),
+    // The brand strip (logo, name, slogan) is laid over every frame afterwards, as on image ads.
+    context.format === 'vertical' ? 'Keep the action in the upper two thirds; a brand strip covers the lower part.' : 'Keep faces above the bottom edge; a brand strip covers it.',
     voiceover
       ? narrationLine
       : musicPromptLine(settings, false),

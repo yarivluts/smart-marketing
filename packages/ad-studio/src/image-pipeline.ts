@@ -1,6 +1,8 @@
 import { z } from 'zod/v4';
 import {
   AD_STUDIO_COPY_LIMITS,
+  AD_STUDIO_HEADLINE_LAYOUTS,
+  AD_STUDIO_IMAGE_STYLES,
   AD_STUDIO_IMAGE_HEADLINE_MAX,
   AD_STUDIO_IMAGE_ASPECT_RATIO,
   AD_STUDIO_IMAGE_INSTRUCTION_MAX,
@@ -11,6 +13,7 @@ import {
   imageConceptFingerprint,
   isAdStudioImageFormat,
   planToScriptContext,
+  sniffReferenceMimeType,
   type AdStudioImageFormat,
 } from '@growthos/shared';
 import {
@@ -33,10 +36,10 @@ import {
   type AdStudioImageModel,
   type AdStudioImageQa,
 } from '@growthos/firebase-orm-models';
-import { briefPromptInput } from './brand';
+import { briefPromptInput, resolveAdBrandMark } from './brand';
 import { ensureOrm, getServerKmsProvider } from './runtime';
 import { AdStudioProviderError, resolveAdStudioLlm, resolveAdStudioReviewer, type AdStudioLlm, type AdStudioReviewer } from './llm';
-import { canOverlayHeadline, overlayHeadline } from './headline-overlay';
+import { applyBrandStrip, canTypesetLanguage, headlineAccent, setHeadline, type AdBrandMark } from './ad-typography';
 import { betterImageVerdict, reviewAdStudioImage, type ImageQaSubject, type ImageQaVerdict } from './image-qa';
 import { englishForModel } from './translate';
 import { meteredCall, type AdStudioCallContext } from './metering';
@@ -106,6 +109,9 @@ const GeneratedConceptsSchema = z.object({
     z.object({
       visualPrompt: z.string().describe('What the picture shows, in English, for an image model. No text in the picture here.'),
       headline: z.string().describe('The only text drawn into the image, in the ad language, at most 40 characters, or empty.'),
+      emphasis: z.array(z.string()).optional().describe('1-2 short phrases copied exactly from the headline, set larger, heavier and in the accent colour.'),
+      style: z.enum(AD_STUDIO_IMAGE_STYLES).optional().describe('"designed": text-free picture, headline set by the studio. "free": the image model designs the lettering with the picture.'),
+      layout: z.enum(AD_STUDIO_HEADLINE_LAYOUTS).optional().describe('For designed ideas: centered, start or stacked.'),
       formats: z.array(z.string()).describe('Placements this idea suits: square, portrait, story, landscape.'),
       copy: AdCopySchema.optional().describe('The ad text that runs next to this idea in the feed, in the ad language.'),
     }),
@@ -180,7 +186,13 @@ export async function rewriteAdStudioImageConcept(ctx: AdStudioCallContext & { b
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   const [rewritten] = await repairConceptLengths(ctx, brief, raw.concepts.slice(0, 1));
   const original = concepts[index];
-  const [fitted] = rewritten ? fitAdStudioImageConcepts([{ ...rewritten, formats: original.formats }], () => original.id, original.formats) : [];
+  const [fitted] = rewritten
+    ? fitAdStudioImageConcepts(
+        [{ ...rewritten, formats: original.formats, style: rewritten.style ?? original.style, layout: rewritten.layout ?? original.layout }],
+        () => original.id,
+        original.formats,
+      )
+    : [];
   if (!fitted) throw new AdStudioProviderError('invalid_output', 'The model returned no usable image idea.');
   return saveAdStudioImageConcepts({
     organizationId: ctx.organizationId,
@@ -288,7 +300,11 @@ export function withFixes(prompt: string, fixes: readonly string[]): string {
   return fixes.length ? `${prompt}\nAn earlier render of this picture had problems. This time: ${fixes.join(' ')}` : prompt;
 }
 
-/** Runs the image calls inside the daily image limit, stores the kept image and records the usage either way. */
+/**
+ * Runs the image calls inside the daily image limit, stores the kept image and records the usage either
+ * way. With a brand, the checked picture is stored as the image's base and the brand strip (logo, name,
+ * slogan) is set on it for the image itself - every ad carries the brand, drawn exactly, never by the model.
+ */
 async function produceImage(
   ctx: BriefContext,
   deps: AdStudioImageDeps,
@@ -297,7 +313,8 @@ async function produceImage(
   check: ImageCheckPlan,
   subject: ImageQaSubject,
   call: (generator: AdStudioImageGenerator, fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
-  fallback?: (generator: AdStudioImageGenerator, fixes: readonly string[]) => Promise<AdStudioGeneratedImage>,
+  fallback: ((generator: AdStudioImageGenerator, fixes: readonly string[]) => Promise<AdStudioGeneratedImage>) | undefined,
+  brand: AdBrandMark | null,
 ): Promise<AdStudioImageModel> {
   const now = deps.now ?? (() => new Date());
   const usage = { organizationId: ctx.organizationId, projectId: ctx.projectId, kind, provider: 'gemini', model: record.model, briefId: ctx.briefId, actorId: ctx.actorId };
@@ -305,10 +322,25 @@ async function produceImage(
     const generator = deps.images;
     if (!generator) throw new AdStudioProviderError('not_configured', 'No image model is configured.');
     const { image, renders, qa } = await renderChecked(ctx, deps, kind, check, subject, (fixes) => call(generator, fixes), fallback ? (fixes) => fallback(generator, fixes) : undefined);
-    const objectPath = adStudioImageObjectPath({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: ctx.briefId, imageId: record.id, mimeType: image.mimeType });
-    await deps.storage.upload(objectPath, image.bytes, image.mimeType);
+    const ref = { organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: ctx.briefId };
+    let basePath: string | null = null;
+    let finished = image;
+    if (brand) {
+      try {
+        finished = await applyBrandStrip({ image, format: record.image_format, brand });
+        basePath = adStudioImageObjectPath({ ...ref, imageId: `${record.id}-base`, mimeType: image.mimeType });
+        await deps.storage.upload(basePath, image.bytes, image.mimeType);
+      } catch (error) {
+        // Only bytes that are not a decodable picture get here; the image is kept as the model made it, and the failure is logged.
+        console.error('[ad-studio] brand strip failed', { imageId: record.id, error: error instanceof Error ? error.message : String(error) });
+        finished = image;
+        basePath = null;
+      }
+    }
+    const objectPath = adStudioImageObjectPath({ ...ref, imageId: record.id, mimeType: finished.mimeType });
+    await deps.storage.upload(objectPath, finished.bytes, finished.mimeType);
     await recordAdStudioUsage({ ...usage, units: renders, outcome: 'succeeded', now: now() });
-    return await markAdStudioImageReady(record, { gcsPath: objectPath, mimeType: image.mimeType, byteSize: image.bytes.length, qa, now: now() });
+    return await markAdStudioImageReady(record, { gcsPath: objectPath, mimeType: finished.mimeType, byteSize: finished.bytes.length, qa, basePath, now: now() });
   } catch (error) {
     const code = error instanceof AdStudioProviderError ? error.code : 'storage_error';
     const message = error instanceof Error ? error.message : String(error);
@@ -353,25 +385,25 @@ export async function renderAdStudioConceptImage(ctx: BriefContext & { conceptId
   });
   const subject = { headline: concept.headline, visualPrompt: concept.visualPrompt, language: input.language };
   const headline = concept.headline.trim();
-  // A text-free picture with room kept for the headline, which is then set in code: the words are always exact.
-  const fallback =
-    headline && canOverlayHeadline(input.language)
+  const brand = await resolveAdBrandMark(brief, deps.storage);
+  // A text-free picture with room kept for the headline, which is then set in code: the words are always exact,
+  // with the emphasised phrases larger, heavier and in the accent colour.
+  const designed =
+    headline && canTypesetLanguage(input.language)
       ? async (generator: AdStudioImageGenerator, fixes: readonly string[]) => {
           const cleanPrompt = buildImagePrompt({ ...concept, visualPrompt, headline: '' }, ctx.format, input, { headlineSpace: true });
           const clean = await generator.generate({ prompt: withFixes(cleanPrompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize });
-          return overlayHeadline({ image: clean, headline, format: ctx.format });
+          return setHeadline({ image: clean, headline, format: ctx.format, language: input.language, emphasis: concept.emphasis, layout: concept.layout, accent: headlineAccent(brand.colors) });
         }
       : undefined;
-  return produceImage(
-    ctx,
-    deps,
-    record,
-    'image',
-    settings.videoQa,
-    subject,
-    (generator, fixes) => generator.generate({ prompt: withFixes(prompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize }),
-    fallback,
-  );
+  const modelDrawn = (generator: AdStudioImageGenerator, fixes: readonly string[]) =>
+    generator.generate({ prompt: withFixes(prompt, fixes), aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[ctx.format], imageSize: settings.imageSize });
+  // A designed idea is set in code from the first render; a free one (and an idea from before styles) lets the model
+  // draw the lettering, with the designed render as its last resort.
+  if (concept.style === 'designed' && designed) {
+    return produceImage(ctx, deps, record, 'image', settings.videoQa, { ...subject, headlineSetByCode: true }, designed, undefined, brand);
+  }
+  return produceImage(ctx, deps, record, 'image', settings.videoQa, subject, modelDrawn, designed, brand);
 }
 
 /**
@@ -389,7 +421,9 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'image_edit', units: 1, now: deps.now?.() });
   const [brief, settings] = await Promise.all([getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId), getAdStudioSettings(ctx.organizationId, ctx.projectId)]);
   const concept = (brief.image_concepts ?? []).find((candidate) => candidate.id === parent.concept_id);
-  const bytes = await readAdStudioObject(deps.storage, parent.gcs_path, MAX_STORED_IMAGE_BYTES);
+  // The edit starts from the picture without the brand strip, which is set again, exactly, on the result.
+  const bytes = await readAdStudioObject(deps.storage, parent.base_gcs_path ?? parent.gcs_path, MAX_STORED_IMAGE_BYTES);
+  const brand = await resolveAdBrandMark(brief, deps.storage);
   // The person's words are kept on the image; the image model gets them in English.
   const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
   const record = await createAdStudioImage({
@@ -411,13 +445,23 @@ export async function editAdStudioImage(ctx: BriefContext & { imageId: string; i
   });
   // The edit may change the words on purpose, so the check looks for misspellings, not for the original headline.
   const subject = { headline: null, visualPrompt: `${concept?.visualPrompt ?? ''}\nEdited as asked: ${instruction}`.trim(), language: brief.language };
-  return produceImage(ctx, deps, record, 'image_edit', settings.videoQa, subject, (generator, fixes) =>
-    generator.edit({
-      instruction: withFixes(modelInstruction, fixes),
-      image: { bytes, mimeType: parent.mime_type ?? 'image/png' },
-      aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format],
-      imageSize: settings.imageSize,
-    }),
+  return produceImage(
+    ctx,
+    deps,
+    record,
+    'image_edit',
+    settings.videoQa,
+    subject,
+    (generator, fixes) =>
+      generator.edit({
+        instruction: withFixes(modelInstruction, fixes),
+        // The base may be a PNG under a branded JPEG: the type comes from the bytes.
+        image: { bytes, mimeType: sniffReferenceMimeType(bytes) ?? parent.mime_type ?? 'image/png' },
+        aspectRatio: AD_STUDIO_IMAGE_ASPECT_RATIO[parent.image_format],
+        imageSize: settings.imageSize,
+      }),
+    undefined,
+    brand,
   );
 }
 

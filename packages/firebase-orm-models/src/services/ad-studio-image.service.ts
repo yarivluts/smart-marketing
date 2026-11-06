@@ -89,11 +89,12 @@ export async function createAdStudioImage(params: {
  */
 export async function markAdStudioImageReady(
   image: AdStudioImageModel,
-  params: { gcsPath: string; mimeType: string; byteSize: number; qa?: AdStudioImageQa | null; now?: Date },
+  params: { gcsPath: string; mimeType: string; byteSize: number; qa?: AdStudioImageQa | null; basePath?: string | null; now?: Date },
 ): Promise<AdStudioImageModel> {
   image.status = 'ready';
   if (params.qa) image.qa = params.qa;
   image.gcs_path = params.gcsPath;
+  if (params.basePath) image.base_gcs_path = params.basePath;
   image.mime_type = params.mimeType;
   image.byte_size = params.byteSize;
   image.completed_on = (params.now ?? new Date()).toISOString();

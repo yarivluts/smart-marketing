@@ -58,7 +58,7 @@ describe('sanitizing what the model returned', () => {
       offerings: [{ kind: 'other' as 'service', name: ' Sign ', description: 'd', forWhom: 'f', why: ' w ' }, { kind: 'product', name: ' ', description: '', forWhom: '', why: '' }],
       audiences: [{ name: 'A\n group', description: 'd', needs: 'n', why: 'y' }],
     });
-    expect(clean).toEqual({ businessName: 'EasySign', summary: 's', language: 'he', offerings: [{ kind: 'service', name: 'Sign', description: 'd', forWhom: 'f', why: 'w' }], audiences: [{ name: 'A group', description: 'd', needs: 'n', why: 'y' }] });
+    expect(clean).toEqual({ businessName: 'EasySign', slogan: '', summary: 's', language: 'he', offerings: [{ kind: 'service', name: 'Sign', description: 'd', forWhom: 'f', why: 'w' }], audiences: [{ name: 'A group', description: 'd', needs: 'n', why: 'y' }] });
     expect(sanitizeSiteAnalysis({ ...clean, language: '' }).language).toBe('en');
   });
 

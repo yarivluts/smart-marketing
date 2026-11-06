@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
   adCopyIssues,
+  fitHeadlineEmphasis,
   isAdCopyEmpty,
   isAdStudioFormat,
   reconcilePronunciations,
@@ -299,10 +300,24 @@ export async function saveAdStudioImageConcepts(params: {
   // An idea sent without copy keeps the copy it has (the ideas editor does not carry it); copy is
   // changed or cleared through saveAdStudioCopy (KAN-278).
   const storedCopy = new Map((brief.image_concepts ?? []).flatMap((concept) => (concept.copy ? [[concept.id, concept.copy] as const] : [])));
+  // Likewise its look (style, layout, emphasis): an editor that does not send it keeps it; the emphasis
+  // is fitted again to the headline as saved, so a reworded headline drops phrases no longer in it.
+  const storedLook = new Map((brief.image_concepts ?? []).map((concept) => [concept.id, concept] as const));
   brief.image_concepts = params.concepts.map((concept) => {
-    const { copy: sent, ...rest } = concept;
+    const { copy: sent, style, layout, emphasis, ...rest } = concept;
     const copy = sent ?? storedCopy.get(concept.id);
-    return { ...rest, formats: [...concept.formats], ...(copy && !isAdCopyEmpty(copy) ? { copy: { ...copy } } : {}) };
+    const stored = storedLook.get(concept.id);
+    const lookStyle = style ?? stored?.style;
+    const lookLayout = layout ?? stored?.layout;
+    const lookEmphasis = fitHeadlineEmphasis(concept.headline, emphasis ?? stored?.emphasis);
+    return {
+      ...rest,
+      formats: [...concept.formats],
+      ...(lookStyle ? { style: lookStyle } : {}),
+      ...(lookLayout ? { layout: lookLayout } : {}),
+      ...(lookStyle ? { emphasis: lookEmphasis } : {}),
+      ...(copy && !isAdCopyEmpty(copy) ? { copy: { ...copy } } : {}),
+    };
   });
   brief.image_concepts_generated_by = params.generatedBy ?? null;
   brief.last_changed_on = nowIso(params.now);

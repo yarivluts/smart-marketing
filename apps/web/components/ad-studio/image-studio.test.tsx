@@ -176,6 +176,25 @@ describe('ImageStudio', () => {
     expect(JSON.parse(init.body as string).concepts[0].headline).toBe('Signed before lunch');
   });
 
+  it('lets the person pick the design, the headline position and the words to highlight, and saves them', async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => json({ concepts: JSON.parse(String(init?.body)).concepts, images: [image()] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderStudio({ initialConcepts: [{ ...CONCEPT, style: 'free', emphasis: [] }] });
+
+    // The position applies only to clean type.
+    expect(screen.queryByRole('button', { name: 'Stacked' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Clean type' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stacked' }));
+    const emphasis = screen.getByLabelText(/^Words to highlight/);
+    fireEvent.change(emphasis, { target: { value: 'fast, Sign, third' } });
+    fireEvent.blur(emphasis);
+    fireEvent.click(screen.getByRole('button', { name: 'Save ideas' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const sent = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).concepts[0];
+    expect(sent).toMatchObject({ style: 'designed', layout: 'stacked', emphasis: ['fast', 'Sign'] });
+  });
+
   it('changes an image by an instruction and lets the person pick between versions', async () => {
     const v2 = image({ id: 'i2', version: 2, kind: 'edit', parentImageId: 'i1', instruction: 'Warmer light' });
     const fetchMock = vi
