@@ -6,7 +6,9 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   acceptInvite,
   createAdStudioClip,
+  createAdStudioDemoRecording,
   createOrganizationWithOwner,
+  markAdStudioDemoRecordingReady,
   createProject,
   ensureUserForFirebaseSession,
   getAdStudioBrief,
@@ -440,6 +442,43 @@ describe('Ad Studio video routes (KAN-231)', () => {
     });
     expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
     expect(await listAdStudioVideos(ctx.orgId, ctx.projectId, ctx.briefId)).toHaveLength(2);
+  });
+
+  it('shows the selected moments of the product walkthrough after the first scene, framed, and records them', async () => {
+    const ctx = await setup();
+    fakeOmni();
+    await renderAll(request('POST'), ctx.p());
+    await poll(ctx.p());
+    await poll(ctx.p());
+    const recording = await createAdStudioDemoRecording({ organizationId: ctx.orgId, projectId: ctx.projectId, site: 'app.example.com', requestedBy: ctx.owner.id });
+    const walkthroughPath = `orgs/${ctx.orgId}/projects/${ctx.projectId}/demo-recordings/${recording.id}.mp4`;
+    await storage().upload(walkthroughPath, Buffer.from('walkthrough-mp4'), 'video/mp4');
+    await markAdStudioDemoRecordingReady(recording, {
+      gcsPath: walkthroughPath,
+      durationSeconds: 30,
+      segments: [
+        { id: 'menu', startSeconds: 0, endSeconds: 4, title: 'Menu', description: '', selected: false },
+        { id: 'docs', startSeconds: 4, endSeconds: 12, title: 'Documents', description: '', selected: true },
+        { id: 'sign', startSeconds: 12, endSeconds: 15, title: 'Signing', description: '', selected: true },
+        { id: 'more', startSeconds: 15, endSeconds: 20, title: 'More', description: '', selected: true },
+      ],
+    });
+    concatClipsMock.mockImplementation(async ({ clips, output }: { clips: { file: string; seconds: number; startSeconds?: number; fit?: string }[]; output: string }) => {
+      expect(clips.map((clip) => [clip.seconds, clip.startSeconds ?? null, clip.fit ?? null])).toEqual([
+        [5, null, null],
+        [5, 4, 'screen'],
+        [3, 12, 'screen'],
+        [8, null, null],
+      ]);
+      await writeFile(output, Buffer.from('with-demo'));
+      return { durationSeconds: 21 };
+    });
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
+    const [video] = await listAdStudioVideos(ctx.orgId, ctx.projectId, ctx.briefId);
+    expect(video.demo_segments).toEqual([
+      { recording_id: recording.id, segment_id: 'docs', start_seconds: 4, seconds: 5 },
+      { recording_id: recording.id, segment_id: 'sign', start_seconds: 12, seconds: 3 },
+    ]);
   });
 
   it('an ffmpeg failure marks the video failed with a code', async () => {

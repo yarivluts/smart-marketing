@@ -23,11 +23,13 @@ import {
   type AdStudioDemoRecordingModel,
   type KmsProvider,
 } from '@growthos/firebase-orm-models';
-import { ensureOrm } from './runtime';
-import { AdStudioProviderError, type AdStudioLlm } from './llm';
+import { adStudioRuntime, ensureOrm } from './runtime';
+import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './llm';
 import { meteredCall } from './metering';
-import { adStudioDemoObjectPath, type AdStudioMediaStorage } from './media-storage';
-import { FfmpegFailedError, FfmpegUnavailableError, runFfmpeg, type FfmpegRunner } from './ffmpeg';
+import { adStudioDemoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
+import { defaultFfmpegRunner, FfmpegFailedError, FfmpegUnavailableError, runFfmpeg, type FfmpegRunner } from './ffmpeg';
+import { serverKms } from './planning-sources';
+import { createPlaywrightDemoLauncher } from './demo-browser';
 import { cachedAddressCheck, decideDemoRequest, isDeniedElement, isSameSite, siteOf, type DemoRequest } from './demo-policy';
 
 /**
@@ -445,6 +447,19 @@ export interface DemoRecorderDeps {
   /** The public-address guard; tests that serve a local app replace it. */
   checkAddress?: (url: string) => Promise<void>;
   dwellMs?: number;
+}
+
+/** The deployment's recorder: system Chromium, the configured text model, the bucket, ffmpeg and the vault. */
+export function resolveAdStudioDemoDeps(env: NodeJS.ProcessEnv = process.env): DemoRecorderDeps {
+  const runtime = adStudioRuntime();
+  return {
+    launchBrowser: runtime.demoBrowser ?? createPlaywrightDemoLauncher(env),
+    llm: resolveAdStudioLlm(env),
+    storage: resolveAdStudioMediaStorage(env),
+    runner: defaultFfmpegRunner(env),
+    kms: serverKms(),
+    ...(runtime.demoAddressCheck ? { checkAddress: runtime.demoAddressCheck } : {}),
+  };
 }
 
 function failureCode(error: unknown): AdStudioDemoFailureCode {

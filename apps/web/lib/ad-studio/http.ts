@@ -20,9 +20,12 @@ import {
   AdStudioRunAlreadyActiveError,
   AdStudioRunNotFoundError,
   AdStudioRunOptionsInvalidError,
+  AdStudioDemoAccessInvalidError,
+  AdStudioDemoRecordingNotFoundError,
+  AdStudioDemoSegmentsInvalidError,
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
-import { AdStudioAssemblyError, AdStudioImageRequestError, AdStudioProviderError, AdStudioReferenceRequestError, AdStudioVideoRequestError } from './engine';
+import { AdStudioAssemblyError, AdStudioDemoRequestError, AdStudioImageRequestError, AdStudioProviderError, AdStudioReferenceRequestError, AdStudioVideoRequestError } from './engine';
 
 const IMAGE_REQUEST_STATUS: Record<AdStudioImageRequestError['code'], number> = {
   concept_not_found: 404,
@@ -39,6 +42,14 @@ const VIDEO_REQUEST_STATUS: Record<AdStudioVideoRequestError['code'], number> = 
   clip_not_editable: 409,
   not_ready: 409,
   already_assembling: 409,
+};
+
+const DEMO_REQUEST_STATUS: Record<AdStudioDemoRequestError['code'], number> = {
+  no_demo_access: 409,
+  already_recording: 409,
+  vault_not_configured: 503,
+  not_configured: 503,
+  invalid_segments: 400,
 };
 
 const REFERENCE_REQUEST_STATUS: Record<AdStudioReferenceRequestError['code'], number> = {
@@ -66,7 +77,8 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
     error instanceof AdStudioVideoNotFoundError ||
     error instanceof AdStudioImageNotFoundError ||
     error instanceof AdStudioRunNotFoundError ||
-    error instanceof AdStudioReferenceNotFoundError
+    error instanceof AdStudioReferenceNotFoundError ||
+    error instanceof AdStudioDemoRecordingNotFoundError
   ) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
@@ -115,6 +127,15 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof AdStudioRunOptionsInvalidError) {
     return NextResponse.json({ error: 'invalid_options', reasons: error.reasons }, { status: 400 });
+  }
+  if (error instanceof AdStudioDemoAccessInvalidError) {
+    return NextResponse.json({ error: 'invalid_demo_access', fields: error.fields }, { status: 400 });
+  }
+  if (error instanceof AdStudioDemoSegmentsInvalidError) {
+    return NextResponse.json({ error: 'demo_request', code: 'invalid_segments' }, { status: 400 });
+  }
+  if (error instanceof AdStudioDemoRequestError) {
+    return NextResponse.json({ error: 'demo_request', code: error.code }, { status: DEMO_REQUEST_STATUS[error.code] });
   }
   if (error instanceof AdStudioAssemblyError) {
     return NextResponse.json({ error: 'assembly_failed', code: error.code }, { status: error.code === 'ffmpeg_unavailable' ? 503 : 500 });

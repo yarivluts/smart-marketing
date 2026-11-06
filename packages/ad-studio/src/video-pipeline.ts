@@ -3,7 +3,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AD_STUDIO_ASPECT_RATIO,
+  AD_STUDIO_MAX_TOTAL_SECONDS,
   assemblyPlan,
+  planDemoInserts,
   buildSceneEditInstruction,
   buildScenePrompt,
   needsPronunciation,
@@ -21,6 +23,7 @@ import {
   createAdStudioClip,
   createAdStudioVideo,
   getAdStudioBrief,
+  getLatestReadyAdStudioDemoRecording,
   getAdStudioSettings,
   chooseAdStudioClip,
   listAdStudioClips,
@@ -34,6 +37,7 @@ import {
   releaseAdStudioClipLease,
   type AdStudioBriefModel,
   type AdStudioClipModel,
+  type AdStudioDemoRecordingModel,
   type AdStudioUsageKind,
   type AdStudioVideoModel,
 } from '@growthos/firebase-orm-models';
@@ -481,6 +485,31 @@ export async function listBriefVideo(ctx: Omit<BriefContext, 'actorId'>): Promis
 }
 
 /**
+ * The walkthrough moments an ad of `sceneSeconds` shows: the selected moments of the project's newest
+ * ready recording that fit (at most two, five seconds each, within the length limit). None without a
+ * recording; a recording that cannot be read never stops an ad from being assembled.
+ */
+export async function demoInsertsFor(
+  ctx: Pick<BriefContext, 'organizationId' | 'projectId'>,
+  sceneSeconds: number,
+): Promise<{ recording: AdStudioDemoRecordingModel | null; inserts: ReturnType<typeof planDemoInserts> }> {
+  let recording: AdStudioDemoRecordingModel | null = null;
+  try {
+    recording = await getLatestReadyAdStudioDemoRecording(ctx.organizationId, ctx.projectId);
+  } catch (error) {
+    console.warn('[ad-studio] reading the product walkthrough failed; assembling without it', { error: error instanceof Error ? error.message : String(error) });
+  }
+  if (!recording?.gcs_path) return { recording: null, inserts: [] };
+  const inserts = planDemoInserts({
+    segments: (recording.segments ?? []).map((segment) => ({ id: segment.id, startSeconds: segment.start_seconds, endSeconds: segment.end_seconds, selected: segment.selected === true })),
+    sceneSeconds,
+    maxTotalSeconds: AD_STUDIO_MAX_TOTAL_SECONDS,
+    recordingSeconds: recording.duration_seconds ?? null,
+  });
+  return inserts.length ? { recording, inserts } : { recording: null, inserts: [] };
+}
+
+/**
  * Joins the newest ready, current clip of every scene in script order into one MP4 of at most 60
  * seconds, stores it and records it. Runs inside the request: work files go to a fresh temp folder
  * (in memory on Cloud Run) that is always removed.
@@ -496,6 +525,9 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
   if (existing.some((video) => video.status === 'assembling' && now.getTime() - new Date(video.requested_on).getTime() <= ASSEMBLY_TIMEOUT_MS)) {
     throw new AdStudioVideoRequestError('already_assembling');
   }
+  const sceneSeconds = plan.reduce((sum, entry) => sum + entry.seconds, 0);
+  // The product in action: selected moments of the newest walkthrough go in after the hook.
+  const demo = await demoInsertsFor(ctx, sceneSeconds);
   const video = await createAdStudioVideo({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -503,18 +535,24 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
     clipIds: plan.map((entry) => entry.clip.id),
     sceneIds: plan.map((entry) => entry.sceneId),
     aspectRatio: AD_STUDIO_ASPECT_RATIO[brief.video_format],
-    durationSeconds: plan.reduce((sum, entry) => sum + entry.seconds, 0),
+    durationSeconds: sceneSeconds + demo.inserts.reduce((sum, insert) => sum + insert.seconds, 0),
     requestedBy: ctx.actorId,
+    demoSegments: demo.recording ? demo.inserts.map((insert) => ({ recording_id: demo.recording!.id, segment_id: insert.segmentId, start_seconds: insert.startSeconds, seconds: insert.seconds })) : [],
     now,
   });
   const workDir = await mkdtemp(path.join(tmpdir(), 'ad-studio-'));
   let stage: AdStudioAssemblyFailure = 'storage_error';
   try {
-    const local: { file: string; seconds: number }[] = [];
+    const local: { file: string; seconds: number; startSeconds?: number; fit?: 'screen' }[] = [];
     for (const [index, entry] of plan.entries()) {
       const file = path.join(workDir, `clip-${index}.mp4`);
       await deps.storage.downloadToFile(entry.clip.model.gcs_path as string, file);
       local.push({ file, seconds: entry.seconds });
+    }
+    if (demo.recording && demo.inserts.length) {
+      const file = path.join(workDir, 'walkthrough.mp4');
+      await deps.storage.downloadToFile(demo.recording.gcs_path as string, file);
+      local.splice(1, 0, ...demo.inserts.map((insert) => ({ file, seconds: insert.seconds, startSeconds: insert.startSeconds, fit: 'screen' as const })));
     }
     // Every video ad carries the brand strip too: drawn once as a PNG the size of the frame and laid over every frame.
     const resolution = normalizeVideoSettings(brief.video_settings).resolution;

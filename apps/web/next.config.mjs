@@ -23,7 +23,8 @@ const nextConfig = {
   transpilePackages: ['@growthos/shared'],
   // The Ad Studio's media store (KAN-231): a Node-only client loaded at runtime rather than bundled,
   // the same way Next already treats firebase-admin. Standalone tracing copies it into the image.
-  serverExternalPackages: ['@google-cloud/storage', 'sharp'],
+  // The product walkthrough recorder drives the system Chromium through playwright-core, also loaded at runtime.
+  serverExternalPackages: ['@google-cloud/storage', 'sharp', 'playwright-core'],
   // @sentry/nextjs's server tracing pulls in OpenTelemetry instrumentation,
   // which uses require-in-the-middle's dynamic requires under the hood.
   // Webpack can't statically analyze those; this is a known, harmless warning.

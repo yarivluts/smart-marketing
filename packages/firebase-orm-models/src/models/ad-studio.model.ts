@@ -397,4 +397,16 @@ export class AdStudioVideoModel extends BaseModel {
 
   @Field({ is_required: false })
   public assembled_on?: string | null;
+
+  /** Moments of the product walkthrough shown in this ad (after the first scene); absent or empty when none. */
+  @Field({ is_required: false })
+  public demo_segments?: AdStudioVideoDemoSegment[] | null;
+}
+
+/** One walkthrough moment an assembled ad shows: which recording and moment, from where, for how long. */
+export interface AdStudioVideoDemoSegment {
+  recording_id: string;
+  segment_id: string;
+  start_seconds: number;
+  seconds: number;
 }

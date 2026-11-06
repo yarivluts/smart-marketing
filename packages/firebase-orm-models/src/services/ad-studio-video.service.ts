@@ -5,6 +5,7 @@ import {
   type AdStudioClipKind,
   type AdStudioClipQaIssue,
   type AdStudioClipQaStatus,
+  type AdStudioVideoDemoSegment,
 } from '../models/ad-studio.model';
 
 /**
@@ -291,9 +292,12 @@ export async function createAdStudioVideo(params: {
   resolution?: string | null;
   durationSeconds: number;
   requestedBy: string;
+  /** Walkthrough moments shown in the ad, if any. */
+  demoSegments?: AdStudioVideoDemoSegment[];
   now?: Date;
 }): Promise<AdStudioVideoModel> {
   const video = new AdStudioVideoModel();
+  video.demo_segments = params.demoSegments?.length ? params.demoSegments.map((segment) => ({ ...segment })) : null;
   video.organization_id = params.organizationId;
   video.project_id = params.projectId;
   video.brief_id = params.briefId;
