@@ -207,3 +207,52 @@ describe.skipIf(!hasFfmpeg)('with a real ffmpeg binary', () => {
     expect(await probeMedia(output, realRunner)).toMatchObject({ hasVideo: true, hasAudio: true });
   }, 60_000);
 });
+
+describe('screen recordings in an ad', () => {
+  it('cuts a moment from its start and shows it inside the frame on a blurred, darkened copy (vertical)', () => {
+    const args = buildConcatArgs({
+      inputs: [
+        { file: 'hook.mp4', seconds: 4, hasAudio: true },
+        { file: 'demo.mp4', seconds: 5, hasAudio: false, startSeconds: 12.5, fit: 'screen' },
+      ],
+      output: 'out.mp4',
+      format: 'vertical',
+    });
+    const graph = args[args.indexOf('-filter_complex') + 1];
+    expect(graph).toContain('[1:v:0]trim=start=12.5:duration=5,setpts=PTS-STARTPTS,fps=30,split=2[bgsrc1][fgsrc1]');
+    expect(graph).toContain('[bgsrc1]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=24:2,eq=brightness=-0.22[bg1]');
+    expect(graph).toContain('[fgsrc1]scale=662:1178:force_original_aspect_ratio=decrease:force_divisible_by=2[fg1]');
+    expect(graph).toContain('[bg1][fg1]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v1]');
+    // The silent moment gets a silent track of its own length, from the start.
+    expect(args.join(' ')).toContain('-f lavfi -t 5 -i anullsrc=channel_layout=stereo:sample_rate=48000');
+    expect(graph).toContain('[2:a:0]atrim=duration=5,');
+    // The scene clip keeps the plain fit.
+    expect(graph).toContain('[0:v:0]trim=duration=4,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=decrease,pad=');
+    expect(graph).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1');
+  });
+
+  it('frames a moment in a horizontal ad too, and trims a clip with sound from the same start', () => {
+    const args = buildConcatArgs({ inputs: [{ file: 'demo.mp4', seconds: 3, hasAudio: true, startSeconds: 2, fit: 'screen' }], output: 'out.mp4', format: 'horizontal', resolution: '1080p' });
+    const graph = args[args.indexOf('-filter_complex') + 1];
+    expect(graph).toContain('crop=1920:1080');
+    expect(graph).toContain('scale=1766:994:force_original_aspect_ratio=decrease');
+    expect(graph).toContain('[0:a:0]atrim=start=2:duration=3,');
+  });
+});
+
+describe.skipIf(!hasFfmpeg)('a screen recording with a real ffmpeg binary', () => {
+  it('joins a scene and a framed moment cut from the middle of a recording', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-ffmpeg-'));
+    workDirs.push(dir);
+    const scene = path.join(dir, 'scene.mp4');
+    const demo = path.join(dir, 'demo.mp4');
+    const make = (args: string[]) => expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { windowsHide: true }).status).toBe(0);
+    make(['-f', 'lavfi', '-i', 'testsrc=size=360x640:rate=24:duration=2', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', scene]);
+    make(['-f', 'lavfi', '-i', 'testsrc=size=1280x800:rate=30:duration=8', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', demo]);
+    const output = path.join(dir, 'out.mp4');
+    const result = await concatClips({ clips: [{ file: scene, seconds: 2 }, { file: demo, seconds: 3, startSeconds: 4, fit: 'screen' }], output, format: 'vertical', runner: realRunner });
+    expect(result.durationSeconds).toBeGreaterThan(4.7);
+    expect(result.durationSeconds).toBeLessThan(5.4);
+    expect(await probeMedia(output, realRunner)).toMatchObject({ hasVideo: true, hasAudio: true });
+  }, 60_000);
+});

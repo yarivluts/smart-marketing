@@ -170,7 +170,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan', 'keyword_choice'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan', 'keyword_choice', 'demo_tour'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**
@@ -397,4 +397,16 @@ export class AdStudioVideoModel extends BaseModel {
 
   @Field({ is_required: false })
   public assembled_on?: string | null;
+
+  /** Moments of the product walkthrough shown in this ad (after the first scene); absent or empty when none. */
+  @Field({ is_required: false })
+  public demo_segments?: AdStudioVideoDemoSegment[] | null;
+}
+
+/** One walkthrough moment an assembled ad shows: which recording and moment, from where, for how long. */
+export interface AdStudioVideoDemoSegment {
+  recording_id: string;
+  segment_id: string;
+  start_seconds: number;
+  seconds: number;
 }

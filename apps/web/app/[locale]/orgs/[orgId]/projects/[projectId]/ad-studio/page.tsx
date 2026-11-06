@@ -50,6 +50,7 @@ import {
   resolveAdStudioImageGenerator,
   listBriefImages,
   listBriefReferences,
+  serverKms,
 } from '@/lib/ad-studio/engine';
 import {
   adStudioImageSlots,
@@ -72,7 +73,7 @@ import {
 } from '@/components/viz';
 import { BriefForm } from '@/components/ad-studio/brief-form';
 import { AdFromSite } from '@/components/ad-studio/ad-from-site';
-import { getCurrentGrowthPilot } from '@growthos/firebase-orm-models';
+import { getAdStudioDemoAccess, getCurrentGrowthPilot, listAdStudioDemoRecordings, toAdStudioDemoRecordingView } from '@growthos/firebase-orm-models';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
 import { ReferenceLibrary } from '@/components/ad-studio/reference-library';
 import { VideoStudio } from '@/components/ad-studio/video-studio';
@@ -80,6 +81,7 @@ import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { BrandKitPanel } from '@/components/ad-studio/brand-kit-panel';
+import { DemoAccessPanel } from '@/components/ad-studio/demo-access-panel';
 import { BrandLogoProvider } from '@/components/ad-studio/brand-logo';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { KeywordResearch } from '@/components/ad-studio/keyword-research';
@@ -162,7 +164,8 @@ export default async function AdStudioPage({
     can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
 
   const canEditBrand = can(bindings, principal, 'project.configure', { orgId, projectId });
-  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot, shareLinks] =
+  const vault = serverKms();
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot, shareLinks, demoAccessLoaded, demoRecordings] =
     await Promise.all([
       listOrgProjects(orgId),
       listAdStudioBriefs(orgId, projectId),
@@ -175,6 +178,9 @@ export default async function AdStudioPage({
       getCurrentGrowthPilot(orgId, projectId).catch(() => null),
       // Sharing ads outside the team is a project admin's call, like the brand kit.
       canEditBrand ? listShareLinks(orgId, projectId) : Promise.resolve([]),
+      // The trial account's username is shown only to those who may change it; the password never.
+      getAdStudioDemoAccess(orgId, projectId, canEditBrand ? vault : null),
+      listAdStudioDemoRecordings(orgId, projectId),
     ]);
   const brandKit = brandLoaded.kit;
   const logoUrl = brandLoaded.logoVersion ? `/api/orgs/${orgId}/projects/${projectId}/ad-studio/brand-kit/logo?v=${encodeURIComponent(brandLoaded.logoVersion)}` : null;
@@ -942,6 +948,14 @@ export default async function AdStudioPage({
           {t('admin.collapsed')}
         </summary>
         <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} logoUrl={logoUrl} />
+        <DemoAccessPanel
+          orgId={orgId}
+          projectId={projectId}
+          access={demoAccessLoaded}
+          canEdit={canEditBrand}
+          recordings={demoRecordings.slice(0, 5).map(toAdStudioDemoRecordingView)}
+          recordingAvailable={providers.text !== null && vault !== null}
+        />
         <AdStudioAdminPanel
           orgId={orgId}
           projectId={projectId}

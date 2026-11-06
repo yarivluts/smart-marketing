@@ -17,6 +17,18 @@ Template for each entry:
 
 ---
 
+## 2026-11-06 — Ad Studio: product walkthrough video in ads (trial access, recorder, insertion)
+
+- **Last completed:**
+  - Trial (demo) account access per project (`ad_studio_demo_access`, username + password envelope-encrypted with the vault under `${org}:${project}:demo-access`; views carry `hasPassword` only; audited without secrets; login address through the SSRF guard). Routes `ad-studio/demo-access` (GET/PUT/DELETE, `project.configure`).
+  - Recorder (`packages/ad-studio/src/demo-recorder.ts`, `demo-browser.ts`, `demo-policy.ts`): system Chromium via `playwright-core` (`CHROMIUM_PATH`), signs in, records only after sign-in (CDP screencast -> ffmpeg, constant 30 fps), AI-guided tour (usage kind `demo_tour`, paused while the guide decides), hard denylist (EN + HE), no form submits or typing after sign-in, same-site navigation, every request and WebSocket through the address guard, 8 steps / 90 s caps. Recordings in `ad_studio_demo_recordings`; best 2-3 moments auto-selected.
+  - Routes `ad-studio/demo-recordings` (GET/POST), `[recordingId]` (PATCH selection), `[recordingId]/media`; MCP tools `record_product_walkthrough`, `list_product_walkthroughs`, `select_walkthrough_segments`; "Product demo" panel next to the brand kit.
+  - Assembly: up to 2 selected moments (5 s each) after the first scene, framed on a blurred copy (`fit: 'screen'`, `startSeconds` in `buildConcatArgs`), within the 60 s cap; recorded on the video as `demo_segments`. Growth Pilot / autopilot get it automatically through `assembleBriefVideo`.
+  - Web and API images install `chromium` + Noto fonts; `ENV CHROMIUM_PATH=/usr/bin/chromium`.
+- **In progress (exact stopping point):** None.
+- **Blocked + why:** None.
+- **Next step:** After deploy, record a walkthrough of a real trial account and check the Debian Chromium + playwright-core pairing and Cloud Run memory/time.
+- **Waiting on human:** A trial account of a customer app to try it end to end in prod.
 ## 2026-11-06 — Ad Studio: share the ads with the client (read-only link)
 
 - **Last completed:** "Share with client" for Ad Studio (PR #1177). New `AdShareLinkModel` (top-level `ad_share_links`, doc id = sha256 of a 32-byte base64url token; the token is shown once) + `ad-share-link.service.ts` (create / list / revoke / resolve, 7/30/90-day expiry, default 30, audited). Public page `/[locale]/share/ads/<token>` (no sign-in, noindex, no-referrer) shows the brand logo/name and each shared ad's chosen up-to-date images and current assembled video in the platform mock-ups with their copy; unknown/revoked/expired tokens get one "link no longer active" page. Public media under `/api/share/ads/<token>/{logo,briefs/<id>/images/<id>,briefs/<id>/videos/<id>}` serve only media of the link's project and briefs (chosen images only), `private, max-age=300`. Management: "Share with client" panel on the Ad Studio home and a per-ad shortcut in the publish step, both `project.configure`; API `ad-studio/share-links` (GET/POST) and `share-links/<id>` (DELETE).

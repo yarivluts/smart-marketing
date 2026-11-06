@@ -39,6 +39,7 @@
     "@google-cloud/storage": "^8.2.0",
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
+    "playwright-core": "1.61.1",
     "sharp": "0.34.5",
     "zod": "^3.25.0"
   },

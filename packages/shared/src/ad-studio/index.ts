@@ -15,3 +15,4 @@ export * from './writing-rules';
 export * from './length-repair';
 export * from './brand-kit';
 export * from './claims';
+export * from './demo';

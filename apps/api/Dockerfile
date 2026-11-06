@@ -17,10 +17,13 @@ RUN pnpm --filter "@growthos/api^..." --filter "!@growthos/dbt-transform" build 
 FROM base AS runner
 ENV NODE_ENV=production
 # ffmpeg joins Ad Studio scene clips into the finished video for the MCP tools (assemble_ad_video and
-# the autopilot), the same way the web image already does.
+# the autopilot), the same way the web image already does. Chromium records the product
+# walkthrough for record_product_walkthrough (playwright-core, CHROMIUM_PATH), with Noto fonts for
+# Hebrew and other scripts.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg \
+ && apt-get install -y --no-install-recommends ffmpeg chromium fonts-noto-core fonts-noto-color-emoji \
  && rm -rf /var/lib/apt/lists/*
+ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV PORT=8080
 # The commit this image was built from, reported on /v1/health so production
 # can be compared against main with no credentials (KAN-180). Left empty when

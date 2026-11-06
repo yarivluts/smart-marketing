@@ -214,6 +214,9 @@ Rendering takes minutes, so no tool waits for it to finish. Start the work with 
 | `render_ad_video` / `render_ad_scene` / `edit_ad_scene_clip` | `ai.use` | Start Gemini Omni clips for every stale scene, for one scene, or as an edit of a scene's clip |
 | `get_ad_video_status` | `ai.use` | Move rendering clips along, run the AI quality check of ready clips (one per call), and return each scene's state and `qa` verdict (`passed`, `issues` with what was heard and each problem, `skipped`, `error`); poll while generating or until every clip is checked |
 | `assemble_ad_video` | `ai.use` | Join the current clips into the finished video |
+| `record_product_walkthrough` | `ai.use` | Sign in to the customer's web app with the trial account saved in the Ad Studio (Product demo panel - never set or returned over MCP), record a short AI-guided usage video and cut it into moments; the best 2-3 are selected. Assembled video ads then show up to 2 selected moments (5 s each) after the first scene. Never clicks delete/pay/sign-out/invite/send/publish/save |
+| `list_product_walkthroughs` | `ai.use` | The recorded walkthroughs with their moments and which are used in ads, and whether trial access is set |
+| `select_walkthrough_segments` | `ai.use` | Set exactly which moments of a walkthrough video ads use |
 | `start_ad_autopilot` | `ai.use` | Plan -> script -> image ideas -> (person confirms) -> images -> clips -> assembled video, each only if missing; keeps anything existing or edited. `confirm_plan` (default true) stops at `awaiting_approval` before rendering |
 | `advance_ad_autopilot` | `ai.use` | Do the next unit of a run; call again until `status` is not `running` |
 | `approve_ad_plan` | `ai.use` | Confirm a run waiting at `awaiting_approval` so it renders the images and video - only after the person said to go ahead |

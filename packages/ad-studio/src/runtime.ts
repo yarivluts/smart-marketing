@@ -2,6 +2,7 @@ import { LocalKmsProvider, loadLocalKmsKeyRingFromEnv, type KmsProvider } from '
 import type { AdStudioMediaStorage } from './media-storage';
 import type { concatClips } from './ffmpeg';
 import type { PlanningSourceDeps } from './planning-sources';
+import type { DemoBrowserLauncher } from './demo-recorder';
 
 /**
  * How the host app plugs into the Ad Studio engine. The engine is shared by the web app (routes and
@@ -20,6 +21,10 @@ export interface AdStudioRuntime {
   concatClips?: typeof concatClips;
   /** How Growth Pilot reads websites (a fake fetch and resolver); production reads the real site. */
   siteReader?: PlanningSourceDeps;
+  /** The browser the walkthrough recorder drives (a fake in tests); production launches Chromium. */
+  demoBrowser?: DemoBrowserLauncher;
+  /** The address guard the recorder applies to every request (tests serving a local app relax it). */
+  demoAddressCheck?: (url: string) => Promise<void>;
 }
 
 let runtime: AdStudioRuntime = { ensureOrm: async () => undefined };

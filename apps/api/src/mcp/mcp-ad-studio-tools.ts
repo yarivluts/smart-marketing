@@ -56,6 +56,13 @@ import {
   setAdStudioSettings,
   findUserById,
   updateAdStudioBriefDetails,
+  AdStudioDemoRecordingNotFoundError,
+  AdStudioDemoSegmentsInvalidError,
+  getAdStudioDemoAccess,
+  listAdStudioDemoRecordings,
+  selectAdStudioDemoSegments,
+  toAdStudioDemoRecordingView,
+  type AdStudioDemoRecordingModel,
   type AdStudioBriefModel,
   type AdStudioExportModel,
   type AdStudioImageExportDestination,
@@ -63,6 +70,9 @@ import {
 } from '@growthos/firebase-orm-models';
 import {
   AdStudioAssemblyError,
+  AdStudioDemoRequestError,
+  recordProductWalkthrough,
+  resolveAdStudioDemoDeps,
   AdStudioImageRequestError,
   AdStudioProviderError,
   AdStudioReferenceRequestError,
@@ -171,7 +181,8 @@ function describeAdStudioToolError(error: unknown): string {
     error instanceof AdStudioVideoNotFoundError ||
     error instanceof AdStudioImageNotFoundError ||
     error instanceof AdStudioRunNotFoundError ||
-    error instanceof AdStudioReferenceNotFoundError
+    error instanceof AdStudioReferenceNotFoundError ||
+    error instanceof AdStudioDemoRecordingNotFoundError
   ) {
     return 'Not found.';
   }
@@ -196,6 +207,12 @@ function describeAdStudioToolError(error: unknown): string {
   if (error instanceof AdStudioImageNotReadyError) return 'Cannot do that: image_not_ready.';
   if (error instanceof AdStudioReferenceRequestError || error instanceof AdStudioReferenceInvalidError) return `Cannot do that: ${error.code}.`;
   if (error instanceof AdStudioAssemblyError) return `Assembly failed: ${error.code}.`;
+  if (error instanceof AdStudioDemoRequestError) {
+    return error.code === 'no_demo_access'
+      ? 'No trial access is saved for this project. A project admin adds it in the Ad Studio (Product demo panel); it cannot be set through MCP.'
+      : `Cannot record: ${error.code}.`;
+  }
+  if (error instanceof AdStudioDemoSegmentsInvalidError) return `Unknown moments: ${error.unknownIds.join(', ')}.`;
   if (error instanceof AdStudioRunNotAwaitingApprovalError) return 'Cannot do that: this run is not waiting for its plan to be confirmed.';
   if (error instanceof AdStudioRunAlreadyActiveError) return `An autopilot run is already in progress for this ad (run_id ${error.runId}); advance or cancel it first.`;
   if (error instanceof AdStudioExportUnavailableError) return `Exporting to ${error.destination} is not available for this project (${error.reason}); attach a credential with write access in project resources.`;
@@ -1247,6 +1264,71 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string }) => {
         const video = await assembleBriefVideo({ ...ctx(a.brief_id), actorId: actorId(auth) }, resolveAdStudioVideoDeps());
         return textResult({ video_id: video.id, status: video.status, duration_seconds: video.duration_seconds ?? null, web_url: webUrl(auth, a.brief_id) });
+      }),
+    ),
+  );
+
+  // The product walkthrough. The trial account it signs in with is set only in the app's form: no
+  // tool takes or returns a username or password.
+  const walkthroughOutput = (recording: AdStudioDemoRecordingModel) => {
+    const view = toAdStudioDemoRecordingView(recording);
+    return {
+      recording_id: view.id,
+      status: view.status,
+      failure_code: view.failureCode,
+      duration_seconds: view.durationSeconds,
+      site: view.site,
+      requested_on: view.requestedOn,
+      completed_on: view.completedOn,
+      segments: view.segments.map((segment) => ({ id: segment.id, title: segment.title, description: segment.description, start_seconds: segment.startSeconds, end_seconds: segment.endSeconds, selected: segment.selected })),
+    };
+  };
+
+  server.registerTool(
+    'record_product_walkthrough',
+    {
+      title: 'Record a product walkthrough',
+      description:
+        "Signs in to the customer's web app with the trial account saved in the Ad Studio (Product demo panel; it can only be set there, never through MCP), records a short AI-guided usage video (at most 90 seconds) and cuts it into moments; the 2-3 best are selected for video ads, which then show up to 2 of them after the first scene. Never clicks anything that deletes, pays, signs out, invites, sends, publishes or saves. Takes 1-2 minutes; uses up to 9 AI text calls. Requires \"ai.use\".",
+      inputSchema: toolInputSchema({}),
+    },
+    auditedToolHandler(auth, 'record_product_walkthrough', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async () => {
+        const recording = await recordProductWalkthrough({ organizationId: auth.organizationId, projectId: auth.projectId, actorId: actorId(auth) }, resolveAdStudioDemoDeps());
+        return textResult({ ...walkthroughOutput(recording), web_url: webUrl(auth) });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'list_product_walkthroughs',
+    {
+      title: 'List product walkthroughs',
+      description: 'The recorded walkthroughs of the product, newest first, with their moments and which are used in video ads, and whether trial access is set. Requires "ai.use".',
+      inputSchema: toolInputSchema({}),
+    },
+    auditedToolHandler(auth, 'list_product_walkthroughs', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async () => {
+        const [recordings, access] = await Promise.all([listAdStudioDemoRecordings(auth.organizationId, auth.projectId), getAdStudioDemoAccess(auth.organizationId, auth.projectId, null)]);
+        return textResult({ trial_access_set: access !== null, trial_site: access ? new URL(access.loginUrl).host : null, walkthroughs: recordings.slice(0, 10).map(walkthroughOutput) });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'select_walkthrough_segments',
+    {
+      title: 'Choose walkthrough moments for ads',
+      description: 'Sets exactly which moments of a ready walkthrough video ads use (segment ids from list_product_walkthroughs). The newest ready walkthrough is the one ads use; up to 2 selected moments, 5 seconds each, go in after the first scene. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        recording_id: z.string().min(1).describe('The walkthrough id, from list_product_walkthroughs.'),
+        segment_ids: z.array(z.string()).max(50).describe('The moments to use in ads; an empty list uses none.'),
+      }),
+    },
+    auditedToolHandler(auth, 'select_walkthrough_segments', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { recording_id: string; segment_ids: string[] }) => {
+        const recording = await selectAdStudioDemoSegments({ organizationId: auth.organizationId, projectId: auth.projectId, recordingId: a.recording_id, segmentIds: a.segment_ids ?? [] });
+        return textResult(walkthroughOutput(recording));
       }),
     ),
   );
