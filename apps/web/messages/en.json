@@ -218,6 +218,7 @@
     "haveAccount": "Already have an account? Sign in",
     "genericError": "We could not sign you in just now. Nothing was changed - please try again in a minute.",
     "invalidCredentialsError": "Incorrect email or password. Check for typos, or choose \"Forgot password?\" to set a new one.",
+    "invalidEmailError": "That email address does not look right. Check it for typos, such as a missing @ or a missing dot.",
     "emailInUseError": "An account with this email already exists. Sign in instead, or choose \"Forgot password?\" if you do not remember it.",
     "weakPasswordError": "That password is too short. Add a few more characters and try again.",
     "passwordHint": "At least 6 characters.",

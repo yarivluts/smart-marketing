@@ -154,6 +154,17 @@ describe('EmailPasswordForm Component', () => {
     expect(enMessages.Auth.weakPasswordError).not.toMatch(/at least 6/);
   });
 
+  it('a mistyped email on sign-up says the address looks wrong, not "incorrect password"', async () => {
+    mockSignUpWithEmail.mockRejectedValue({ code: 'auth/invalid-email' });
+    renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    const email = screen.getByLabelText(enMessages.Auth.emailLabel);
+    fireEvent.submit(email.closest('form') as HTMLFormElement);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain(enMessages.Auth.invalidEmailError);
+    expect(alert.textContent).not.toMatch(/password/i);
+    expect(heMessages.Auth.invalidEmailError.length).toBeGreaterThan(0);
+  });
+
   it('keeps the email address left-to-right, also in the Hebrew (right-to-left) app', () => {
     renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'he' });
     expect(screen.getByLabelText(heMessages.Auth.emailLabel)).toHaveAttribute('dir', 'ltr');
