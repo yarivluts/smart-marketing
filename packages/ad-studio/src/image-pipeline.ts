@@ -326,9 +326,16 @@ async function produceImage(
     let basePath: string | null = null;
     let finished = image;
     if (brand) {
-      basePath = adStudioImageObjectPath({ ...ref, imageId: `${record.id}-base`, mimeType: image.mimeType });
-      await deps.storage.upload(basePath, image.bytes, image.mimeType);
-      finished = await applyBrandStrip({ image, format: record.image_format, brand });
+      try {
+        finished = await applyBrandStrip({ image, format: record.image_format, brand });
+        basePath = adStudioImageObjectPath({ ...ref, imageId: `${record.id}-base`, mimeType: image.mimeType });
+        await deps.storage.upload(basePath, image.bytes, image.mimeType);
+      } catch (error) {
+        // Only bytes that are not a decodable picture get here; the image is kept as the model made it, and the failure is logged.
+        console.error('[ad-studio] brand strip failed', { imageId: record.id, error: error instanceof Error ? error.message : String(error) });
+        finished = image;
+        basePath = null;
+      }
     }
     const objectPath = adStudioImageObjectPath({ ...ref, imageId: record.id, mimeType: finished.mimeType });
     await deps.storage.upload(objectPath, finished.bytes, finished.mimeType);
