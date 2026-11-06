@@ -106,6 +106,13 @@ export function createPlaywrightDemoLauncher(env: NodeJS.ProcessEnv = process.en
         const allowed = await options.allowRequest({ url: request.url(), method: request.method(), isNavigation }).catch(() => false);
         await (allowed ? route.continue() : route.abort('blockedbyclient')).catch(() => undefined);
       });
+      // WebSockets bypass `route`, so they get the same address rule (wss checked as https; plain ws never).
+      await context.routeWebSocket(/.*/, async (socket) => {
+        const target = socket.url().replace(/^wss:/i, 'https:');
+        const allowed = target.startsWith('https:') && (await options.allowRequest({ url: target, method: 'GET', isNavigation: false }).catch(() => false));
+        if (allowed) socket.connectToServer();
+        else await socket.close().catch(() => undefined);
+      });
       const page = await context.newPage();
       // New tabs and windows are never followed.
       context.on('page', (opened) => {

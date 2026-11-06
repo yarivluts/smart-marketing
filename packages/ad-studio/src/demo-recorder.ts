@@ -14,6 +14,7 @@ import {
   assertAdStudioQuota,
   assertPublicHttpsUrl,
   createAdStudioDemoRecording,
+  getAdStudioDemoAccess,
   listAdStudioBriefs,
   listAdStudioDemoRecordings,
   markAdStudioDemoRecordingFailed,
@@ -488,6 +489,8 @@ export async function recordProductWalkthrough(
   deps: DemoRecorderDeps,
 ): Promise<AdStudioDemoRecordingModel> {
   await ensureOrm();
+  // Whether trial access exists needs no key; opening it does.
+  if (!(await getAdStudioDemoAccess(ctx.organizationId, ctx.projectId, null))) throw new AdStudioDemoRequestError('no_demo_access');
   if (!deps.kms) throw new AdStudioDemoRequestError('vault_not_configured');
   if (!deps.llm) throw new AdStudioDemoRequestError('not_configured');
   const llm = deps.llm;

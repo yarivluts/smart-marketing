@@ -1,6 +1,8 @@
 import {
   connectFirestoreOrmAdmin,
+  createAdStudioDemoRecording,
   createOrganizationWithOwner,
+  markAdStudioDemoRecordingReady,
   createProject,
   ensureUserForFirebaseSession,
   listAuditLogEntriesForOrg,
@@ -373,5 +375,36 @@ describe('Ad Studio MCP tools', () => {
 
     const audit = await listAuditLogEntriesForOrg(agent.orgId, 50);
     expect(audit.some((entry) => entry.action === 'mcp.tool_call')).toBe(true);
+  });
+
+  it('lists product walkthroughs and their moments, chooses moments for ads, and never takes or returns sign-in details', async () => {
+    const agent = await setup(['mcp.read', 'ai.use']);
+    const projectId = (agent.auth as { projectId: string }).projectId;
+    // Without trial access nothing is recorded, and the agent is told where a person adds it.
+    const refused = await agent.call('record_product_walkthrough');
+    expect((refused.content[0] as { text: string }).text).toContain('cannot be set through MCP');
+
+    const recording = await createAdStudioDemoRecording({ organizationId: agent.orgId, projectId, site: 'app.example.com', requestedBy: agent.owner.id });
+    await markAdStudioDemoRecordingReady(recording, {
+      gcsPath: `orgs/${agent.orgId}/projects/${projectId}/demo-recordings/${recording.id}.mp4`,
+      durationSeconds: 12,
+      segments: [
+        { id: 'a', startSeconds: 0, endSeconds: 4, title: 'Dashboard', description: 'Overview', selected: true },
+        { id: 'b', startSeconds: 4, endSeconds: 9, title: 'Reports', description: 'A report', selected: false },
+      ],
+    });
+    type Listed = { trial_access_set: boolean; walkthroughs: { recording_id: string; status: string; segments: { id: string; selected: boolean }[] }[] };
+    const listed = await agent.json<Listed>('list_product_walkthroughs');
+    expect(listed.trial_access_set).toBe(false);
+    expect(listed.walkthroughs).toEqual([expect.objectContaining({ recording_id: recording.id, status: 'ready' })]);
+    expect(JSON.stringify(listed)).not.toMatch(/password|username/i);
+
+    const chosen = await agent.json<{ segments: { id: string; selected: boolean }[] }>('select_walkthrough_segments', { recording_id: recording.id, segment_ids: ['b'] });
+    expect(chosen.segments.map((segment) => segment.selected)).toEqual([false, true]);
+    const unknown = await agent.call('select_walkthrough_segments', { recording_id: recording.id, segment_ids: ['zzz'] });
+    expect((unknown.content[0] as { text: string }).text).toBe('Unknown moments: zzz.');
+
+    const readOnly = await setup(['mcp.read']);
+    expect((await readOnly.call('list_product_walkthroughs')).isError).toBe(true);
   });
 });

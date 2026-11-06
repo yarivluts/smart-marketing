@@ -5,6 +5,7 @@ const orm = vi.hoisted(() => ({
   assertAdStudioQuota: vi.fn(),
   recordAdStudioUsage: vi.fn(),
   revealAdStudioDemoAccess: vi.fn(),
+  getAdStudioDemoAccess: vi.fn(),
   listAdStudioDemoRecordings: vi.fn(),
   listAdStudioBriefs: vi.fn(),
   createAdStudioDemoRecording: vi.fn(),
@@ -295,6 +296,7 @@ describe('recordProductWalkthrough', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     orm.revealAdStudioDemoAccess.mockResolvedValue({ ...credentials, notes: 'Show invoices' });
+    orm.getAdStudioDemoAccess.mockResolvedValue({ loginUrl: credentials.loginUrl, username: null, hasPassword: true, notes: '', lastChangedOn: null });
     orm.listAdStudioDemoRecordings.mockResolvedValue([]);
     orm.listAdStudioBriefs.mockResolvedValue([{ product_description: 'Invoicing', language: 'he' }]);
     orm.createAdStudioDemoRecording.mockResolvedValue(recording);
@@ -345,7 +347,7 @@ describe('recordProductWalkthrough', () => {
   });
 
   it('refuses without trial access, without a vault, without a model, or while one is recording', async () => {
-    orm.revealAdStudioDemoAccess.mockResolvedValueOnce(null);
+    orm.getAdStudioDemoAccess.mockResolvedValueOnce(null);
     await expect(recordProductWalkthrough(ctx, deps().value)).rejects.toMatchObject({ code: 'no_demo_access' });
     await expect(recordProductWalkthrough(ctx, { ...deps().value, kms: null })).rejects.toMatchObject({ code: 'vault_not_configured' });
     await expect(recordProductWalkthrough(ctx, { ...deps().value, llm: null })).rejects.toMatchObject({ code: 'not_configured' });
