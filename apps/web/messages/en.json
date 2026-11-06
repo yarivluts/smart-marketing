@@ -4648,7 +4648,7 @@
       "errorInvalidConcepts": "Some ideas break the rules - fix the highlighted ones.",
       "quotaExceeded": "You have used today's picture allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
       "destination": {
-        "meta": "Meta",
+        "meta": "Facebook & Instagram",
         "google_ads": "Google Ads"
       },
       "format": {
@@ -4821,7 +4821,7 @@
       "collapsed": "Studio settings and AI usage",
       "customerDescription": "Your daily AI allowance and the latest AI calls. Daily limits come from your GrowthOS plan.",
       "imageSize": "Image size",
-      "imageSizeHint": "2K meets Meta's recommended sizes (1080 px feeds, 1080x1920 Stories). 1K is cheaper, for drafts.",
+      "imageSizeHint": "2K meets the recommended sizes for Facebook and Instagram (1080 px feeds, 1080x1920 Stories). 1K is cheaper, for drafts.",
       "imageSizes": {
         "1K": "1K - drafts",
         "2K": "2K - recommended"
