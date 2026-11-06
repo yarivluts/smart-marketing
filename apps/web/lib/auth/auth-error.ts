@@ -1,5 +1,6 @@
 export type AuthErrorMessageKey =
   | 'invalidCredentialsError'
+  | 'invalidEmailError'
   | 'emailInUseError'
   | 'weakPasswordError'
   | 'tooManyAttemptsError'
@@ -12,7 +13,7 @@ export type AuthErrorMessageKey =
 
 const CODE_TO_KEY: Record<string, AuthErrorMessageKey> = {
   'auth/invalid-credential': 'invalidCredentialsError',
-  'auth/invalid-email': 'invalidCredentialsError',
+  'auth/invalid-email': 'invalidEmailError',
   'auth/user-not-found': 'invalidCredentialsError',
   'auth/wrong-password': 'invalidCredentialsError',
   'auth/email-already-in-use': 'emailInUseError',

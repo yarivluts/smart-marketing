@@ -6,7 +6,7 @@ import { authErrorMessageKey, isAuthCancelled } from './auth-error';
 describe('authErrorMessageKey', () => {
   it.each([
     ['auth/invalid-credential', 'invalidCredentialsError'],
-    ['auth/invalid-email', 'invalidCredentialsError'],
+    ['auth/invalid-email', 'invalidEmailError'],
     ['auth/user-not-found', 'invalidCredentialsError'],
     ['auth/wrong-password', 'invalidCredentialsError'],
     ['auth/email-already-in-use', 'emailInUseError'],
