@@ -4467,7 +4467,7 @@
     },
     "planningAdminHint": "Deep analysis also reads the web page (public https pages only) and the last 90 days of web page results from the warehouse. A missing source is shown as missing, never estimated.",
     "exportTitle": "Export",
-    "exportDescription": "Send the finished {seconds}-second video to your Meta ad account or your YouTube channel.",
+    "exportDescription": "Send the finished {seconds}-second video to your Facebook and Instagram ad account or your YouTube channel.",
     "exportNeedsVideo": "Assemble the video first. Only the current finished video can be exported.",
     "exportDestination": {
       "meta": "Facebook and Instagram",
@@ -4508,7 +4508,7 @@
       "upload_failed": "The upload failed. Try again.",
       "no_secret": "This connection has no login saved yet. Add it in Ad platform connections.",
       "invalid_credential": "The saved login looks incomplete or wrong. Save it again in Ad platform connections.",
-      "account_action_required": "Meta needs you to verify the account in Ads Manager (adsmanager.facebook.com) before ads can be created or changed."
+      "account_action_required": "Facebook and Instagram need you to verify the account in Ads Manager (adsmanager.facebook.com) before ads can be created or changed."
     },
     "exportVideoNotReady": "That video is not assembled yet.",
     "exportHistory": "Exports",

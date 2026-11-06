@@ -52,7 +52,7 @@ describe('ExportPanel', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderPanel();
 
-    expect(screen.getByText('Send the finished 30-second video to your Meta ad account or your YouTube channel.')).toBeInTheDocument();
+    expect(screen.getByText('Send the finished 30-second video to your Facebook and Instagram ad account or your YouTube channel.')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Video title'), { target: { value: 'Signed before lunch' } });
     fireEvent.click(within(screen.getByTestId('ad-studio-export-meta')).getByRole('button'));
 
