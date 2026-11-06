@@ -4732,7 +4732,7 @@
       },
       "publish": {
         "label": "Publish",
-        "hint": "Meta and Google Ads",
+        "hint": "Facebook, Instagram and Google",
         "hintLocked": "Create the ads first",
         "libraryUploads": "Other options: upload the media only (no ad)"
       }
@@ -5176,15 +5176,15 @@
         "male": "Men"
       },
       "audiencesTitle": "Your groups of people ({count} of up to {max} chosen)",
-      "loading": "Reading your Meta ad account...",
+      "loading": "Reading your Facebook and Instagram ad account...",
       "noAudiences": "Your ad account has no saved groups of people yet. That is fine - choose age, gender and interests below and the ad still reaches the right people.",
       "kinds": {
         "custom": "Your people",
         "lookalike": "Similar to your people",
         "saved": "Saved group"
       },
-      "kindsHint": "\"Your people\" are real contacts or visitors you already have. \"Similar to your people\" are new people Meta finds who resemble them.",
-      "savedNote": "These are groups of people you saved in your Meta ad account. They are shown so you can see them, but you cannot add them here - pick age, gender and interests instead.",
+      "kindsHint": "\"Your people\" are real contacts or visitors you already have. \"Similar to your people\" are new people Facebook and Instagram find who resemble them.",
+      "savedNote": "These are groups of people you saved in your Facebook and Instagram ad account. They are shown so you can see them, but you cannot add them here - pick age, gender and interests instead.",
       "sizeUnknown": "size unknown",
       "interestsTitle": "Interests ({count} of up to {max})",
       "interestPlaceholder": "Search topics people like, e.g. law, real estate",
@@ -5195,7 +5195,7 @@
       "interestsHint": "People with any of the chosen interests (or in any chosen audience) can see the ad. Fewer, closer interests usually work better than many broad ones.",
       "estimate": "How many people could see it",
       "estimateValue": "About {range} people a month",
-      "estimateNone": "Meta gave no estimate for this audience.",
+      "estimateNone": "Facebook and Instagram gave no estimate for this audience.",
       "pastTitle": "What worked before",
       "pastDescription": "Your Facebook & Instagram ad account's last 90 days, every ad: money spent, clicks, and sign-ups or sales for each group of people.",
       "breakdowns": {
