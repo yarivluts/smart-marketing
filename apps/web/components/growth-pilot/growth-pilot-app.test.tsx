@@ -709,6 +709,7 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [empty], targets: [TARGET] })} />, { locale: 'en' });
       const box = screen.getByTestId('growth-pilot-budget');
       expect(box).toHaveValue(null);
+      expect(box).toBeValid();
       expect(box).toHaveAccessibleDescription(/^Not sure what to enter\? A small amount is fine to start/);
       expect(document.getElementById('growth-pilot-budget-hint')).not.toHaveClass('text-destructive');
       expect(screen.getByTestId('growth-pilot-approve')).toBeDisabled();
@@ -759,8 +760,10 @@ describe('GrowthPilotApp', () => {
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '0' } });
       expect(within(card).getByTestId('growth-pilot-approve')).toBeDisabled();
       expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription(/Enter a daily budget above zero to publish/);
+      expect(screen.getByTestId('growth-pilot-budget')).toBeInvalid();
       fireEvent.change(screen.getByTestId('growth-pilot-budget'), { target: { value: '35' } });
       expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription(/^The most you will spend/);
+      expect(screen.getByTestId('growth-pilot-budget')).toBeValid();
       fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
       await waitFor(() => expect(sent(fetchMock)).toEqual({ url: BASE + '/proposals/pub1', body: { action: 'approve', dailyBudget: 35 } }));
       expect(await screen.findByTestId('growth-pilot-target-publish')).toHaveTextContent('On Facebook and Instagram, switched off - not showing to anyone');

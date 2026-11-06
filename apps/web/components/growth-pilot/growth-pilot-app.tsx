@@ -490,6 +490,7 @@ function ProposalCard({
                   className="h-9 w-24 rounded-xl border border-input bg-background px-2 text-sm tabular-nums"
                   data-testid="growth-pilot-budget"
                   aria-describedby="growth-pilot-budget-hint"
+                  aria-invalid={budget.trim() !== '' && !(Number(budget) > 0) ? true : undefined}
                 />
               </span>
               <span id="growth-pilot-budget-hint" className={Number(budget) > 0 || budget.trim() === '' ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
