@@ -160,6 +160,9 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
             type="text"
             inputMode="url"
             autoComplete="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             dir="ltr"
             value={url}
             onChange={(event) => {
