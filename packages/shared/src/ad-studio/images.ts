@@ -70,6 +70,33 @@ export const AD_STUDIO_IMAGE_VISUAL_MAX = 700;
 /** An edit instruction ("make the background warmer"), like a scene edit. */
 export const AD_STUDIO_IMAGE_INSTRUCTION_MAX = 500;
 
+/**
+ * How an idea's headline gets into the picture:
+ * - `designed`: the image model paints a text-free picture and the studio sets the headline itself,
+ *   mixing weight, size and colour so the emphasised words stand out - the words are always exact.
+ * - `free`: the image model designs the picture and the lettering together, with a freer hand (an
+ *   accent colour, a shape behind a word); the check reads the words back and falls back to `designed`.
+ * Ideas saved before the choice existed have none and render as before (the model draws the headline).
+ */
+export const AD_STUDIO_IMAGE_STYLES = ['designed', 'free'] as const;
+export type AdStudioImageStyle = (typeof AD_STUDIO_IMAGE_STYLES)[number];
+
+/** Where a `designed` headline sits: centred at the top, aligned to the reading side, or stacked with the emphasis on its own line. */
+export const AD_STUDIO_HEADLINE_LAYOUTS = ['centered', 'start', 'stacked'] as const;
+export type AdStudioHeadlineLayout = (typeof AD_STUDIO_HEADLINE_LAYOUTS)[number];
+
+/** At most this many emphasised phrases per headline, each a few words of it. */
+export const AD_STUDIO_MAX_EMPHASIS = 2;
+export const AD_STUDIO_EMPHASIS_MAX = 24;
+
+export function isAdStudioImageStyle(value: unknown): value is AdStudioImageStyle {
+  return typeof value === 'string' && (AD_STUDIO_IMAGE_STYLES as readonly string[]).includes(value);
+}
+
+export function isAdStudioHeadlineLayout(value: unknown): value is AdStudioHeadlineLayout {
+  return typeof value === 'string' && (AD_STUDIO_HEADLINE_LAYOUTS as readonly string[]).includes(value);
+}
+
 export interface AdStudioImageConcept {
   /** Stable across edits, so rendered images stay attached to their concept. */
   id: string;
@@ -81,6 +108,48 @@ export interface AdStudioImageConcept {
   formats: AdStudioImageFormat[];
   /** The ad copy that runs next to this idea's images (KAN-278); absent until written. */
   copy?: AdStudioAdCopy;
+  /** How the headline is put into the picture; absent on ideas saved before the choice existed. */
+  style?: AdStudioImageStyle;
+  /** The words of the headline that matter most, set larger, heavier and in the accent colour. */
+  emphasis?: string[];
+  /** Where a `designed` headline sits. */
+  layout?: AdStudioHeadlineLayout;
+}
+
+/**
+ * The emphasised phrases that really are in the headline (the model sometimes paraphrases), trimmed,
+ * de-duplicated, at most AD_STUDIO_MAX_EMPHASIS, never the whole headline (then nothing stands out).
+ */
+export function fitHeadlineEmphasis(headline: string, emphasis: readonly unknown[] | null | undefined): string[] {
+  const text = headline.trim();
+  const phrases = (emphasis ?? [])
+    .filter((entry): entry is string => typeof entry === 'string')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0 && entry.length <= AD_STUDIO_EMPHASIS_MAX && entry !== text && text.includes(entry));
+  return [...new Set(phrases)].slice(0, AD_STUDIO_MAX_EMPHASIS);
+}
+
+/** A headline split into runs, each marked when it is one of the emphasised phrases (first occurrence of each). */
+export function splitHeadlineEmphasis(headline: string, emphasis: readonly string[]): { text: string; emphasis: boolean }[] {
+  const text = headline.trim();
+  const marks: { start: number; end: number }[] = [];
+  for (const phrase of emphasis) {
+    const start = text.indexOf(phrase);
+    if (start < 0) continue;
+    const end = start + phrase.length;
+    if (marks.some((mark) => start < mark.end && end > mark.start)) continue;
+    marks.push({ start, end });
+  }
+  marks.sort((a, b) => a.start - b.start);
+  const runs: { text: string; emphasis: boolean }[] = [];
+  let at = 0;
+  for (const mark of marks) {
+    if (mark.start > at) runs.push({ text: text.slice(at, mark.start), emphasis: false });
+    runs.push({ text: text.slice(mark.start, mark.end), emphasis: true });
+    at = mark.end;
+  }
+  if (at < text.length) runs.push({ text: text.slice(at), emphasis: false });
+  return runs;
 }
 
 export type AdStudioImageConceptIssueCode =
@@ -119,31 +188,58 @@ export function validateAdStudioImageConcepts(concepts: readonly AdStudioImageCo
   return issues;
 }
 
-/** Fits a model's concepts to the rules: trims text, drops bad formats and extra concepts, defaults formats. */
+/**
+ * Fits a model's concepts to the rules: trims text, drops bad formats and extra concepts, defaults formats.
+ * Every idea gets a style, emphasis and layout; when the model gave every idea the same style, the
+ * last one is switched so a set of two or more always tests both a set headline and a free design.
+ */
 export function fitAdStudioImageConcepts(
-  concepts: readonly { visualPrompt: string; headline: string; formats: readonly string[]; copy?: Partial<AdStudioAdCopy> | null }[],
+  concepts: readonly {
+    visualPrompt: string;
+    headline: string;
+    formats: readonly string[];
+    copy?: Partial<AdStudioAdCopy> | null;
+    style?: string | null;
+    emphasis?: readonly unknown[] | null;
+    layout?: string | null;
+  }[],
   newId: () => string,
   defaultFormats: readonly AdStudioImageFormat[] = ['square', 'portrait'],
 ): AdStudioImageConcept[] {
-  return concepts
-    .map((concept) => {
+  const fitted = concepts
+    .map((concept, index) => {
       const formats = [...new Set(concept.formats.filter(isAdStudioImageFormat))];
       const copy = fitAdCopy(concept.copy);
+      const headline = concept.headline.trim().slice(0, AD_STUDIO_IMAGE_HEADLINE_MAX);
       return {
         id: newId(),
         visualPrompt: concept.visualPrompt.trim().slice(0, AD_STUDIO_IMAGE_VISUAL_MAX),
-        headline: concept.headline.trim().slice(0, AD_STUDIO_IMAGE_HEADLINE_MAX),
+        headline,
         formats: formats.length ? formats : [...defaultFormats],
         ...(copy ? { copy } : {}),
+        style: isAdStudioImageStyle(concept.style) ? concept.style : AD_STUDIO_IMAGE_STYLES[index % AD_STUDIO_IMAGE_STYLES.length],
+        emphasis: fitHeadlineEmphasis(headline, concept.emphasis),
+        layout: isAdStudioHeadlineLayout(concept.layout) ? concept.layout : AD_STUDIO_HEADLINE_LAYOUTS[index % AD_STUDIO_HEADLINE_LAYOUTS.length],
       };
     })
     .filter((concept) => concept.visualPrompt.length > 0)
     .slice(0, AD_STUDIO_MAX_IMAGE_CONCEPTS);
+  if (fitted.length > 1 && fitted.every((concept) => concept.style === fitted[0].style)) {
+    const last = fitted[fitted.length - 1];
+    last.style = last.style === 'designed' ? 'free' : 'designed';
+  }
+  return fitted;
 }
 
 /** Which rendered image belongs to which concept version: a changed concept or format means a new render. */
-export function imageConceptFingerprint(concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline'>, format: AdStudioImageFormat, language: string): string {
-  return JSON.stringify([concept.visualPrompt.trim(), concept.headline.trim(), format, language]);
+export function imageConceptFingerprint(
+  concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline' | 'style' | 'emphasis' | 'layout'>,
+  format: AdStudioImageFormat,
+  language: string,
+): string {
+  // Ideas saved before style existed keep their fingerprint, so their images do not all turn stale.
+  const look = concept.style ? [concept.style, concept.layout ?? '', (concept.emphasis ?? []).join('|')] : [];
+  return JSON.stringify([concept.visualPrompt.trim(), concept.headline.trim(), format, language, ...look]);
 }
 
 const CONCEPT_RULES = [
@@ -152,6 +248,10 @@ const CONCEPT_RULES = [
   // Image models draw device screens badly (text, giant phones, floating screens): ideas should not hinge on one.
   'Build each picture around people, places and the result they get, not around a device: never a close-up of a phone or computer screen, and never a picture whose point is what a screen shows. A device, if any, is a small, natural part of the scene.',
   `headline is the only text drawn into the image: at most ${AD_STUDIO_IMAGE_HEADLINE_MAX} characters, in the ad language, or empty. Prefer short, concrete benefit statements.`,
+  `emphasis lists 1-${AD_STUDIO_MAX_EMPHASIS} short phrases copied exactly from the headline - the words that sell (a number, the benefit, the time saved) - which are set larger, heavier and in an accent colour. Never the whole headline.`,
+  'style is "designed" (a text-free picture; the studio sets the headline in clean, bold typography) or "free" (the image model designs the lettering together with the picture, for a more graphic, poster-like ad). Use both across the ideas.',
+  'layout, for designed ideas, is "centered" (headline centred at the top), "start" (aligned to the reading side, for a picture whose subject sits on the other side) or "stacked" (the emphasis on its own large line). Vary it across the ideas.',
+  'Every ad gets a brand strip with the logo, the brand name and the slogan at the bottom, set by the studio: never put the logo, the brand name or the slogan in visualPrompt or the headline.',
   'formats lists the placements the idea suits: square and portrait for feeds, story for full-screen vertical, landscape for Google display.',
   'copy is the ad text that runs next to this idea in the feed (not drawn into the image); write it for every idea.',
   ...AD_COPY_RULES,
@@ -200,13 +300,21 @@ export function buildImageConceptsPrompt(
  */
 export function buildImageConceptRewritePrompt(
   brief: AdStudioBriefInput,
-  concepts: readonly Pick<AdStudioImageConcept, 'visualPrompt' | 'headline' | 'copy'>[],
+  concepts: readonly Pick<AdStudioImageConcept, 'visualPrompt' | 'headline' | 'copy' | 'style' | 'emphasis' | 'layout'>[],
   index: number,
   instruction: string,
   context: AdStudioScriptContext = {},
 ): AdStudioPrompt {
   const base = buildImageConceptsPrompt(brief, context);
-  const ideas = concepts.map((concept, at) => ({ idea: at + 1, visualPrompt: concept.visualPrompt, headline: concept.headline, copy: concept.copy ?? null }));
+  const ideas = concepts.map((concept, at) => ({
+    idea: at + 1,
+    visualPrompt: concept.visualPrompt,
+    headline: concept.headline,
+    style: concept.style ?? null,
+    emphasis: concept.emphasis ?? [],
+    layout: concept.layout ?? null,
+    copy: concept.copy ?? null,
+  }));
   return {
     system: [
       base.system,
@@ -226,29 +334,43 @@ export function buildImageConceptRewritePrompt(
 
 /** The prompt the image model receives for one concept in one placement. */
 export function buildImagePrompt(
-  concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline'>,
+  concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline' | 'style' | 'emphasis' | 'layout'>,
   format: AdStudioImageFormat,
   brief: Pick<AdStudioBriefInput, 'productDescription' | 'language' | 'brand'>,
   /** A text-free picture the studio will set the headline on itself: keep a calm area for it. */
   options: { headlineSpace?: boolean } = {},
 ): string {
   const headline = concept.headline.trim();
+  const free = concept.style === 'free' && headline.length > 0;
+  const emphasis = fitHeadlineEmphasis(headline, concept.emphasis);
+  const space = concept.layout === 'stacked' || format === 'story' ? 'upper third' : 'top quarter';
   return [
     `An advertising image, ${AD_STUDIO_IMAGE_ASPECT_RATIO[format]} aspect ratio, for: ${brief.productDescription}.`,
     concept.visualPrompt.trim(),
-    headline
-      ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
-      : 'No words, letters, captions or logos anywhere in the image.',
+    free
+      ? [
+          `Design this headline into the ad as bold, expressive advertising typography, spelled exactly, in ${languageName(brief.language)}: "${headline}".`,
+          emphasis.length
+            ? `Make ${emphasis.map((phrase) => `"${phrase}"`).join(' and ')} the hero: clearly larger and heavier than the other words, and it may take an accent colour or sit on a simple colour block or underline; the remaining words are smaller and lighter.`
+            : 'Give the key words more size and weight than the rest.',
+          'Keep the lettering on a calm area - never over a face. No other words, letters, logos, badges or icons anywhere in the image.',
+        ].join(' ')
+      : headline
+        ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
+        : 'No words, letters, captions or logos anywhere in the image.',
     !headline && options.headlineSpace
-      ? `Leave the ${format === 'story' ? 'upper third' : 'top quarter'} of the scene uncluttered - wall, ceiling, sky or soft background, part of the same continuous photograph - with no face, person or important object there: a headline will be set on it afterwards.`
+      ? `Leave the ${space} of the scene uncluttered - wall, ceiling, sky or soft background, part of the same continuous photograph - with no face, person or important object there: a headline will be set on it afterwards.`
       : null,
+    BRAND_STRIP_PROMPT[format],
     brandColorsLine(brief.brand),
     IMAGE_SAFE_ZONES[format],
     // Image models fill phone and laptop screens with English UI text ("Sign Here"), which the image check then rightly fails.
     // Making the screen's interface the point ("large flat shapes") turned screens into floating mock-ups held at the camera.
     'Photograph it as a candid, natural moment: the person and the place are the subject. Any paper, document, sign or label in the scene shows only soft grey lines - no title, heading or readable word (never "CONTRACT" or similar). At most one phone or tablet appears in the whole scene. A phone, tablet or laptop is a small, secondary part of the scene, held or placed naturally and the right way round - its screen faces the person using it, who touches the screen, not the back -, seen at an angle with its screen softly out of focus - no readable words, letters or text-like lines on it. Never show a device held toward the camera, a hand or object close to the lens, or a screen outside its device.',
     // A render added a floating "Signed" card above the phone: no interface element may leave its device.
-    'It is a photograph, not a design: no floating cards, labels, badges, icons, checkmarks, speech bubbles or graphic overlays anywhere - the only added element is the headline.',
+    free
+      ? 'Apart from the headline design, it is a photograph: no floating cards, labels, badges, icons, checkmarks, speech bubbles or interface elements anywhere.'
+      : 'It is a photograph, not a design: no floating cards, labels, badges, icons, checkmarks, speech bubbles or graphic overlays anywhere - the only added element is the headline.',
     // Worded as a condition: "a signature anywhere in the picture" made the model add one, floating on a desk.
     'If the scene shows something being signed, the signature is an illegible scribble on that document or screen only; do not add signatures or writing anywhere else.',
     'Every object has its real-world size and proportions (a phone fits in a hand) and sits where it physically could.',
@@ -257,6 +379,26 @@ export function buildImagePrompt(
     .filter((line): line is string => line !== null)
     .join('\n');
 }
+
+/**
+ * The band every ad's brand strip (logo, name, slogan) covers, as shares of the height. Feeds take the
+ * bottom; a story keeps it above the reply bar the app lays over the bottom fifth; landscape keeps it
+ * clear of the 1.91:1 crop Google display applies. The studio draws the strip opaque, over the picture.
+ */
+export const AD_STUDIO_BRAND_STRIP: Record<AdStudioImageFormat, { top: number; height: number }> = {
+  square: { top: 0.865, height: 0.135 },
+  portrait: { top: 0.88, height: 0.12 },
+  story: { top: 0.7, height: 0.09 },
+  landscape: { top: 0.8, height: 0.15 },
+};
+
+// Percentages made models draw empty bands, so the strip area is described as part of the scene.
+const BRAND_STRIP_PROMPT: Record<AdStudioImageFormat, string> = {
+  square: 'The bottom edge of the picture will be covered by a brand strip: keep faces, the subject and any lettering well above the bottom edge, and let the scene simply continue there (floor, table, ground). Never draw a logo or a brand name.',
+  portrait: 'The bottom edge of the picture will be covered by a brand strip: keep faces, the subject and any lettering well above the bottom edge, and let the scene simply continue there (floor, table, ground). Never draw a logo or a brand name.',
+  story: 'A brand strip will cover a band in the lower part of the picture: keep faces, the subject and any lettering in the upper two thirds. Never draw a logo or a brand name.',
+  landscape: 'The bottom edge of the picture will be covered by a brand strip: keep faces, the subject and any lettering in the upper three quarters. Never draw a logo or a brand name.',
+};
 
 /**
  * Where a placement covers or crops the picture, so the subject and the drawn headline stay visible:

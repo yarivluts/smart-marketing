@@ -6,6 +6,8 @@
 export interface AdStudioBrandKit {
   /** As it must appear in ads and as the advertiser name in previews. Empty: the ad's name is used. */
   brandName: string;
+  /** The brand's short tagline, set under the name in the brand strip every ad carries. Empty: none. */
+  slogan: string;
   /** In the customer's words, e.g. "warm, plain-spoken, a little playful; never pushy". */
   toneOfVoice: string;
   /** Words or phrases the copy must never use (competitor names, banned claims, jargon). */
@@ -14,9 +16,9 @@ export interface AdStudioBrandKit {
   colors: string[];
 }
 
-export const AD_STUDIO_BRAND_LIMITS = { brandName: 60, toneOfVoice: 400, avoidWords: 20, avoidWord: 40, colors: 5 } as const;
+export const AD_STUDIO_BRAND_LIMITS = { brandName: 60, slogan: 70, toneOfVoice: 400, avoidWords: 20, avoidWord: 40, colors: 5 } as const;
 
-export const EMPTY_AD_STUDIO_BRAND_KIT: AdStudioBrandKit = { brandName: '', toneOfVoice: '', avoidWords: [], colors: [] };
+export const EMPTY_AD_STUDIO_BRAND_KIT: AdStudioBrandKit = { brandName: '', slogan: '', toneOfVoice: '', avoidWords: [], colors: [] };
 
 const HEX = /^#[0-9a-f]{6}$/;
 
@@ -29,6 +31,7 @@ export function parseAdStudioBrandKit(raw: unknown): AdStudioBrandKit | null {
     Array.isArray(field) ? [...new Set(field.filter((entry): entry is string => typeof entry === 'string').map((entry) => normalize(entry.trim())).filter(Boolean))] : [];
   return {
     brandName: text(value.brandName),
+    slogan: text(value.slogan),
     toneOfVoice: text(value.toneOfVoice),
     avoidWords: list(value.avoidWords),
     colors: list(value.colors, (color) => color.toLowerCase()),
@@ -39,6 +42,7 @@ export function parseAdStudioBrandKit(raw: unknown): AdStudioBrandKit | null {
 export function validateAdStudioBrandKit(kit: AdStudioBrandKit): string[] {
   const issues: string[] = [];
   if (kit.brandName.length > AD_STUDIO_BRAND_LIMITS.brandName) issues.push('brand_name_too_long');
+  if (kit.slogan.length > AD_STUDIO_BRAND_LIMITS.slogan) issues.push('slogan_too_long');
   if (kit.toneOfVoice.length > AD_STUDIO_BRAND_LIMITS.toneOfVoice) issues.push('tone_too_long');
   if (kit.avoidWords.length > AD_STUDIO_BRAND_LIMITS.avoidWords) issues.push('too_many_avoid_words');
   if (kit.avoidWords.some((word) => word.length > AD_STUDIO_BRAND_LIMITS.avoidWord)) issues.push('avoid_word_too_long');
@@ -48,7 +52,7 @@ export function validateAdStudioBrandKit(kit: AdStudioBrandKit): string[] {
 }
 
 export function isAdStudioBrandKitEmpty(kit: AdStudioBrandKit | null | undefined): boolean {
-  return !kit || (!kit.brandName && !kit.toneOfVoice && kit.avoidWords.length === 0 && kit.colors.length === 0);
+  return !kit || (!kit.brandName && !kit.slogan && !kit.toneOfVoice && kit.avoidWords.length === 0 && kit.colors.length === 0);
 }
 
 /** The prompt rules a brand kit adds to every text prompt (scripts, copy, ideas, search ads). */
@@ -56,6 +60,7 @@ export function brandKitRules(kit: AdStudioBrandKit | null | undefined): string[
   if (isAdStudioBrandKitEmpty(kit) || !kit) return [];
   return [
     kit.brandName ? `The brand is "${kit.brandName}": write its name exactly so, never translated or abbreviated.` : null,
+    kit.slogan ? `The brand's slogan is "${kit.slogan}"; every ad already carries it in a brand strip, so do not repeat it word for word.` : null,
     kit.toneOfVoice ? `The brand's tone of voice, as the brand describes it: ${kit.toneOfVoice}` : null,
     kit.avoidWords.length ? `Never use these words or phrases: ${kit.avoidWords.map((word) => `"${word}"`).join(', ')}.` : null,
     kit.colors.length ? `Brand colours, for pictures and footage: ${kit.colors.join(', ')}. Use them for accents, props or backgrounds where it looks natural.` : null,

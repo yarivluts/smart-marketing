@@ -19,6 +19,10 @@ export class AdStudioBrandKitModel extends BaseModel {
   @Field({ is_required: true })
   public brand_name!: string;
 
+  /** The brand's tagline, drawn under the name in every ad's brand strip; absent on kits saved before it existed. */
+  @Field({ is_required: false })
+  public slogan?: string | null;
+
   @Field({ is_required: true })
   public tone_of_voice!: string;
 

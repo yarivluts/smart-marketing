@@ -8,7 +8,9 @@ import {
   isAdStudioImageSize,
   buildImagePrompt,
   fitAdStudioImageConcepts,
+  fitHeadlineEmphasis,
   imageConceptFingerprint,
+  splitHeadlineEmphasis,
   validateAdStudioImageConcepts,
   type AdStudioImageConcept,
 } from './images';
@@ -66,10 +68,51 @@ describe('image concepts', () => {
       ],
       () => `id${(n += 1)}`,
     );
-    expect(fitted[0]).toEqual({ id: 'id1', visualPrompt: 'A desk', headline: 'y'.repeat(AD_STUDIO_IMAGE_HEADLINE_MAX), formats: ['square'] });
+    expect(fitted[0]).toEqual({
+      id: 'id1',
+      visualPrompt: 'A desk',
+      headline: 'y'.repeat(AD_STUDIO_IMAGE_HEADLINE_MAX),
+      formats: ['square'],
+      style: 'designed',
+      emphasis: [],
+      layout: 'centered',
+    });
     expect(fitted[1]).toMatchObject({ visualPrompt: 'A phone', formats: ['square', 'portrait'] });
     expect(fitted).toHaveLength(AD_STUDIO_MAX_IMAGE_CONCEPTS);
     expect(validateAdStudioImageConcepts(fitted)).toEqual([]);
+  });
+
+  it('keeps only emphasis that is really in the headline, and mixes the styles across a set', () => {
+    const fitted = fitAdStudioImageConcepts(
+      [
+        { visualPrompt: 'A', headline: 'Sign in 30 seconds', formats: ['square'], style: 'free', emphasis: ['30 seconds', 'in seconds', 'Sign in 30 seconds', 7, '30 seconds'], layout: 'stacked' },
+        { visualPrompt: 'B', headline: 'No printer needed', formats: ['square'], style: 'free', emphasis: ['No printer'], layout: 'sideways' },
+      ],
+      () => 'id',
+    );
+    expect(fitted[0]).toMatchObject({ style: 'free', emphasis: ['30 seconds'], layout: 'stacked' });
+    // Both came back "free": the last one is switched so the set tests both looks; an unknown layout gets a default.
+    expect(fitted[1]).toMatchObject({ style: 'designed', emphasis: ['No printer'], layout: 'start' });
+  });
+
+  it('splits a headline into emphasised and plain runs', () => {
+    expect(splitHeadlineEmphasis('Sign in 30 seconds, no printer', ['30 seconds'])).toEqual([
+      { text: 'Sign in ', emphasis: false },
+      { text: '30 seconds', emphasis: true },
+      { text: ', no printer', emphasis: false },
+    ]);
+    expect(splitHeadlineEmphasis('Fast', [])).toEqual([{ text: 'Fast', emphasis: false }]);
+    expect(fitHeadlineEmphasis('Fast and easy', ['easy', 'Easy', 'missing'])).toEqual(['easy']);
+  });
+
+  it('asks a free idea for designed lettering and every render for room for the brand strip', () => {
+    const free = buildImagePrompt(concept({ style: 'free', emphasis: ['30 seconds'] }), 'square', { ...BRIEF, brand: null });
+    expect(free).toContain('advertising typography');
+    expect(free).toContain('"30 seconds"');
+    expect(free).toContain('brand strip');
+    const designed = buildImagePrompt(concept({ style: 'designed', headline: '' }), 'story', { ...BRIEF, brand: null }, { headlineSpace: true });
+    expect(designed).toContain('No words, letters');
+    expect(designed).toContain('brand strip');
   });
 
   it('fingerprints change with the picture, the headline, the placement and the language only', () => {
@@ -78,6 +121,15 @@ describe('image concepts', () => {
     expect(imageConceptFingerprint(concept({ headline: 'New' }), 'square', 'he')).not.toBe(base);
     expect(imageConceptFingerprint(concept(), 'story', 'he')).not.toBe(base);
     expect(imageConceptFingerprint(concept(), 'square', 'en')).not.toBe(base);
+  });
+
+  it('fingerprints an idea with a look by its style, layout and emphasis too, and keeps older ideas as they were', () => {
+    // An idea from before styles keeps its fingerprint, so its images do not turn stale.
+    expect(imageConceptFingerprint(concept(), 'square', 'he')).toBe(JSON.stringify(['A lawyer signing on a phone in a bright office', 'Sign in 30 seconds', 'square', 'he']));
+    const designed = imageConceptFingerprint(concept({ style: 'designed', layout: 'centered', emphasis: ['30 seconds'] }), 'square', 'he');
+    expect(imageConceptFingerprint(concept({ style: 'designed', layout: 'stacked', emphasis: ['30 seconds'] }), 'square', 'he')).not.toBe(designed);
+    expect(imageConceptFingerprint(concept({ style: 'free', layout: 'centered', emphasis: ['30 seconds'] }), 'square', 'he')).not.toBe(designed);
+    expect(imageConceptFingerprint(concept({ style: 'designed', layout: 'centered', emphasis: [] }), 'square', 'he')).not.toBe(designed);
   });
 });
 

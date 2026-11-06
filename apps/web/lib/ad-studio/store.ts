@@ -272,7 +272,7 @@ export async function loadAdStudioBrandKit(organizationId: string, projectId: st
   await ensureFirestoreOrm();
   const kit = await getAdStudioBrandKit(organizationId, projectId);
   return {
-    kit: { brandName: kit.brandName, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors },
+    kit: { brandName: kit.brandName, slogan: kit.slogan, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors },
     logoVersion: kit.logo ? (kit.lastChangedOn ?? 'logo') : null,
   };
 }

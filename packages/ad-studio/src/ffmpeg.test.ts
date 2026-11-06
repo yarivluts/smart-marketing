@@ -82,6 +82,25 @@ describe('buildConcatArgs', () => {
     expect(buildConcatArgs({ inputs: input, output: 'o.mp4', format: 'horizontal', resolution: '1080p' }).join(' ')).toContain('scale=1920:1080');
     expect(buildConcatArgs({ inputs: input, output: 'o.mp4', format: 'vertical', resolution: '360p' }).join(' ')).toContain('scale=720:1280');
   });
+
+  it('lays the brand strip PNG over every frame, as the last input', () => {
+    const args = buildConcatArgs({
+      inputs: [
+        { file: 'a.mp4', seconds: 5, hasAudio: true },
+        { file: 'b.mp4', seconds: 4, hasAudio: false },
+      ],
+      output: 'o.mp4',
+      format: 'vertical',
+      overlay: 'brand.png',
+    });
+    // Clips 0-1, the silence for clip b is 2, the overlay is 3.
+    expect(args.slice(args.lastIndexOf('-i'), args.lastIndexOf('-i') + 2)).toEqual(['-i', 'brand.png']);
+    const filter = args[args.indexOf('-filter_complex') + 1];
+    expect(filter).toContain('concat=n=2:v=1:a=1[vjoined][aout]');
+    expect(filter).toContain('[3:v:0]scale=720:1280,format=rgba[brand]');
+    expect(filter).toContain('[vjoined][brand]overlay=0:0');
+    expect(filter).toMatch(/\[vout\]$/);
+  });
 });
 
 describe('parsing ffmpeg output', () => {
@@ -169,5 +188,22 @@ describe.skipIf(!hasFfmpeg)('with a real ffmpeg binary', () => {
     const probe = await probeMedia(output, realRunner);
     expect(probe).toMatchObject({ hasVideo: true, hasAudio: true });
     expect(probe.durationSeconds).toBeGreaterThan(3.8);
+  }, 60_000);
+
+  it('joins clips under a brand strip overlay', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-ffmpeg-'));
+    workDirs.push(dir);
+    const clip = path.join(dir, 'clip.mp4');
+    expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=360x640:rate=24:duration=2', '-c:v', 'libx264', clip], { windowsHide: true }).status).toBe(0);
+    const overlay = path.join(dir, 'brand.png');
+    const { default: sharp } = await import('sharp');
+    await sharp({ create: { width: 720, height: 1280, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: { create: { width: 720, height: 120, channels: 4, background: '#1e3a8a' } }, top: 900, left: 0 }])
+      .png()
+      .toFile(overlay);
+    const output = path.join(dir, 'branded.mp4');
+    const result = await concatClips({ clips: [{ file: clip, seconds: 2 }], output, format: 'vertical', overlay, runner: realRunner });
+    expect(result.durationSeconds).toBeGreaterThan(1.8);
+    expect(await probeMedia(output, realRunner)).toMatchObject({ hasVideo: true, hasAudio: true });
   }, 60_000);
 });

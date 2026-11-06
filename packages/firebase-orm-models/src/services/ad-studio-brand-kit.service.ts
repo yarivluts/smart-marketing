@@ -26,12 +26,24 @@ export async function getAdStudioBrandKit(organizationId: string, projectId: str
   if (!kit) return { ...EMPTY_AD_STUDIO_BRAND_KIT, lastChangedOn: null, logo: null };
   return {
     brandName: kit.brand_name,
+    slogan: kit.slogan ?? '',
     toneOfVoice: kit.tone_of_voice,
     avoidWords: kit.avoid_words ?? [],
     colors: kit.colors ?? [],
     lastChangedOn: kit.last_changed_on,
     logo: kit.logo_path && kit.logo_mime ? { path: kit.logo_path, mimeType: kit.logo_mime } : null,
   };
+}
+
+/**
+ * The name every ad's brand strip shows: the brand kit's name, or the project's name when the kit
+ * has none, so no ad goes out without a name.
+ */
+export async function getAdStudioAdvertiserName(organizationId: string, projectId: string, kit?: Pick<AdStudioBrandKitView, 'brandName'>): Promise<string> {
+  const brandName = (kit ?? (await getAdStudioBrandKit(organizationId, projectId))).brandName.trim();
+  if (brandName) return brandName;
+  const project = await ProjectModel.init(projectId, { organization_id: organizationId });
+  return project?.name?.trim() ?? '';
 }
 
 /**
@@ -99,6 +111,7 @@ export async function setAdStudioBrandKit(params: {
   kit.organization_id = params.organizationId;
   kit.project_id = params.projectId;
   kit.brand_name = params.kit.brandName;
+  kit.slogan = params.kit.slogan;
   kit.tone_of_voice = params.kit.toneOfVoice;
   kit.avoid_words = params.kit.avoidWords;
   kit.colors = params.kit.colors;
@@ -116,8 +129,8 @@ export async function setAdStudioBrandKit(params: {
       targetType: 'ad_studio_brand_kit',
       targetId: params.projectId,
       summary: `Updated the Ad Studio brand kit${params.kit.brandName ? ` for ${params.kit.brandName}` : ''}`,
-      before: { brand_name: before.brandName, tone_of_voice: before.toneOfVoice, avoid_words: before.avoidWords, colors: before.colors },
-      after: { brand_name: params.kit.brandName, tone_of_voice: params.kit.toneOfVoice, avoid_words: params.kit.avoidWords, colors: params.kit.colors },
+      before: { brand_name: before.brandName, slogan: before.slogan, tone_of_voice: before.toneOfVoice, avoid_words: before.avoidWords, colors: before.colors },
+      after: { brand_name: params.kit.brandName, slogan: params.kit.slogan, tone_of_voice: params.kit.toneOfVoice, avoid_words: params.kit.avoidWords, colors: params.kit.colors },
     });
   } catch {
     // Best-effort, like every other audit write.

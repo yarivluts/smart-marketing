@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
@@ -46,7 +46,9 @@ import { englishForModel } from './translate';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioClipView, AdStudioVideoView } from './view';
-import { concatClips, defaultFfmpegRunner, FfmpegUnavailableError, type FfmpegRunner } from './ffmpeg';
+import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, type FfmpegRunner } from './ffmpeg';
+import { brandStripLayer } from './ad-typography';
+import { resolveAdBrandMark } from './brand';
 
 /**
  * The Ad Studio's video pipeline (KAN-231): starting renders and edits, advancing them, and joining
@@ -514,9 +516,15 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
       await deps.storage.downloadToFile(entry.clip.model.gcs_path as string, file);
       local.push({ file, seconds: entry.seconds });
     }
+    // Every video ad carries the brand strip too: drawn once as a PNG the size of the frame and laid over every frame.
+    const resolution = normalizeVideoSettings(brief.video_settings).resolution;
+    const frame = assemblyFrame(brief.video_format, resolution);
+    const brand = await resolveAdBrandMark(brief, deps.storage);
+    const overlay = path.join(workDir, 'brand.png');
+    await writeFile(overlay, await brandStripLayer({ ...frame, format: brief.video_format === 'vertical' ? 'story' : 'landscape', brand }));
     stage = 'ffmpeg_failed';
     const output = path.join(workDir, 'video.mp4');
-    const { durationSeconds } = await (adStudioRuntime().concatClips ?? concatClips)({ clips: local, output, format: brief.video_format, resolution: normalizeVideoSettings(brief.video_settings).resolution, runner: deps.runner });
+    const { durationSeconds } = await (adStudioRuntime().concatClips ?? concatClips)({ clips: local, output, format: brief.video_format, resolution, overlay, runner: deps.runner });
     stage = 'storage_error';
     const objectPath = adStudioVideoObjectPath({ ...ctx, videoId: video.id });
     await deps.storage.upload(objectPath, await readFile(output), 'video/mp4');

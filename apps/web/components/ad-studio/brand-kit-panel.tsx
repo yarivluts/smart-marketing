@@ -82,7 +82,7 @@ export function BrandKitPanel({
         setMessage({ tone: 'error', text: body.issues?.length ? body.issues.map((code) => t(`issue.${code}`)).join(' · ') : t('saveFailed') });
         return;
       }
-      const next = { brandName: body.brandKit.brandName, toneOfVoice: body.brandKit.toneOfVoice, avoidWords: body.brandKit.avoidWords, colors: body.brandKit.colors };
+      const next = { brandName: body.brandKit.brandName, slogan: body.brandKit.slogan ?? '', toneOfVoice: body.brandKit.toneOfVoice, avoidWords: body.brandKit.avoidWords, colors: body.brandKit.colors };
       setKit(next);
       setSaved(JSON.stringify(next));
       setMessage({ tone: 'ok', text: t('saved') });
@@ -148,6 +148,11 @@ export function BrandKitPanel({
             {t('brandName')}
             <input value={kit.brandName} onChange={(event) => setKit({ ...kit, brandName: event.target.value })} maxLength={AD_STUDIO_BRAND_LIMITS.brandName} dir="auto" className={inputClass} />
             <span className="font-normal">{t('brandNameHint')}</span>
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            {t('slogan')}
+            <input value={kit.slogan} onChange={(event) => setKit({ ...kit, slogan: event.target.value })} maxLength={AD_STUDIO_BRAND_LIMITS.slogan} dir="auto" placeholder={t('sloganPlaceholder')} className={inputClass} />
+            <span className="font-normal">{t('sloganHint')}</span>
           </label>
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('toneOfVoice')}

@@ -1,7 +1,15 @@
-import { adStudioBriefInput, getAdStudioBrandKit, setAdStudioBrandLogo, type AdStudioBrandKitView, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import {
+  adStudioBriefInput,
+  getAdStudioAdvertiserName,
+  getAdStudioBrandKit,
+  setAdStudioBrandLogo,
+  type AdStudioBrandKitView,
+  type AdStudioBriefModel,
+} from '@growthos/firebase-orm-models';
 import { isAdStudioBrandKitEmpty, sniffReferenceMimeType, type AdStudioBriefInput } from '@growthos/shared';
 import { ensureOrm } from './runtime';
-import { resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
+import { readAdStudioObject, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
+import type { AdBrandMark } from './ad-typography';
 
 /**
  * What a prompt knows about the ad: the brief, plus the project's brand kit when one is set, so
@@ -9,8 +17,33 @@ import { resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-
  */
 export async function briefPromptInput(brief: AdStudioBriefModel): Promise<AdStudioBriefInput> {
   const kit = await getAdStudioBrandKit(brief.organization_id, brief.project_id);
-  const brand = { brandName: kit.brandName, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors };
+  const brand = { brandName: kit.brandName, slogan: kit.slogan, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors };
   return { ...adStudioBriefInput(brief), brand: isAdStudioBrandKitEmpty(brand) ? null : brand };
+}
+
+/** A stored logo is at most AD_STUDIO_MAX_LOGO_BYTES; reading one is capped a little above that. */
+const MAX_STORED_LOGO_BYTES = 3 * 1024 * 1024;
+
+/**
+ * What the brand strip on every ad shows: the name (the brand kit's, else the project's), the slogan,
+ * the logo's bytes and the brand colours. A logo that cannot be read leaves the strip without it
+ * rather than failing the ad.
+ */
+export async function resolveAdBrandMark(
+  brief: Pick<AdStudioBriefModel, 'organization_id' | 'project_id' | 'language'>,
+  storage: AdStudioMediaStorage = resolveAdStudioMediaStorage(),
+): Promise<AdBrandMark> {
+  const kit = await getAdStudioBrandKit(brief.organization_id, brief.project_id);
+  const name = await getAdStudioAdvertiserName(brief.organization_id, brief.project_id, kit);
+  let logo: Buffer | null = null;
+  if (kit.logo) {
+    try {
+      logo = await readAdStudioObject(storage, kit.logo.path, MAX_STORED_LOGO_BYTES);
+    } catch (error) {
+      console.error('[ad-studio] brand logo unreadable', { projectId: brief.project_id, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { name, slogan: kit.slogan, logo, colors: kit.colors, language: brief.language };
 }
 
 /** The largest logo accepted: a logo is small; anything bigger is a photo uploaded by mistake. */

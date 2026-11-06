@@ -92,6 +92,13 @@ export class AdStudioImageModel extends BaseModel {
   @Field({ is_required: false })
   public gcs_path?: string | null;
 
+  /**
+   * The picture before the studio set the brand strip (logo, name, slogan) on it: an edit starts from
+   * it so the image model never redraws the brand. Absent on images made before every ad carried the strip.
+   */
+  @Field({ is_required: false })
+  public base_gcs_path?: string | null;
+
   @Field({ is_required: false })
   public mime_type?: string | null;
 

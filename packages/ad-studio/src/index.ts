@@ -23,6 +23,7 @@ export * from './gemini-image';
 export * from './image-pipeline';
 export * from './image-qa';
 export * from './headline-overlay';
+export { applyBrandStrip, brandStripColours, canTypesetLanguage, headlineAccent, setHeadline, type AdBrandMark } from './ad-typography';
 export * from './autopilot';
 export * from './scheduled-runs';
 export * from './growth-pilot';

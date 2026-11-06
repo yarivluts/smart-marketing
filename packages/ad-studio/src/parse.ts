@@ -1,3 +1,4 @@
+import { isAdStudioHeadlineLayout, isAdStudioImageStyle } from '@growthos/shared';
 import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioDelivery, AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
 
 /**
@@ -66,6 +67,10 @@ export function parseImageConcepts(value: unknown): AdStudioImageConcept[] | nul
       visualPrompt: text(concept.visualPrompt),
       headline: text(concept.headline),
       formats: stringList(concept.formats) as AdStudioImageFormat[],
+      // Absent fields keep what the idea has (the service merges them in).
+      ...(isAdStudioImageStyle(concept.style) ? { style: concept.style } : {}),
+      ...(isAdStudioHeadlineLayout(concept.layout) ? { layout: concept.layout } : {}),
+      ...(Array.isArray(concept.emphasis) ? { emphasis: stringList(concept.emphasis) } : {}),
     };
   });
 }
