@@ -32,6 +32,8 @@ const COMPONENTS_OWNING_MAIN = new Set([
   'components/tv/tv-app.tsx',
   'components/tv/tv-pairing-screen.tsx',
   'components/tv/tv-rotation-screen.tsx',
+  // The public page a client opens from an ad share link: a full-screen view outside the app shell.
+  'components/ad-studio/shared-ads-view.tsx',
 ]);
 
 describe('one main landmark per page (KAN-234)', () => {

@@ -12,7 +12,8 @@ const PUBLIC_PATHS = new Set(['/', '/login', '/login/token', '/signup', '/privac
 // Invite links (KAN-25's join flow) are shared before the recipient
 // necessarily has an account, so every `/invite/:orgId/:membershipId` must
 // stay reachable pre-auth; the page itself prompts sign-in/sign-up inline.
-const PUBLIC_PATH_PREFIXES = ['/invite/', '/developers/'];
+// Ad share links (`/share/ads/:token`) are opened by an agency's client, who has no account at all.
+const PUBLIC_PATH_PREFIXES = ['/invite/', '/developers/', '/share/ads/'];
 
 function isPublicPath(pathWithoutLocale: string): boolean {
   return (
