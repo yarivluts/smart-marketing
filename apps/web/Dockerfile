@@ -32,9 +32,13 @@ FROM node:22-slim AS runner
 WORKDIR /app
 # ffmpeg joins the Ad Studio's scene clips into the finished video (KAN-231; FFMPEG_PATH
 # defaults to `ffmpeg` on PATH). Its work files live in /tmp, which on Cloud Run is memory.
+# Chromium records the product walkthrough (a short tour of the customer's app, signed in with
+# their trial account) that video ads show; driven by playwright-core from CHROMIUM_PATH. The Noto
+# fonts cover Hebrew and most other scripts, so the app's pages render as its users see them.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg \
+ && apt-get install -y --no-install-recommends ffmpeg chromium fonts-noto-core fonts-noto-color-emoji \
  && rm -rf /var/lib/apt/lists/*
+ENV CHROMIUM_PATH=/usr/bin/chromium
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV HOSTNAME=0.0.0.0
