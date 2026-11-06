@@ -4608,6 +4608,21 @@
       "removeIdea": "Remove",
       "visualPrompt": "What the picture shows",
       "visualPromptHint": "What the picture shows: subject, setting, light, style. Any language works; it is translated for the AI that draws. No text here.",
+      "emphasis": "Words to highlight",
+      "emphasisHint": "Up to two phrases from the headline, separated by commas. They are set larger, bolder and in the accent colour.",
+      "style": {
+        "label": "Design",
+        "designed": "Clean type",
+        "designedHint": "A picture without text; the studio sets the headline in exact, bold type.",
+        "free": "Free design",
+        "freeHint": "The AI designs the lettering together with the picture, for a more graphic ad. The words are checked."
+      },
+      "layout": {
+        "label": "Headline position",
+        "centered": "Centred",
+        "start": "To the side",
+        "stacked": "Stacked"
+      },
       "headline": "Headline in the image (optional)",
       "placements": "Where the ad shows",
       "addIdea": "Add an idea",

@@ -20,10 +20,13 @@ import {
   Zap,
 } from 'lucide-react';
 import {
+  AD_STUDIO_HEADLINE_LAYOUTS,
   AD_STUDIO_IMAGE_ASPECT_RATIO,
   AD_STUDIO_IMAGE_FORMATS,
   AD_STUDIO_IMAGE_HEADLINE_MAX,
   AD_STUDIO_IMAGE_INSTRUCTION_MAX,
+  AD_STUDIO_IMAGE_STYLES,
+  AD_STUDIO_MAX_EMPHASIS,
   AD_STUDIO_MAX_IMAGE_CONCEPTS,
   validateAdStudioImageConcepts,
   type AdStudioImageConcept,
@@ -104,7 +107,23 @@ function newConcept(): AdStudioImageConcept {
     visualPrompt: '',
     headline: '',
     formats: ['square', 'portrait'],
+    style: 'designed',
+    layout: 'centered',
+    emphasis: [],
   };
+}
+
+/** The emphasis field's text: phrases separated by commas. */
+function emphasisText(concept: AdStudioImageConcept): string {
+  return (concept.emphasis ?? []).join(', ');
+}
+
+function parseEmphasis(text: string): string[] {
+  return text
+    .split(/[,،]/)
+    .map((phrase) => phrase.trim())
+    .filter(Boolean)
+    .slice(0, AD_STUDIO_MAX_EMPHASIS);
 }
 
 /**
@@ -672,6 +691,56 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                         className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
                       />
                     </label>
+                    <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                      {t('images.emphasis')}
+                      <input
+                        // Committed on blur, so a comma can be typed; re-mounted when the phrases change elsewhere.
+                        key={`${concept.id}:${emphasisText(concept)}`}
+                        defaultValue={emphasisText(concept)}
+                        onBlur={(event) => update(index, { emphasis: parseEmphasis(event.target.value) })}
+                        dir="auto"
+                        data-testid="image-concept-emphasis"
+                        className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground"
+                      />
+                      <span className="font-normal">{t('images.emphasisHint')}</span>
+                    </label>
+                    <fieldset className="flex flex-wrap gap-2">
+                      <legend className="mb-1 text-xs font-medium text-muted-foreground">{t('images.style.label')}</legend>
+                      {AD_STUDIO_IMAGE_STYLES.map((style) => (
+                        <button
+                          key={style}
+                          type="button"
+                          aria-pressed={(concept.style ?? 'free') === style}
+                          title={t(`images.style.${style}Hint`)}
+                          onClick={() => update(index, { style })}
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-xs font-medium',
+                            (concept.style ?? 'free') === style ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted',
+                          )}
+                        >
+                          {t(`images.style.${style}`)}
+                        </button>
+                      ))}
+                    </fieldset>
+                    {concept.style === 'designed' ? (
+                      <fieldset className="flex flex-wrap gap-2">
+                        <legend className="mb-1 text-xs font-medium text-muted-foreground">{t('images.layout.label')}</legend>
+                        {AD_STUDIO_HEADLINE_LAYOUTS.map((layout) => (
+                          <button
+                            key={layout}
+                            type="button"
+                            aria-pressed={(concept.layout ?? 'centered') === layout}
+                            onClick={() => update(index, { layout })}
+                            className={cn(
+                              'rounded-full border px-3 py-1 text-xs font-medium',
+                              (concept.layout ?? 'centered') === layout ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted',
+                            )}
+                          >
+                            {t(`images.layout.${layout}`)}
+                          </button>
+                        ))}
+                      </fieldset>
+                    ) : null}
                     <fieldset className="flex flex-wrap gap-2">
                       <legend className="mb-1 text-xs font-medium text-muted-foreground">{t('images.placements')}</legend>
                       {AD_STUDIO_IMAGE_FORMATS.map((format) => (

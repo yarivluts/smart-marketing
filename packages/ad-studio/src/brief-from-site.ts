@@ -9,6 +9,7 @@ import { createAdStudioBrief, type AdStudioBriefModel } from '@growthos/firebase
 import { ensureOrm, adStudioRuntime } from './runtime';
 import { meteredCall, type AdStudioCallContext } from './metering';
 import { GrowthSiteAnalysisSchema, readGrowthSite } from './growth-pilot';
+import { fillAdStudioBrandFromSite } from './brand';
 import type { PlanningSourceDeps } from './planning-sources';
 
 /** Why an ad could not be made from a website: an address that is not a website, a site that cannot be read, or nothing on it to advertise. */
@@ -35,6 +36,8 @@ export async function createAdStudioBriefFromSite(ctx: AdStudioCallContext & { s
   const prompt = buildSiteAnalysisPrompt(site.pages);
   const raw = await meteredCall(ctx, 'site_analysis', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthSiteAnalysisSchema, effort: 'high' }));
   const analysis = sanitizeSiteAnalysis(raw);
+  // The ads that follow carry the brand strip: fill the kit's name, slogan and logo from the site where the person has not.
+  await fillAdStudioBrandFromSite(ctx, { businessName: analysis.businessName, slogan: analysis.slogan, logoUrl: site.logoUrl }, { site: ctx.deps ?? adStudioRuntime().siteReader });
   const drafts = proposedTargetsFromAnalysis(analysis);
   // What is sold makes a clearer first ad than an audience; an audience-only site still gets one.
   const target = drafts.find((draft) => draft.kind !== 'audience') ?? drafts[0];

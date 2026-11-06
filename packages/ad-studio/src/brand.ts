@@ -2,11 +2,14 @@ import {
   adStudioBriefInput,
   getAdStudioAdvertiserName,
   getAdStudioBrandKit,
+  setAdStudioBrandKit,
   setAdStudioBrandLogo,
   type AdStudioBrandKitView,
   type AdStudioBriefModel,
 } from '@growthos/firebase-orm-models';
-import { isAdStudioBrandKitEmpty, sniffReferenceMimeType, type AdStudioBriefInput } from '@growthos/shared';
+import sharp from 'sharp';
+import { AD_STUDIO_BRAND_LIMITS, isAdStudioBrandKitEmpty, sniffReferenceMimeType, type AdStudioBriefInput } from '@growthos/shared';
+import { fetchPublicImage, type PlanningSourceDeps } from './planning-sources';
 import { ensureOrm } from './runtime';
 import { readAdStudioObject, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdBrandMark } from './ad-typography';
@@ -72,6 +75,40 @@ export async function saveAdStudioBrandLogo(
   const path = `orgs/${ctx.organizationId}/projects/${ctx.projectId}/brand/logo-${Date.now()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`;
   await storage.upload(path, ctx.bytes, mimeType);
   return setAdStudioBrandLogo({ organizationId: ctx.organizationId, projectId: ctx.projectId, logo: { path, mimeType }, actorId: ctx.actorId });
+}
+
+/**
+ * Fills what the brand kit is missing from what was read on the business's own site, so a beginner's
+ * first ads already carry the brand: the name and slogan the site analysis found, and the logo the
+ * home page points at (any image type, made a PNG of at most 512 px). Never overwrites what the person
+ * set. Best effort: a logo that cannot be fetched or read leaves the kit without one.
+ */
+export async function fillAdStudioBrandFromSite(
+  ctx: { organizationId: string; projectId: string; actorId: string },
+  found: { businessName?: string | null; slogan?: string | null; logoUrl?: string | null },
+  deps: { storage?: AdStudioMediaStorage; site?: PlanningSourceDeps } = {},
+): Promise<void> {
+  try {
+    await ensureOrm();
+    const kit = await getAdStudioBrandKit(ctx.organizationId, ctx.projectId);
+    const brandName = kit.brandName || (found.businessName ?? '').trim().slice(0, AD_STUDIO_BRAND_LIMITS.brandName);
+    const slogan = kit.slogan || (found.slogan ?? '').trim().slice(0, AD_STUDIO_BRAND_LIMITS.slogan);
+    if (brandName !== kit.brandName || slogan !== kit.slogan) {
+      await setAdStudioBrandKit({
+        organizationId: ctx.organizationId,
+        projectId: ctx.projectId,
+        kit: { brandName, slogan, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors },
+        actorId: ctx.actorId,
+      });
+    }
+    if (kit.logo || !found.logoUrl) return;
+    const bytes = await fetchPublicImage(found.logoUrl, deps.site);
+    if (!bytes) return;
+    const png = await sharp(bytes, { limitInputPixels: 50_000_000 }).resize(512, 512, { fit: 'inside', withoutEnlargement: true }).png().toBuffer();
+    await saveAdStudioBrandLogo({ organizationId: ctx.organizationId, projectId: ctx.projectId, actorId: ctx.actorId, bytes: png }, deps.storage ?? resolveAdStudioMediaStorage());
+  } catch (error) {
+    console.error('[ad-studio] brand from site failed', { projectId: ctx.projectId, error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 /** Removes the project's brand logo (the stored file stays with the project's media). */

@@ -353,6 +353,9 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
       visual_prompt: concept.visualPrompt,
       headline: concept.headline,
       formats: concept.formats,
+      style: concept.style ?? null,
+      emphasis: concept.emphasis ?? [],
+      layout: concept.layout ?? null,
       copy: copyOutput(concept.copy),
       placements: slots
         .filter((slot) => slot.conceptId === concept.id)
@@ -504,9 +507,12 @@ const ideaShape = z
       visual_prompt: z.string().describe('What the picture shows, in English, without text.'),
       headline: z.string().describe('The only text drawn into the image, in the ad language, at most 40 characters, or empty.'),
       formats: z.array(z.string()).describe('Placements: any of square (1:1), portrait (4:5), story (9:16), landscape (16:9).'),
+      style: z.enum(['designed', 'free']).optional().describe('designed: text-free picture, the headline set in exact type; free: the image model designs the lettering. Omit to keep.'),
+      emphasis: z.array(z.string()).optional().describe('Up to 2 phrases copied from the headline, set larger, bolder and in the accent colour. Omit to keep.'),
+      layout: z.enum(['centered', 'start', 'stacked']).optional().describe('Where a designed headline sits. Omit to keep.'),
     }),
   )
-  .describe('All image ideas of the ad, at most 6. Replaces the current list.');
+  .describe('All image ideas of the ad, at most 6. Replaces the current list. Every image also gets the brand strip (logo, name, slogan) set by the studio.');
 
 export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext): void {
   const ctx = (id: string) => ({ organizationId: auth.organizationId, projectId: auth.projectId, briefId: id });
@@ -666,7 +672,9 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     auditedToolHandler(auth, 'save_ad_image_ideas', async (args: any) =>
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; ideas: unknown }) => {
         const concepts = parseImageConcepts(
-          Array.isArray(a.ideas) ? a.ideas.map((idea: Record<string, unknown>) => ({ id: idea.id, visualPrompt: idea.visual_prompt, headline: idea.headline, formats: idea.formats })) : null,
+          Array.isArray(a.ideas)
+            ? a.ideas.map((idea: Record<string, unknown>) => ({ id: idea.id, visualPrompt: idea.visual_prompt, headline: idea.headline, formats: idea.formats, style: idea.style, emphasis: idea.emphasis, layout: idea.layout }))
+            : null,
         );
         if (!concepts) return errorResult('Invalid: ideas must be an array.');
         await saveAdStudioImageConcepts({ organizationId: auth.organizationId, projectId: auth.projectId, briefId: a.brief_id, concepts });

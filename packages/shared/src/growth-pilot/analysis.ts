@@ -23,6 +23,8 @@ export interface GrowthSitePage {
 
 export interface GrowthSiteAnalysis {
   businessName: string;
+  /** The brand's tagline as the site states it, or a short one true to the site; absent on analyses made before it was read. */
+  slogan?: string;
   /** Two or three sentences: what the business does and for whom. */
   summary: string;
   /** The site's language as a two-letter code ("he", "en"). */
@@ -48,6 +50,45 @@ export const GROWTH_PILOT_MAX_PROPOSED_TARGETS = 6;
 const PAGE_TEXT_CHARS = 3_000;
 const NAME_CHARS = 80;
 const TEXT_CHARS = 600;
+/** Matches the brand kit's slogan limit. */
+const SLOGAN_CHARS = 70;
+
+/**
+ * Where the site's logo most likely is, as an absolute https URL, or null: the structured-data logo,
+ * then an image the page itself calls a logo, then the touch icon, then a PNG or SVG favicon (an
+ * .ico is skipped - the brand strip needs a picture, not a 16-pixel icon).
+ */
+export function extractSiteLogoUrl(html: string, pageUrl: string): string | null {
+  const absolute = (raw: string | undefined): string | null => {
+    if (!raw) return null;
+    try {
+      const url = new URL(raw.trim().replace(/&amp;/g, '&'), pageUrl);
+      if (url.protocol === 'http:') url.protocol = 'https:';
+      return url.protocol === 'https:' ? url.toString() : null;
+    } catch {
+      return null;
+    }
+  };
+  const attr = (tag: string, name: string) => new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i').exec(tag)?.slice(1).find((value) => value !== undefined);
+  const jsonLd = /"logo"\s*:\s*(?:"([^"]+)"|\{[^{}]*?"url"\s*:\s*"([^"]+)")/i.exec(html);
+  const fromJsonLd = absolute(jsonLd?.[1] ?? jsonLd?.[2]);
+  if (fromJsonLd) return fromJsonLd;
+  for (const tag of html.match(/<img\b[^>]*>/gi) ?? []) {
+    const hints = [attr(tag, 'class'), attr(tag, 'id'), attr(tag, 'alt'), attr(tag, 'src')].join(' ');
+    if (!/logo/i.test(hints)) continue;
+    const src = absolute(attr(tag, 'src') ?? attr(tag, 'data-src'));
+    if (src && !src.startsWith('data:')) return src;
+  }
+  const links = html.match(/<link\b[^>]*>/gi) ?? [];
+  const byRel = (pattern: RegExp) => links.find((tag) => pattern.test(attr(tag, 'rel') ?? ''));
+  const touch = absolute(attr(byRel(/apple-touch-icon/i) ?? '', 'href'));
+  if (touch) return touch;
+  for (const tag of links.filter((link) => /(^|\s)icon(\s|$)/i.test(attr(link, 'rel') ?? ''))) {
+    const href = absolute(attr(tag, 'href'));
+    if (href && /\.(png|svg)(\?|$)/i.test(href)) return href;
+  }
+  return null;
+}
 
 function clean(value: unknown, max: number): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
@@ -74,11 +115,12 @@ export function buildSiteAnalysisPrompt(pages: readonly GrowthSitePage[]): { sys
     system: [
       'You are a senior performance marketer onboarding a new client. You read their website and work out what they sell and to whom, so that ads, landing pages and audiences can be built for each offering.',
       LANGUAGE_RULE,
+      `Slogan: the brand's tagline as the site states it (a hero line or a repeated tag line); when it has none, write a short one (at most ${SLOGAN_CHARS} characters) true to what the site says. Never the business name alone.`,
       'Offerings: the distinct products or services a customer can buy, each with who it is for. Merge near-duplicates; skip generic pages (contact, blog posts).',
       'Audiences: the distinct customer groups the site speaks to, each with what they need. Prefer concrete groups ("small law firms") over vague ones ("businesses").',
       'For each offering and audience, "why" is one sentence a marketer would say to the owner: why it is worth advertising - the opportunity, not a repeat of the description or of who it is for.',
     ].join('\n'),
-    user: `The website pages:\n\n${body}\n\nReturn the business name, a short summary, the site language code, the offerings and the audiences.`,
+    user: `The website pages:\n\n${body}\n\nReturn the business name, its slogan, a short summary, the site language code, the offerings and the audiences.`,
   };
 }
 
@@ -126,6 +168,7 @@ export function buildTargetFromRequestPrompt(params: { analysis: GrowthSiteAnaly
 export function sanitizeSiteAnalysis(raw: GrowthSiteAnalysis): GrowthSiteAnalysis {
   return {
     businessName: clean(raw.businessName, NAME_CHARS),
+    slogan: clean(raw.slogan, SLOGAN_CHARS),
     summary: clean(raw.summary, TEXT_CHARS),
     language: clean(raw.language, 5).toLowerCase() || 'en',
     offerings: (raw.offerings ?? [])

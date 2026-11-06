@@ -58,6 +58,7 @@ import {
   buildTargetFromRequestPrompt,
   buildTargetRevisionPrompt,
   extractLandingPageContent,
+  extractSiteLogoUrl,
   GROWTH_PILOT_MAX_PAGES,
   GROWTH_TARGET_KINDS,
   growthBriefInput,
@@ -77,6 +78,7 @@ import {
   type GrowthTargetDraft,
 } from '@growthos/shared';
 import { estimateAdStudioMetaReach, loadAdStudioMetaCampaignInsights, searchAdStudioMetaInterests } from './audiences';
+import { fillAdStudioBrandFromSite } from './brand';
 import { publishBriefAd } from './publish';
 import { serverKms } from './planning-sources';
 import { advanceAdStudioAutopilot, startAdStudioAutopilot, type AdStudioAutopilotDeps } from './autopilot';
@@ -95,6 +97,7 @@ import { adStudioRuntime, ensureOrm } from './runtime';
 
 export const GrowthSiteAnalysisSchema = z.object({
   businessName: z.string().describe('The business or brand name as the site shows it.'),
+  slogan: z.string().describe("The brand's tagline as the site states it, or a short one true to the site; at most 70 characters, in the site language."),
   summary: z.string().describe('Two or three sentences: what the business does and for whom, in the site language.'),
   language: z.string().describe('The site language as a two-letter code, e.g. "he" or "en".'),
   offerings: z.array(
@@ -146,7 +149,8 @@ export const GrowthAudienceDraftSchema = z.object({
 
 export const GrowthInterestChoiceSchema = z.object({ ids: z.array(z.string()).describe('The ids of the relevant interests, at most 8.') });
 
-export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[] } | { status: 'unavailable'; reason: string };
+/** The site as read: its pages, and where its logo most likely is (for the brand kit), or why it could not be read. */
+export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[]; logoUrl?: string | null } | { status: 'unavailable'; reason: string };
 
 function toPage(url: string, html: string): GrowthSitePage | null {
   const page = extractLandingPageContent(html);
@@ -171,7 +175,7 @@ export async function readGrowthSite(siteUrl: string, deps: PlanningSourceDeps =
       return fetched.status === 'ok' ? toPage(fetched.url, fetched.html) : null;
     }),
   );
-  return { status: 'ok', pages: [first, ...more.filter((page): page is GrowthSitePage => page !== null)] };
+  return { status: 'ok', pages: [first, ...more.filter((page): page is GrowthSitePage => page !== null)], logoUrl: extractSiteLogoUrl(home.html, home.url) };
 }
 
 /** A failure as a stable code the page words: the daily limit, a provider problem, or anything else. */
@@ -219,6 +223,8 @@ export async function advanceGrowthPilotOnce(ctx: GrowthAdvanceContext): Promise
     const analysis = sanitizeSiteAnalysis(raw);
     const drafts = proposedTargetsFromAnalysis(analysis);
     if (drafts.length === 0) return { pilot: (await failGrowthPilotAnalysis({ pilot, token, code: 'nothing_found', now: ctx.now })) ?? pilot, worked: true };
+    // Every ad the pilot makes carries the brand strip: fill the kit's name, slogan and logo from the site where the person has not.
+    await fillAdStudioBrandFromSite(ctx, { businessName: analysis.businessName, slogan: analysis.slogan, logoUrl: site.logoUrl }, { site: ctx.deps ?? adStudioRuntime().siteReader });
     const saved = await saveGrowthPilotAnalysis({
       pilot,
       token,
@@ -296,8 +302,17 @@ export async function requestGrowthTarget(ctx: AdStudioCallContext & { pilotId: 
   return addRequestedGrowthTarget({ organizationId: ctx.organizationId, projectId: ctx.projectId, pilotId: pilot.id, draft, actorId: ctx.actorId, now: ctx.now });
 }
 
-/** How the pilot makes ads: image ads in the Ad Studio's default placements, no video (the costly part is the person's call). */
-export const GROWTH_ADS_RUN_OPTIONS = { plan: true, images: true, video: false, confirmPlan: false } as const;
+/**
+ * How the pilot makes ads: image ads in the Ad Studio's default placements and, whenever a video model
+ * is configured, the video ad too - script, clips and the assembled video, made automatically like the
+ * images, so the person only decides. Without a video model the run makes images only.
+ */
+export function growthAdsRunOptions(deps: Pick<AdStudioAutopilotDeps, 'video'>): { plan: true; images: true; video: boolean; confirmPlan: false } {
+  return { plan: true, images: true, video: Boolean(deps.video?.omni), confirmPlan: false };
+}
+
+/** A requested change rewrites the image ideas only, so its run renders images; the video made earlier stays. */
+export const GROWTH_REVISE_RUN_OPTIONS = { plan: true, images: true, video: false, confirmPlan: false } as const;
 /** How many images an ads proposal previews. */
 const PREVIEW_IMAGES = 6;
 
@@ -360,7 +375,7 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
   });
   const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: next.id, now: ctx.now };
   try {
-    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: growthAdsRunOptions(ctx.autopilot) });
     await linkGrowthTargetAds({ ...scope, briefId: brief.id, runId: run.id });
   } catch (error) {
     // The brief stays linked so the person can open it; the target says why its ads did not start.
@@ -384,7 +399,7 @@ async function reviseGrowthAds(ctx: AdStudioCallContext, held: GrowthProposalMod
       await rewriteAdStudioImageConcept({ ...ctx, briefId: brief.id, conceptId: concept.id, instruction: request });
     }
     const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id);
-    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_REVISE_RUN_OPTIONS });
     await linkGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, briefId: brief.id, runId: run.id, now: ctx.now });
     return held;
   } catch (error) {

@@ -165,6 +165,62 @@ export async function fetchHtmlPage(rawUrl: string | null, deps: PlanningSourceD
   return { status: 'unavailable', reason: 'too_many_redirects' };
 }
 
+/** A logo is small; anything bigger is not one. */
+export const SITE_IMAGE_MAX_BYTES = 2_000_000;
+
+/**
+ * Reads one public image (a site's logo) with the same guards as {@link fetchHtmlPage} - SSRF check
+ * on every hop, https only, redirects followed by hand, one time budget - and a 2 MB cap. Null when
+ * it cannot be read or is not an image; never throws for a bad address.
+ */
+export async function fetchPublicImage(rawUrl: string, deps: PlanningSourceDeps = {}): Promise<Buffer | null> {
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (url.protocol === 'http:') url.protocol = 'https:';
+  const signal = AbortSignal.timeout(LANDING_PAGE_TIMEOUT_MS);
+  for (let hop = 0; hop <= LANDING_PAGE_MAX_REDIRECTS; hop += 1) {
+    try {
+      await assertPublicHttpsUrl(url.toString(), deps.resolver);
+    } catch {
+      return null;
+    }
+    let response: Response;
+    try {
+      response = await fetchImpl(url.toString(), { method: 'GET', redirect: 'manual', credentials: 'omit', signal, headers: { accept: 'image/*', 'user-agent': 'GrowthOS-AdStudio/1.0 (+brand logo)' } });
+    } catch {
+      return null;
+    }
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      await response.body?.cancel().catch(() => undefined);
+      if (!location) return null;
+      try {
+        url = new URL(location, url);
+      } catch {
+        return null;
+      }
+      continue;
+    }
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!response.ok || (contentType && !/^image\//i.test(contentType))) {
+      await response.body?.cancel().catch(() => undefined);
+      return null;
+    }
+    try {
+      const { bytes, truncated } = await readCapped(response, SITE_IMAGE_MAX_BYTES);
+      return truncated ? null : Buffer.from(bytes);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 function utcDayOffset(now: Date, daysBack: number): string {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysBack)).toISOString().slice(0, 10);
 }
