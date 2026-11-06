@@ -29,6 +29,8 @@ import {
   saveGrowthLandingDraft,
   updateGrowthLandingContent,
   finishGrowthTargetAds,
+  finishGrowthTargetVideo,
+  linkGrowthTargetVideo,
   getAdStudioBrief,
   getAdStudioRun,
   getGrowthTarget,
@@ -97,7 +99,7 @@ import { adStudioRuntime, ensureOrm } from './runtime';
 
 export const GrowthSiteAnalysisSchema = z.object({
   businessName: z.string().describe('The business or brand name as the site shows it.'),
-  slogan: z.string().describe("The brand's tagline as the site states it, or a short one true to the site; at most 70 characters, in the site language."),
+  slogan: z.string().optional().describe("The brand's tagline as the site states it, or a short one true to the site; at most 70 characters, in the site language."),
   summary: z.string().describe('Two or three sentences: what the business does and for whom, in the site language.'),
   language: z.string().describe('The site language as a two-letter code, e.g. "he" or "en".'),
   offerings: z.array(
@@ -302,17 +304,27 @@ export async function requestGrowthTarget(ctx: AdStudioCallContext & { pilotId: 
   return addRequestedGrowthTarget({ organizationId: ctx.organizationId, projectId: ctx.projectId, pilotId: pilot.id, draft, actorId: ctx.actorId, now: ctx.now });
 }
 
-/**
- * How the pilot makes ads: image ads in the Ad Studio's default placements and, whenever a video model
- * is configured, the video ad too - script, clips and the assembled video, made automatically like the
- * images, so the person only decides. Without a video model the run makes images only.
- */
-export function growthAdsRunOptions(deps: Pick<AdStudioAutopilotDeps, 'video'>): { plan: true; images: true; video: boolean; confirmPlan: false } {
-  return { plan: true, images: true, video: Boolean(deps.video?.omni), confirmPlan: false };
-}
+/** How the pilot makes image ads: in the Ad Studio's default placements, put in front of the person as soon as they are ready. */
+export const GROWTH_ADS_RUN_OPTIONS = { plan: true, images: true, video: false, confirmPlan: false } as const;
 
-/** A requested change rewrites the image ideas only, so its run renders images; the video made earlier stays. */
-export const GROWTH_REVISE_RUN_OPTIONS = { plan: true, images: true, video: false, confirmPlan: false } as const;
+/**
+ * The video ad follows automatically once the image ads are ready, whenever a video model is
+ * configured - script, clips and the assembled video - in its own run, so the image ads never wait
+ * for the slower video. A requested change re-renders the images only.
+ */
+export const GROWTH_VIDEO_RUN_OPTIONS = { plan: false, images: false, video: true, confirmPlan: false } as const;
+
+/** Starts the target's video ad after its image ads, once per target, when a video model is configured. */
+async function startGrowthVideo(ctx: AdsContext, target: GrowthTargetModel): Promise<void> {
+  if (!ctx.autopilot.video?.omni || !target.brief_id || (target.video_status ?? 'none') !== 'none') return;
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
+  try {
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: target.brief_id, actorId: ctx.actorId, options: GROWTH_VIDEO_RUN_OPTIONS });
+    await linkGrowthTargetVideo({ ...scope, runId: run.id });
+  } catch (error) {
+    await finishGrowthTargetVideo({ ...scope, failureCode: growthFailureCode(error) });
+  }
+}
 /** How many images an ads proposal previews. */
 const PREVIEW_IMAGES = 6;
 
@@ -328,6 +340,7 @@ async function finishAds(ctx: AdsContext, target: GrowthTargetModel, run: AdStud
   const images = run.status === 'done' && target.brief_id ? await listBriefImages({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: target.brief_id }) : [];
   const preview = images.filter((image) => image.selected && image.status === 'ready').slice(0, PREVIEW_IMAGES).map((image) => image.id);
   await finishGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, previewImageIds: preview, failureCode: preview.length ? null : runFailureCode(run), now: ctx.now });
+  if (preview.length) await startGrowthVideo(ctx, target);
 }
 
 /**
@@ -364,6 +377,17 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
       ['none', 'needs_meta'].includes(target.publish_status ?? 'none'),
   );
   if (readyToPublish && (await proposeGrowthPublish(ctx, pilot, readyToPublish))) return true;
+  // The video ad, made in the background of everything above: one step per call.
+  const videoBuilding = targets.find((target) => target.video_status === 'building' && target.brief_id && target.video_run_id);
+  if (videoBuilding?.brief_id && videoBuilding.video_run_id) {
+    let run = await getAdStudioRun(ctx.organizationId, ctx.projectId, videoBuilding.brief_id, videoBuilding.video_run_id);
+    if (run.status === 'running') run = await advanceAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: videoBuilding.brief_id, actorId: ctx.actorId, runId: run.id }, ctx.autopilot);
+    if (run.status !== 'running' && run.status !== 'awaiting_approval') {
+      const failed = run.status !== 'done' ? (run.failure_code ?? run.status) : (run.steps.find((step) => step.id === 'assemble' && step.status === 'failed')?.reason ?? null);
+      await finishGrowthTargetVideo({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: videoBuilding.id, failureCode: failed, now: ctx.now });
+    }
+    return true;
+  }
   const next = targets.find((target) => target.status === 'active' && !target.brief_id && (target.ads_status ?? 'none') === 'none');
   if (!next) return false;
   const brief = await createAdStudioBrief({
@@ -375,7 +399,7 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
   });
   const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: next.id, now: ctx.now };
   try {
-    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: growthAdsRunOptions(ctx.autopilot) });
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
     await linkGrowthTargetAds({ ...scope, briefId: brief.id, runId: run.id });
   } catch (error) {
     // The brief stays linked so the person can open it; the target says why its ads did not start.
@@ -399,7 +423,7 @@ async function reviseGrowthAds(ctx: AdStudioCallContext, held: GrowthProposalMod
       await rewriteAdStudioImageConcept({ ...ctx, briefId: brief.id, conceptId: concept.id, instruction: request });
     }
     const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id);
-    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_REVISE_RUN_OPTIONS });
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
     await linkGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, briefId: brief.id, runId: run.id, now: ctx.now });
     return held;
   } catch (error) {

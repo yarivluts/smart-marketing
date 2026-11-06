@@ -42,7 +42,8 @@ export function parseAdStudioBrandKit(raw: unknown): AdStudioBrandKit | null {
 export function validateAdStudioBrandKit(kit: AdStudioBrandKit): string[] {
   const issues: string[] = [];
   if (kit.brandName.length > AD_STUDIO_BRAND_LIMITS.brandName) issues.push('brand_name_too_long');
-  if (kit.slogan.length > AD_STUDIO_BRAND_LIMITS.slogan) issues.push('slogan_too_long');
+  // A kit from a caller that predates the slogan has none.
+  if ((kit.slogan ?? '').length > AD_STUDIO_BRAND_LIMITS.slogan) issues.push('slogan_too_long');
   if (kit.toneOfVoice.length > AD_STUDIO_BRAND_LIMITS.toneOfVoice) issues.push('tone_too_long');
   if (kit.avoidWords.length > AD_STUDIO_BRAND_LIMITS.avoidWords) issues.push('too_many_avoid_words');
   if (kit.avoidWords.some((word) => word.length > AD_STUDIO_BRAND_LIMITS.avoidWord)) issues.push('avoid_word_too_long');

@@ -263,6 +263,8 @@ describe('image ads routes', () => {
     expect(second).toMatchObject({ kind: 'edit', parentImageId: first.id, instruction: 'Warmer light', selected: true });
     const editCall = google.calls.filter((call) => call.url === `${BASE}/interactions`).at(-1);
     expect((editCall?.body?.input as { type: string }[]).map((item) => item.type)).toEqual(['text', 'image']);
+    // The edit starts from the picture as the model made it, without the brand strip.
+    expect((editCall?.body?.input as { type: string; data?: string }[])[1].data).toBe(PNG.toString('base64'));
 
     const picked = (await (await selectImage(request('POST'), ctx.p({ imageId: first.id }))).json()) as ImagesPayload;
     expect(picked.images.find((image) => image.id === first.id)?.selected).toBe(true);
@@ -270,8 +272,11 @@ describe('image ads routes', () => {
 
     const media = await imageMedia(new NextRequest('http://localhost/api/test'), ctx.p({ imageId: first.id }));
     expect(media.status).toBe(200);
-    expect(media.headers.get('content-type')).toBe('image/png');
-    expect(Buffer.from(await media.arrayBuffer())).toEqual(PNG);
+    // What is served is the ad as it runs: the picture with the brand strip set on it, as a JPEG.
+    expect(media.headers.get('content-type')).toBe('image/jpeg');
+    const served = Buffer.from(await media.arrayBuffer());
+    expect(served.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
+    expect(served).not.toEqual(PNG);
 
     // One AI text call for the ideas, and one AI check of each image.
     expect(await getAdStudioUsageToday(ctx.orgId, ctx.projectId)).toMatchObject({ images: 2, textGenerations: 3 });
@@ -394,7 +399,10 @@ describe('image ads routes', () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ export: { mediaKind: 'image', imageId: image.id, destination: 'google_ads', status: 'done', externalId: 'customers/1234567890/assets/77' } });
     const mutate = google.calls.find((call) => call.url.endsWith('/assets:mutate'));
-    expect(mutate?.body).toEqual({ operations: [{ create: { name: 'Sign fast - square', imageAsset: { data: PNG.toString('base64') } } }] });
+    // The branded image (a JPEG with the brand strip) is what goes to Google.
+    const sent = mutate?.body as { operations: { create: { name: string; imageAsset: { data: string } } }[] };
+    expect(sent.operations[0].create.name).toBe('Sign fast - square');
+    expect(Buffer.from(sent.operations[0].create.imageAsset.data, 'base64').subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]));
     expect((await listAdStudioExports(ctx.orgId, ctx.projectId, ctx.briefId))[0]).toMatchObject({ media_kind: 'image', status: 'done' });
 
     // An editor can make images but not send them to an ad platform.

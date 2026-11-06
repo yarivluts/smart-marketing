@@ -75,6 +75,8 @@ export type GrowthTargetStatus = (typeof GROWTH_TARGET_STATUSES)[number];
  */
 export const GROWTH_ADS_STATUSES = ['none', 'building', 'ready', 'approved', 'rejected', 'failed'] as const;
 export type GrowthAdsStatus = (typeof GROWTH_ADS_STATUSES)[number];
+export const GROWTH_VIDEO_STATUSES = ['none', 'building', 'ready', 'failed'] as const;
+export type GrowthVideoStatus = (typeof GROWTH_VIDEO_STATUSES)[number];
 
 /** Where a target's landing page stands. */
 export const GROWTH_LANDING_STATUSES = ['none', 'ready', 'published', 'rejected', 'failed'] as const;
@@ -145,6 +147,19 @@ export class GrowthTargetModel extends BaseModel {
 
   @Field({ is_required: false })
   public ads_failure?: string | null;
+
+  /**
+   * The video ad, made automatically after the image ads are ready (so they never wait for it): the
+   * autopilot run making it and where it stands. Absent until a video model is configured.
+   */
+  @Field({ is_required: false })
+  public video_run_id?: string | null;
+
+  @Field({ is_required: false })
+  public video_status?: GrowthVideoStatus | null;
+
+  @Field({ is_required: false })
+  public video_failure?: string | null;
 
   /** The landing page written for this target, once there is one. */
   @Field({ is_required: false })

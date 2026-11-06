@@ -436,6 +436,27 @@ export async function linkGrowthTargetAds(params: Scope & { targetId: string; br
   return target;
 }
 
+/** The target's video ad is being made by the autopilot run `runId` (after its image ads). */
+export async function linkGrowthTargetVideo(params: Scope & { targetId: string; runId: string; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  target.video_run_id = params.runId;
+  target.video_status = 'building';
+  target.video_failure = null;
+  target.updated_on = (params.now ?? new Date()).toISOString();
+  await target.save();
+  return target;
+}
+
+/** The target's video ad run ended: ready, or failed with a code the page words. */
+export async function finishGrowthTargetVideo(params: Scope & { targetId: string; failureCode?: string | null; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  target.video_status = params.failureCode ? 'failed' : 'ready';
+  target.video_failure = params.failureCode ?? null;
+  target.updated_on = (params.now ?? new Date()).toISOString();
+  await target.save();
+  return target;
+}
+
 async function revisingAdsProposal(scope: Scope, target: GrowthTargetModel): Promise<GrowthProposalModel | null> {
   const rows = await GrowthProposalModel.initPath(pathParams(scope.organizationId, scope.projectId)).where('target_id', '==', target.id).get();
   return rows.find((row) => row.kind === 'ads' && row.status === 'revising') ?? null;

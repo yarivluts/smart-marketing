@@ -57,7 +57,8 @@ beforeEach(() => {
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] });
       }
       const answer = schema.includes('"concepts"')
-        ? { concepts: [{ visualPrompt: 'A lawyer signing on a phone', headline: 'Sign in 30 seconds', formats: ['square'] }] }
+        ? // "free": the model draws the headline, so the stand-in bytes (not a decodable picture) come back as made.
+          { concepts: [{ visualPrompt: 'A lawyer signing on a phone', headline: 'Sign in 30 seconds', formats: ['square'], style: 'free' }] }
         : { title: 't', scenes: [{ durationSeconds: 5, visualPrompt: 'A desk', voiceover: '', onScreenText: '' }] };
       return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] });
     }
