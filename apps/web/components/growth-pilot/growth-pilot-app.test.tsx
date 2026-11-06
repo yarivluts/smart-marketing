@@ -84,6 +84,15 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByTestId('growth-pilot-site-input')).toHaveFocus();
   });
 
+  it('stops phones from capitalising or autocorrecting the website address', () => {
+    stubFetch({ body: page() });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const input = screen.getByTestId('growth-pilot-site-input');
+    expect(input).toHaveAttribute('autocapitalize', 'off');
+    expect(input).toHaveAttribute('autocorrect', 'off');
+    expect(input).toHaveAttribute('spellcheck', 'false');
+  });
+
   it('starts with one input, the website, and sends it', async () => {
     const fetchMock = stubFetch({ status: 201, body: page({ status: 'analyzing' }) }, { body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
