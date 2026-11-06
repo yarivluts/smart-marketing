@@ -150,7 +150,6 @@ export default async function ProjectLayout({
           { href: `${base}/goals`, label: t('projectGoalsLink'), icon: 'Target' as const },
           { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
           { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
-          { href: `${base}/funnel`, label: t('projectFunnelLink'), icon: 'Filter' as const },
           { href: `${base}/cohorts`, label: t('projectCohortsLink'), icon: 'Grid3x3' as const },
           { href: `${base}/insights`, label: t('projectInsightsLink'), icon: 'Bell' as const },
           { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
@@ -246,6 +245,8 @@ export default async function ProjectLayout({
   // shortcut of their own.
   const pageShortcuts = buildOmniSearchPageShortcuts([
     ...(canUseAi ? [adStudioItem] : []),
+    // The sidebar already links /funnel as "Customer journey & goals"; keep the plain-language name searchable.
+    ...(canViewCockpit ? [{ href: `${base}/funnel`, label: t('projectFunnelLink'), icon: 'Filter' as const }] : []),
     connectionsItem,
     ...orgItems,
     ...insightsItems,

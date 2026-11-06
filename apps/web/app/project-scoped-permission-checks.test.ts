@@ -66,6 +66,10 @@ describe('permission checks under project routes', () => {
     expect(layout).toContain("can(bindings, principal, 'automation.execute', { orgId, projectId })");
     expect(layout).toContain("can(bindings, principal, 'audit.read', orgScope)");
     expect(layout).toContain("can(bindings, principal, 'plugin.install', orgScope)");
+    // /funnel is one sidebar link (the main "Customer journey & goals"), not repeated under "More tools".
+    expect(layout.match(/href: `\$\{base\}\/funnel`/g)).toHaveLength(2); // main nav + search shortcut
+    const moreToolsInsights = layout.slice(layout.indexOf('const insightsItems'), layout.indexOf('const dataItems'));
+    expect(moreToolsInsights).not.toContain('/funnel');
     expect(layout).toMatch(/canExecuteAutomation\s*\?\s*\[\s*\{\s*href:\s*`\$\{base\}\/automation`/);
     expect(layout).toMatch(/canManageProjects\s*\?\s*\[\{\s*href:\s*`\$\{base\}\/settings`/);
   });
