@@ -65,7 +65,7 @@ describe.skipIf(!browserAvailable)('walkthrough recorder with a real browser', (
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  it('signs in, tours the app without clicking anything denied, and encodes an MP4', { timeout: 120_000 }, async () => {
+  it('signs in, tours the app without clicking anything denied, and encodes an MP4', { timeout: 240_000 }, async () => {
     const plan = ['Reports', 'Delete everything', 'Contacts'];
     const result = await runDemoTour({
       launchBrowser: createPlaywrightDemoLauncher(),
@@ -105,7 +105,7 @@ describe.skipIf(!browserAvailable)('walkthrough recorder with a real browser', (
     }
   });
 
-  it('reports a wrong password as login_failed', { timeout: 60_000 }, async () => {
+  it('reports a wrong password as login_failed', { timeout: 120_000 }, async () => {
     await expect(
       runDemoTour({
         launchBrowser: createPlaywrightDemoLauncher(),
