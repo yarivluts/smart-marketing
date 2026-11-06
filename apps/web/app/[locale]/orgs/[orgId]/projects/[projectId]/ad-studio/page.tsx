@@ -103,6 +103,8 @@ import { PlanSection } from '@/components/ad-studio/plan-section';
 import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
+import { listShareLinks } from '@/lib/ad-studio/share';
+import { ShareLinksPanel } from '@/components/ad-studio/share-links-panel';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -160,7 +162,7 @@ export default async function AdStudioPage({
     can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
 
   const canEditBrand = can(bindings, principal, 'project.configure', { orgId, projectId });
-  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot] =
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot, shareLinks] =
     await Promise.all([
       listOrgProjects(orgId),
       listAdStudioBriefs(orgId, projectId),
@@ -171,6 +173,8 @@ export default async function AdStudioPage({
       isFfmpegAvailable(),
       loadAdStudioBrandKit(orgId, projectId),
       getCurrentGrowthPilot(orgId, projectId).catch(() => null),
+      // Sharing ads outside the team is a project admin's call, like the brand kit.
+      canEditBrand ? listShareLinks(orgId, projectId) : Promise.resolve([]),
     ]);
   const brandKit = brandLoaded.kit;
   const logoUrl = brandLoaded.logoVersion ? `/api/orgs/${orgId}/projects/${projectId}/ad-studio/brand-kit/logo?v=${encodeURIComponent(brandLoaded.logoVersion)}` : null;
@@ -178,6 +182,7 @@ export default async function AdStudioPage({
   if (!project) notFound();
 
   const t = await getTranslations('AdStudio');
+  const tShare = await getTranslations('AdShare.manage');
   const briefs = briefModels.map(toAdStudioBriefView);
   // The site this project already advertises - from an earlier ad or Growth Pilot - so a new ad needs no typing at all.
   const knownSite = briefs.find((brief) => brief.landingPageUrl)?.landingPageUrl ?? growthPilot?.site_url ?? null;
@@ -798,6 +803,20 @@ export default async function AdStudioPage({
                   </div>
                 </details>
               ) : null}
+              {canEditBrand && publishCreatives.some((creative) => creative.kind !== 'search') ? (
+                <details className="rounded-2xl border border-border bg-card p-5 shadow-sm" data-testid="ad-studio-share-shortcut">
+                  <summary className="cursor-pointer text-sm font-semibold">{tShare('shortcut')}</summary>
+                  <div className="mt-4">
+                    <ShareLinksPanel
+                      orgId={orgId}
+                      projectId={projectId}
+                      briefs={[{ id: selected.id, name: selected.name }]}
+                      initialLinks={shareLinks}
+                      defaultBriefId={selected.id}
+                    />
+                  </div>
+                </details>
+              ) : null}
             </>
           ) : null}
 
@@ -899,6 +918,16 @@ export default async function AdStudioPage({
               </ul>
             )}
           </section>
+          {canEditBrand && briefs.length > 0 ? (
+            <div className="lg:col-span-2">
+              <ShareLinksPanel
+                orgId={orgId}
+                projectId={projectId}
+                briefs={briefs.map((brief) => ({ id: brief.id, name: brief.name }))}
+                initialLinks={shareLinks}
+              />
+            </div>
+          ) : null}
         </div>
       )}
 
