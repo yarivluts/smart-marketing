@@ -5,6 +5,7 @@ import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
 import type { GrowthActivityView, GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { isolate } from '@/lib/bidi';
+import { liveTarget, targetView } from '@/lib/growth-pilot/test-fixtures';
 import { GrowthPilotApp } from './growth-pilot-app';
 
 vi.mock('@/i18n/navigation', () => ({
@@ -898,5 +899,58 @@ describe('GrowthPilotApp', () => {
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [TARGET] })} />, { locale: 'en' });
     expect(await screen.findByTestId('growth-pilot-target-results')).toHaveTextContent('310 clicks, 84.5 spent');
     expect(screen.getByTestId('growth-pilot-target-publish')).toHaveTextContent('Ads are running');
+  });
+
+  describe('overview and details', () => {
+    const LIVE = liveTarget({ id: 't1', name: 'Free plan' });
+    const READY = targetView({ id: 't2', name: 'Law firms', adsStatus: 'ready', landingStatus: 'ready', audienceStatus: 'ready' });
+    const ADS = { ...PROPOSAL, id: 'ads2', kind: 'ads' as const, targetId: 't2', briefId: 'b2', draft: { kind: 'service' as const, name: 'Law firms', description: '', audience: '', reason: '' } };
+
+    it('shows overall progress, the counts, and the single most important decision with the way to it', () => {
+      stubFetch({ body: { status: 'none' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [LIVE, READY], proposals: [ADS] })} />, { locale: 'en' });
+      const overview = screen.getByTestId('growth-pilot-overview');
+      expect(within(overview).getByTestId('growth-pilot-overview-waiting')).toHaveTextContent('1decision waits for you');
+      expect(within(overview).getByTestId('growth-pilot-next')).toHaveAttribute('data-next', 'ads');
+      expect(within(overview).getByTestId('growth-pilot-next')).toHaveTextContent('Look at the ads made for');
+      expect(within(overview).getByTestId('growth-pilot-next-go')).toHaveAttribute('href', '#proposal-ads2');
+      expect(document.getElementById('proposal-ads2')).not.toBeNull();
+      // The live target: 6 of 7 steps (no results yet); the other: only the idea, 1 of 7.
+      expect(within(overview).getByTestId('growth-pilot-overview-percent')).toHaveTextContent('50%');
+    });
+
+    it('says nothing waits when the person is all caught up', () => {
+      stubFetch({ body: { status: 'none' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [{ ...READY, adsStatus: 'approved', audienceStatus: 'approved', landingStatus: 'published', publishStatus: 'rejected' }], proposals: [] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-next')).toHaveAttribute('data-next', 'none');
+    });
+
+    it('links each promoted item, and the feed lines about it, to its details page, with its progress', () => {
+      stubFetch({ body: { status: 'none' } });
+      const activity = [
+        { id: 'a1', kind: 'ads_ready' as const, byPilot: true, subject: 'Law firms', count: 3, targetId: 't2', on: '2026-10-13T10:00:00Z' },
+        { id: 'a2', kind: 'proposal_approved' as const, byPilot: false, subject: 'Free plan', count: null, targetId: null, on: '2026-10-13T09:00:00Z' },
+        { id: 'a3', kind: 'pilot_paused' as const, byPilot: false, subject: null, count: null, targetId: null, on: '2026-10-13T08:00:00Z' },
+      ];
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [LIVE, READY], proposals: [ADS], activity })} />, { locale: 'en' });
+      const cards = screen.getAllByTestId('growth-pilot-target');
+      expect(within(cards[0]).getByTestId('growth-pilot-target-details')).toHaveAttribute('href', '/orgs/o/projects/p/growth-pilot/targets/t1');
+      expect(within(cards[1]).getByTestId('growth-pilot-target-title-link')).toHaveAttribute('href', '/orgs/o/projects/p/growth-pilot/targets/t2');
+      expect(within(cards[1]).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '14');
+      const links = within(screen.getByTestId('growth-pilot-activity')).getAllByTestId('growth-pilot-activity-link');
+      expect(links.map((link) => link.getAttribute('href'))).toEqual(['/orgs/o/projects/p/growth-pilot/targets/t2', '/orgs/o/projects/p/growth-pilot/targets/t1']);
+    });
+
+    it('previews new words proposed for a live page, not the live words', () => {
+      stubFetch({ body: { status: 'none' } });
+      const CONTENT = { eyebrow: 'e', headline: 'Live words', subheadline: 's', benefits: [], steps: [], faq: [], ctaText: 'Go', closingHeadline: 'c' };
+      const LP = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'published' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://a.co/', publishedOn: null };
+      const change = { ...PROPOSAL, id: 'lpc', kind: 'landing_page' as const, landingPageId: 'lp1', landingContent: { ...CONTENT, headline: 'Proposed words' } };
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [LIVE], proposals: [change], landingPages: [LP] })} />, { locale: 'en' });
+      const card = screen.getByTestId('growth-pilot-proposal');
+      expect(card).toHaveTextContent('Proposed words');
+      expect(card).not.toHaveTextContent('Live words');
+      expect(card).toHaveTextContent('New words for your live web page');
+    });
   });
 });
