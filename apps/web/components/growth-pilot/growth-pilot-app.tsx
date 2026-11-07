@@ -243,7 +243,7 @@ function FailedCard({ host, code, onRetry, onOther, pending }: { host: string; c
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden="true" />
         <div className="flex flex-col gap-1">
           <h2 className="font-pp-display text-lg font-semibold">{t('failed.title', { host: isolate(host) })}</h2>
-          <p className="text-sm text-muted-foreground">{t(`failure.${failureKey(code)}`)}</p>
+          <p role="alert" className="text-sm text-muted-foreground">{t(`failure.${failureKey(code)}`)}</p>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
