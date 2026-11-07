@@ -84,4 +84,19 @@ describe('GrowthPerformanceSection', () => {
     await screen.findByTestId('growth-pilot-performance-unavailable');
     expect(screen.queryByTestId('growth-pilot-performance-connect-meta')).toBeNull();
   });
+
+  it('lets the person try again after a temporary failure, but not when the account is simply not connected', async () => {
+    const fetchMock = stub({ status: 'unavailable', reason: 'error' }, { status: 'ok', since: 'a', until: 'b', summary: SUMMARY });
+    renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByTestId('growth-pilot-kpis')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows no try-again button when the ad account is not connected', async () => {
+    stub({ status: 'unavailable', reason: 'no_meta_credential' });
+    renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
+    await screen.findByTestId('growth-pilot-performance-unavailable');
+    expect(screen.queryByTestId('growth-pilot-performance-retry')).toBeNull();
+  });
 });

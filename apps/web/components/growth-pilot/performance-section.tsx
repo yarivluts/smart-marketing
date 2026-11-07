@@ -22,6 +22,7 @@ export function GrowthPerformanceSection({ base, onTargets, metaConnectHref }: {
   const [days, setDays] = React.useState<(typeof PERIODS)[number]>(30);
   const [data, setData] = React.useState<Performance | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [attempt, setAttempt] = React.useState(0);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -44,7 +45,7 @@ export function GrowthPerformanceSection({ base, onTargets, metaConnectHref }: {
     return () => {
       cancelled = true;
     };
-  }, [base, days, onTargets]);
+  }, [base, days, onTargets, attempt]);
 
   if (data?.status === 'none') return null;
   const money = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
@@ -97,6 +98,14 @@ export function GrowthPerformanceSection({ base, onTargets, metaConnectHref }: {
               <a href={metaConnectHref} className="font-semibold underline" data-testid="growth-pilot-performance-connect-meta">
                 {tPublish('connect')}
               </a>
+            </>
+          ) : null}
+          {!missingMeta ? (
+            <>
+              {' '}
+              <button type="button" onClick={() => setAttempt((n) => n + 1)} className="font-semibold underline" data-testid="growth-pilot-performance-retry">
+                {t('retry')}
+              </button>
             </>
           ) : null}
         </p>

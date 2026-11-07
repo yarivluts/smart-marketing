@@ -6261,6 +6261,7 @@
       "days": "Last {count} days",
       "loading": "Reading the numbers from Facebook and Instagram...",
       "unavailable": "Facebook and Instagram did not return the numbers right now. Try again in a few minutes.",
+      "retry": "Try again",
       "unavailableMeta": "Connect your Facebook and Instagram ad account to see how the ads are doing.",
       "noDelivery": "The ads have not been shown yet in this period - switched-off ads show no results until you turn them on.",
       "chart": "Clicks, sign-ups and sales per day",
