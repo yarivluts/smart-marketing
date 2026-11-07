@@ -80,7 +80,7 @@ describe('PushVisitPrompt', () => {
 
   it('"Not now" hides it for the rest of this visit only', async () => {
     const first = renderPrompt();
-    fireEvent.click(await screen.findByRole('button', { name: 'Not now', exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Not now' }));
     expect(screen.queryByTestId('push-visit-prompt')).not.toBeInTheDocument();
     first.unmount();
     renderPrompt();

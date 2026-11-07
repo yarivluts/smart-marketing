@@ -33,10 +33,18 @@ const MAX_KEY = 200;
 const MAX_LABEL = 120;
 const MAX_USER_AGENT = 500;
 
-function isPushEndpoint(value: string): boolean {
+/**
+ * The browsers' push services (Chrome/Edge-on-Android/Samsung/Opera: FCM; Firefox: Mozilla;
+ * Safari: Apple; Edge on Windows: WNS). Only these are accepted, so a saved "subscription" can
+ * never make the server post to an arbitrary address.
+ */
+const PUSH_SERVICE_HOST_SUFFIXES = ['.googleapis.com', '.mozilla.com', '.mozaws.net', '.push.apple.com', '.notify.windows.com'];
+
+export function isPushEndpoint(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:';
+    const host = `.${url.hostname.toLowerCase()}`;
+    return url.protocol === 'https:' && !url.port && PUSH_SERVICE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
   } catch {
     return false;
   }

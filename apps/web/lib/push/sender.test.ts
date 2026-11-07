@@ -69,7 +69,7 @@ describe('deliverToUsers', () => {
     const result = await deliverToUsers({ userIds: ['off', 'no-ready', 'on'], category: 'ready', payloadFor }, { transport, config: CONFIG });
     expect(result).toMatchObject({ sent: 1, optedOut: 2 });
     expect(transport).toHaveBeenCalledTimes(1);
-    expect(transport.mock.calls[0][0]).toMatchObject({ endpoint: 'https://push.example/on-d' });
+    expect(transport).toHaveBeenCalledWith(expect.objectContaining({ endpoint: 'https://push.example/on-d' }), expect.any(String), CONFIG);
   });
 
   it('deletes a subscription the push service says is gone, and counts other failures without throwing', async () => {

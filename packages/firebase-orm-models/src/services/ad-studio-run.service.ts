@@ -196,7 +196,8 @@ export async function saveAdStudioRunProgress(run: AdStudioRunModel, token: stri
       kind,
       organizationId: run.organization_id,
       projectId: run.project_id,
-      actor: run.started_by,
+      // The run got here by itself, not by anyone's click: the person who started it hears too.
+      actor: 'autopilot',
       briefId: run.brief_id,
     });
   }

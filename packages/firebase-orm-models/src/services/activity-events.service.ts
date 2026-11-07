@@ -16,7 +16,7 @@ export interface ActivityEvent {
   kind: string;
   organizationId: string;
   projectId: string;
-  /** `pilot` for the AI, otherwise the user id of the person whose action this was. */
+  /** `pilot` / `autopilot` when it happened by itself, otherwise the user id of the person whose action this was. */
   actor: string;
   subject?: string | null;
   count?: number | null;

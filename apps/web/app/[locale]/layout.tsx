@@ -39,9 +39,8 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   return {
     title: t('title'),
     description: t('description'),
-    // Installed to an iPhone home screen, the app opens full screen with its own icon.
+    // Installed to an iPhone home screen, the app opens full screen (its icon is app/apple-icon.png).
     appleWebApp: { capable: true, title: t('title'), statusBarStyle: 'default' },
-    icons: { apple: '/icons/apple-touch-icon.png' },
   };
 }
 

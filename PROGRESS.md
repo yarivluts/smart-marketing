@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-11-07 — Browser push notifications + installable app (PWA)
+
+- **Last completed:**
+  - Installable app: `app/manifest.ts` (standalone, `#5243d5` / `#fbf8ff`), icons from `app/icon.svg` via `scripts/generate-pwa-icons.mjs` (192, 512, maskable 512, apple 180, badge 96), Apple web-app meta. Root service worker `public/sw.js`: `push` + `notificationclick` only, no fetch handler / offline cache.
+  - Models (ORM): `PushSubscriptionModel` (top-level `push_subscriptions`, doc id = sha256(endpoint)[0..40], endpoint limited to the browsers' push services) and `PushPreferencesModel` (`push_preferences`, doc id = user id; no row = everything on). Service: save/list/remove/expire subscriptions, preferences, `listProjectNotificationRecipients` (active org-wide members + this project's members).
+  - One hook for "every update": `emitActivityEvent` (`activity-events.service.ts`), fired by `recordGrowthActivity` (every Growth Pilot feed line), `finishGrowthTargetVideo` (video ready/failed) and `saveAdStudioRunProgress` (run waiting for plan OK / done / failed). Best-effort, errors swallowed, caller waits at most 4 s.
+  - Sender (`apps/web/lib/push`): `web-push` + VAPID; category per event from `@growthos/shared` `pushCategoryForEvent` (approvals / ready / publishing / failures), per-user preferences enforced, per-device language (en/he), deep link to Growth Pilot or the Ad Studio brief, 404/410 deletes the subscription. Not sent to the person whose own click caused it; Ad Studio runs made by the Growth Pilot are left to the pilot's own update. Registered in `ensureFirestoreOrm`.
+  - Routes `/api/push/{config, subscriptions (GET/POST), subscriptions/[id] (DELETE), unsubscribe, preferences (GET/PATCH), test}`.
+  - Visit prompt (soft card on every visit while permission is `default`; browser dialog only on "Turn on"; "Not now" per tab session; silent re-subscribe when granted; nothing when denied; iPhone outside the installed app gets the home-screen steps). Settings page `/[locale]/dashboard/notifications` ("Notifications & app": permission + this device, master + 4 category switches, devices with remove, test, install button or iOS steps), linked from the account menu and the account dashboard.
+  - Secrets `web-push-vapid-public-key` / `web-push-vapid-private-key` created in Secret Manager (one pair, piped straight from the generator); compute SA has `secretAccessor` on both.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** at the next web deploy add `--update-secrets=WEB_PUSH_VAPID_PUBLIC_KEY=web-push-vapid-public-key:latest,WEB_PUSH_VAPID_PRIVATE_KEY=web-push-vapid-private-key:latest` (docs/deploy-api.md) and check `/api/push/config` says `configured: true`; then try a test notification on Android Chrome and an installed iPhone.
+- **Waiting on human:** the deploy above. The API (MCP-advanced runs) does not send pushes; the scheduler in the web app advances almost every run, so most completions are covered.
+
 ## 2026-11-06 — Ad Studio: product walkthrough video in ads (trial access, recorder, insertion)
 
 - **Last completed:**

@@ -4,7 +4,7 @@
 //  - maskable-512: full-bleed background with the mark inside the 80% safe zone, purpose "maskable".
 //  - apple-touch-icon (180): full-bleed square; iOS rounds the corners itself.
 //  - badge-96: the mark alone in white on transparent, for the Android status bar.
-import { mkdirSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
@@ -37,4 +37,6 @@ await render(logo, 192, 'icon-192.png');
 await render(logo, 512, 'icon-512.png');
 await render(fullBleed(0.75), 512, 'maskable-512.png');
 await render(fullBleed(0.85), 180, 'apple-touch-icon.png');
+// Next links app/apple-icon.png as the page's apple-touch-icon.
+copyFileSync(path.join(out, 'apple-touch-icon.png'), path.join(root, 'app', 'apple-icon.png'));
 await render(badge, 96, 'badge-96.png');

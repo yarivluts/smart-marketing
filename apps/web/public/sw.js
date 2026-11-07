@@ -43,10 +43,13 @@ self.addEventListener('notificationclick', (event) => {
       for (const client of windows) {
         if (client.url === target && 'focus' in client) return client.focus();
       }
-      for (const client of windows) {
-        if (new URL(client.url).origin === self.location.origin && 'navigate' in client) {
-          return client.focus().then(() => client.navigate(target));
-        }
+      const open = windows.find((client) => new URL(client.url).origin === self.location.origin && 'navigate' in client);
+      if (open) {
+        // navigate() refuses a tab this worker does not control yet; open a new one then.
+        return open
+          .focus()
+          .then(() => open.navigate(target))
+          .catch(() => self.clients.openWindow(target));
       }
       return self.clients.openWindow(target);
     }),

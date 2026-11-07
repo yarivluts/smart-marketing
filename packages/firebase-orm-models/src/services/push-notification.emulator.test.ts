@@ -12,6 +12,7 @@ import {
   getAdStudioRun,
   getPushPreferences,
   isGrowthPilotBrief,
+  isPushEndpoint,
   linkGrowthTargetAds,
   listGrowthTargets,
   listProjectNotificationRecipients,
@@ -97,8 +98,23 @@ describe('push subscriptions', () => {
     expect(await listPushSubscriptionsForUser(second)).toHaveLength(1);
   });
 
-  it('refuses an endpoint that is not https and empty keys', async () => {
+  it('accepts only the browsers’ push services', () => {
+    for (const ok of [
+      'https://fcm.googleapis.com/fcm/send/abc',
+      'https://updates.push.services.mozilla.com/wpush/v2/abc',
+      'https://web.push.apple.com/abc',
+      'https://wns2-par02p.notify.windows.com/w/?token=abc',
+    ]) {
+      expect(isPushEndpoint(ok), ok).toBe(true);
+    }
+    for (const bad of ['http://fcm.googleapis.com/x', 'https://evil.example/x', 'https://googleapis.com.evil.example/x', 'https://fcm.googleapis.com:8443/x', 'https://evilgoogleapis.com/x']) {
+      expect(isPushEndpoint(bad), bad).toBe(false);
+    }
+  });
+
+  it('refuses an endpoint that is not a push service and empty keys', async () => {
     await expect(savePushSubscription({ userId: 'u', endpoint: 'http://push.example/x', p256dh: 'p', auth: 'a' })).rejects.toBeInstanceOf(PushSubscriptionInvalidError);
+    await expect(savePushSubscription({ userId: 'u', endpoint: 'https://internal.example/x', p256dh: 'p', auth: 'a' })).rejects.toBeInstanceOf(PushSubscriptionInvalidError);
     await expect(savePushSubscription({ userId: 'u', endpoint: 'not a url', p256dh: 'p', auth: 'a' })).rejects.toBeInstanceOf(PushSubscriptionInvalidError);
     await expect(savePushSubscription({ userId: 'u', endpoint: endpoint(), p256dh: ' ', auth: 'a' })).rejects.toBeInstanceOf(PushSubscriptionInvalidError);
   });
@@ -227,7 +243,7 @@ describe('activity events', () => {
     working = await getAdStudioRun(scope.organizationId, scope.projectId, brief.id, run.id);
     working.status = 'done';
     await saveAdStudioRunProgress(working, token!);
-    expect(events).toEqual([{ source: 'ad_studio', kind: 'run_done', organizationId: scope.organizationId, projectId: scope.projectId, actor: scope.ownerId, briefId: brief.id }]);
+    expect(events).toEqual([{ source: 'ad_studio', kind: 'run_done', organizationId: scope.organizationId, projectId: scope.projectId, actor: 'autopilot', briefId: brief.id }]);
   });
 
   it('never fails or stalls the caller when a listener throws or hangs', async () => {
