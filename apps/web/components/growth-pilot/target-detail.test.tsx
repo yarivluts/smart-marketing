@@ -3,6 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import en from '@/messages/en.json';
+import heMessages from '@/messages/he.json';
 import type { GrowthPilotPageData } from '@/lib/growth-pilot/view';
 import { liveTarget, pageData, proposalView, targetView } from '@/lib/growth-pilot/test-fixtures';
 import { GrowthTargetDetail } from './target-detail';
@@ -79,6 +80,13 @@ describe('GrowthTargetDetail', () => {
     const links = within(done).getAllByTestId('growth-pilot-done-link');
     expect(links.map((link) => link.getAttribute('href'))).toEqual(expect.arrayContaining(['/lp/abcDEF123456', '/orgs/o/projects/p/ad-studio?brief=b1&step=review', '/orgs/o/projects/p/ad-studio?brief=b1&step=publish']));
     expect(screen.getByTestId('growth-pilot-detail-back')).toHaveAttribute('href', '/orgs/o/projects/p/growth-pilot');
+  });
+
+  it('names the publish step in plain words: sent to Facebook and Instagram, still off', () => {
+    expect(en.GrowthPilot.detail.stages.published).toBe('Ads sent to Facebook & Instagram (still off)');
+    expect(en.GrowthPilot.detail.done.published).toBe(en.GrowthPilot.detail.stages.published);
+    expect(heMessages.GrowthPilot.detail.done.published).toBe(heMessages.GrowthPilot.detail.stages.published);
+    expect(heMessages.GrowthPilot.detail.stages.published).not.toBe(en.GrowthPilot.detail.stages.published);
   });
 
   it('puts what waits for the person on the page with the same buttons, and points at it as the next step', async () => {
