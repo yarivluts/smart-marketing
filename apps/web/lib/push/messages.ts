@@ -43,15 +43,17 @@ export interface PushEventWording {
   subject: string | null;
   count: number | null;
   briefId: string | null;
+  /** The Growth Pilot target the event is about: the notification opens its details page. */
+  targetId?: string | null;
 }
 
 /** Where a notification about this event opens. */
-export function pushEventPath(locale: AppLocale, event: Pick<PushEventWording, 'source' | 'organizationId' | 'projectId' | 'briefId'>): string {
+export function pushEventPath(locale: AppLocale, event: Pick<PushEventWording, 'source' | 'organizationId' | 'projectId' | 'briefId' | 'targetId'>): string {
   const project = `/${locale}/orgs/${encodeURIComponent(event.organizationId)}/projects/${encodeURIComponent(event.projectId)}`;
   if (event.source === 'ad_studio') {
     return event.briefId ? `${project}/ad-studio?brief=${encodeURIComponent(event.briefId)}` : `${project}/ad-studio`;
   }
-  return `${project}/growth-pilot`;
+  return event.targetId ? `${project}/growth-pilot/targets/${encodeURIComponent(event.targetId)}` : `${project}/growth-pilot`;
 }
 
 /** The notification for one product event, in `locale`. */

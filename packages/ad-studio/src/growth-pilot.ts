@@ -41,6 +41,11 @@ import {
   getGrowthPilot,
   requestGrowthProposalChange,
   saveGrowthPilotAnalysis,
+  startGrowthTargetChange,
+  finishGrowthTargetChange,
+  proposeGrowthLandingChange,
+  updateGrowthProposalLandingContent,
+  GrowthTargetChangeNotAllowedError,
   type AdStudioRunModel,
   type GrowthPilotModel,
   type GrowthTargetModel,
@@ -70,6 +75,8 @@ import {
   sanitizeLandingContent,
   sanitizeSiteAnalysis,
   sanitizeTargetDraft,
+  tidyGrowthChangeRequest,
+  type GrowthChangeArea,
   type GrowthAudienceDraft,
   type GrowthAudiencePlan,
   type GrowthInterestCandidate,
@@ -459,11 +466,14 @@ async function reviseGrowthLanding(ctx: AdStudioCallContext, held: GrowthProposa
     ]);
     if (!pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
     const request = held.change_requests[held.change_requests.length - 1].text;
-    const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current: page.content, request });
+    // New words proposed for a page that is already public are revised in the proposal, never on the live page.
+    const current = held.landing_content ?? page.content;
+    const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current, request });
     const raw = await meteredCall(ctx, 'landing_page', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthLandingContentSchema, effort: 'high' }));
     const content = sanitizeLandingContent(raw as GrowthLandingContent);
     if (!content) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'invalid_output' });
-    await updateGrowthLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, pageId: page.id, content, now: ctx.now });
+    if (held.landing_content) await updateGrowthProposalLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, content, now: ctx.now });
+    else await updateGrowthLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, pageId: page.id, content, now: ctx.now });
     return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
   } catch (error) {
     return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
@@ -535,14 +545,7 @@ async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthPropos
     if (!held.audience || !held.target_id) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
     const [pilot, target] = await Promise.all([getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id), getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id)]);
     if (!pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
-    const current: GrowthAudienceDraft = {
-      summary: held.audience.summary,
-      countries: held.audience.targeting.countries,
-      ageMin: held.audience.targeting.ageMin,
-      ageMax: held.audience.targeting.ageMax,
-      genders: held.audience.targeting.genders,
-      interestKeywords: [...held.audience.targeting.interests.map((interest) => interest.name), ...held.audience.unresolvedInterests],
-    };
+    const current = audienceDraftOf(held.audience);
     const request = held.change_requests[held.change_requests.length - 1].text;
     const draft = await writeAudienceDraft(ctx, pilot, target, current, request);
     const plan = await resolveAudiencePlan(ctx, draft, { analysis: pilot.analysis, target });
@@ -550,6 +553,109 @@ async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthPropos
     return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
   } catch (error) {
     return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
+  }
+}
+
+/** The proposal kind that carries each part a person can ask to change. */
+const CHANGE_PROPOSAL_KIND = { ads: 'ads', landing: 'landing_page', audience: 'audience' } as const;
+
+function audienceDraftOf(plan: GrowthAudiencePlan): GrowthAudienceDraft {
+  return {
+    summary: plan.summary,
+    countries: plan.targeting.countries,
+    ageMin: plan.targeting.ageMin,
+    ageMax: plan.targeting.ageMax,
+    genders: plan.targeting.genders,
+    interestKeywords: [...plan.targeting.interests.map((interest) => interest.name), ...plan.unresolvedInterests],
+  };
+}
+
+/**
+ * The person asks, in their own words, for a change to one part of a target they already approved:
+ * its ads, its landing page or its audience. While that part still waits for their decision, this is
+ * the proposal's own "ask for a change" (the proposal is revised and comes back). Otherwise the pilot
+ * redoes the part with their words - new ads are rendered, a new page or new page words are written,
+ * a new audience is planned - and it comes back as a proposal like everything else. The request and
+ * how it went are kept on the target and in the feed.
+ */
+export async function changeGrowthTarget(ctx: AdStudioCallContext & { targetId: string; area: GrowthChangeArea; request: string }): Promise<void> {
+  await ensureOrm();
+  const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, ctx.targetId);
+  const proposals = (await listGrowthProposals(ctx.organizationId, ctx.projectId, target.pilot_id)).filter((proposal) => proposal.target_id === target.id && proposal.kind === CHANGE_PROPOSAL_KIND[ctx.area]);
+  const open = proposals.find((proposal) => proposal.status === 'pending' || proposal.status === 'revising');
+  if (open) {
+    if (open.status === 'revising') throw new GrowthProposalNotPendingError(open.status);
+    await reviseGrowthProposal({ ...ctx, proposalId: open.id });
+    return;
+  }
+  await startGrowthTargetChange({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, area: ctx.area, text: ctx.request, actorId: ctx.actorId, now: ctx.now });
+  const request = tidyGrowthChangeRequest(ctx.request);
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, area: ctx.area, now: ctx.now };
+  try {
+    if (ctx.area === 'ads') {
+      // Every image idea is rewritten by the request and rendered again; the new ads come back when ready (see finishGrowthTargetAds).
+      const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!);
+      for (const concept of brief.image_concepts ?? []) {
+        await rewriteAdStudioImageConcept({ ...ctx, briefId: brief.id, conceptId: concept.id, instruction: request });
+      }
+      const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
+      await linkGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, briefId: brief.id, runId: run.id, now: ctx.now });
+      return;
+    }
+    const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, target.pilot_id);
+    if (!pilot.analysis) {
+      await finishGrowthTargetChange({ ...scope, failureCode: 'nothing_to_revise' });
+      return;
+    }
+    if (ctx.area === 'landing') {
+      const page = target.landing_page_id ? await getGrowthLandingPage(ctx.organizationId, ctx.projectId, target.landing_page_id).catch(() => null) : null;
+      const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current: page?.content, request });
+      const raw = await meteredCall(ctx, 'landing_page', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthLandingContentSchema, effort: 'high' }));
+      const content = sanitizeLandingContent(raw as GrowthLandingContent);
+      if (!content) {
+        await finishGrowthTargetChange({ ...scope, failureCode: 'invalid_output' });
+        return;
+      }
+      // A public page gets new words to approve (it stays as it is meanwhile); a declined or failed one, a new page.
+      if (target.landing_status === 'published' && page) await proposeGrowthLandingChange({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, content, now: ctx.now });
+      else await saveGrowthLandingDraft({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, content, language: pilot.analysis.language || 'en', siteUrl: pilot.site_url, now: ctx.now });
+      await finishGrowthTargetChange(scope);
+      return;
+    }
+    const last = proposals.filter((proposal) => proposal.audience).at(-1)?.audience;
+    const draft = await writeAudienceDraft(ctx, pilot, target, last ? audienceDraftOf(last) : undefined, request);
+    const plan = await resolveAudiencePlan(ctx, draft, { analysis: pilot.analysis, target });
+    await saveGrowthAudienceProposal({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, plan, now: ctx.now });
+    await finishGrowthTargetChange(scope);
+  } catch (error) {
+    await finishGrowthTargetChange({ ...scope, failureCode: growthFailureCode(error) });
+  }
+}
+
+export class GrowthVideoUnavailableError extends Error {
+  constructor() {
+    super('Video ads are not available.');
+    this.name = 'GrowthVideoUnavailableError';
+  }
+}
+
+/**
+ * The person asks for the target's video ad (none was made, or it failed): the pilot starts making it
+ * from the target's ads, as it does by itself when a video model is configured.
+ */
+export async function requestGrowthTargetVideo(ctx: AdsContext & { targetId: string }): Promise<void> {
+  await ensureOrm();
+  if (!ctx.autopilot.video?.omni) throw new GrowthVideoUnavailableError();
+  const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, ctx.targetId);
+  if (target.status !== 'active' || !target.brief_id || !['ready', 'approved'].includes(target.ads_status ?? 'none') || !['none', 'failed'].includes(target.video_status ?? 'none')) {
+    throw new GrowthTargetChangeNotAllowedError('video');
+  }
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
+  try {
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: target.brief_id, actorId: ctx.actorId, options: GROWTH_VIDEO_RUN_OPTIONS });
+    await linkGrowthTargetVideo({ ...scope, runId: run.id });
+  } catch (error) {
+    await finishGrowthTargetVideo({ ...scope, failureCode: growthFailureCode(error) });
   }
 }
 
@@ -580,7 +686,8 @@ async function proposeGrowthPublish(ctx: AdsContext, pilot: GrowthPilotModel, ta
     listGrowthLandingPages(ctx.organizationId, ctx.projectId, pilot.id),
     getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!),
   ]);
-  const ads = proposals.find((proposal) => proposal.kind === 'ads' && proposal.status === 'approved' && proposal.target_id === target.id);
+  // The newest approved ads: after the person asked for new ones, those are what gets published.
+  const ads = proposals.filter((proposal) => proposal.kind === 'ads' && proposal.status === 'approved' && proposal.target_id === target.id).at(-1);
   const imageIds = ads?.preview_image_ids ?? [];
   if (!imageIds.length) return false;
   const page = pages.find((candidate) => candidate.target_id === target.id && candidate.status === 'published');
@@ -631,6 +738,13 @@ export async function approveGrowthPublish(ctx: AdStudioCallContext & { proposal
   const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, proposal.pilot_id);
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!);
   const images = await listBriefImages({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id });
+  // New ads replacing ones already on Meta: the old ones are paused first, so the target never spends twice.
+  // If they cannot be paused, nothing new is published.
+  if (target.ad_export_ids?.length) {
+    const kms = serverKms();
+    if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');
+    await (deps.setStatus ?? setAdStudioMetaAdsStatus)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: target.ad_export_ids, status: 'PAUSED', actorId: ctx.actorId, kms });
+  }
   const publish = deps.publish ?? publishBriefAd;
   const plan = proposal.publish;
   const done: string[] = [];

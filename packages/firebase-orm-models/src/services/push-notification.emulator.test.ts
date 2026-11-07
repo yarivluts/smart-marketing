@@ -183,9 +183,9 @@ describe('activity events', () => {
   it('announces every Growth Pilot feed line', async () => {
     const events = listen();
     const scope = await setup();
-    await recordGrowthActivity({ organizationId: scope.organizationId, projectId: scope.projectId, pilotId: 'p1', kind: 'ads_ready', actor: 'pilot', subject: 'Signatures', count: 3 });
+    await recordGrowthActivity({ organizationId: scope.organizationId, projectId: scope.projectId, pilotId: 'p1', kind: 'ads_ready', actor: 'pilot', subject: 'Signatures', count: 3, targetId: 't1' });
     expect(events).toEqual([
-      { source: 'growth_pilot', kind: 'ads_ready', organizationId: scope.organizationId, projectId: scope.projectId, actor: 'pilot', subject: 'Signatures', count: 3 },
+      { source: 'growth_pilot', kind: 'ads_ready', organizationId: scope.organizationId, projectId: scope.projectId, actor: 'pilot', subject: 'Signatures', count: 3, targetId: 't1' },
     ]);
   });
 

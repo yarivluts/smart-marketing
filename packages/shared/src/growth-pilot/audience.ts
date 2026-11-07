@@ -84,7 +84,9 @@ export function buildAudiencePrompt(params: { analysis: GrowthSiteAnalysis; targ
       user: [...facts, '', 'The current audience:', JSON.stringify(params.current, null, 2), '', `The change they asked for: ${params.request}`, '', 'Return the whole revised audience.'].join('\n'),
     };
   }
-  return { system: ['You plan Meta ads audiences for small businesses.', RULES].join('\n'), user: [...facts, '', 'Propose the audience.'].join('\n') };
+  // A new audience the owner asked for in their own words (after a failed one): follow what they said.
+  const asked = params.request ? ['', `What the owner asked for: ${params.request}`] : [];
+  return { system: ['You plan Meta ads audiences for small businesses.', RULES].join('\n'), user: [...facts, ...asked, '', 'Propose the audience.'].join('\n') };
 }
 
 /** A Meta interest found for one of the AI's keywords: what it is, where Meta files it, how big it is. */

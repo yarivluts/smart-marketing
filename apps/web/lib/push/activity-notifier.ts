@@ -45,6 +45,7 @@ export async function notifyActivityEvent(event: ActivityEvent, options: Deliver
     subject: event.subject ?? briefName ?? null,
     count: event.count ?? null,
     briefId: event.briefId ?? null,
+    targetId: event.targetId ?? null,
   };
   return deliverToUsers({ userIds: recipients, category, payloadFor: (locale) => buildEventPayload(locale, wording) }, { ...options, config });
 }
