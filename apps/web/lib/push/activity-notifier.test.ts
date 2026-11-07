@@ -52,6 +52,12 @@ describe('notifyActivityEvent', () => {
     expect(hebrew.title).not.toBe('Ads ready');
   });
 
+  it('opens the target details page for an event about one target', async () => {
+    await notifyActivityEvent({ ...GROWTH, kind: 'ads_ready', subject: 'Signatures', count: 4, targetId: 't9' }, { config: CONFIG });
+    const [params] = deliver.mock.calls[0];
+    expect((await params.payloadFor('he')).url).toBe('/he/orgs/o1/projects/p1/growth-pilot/targets/t9');
+  });
+
   it('sends nothing for feed-only events or when push is not set up', async () => {
     expect(await notifyActivityEvent({ ...GROWTH, kind: 'site_read' }, { config: CONFIG })).toBeNull();
     expect(await notifyActivityEvent({ ...GROWTH, kind: 'ads_ready' }, { config: null })).toBeNull();

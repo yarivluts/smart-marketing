@@ -35,6 +35,8 @@ describe('push notification wording', () => {
     expect(pushLocale('fr')).toBe('en');
     expect(pushLocale(null)).toBe('en');
     expect(pushEventPath('he', { source: 'ad_studio', organizationId: 'o 1', projectId: 'p', briefId: null })).toBe('/he/orgs/o%201/projects/p/ad-studio');
+    expect(pushEventPath('en', { source: 'growth_pilot', organizationId: 'o', projectId: 'p', briefId: null })).toBe('/en/orgs/o/projects/p/growth-pilot');
+    expect(pushEventPath('en', { source: 'growth_pilot', organizationId: 'o', projectId: 'p', briefId: null, targetId: 't 1' })).toBe('/en/orgs/o/projects/p/growth-pilot/targets/t%201');
     const test = await buildTestPayload('he');
     expect(test.url).toBe('/he/dashboard/notifications');
     expect(test.title).toBe(he.PushNotifications.testNotification.title);

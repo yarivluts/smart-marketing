@@ -6105,7 +6105,8 @@
       "revising": "The AI is updating this proposal...",
       "asked": "You asked: {text}",
       "changeFailed": "The AI could not make that change ({reason}). The proposal is unchanged.",
-      "for": "For"
+      "for": "For",
+      "readOnly": "You can see this, but only someone who can use the AI in this project can decide on it."
     },
     "kind": {
       "product": "Product",
@@ -6176,7 +6177,9 @@
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
       "unauthorized": "You were signed out. Reload the page and sign in again - nothing was lost.",
       "forbidden": "You do not have permission to make this change in this project. Ask the project owner to give you access, then try again.",
-      "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost."
+      "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost.",
+      "not_changeable": "This part cannot be changed right now - it may still be in the making. Reload the page to see where it stands.",
+      "video_unavailable": "Video ads are not available on our side yet, so a video cannot be made. Please contact GrowthOS support."
     },
     "ads": {
       "title": "Ads for {name}",
@@ -6206,7 +6209,8 @@
         "rejected": "You rejected the web page",
         "failed": "The web page could not be written ({reason})",
         "open": "Open"
-      }
+      },
+      "explainChange": "New words for your live web page. The page keeps its current words until you approve these."
     },
     "audience": {
       "title": "Who will see the ads for {name}",
@@ -6322,6 +6326,230 @@
       "timed_out": "it took too long and was given up, ask for a change to try again",
       "no_concepts": "the AI could not come up with ideas for this, ask for a change worded differently",
       "generic": "something went wrong, try again in a minute"
+    },
+    "overview": {
+      "title": "Where things stand",
+      "percent": "{percent}%",
+      "progressLabel": "Overall progress",
+      "explain": "Across {count, plural, one {the # item} other {the # items}} the pilot is promoting for you.",
+      "counts": {
+        "done": "{count, plural, one {step done} other {steps done}}",
+        "inProgress": "in progress",
+        "waiting": "{count, plural, one {decision waits for you} other {decisions wait for you}}"
+      },
+      "nextTitle": "What to do next",
+      "next": {
+        "target": "Say yes or no to a new idea: {name}",
+        "ads": "Look at the ads made for {name}",
+        "audience": "Check who will see the ads for {name}",
+        "landing_page": "Look at the web page for {name}",
+        "publish": "Decide whether to publish the ads for {name}",
+        "activate": "Decide whether to turn on the ads for {name}",
+        "connect_meta": "Connect your Facebook & Instagram ad account so the ads for {name} can be published"
+      },
+      "go": "Go to it",
+      "connect": "Connect",
+      "nextWorking": "Nothing waits for you right now - the pilot is working on the next step.",
+      "nextNone": "Nothing waits for you right now."
+    },
+    "detail": {
+      "open": "Details and progress",
+      "back": "Back to Growth Pilot",
+      "paused": "Pilot paused",
+      "percent": "{percent}%",
+      "progressLabel": "Progress",
+      "progressTitle": "How far it got",
+      "progressExplain": "{done} of {total} steps done. Steps that do not apply to this item are not counted.",
+      "missing": {
+        "title": "This item is not here any more",
+        "body": "It may belong to an earlier start of Growth Pilot. Go back to see what the pilot is promoting now."
+      },
+      "stages": {
+        "idea": "Idea approved",
+        "audience": "Who sees the ads",
+        "landing": "Web page",
+        "images": "Ad images",
+        "video": "Video ad",
+        "published": "Ads published (off)",
+        "live": "Ads turned on",
+        "results": "Collecting results"
+      },
+      "states": {
+        "done": "Done",
+        "in_progress": "The pilot is working on it",
+        "waiting": "Waiting for you",
+        "failed": "Did not work",
+        "failedWhy": "Did not work: {reason}",
+        "declined": "You said no",
+        "not_started": "Not started yet",
+        "skipped": "Not needed for this item"
+      },
+      "stepsTitle": "All the steps",
+      "waitingTitle": "Waiting for you",
+      "waitingNone": "Nothing waits for you on this item right now.",
+      "needsMeta": "The ads are ready to publish. Connect your Facebook & Instagram ad account to continue.",
+      "inProgressTitle": "In progress",
+      "inProgressNone": "Nothing is running for this item right now.",
+      "inProgressPaused": "The pilot is paused, so nothing runs. Resume it on the Growth Pilot page to continue.",
+      "inProgress": {
+        "idea": "The AI is updating this idea the way you asked.",
+        "audience": "The AI is choosing who should see the ads.",
+        "landing": "The AI is writing the web page people see after they click.",
+        "images": "The AI is making the ad images and checking them.",
+        "video": "The AI is making a short video ad.",
+        "published": "The ads are being sent to Facebook and Instagram.",
+        "live": "The ads are being turned on.",
+        "results": "The ads are running. Facebook usually reports the first numbers within a day."
+      },
+      "inProgressChange": "You asked for a change to the {area}: \"{text}\". The pilot is working on it.",
+      "doneTitle": "Done",
+      "doneNone": "Nothing is finished yet - it shows up here step by step.",
+      "done": {
+        "idea": "Idea approved",
+        "audience": "Who sees the ads",
+        "landing": "Web page",
+        "images": "Ad images",
+        "video": "Video ad",
+        "published": "Ads published (off)",
+        "live": "Ads turned on",
+        "results": "Collecting results"
+      },
+      "doneLink": {
+        "audience": "See it in the Ad Studio",
+        "landing": "Open the page",
+        "images": "See the ads",
+        "video": "See the video",
+        "published": "See the published ads"
+      },
+      "resultsTitle": "Results in the last 30 days",
+      "results": {
+        "clicks": "Clicks",
+        "impressions": "Times shown",
+        "spend": "Spent",
+        "conversions": "Sign-ups or sales"
+      },
+      "resultsNote": "The numbers come straight from Facebook and Instagram.",
+      "moreTitle": "What else can be done",
+      "actions": {
+        "turnOn": {
+          "title": "Turn on the ads",
+          "why": "Until they are on, nobody sees them. You set the daily budget, and you can turn them off at any time."
+        },
+        "publish": {
+          "title": "Publish the ads",
+          "why": "Sends the ads to Facebook and Instagram, switched off - nothing is spent yet."
+        },
+        "connectMeta": {
+          "title": "Connect your ad account",
+          "why": "Needed once, so the pilot can publish ads on Facebook and Instagram for you."
+        },
+        "makeVideo": {
+          "title": "Make a video ad",
+          "why": "Short videos often reach more people than images. The pilot makes one from your ads."
+        },
+        "askChange": {
+          "title": "Ask for a change",
+          "why": "Not happy with something? Say it in your own words and the pilot redoes it."
+        },
+        "viewPage": {
+          "title": "Open the web page",
+          "why": "See exactly what people see after they click your ad."
+        },
+        "openStudio": {
+          "title": "Open in the Ad Studio",
+          "why": "For fine-tuning the ads yourself, word by word."
+        }
+      },
+      "suggestionsTitle": "Suggestions for changes",
+      "suggestionApply": "Do it",
+      "suggestionDismiss": "Not now",
+      "suggestions": {
+        "no_clicks": {
+          "title": "Try a new headline and picture",
+          "why": "People saw the ads for a few days but nobody clicked. A clearer headline and a different picture often fix that.",
+          "request": "Nobody clicks on these ads. Write a clearer, more direct headline and use a different picture that shows the main benefit."
+        },
+        "low_ctr": {
+          "title": "Make the ads speak more directly",
+          "why": "Many people saw the ads but very few clicked. A sharper message usually gets more clicks.",
+          "request": "Very few people click on these ads. Make the headline shorter and more direct, and lead with the main benefit."
+        },
+        "no_conversions": {
+          "title": "Make the web page clearer",
+          "why": "People click the ads but nobody signs up or buys. The page may not say clearly enough what to do next.",
+          "request": "People arrive but nobody signs up or buys. Make the headline and the main button clearer, and put the main benefit first."
+        },
+        "add_video": {
+          "title": "Add a video ad",
+          "why": "There is no video ad yet. Short videos often reach more people than images."
+        },
+        "retry_video": {
+          "title": "Try the video again",
+          "why": "The last video could not be made. Trying again often works."
+        },
+        "ads_failed": {
+          "title": "Make the ads again",
+          "why": "The ads could not be made last time. The pilot can try again.",
+          "request": "Make the ads again."
+        },
+        "ads_declined": {
+          "title": "Get new ads",
+          "why": "You said no to the last ads. The pilot can make different ones.",
+          "request": "Make different ads with new pictures and new headlines."
+        },
+        "landing_failed": {
+          "title": "Write the web page again",
+          "why": "The page could not be written last time. The pilot can try again.",
+          "request": "Write the page again."
+        },
+        "landing_declined": {
+          "title": "Get a different web page",
+          "why": "You said no to the last page. Without one, the ads send people to your site.",
+          "request": "Write a different page with a new headline and a clearer button."
+        },
+        "audience_failed": {
+          "title": "Choose who sees the ads again",
+          "why": "The audience could not be chosen last time. The pilot can try again.",
+          "request": "Choose the audience again."
+        }
+      },
+      "areas": {
+        "ads": "ads",
+        "landing": "web page",
+        "audience": "audience"
+      },
+      "change": {
+        "title": "Ask for a change",
+        "hint": "Tell the pilot what to change in your own words. It redoes that part and shows it to you before anything goes live.",
+        "which": "What should change?",
+        "areaLabel": {
+          "ads": "Ads",
+          "landing": "Web page",
+          "audience": "Audience"
+        },
+        "areaHint": {
+          "ads": "New pictures and words for the ads. If your ads are already running, they keep running until you approve the new ones.",
+          "landing": "New words for the web page. A live page keeps its current words until you approve the new ones.",
+          "audience": "Who should see the ads: places, ages, interests."
+        },
+        "placeholder": {
+          "ads": "For example: brighter pictures, mention the free trial",
+          "landing": "For example: a shorter headline, put the price lower down",
+          "audience": "For example: only women 30-45 in Tel Aviv"
+        },
+        "send": "Send to the pilot",
+        "sent": "Sent. The pilot is on it - you will see the result here.",
+        "unavailable": "Nothing can be changed right now - the pilot is still making the parts, or a change is already on its way.",
+        "notActive": "Approve this idea first; then you can ask for changes.",
+        "history": "What you asked for",
+        "outcome": {
+          "pending": "The pilot is working on it",
+          "done": "Done - waiting for your decision above, or already decided",
+          "failed": "Did not work: {reason}"
+        }
+      },
+      "readOnly": "You can see this item, but only someone who can use the AI in this project can decide or ask for changes.",
+      "activityTitle": "What happened with this item"
     }
   },
   "ErrorPage": {
