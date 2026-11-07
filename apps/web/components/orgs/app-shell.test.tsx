@@ -41,6 +41,15 @@ describe('AppShell', () => {
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 
+  it('names its navigation landmarks and marks the current page on the phone tab bar', () => {
+    renderShell('/orgs/org-1/projects/p1/boards');
+    expect(screen.getByRole('navigation', { name: 'Main menu' })).toBeInTheDocument();
+    const tabBar = screen.getByRole('navigation', { name: 'Quick links' });
+    const links = tabBar.querySelectorAll('a');
+    expect(links[1]).toHaveAttribute('aria-current', 'page');
+    expect(links[0]).not.toHaveAttribute('aria-current');
+  });
+
   it('marks only the most specific matching nav link as current, not a broader sibling whose href happens to be a path-prefix', () => {
     // Regression: naive prefix-matching would mark Home (href `/orgs/org-1`) active on every
     // sub-page too, since `/orgs/org-1` is a path-prefix of `/orgs/org-1/projects/p1/boards/...` —

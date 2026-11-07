@@ -118,6 +118,8 @@
     "moreTools": "More tools",
     "moreToolsHint": "Extra tools for later. You don't need any of them to get started.",
     "openMenu": "Open menu",
+    "mainNavigation": "Main menu",
+    "quickNavigation": "Quick links",
     "closeMenu": "Close menu",
     "userMenu": "Account menu",
     "signedInAs": "Signed in as",
