@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
+import he from '@/messages/he.json';
 import { GrowthPerformanceSection } from './performance-section';
 
 vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), Link: ({ children }: { children: React.ReactNode }) => children }));
@@ -30,6 +31,7 @@ describe('GrowthPerformanceSection', () => {
     const onTargets = vi.fn();
     renderWithIntl(<GrowthPerformanceSection base="/api/x/growth-pilot" onTargets={onTargets} />, { locale: 'en' });
     expect(await screen.findByTestId('growth-pilot-kpi-spend')).toHaveTextContent('84.5');
+    expect(screen.getByText('Money spent')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/x/growth-pilot/performance?days=30');
     expect(screen.getByTestId('growth-pilot-kpi-impressions')).toHaveTextContent('12.4K');
     expect(screen.getByTestId('growth-pilot-kpis')).toHaveTextContent('2.5% of the people who saw an ad clicked it');
@@ -37,6 +39,12 @@ describe('GrowthPerformanceSection', () => {
     expect(screen.getByTestId('growth-pilot-kpis')).toHaveTextContent('7.04 for each sign-up or sale');
     expect(screen.getByRole('table', { hidden: true })).toHaveTextContent('10-14');
     expect(onTargets).toHaveBeenCalledWith(SUMMARY.byTarget);
+  });
+
+  it('labels the spend with the Hebrew translation', async () => {
+    stub({ status: 'ok', since: 'a', until: 'b', summary: SUMMARY });
+    renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'he' });
+    expect(await screen.findByText(he.GrowthPilot.performance.kpi.spend)).toBeInTheDocument();
   });
 
   it('switches the period, and says why when Meta cannot be read', async () => {

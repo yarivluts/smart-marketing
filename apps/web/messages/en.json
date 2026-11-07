@@ -6270,7 +6270,7 @@
       "source": "Numbers come from Facebook and Instagram for the ads the pilot made, in your ad account currency.",
       "targetResults": "{clicks} clicks, {spend} spent",
       "kpi": {
-        "spend": "Spend",
+        "spend": "Money spent",
         "impressions": "Times shown",
         "clicks": "Clicks on the ads",
         "cpc": "Cost of each click",
