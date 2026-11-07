@@ -132,7 +132,7 @@ export default async function ProjectLayout({
   // Restored pre-redesign items — see the module doc comment above.
   const orgItems: AppShellNavItem[] = [
     { href: `/orgs/${orgId}`, label: tShell('homeLink'), hint: tShell('homeHint'), icon: 'Home' },
-    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
+    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), hint: tShell('libraryHint'), icon: 'FolderOpen' },
     ...(canViewOrgAuditLog
       ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: 'ShieldCheck' as const }]
       : []),
