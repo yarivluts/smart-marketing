@@ -301,6 +301,11 @@ describe('GrowthPilotApp', () => {
     await waitFor(() => expect(sent(fetchMock, 0)).toEqual({ url: BASE, body: { siteUrl: 'https://easysign.co.il/' } }));
   });
 
+  it('announces why the read failed to screen readers, since the reading card just disappears', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_timeout' })} />, { locale: 'en' });
+    expect(screen.getByRole('alert')).toHaveTextContent('The site took too long to answer');
+  });
+
   it('says a slow site is worth another try, and a redirect loop is not', () => {
     const slow = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ status: 'failed', failureCode: 'site_timeout' })} />, { locale: 'en' });
     expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('The site took too long to answer');
