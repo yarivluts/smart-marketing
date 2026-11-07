@@ -110,6 +110,17 @@ describe('AutopilotPanel', () => {
     expect(screen.getByRole('button', { name: 'Run the autopilot again' })).toBeEnabled();
   });
 
+  it('explains a step that stopped for a reason only we can fix in plain words, en and he', () => {
+    const finished = run({ status: 'failed' }, ['done', 'done', 'done', 'done', 'failed', 'skipped']);
+    finished.steps[4].reason = 'provider_billing';
+    const { unmount } = renderPanel({ initialRun: finished });
+    expect(screen.getByTestId('ad-studio-autopilot-step-clips')).toHaveTextContent('a problem on our side - contact support');
+    unmount();
+    renderPanel({ initialRun: finished }, 'he');
+    expect(screen.getByTestId('ad-studio-autopilot-step-clips')).toHaveTextContent(heMessages.AdStudio.autopilot.reason.provider_billing);
+    expect(heMessages.AdStudio.autopilot.reason.provider_billing).not.toMatch(/קרדיט/);
+  });
+
   it('cannot start with nothing to make, and warns in Hebrew when a model is not set up', () => {
     renderPanel({ available: { text: true, images: false, video: true } }, 'he');
     // What has no model starts off, so Prepare never runs into it...
