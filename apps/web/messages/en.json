@@ -4138,7 +4138,7 @@
     "scriptSaved": "Script saved.",
     "providerErrors": {
       "not_configured": "The AI helper is not switched on yet. Trying again will not help - contact GrowthOS support.",
-      "provider_billing": "The AI service stopped because its account is out of credit. Ask your account admin to top it up, then try again.",
+      "provider_billing": "The AI helper is not available because of a problem on our side, not yours. Trying again will not help - please contact GrowthOS support.",
       "rate_limited": "The AI service is too busy right now. Try again in a minute.",
       "refused": "The AI declined this request. Rephrase what the ad is about and try again.",
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
