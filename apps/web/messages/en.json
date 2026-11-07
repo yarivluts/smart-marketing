@@ -588,7 +588,7 @@
     "journeyStep_sources": "Data source",
     "journeyStep_funnel": "Customer path",
     "journeyStep_board": "Starter board",
-    "journeyStep_done": "Live",
+    "journeyStep_done": "Finished",
     "journeyStartedOn": "Started {date}",
     "journeyNotStarted": "Not started yet",
     "journeyPackNone": "No starting point chosen yet",

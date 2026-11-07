@@ -588,7 +588,7 @@
     "journeyStep_sources": "מקור נתונים",
     "journeyStep_funnel": "מסלול הלקוח",
     "journeyStep_board": "לוח התחלתי",
-    "journeyStep_done": "פעיל",
+    "journeyStep_done": "סיום",
     "journeyStartedOn": "התחיל ב-{date}",
     "journeyNotStarted": "עדיין לא התחיל",
     "journeyPackNone": "עדיין לא נבחרה נקודת התחלה",
