@@ -10,6 +10,7 @@ import {
 } from '../models/ad-studio-run.model';
 import { AdStudioBriefModel } from '../models/ad-studio.model';
 import { recordAuditLogEntry } from './audit-log.service';
+import { emitActivityEvent } from './activity-events.service';
 
 /**
  * Ad Studio autopilot runs: the record of one automated end-to-end pass over a brief. The engine
@@ -186,8 +187,27 @@ export async function saveAdStudioRunProgress(run: AdStudioRunModel, token: stri
   run.lease_until = null;
   run.last_advanced_on = now.toISOString();
   await run.save();
+  // Only the lease holder gets here, so a run that just stopped to wait, finished or failed is
+  // announced exactly once.
+  const kind = RUN_EVENT_BY_STATUS[run.status];
+  if (kind && fresh.status !== run.status) {
+    await emitActivityEvent({
+      source: 'ad_studio',
+      kind,
+      organizationId: run.organization_id,
+      projectId: run.project_id,
+      actor: run.started_by,
+      briefId: run.brief_id,
+    });
+  }
   return run;
 }
+
+const RUN_EVENT_BY_STATUS: Partial<Record<AdStudioRunModel['status'], string>> = {
+  awaiting_approval: 'run_awaiting_approval',
+  done: 'run_done',
+  failed: 'run_failed',
+};
 
 export function runStep(run: AdStudioRunModel, id: AdStudioRunStepId): AdStudioRunStep {
   const step = run.steps.find((candidate) => candidate.id === id);

@@ -14,6 +14,7 @@ import {
 } from '../models/growth-pilot.model';
 import { recordAuditLogEntry } from './audit-log.service';
 import { saveAdStudioMetaTargeting } from './ad-studio-audience.service';
+import { emitActivityEvent } from './activity-events.service';
 
 /**
  * Growth Pilot state: the pilot (one website), its targets, the proposals waiting for the person,
@@ -91,6 +92,15 @@ export async function recordGrowthActivity(params: Scope & { pilotId: string; ki
   row.created_on = (params.now ?? new Date()).toISOString();
   row.setPathParams(pathParams(params.organizationId, params.projectId));
   await row.save();
+  await emitActivityEvent({
+    source: 'growth_pilot',
+    kind: params.kind,
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    actor: params.actor,
+    subject: row.subject,
+    count: row.count,
+  });
   return row;
 }
 
@@ -454,6 +464,16 @@ export async function finishGrowthTargetVideo(params: Scope & { targetId: string
   target.video_failure = params.failureCode ?? null;
   target.updated_on = (params.now ?? new Date()).toISOString();
   await target.save();
+  // Not a feed line (the target card shows the video), but the person still hears about it.
+  await emitActivityEvent({
+    source: 'growth_pilot',
+    kind: params.failureCode ? 'video_failed' : 'video_ready',
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    actor: 'pilot',
+    subject: target.name,
+    briefId: target.brief_id ?? null,
+  });
   return target;
 }
 
