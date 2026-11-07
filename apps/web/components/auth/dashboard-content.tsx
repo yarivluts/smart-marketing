@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { isRole } from '@growthos/shared';
-import { Activity, Building2, CheckCircle2, FolderKanban, Gauge, LayoutDashboard, Mail, Network, Plus, TrendingUp } from 'lucide-react';
+import { Activity, Bell, Building2, CheckCircle2, FolderKanban, Gauge, LayoutDashboard, Mail, Plus, TrendingUp } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
-import { LanguageSwitcher } from '@/components/shell/language-switcher';
+import { AccountHeader } from '@/components/auth/account-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/ui/stat-card';
@@ -41,7 +41,7 @@ function trendDays(now: number): string[] {
 export function DashboardContent({ email, overview, now }: DashboardContentProps): React.ReactElement {
   const t = useTranslations('DashboardPage');
   const tRoles = useTranslations('Roles');
-  const tShell = useTranslations('AppShell');
+  const tPush = useTranslations('PushNotifications');
   const locale = useLocale();
   const numberFormat = new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -63,18 +63,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
 
   return (
     <div className="flex min-h-screen flex-col bg-pp-surface-container-low text-pp-on-surface">
-      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between gap-pp-md border-b border-pp-outline-variant/30 bg-pp-surface-container-lowest/95 px-pp-md backdrop-blur lg:px-pp-lg">
-        <Link href="/dashboard" className="flex shrink-0 items-center gap-pp-sm">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pp-primary text-pp-on-primary shadow-sm shadow-pp-primary/30">
-            <Network className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span className="font-pp-display text-pp-headline-md font-bold tracking-tight text-pp-primary">{tShell('brandName')}</span>
-        </Link>
-        <div className="flex shrink-0 items-center gap-pp-sm">
-          <LanguageSwitcher compact />
-          <InitialsAvatar name={email} seed={email} size="sm" />
-        </div>
-      </header>
+      <AccountHeader email={email} />
       <main className="container mx-auto flex max-w-6xl flex-1 flex-col gap-6 py-10">
       <PageHero
         icon={LayoutDashboard}
@@ -87,6 +76,12 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
               <Link href="/orgs/new">
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 {t('createOrganization')}
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/notifications">
+                <Bell className="h-4 w-4" aria-hidden="true" />
+                {tPush('dashboardLink')}
               </Link>
             </Button>
             <DashboardSignOutButton />

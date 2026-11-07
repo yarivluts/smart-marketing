@@ -57,6 +57,7 @@ describe('UserMenu', () => {
     fireEvent.click(trigger);
     expect(screen.getByRole('menu')).toHaveTextContent('Signed in as');
     expect(screen.getByRole('menuitem', { name: /My account/ })).toHaveAttribute('href', '/dashboard');
+    expect(screen.getByRole('menuitem', { name: /Notifications & app/ })).toHaveAttribute('href', '/dashboard/notifications');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });

@@ -168,6 +168,19 @@ gcloud run deploy web-prod --region me-west1 --project growthos-g2w84 \
 curl -s https://web-prod-1098891924957.me-west1.run.app/api/health   # "buildSha":"<SHA>"
 ```
 
+### Browser push secrets (web)
+
+Browser push notifications need the VAPID key pair mounted on every web service. Until they
+are, push degrades to "not set up" (no prompt, nothing sent) - nothing breaks. If the
+service does not have them yet, or the deploy copies env from a revision older than them,
+add this to the deploy:
+
+```bash
+--update-secrets=WEB_PUSH_VAPID_PUBLIC_KEY=web-push-vapid-public-key:latest,WEB_PUSH_VAPID_PRIVATE_KEY=web-push-vapid-private-key:latest
+```
+
+Check afterwards: `curl -s https://<web>/api/push/config` returns `"configured":true`.
+
 ## Deploying dbt-refresh
 
 The scheduled warehouse refresh is a Cloud Run **Job**, started hourly by Cloud
