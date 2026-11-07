@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
+import { PWA_THEME_COLOR } from '@/lib/push/pwa';
 import { Heebo, Manrope, Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
@@ -35,8 +36,16 @@ type LayoutProps = Readonly<{
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Metadata' });
-  return { title: t('title'), description: t('description') };
+  return {
+    title: t('title'),
+    description: t('description'),
+    // Installed to an iPhone home screen, the app opens full screen with its own icon.
+    appleWebApp: { capable: true, title: t('title'), statusBarStyle: 'default' },
+    icons: { apple: '/icons/apple-touch-icon.png' },
+  };
 }
+
+export const viewport: Viewport = { themeColor: PWA_THEME_COLOR };
 
 export default async function LocaleLayout({ children, params }: LayoutProps): Promise<React.ReactElement> {
   const { locale } = await params;

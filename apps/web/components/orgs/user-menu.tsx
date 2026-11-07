@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { LayoutDashboard, LogOut } from 'lucide-react';
+import { Bell, LayoutDashboard, LogOut } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 
@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth/auth-context';
  */
 export function UserMenu(): React.ReactElement | null {
   const t = useTranslations('AppShell');
+  const tPush = useTranslations('PushNotifications');
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
   const [open, setOpen] = useState(false);
@@ -89,6 +90,15 @@ export function UserMenu(): React.ReactElement | null {
           >
             <LayoutDashboard className="h-4 w-4 text-pp-on-surface-variant" aria-hidden="true" />
             {t('myAccount')}
+          </Link>
+          <Link
+            href="/dashboard/notifications"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 rounded-pp px-pp-sm py-2 text-pp-label-md text-pp-on-surface hover:bg-pp-surface-container"
+          >
+            <Bell className="h-4 w-4 text-pp-on-surface-variant" aria-hidden="true" />
+            {tPush('menuLink')}
           </Link>
           <button
             type="button"

@@ -32,6 +32,7 @@ every environment picks it up on the next call.
 | `meta-user-access-token` | Meta Marketing API user access token |
 | `growthos-vault-keys-dev` / `-preprod` / `-prod` | envelope-encryption keys the app's own credential vault uses (`GROWTHOS_VAULT_KEYS`) |
 | `meta-app-id` / `meta-app-secret` | the Meta app behind "Connect with Facebook"; mounted on web-prod / web-preprod as `META_APP_ID` / `META_APP_SECRET` |
+| `web-push-vapid-public-key` / `web-push-vapid-private-key` | the VAPID key pair browser push notifications are signed with; mounted on the web services as `WEB_PUSH_VAPID_PUBLIC_KEY` / `WEB_PUSH_VAPID_PRIVATE_KEY` (runtime SA has `secretAccessor` on both). Rotating it invalidates every existing browser subscription - people re-subscribe on their next visit |
 
 `gcloud secrets list --project growthos-g2w84` is the live list; this table will drift.
 

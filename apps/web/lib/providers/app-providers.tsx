@@ -7,6 +7,7 @@ import { OrgProvider, useOrgContext } from '@/lib/orgs/org-context';
 import { PermissionProvider } from '@/lib/permissions/permission-context';
 import { useTranslations } from 'next-intl';
 import { Toaster } from '@/components/ui/toaster';
+import { PwaBootstrap } from '@/components/push/pwa-bootstrap';
 
 function AuthenticatedPermissionProvider({ children }: { children: ReactNode }): React.ReactElement {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ export function AppProviders({ children }: { children: ReactNode }): React.React
       <OrgProvider>
         <AuthenticatedPermissionProvider>{children}</AuthenticatedPermissionProvider>
       </OrgProvider>
+      <PwaBootstrap />
       <Toaster labels={{ region: t('notifications'), dismiss: t('dismissNotification') }} />
     </AuthProvider>
   );

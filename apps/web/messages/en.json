@@ -6386,5 +6386,192 @@
       "inactiveTitle": "This link is no longer active",
       "inactiveBody": "It may have expired or been turned off. Ask whoever sent it for a new link."
     }
+  },
+  "PushNotifications": {
+    "metaTitle": "Notifications & app",
+    "eyebrow": "Your account",
+    "title": "Notifications & app",
+    "intro": "Get told on your phone or computer when something needs you: ideas and ads waiting for your approval, ads and videos that are ready, publishing results, and anything that failed.",
+    "backToDashboard": "Back to my account",
+    "menuLink": "Notifications & app",
+    "dashboardLink": "Notifications & app",
+    "prompt": {
+      "region": "Turn on notifications",
+      "title": "Turn on notifications?",
+      "body": "Hear right away when something waits for your approval, when ads and videos are ready, and when something fails.",
+      "enable": "Turn on",
+      "notNow": "Not now",
+      "enabled": "Notifications are on for this device.",
+      "blocked": "The browser blocked notifications. You can allow them again in the browser's site settings.",
+      "failed": "Notifications could not be turned on. Try again from Notifications & app in your account.",
+      "iosTitle": "Notifications on your iPhone",
+      "iosBody": "On iPhone and iPad, notifications work once GrowthOS is on your home screen: tap Share, then Add to Home Screen, and open it from there."
+    },
+    "status": {
+      "title": "This device",
+      "description": "What this browser allows, and whether it gets notifications.",
+      "notConfigured": "Notifications are not set up on this site yet. Everything else works as usual.",
+      "unsupported": "This browser can't show notifications from websites.",
+      "permissionLabel": "Browser permission",
+      "permission": {
+        "default": "Not asked yet",
+        "granted": "Allowed",
+        "denied": "Blocked",
+        "unsupported": "Not available"
+      },
+      "deviceLabel": "On this device",
+      "deviceOn": "Notifications on",
+      "deviceOff": "Notifications off",
+      "enableButton": "Turn on notifications",
+      "disableButton": "Turn off on this device",
+      "deniedHelp": "Notifications are blocked for this site. To allow them again, open the browser's site settings (the lock icon next to the address), set Notifications to Allow, and reload the page.",
+      "enabledToast": "Notifications are on for this device.",
+      "disabledToast": "Notifications are off for this device.",
+      "failedToast": "Notifications could not be changed. Try again."
+    },
+    "install": {
+      "title": "Install the app",
+      "description": "Open GrowthOS from your home screen or dock, like any other app.",
+      "button": "Install app",
+      "installed": "GrowthOS is installed on this device.",
+      "iosSteps": "On iPhone or iPad: in Safari, tap Share, then Add to Home Screen.",
+      "iosPushNote": "On iPhone and iPad, notifications only work in the installed app: add it to your home screen, open it from there, and turn notifications on.",
+      "unavailable": "To install, open your browser's menu and look for Install app or Add to Home Screen."
+    },
+    "preferences": {
+      "title": "What to tell you about",
+      "description": "These choices apply to all your devices.",
+      "master": "All notifications",
+      "masterHint": "Off stops every notification on all your devices.",
+      "categories": {
+        "approvals": {
+          "label": "Waiting for your approval",
+          "hint": "Ideas, web pages, audiences and plans that need your OK."
+        },
+        "ready": {
+          "label": "Ads and videos ready",
+          "hint": "Ads, images and videos that finished being made."
+        },
+        "publishing": {
+          "label": "Publishing results",
+          "hint": "Ads that were published or turned on, and web pages that went live."
+        },
+        "failures": {
+          "label": "Problems",
+          "hint": "Anything that did not work and needs you."
+        }
+      },
+      "saved": "Saved.",
+      "failed": "Your choice could not be saved. Try again."
+    },
+    "devices": {
+      "title": "Your devices",
+      "description": "Every browser that gets notifications. Remove one you no longer use.",
+      "empty": "No device gets notifications yet.",
+      "current": "This device",
+      "added": "Added {date}",
+      "lastUsed": "Last notified {date}",
+      "unnamed": "Unknown device",
+      "remove": "Remove",
+      "removeLabel": "Remove {device}",
+      "removed": "The device was removed.",
+      "removeFailed": "The device could not be removed. Try again."
+    },
+    "test": {
+      "button": "Send a test notification",
+      "sent": "Test sent. It should appear in a few seconds.",
+      "noDevices": "Turn on notifications on a device first.",
+      "failed": "The test notification could not be sent."
+    },
+    "testNotification": {
+      "title": "GrowthOS notifications work",
+      "body": "This is how you'll hear when something needs you."
+    },
+    "fallback": {
+      "title": "Update in {project}",
+      "body": "Something changed in {project}. Open it to see."
+    },
+    "events": {
+      "growth_pilot": {
+        "targets_proposed": {
+          "title": "New ideas to approve",
+          "body": "Growth Pilot suggested {count, plural, one {# thing} other {# things}} to grow in {project}."
+        },
+        "proposal_revised": {
+          "title": "A change is ready to review",
+          "body": "{subject} was rewritten as you asked, in {project}."
+        },
+        "landing_ready": {
+          "title": "Web page waiting for approval",
+          "body": "A web page for {subject} is waiting for your approval in {project}."
+        },
+        "audience_ready": {
+          "title": "Audience waiting for approval",
+          "body": "An audience for {subject} is waiting for your approval in {project}."
+        },
+        "ads_ready": {
+          "title": "Ads ready",
+          "body": "New ads for {subject} are ready to review in {project}."
+        },
+        "video_ready": {
+          "title": "Video ad ready",
+          "body": "The video ad for {subject} is ready in {project}."
+        },
+        "ads_published": {
+          "title": "Ads published",
+          "body": "The ads for {subject} were sent to the ad platform, still paused, in {project}."
+        },
+        "landing_published": {
+          "title": "Web page live",
+          "body": "The web page for {subject} is live in {project}."
+        },
+        "ads_activated": {
+          "title": "Ads running",
+          "body": "The ads for {subject} are running now in {project}."
+        },
+        "analysis_failed": {
+          "title": "Your website could not be read",
+          "body": "Growth Pilot could not read the website for {project}. Open it to see what to do."
+        },
+        "revision_failed": {
+          "title": "The change was not made",
+          "body": "The change to {subject} could not be made in {project}."
+        },
+        "ads_failed": {
+          "title": "Ads were not made",
+          "body": "The ads for {subject} could not be made in {project}. Open it to see why."
+        },
+        "video_failed": {
+          "title": "Video ad was not made",
+          "body": "The video ad for {subject} could not be made in {project}."
+        },
+        "landing_failed": {
+          "title": "Web page was not written",
+          "body": "The web page for {subject} could not be written in {project}."
+        },
+        "audience_failed": {
+          "title": "Audience was not built",
+          "body": "An audience for {subject} could not be built in {project}."
+        },
+        "publish_failed": {
+          "title": "Publishing failed",
+          "body": "The ads for {subject} could not be published in {project}. Open it to see why."
+        }
+      },
+      "ad_studio": {
+        "run_awaiting_approval": {
+          "title": "Plan waiting for your OK",
+          "body": "The plan for {subject} in {project} is waiting for your OK before images and video are made."
+        },
+        "run_done": {
+          "title": "Ads ready",
+          "body": "The images and video for {subject} are ready in {project}."
+        },
+        "run_failed": {
+          "title": "Ads were not finished",
+          "body": "Making {subject} in {project} stopped. Open it to see why."
+        }
+      }
+    }
   }
 }

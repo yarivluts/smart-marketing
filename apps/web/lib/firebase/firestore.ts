@@ -1,6 +1,7 @@
 import 'server-only';
 import { connectFirestoreOrm, connectFirestoreOrmAdmin } from '@growthos/firebase-orm-models';
 import { assertEmulatorReachable } from '@/lib/firebase/emulator-probe';
+import { registerPushNotifier } from '@/lib/push/activity-notifier';
 
 const EMULATOR_PROJECT_ID = 'demo-growthos-test';
 
@@ -57,6 +58,9 @@ let connectionPromise: Promise<void> | undefined;
  */
 export function ensureFirestoreOrm(): Promise<void> {
   if (!connectionPromise) {
+    // Every server path that writes through the ORM connects here first, so this is where product
+    // updates get their browser-push listener (a no-op until the VAPID keys are configured).
+    registerPushNotifier();
     const emulatorHost = process.env.FIRESTORE_EMULATOR_HOST;
     const projectId = process.env.FIREBASE_PROJECT_ID ?? EMULATOR_PROJECT_ID;
     // The probe stays: an absent emulator otherwise surfaces as SDK retry
