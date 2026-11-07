@@ -17,6 +17,17 @@ Template for each entry:
 
 ---
 
+## 2026-11-07 — Growth Pilot: details & progress page per promoted item, target change requests
+
+- **Last completed:**
+  - Route `/[locale]/orgs/[orgId]/projects/[projectId]/growth-pilot/targets/[targetId]` (`ai.use`, like the pilot page): progress % with an 8-stage stepper (idea, audience, web page, ad images, video, published, turned on, collecting results; skipped stages are left out of the denominator, failed/declined stay in), Done (dated, with links to the page, the Ad Studio review/publish steps), In progress (plain words + pending change requests), Waiting for you (the same `ProposalCard`s and buttons, `canExecute` gating kept), What else can be done (only possible actions), rule-based suggestions (`lib/growth-pilot/suggestions.ts`: no clicks after 3 days / low CTR / clicks without conversions / add or retry video / redo a failed or declined part) with Do it / Not now (per-browser), a free-text change request, its history, and the item's own activity. Read-only mode in the component (`canAct`).
+  - Pilot page: overview card (overall %, steps done / in progress / decisions waiting, the single next decision with a link to it), progress bar + Details link on each target card, feed lines link to their item. Push notifications about one target open its page (`ActivityEvent.targetId` -> `pushEventPath`).
+  - Change requests after approval: `POST .../growth-pilot/targets/[targetId]` `{action:'change', area:'ads'|'landing'|'audience', request}` or `{action:'video'}`. A part still waiting for a decision goes through the proposal's existing revise; otherwise `changeGrowthTarget` (ad-studio) redoes it: ads re-rendered from rewritten ideas (new proposal; a failed redo restores the old status), a live page gets new words as a `landing_content` proposal (live page untouched until approved), a declined/failed page is written again with the request, a new audience planned from the last one. Kept on `GrowthTargetModel.change_requests` with outcome; activity rows carry `target_id`. New ads for live ones: approving them proposes publishing again, and `approveGrowthPublish` pauses the old ads first.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** watch real use of the suggestion thresholds (constants in `suggestions.ts`); a daily-budget change for running ads has no API yet, so "raise the budget" is not offered.
+- **Waiting on human:** deploy (not done by this run).
+
 ## 2026-11-07 — Browser push notifications + installable app (PWA)
 
 - **Last completed:**
