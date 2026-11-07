@@ -22,6 +22,8 @@ export interface ActivityEvent {
   count?: number | null;
   /** The Ad Studio brief the event is about, when it is about one. */
   briefId?: string | null;
+  /** The Growth Pilot target the event is about, when it is about one (its notification opens the target's page). */
+  targetId?: string | null;
 }
 
 export type ActivityEventListener = (event: ActivityEvent) => Promise<void> | void;

@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { GrowthAudiencePlan, GrowthLandingContent, GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
+import type { GrowthAudiencePlan, GrowthChangeArea, GrowthLandingContent, GrowthSiteAnalysis, GrowthTargetDraft, GrowthTargetKind } from '@growthos/shared';
 
 /**
  * Growth Pilot: the person gives their website and the AI does the marketing work - reads the site,
@@ -187,11 +187,30 @@ export class GrowthTargetModel extends BaseModel {
   @Field({ is_required: false })
   public ad_export_ids?: string[] | null;
 
+  /** What the person asked the pilot to redo after approving the target, oldest first, with how each went. */
+  @Field({ is_required: false })
+  public change_requests?: GrowthTargetChangeRequest[] | null;
+
   @Field({ is_required: true })
   public created_on!: string;
 
   @Field({ is_required: true })
   public updated_on!: string;
+}
+
+/**
+ * A change the person asked for on an approved target - new ads, a new landing page or a new
+ * audience - in their own words. The pilot redoes that part and it comes back for a decision.
+ */
+export interface GrowthTargetChangeRequest {
+  area: GrowthChangeArea;
+  text: string;
+  by: string;
+  on: string;
+  outcome: 'pending' | 'done' | 'failed';
+  failure_code?: string | null;
+  /** Where the ads stood before new ones were started, so a failed redo puts them back. */
+  previous_ads_status?: GrowthAdsStatus | null;
 }
 
 /** What a proposal asks the person to decide. Later stories add creatives, landing pages, audiences and publishing. */
@@ -254,6 +273,13 @@ export class GrowthProposalModel extends BaseModel {
   /** The landing page to approve (kind `landing_page`). */
   @Field({ is_required: false })
   public landing_page_id?: string | null;
+
+  /**
+   * New words for a page that is already public (kind `landing_page`, asked for by the person): the
+   * live page keeps its words until this is approved, and keeps them when it is declined.
+   */
+  @Field({ is_required: false })
+  public landing_content?: GrowthLandingContent | null;
 
   /** The chosen images to preview on the card (kind `ads`). */
   @Field({ is_required: false })
@@ -329,6 +355,10 @@ export class GrowthActivityModel extends BaseModel {
 
   @Field({ is_required: false })
   public count?: number | null;
+
+  /** The target the line is about, when it is about one (its details page lists it). */
+  @Field({ is_required: false })
+  public target_id?: string | null;
 
   @Field({ is_required: true })
   public created_on!: string;

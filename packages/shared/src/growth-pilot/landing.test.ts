@@ -36,6 +36,13 @@ describe('landing page prompt', () => {
     expect(prompt.user).toContain('"headline": "Sign 20 documents a month"');
     expect(prompt.user).toContain('Shorter headline');
   });
+
+  it('writes a new page that follows the request when there is no current page', () => {
+    const prompt = buildLandingPagePrompt({ analysis: ANALYSIS, target: TARGET, request: 'Mention the free trial' });
+    expect(prompt.system).not.toMatch(/revise/);
+    expect(prompt.user).toContain('What the owner asked for: Mention the free trial');
+    expect(buildLandingPagePrompt({ analysis: ANALYSIS, target: TARGET }).user).not.toContain('What the owner asked for');
+  });
 });
 
 describe('sanitizeLandingContent', () => {

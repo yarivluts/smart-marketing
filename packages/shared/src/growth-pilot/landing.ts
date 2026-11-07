@@ -74,7 +74,15 @@ export function buildLandingPagePrompt(params: { analysis: GrowthSiteAnalysis; t
   }
   return {
     system: ['You write high-converting landing pages for paid ads.', RULES].join('\n'),
-    user: [...facts, '', focus, '', 'Write the page: eyebrow, headline, subheadline, 3-4 benefits, 0-4 steps of how it works, 3-5 FAQ items, the call-to-action text and a closing headline.'].join('\n'),
+    user: [
+      ...facts,
+      '',
+      focus,
+      // A new page the owner asked for in their own words (after a failed one): follow what they said.
+      ...(params.request ? ['', `What the owner asked for: ${params.request}`] : []),
+      '',
+      'Write the page: eyebrow, headline, subheadline, 3-4 benefits, 0-4 steps of how it works, 3-5 FAQ items, the call-to-action text and a closing headline.',
+    ].join('\n'),
   };
 }
 
