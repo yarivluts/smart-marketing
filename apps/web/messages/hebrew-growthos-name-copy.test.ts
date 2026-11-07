@@ -22,6 +22,10 @@ describe('Hebrew copy writes the product name cleanly and in one gender', () => 
     expect(all.filter((s) => FEMININE_VERB_AFTER_GROWTHOS.test(s))).toEqual([]);
   });
 
+  it('calls Growth Pilot by the name the menu and page title use, not in Latin letters', () => {
+    expect(all.filter((s) => s.includes('Growth Pilot'))).toEqual([]);
+  });
+
   it('fixes the ad details source note', () => {
     const note = (he as { Campaigns: { stateSourceNote: string } }).Campaigns.stateSourceNote;
     expect(note).toContain('GrowthOS \u05e2\u05e9\u05d4');
