@@ -6189,7 +6189,7 @@
       "not_changeable": "This part cannot be changed right now - it may still be in the making. Reload the page to see where it stands.",
       "video_unavailable": "Video ads are not available on our side yet, so a video cannot be made. Please contact GrowthOS support.",
       "not_live": "These ads are not on Facebook and Instagram any more. Reload the page to see the latest.",
-      "platform_failed": "Facebook and Instagram did not accept the change, so nothing changed. Try again in a minute, or make it in Meta Ads Manager.",
+      "platform_failed": "Facebook and Instagram did not accept the change, so nothing changed. Try again in a minute, or make it in Facebook Ads Manager.",
       "invalid_thresholds": "Some values are out of range. Fix the highlighted fields and save again."
     },
     "ads": {
@@ -6268,7 +6268,7 @@
         "connect": "Connect Facebook and Instagram",
         "turnOnWaiting": "When you are ready, turn them on in the \"Turn on the ads\" card waiting for your approval.",
         "turnOnDeclined": "The ads stay switched off and nothing is spent. When you want them on, turn them on in your Facebook and Instagram ad account.",
-        "adsManager": "Open in Meta Ads Manager"
+        "adsManager": "Open in Facebook Ads Manager"
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",
       "confirmCancel": "Not yet"
@@ -6474,8 +6474,8 @@
           "why": "For fine-tuning the ads yourself, word by word."
         },
         "adsManager": {
-          "title": "Open in Meta Ads Manager",
-          "why": "See and manage these ads where Meta runs them."
+          "title": "Open in Facebook Ads Manager",
+          "why": "See and manage these ads where Facebook and Instagram run them."
         },
         "thresholds": {
           "title": "Suggestion settings",
@@ -6597,7 +6597,7 @@
         "confirmBack": "Back"
       },
       "thresholdsLink": "Change when the pilot makes these suggestions",
-      "adsManagerLink": "Open in Meta Ads Manager"
+      "adsManagerLink": "Open in Facebook Ads Manager"
     },
     "settings": {
       "metaTitle": "Growth Pilot suggestion settings",
