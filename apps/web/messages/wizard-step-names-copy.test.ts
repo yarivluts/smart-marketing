@@ -16,4 +16,10 @@ describe('setup wizard step names are plain words', () => {
       }
     }
   });
+
+  it('calls the last step Finished, not Live, so a beginner is not told ads are running', () => {
+    expect(en.Onboarding.journeyStep_done).toBe('Finished');
+    expect(he.Onboarding.journeyStep_done).toBeTruthy();
+    expect(he.Onboarding.journeyStep_done).not.toBe(en.Onboarding.journeyStep_done);
+  });
 });

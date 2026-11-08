@@ -203,10 +203,12 @@ function Brand({ name }: { name: string }): React.ReactElement {
 function NavSections({
   sections,
   activeHref,
+  label,
   onNavigate,
 }: {
   sections: AppShellNavSection[];
   activeHref: string | undefined;
+  label: string;
   onNavigate?: () => void;
 }): React.ReactElement {
   // The same href can appear twice (a primary module and its restored per-feature link, e.g. the
@@ -221,7 +223,7 @@ function NavSections({
     else blocks.push({ kind: 'section', section, index });
   });
   return (
-    <nav className="flex flex-col gap-pp-md">
+    <nav aria-label={label} className="flex flex-col gap-pp-md">
       {blocks.map((block) =>
         block.kind === 'group' ? (
           <NavGroup key={`group-${block.group.id}`} group={block.group} sections={block.sections} activeItem={activeItem} onNavigate={onNavigate} />
@@ -375,7 +377,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
               {switchers}
             </div>
           ) : null}
-          <NavSections sections={sections} activeHref={activeHref} />
+          <NavSections sections={sections} activeHref={activeHref} label={t('mainNavigation')} />
         </aside>
 
         {/* Main content */}
@@ -390,7 +392,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
           {switchers ? <div className="flex flex-col gap-3 rounded-pp bg-pp-surface-container-low p-pp-sm">{switchers}</div> : null}
           {omniSearch}
           <LanguageSwitcher compact className="sm:hidden" />
-          <NavSections sections={sections} activeHref={activeHref} onNavigate={() => setMobileMenuOpen(false)} />
+          <NavSections sections={sections} activeHref={activeHref} label={t('mainNavigation')} onNavigate={() => setMobileMenuOpen(false)} />
           <Link
             href="/developers"
             title={t('developersHint')}
@@ -405,7 +407,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
 
       {/* Mobile bottom tab bar */}
       {mobileTabItems.length > 0 ? (
-        <nav className="fixed inset-x-3 bottom-3 z-20 flex items-stretch justify-around rounded-pp-lg bg-pp-surface-container-lowest/95 pb-[env(safe-area-inset-bottom)] shadow-pp-dock backdrop-blur md:hidden">
+        <nav aria-label={t('quickNavigation')} className="fixed inset-x-3 bottom-3 z-20 flex items-stretch justify-around rounded-pp-lg bg-pp-surface-container-lowest/95 pb-[env(safe-area-inset-bottom)] shadow-pp-dock backdrop-blur md:hidden">
           {mobileTabItems.map((item) => {
             const Icon = ICONS[item.icon];
             const active = item.href === activeHref;
@@ -413,6 +415,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
                   'flex flex-1 flex-col items-center gap-0.5 rounded-pp-lg py-2 text-[11px] font-semibold transition-colors',
                   active ? 'text-primary' : 'text-pp-on-surface-variant hover:text-pp-on-surface',

@@ -82,6 +82,10 @@ export function AdFromSite({ orgId, projectId, studioHref, defaultSiteUrl }: AdF
             id="ad-studio-from-site-url"
             type="url"
             inputMode="url"
+            autoComplete="url"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             dir="ltr"
             value={siteUrl}
             onChange={(event) => setSiteUrl(event.target.value)}

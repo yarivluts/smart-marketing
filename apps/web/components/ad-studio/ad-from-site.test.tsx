@@ -18,6 +18,15 @@ afterEach(() => {
 });
 
 describe('AdFromSite', () => {
+  it('does not capitalise or autocorrect the web address a newcomer types on a phone', () => {
+    renderWithIntl(<AdFromSite orgId="o" projectId="p" studioHref="/s" defaultSiteUrl={null} />, { locale: 'en' });
+    const box = screen.getByLabelText(en.label);
+    expect(box).toHaveAttribute('autocapitalize', 'off');
+    expect(box).toHaveAttribute('autocorrect', 'off');
+    expect(box).toHaveAttribute('spellcheck', 'false');
+    expect(box).toHaveAttribute('autocomplete', 'url');
+  });
+
   it('starts from the site the project already advertises and opens the new ad on its plan', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ brief: { id: 'b9' }, run: { status: 'running' } }), { status: 201 }));
     vi.stubGlobal('fetch', fetchMock);

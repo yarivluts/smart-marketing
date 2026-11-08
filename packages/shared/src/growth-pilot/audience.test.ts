@@ -32,6 +32,10 @@ describe('audience targeting and prompt', () => {
     const revise = buildAudiencePrompt({ analysis: ANALYSIS, target: TARGET, siteUrl: 'https://easy-sign.co.il/', current: DRAFT, request: 'Only women 30-45' });
     expect(revise.user).toContain('Only women 30-45');
     expect(revise.user).toContain('"ageMin": 25');
+    const fresh = buildAudiencePrompt({ analysis: ANALYSIS, target: TARGET, siteUrl: 'https://easy-sign.co.il/', request: 'Only in Haifa' });
+    expect(fresh.system).not.toMatch(/revise/);
+    expect(fresh.user).toContain('What the owner asked for: Only in Haifa');
+    expect(prompt.user).not.toContain('What the owner asked for');
   });
 });
 

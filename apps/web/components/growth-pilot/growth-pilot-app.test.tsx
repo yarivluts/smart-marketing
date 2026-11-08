@@ -5,6 +5,7 @@ import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
 import type { GrowthActivityView, GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { isolate } from '@/lib/bidi';
+import { liveTarget, targetView } from '@/lib/growth-pilot/test-fixtures';
 import { GrowthPilotApp } from './growth-pilot-app';
 
 vi.mock('@/i18n/navigation', () => ({
@@ -29,6 +30,9 @@ const PROPOSAL: GrowthProposalView = {
   status: 'pending',
   draft: { kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', reason: 'The main service' },
   changes: [],
+  landingContent: null,
+  appliesToLive: false,
+  decidedOn: null,
   createdOn: '2026-10-13T10:00:00Z',
 };
 
@@ -43,9 +47,9 @@ function page(extra: Partial<GrowthPilotPageData> & { status?: GrowthPilotPageDa
       pagesRead: [{ url: 'https://easysign.co.il/', title: 'EasySign' }],
       createdOn: '2026-10-13T10:00:00Z',
     },
-    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null }],
+    targets: extra.targets ?? [{ id: 't1', kind: 'service', name: 'Digital signature', description: 'Sign in 30 seconds', audience: 'Small law firms', status: 'proposed', origin: 'site', briefId: null, adsStatus: 'none', adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' }],
     proposals: extra.proposals ?? [PROPOSAL],
-    activity: extra.activity ?? [{ id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 1, on: '2026-10-13T10:00:00Z' }],
+    activity: extra.activity ?? [{ id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 1, targetId: null, detail: null, on: '2026-10-13T10:00:00Z' }],
     landingPages: extra.landingPages ?? [],
   };
 }
@@ -82,6 +86,15 @@ describe('GrowthPilotApp', () => {
     stubFetch({ body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
     expect(screen.getByTestId('growth-pilot-site-input')).toHaveFocus();
+  });
+
+  it('shows the "nothing goes live, no money spent" reassurance right under the box, before the step list', () => {
+    stubFetch({ body: page() });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const safe = screen.getByTestId('growth-pilot-safe-note');
+    expect(safe).toHaveTextContent('Nothing goes live without your approval');
+    const steps = screen.getByRole('list');
+    expect(safe.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('stops phones from capitalising or autocorrecting the website address', () => {
@@ -441,8 +454,8 @@ describe('GrowthPilotApp', () => {
 
   it('words the activity log without the word "target"', () => {
     const activity: GrowthActivityView[] = [
-      { id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 3, on: '2026-10-13T10:00:00Z' },
-      { id: 'a2', kind: 'target_requested', byPilot: false, subject: 'Accountants', count: null, on: '2026-10-13T11:00:00Z' },
+      { id: 'a1', kind: 'targets_proposed', byPilot: true, subject: null, count: 3, targetId: null, detail: null, on: '2026-10-13T10:00:00Z' },
+      { id: 'a2', kind: 'target_requested', byPilot: false, subject: 'Accountants', count: null, targetId: null, detail: null, on: '2026-10-13T11:00:00Z' },
     ];
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ activity })} />, { locale: 'en' });
     const log = screen.getByTestId('growth-pilot-activity');
@@ -479,7 +492,7 @@ describe('GrowthPilotApp', () => {
   });
 
   describe('ads', () => {
-    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null };
+    const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
     const ADS: GrowthProposalView = { ...PROPOSAL, id: 'ad1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
     it('says approving ads publishes nothing yet', () => {
@@ -519,7 +532,7 @@ describe('GrowthPilotApp', () => {
     });
 
     it('never shows a raw failure code: unknown ones become a plain sentence, in Hebrew too', () => {
-      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_error_190', adsStatus: 'failed' as const, adsFailure: 'no_images' };
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_error_190', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], createdOn: '', updatedOn: '', adsStatus: 'failed' as const, adsFailure: 'no_images' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(screen.getByText('Publishing failed (something went wrong, try again in a minute). No ad was switched on, so nothing was spent.')).toBeInTheDocument();
       expect(screen.getByText('The ads could not be made (no image passed the quality check, ask for a change to try again)')).toBeInTheDocument();
@@ -531,7 +544,7 @@ describe('GrowthPilotApp', () => {
     });
 
     it('reassures that a failed publish spent nothing, once, and says the same in Hebrew', () => {
-      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded' };
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       const line = screen.getByText(/^Publishing failed/);
       expect(line).toHaveTextContent('too many requests right now, try again in a few minutes). No ad was switched on, so nothing was spent.');
@@ -542,7 +555,7 @@ describe('GrowthPilotApp', () => {
     });
 
     it('says when trying again will not help (AI account out of credit) and never leaks the code, in Hebrew too', () => {
-      const target = { ...ACTIVE_TARGET, adsStatus: 'failed' as const, adsFailure: 'provider_billing', publishStatus: 'failed' as const, publishFailure: 'upload_failed' };
+      const target = { ...ACTIVE_TARGET, adsStatus: 'failed' as const, adsFailure: 'provider_billing', publishStatus: 'failed' as const, publishFailure: 'upload_failed', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(view.container).toHaveTextContent('trying again will not help - please contact GrowthOS support');
       expect(view.container).toHaveTextContent('the upload to Facebook and Instagram did not go through');
@@ -555,7 +568,7 @@ describe('GrowthPilotApp', () => {
     });
 
     it('words a timed-out or idea-less ads run in plain language, in Hebrew too', () => {
-      const target = { ...ACTIVE_TARGET, adsStatus: 'failed' as const, adsFailure: 'timed_out', publishStatus: 'failed' as const, publishFailure: 'no_concepts' };
+      const target = { ...ACTIVE_TARGET, adsStatus: 'failed' as const, adsFailure: 'timed_out', publishStatus: 'failed' as const, publishFailure: 'no_concepts', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(view.container).toHaveTextContent('it took too long and was given up');
       expect(view.container).toHaveTextContent('could not come up with ideas');
@@ -568,7 +581,7 @@ describe('GrowthPilotApp', () => {
     });
 
     it('explains a restricted ad account in words, in both languages', () => {
-      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_account_restricted' };
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'meta_account_restricted', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(view.container).toHaveTextContent('Facebook has restricted your ad account');
       expect(view.container).not.toHaveTextContent('meta_account_restricted');
@@ -580,18 +593,18 @@ describe('GrowthPilotApp', () => {
     });
 
     it('explains a publish failure the person can act on instead of "try again"', () => {
-      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required' };
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(view.container).toHaveTextContent('verify your ad account in Ads Manager');
       expect(view.container).not.toHaveTextContent('account_action_required');
       view.unmount();
-      const auth = { ...target, publishFailure: 'auth_failed' };
+      const auth = { ...target, publishFailure: 'auth_failed', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [auth] })} />, { locale: 'en' });
       expect(screen.getByText(/reconnect your ad account in Ad platform connections/)).toBeInTheDocument();
     });
 
     it('does not blame the daily AI limit when the ad platform rate-limits a publish', () => {
-      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded' };
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
       expect(view.container).toHaveTextContent('the ad platform is receiving too many requests');
       expect(view.container).not.toHaveTextContent('AI limit');
@@ -611,8 +624,8 @@ describe('GrowthPilotApp', () => {
 
   describe('landing pages', () => {
     const CONTENT = { eyebrow: 'For small offices', headline: 'Sign 20 documents a month', subheadline: 'On WhatsApp, for 20 ILS.', benefits: [{ title: 'Fast', text: 'Signed in seconds' }], steps: ['Upload', 'Send'], faq: [{ question: 'Price?', answer: '20 ILS a month' }], ctaText: 'Start now', closingHeadline: 'Ready to sign?' };
-    const PAGE = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'draft' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://easy-sign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=abcDEF123456' };
-    const TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: 'lp1', landingStatus: 'ready' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null };
+    const PAGE = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'draft' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://easy-sign.co.il/?utm_source=growthos&utm_medium=landing_page&utm_campaign=abcDEF123456', publishedOn: null };
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: 'lp1', landingStatus: 'ready' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
     const PROPOSAL_LP: GrowthProposalView = { ...PROPOSAL, id: 'p-lp', kind: 'landing_page', landingPageId: 'lp1', draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
     it('warns that approving the page puts it online', () => {
@@ -640,7 +653,7 @@ describe('GrowthPilotApp', () => {
         <GrowthPilotApp
           orgId="o"
           projectId="p"
-          initial={page({ proposals: [], targets: [{ ...TARGET, landingStatus: 'published' }, { ...TARGET, id: 't2', landingPageId: null, landingStatus: 'failed', landingFailure: 'quota_exceeded', audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null }], landingPages: [{ ...PAGE, status: 'published' }] })}
+          initial={page({ proposals: [], targets: [{ ...TARGET, landingStatus: 'published' }, { ...TARGET, id: 't2', landingPageId: null, landingStatus: 'failed', landingFailure: 'quota_exceeded', audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' }], landingPages: [{ ...PAGE, status: 'published' }] })}
         />,
         { locale: 'en' },
       );
@@ -652,7 +665,7 @@ describe('GrowthPilotApp', () => {
   });
 
   describe('audiences', () => {
-    const TARGET = { id: 't1', kind: 'audience' as const, name: 'Freelancers', description: 'Self-employed', audience: 'Fast', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'ready' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null };
+    const TARGET = { id: 't1', kind: 'audience' as const, name: 'Freelancers', description: 'Self-employed', audience: 'Fast', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'ready' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
     const PLAN = { summary: 'Freelancers in Israel who sign contracts', targeting: { countries: ['IL'], ageMin: 25, ageMax: 65, genders: [] as ('male' | 'female')[], customAudiences: [], interests: [{ id: 'i1', name: 'Freelancer', sizeLower: 1, sizeUpper: 2 }] }, unresolvedInterests: ['Paperwork'], reach: { lower: 52000, upper: 81000 }, meta: 'ok' };
     const AUDIENCE: GrowthProposalView = { ...PROPOSAL, id: 'p-aud', kind: 'audience', audience: PLAN, draft: { kind: 'audience', name: 'Freelancers', description: '', audience: '', reason: '' } };
 
@@ -683,7 +696,7 @@ describe('GrowthPilotApp', () => {
     it('without Meta says how to get the interests matched, and shows a failed audience with its reason', () => {
       const noMeta = { ...AUDIENCE, audience: { ...PLAN, meta: 'no_meta_credential', reach: null, targeting: { ...PLAN.targeting, interests: [], genders: ['female' as const] } } };
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [noMeta], targets: [{ ...TARGET, audienceStatus: 'failed', audienceFailure: 'quota_exceeded' }] })} />, { locale: 'en' });
-      expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Facebook and Instagram (Meta) ad account');
+      expect(screen.getByTestId('growth-pilot-audience-meta')).toHaveTextContent('Connect your Facebook and Instagram ad account');
       expect(screen.getByTestId('growth-pilot-audience')).toHaveTextContent('Women');
       expect(screen.queryByTestId('growth-pilot-audience-reach')).toBeNull();
       expect(screen.getByTestId('growth-pilot-audience-meta').textContent ?? '').not.toMatch(/^Meta /);
@@ -710,7 +723,7 @@ describe('GrowthPilotApp', () => {
   });
 
   describe('publishing', () => {
-    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'ready' as const, publishFailure: null };
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'ready' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
     const PLAN = { destination: 'meta' as const, imageIds: ['i1', 'i2'], dailyBudget: 20, linkUrl: 'https://app.growthos.io/lp/abc', campaignName: 'EasySign - Free plan', countries: ['IL'] };
     const PUBLISH: GrowthProposalView = { ...PROPOSAL, id: 'pub1', kind: 'publish', briefId: 'b1', publish: PLAN, previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Free plan', description: '', audience: '', reason: '' } };
 
@@ -760,7 +773,7 @@ describe('GrowthPilotApp', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [PUBLISH], targets: [TARGET] })} />, { locale: 'en' });
       const card = screen.getByTestId('growth-pilot-proposal');
       expect(card).toHaveTextContent(`Publish the ads for ${isolate('Free plan')}`);
-      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The page people open after clicking: https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
@@ -860,7 +873,7 @@ describe('GrowthPilotApp', () => {
     it('shows how to connect Meta when that is what publishing waits for', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" metaConnectHref="/api/integrations/meta/start?orgId=o" initial={page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'needs_meta' }] })} />, { locale: 'en' });
       const line = screen.getByTestId('growth-pilot-target-publish');
-      expect(line).toHaveTextContent('Ready to publish once your Facebook and Instagram (Meta) ad account is connected.');
+      expect(line).toHaveTextContent('Ready to publish once your Facebook and Instagram ad account is connected.');
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
     });
 
@@ -890,11 +903,78 @@ describe('GrowthPilotApp', () => {
   });
 
   it('shows each published target its own clicks and spend from Meta', async () => {
-    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'running' as const, publishFailure: null };
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'running' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
     const totals = { spend: 84.5, impressions: 1000, clicks: 310, linkClicks: 200, conversions: 3, ctr: 0.31, cpc: 0.27, costPerConversion: 28.17 };
     stubFetch({ body: { status: 'ok', since: 'a', until: 'b', summary: { totals, daily: [], byTarget: { t1: totals } } } });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [TARGET] })} />, { locale: 'en' });
     expect(await screen.findByTestId('growth-pilot-target-results')).toHaveTextContent('310 clicks, 84.5 spent');
     expect(screen.getByTestId('growth-pilot-target-publish')).toHaveTextContent('Ads are running');
+  });
+
+  describe('overview and details', () => {
+    const LIVE = liveTarget({ id: 't1', name: 'Free plan' });
+    const READY = targetView({ id: 't2', name: 'Law firms', adsStatus: 'ready', landingStatus: 'ready', audienceStatus: 'ready' });
+    const ADS = { ...PROPOSAL, id: 'ads2', kind: 'ads' as const, targetId: 't2', briefId: 'b2', draft: { kind: 'service' as const, name: 'Law firms', description: '', audience: '', reason: '' } };
+
+    it('shows overall progress, the counts, and the single most important decision with the way to it', () => {
+      stubFetch({ body: { status: 'none' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [LIVE, READY], proposals: [ADS] })} />, { locale: 'en' });
+      const overview = screen.getByTestId('growth-pilot-overview');
+      expect(within(overview).getByTestId('growth-pilot-overview-waiting')).toHaveTextContent('1decision waits for you');
+      expect(within(overview).getByTestId('growth-pilot-next')).toHaveAttribute('data-next', 'ads');
+      expect(within(overview).getByTestId('growth-pilot-next')).toHaveTextContent('Look at the ads made for');
+      expect(within(overview).getByTestId('growth-pilot-next-go')).toHaveAttribute('href', '#proposal-ads2');
+      expect(document.getElementById('proposal-ads2')).not.toBeNull();
+      // The live target: 6 of 7 steps (no results yet); the other: only the idea, 1 of 7.
+      expect(within(overview).getByTestId('growth-pilot-overview-percent')).toHaveTextContent('50%');
+    });
+
+    it('says nothing waits when the person is all caught up', () => {
+      stubFetch({ body: { status: 'none' } });
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [{ ...READY, adsStatus: 'approved', audienceStatus: 'approved', landingStatus: 'published', publishStatus: 'rejected' }], proposals: [] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-next')).toHaveAttribute('data-next', 'none');
+    });
+
+    it('links each promoted item, and the feed lines about it, to its details page, with its progress', () => {
+      stubFetch({ body: { status: 'none' } });
+      const activity = [
+        { id: 'a1', kind: 'ads_ready' as const, byPilot: true, subject: 'Law firms', count: 3, targetId: 't2', detail: null, on: '2026-10-13T10:00:00Z' },
+        { id: 'a2', kind: 'proposal_approved' as const, byPilot: false, subject: 'Free plan', count: null, targetId: null, detail: null, on: '2026-10-13T09:00:00Z' },
+        { id: 'a3', kind: 'pilot_paused' as const, byPilot: false, subject: null, count: null, targetId: null, detail: null, on: '2026-10-13T08:00:00Z' },
+      ];
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [LIVE, READY], proposals: [ADS], activity })} />, { locale: 'en' });
+      const cards = screen.getAllByTestId('growth-pilot-target');
+      expect(within(cards[0]).getByTestId('growth-pilot-target-details')).toHaveAttribute('href', '/orgs/o/projects/p/growth-pilot/targets/t1');
+      expect(within(cards[1]).getByTestId('growth-pilot-target-title-link')).toHaveAttribute('href', '/orgs/o/projects/p/growth-pilot/targets/t2');
+      expect(within(cards[1]).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '14');
+      const links = within(screen.getByTestId('growth-pilot-activity')).getAllByTestId('growth-pilot-activity-link');
+      expect(links.map((link) => link.getAttribute('href'))).toEqual(['/orgs/o/projects/p/growth-pilot/targets/t2', '/orgs/o/projects/p/growth-pilot/targets/t1']);
+    });
+
+    it('previews new words proposed for a live page, not the live words', () => {
+      stubFetch({ body: { status: 'none' } });
+      const CONTENT = { eyebrow: 'e', headline: 'Live words', subheadline: 's', benefits: [], steps: [], faq: [], ctaText: 'Go', closingHeadline: 'c' };
+      const LP = { id: 'lp1', targetId: 't1', slug: 'abcDEF123456', status: 'published' as const, content: CONTENT, dir: 'ltr' as const, ctaUrl: 'https://a.co/', publishedOn: null };
+      const change = { ...PROPOSAL, id: 'lpc', kind: 'landing_page' as const, landingPageId: 'lp1', landingContent: { ...CONTENT, headline: 'Proposed words' } };
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [LIVE], proposals: [change], landingPages: [LP] })} />, { locale: 'en' });
+      const card = screen.getByTestId('growth-pilot-proposal');
+      expect(card).toHaveTextContent('Proposed words');
+      expect(card).not.toHaveTextContent('Live words');
+      expect(card).toHaveTextContent('New words for your live web page');
+    });
+  });
+});
+
+describe('GrowthPilotApp target card links to Meta', () => {
+  it('opens the campaign in Meta Ads Manager from the card once the ads are on Meta, and not before', () => {
+    stubFetch({ body: { status: 'none' } });
+    const url = 'https://adsmanager.facebook.com/adsmanager/manage/ads?act=99&selected_campaign_ids=2385';
+    const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [liveTarget({ adsManagerUrl: url })], proposals: [] })} />, { locale: 'en' });
+    const link = within(screen.getByTestId('growth-pilot-target')).getByTestId('growth-pilot-ads-manager');
+    expect(link).toHaveAttribute('href', url);
+    expect(link).toHaveAttribute('target', '_blank');
+    unmount();
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ targets: [liveTarget({ adsManagerUrl: url, publishStatus: 'failed', publishFailure: 'rejected' })], proposals: [] })} />, { locale: 'en' });
+    expect(screen.queryByTestId('growth-pilot-ads-manager')).toBeNull();
   });
 });
