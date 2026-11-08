@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { AutomationProposeCampaignDraftForm } from './automation-propose-campaign-draft-form';
 import type { AutomationTargetView } from '@/lib/orgs/automation-view';
 import messages from '../../messages/en.json';
+import heMessages from '../../messages/he.json';
 
 const refresh = vi.fn();
 
@@ -68,6 +69,16 @@ describe('AutomationProposeCampaignDraftForm', () => {
       dailyBudgetUsd: 25,
     });
     expect((body.draft.adGroups as unknown[]).length).toBe(1);
+  });
+
+  it('names the Facebook and Instagram option in plain words, not "Meta" (en + he)', () => {
+    renderForm();
+    expect(screen.getByRole('option', { name: 'Facebook & Instagram' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Meta' })).toBeNull();
+    const label = (heMessages as unknown as { Automation: Record<string, string> }).Automation
+      .proposeDraftPlatformMetaOption;
+    expect(label).toBeTruthy();
+    expect(label).not.toMatch(/Meta/);
   });
 
   it('switches to Meta and submits a meta discriminated-union draft with the right shape', async () => {
