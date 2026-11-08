@@ -47,6 +47,7 @@ import {
   updateGrowthProposalLandingContent,
   GrowthTargetChangeNotAllowedError,
   AdStudioAutomationStoppedError,
+  decideGrowthProposal,
   getLiveAudienceProposal,
   getLiveGrowthTarget,
   markGrowthLiveAudienceApplied,
@@ -83,6 +84,7 @@ import {
   GROWTH_TARGET_KINDS,
   growthBriefInput,
   isValidGrowthDailyBudget,
+  isLiveGrowthPublishStatus,
   pickSiteLinks,
   proposedTargetsFromAnalysis,
   sanitizeAudienceDraft,
@@ -879,6 +881,12 @@ async function quietly(run: () => Promise<unknown>): Promise<void> {
  */
 export async function approveGrowthLiveAudience(ctx: { organizationId: string; projectId: string; actorId: string; proposalId: string; now?: Date }, deps: GrowthPlatformDeps = {}): Promise<GrowthProposalModel> {
   await ensureOrm();
+  // Proposed while the ads were on Meta, but they are not any more (new ads replaced them): an ordinary audience decision, kept for the next publish.
+  const pending = await getGrowthProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
+  const owner = pending.target_id ? await getGrowthTarget(ctx.organizationId, ctx.projectId, pending.target_id) : null;
+  if (owner && !isLiveGrowthPublishStatus(owner.publish_status)) {
+    return decideGrowthProposal({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: pending.id, decision: 'approve', actorId: ctx.actorId, now: ctx.now });
+  }
   const { proposal, target } = await getLiveAudienceProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
   const kms = serverKms();
   if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');

@@ -17,6 +17,18 @@ Template for each entry:
 
 ---
 
+## 2026-11-08 — Growth Pilot live controls: budget, Ads Manager link, audience on live ads, suggestion thresholds
+
+- **Last completed:**
+  - Daily budget of running ads: a Daily budget card on the target detail page (amount + currency; `budget_currency` read from Meta at publish/change, else "ad account currency"), "Change budget" for `canExecute` only, two steps (type, then confirm with the amount and currency spelled out). `POST .../targets/[targetId]` `{action:'budget', dailyBudget}` needs `automation.execute`; `changeGrowthBudget` (ad-studio) -> `setAdStudioMetaDailyBudget` (ORM) sets the budget where it lives - the campaign (CBO), as publishing creates it, else the ad sets; raising is refused while the kill switch is on. Range 1..100000 (`isValidGrowthDailyBudget`, shared with publish). Stored on the target (`daily_budget`), feed `budget_changed`/`budget_change_failed`, push, audit. New "raise the budget" suggestion (good CTR + conversions + budget nearly all spent) opens the change prefilled, never sends it.
+  - Meta Ads Manager link: `meta_refs` (account, campaign, ad sets, ads) stored on the target when publishing (nothing backfilled); `metaAdsManagerUrl` (shared, pure) in the Done list (published/turned on), the "What else" actions and the target card.
+  - Audience after the ads are live: `canChangeGrowthTarget` now allows it; the planned audience comes back as a proposal with `applies_to_live` (explains the live ad set changes and Meta may restart learning); approving needs `automation.execute` and goes through `approveGrowthLiveAudience` -> `updateAdStudioMetaTargeting`: in-place ad set targeting edit; if Meta refuses (400), a new PAUSED ad set in the same campaign with the same creatives, old one paused first, new one turned on only if the old one was on; export rows + target refs repointed. Declining keeps the live audience. Asking for it does not drop a pending "turn on" decision.
+  - Suggestion thresholds as settings: `GrowthPilotPlatformSettingsModel` (operators, with its own change history) + `GrowthPilotProjectSettingsModel` (project admins, `project.manage`, audited), resolved project > platform > built-in. Admin pages `/orgs/:org/projects/:project/growth-pilot/settings` and `/operator/growth-pilots/settings` (validation, reset to defaults). `suggestions.ts` is pure given the thresholds.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** verify against a real Meta account (by a human): the budget update on a CBO campaign, an in-place targeting edit on an ACTIVE ad set, and the replacement path. Budgets are sent in minor units (x100), like publishing - wrong for zero-decimal currencies (JPY etc.).
+- **Waiting on human:** deploy (not done by this run).
+
 ## 2026-11-07 — Growth Pilot: details & progress page per promoted item, target change requests
 
 - **Last completed:**

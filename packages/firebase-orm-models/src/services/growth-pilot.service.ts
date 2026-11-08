@@ -327,7 +327,9 @@ async function proposalTarget(proposal: GrowthProposalModel): Promise<GrowthTarg
 export async function decideGrowthProposal(params: Scope & { proposalId: string; decision: 'approve' | 'reject'; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
   const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
   if (proposal.status !== 'pending') throw new GrowthProposalNotPendingError(proposal.status);
-  if (params.decision === 'approve' && (proposal.kind === 'publish' || proposal.kind === 'activate' || (proposal.kind === 'audience' && proposal.applies_to_live))) throw new GrowthProposalNeedsPlatformError();
+  // A new audience for ads still on Meta changes the live ad set (see markGrowthLiveAudienceApplied); once they are not, it is an ordinary audience.
+  const liveAudience = proposal.kind === 'audience' && proposal.applies_to_live === true && isLiveGrowthPublishStatus((await proposalTarget(proposal))?.publish_status);
+  if (params.decision === 'approve' && (proposal.kind === 'publish' || proposal.kind === 'activate' || liveAudience)) throw new GrowthProposalNeedsPlatformError();
   const now = (params.now ?? new Date()).toISOString();
   proposal.status = params.decision === 'approve' ? 'approved' : 'rejected';
   proposal.decided_by = params.actorId;
@@ -370,7 +372,7 @@ export async function decideGrowthProposal(params: Scope & { proposalId: string;
     await target.save();
     if (params.decision === 'approve') await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: 'landing_published', actor: params.actorId, subject: target.name, targetId: target.id, now: params.now });
   }
-  if (target && proposal.kind === 'audience' && proposal.applies_to_live) {
+  if (target && liveAudience) {
     // Only declining reaches here (approving acts on Meta, see markGrowthLiveAudienceApplied): the live ads keep the audience they have.
     target.audience_status = proposal.previous_audience_status ?? 'approved';
     target.updated_on = now;

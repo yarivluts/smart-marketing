@@ -51,6 +51,7 @@ const orm = vi.hoisted(() => ({
   markGrowthLiveAudienceApplied: vi.fn(),
   recordGrowthLiveAudienceFailure: vi.fn(),
   readAdStudioMetaCurrency: vi.fn(),
+  decideGrowthProposal: vi.fn(),
 }));
 
 vi.mock('@growthos/firebase-orm-models', async (importOriginal) => ({ ...(await importOriginal<object>()), ...orm }));
@@ -624,6 +625,8 @@ describe('changing live ads', () => {
   });
 
   it('applies an approved live audience to the ad set, and keeps the proposal waiting when Meta refuses', async () => {
+    orm.getGrowthProposal.mockResolvedValue({ id: 'aud1', kind: 'audience', target_id: 't1', applies_to_live: true });
+    orm.getGrowthTarget.mockResolvedValue(LIVE);
     orm.getLiveAudienceProposal.mockResolvedValue({ proposal: { id: 'aud1', audience: AUDIENCE }, target: LIVE });
     const retarget = vi.fn(async () => ({ mode: 'replaced', adSets: [{ from: 's1', to: 's2', status: 'ACTIVE' }], adSetIds: ['s2'], adIds: ['a3'] }));
     await approveGrowthLiveAudience({ organizationId: 'o', projectId: 'p', actorId: 'u', proposalId: 'aud1' }, { retarget: retarget as never });
@@ -637,6 +640,15 @@ describe('changing live ads', () => {
     await expect(approveGrowthLiveAudience({ organizationId: 'o', projectId: 'p', actorId: 'u', proposalId: 'aud1' }, { retarget: refused as never })).rejects.toBeInstanceOf(MetaAdsApiError);
     expect(orm.recordGrowthLiveAudienceFailure).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'aud1', failureCode: 'auth_failed' }));
     expect(orm.markGrowthLiveAudienceApplied).not.toHaveBeenCalled();
+  });
+
+  it('approves as an ordinary audience when the ads are no longer on Meta, without touching Meta', async () => {
+    orm.getGrowthProposal.mockResolvedValue({ id: 'aud1', kind: 'audience', target_id: 't1', applies_to_live: true });
+    orm.getGrowthTarget.mockResolvedValue({ ...LIVE, publish_status: 'none' });
+    const retarget = vi.fn();
+    await approveGrowthLiveAudience({ organizationId: 'o', projectId: 'p', actorId: 'u', proposalId: 'aud1' }, { retarget: retarget as never });
+    expect(retarget).not.toHaveBeenCalled();
+    expect(orm.decideGrowthProposal).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'aud1', decision: 'approve', actorId: 'u' }));
   });
 
   it('reads Meta ids from export rows and words platform failures as stable codes', () => {

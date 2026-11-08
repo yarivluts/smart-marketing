@@ -141,6 +141,19 @@ describe('the live ads of a target', () => {
     expect((await getGrowthTarget(scope.organizationId, scope.projectId, targetId)).audience_status).toBe('approved');
   });
 
+  it('a live audience whose ads were replaced since is decided like any audience: no platform step', async () => {
+    const { scope, pilot, targetId, briefId } = await publishedTarget();
+    const live = await saveGrowthAudienceProposal({ ...scope, targetId, plan: PLAN });
+    // New ads approved for the target: its old ones wait to be replaced, so nothing is live to retarget.
+    const target = await getGrowthTarget(scope.organizationId, scope.projectId, targetId);
+    target.publish_status = 'none';
+    await target.save();
+    await decideGrowthProposal({ ...scope, proposalId: live.id, decision: 'approve' });
+    expect((await listGrowthProposals(scope.organizationId, scope.projectId, pilot.id)).find((row) => row.id === live.id)?.status).toBe('approved');
+    expect((await getAdStudioBrief(scope.organizationId, scope.projectId, briefId)).meta_targeting).toMatchObject({ ageMin: 30 });
+    expect((await getGrowthTarget(scope.organizationId, scope.projectId, targetId)).audience_status).toBe('approved');
+  });
+
   it('applies an approved live audience: the brief keeps it, the target its new ad sets, the feed says so; a failure leaves the proposal waiting', async () => {
     const { scope, pilot, targetId, briefId } = await publishedTarget();
     const live = await saveGrowthAudienceProposal({ ...scope, targetId, plan: PLAN });
