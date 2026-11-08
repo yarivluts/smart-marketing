@@ -70,6 +70,16 @@ describe('SharedAdsView', () => {
   });
 });
 
+describe('SharedAdsView intro', () => {
+  it('explains the buttons in plain words, without the word "placement"', () => {
+    renderWithIntl(<SharedAdsView page={PAGE} />);
+    expect(screen.getByText(/Use the buttons above each ad to see how it looks in each place it will show/)).toBeInTheDocument();
+    expect(screen.queryByText(/placement/i)).not.toBeInTheDocument();
+    renderWithIntl(<SharedAdsView page={PAGE} />, { locale: 'he' });
+    expect(screen.getByText(heMessages.AdShare.public.intro)).toBeInTheDocument();
+  });
+});
+
 describe('SharedAdsInactive', () => {
   it('says the link is no longer active without telling why', () => {
     renderWithIntl(<SharedAdsInactive />);
