@@ -4146,6 +4146,7 @@
       "provider_error": "The AI service had a problem on its side, not yours. Wait a minute and try again."
     },
     "quotaExceeded": "You have used today's AI allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
+    "videoQuotaExceeded": "You have used today's video allowance ({used} of {limit} seconds of video). It starts again tomorrow, or a project admin can raise it in the studio settings.",
     "errorInvalidBrief": "Check what the ad is about: {reasons}",
     "briefIssues": {
       "name": "Give the ad a short name (up to 120 characters).",
