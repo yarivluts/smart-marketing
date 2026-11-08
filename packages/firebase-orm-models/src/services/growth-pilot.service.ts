@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   canChangeGrowthTarget,
+  isLiveGrowthPublishStatus,
   landingCtaUrl,
   normalizeSiteUrl,
   siteHost,
@@ -22,6 +23,7 @@ import {
   GrowthTargetModel,
   type GrowthActivityKind,
   type GrowthTargetChangeRequest,
+  type GrowthTargetMetaRefs,
   type GrowthPublishPlan,
   type GrowthPilotPage,
 } from '../models/growth-pilot.model';
@@ -93,7 +95,7 @@ async function audit(scope: Scope, actorId: string, action: string, targetType: 
   }
 }
 
-export async function recordGrowthActivity(params: Scope & { pilotId: string; kind: GrowthActivityKind; actor: string; subject?: string | null; count?: number | null; targetId?: string | null; now?: Date }): Promise<GrowthActivityModel> {
+export async function recordGrowthActivity(params: Scope & { pilotId: string; kind: GrowthActivityKind; actor: string; subject?: string | null; count?: number | null; targetId?: string | null; detail?: string | null; now?: Date }): Promise<GrowthActivityModel> {
   const row = new GrowthActivityModel();
   row.organization_id = params.organizationId;
   row.project_id = params.projectId;
@@ -103,6 +105,7 @@ export async function recordGrowthActivity(params: Scope & { pilotId: string; ki
   row.subject = params.subject ?? null;
   row.count = params.count ?? null;
   row.target_id = params.targetId ?? null;
+  row.detail = params.detail ?? null;
   row.created_on = (params.now ?? new Date()).toISOString();
   row.setPathParams(pathParams(params.organizationId, params.projectId));
   await row.save();
@@ -324,7 +327,9 @@ async function proposalTarget(proposal: GrowthProposalModel): Promise<GrowthTarg
 export async function decideGrowthProposal(params: Scope & { proposalId: string; decision: 'approve' | 'reject'; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
   const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
   if (proposal.status !== 'pending') throw new GrowthProposalNotPendingError(proposal.status);
-  if (params.decision === 'approve' && (proposal.kind === 'publish' || proposal.kind === 'activate')) throw new GrowthProposalNeedsPlatformError();
+  // A new audience for ads still on Meta changes the live ad set (see markGrowthLiveAudienceApplied); once they are not, it is an ordinary audience.
+  const liveAudience = proposal.kind === 'audience' && proposal.applies_to_live === true && isLiveGrowthPublishStatus((await proposalTarget(proposal))?.publish_status);
+  if (params.decision === 'approve' && (proposal.kind === 'publish' || proposal.kind === 'activate' || liveAudience)) throw new GrowthProposalNeedsPlatformError();
   const now = (params.now ?? new Date()).toISOString();
   proposal.status = params.decision === 'approve' ? 'approved' : 'rejected';
   proposal.decided_by = params.actorId;
@@ -367,7 +372,12 @@ export async function decideGrowthProposal(params: Scope & { proposalId: string;
     await target.save();
     if (params.decision === 'approve') await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: 'landing_published', actor: params.actorId, subject: target.name, targetId: target.id, now: params.now });
   }
-  if (target && proposal.kind === 'audience') {
+  if (target && liveAudience) {
+    // Only declining reaches here (approving acts on Meta, see markGrowthLiveAudienceApplied): the live ads keep the audience they have.
+    target.audience_status = proposal.previous_audience_status ?? 'approved';
+    target.updated_on = now;
+    await target.save();
+  } else if (target && proposal.kind === 'audience') {
     // Approving puts the audience on the target's ads, where publishing reads it.
     if (params.decision === 'approve' && proposal.audience && target.brief_id) {
       await saveAdStudioMetaTargeting({ organizationId: params.organizationId, projectId: params.projectId, briefId: target.brief_id, targeting: proposal.audience.targeting, now: params.now });
@@ -684,6 +694,10 @@ export async function saveGrowthAudienceProposal(params: Scope & { targetId: str
   proposal.brief_id = target.brief_id ?? null;
   proposal.landing_page_id = null;
   proposal.audience = params.plan;
+  // Ads already on Meta: approving this changes who the live ad set reaches, and declining it keeps the audience they have.
+  const live = isLiveGrowthPublishStatus(target.publish_status);
+  proposal.applies_to_live = live;
+  proposal.previous_audience_status = live ? (target.audience_status ?? null) : null;
   proposal.preview_image_ids = null;
   proposal.change_requests = [];
   proposal.decided_by = null;
@@ -776,7 +790,17 @@ export async function markGrowthTargetNeedsMeta(params: Scope & { targetId: stri
  * The person approved publishing and the ads now exist, paused, on Meta: the proposal is decided, the
  * target remembers its ads, and turning them on becomes the next proposal - spending is its own decision.
  */
-export async function markGrowthAdsPublished(params: Scope & { proposalId: string; exportIds: string[]; dailyBudget: number; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
+export async function markGrowthAdsPublished(params: Scope & {
+  proposalId: string;
+  exportIds: string[];
+  dailyBudget: number;
+  /** Where the ads now live on Meta, for the Ads Manager link; null when the rows did not say. */
+  metaRefs?: GrowthTargetMetaRefs | null;
+  /** The ad account's currency, when it could be read. */
+  currency?: string | null;
+  actorId: string;
+  now?: Date;
+}): Promise<GrowthProposalModel> {
   const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
   if (proposal.status !== 'pending' || proposal.kind !== 'publish' || !proposal.target_id || !proposal.publish) throw new GrowthProposalNotPendingError(proposal.status);
   const now = (params.now ?? new Date()).toISOString();
@@ -790,6 +814,9 @@ export async function markGrowthAdsPublished(params: Scope & { proposalId: strin
   target.publish_status = 'published';
   target.publish_failure = null;
   target.ad_export_ids = params.exportIds;
+  target.daily_budget = params.dailyBudget;
+  target.budget_currency = params.currency ?? null;
+  target.meta_refs = params.metaRefs ?? null;
   target.updated_on = now;
   await target.save();
   await newPlatformProposal(params, target, 'activate', { ...proposal.publish }, now).save();
@@ -826,6 +853,85 @@ export async function markGrowthAdsRunning(params: Scope & { proposalId: string;
   await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'ads_activated', actor: params.actorId, subject: target.name, targetId: target.id, now: params.now });
   await audit(params, params.actorId, 'growth_pilot.ads_activated', 'growth_proposal', proposal.id, `Turned on the ads for "${target.name}"`, { daily_budget: proposal.publish?.dailyBudget ?? null });
   return proposal;
+}
+
+export class GrowthTargetNotLiveError extends Error {
+  constructor() {
+    super('This item has no ads on Meta to change.');
+    this.name = 'GrowthTargetNotLiveError';
+  }
+}
+
+/** The target, when its ads are on Meta (published or running); otherwise there is nothing live to change. */
+export async function getLiveGrowthTarget(organizationId: string, projectId: string, targetId: string): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(organizationId, projectId, targetId);
+  if (target.status !== 'active' || !isLiveGrowthPublishStatus(target.publish_status) || !target.ad_export_ids?.length) throw new GrowthTargetNotLiveError();
+  return target;
+}
+
+/** The person changed the daily budget of the target's live ads, and Meta took it: the target shows the new amount. */
+export async function recordGrowthBudgetChange(params: Scope & { targetId: string; dailyBudget: number; previousDailyBudget: number | null; currency: string | null; actorId: string; now?: Date }): Promise<GrowthTargetModel> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  target.daily_budget = params.dailyBudget;
+  if (params.currency) target.budget_currency = params.currency;
+  target.updated_on = (params.now ?? new Date()).toISOString();
+  await target.save();
+  const currency = params.currency ?? target.budget_currency ?? null;
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'budget_changed', actor: params.actorId, subject: target.name, count: params.dailyBudget, detail: currency, targetId: target.id, now: params.now });
+  await audit(params, params.actorId, 'growth_pilot.budget_changed', 'growth_target', target.id, `Changed the daily budget of "${target.name}" to ${params.dailyBudget}${currency ? ` ${currency}` : ''}`, {
+    daily_budget: params.dailyBudget,
+    previous_daily_budget: params.previousDailyBudget,
+    currency,
+  });
+  return target;
+}
+
+/** Changing the budget failed on Meta: the ads keep the budget they had; the feed and the audit trail say why. */
+export async function recordGrowthBudgetChangeFailure(params: Scope & { targetId: string; dailyBudget: number; failureCode: string; actorId: string; now?: Date }): Promise<void> {
+  const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'budget_change_failed', actor: params.actorId, subject: target.name, count: params.dailyBudget, detail: params.failureCode, targetId: target.id, now: params.now });
+  await audit(params, params.actorId, 'growth_pilot.budget_change_failed', 'growth_target', target.id, `Changing the daily budget of "${target.name}" failed (${params.failureCode})`, { daily_budget: params.dailyBudget, failure_code: params.failureCode });
+}
+
+/** A pending audience proposal for ads already on Meta, with its target; anything else is not this decision. */
+export async function getLiveAudienceProposal(organizationId: string, projectId: string, proposalId: string): Promise<{ proposal: GrowthProposalModel; target: GrowthTargetModel }> {
+  const proposal = await getGrowthProposal(organizationId, projectId, proposalId);
+  if (proposal.status !== 'pending' || proposal.kind !== 'audience' || !proposal.applies_to_live || !proposal.audience || !proposal.target_id) throw new GrowthProposalNotPendingError(proposal.status);
+  return { proposal, target: await getLiveGrowthTarget(organizationId, projectId, proposal.target_id) };
+}
+
+/**
+ * The person approved a new audience for ads already on Meta, and Meta now reaches it: the proposal
+ * is decided, the audience is kept on the ads' brief (so publishing again uses it), and the target
+ * remembers the ad sets and ads it now has - new ones when Meta made the pilot replace the ad set.
+ */
+export async function markGrowthLiveAudienceApplied(params: Scope & { proposalId: string; mode: 'updated' | 'replaced'; adSetIds: string[]; adIds: string[]; actorId: string; now?: Date }): Promise<GrowthProposalModel> {
+  const { proposal, target } = await getLiveAudienceProposal(params.organizationId, params.projectId, params.proposalId);
+  const now = (params.now ?? new Date()).toISOString();
+  proposal.status = 'approved';
+  proposal.decided_by = params.actorId;
+  proposal.decided_on = now;
+  proposal.updated_on = now;
+  await proposal.save();
+  if (target.brief_id && proposal.audience) {
+    await saveAdStudioMetaTargeting({ organizationId: params.organizationId, projectId: params.projectId, briefId: target.brief_id, targeting: proposal.audience.targeting, now: params.now });
+  }
+  target.audience_status = 'approved';
+  target.audience_failure = null;
+  if (target.meta_refs) target.meta_refs = { ...target.meta_refs, ad_set_ids: params.adSetIds, ad_ids: params.adIds };
+  target.updated_on = now;
+  await target.save();
+  await recordGrowthActivity({ ...params, pilotId: target.pilot_id, kind: 'audience_applied', actor: params.actorId, subject: target.name, detail: params.mode, targetId: target.id, now: params.now });
+  await audit(params, params.actorId, 'growth_pilot.live_audience_applied', 'growth_proposal', proposal.id, `Changed who the live ads of "${target.name}" reach`, { mode: params.mode, ad_set_ids: params.adSetIds, ad_ids: params.adIds });
+  return proposal;
+}
+
+/** Meta did not take the new audience: the proposal stays waiting so the person can try again; the live ads keep their audience. */
+export async function recordGrowthLiveAudienceFailure(params: Scope & { proposalId: string; failureCode: string; actorId: string; now?: Date }): Promise<void> {
+  const proposal = await getGrowthProposal(params.organizationId, params.projectId, params.proposalId);
+  const target = proposal.target_id ? await getGrowthTarget(params.organizationId, params.projectId, proposal.target_id) : null;
+  await recordGrowthActivity({ ...params, pilotId: proposal.pilot_id, kind: 'audience_apply_failed', actor: params.actorId, subject: target?.name ?? proposal.draft?.name ?? '', detail: params.failureCode, targetId: proposal.target_id ?? null, now: params.now });
+  await audit(params, params.actorId, 'growth_pilot.live_audience_failed', 'growth_proposal', proposal.id, `Changing who the live ads reach failed (${params.failureCode})`, { failure_code: params.failureCode });
 }
 
 export class GrowthTargetChangeNotAllowedError extends Error {
@@ -879,7 +985,9 @@ export async function startGrowthTargetChange(params: Scope & { targetId: string
   const target = await getGrowthTarget(params.organizationId, params.projectId, params.targetId);
   if (!canChangeGrowthTarget(growthTargetChangeFacts(target), params.area)) throw new GrowthTargetChangeNotAllowedError(params.area);
   const now = (params.now ?? new Date()).toISOString();
-  if (params.area !== 'landing') {
+  // A new audience for ads already on Meta changes their ad set in place: the decision to turn them on still stands.
+  const liveAudience = params.area === 'audience' && isLiveGrowthPublishStatus(target.publish_status);
+  if (params.area !== 'landing' && !liveAudience) {
     const rows = await GrowthProposalModel.initPath(pathParams(params.organizationId, params.projectId)).where('target_id', '==', target.id).get();
     for (const row of rows.filter((candidate) => (candidate.kind === 'publish' || candidate.kind === 'activate') && candidate.status === 'pending')) {
       row.status = 'rejected';

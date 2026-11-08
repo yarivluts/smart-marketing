@@ -3,5 +3,7 @@ export * from './audience';
 export * from './brief';
 export * from './changes';
 export * from './landing';
+export * from './live-ads';
 export * from './performance';
 export * from './site';
+export * from './suggestion-thresholds';

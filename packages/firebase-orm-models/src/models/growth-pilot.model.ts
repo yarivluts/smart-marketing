@@ -191,11 +191,34 @@ export class GrowthTargetModel extends BaseModel {
   @Field({ is_required: false })
   public change_requests?: GrowthTargetChangeRequest[] | null;
 
+  /**
+   * The daily budget its ads run with on Meta, in the ad account's currency: set when they are
+   * published and whenever the person changes it. Absent for targets published before it was kept.
+   */
+  @Field({ is_required: false })
+  public daily_budget?: number | null;
+
+  /** The ad account's currency (ISO 4217) as Meta reported it; null when it could not be read. */
+  @Field({ is_required: false })
+  public budget_currency?: string | null;
+
+  /** The Meta ids of its published ads (account, campaign, ad sets, ads), for the Ads Manager link. */
+  @Field({ is_required: false })
+  public meta_refs?: GrowthTargetMetaRefs | null;
+
   @Field({ is_required: true })
   public created_on!: string;
 
   @Field({ is_required: true })
   public updated_on!: string;
+}
+
+/** Where a target's published ads live on Meta. The ad account id is without the `act_` prefix. */
+export interface GrowthTargetMetaRefs {
+  ad_account_id: string;
+  campaign_id: string;
+  ad_set_ids: string[];
+  ad_ids: string[];
 }
 
 /**
@@ -270,6 +293,17 @@ export class GrowthProposalModel extends BaseModel {
   @Field({ is_required: false })
   public audience?: GrowthAudiencePlan | null;
 
+  /**
+   * An audience proposed for ads already on Meta (kind `audience`): approving it updates the live ad
+   * set's targeting - an act on the ad platform, so it needs the publish permission.
+   */
+  @Field({ is_required: false })
+  public applies_to_live?: boolean | null;
+
+  /** Where the target's audience stood before this live change was proposed, so declining it puts it back. */
+  @Field({ is_required: false })
+  public previous_audience_status?: GrowthAudienceStatus | null;
+
   /** The landing page to approve (kind `landing_page`). */
   @Field({ is_required: false })
   public landing_page_id?: string | null;
@@ -325,6 +359,10 @@ export const GROWTH_ACTIVITY_KINDS = [
   'ads_published',
   'publish_failed',
   'ads_activated',
+  'budget_changed',
+  'budget_change_failed',
+  'audience_applied',
+  'audience_apply_failed',
 ] as const;
 export type GrowthActivityKind = (typeof GROWTH_ACTIVITY_KINDS)[number];
 
@@ -359,6 +397,10 @@ export class GrowthActivityModel extends BaseModel {
   /** The target the line is about, when it is about one (its details page lists it). */
   @Field({ is_required: false })
   public target_id?: string | null;
+
+  /** One more fact the line words, as a code or a value: a currency, a failure code. */
+  @Field({ is_required: false })
+  public detail?: string | null;
 
   @Field({ is_required: true })
   public created_on!: string;

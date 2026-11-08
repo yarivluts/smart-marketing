@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { decideGrowthProposal, getGrowthProposal } from '@growthos/firebase-orm-models';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { approveGrowthActivation, approveGrowthPublish, resolveAdStudioLlm, reviseGrowthProposal } from '@/lib/ad-studio/engine';
+import { approveGrowthActivation, approveGrowthLiveAudience, approveGrowthPublish, resolveAdStudioLlm, reviseGrowthProposal } from '@/lib/ad-studio/engine';
 import { loadGrowthPilotPage } from '@/lib/growth-pilot/store';
 import { growthPilotErrorResponse } from '@/lib/growth-pilot/http';
 
@@ -17,7 +17,8 @@ export const maxDuration = 300;
  * The person's decision on a proposal: `{ action: 'approve' | 'reject' }`, or `{ action: 'revise',
  * request }` to have the AI change it (it comes back for a decision). Returns the page data.
  * Gated on `ai.use`; approving a `publish` (with `dailyBudget`) or an `activate` proposal acts on the
- * ad platform - publishing paused ads, then turning them on - and needs `automation.execute`.
+ * ad platform - publishing paused ads, then turning them on - and needs `automation.execute`. So does
+ * approving an `audience` proposal for ads already on Meta: it changes the live ad set's targeting.
  * Approvals and rejections are audited.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
@@ -35,7 +36,11 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       await reviseGrowthProposal({ organizationId: orgId, projectId, actorId: user.id, llm, proposalId, request: typeof body?.request === 'string' ? body.request : '' });
     } else {
       const proposal = await getGrowthProposal(orgId, projectId, proposalId);
-      if (action === 'approve' && (proposal.kind === 'publish' || proposal.kind === 'activate')) {
+      if (action === 'approve' && proposal.kind === 'audience' && proposal.applies_to_live) {
+        const gate = await requireProjectPermission(orgId, projectId, 'automation.execute');
+        if (gate.error) return gate.error;
+        await approveGrowthLiveAudience({ organizationId: orgId, projectId, actorId: user.id, proposalId });
+      } else if (action === 'approve' && (proposal.kind === 'publish' || proposal.kind === 'activate')) {
         const gate = await requireProjectPermission(orgId, projectId, 'automation.execute');
         if (gate.error) return gate.error;
         const llm = resolveAdStudioLlm();

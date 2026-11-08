@@ -6,6 +6,7 @@ import { isPlatformOperator } from '@/lib/auth/platform-operator';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { OperatorPilots, type OperatorPilotRow } from '@/components/growth-pilot/operator-pilots';
+import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{ params: Promise<{ locale: string }> }>;
 
@@ -23,6 +24,7 @@ export default async function OperatorGrowthPilotsPage({ params }: PageProps): P
   if (!isPlatformOperator(user.email)) notFound();
   await ensureFirestoreOrm();
   const t = await getTranslations('GrowthPilot.operator');
+  const ts = await getTranslations('GrowthPilot.settings');
   const index = (await listGrowthPilotIndex()).filter((row) => row.status !== 'archived');
   const names = new Map<string, string>();
   for (const organizationId of new Set(index.map((row) => row.organization_id))) {
@@ -45,6 +47,9 @@ export default async function OperatorGrowthPilotsPage({ params }: PageProps): P
       <header className="flex flex-col gap-1">
         <h1 className="font-pp-display text-2xl font-bold">{t('title')}</h1>
         <p className="text-sm text-muted-foreground">{t('description')}</p>
+        <Link href="/operator/growth-pilots/settings" className="self-start text-sm font-semibold text-primary hover:underline" data-testid="operator-growth-pilot-settings-link">
+          {ts('operatorLink')}
+        </Link>
       </header>
       <OperatorPilots rows={rows} />
     </div>

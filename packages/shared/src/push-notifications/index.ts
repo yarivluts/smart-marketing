@@ -31,6 +31,8 @@ const CATEGORY_BY_EVENT: Record<PushEventSource, Readonly<Record<string, PushCat
     ads_published: 'publishing',
     landing_published: 'publishing',
     ads_activated: 'publishing',
+    budget_changed: 'publishing',
+    audience_applied: 'publishing',
     analysis_failed: 'failures',
     revision_failed: 'failures',
     ads_failed: 'failures',
@@ -38,6 +40,8 @@ const CATEGORY_BY_EVENT: Record<PushEventSource, Readonly<Record<string, PushCat
     landing_failed: 'failures',
     audience_failed: 'failures',
     publish_failed: 'failures',
+    budget_change_failed: 'failures',
+    audience_apply_failed: 'failures',
   },
   ad_studio: {
     run_awaiting_approval: 'approvals',

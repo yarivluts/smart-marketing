@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canChangeGrowthTarget, growthChangeAreas, isGrowthChangeArea, tidyGrowthChangeRequest, type GrowthChangeFacts } from './changes';
+import { canChangeGrowthTarget, growthChangeAreas, isGrowthChangeArea, isLiveGrowthPublishStatus, tidyGrowthChangeRequest, type GrowthChangeFacts } from './changes';
 
 const LIVE: GrowthChangeFacts = { status: 'active', briefId: 'b1', adsStatus: 'approved', landingStatus: 'published', audienceStatus: 'approved', publishStatus: 'none' };
 
@@ -26,11 +26,19 @@ describe('growthChangeAreas', () => {
     for (const status of ['ready', 'published', 'rejected', 'failed']) expect(canChangeGrowthTarget({ ...LIVE, landingStatus: status }, 'landing')).toBe(true);
   });
 
-  it('does not offer the audience once the ads are live', () => {
-    expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'published' }, 'audience')).toBe(false);
-    expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'running' }, 'audience')).toBe(false);
+  it('offers the audience also once the ads are published or running (the change then updates the live ad set)', () => {
+    expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'published' }, 'audience')).toBe(true);
+    expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'running' }, 'audience')).toBe(true);
+    expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'running', audienceStatus: 'rejected' }, 'audience')).toBe(true);
     expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'rejected' }, 'audience')).toBe(true);
     expect(canChangeGrowthTarget({ ...LIVE, audienceStatus: 'none' }, 'audience')).toBe(false);
+    expect(canChangeGrowthTarget({ ...LIVE, publishStatus: 'running', pendingAreas: ['audience'] }, 'audience')).toBe(false);
+  });
+
+  it('knows which publish states are live on the platform', () => {
+    expect(isLiveGrowthPublishStatus('published')).toBe(true);
+    expect(isLiveGrowthPublishStatus('running')).toBe(true);
+    for (const status of ['none', 'ready', 'needs_meta', 'failed', 'rejected', null, undefined]) expect(isLiveGrowthPublishStatus(status)).toBe(false);
   });
 
   it('does not offer a part already being changed', () => {

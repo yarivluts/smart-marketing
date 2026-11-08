@@ -1,26 +1,21 @@
-import type { GrowthChangeArea, GrowthPerformanceTotals } from '@growthos/shared';
+import { DEFAULT_GROWTH_SUGGESTION_THRESHOLDS, type GrowthChangeArea, type GrowthPerformanceTotals, type GrowthSuggestionThresholds } from '@growthos/shared';
 import type { GrowthProposalView, GrowthTargetView } from './view';
 
 /**
  * What the pilot suggests changing for one target, by fixed rules over its state and its results -
  * deterministic, so the same facts always give the same advice, and every suggestion is something the
- * pilot can actually do: applying one sends the matching change request (or makes the video).
+ * pilot can actually do: applying one sends the matching change request, makes the video, or opens
+ * the budget change (which the person still confirms). The numbers the rules compare against are the
+ * project's thresholds (an admin setting over platform defaults); given them, this is a pure function.
  */
 
-export const GROWTH_SUGGESTIONS = ['no_clicks', 'low_ctr', 'no_conversions', 'add_video', 'retry_video', 'ads_failed', 'ads_declined', 'landing_failed', 'landing_declined', 'audience_failed'] as const;
+export const GROWTH_SUGGESTIONS = ['no_clicks', 'low_ctr', 'no_conversions', 'raise_budget', 'add_video', 'retry_video', 'ads_failed', 'ads_declined', 'landing_failed', 'landing_declined', 'audience_failed'] as const;
 export type GrowthSuggestionId = (typeof GROWTH_SUGGESTIONS)[number];
 
-export type GrowthSuggestion = { id: GrowthSuggestionId; action: 'change'; area: GrowthChangeArea } | { id: GrowthSuggestionId; action: 'video' };
+export type GrowthSuggestion = { id: GrowthSuggestionId; action: 'change'; area: GrowthChangeArea } | { id: GrowthSuggestionId; action: 'video' } | { id: GrowthSuggestionId; action: 'budget' };
 
-/** Days the ads must have been on before "no clicks" is a signal and not just a slow start. */
-export const NO_CLICKS_AFTER_DAYS = 3;
-/** Fewer impressions than this and no clicks is still too early to judge. */
-export const NO_CLICKS_MIN_IMPRESSIONS = 300;
-/** Click-through below this, over at least {@link LOW_CTR_MIN_IMPRESSIONS} impressions, means the ad does not speak to people. */
-export const LOW_CTR = 0.005;
-export const LOW_CTR_MIN_IMPRESSIONS = 1_000;
-/** Clicks with no conversion: past this many, the page (not the ad) is the likely problem. */
-export const NO_CONVERSIONS_MIN_CLICKS = 30;
+/** How far back the performance numbers the page reads reach: "spent the whole budget" averages over at most this many days. */
+export const RESULTS_WINDOW_DAYS = 30;
 
 export interface GrowthSuggestionInput {
   target: GrowthTargetView;
@@ -29,7 +24,13 @@ export interface GrowthSuggestionInput {
   changeAreas: readonly GrowthChangeArea[];
   /** Whether a video model is configured, so a video can be made. */
   videoAvailable: boolean;
+  /** Whether the person may change the budget (the publish permission): only then is "raise the budget" offered. */
+  canChangeBudget?: boolean;
+  /** The daily budget the ads run with now; null when it is not known. */
+  dailyBudget?: number | null;
   results?: GrowthPerformanceTotals | null;
+  /** The project's thresholds; the built-in defaults when not given. */
+  thresholds?: GrowthSuggestionThresholds;
   now: Date;
 }
 
@@ -43,18 +44,39 @@ export function daysRunning(target: GrowthTargetView, proposals: readonly Growth
   return Math.floor((now.getTime() - new Date(on).getTime()) / DAY_MS);
 }
 
+/** The daily budget its ads run with: kept on the target, or (for ads published before it was kept) the one approved at publishing. */
+export function currentDailyBudget(target: GrowthTargetView, proposals: readonly GrowthProposalView[]): number | null {
+  if (target.dailyBudget !== null) return target.dailyBudget;
+  return proposals.filter((proposal) => proposal.targetId === target.id && proposal.kind === 'publish' && proposal.status === 'approved').at(-1)?.publish?.dailyBudget ?? null;
+}
+
+/**
+ * Results good enough, and held back by the budget: on for long enough, a good click-through, enough
+ * conversions, and most of the daily budget spent on average over the days the numbers cover.
+ */
+export function budgetHoldsBack(results: GrowthPerformanceTotals, days: number, dailyBudget: number, thresholds: GrowthSuggestionThresholds): boolean {
+  if (days < thresholds.raiseBudgetAfterDays || dailyBudget <= 0) return false;
+  if (results.ctr === null || results.ctr < thresholds.raiseBudgetMinCtr) return false;
+  if (results.conversions < thresholds.raiseBudgetMinConversions) return false;
+  const covered = Math.max(1, Math.min(days, RESULTS_WINDOW_DAYS));
+  return results.spend / covered >= dailyBudget * thresholds.raiseBudgetSpendShare;
+}
+
 export function growthSuggestions(input: GrowthSuggestionInput): GrowthSuggestion[] {
   const { target, results, changeAreas } = input;
   if (target.status !== 'active') return [];
+  const limits = input.thresholds ?? DEFAULT_GROWTH_SUGGESTION_THRESHOLDS;
   const out: GrowthSuggestion[] = [];
   const can = (area: GrowthChangeArea) => changeAreas.includes(area);
   const days = daysRunning(target, input.proposals, input.now);
 
   // Results first: they say most about what to change.
   if (results && days !== null) {
-    if (can('ads') && days >= NO_CLICKS_AFTER_DAYS && results.impressions >= NO_CLICKS_MIN_IMPRESSIONS && results.clicks === 0) out.push({ id: 'no_clicks', action: 'change', area: 'ads' });
-    else if (can('ads') && results.impressions >= LOW_CTR_MIN_IMPRESSIONS && results.clicks > 0 && results.ctr !== null && results.ctr < LOW_CTR) out.push({ id: 'low_ctr', action: 'change', area: 'ads' });
-    if (can('landing') && target.landingStatus === 'published' && results.clicks >= NO_CONVERSIONS_MIN_CLICKS && results.conversions === 0) out.push({ id: 'no_conversions', action: 'change', area: 'landing' });
+    if (can('ads') && days >= limits.noClicksAfterDays && results.impressions >= limits.noClicksMinImpressions && results.clicks === 0) out.push({ id: 'no_clicks', action: 'change', area: 'ads' });
+    else if (can('ads') && results.impressions >= limits.lowCtrMinImpressions && results.clicks > 0 && results.ctr !== null && results.ctr < limits.lowCtr) out.push({ id: 'low_ctr', action: 'change', area: 'ads' });
+    if (can('landing') && target.landingStatus === 'published' && results.clicks >= limits.noConversionsMinClicks && results.conversions === 0) out.push({ id: 'no_conversions', action: 'change', area: 'landing' });
+    const budget = input.dailyBudget ?? null;
+    if (input.canChangeBudget && budget !== null && budgetHoldsBack(results, days, budget, limits)) out.push({ id: 'raise_budget', action: 'budget' });
   }
 
   if (input.videoAvailable && target.briefId && (target.adsStatus === 'ready' || target.adsStatus === 'approved')) {

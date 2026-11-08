@@ -4,6 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
+import { getEffectiveGrowthThresholds } from '@growthos/firebase-orm-models';
 import { loadGrowthPilotPage } from '@/lib/growth-pilot/store';
 import { isMetaOAuthConfigured, metaConnectHref } from '@/lib/integrations/meta';
 import { resolveAdStudioVideoDeps } from '@/lib/ad-studio/engine';
@@ -35,6 +36,8 @@ export default async function GrowthTargetPage({ params }: PageProps): Promise<R
   if (!initial || !initial.targets.some((target) => target.id === targetId)) notFound();
   const canConnect = can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
   const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
+  const canManage = can(bindings, principal, 'project.manage', { orgId, projectId });
+  const thresholds = await getEffectiveGrowthThresholds(orgId, projectId);
   const connectHref = canConnect ? metaConnectHref({ orgId, projectId, locale, returnTo: `/${locale}${here}` }) : null;
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
@@ -47,6 +50,8 @@ export default async function GrowthTargetPage({ params }: PageProps): Promise<R
         canExecute={canExecute}
         canAct
         videoAvailable={resolveAdStudioVideoDeps().omni !== null}
+        thresholds={thresholds}
+        settingsHref={canManage ? `/orgs/${orgId}/projects/${projectId}/growth-pilot/settings` : null}
       />
     </div>
   );
