@@ -267,6 +267,9 @@ describe('GrowthTargetDetail live ads', () => {
     fireEvent.change(within(card).getByTestId('growth-pilot-budget-input'), { target: { value: '30' } });
     fireEvent.click(within(card).getByTestId('growth-pilot-budget-review'));
     expect(within(card).getByTestId('growth-pilot-budget-confirm')).toHaveTextContent(budgetWords.confirmBodyNoCurrency);
+    // A newcomer does not know "Meta": the confirmation names the apps they use.
+    expect(budgetWords.confirmBodyNoCurrency).not.toMatch(/\bMeta\b/);
+    expect(budgetWords.confirmBody).not.toMatch(/\bMeta\b/);
     fireEvent.click(within(card).getByTestId('growth-pilot-budget-confirm-back'));
     fireEvent.click(within(card).getByTestId('growth-pilot-budget-cancel'));
     expect(within(card).getByTestId('growth-pilot-budget-change')).toBeInTheDocument();

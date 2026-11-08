@@ -6590,8 +6590,8 @@
         "review": "Review the change",
         "cancel": "Cancel",
         "confirmTitle": "Set the daily budget to {amount}?",
-        "confirmBody": "Meta will spend up to this amount in {currency} every day the ads run, starting now. You can change it again at any time.",
-        "confirmBodyNoCurrency": "Meta will spend up to this amount, in your ad account currency, every day the ads run, starting now. You can change it again at any time.",
+        "confirmBody": "Facebook and Instagram will spend up to this amount in {currency} every day the ads run, starting now. You can change it again at any time.",
+        "confirmBodyNoCurrency": "Facebook and Instagram will spend up to this amount, in your ad account currency, every day the ads run, starting now. You can change it again at any time.",
         "confirmYes": "Yes, set {amount} a day",
         "confirmBack": "Back"
       },
