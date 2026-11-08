@@ -202,9 +202,9 @@ describe('GrowthTargetDetail', () => {
   it('lists only this item activity, and what the pilot is doing now in plain words', () => {
     stubServer();
     const activity = [
-      { id: 'a1', kind: 'ads_ready' as const, byPilot: true, subject: 'Digital signature', count: 4, targetId: 't1', on: '2026-11-02T10:00:00.000Z' },
-      { id: 'a2', kind: 'ads_ready' as const, byPilot: true, subject: 'Law firms', count: 2, targetId: 't2', on: '2026-11-02T11:00:00.000Z' },
-      { id: 'a3', kind: 'pilot_paused' as const, byPilot: false, subject: null, count: null, targetId: null, on: '2026-11-02T12:00:00.000Z' },
+      { id: 'a1', kind: 'ads_ready' as const, byPilot: true, subject: 'Digital signature', count: 4, targetId: 't1', detail: null, on: '2026-11-02T10:00:00.000Z' },
+      { id: 'a2', kind: 'ads_ready' as const, byPilot: true, subject: 'Law firms', count: 2, targetId: 't2', detail: null, on: '2026-11-02T11:00:00.000Z' },
+      { id: 'a3', kind: 'pilot_paused' as const, byPilot: false, subject: null, count: null, targetId: null, detail: null, on: '2026-11-02T12:00:00.000Z' },
     ];
     const target = targetView({ adsStatus: 'approved', landingStatus: 'ready', audienceStatus: 'approved', changeRequests: [{ area: 'ads', text: 'Brighter', on: '2026-11-03T10:00:00.000Z', outcome: 'pending', failureCode: null }] });
     render(pageData({ targets: [target], activity, proposals: [proposalView({ id: 'lp', kind: 'landing_page', status: 'revising' })] }));
@@ -225,5 +225,144 @@ describe('GrowthTargetDetail', () => {
     stubServer();
     renderWithIntl(<GrowthTargetDetail orgId="o" projectId="p" targetId="t1" initial={pageData({ targets: [liveTarget()] })} now={NOW} />, { locale: 'he' });
     expect(screen.getByText(/חזרה לטייס הצמיחה/)).toBeInTheDocument();
+  });
+});
+
+describe('GrowthTargetDetail live ads', () => {
+  const budgetWords = en.GrowthPilot.detail.budget;
+  const ADS_MANAGER = 'https://adsmanager.facebook.com/adsmanager/manage/ads?act=99&selected_campaign_ids=2385';
+  const TURNED_ON = proposalView({ id: 'on', kind: 'activate', status: 'approved', decidedOn: '2026-11-05T11:00:00.000Z' });
+
+  it('shows the daily budget with its currency, and changes it only after the person confirms the amount and currency', async () => {
+    const fetchMock = stubServer({ post: { body: pageData({ targets: [liveTarget({ dailyBudget: 45, budgetCurrency: 'USD' })] }) } });
+    render(pageData({ targets: [liveTarget({ dailyBudget: 20, budgetCurrency: 'USD' })], proposals: [TURNED_ON] }));
+    const card = screen.getByTestId('growth-pilot-detail-budget');
+    expect(within(card).getByTestId('growth-pilot-budget-current')).toHaveTextContent('$20.00 a day');
+
+    fireEvent.click(within(card).getByTestId('growth-pilot-budget-change'));
+    const input = within(card).getByTestId('growth-pilot-budget-input');
+    expect(input).toHaveValue(20);
+    // Out of range: refused before anything is sent.
+    fireEvent.change(input, { target: { value: '0.5' } });
+    expect(within(card).getByTestId('growth-pilot-budget-review')).toBeDisabled();
+    expect(within(card).getByText(budgetWords.invalid.replace('{min}', '1').replace('{max}', '100000'))).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: '45' } });
+    fireEvent.click(within(card).getByTestId('growth-pilot-budget-review'));
+
+    const confirm = within(card).getByTestId('growth-pilot-budget-confirm');
+    expect(confirm).toHaveTextContent('Set the daily budget to $45.00?');
+    expect(confirm).toHaveTextContent('in USD every day');
+    expect(posts(fetchMock)).toEqual([]);
+    fireEvent.click(within(confirm).getByTestId('growth-pilot-budget-confirm-yes'));
+    await waitFor(() => expect(posts(fetchMock)).toEqual([{ url: `${BASE}/targets/t1`, body: { action: 'budget', dailyBudget: 45 } }]));
+    await waitFor(() => expect(within(card).getByTestId('growth-pilot-budget-current')).toHaveTextContent('$45.00 a day'));
+  });
+
+  it('can step back from the confirmation without sending anything', () => {
+    const fetchMock = stubServer();
+    render(pageData({ targets: [liveTarget({ dailyBudget: 20, budgetCurrency: null })], proposals: [TURNED_ON] }));
+    const card = screen.getByTestId('growth-pilot-detail-budget');
+    expect(card).toHaveTextContent(budgetWords.accountCurrency);
+    fireEvent.click(within(card).getByTestId('growth-pilot-budget-change'));
+    fireEvent.change(within(card).getByTestId('growth-pilot-budget-input'), { target: { value: '30' } });
+    fireEvent.click(within(card).getByTestId('growth-pilot-budget-review'));
+    expect(within(card).getByTestId('growth-pilot-budget-confirm')).toHaveTextContent(budgetWords.confirmBodyNoCurrency);
+    fireEvent.click(within(card).getByTestId('growth-pilot-budget-confirm-back'));
+    fireEvent.click(within(card).getByTestId('growth-pilot-budget-cancel'));
+    expect(within(card).getByTestId('growth-pilot-budget-change')).toBeInTheDocument();
+    expect(posts(fetchMock)).toEqual([]);
+  });
+
+  it('shows the budget but no change to someone who may not publish, and no budget before the ads are on Meta', () => {
+    stubServer();
+    const { unmount } = render(pageData({ targets: [liveTarget({ dailyBudget: 20, budgetCurrency: 'ILS' })], proposals: [TURNED_ON] }), { canExecute: false });
+    const card = screen.getByTestId('growth-pilot-detail-budget');
+    expect(within(card).getByTestId('growth-pilot-budget-needs-owner')).toBeInTheDocument();
+    expect(within(card).queryByTestId('growth-pilot-budget-change')).toBeNull();
+    unmount();
+    render(pageData({ targets: [targetView({ adsStatus: 'approved' })] }));
+    expect(screen.queryByTestId('growth-pilot-detail-budget')).toBeNull();
+  });
+
+  it('falls back to the budget approved at publishing for ads published before the target kept it', () => {
+    stubServer();
+    const published = proposalView({ id: 'pub', kind: 'publish', status: 'approved', publish: { destination: 'meta', imageIds: [], dailyBudget: 25, linkUrl: 'https://a.co', campaignName: 'C', countries: ['IL'] } });
+    render(pageData({ targets: [liveTarget()], proposals: [published, TURNED_ON] }));
+    expect(screen.getByTestId('growth-pilot-budget-current')).toHaveTextContent('25 a day');
+  });
+
+  it('links to Meta Ads Manager from the done list and the actions once the ads are on Meta', () => {
+    stubServer();
+    render(pageData({ targets: [liveTarget({ adsManagerUrl: ADS_MANAGER })], proposals: [TURNED_ON] }));
+    const links = within(screen.getByTestId('growth-pilot-detail-done')).getAllByTestId('growth-pilot-done-ads-manager');
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', ADS_MANAGER);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveTextContent(words.adsManagerLink);
+    }
+    const action = screen.getAllByTestId('growth-pilot-action').find((item) => item.getAttribute('data-action') === 'adsManager');
+    expect(action?.querySelector('a')).toHaveAttribute('href', ADS_MANAGER);
+  });
+
+  it('suggests more budget when results are good and the budget is spent; applying opens the change, prefilled, without sending it', async () => {
+    const results = { spend: 95, impressions: 5000, clicks: 100, linkClicks: 90, conversions: 4, ctr: 0.02, cpc: 0.95, costPerConversion: 23.75 };
+    const fetchMock = stubServer({ performance: { status: 'ok', since: '', until: '', summary: { totals: results, daily: [], byTarget: { t1: results } } } });
+    render(pageData({ targets: [liveTarget({ dailyBudget: 20, budgetCurrency: 'USD' })], proposals: [TURNED_ON] }));
+    const suggestion = await screen.findByText(words.suggestions.raise_budget.title);
+    const item = suggestion.closest('[data-testid="growth-pilot-suggestion"]') as HTMLElement;
+    fireEvent.click(within(item).getByTestId('growth-pilot-suggestion-apply'));
+    expect(screen.getByTestId('growth-pilot-budget-input')).toHaveValue(30);
+    expect(posts(fetchMock)).toEqual([]);
+  });
+
+  it('does not suggest more budget by a stricter project threshold, nor to someone who may not publish', async () => {
+    const results = { spend: 95, impressions: 5000, clicks: 100, linkClicks: 90, conversions: 4, ctr: 0.02, cpc: 0.95, costPerConversion: 23.75 };
+    stubServer({ performance: { status: 'ok', since: '', until: '', summary: { totals: results, daily: [], byTarget: { t1: results } } } });
+    const strict = { ...(await import('@growthos/shared')).DEFAULT_GROWTH_SUGGESTION_THRESHOLDS, raiseBudgetMinConversions: 10 };
+    const { unmount } = render(pageData({ targets: [liveTarget({ dailyBudget: 20 })], proposals: [TURNED_ON] }), { thresholds: strict });
+    await waitFor(() => expect(screen.getByTestId('growth-pilot-detail-results')).toBeInTheDocument());
+    expect(screen.queryByText(words.suggestions.raise_budget.title)).toBeNull();
+    unmount();
+    render(pageData({ targets: [liveTarget({ dailyBudget: 20 })], proposals: [TURNED_ON] }), { canExecute: false });
+    await waitFor(() => expect(screen.getByTestId('growth-pilot-detail-results')).toBeInTheDocument());
+    expect(screen.queryByText(words.suggestions.raise_budget.title)).toBeNull();
+  });
+
+  it('a new audience for live ads says it changes the live ad set, and needs the publish permission to apply', async () => {
+    const audience = { summary: 'Older offices', targeting: { countries: ['IL'], ageMin: 40, ageMax: 65, genders: [], customAudiences: [], interests: [] }, unresolvedInterests: [], reach: null, meta: 'ok' };
+    const live = proposalView({ id: 'aud', kind: 'audience', audience, appliesToLive: true, draft: { kind: 'service', name: 'Digital signature', description: '', audience: '', reason: '' } });
+    const fetchMock = stubServer({ post: { body: pageData({ targets: [liveTarget()], proposals: [] }) } });
+    const { unmount } = render(pageData({ targets: [liveTarget({ audienceStatus: 'ready' })], proposals: [TURNED_ON, live] }));
+    const card = screen.getAllByTestId('growth-pilot-proposal').find((item) => item.id === 'proposal-aud') as HTMLElement;
+    expect(within(card).getByTestId('growth-pilot-live-audience')).toHaveTextContent(en.GrowthPilot.audience.liveExplain);
+    fireEvent.click(within(card).getByTestId('growth-pilot-approve'));
+    await waitFor(() => expect(posts(fetchMock)).toEqual([{ url: `${BASE}/proposals/aud`, body: { action: 'approve' } }]));
+    unmount();
+
+    render(pageData({ targets: [liveTarget({ audienceStatus: 'ready' })], proposals: [TURNED_ON, live] }), { canExecute: false });
+    const readOnly = screen.getAllByTestId('growth-pilot-proposal').find((item) => item.id === 'proposal-aud') as HTMLElement;
+    expect(within(readOnly).queryByTestId('growth-pilot-approve')).toBeNull();
+    expect(within(readOnly).getByTestId('growth-pilot-needs-owner')).toBeInTheDocument();
+  });
+
+  it('offers the audience as a change for live ads, and links admins to the suggestion settings', () => {
+    stubServer();
+    render(pageData({ targets: [liveTarget({ adsManagerUrl: ADS_MANAGER })], proposals: [TURNED_ON] }), { settingsHref: '/orgs/o/projects/p/growth-pilot/settings' });
+    expect(screen.getByTestId('growth-pilot-change-area-audience')).toBeInTheDocument();
+    const action = screen.getAllByTestId('growth-pilot-action').find((item) => item.getAttribute('data-action') === 'thresholds');
+    expect(action?.querySelector('a')).toHaveAttribute('href', '/orgs/o/projects/p/growth-pilot/settings');
+  });
+
+  it('words budget and audience changes in the feed, with the amount and currency', () => {
+    stubServer();
+    const activity = [
+      { id: 'b1', kind: 'budget_changed' as const, byPilot: false, subject: 'Digital signature', count: 45, targetId: 't1', detail: 'USD', on: '2026-11-06T10:00:00.000Z' },
+      { id: 'b2', kind: 'audience_applied' as const, byPilot: false, subject: 'Digital signature', count: null, targetId: 't1', detail: 'updated', on: '2026-11-06T11:00:00.000Z' },
+    ];
+    render(pageData({ targets: [liveTarget()], proposals: [TURNED_ON], activity }));
+    const feed = screen.getByTestId('growth-pilot-activity');
+    expect(feed).toHaveTextContent('You set the daily budget for Digital signature to $45.00');
+    expect(feed).toHaveTextContent('You changed who the live ads for Digital signature reach');
   });
 });

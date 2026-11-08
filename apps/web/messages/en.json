@@ -6096,7 +6096,8 @@
         "target": "Approve and the AI starts making ads, a web page for the people who click them and a list of who to reach. Nothing goes live yet.",
         "ads": "Approve to keep these ads. They are not published yet - you will be asked before anything is sent.",
         "landing": "Approve and the page goes online at a public address that anyone with the link can open.",
-        "audience": "Approve to show the ads to these people. Nothing is published yet."
+        "audience": "Approve to show the ads to these people. Nothing is published yet.",
+        "audienceLive": "Approve and the live ads reach these people instead. Whether they are on or off stays as it is."
       },
       "change": "Ask for a change",
       "changePlaceholder": "What should change? For example: only small offices in Tel Aviv",
@@ -6106,7 +6107,8 @@
       "asked": "You asked: {text}",
       "changeFailed": "The AI could not make that change ({reason}). The proposal is unchanged.",
       "for": "For",
-      "readOnly": "You can see this, but only someone who can use the AI in this project can decide on it."
+      "readOnly": "You can see this, but only someone who can use the AI in this project can decide on it.",
+      "rejectHintAudienceLive": "Not right? Reject it - the live ads keep the people they reach now."
     },
     "kind": {
       "product": "Product",
@@ -6157,7 +6159,11 @@
         "audience_failed": "Could not work out who to reach for {subject}",
         "ads_published": "{count, plural, one {Sent # switched-off ad to Facebook and Instagram} other {Sent # switched-off ads to Facebook and Instagram}} for {subject}",
         "publish_failed": "Could not publish the ads for {subject}",
-        "ads_activated": "You turned on the ads for {subject}"
+        "ads_activated": "You turned on the ads for {subject}",
+        "budget_changed": "You set the daily budget for {subject} to {budget}",
+        "budget_change_failed": "Could not change the daily budget for {subject}",
+        "audience_applied": "You changed who the live ads for {subject} reach",
+        "audience_apply_failed": "Could not change who the live ads for {subject} reach"
       }
     },
     "errors": {
@@ -6171,7 +6177,7 @@
       "not_ready": "We are still reading your site. Give it a minute, then try again.",
       "not_found": "We could not find that any more. Reload the page to see the latest.",
       "generic": "We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.",
-      "invalid_budget": "Enter a daily budget above zero.",
+      "invalid_budget": "Enter a daily budget from 1 to 100,000.",
       "automationOpen": "Open AI helper",
       "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper and choose Resume automation, then try again.",
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
@@ -6179,7 +6185,10 @@
       "forbidden": "You do not have permission to make this change in this project. Ask the project owner to give you access, then try again.",
       "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost.",
       "not_changeable": "This part cannot be changed right now - it may still be in the making. Reload the page to see where it stands.",
-      "video_unavailable": "Video ads are not available on our side yet, so a video cannot be made. Please contact GrowthOS support."
+      "video_unavailable": "Video ads are not available on our side yet, so a video cannot be made. Please contact GrowthOS support.",
+      "not_live": "These ads are not on Facebook and Instagram any more. Reload the page to see the latest.",
+      "platform_failed": "Facebook and Instagram did not accept the change, so nothing changed. Try again in a minute, or make it in Meta Ads Manager.",
+      "invalid_thresholds": "Some values are out of range. Fix the highlighted fields and save again."
     },
     "ads": {
       "title": "Ads for {name}",
@@ -6230,7 +6239,9 @@
         "approved": "Approved - the ads will be shown to these people once you publish them",
         "rejected": "You rejected these people",
         "failed": "We could not work out who to reach ({reason})"
-      }
+      },
+      "liveExplain": "These ads are already on Facebook and Instagram. Approving changes who the live ads reach right away. Meta may restart its learning, so results can dip for a few days.",
+      "applyLive": "Apply to the live ads"
     },
     "publish": {
       "title": "Publish the ads for {name}",
@@ -6254,7 +6265,8 @@
         "failed": "Publishing failed ({reason}). No ad was switched on, so nothing was spent.",
         "connect": "Connect Facebook and Instagram",
         "turnOnWaiting": "When you are ready, turn them on in the \"Turn on the ads\" card waiting for your approval.",
-        "turnOnDeclined": "The ads stay switched off and nothing is spent. When you want them on, turn them on in your Facebook and Instagram ad account."
+        "turnOnDeclined": "The ads stay switched off and nothing is spent. When you want them on, turn them on in your Facebook and Instagram ad account.",
+        "adsManager": "Open in Meta Ads Manager"
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",
       "confirmCancel": "Not yet"
@@ -6458,6 +6470,14 @@
         "openStudio": {
           "title": "Open in the Ad Studio",
           "why": "For fine-tuning the ads yourself, word by word."
+        },
+        "adsManager": {
+          "title": "Open in Meta Ads Manager",
+          "why": "See and manage these ads where Meta runs them."
+        },
+        "thresholds": {
+          "title": "Suggestion settings",
+          "why": "Choose when the pilot suggests changes, for every item in this project."
         }
       },
       "suggestionsTitle": "Suggestions for changes",
@@ -6511,6 +6531,11 @@
           "title": "Choose who sees the ads again",
           "why": "The audience could not be chosen last time. The pilot can try again.",
           "request": "Choose the audience again."
+        },
+        "raise_budget": {
+          "title": "Raise the daily budget",
+          "why": "People click and sign up or buy, and the ads spend nearly all of their budget every day. A bigger budget can reach more people like them.",
+          "request": "Raise the daily budget."
         }
       },
       "areas": {
@@ -6549,7 +6574,95 @@
         }
       },
       "readOnly": "You can see this item, but only someone who can use the AI in this project can decide or ask for changes.",
-      "activityTitle": "What happened with this item"
+      "activityTitle": "What happened with this item",
+      "budget": {
+        "title": "Daily budget",
+        "perDay": "{amount} a day",
+        "unknown": "Not known yet",
+        "accountCurrency": "In your ad account currency",
+        "needsOwner": "Only someone who may publish ads in this project can change the budget.",
+        "change": "Change budget",
+        "newAmount": "New daily budget",
+        "hint": "The most Facebook and Instagram will spend on these ads each day. You confirm it on the next step.",
+        "invalid": "Enter an amount from {min} to {max}.",
+        "unchanged": "That is the budget now.",
+        "review": "Review the change",
+        "cancel": "Cancel",
+        "confirmTitle": "Set the daily budget to {amount}?",
+        "confirmBody": "Meta will spend up to this amount in {currency} every day the ads run, starting now. You can change it again at any time.",
+        "confirmBodyNoCurrency": "Meta will spend up to this amount, in your ad account currency, every day the ads run, starting now. You can change it again at any time.",
+        "confirmYes": "Yes, set {amount} a day",
+        "confirmBack": "Back"
+      },
+      "thresholdsLink": "Change when the pilot makes these suggestions",
+      "adsManagerLink": "Open in Meta Ads Manager"
+    },
+    "settings": {
+      "metaTitle": "Growth Pilot suggestion settings",
+      "title": "When the pilot makes suggestions",
+      "intro": "The pilot looks at how each item's ads are doing and suggests what to change. These numbers decide when. Leave a field empty to use the default.",
+      "back": "Back to Growth Pilot",
+      "thisProject": "This project",
+      "defaultValue": "Default: {value}",
+      "range": "From {min} to {max}",
+      "usingDefaults": "This project uses the defaults.",
+      "customized": "This project has its own values. Last changed {date}.",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved. New suggestions use these values.",
+      "reset": "Reset to defaults",
+      "resetDone": "Back on the defaults.",
+      "invalid": "Fix the highlighted fields: each value must be within its range.",
+      "failed": "We could not save that just now, and nothing was changed. Try again in a minute.",
+      "groupResults": "When results say the ads or the page need work",
+      "groupBudget": "When to suggest a bigger budget",
+      "fields": {
+        "noClicksAfterDays": {
+          "label": "Days on before \"nobody clicks\" counts",
+          "help": "Ads that are on for fewer days than this are not judged on clicks yet."
+        },
+        "noClicksMinImpressions": {
+          "label": "Times shown before \"nobody clicks\" counts",
+          "help": "With fewer views than this, no clicks is still too early to judge."
+        },
+        "lowCtr": {
+          "label": "Low share of clicks (%)",
+          "help": "Below this share of people who see the ad and click, the pilot suggests a clearer ad."
+        },
+        "lowCtrMinImpressions": {
+          "label": "Times shown before the share of clicks is judged",
+          "help": "The share of clicks is only judged once the ads were shown at least this many times."
+        },
+        "noConversionsMinClicks": {
+          "label": "Clicks with no result before the web page is suspected",
+          "help": "After this many clicks and no sign-up or purchase, the pilot suggests a clearer web page."
+        },
+        "raiseBudgetAfterDays": {
+          "label": "Days on before more budget is suggested",
+          "help": "More budget is only suggested after the ads have been on at least this many days."
+        },
+        "raiseBudgetMinCtr": {
+          "label": "Good share of clicks for more budget (%)",
+          "help": "More budget is only suggested when at least this share of people who see the ad click it."
+        },
+        "raiseBudgetMinConversions": {
+          "label": "Results needed for more budget",
+          "help": "Sign-ups or purchases from the ads needed before more budget is suggested."
+        },
+        "raiseBudgetSpendShare": {
+          "label": "Share of the daily budget spent (%)",
+          "help": "When the ads spend at least this share of their daily budget on average, the budget is what holds them back."
+        }
+      },
+      "operatorTitle": "Default suggestion settings",
+      "operatorIntro": "Every project starts from these values. A project's admins can set their own on its Growth Pilot settings page.",
+      "operatorBack": "Back to all pilots",
+      "operatorCustomized": "Changed from the built-in values. Last changed {date}.",
+      "operatorUsingBuiltIn": "Using the built-in values.",
+      "history": "Recent changes",
+      "historyEntry": "{date} - {count, plural, one {# value set} other {# values set}}",
+      "historyEmpty": "No changes yet.",
+      "operatorLink": "Suggestion settings"
     }
   },
   "ErrorPage": {
@@ -6786,6 +6899,22 @@
         "publish_failed": {
           "title": "Publishing failed",
           "body": "The ads for {subject} could not be published in {project}. Open it to see why."
+        },
+        "budget_changed": {
+          "title": "Daily budget changed",
+          "body": "The daily budget for {subject} is now {count} in {project}."
+        },
+        "audience_applied": {
+          "title": "Audience changed",
+          "body": "The live ads for {subject} reach a new audience in {project}."
+        },
+        "budget_change_failed": {
+          "title": "Budget not changed",
+          "body": "The daily budget for {subject} could not be changed in {project}."
+        },
+        "audience_apply_failed": {
+          "title": "Audience not changed",
+          "body": "Who the live ads for {subject} reach could not be changed in {project}."
         }
       },
       "ad_studio": {

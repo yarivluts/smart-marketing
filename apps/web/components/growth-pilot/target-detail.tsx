@@ -2,13 +2,24 @@
 
 import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { AlertTriangle, ArrowLeft, Check, Circle, ExternalLink, Hand, Lightbulb, ListChecks, Loader2, Minus, Send, Wand2, X } from 'lucide-react';
-import { siteHost, type GrowthChangeArea, type GrowthPerformanceSummary, type GrowthPerformanceTotals } from '@growthos/shared';
+import { AlertTriangle, ArrowLeft, Check, Circle, ExternalLink, Hand, Lightbulb, ListChecks, Loader2, Minus, Send, SlidersHorizontal, Wallet, Wand2, X } from 'lucide-react';
+import {
+  GROWTH_MAX_DAILY_BUDGET,
+  GROWTH_MIN_DAILY_BUDGET,
+  isLiveGrowthPublishStatus,
+  isValidGrowthDailyBudget,
+  siteHost,
+  type GrowthChangeArea,
+  type GrowthPerformanceSummary,
+  type GrowthPerformanceTotals,
+  type GrowthSuggestionThresholds,
+} from '@growthos/shared';
 import { cn } from '@/lib/utils';
 import { Link } from '@/i18n/navigation';
 import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
 import { growthNextDecision, growthTargetProgress, mergeActivity, targetActivity, targetChangeAreas, type GrowthStage, type GrowthStageState } from '@/lib/growth-pilot/progress';
-import { growthSuggestions, type GrowthSuggestion } from '@/lib/growth-pilot/suggestions';
+import { currentDailyBudget, growthSuggestions, type GrowthSuggestion } from '@/lib/growth-pilot/suggestions';
+import { formatBudget, raisedBudget } from '@/lib/growth-pilot/money';
 import type { GrowthActivityView, GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { ActivityFeed, ErrorLine, KindChip, ProposalCard, useReason } from './growth-pilot-app';
 import { NextDecisionLine, ProgressBar } from './pilot-overview';
@@ -118,6 +129,131 @@ function Stepper({ stages }: { stages: GrowthStage[] }): React.ReactElement {
   );
 }
 
+/**
+ * The daily budget of a target's ads on Meta: what it is now, and - for a person who may publish -
+ * a change in two explicit steps: type the new amount, then confirm it with the amount and currency
+ * spelled out. Nothing is sent before the confirmation.
+ */
+function BudgetCard({
+  amount,
+  currency,
+  canChange,
+  busy,
+  draft,
+  onDraft,
+  onSave,
+}: {
+  amount: number | null;
+  currency: string | null;
+  canChange: boolean;
+  busy: boolean;
+  /** The amount being typed; null while the form is closed. */
+  draft: string | null;
+  onDraft: (value: string | null) => void;
+  onSave: (amount: number) => Promise<boolean>;
+}): React.ReactElement {
+  const t = useTranslations('GrowthPilot.detail.budget');
+  const locale = useLocale();
+  const [confirming, setConfirming] = React.useState(false);
+  const input = React.useRef<HTMLInputElement>(null);
+  const editing = draft !== null;
+  React.useEffect(() => {
+    if (editing && !confirming) input.current?.focus();
+  }, [editing, confirming]);
+  const value = draft === null ? Number.NaN : Number(draft);
+  const valid = draft !== null && draft.trim() !== '' && isValidGrowthDailyBudget(value);
+  const unchanged = valid && amount !== null && value === amount;
+  const close = () => {
+    setConfirming(false);
+    onDraft(null);
+  };
+  return (
+    <Card id="growth-pilot-budget" title={t('title')} icon={Wallet} testId="growth-pilot-detail-budget">
+      <p className="flex flex-col gap-0.5">
+        <span className="font-pp-display text-2xl font-bold tabular-nums" data-testid="growth-pilot-budget-current">
+          {amount === null ? t('unknown') : t('perDay', { amount: formatBudget(locale, amount, currency) })}
+        </span>
+        {amount !== null && !currency ? <span className="text-xs text-muted-foreground">{t('accountCurrency')}</span> : null}
+      </p>
+      {!canChange ? (
+        <p className="text-xs text-muted-foreground" data-testid="growth-pilot-budget-needs-owner">
+          {t('needsOwner')}
+        </p>
+      ) : !editing ? (
+        <button type="button" disabled={busy} onClick={() => onDraft(amount === null ? '' : String(amount))} className="inline-flex h-9 items-center gap-1.5 self-start rounded-full border border-primary/30 bg-primary/5 px-4 text-sm font-semibold text-primary disabled:opacity-60" data-testid="growth-pilot-budget-change">
+          <Wallet className="h-4 w-4" aria-hidden="true" />
+          {t('change')}
+        </button>
+      ) : confirming && valid ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-warning/40 bg-warning/5 p-3" role="alertdialog" aria-labelledby="growth-pilot-budget-confirm-title" data-testid="growth-pilot-budget-confirm">
+          <p id="growth-pilot-budget-confirm-title" className="text-sm font-semibold">
+            {t('confirmTitle', { amount: formatBudget(locale, value, currency) })}
+          </p>
+          <p className="text-xs text-muted-foreground">{currency ? t('confirmBody', { currency }) : t('confirmBodyNoCurrency')}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                if (await onSave(value)) close();
+                else setConfirming(false);
+              }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              data-testid="growth-pilot-budget-confirm-yes"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
+              {t('confirmYes', { amount: formatBudget(locale, value, currency) })}
+            </button>
+            <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-60" data-testid="growth-pilot-budget-confirm-back">
+              {t('confirmBack')}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (valid && !unchanged) setConfirming(true);
+          }}
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium">{t('newAmount')}</span>
+            <span className="flex items-center gap-2">
+              <input
+                ref={input}
+                type="number"
+                min={GROWTH_MIN_DAILY_BUDGET}
+                max={GROWTH_MAX_DAILY_BUDGET}
+                step="any"
+                inputMode="decimal"
+                value={draft ?? ''}
+                onChange={(event) => onDraft(event.target.value)}
+                className="h-9 w-32 rounded-xl border border-input bg-background px-2 text-sm tabular-nums"
+                aria-describedby="growth-pilot-budget-hint"
+                aria-invalid={draft !== null && draft.trim() !== '' && !valid ? true : undefined}
+                data-testid="growth-pilot-budget-input"
+              />
+              {currency ? <span className="text-xs font-semibold text-muted-foreground">{currency}</span> : null}
+            </span>
+          </label>
+          <span id="growth-pilot-budget-hint" className={cn('text-xs', draft !== null && draft.trim() !== '' && !valid ? 'text-destructive' : 'text-muted-foreground')}>
+            {draft !== null && draft.trim() !== '' && !valid ? t('invalid', { min: GROWTH_MIN_DAILY_BUDGET, max: GROWTH_MAX_DAILY_BUDGET }) : unchanged ? t('unchanged') : t('hint')}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={!valid || unchanged || busy} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-budget-review">
+              {t('review')}
+            </button>
+            <button type="button" onClick={close} className="inline-flex h-9 items-center rounded-full px-4 text-sm font-medium text-muted-foreground hover:bg-muted" data-testid="growth-pilot-budget-cancel">
+              {t('cancel')}
+            </button>
+          </div>
+        </form>
+      )}
+    </Card>
+  );
+}
+
 export interface GrowthTargetDetailProps {
   orgId: string;
   projectId: string;
@@ -131,6 +267,10 @@ export interface GrowthTargetDetailProps {
   canAct?: boolean;
   /** Whether a video model is configured, so a video ad can be made. */
   videoAvailable?: boolean;
+  /** The project's suggestion thresholds (admin setting over platform defaults); the built-in ones when absent. */
+  thresholds?: GrowthSuggestionThresholds;
+  /** Where the project's admins change those thresholds; null for everyone else. */
+  settingsHref?: string | null;
   /** "Now", for the rules that look at how long ads have been on (tests). */
   now?: Date;
 }
@@ -141,7 +281,7 @@ export interface GrowthTargetDetailProps {
  * buttons as the pilot page), what else can be done, the pilot's suggestions, a box to ask for any
  * change in plain words, and its own activity. The pilot does the work; the person decides.
  */
-export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaConnectHref = null, canExecute = true, canAct = true, videoAvailable = false, now }: GrowthTargetDetailProps): React.ReactElement {
+export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaConnectHref = null, canExecute = true, canAct = true, videoAvailable = false, thresholds, settingsHref = null, now }: GrowthTargetDetailProps): React.ReactElement {
   const t = useTranslations('GrowthPilot.detail');
   const locale = useLocale();
   const when = useLocalDateTime(SHORT);
@@ -162,6 +302,7 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
   const [area, setArea] = React.useState<GrowthChangeArea | null>(null);
   const [text, setText] = React.useState('');
   const [sent, setSent] = React.useState(false);
+  const [budgetDraft, setBudgetDraft] = React.useState<string | null>(null);
 
   if (!data || !target) {
     return (
@@ -184,7 +325,12 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
   const page = data.landingPages.find((candidate) => candidate.id === target.landingPageId) ?? null;
   const changeAreas = canAct ? targetChangeAreas(target, data.proposals) : [];
   const chosen = area && changeAreas.includes(area) ? area : (changeAreas[0] ?? null);
-  const suggestions = canAct ? growthSuggestions({ target, proposals: data.proposals, changeAreas, videoAvailable, results, now: now ?? new Date() }).filter((suggestion) => !dismissed.has(suggestion.id)) : [];
+  const live = isLiveGrowthPublishStatus(target.publishStatus);
+  const budgetNow = currentDailyBudget(target, data.proposals);
+  const canChangeBudget = canAct && canExecute && live && target.status === 'active';
+  const suggestions = canAct
+    ? growthSuggestions({ target, proposals: data.proposals, changeAreas, videoAvailable, canChangeBudget, dailyBudget: budgetNow, results, thresholds, now: now ?? new Date() }).filter((suggestion) => !dismissed.has(suggestion.id))
+    : [];
   const decision = growthNextDecision(data, { canConnectMeta: Boolean(metaConnectHref), targetId: target.id });
   const doneStages = progress.stages.filter((stage) => stage.state === 'done');
   const runningStages = progress.stages.filter((stage) => stage.state === 'in_progress');
@@ -194,9 +340,14 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
   const decide = (proposal: GrowthProposalView, action: 'approve' | 'reject', extra?: Record<string, unknown>) => void run(proposal.id, `/proposals/${proposal.id}`, { action, ...extra });
   const revise = (proposal: GrowthProposalView, request: string) => void run(proposal.id, `/proposals/${proposal.id}`, { action: 'revise', request });
   const makeVideo = () => void run('video', path, { action: 'video' });
+  const saveBudget = (amount: number) => run('budget', path, { action: 'budget', dailyBudget: amount });
   const applySuggestion = (suggestion: GrowthSuggestion) => {
     if (suggestion.action === 'video') makeVideo();
-    else void run(`suggestion-${suggestion.id}`, path, { action: 'change', area: suggestion.area, request: t(`suggestions.${suggestion.id}.request`) });
+    // More budget is never sent from here: it opens the budget change, which the person confirms.
+    else if (suggestion.action === 'budget') {
+      setBudgetDraft(budgetNow === null ? '' : String(raisedBudget(budgetNow)));
+      document.getElementById('growth-pilot-budget')?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    } else void run(`suggestion-${suggestion.id}`, path, { action: 'change', area: suggestion.area, request: t(`suggestions.${suggestion.id}.request`) });
   };
 
   /** Where each done stage's piece can be seen. */
@@ -219,7 +370,9 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
   if (canAct && videoAvailable && !videoSuggested && target.status === 'active' && target.briefId && (target.adsStatus === 'ready' || target.adsStatus === 'approved') && (target.videoStatus === 'none' || target.videoStatus === 'failed')) actions.push({ key: 'makeVideo', onClick: makeVideo });
   if (changeAreas.length) actions.push({ key: 'askChange', href: '#growth-pilot-change', as: 'plain' });
   if (page && target.landingStatus === 'published') actions.push({ key: 'viewPage', href: `/lp/${page.slug}`, as: 'tab' });
+  if (live && target.adsManagerUrl) actions.push({ key: 'adsManager', href: target.adsManagerUrl, as: 'tab' });
   if (target.briefId) actions.push({ key: 'openStudio', href: `${studio.page}?brief=${target.briefId}`, as: 'app' });
+  if (settingsHref) actions.push({ key: 'thresholds', href: settingsHref, as: 'app' });
 
   const history = [
     ...target.changeRequests.map((change) => ({ text: change.text, on: change.on, outcome: change.outcome, failureCode: change.failureCode, area: change.area as string })),
@@ -337,6 +490,12 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
                   </li>
                 ))}
               </ul>
+              {settingsHref ? (
+                <Link href={settingsHref} className="inline-flex items-center gap-1.5 self-start text-xs font-semibold text-primary hover:underline" data-testid="growth-pilot-thresholds-link">
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                  {t('thresholdsLink')}
+                </Link>
+              ) : null}
             </Card>
           ) : null}
 
@@ -452,6 +611,8 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
             </Card>
           ) : null}
 
+          {live ? <BudgetCard amount={budgetNow} currency={target.budgetCurrency} canChange={canChangeBudget} busy={busy !== null} draft={canChangeBudget ? budgetDraft : null} onDraft={setBudgetDraft} onSave={saveBudget} /> : null}
+
           <Card id="growth-pilot-done" title={t('doneTitle')} icon={Check} testId="growth-pilot-detail-done">
             {doneStages.length === 0 ? <p className="text-sm text-muted-foreground">{t('doneNone')}</p> : null}
             <ul className="flex flex-col gap-2">
@@ -465,6 +626,12 @@ export function GrowthTargetDetail({ orgId, projectId, targetId, initial, metaCo
                     </span>
                     <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                       {stage.on ? <span>{when(stage.on)}</span> : null}
+                      {(stage.id === 'published' || stage.id === 'live') && target.adsManagerUrl ? (
+                        <a href={target.adsManagerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" data-testid="growth-pilot-done-ads-manager">
+                          {t('adsManagerLink')}
+                          <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      ) : null}
                       {link ? (
                         link.external ? (
                           <a href={link.href} target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" data-testid="growth-pilot-done-link">

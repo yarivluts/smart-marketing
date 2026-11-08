@@ -121,7 +121,7 @@ describe('target helpers', () => {
   });
 
   it('finds the feed lines about a target, older ones by its name', () => {
-    const row = (id: string, extra: Partial<GrowthActivityView>): GrowthActivityView => ({ id, kind: 'ads_ready', byPilot: true, subject: null, count: null, targetId: null, on: `2026-11-0${id}T00:00:00.000Z`, ...extra });
+    const row = (id: string, extra: Partial<GrowthActivityView>): GrowthActivityView => ({ id, kind: 'ads_ready', byPilot: true, subject: null, count: null, targetId: null, detail: null, on: `2026-11-0${id}T00:00:00.000Z`, ...extra });
     const activity = [row('1', { targetId: 't1' }), row('2', { targetId: 't2', subject: 'Digital signature' }), row('3', { subject: 'Digital signature' }), row('4', { kind: 'pilot_paused', subject: 'Digital signature' })];
     expect(targetActivity(activity, { id: 't1', name: 'Digital signature' }).map((entry) => entry.id)).toEqual(['1', '3']);
     expect(mergeActivity([row('1', {})], [row('2', {}), row('1', { count: 5 })]).map((entry) => [entry.id, entry.count])).toEqual([

@@ -10,6 +10,7 @@ import { waitingProposals, type GrowthActivityView, type GrowthLandingPageView, 
 import { growthTargetProgress, promotedTargets, targetActivity } from '@/lib/growth-pilot/progress';
 import { useLocalDateTime } from '@/components/ad-studio/use-local-date-time';
 import { isolate } from '@/lib/bidi';
+import { formatBudget } from '@/lib/growth-pilot/money';
 import { GrowthLandingView } from './landing-view';
 import { GrowthPerformanceSection } from './performance-section';
 import { GrowthPilotOverviewCard } from './pilot-overview';
@@ -60,7 +61,7 @@ export function ErrorLine({ code, id, metaConnectHref, automationHref }: { code:
   const t = useTranslations('GrowthPilot.errors');
   const tc = useTranslations('GrowthPilot.publish.status');
   if (!code) return null;
-  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'ai_unavailable', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized', 'forbidden', 'not_changeable', 'video_unavailable'].includes(code);
+  const known = ['invalid_site', 'invalid_site_email', 'empty_request', 'quota_exceeded', 'provider_failed', 'ai_unavailable', 'not_pending', 'not_ready', 'not_found', 'invalid_budget', 'automation_stopped', 'meta_unavailable', 'offline', 'unauthorized', 'forbidden', 'not_changeable', 'video_unavailable', 'not_live', 'platform_failed'].includes(code);
   return (
     <p id={id} role="alert" className="flex items-center gap-1.5 text-sm text-destructive">
       <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -312,6 +313,9 @@ export function ProposalCard({
   const [previewing, setPreviewing] = React.useState(false);
   const audience = proposal.kind === 'audience' ? proposal.audience : null;
   const platform = proposal.kind === 'publish' || proposal.kind === 'activate' ? proposal.publish : null;
+  // A new audience for ads already on Meta: approving it changes the live ad set, so it needs the publish permission too.
+  const liveAudience = Boolean(audience && proposal.appliesToLive);
+  const actsOnPlatform = Boolean(platform) || liveAudience;
   const tp = useTranslations('GrowthPilot.publish');
   const reasonOf = useReason();
   const countryNames = useCountryNames();
@@ -350,6 +354,12 @@ export function ProposalCard({
             </p>
           ) : null}
           {audience ? <AudienceSummary plan={audience} metaConnectHref={metaConnectHref ?? null} /> : null}
+          {liveAudience ? (
+            <p className="flex items-start gap-1.5 rounded-xl bg-warning/10 px-3 py-2 text-xs text-foreground" data-testid="growth-pilot-live-audience">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+              {tu('liveExplain')}
+            </p>
+          ) : null}
           {platform ? (
             <div className="flex flex-col gap-1.5 text-sm text-muted-foreground" data-testid="growth-pilot-publish">
               <p>{proposal.kind === 'publish' ? tp('description', { count: platform.imageIds.length }) : tp('activateDescription', { budget: platform.dailyBudget })}</p>
@@ -490,10 +500,10 @@ export function ProposalCard({
               </span>
             </label>
           ) : null}
-          {!platform || canExecute ? (
+          {!actsOnPlatform || canExecute ? (
             <button type="button" disabled={busy || (proposal.kind === 'publish' && !(Number(budget) > 0))} onClick={() => (proposal.kind === 'activate' && !confirmingOn ? setConfirmingOn(true) : onDecide('approve', proposal.kind === 'publish' ? { dailyBudget: Number(budget) } : undefined))} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60" data-testid="growth-pilot-approve">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-              {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : t('approve')}
+              {proposal.kind === 'publish' ? tp('approve') : proposal.kind === 'activate' ? (confirmingOn ? tp('confirmActivate', { budget: platform?.dailyBudget ?? 0 }) : tp('activate')) : liveAudience ? tu('applyLive') : t('approve')}
             </button>
           ) : null}
           {confirmingOn && !busy ? (
@@ -511,18 +521,18 @@ export function ProposalCard({
             <X className="h-4 w-4" aria-hidden="true" />
             {t('reject')}
           </button>
-          {platform && !canExecute ? (
+          {actsOnPlatform && !canExecute ? (
             <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-needs-owner">
               {t('needsOwner')}
             </p>
           ) : null}
           {platform ? null : (
             <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-approve-hint">
-              {t(`approveHint.${ads ? 'ads' : audience ? 'audience' : page ? 'landing' : 'target'}`)}
+              {t(`approveHint.${ads ? 'ads' : liveAudience ? 'audienceLive' : audience ? 'audience' : page ? 'landing' : 'target'}`)}
             </p>
           )}
           <p className="basis-full text-xs text-muted-foreground" data-testid="growth-pilot-reject-hint">
-            {t(proposal.kind === 'publish' ? 'rejectHintPublish' : proposal.kind === 'activate' ? 'rejectHintActivate' : 'rejectHint')}
+            {t(proposal.kind === 'publish' ? 'rejectHintPublish' : proposal.kind === 'activate' ? 'rejectHintActivate' : liveAudience ? 'rejectHintAudienceLive' : 'rejectHint')}
           </p>
         </div>
       )}
@@ -610,6 +620,12 @@ function TargetPublishLine({ target, metaConnectHref, results, turnOnWaiting = f
       {status === 'needs_meta' && metaConnectHref ? (
         <a href={metaConnectHref} className="font-semibold text-primary hover:underline" data-testid="growth-pilot-connect-meta">
           {t('connect')}
+        </a>
+      ) : null}
+      {(status === 'published' || status === 'running') && target.adsManagerUrl ? (
+        <a href={target.adsManagerUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-primary hover:underline" data-testid="growth-pilot-ads-manager">
+          {t('adsManager')}
+          <ExternalLink className="h-3 w-3" aria-hidden="true" />
         </a>
       ) : null}
     </p>
@@ -705,6 +721,7 @@ function TargetAdsLine({ target }: { target: GrowthTargetView }): React.ReactEle
 /** The feed of what the pilot and the person did; a line about a target links to the target's details when `linkOf` gives one. */
 export function ActivityFeed({ activity, title, linkOf }: { activity: GrowthActivityView[]; title?: string; linkOf?: (row: GrowthActivityView) => string | null }): React.ReactElement {
   const t = useTranslations('GrowthPilot.activity');
+  const locale = useLocale();
   const when = useLocalDateTime(SHORT);
   return (
     <section className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card p-5 shadow-soft" aria-labelledby="growth-pilot-activity">
@@ -716,7 +733,7 @@ export function ActivityFeed({ activity, title, linkOf }: { activity: GrowthActi
       ) : (
         <ol className="flex flex-col gap-3" data-testid="growth-pilot-activity">
           {activity.map((row) => {
-            const words = t(`kind.${row.kind}`, { subject: row.subject ?? '', count: row.count ?? 0 });
+            const words = t(`kind.${row.kind}`, { subject: row.subject ?? '', count: row.count ?? 0, budget: formatBudget(locale, row.count ?? 0, row.kind === 'budget_changed' ? row.detail : null) });
             const href = linkOf?.(row) ?? null;
             return (
               <li key={row.id} className="flex gap-3 text-sm">

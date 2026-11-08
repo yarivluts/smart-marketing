@@ -10,8 +10,12 @@ import {
   GrowthProposalNeedsPlatformError,
   GrowthProposalNotPendingError,
   GrowthTargetChangeNotAllowedError,
+  GrowthSuggestionThresholdsInvalidError,
+  GrowthTargetNotLiveError,
+  MetaAdsApiError,
+  AdStudioExportInvalidError,
 } from '@growthos/firebase-orm-models';
-import { GrowthPilotNotReadyError, GrowthPublishInvalidError, GrowthTargetRequestInvalidError, GrowthVideoUnavailableError } from '@/lib/ad-studio/engine';
+import { GrowthPilotNotReadyError, GrowthPublishInvalidError, GrowthTargetRequestInvalidError, GrowthVideoUnavailableError, growthPlatformFailureCode } from '@/lib/ad-studio/engine';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
 
 /** Maps every Growth Pilot failure to a stable JSON code the page translates; AI and limit failures as in the Ad Studio. */
@@ -27,5 +31,9 @@ export function growthPilotErrorResponse(error: unknown): NextResponse {
   if (error instanceof GrowthProposalNeedsPlatformError) return NextResponse.json({ error: 'invalid_action' }, { status: 400 });
   if (error instanceof AdStudioAutomationStoppedError) return NextResponse.json({ error: 'automation_stopped' }, { status: 409 });
   if (error instanceof AdStudioExportUnavailableError) return NextResponse.json({ error: 'meta_unavailable', reason: error.reason }, { status: 409 });
+  if (error instanceof GrowthTargetNotLiveError) return NextResponse.json({ error: 'not_live' }, { status: 409 });
+  if (error instanceof GrowthSuggestionThresholdsInvalidError) return NextResponse.json({ error: 'invalid_thresholds', invalid: error.invalid }, { status: 400 });
+  // Meta refused or failed a change to live ads: nothing changed on our side, and the code says why.
+  if (error instanceof MetaAdsApiError || error instanceof AdStudioExportInvalidError) return NextResponse.json({ error: 'platform_failed', code: growthPlatformFailureCode(error) }, { status: 502 });
   return adStudioErrorResponse(error);
 }
