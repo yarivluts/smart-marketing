@@ -13,8 +13,12 @@ import {
   MetaAdsApiError,
   publishAdStudioAd,
   pushResourceAttachment,
+  listAuditLogEntriesForOrg,
+  readAdStudioMetaCurrency,
   setAdStudioMetaAdsStatus,
+  setAdStudioMetaDailyBudget,
   setResourceAttachmentWriteTier,
+  updateAdStudioMetaTargeting,
   setSharedCredentialSecret,
   type GoogleAdsApiClient,
   type MetaAdsApiClient,
@@ -366,5 +370,131 @@ describe('setAdStudioMetaAdsStatus', () => {
     await setAdStudioMetaAdsStatus({ organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: [first.id, second.id], status: 'PAUSED', actorId: ctx.owner.id, kms, clients: { meta: () => meta } });
     expect(setObjectStatus.mock.calls.map((call) => call[0])).toEqual(['a1', 'a2', 's1', 'c1']);
     await expect(setAdStudioMetaAdsStatus({ organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: ['missing'], status: 'ACTIVE', actorId: ctx.owner.id, kms, clients: { meta: () => meta } })).rejects.toMatchObject({ name: 'AdStudioExportInvalidError' });
+  });
+});
+
+/** Two image ads published side by side in one paused campaign and ad set, with a fake Meta client that remembers every call. */
+async function publishedPair() {
+  const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
+  const meta = fakeMeta();
+  let ad = 0;
+  meta.createAd.mockImplementation(async () => ({ adId: `a${++ad}` }));
+  Object.assign(meta, {
+    setObjectStatus: vi.fn(async () => undefined),
+    setDailyBudgetCents: vi.fn(async () => undefined),
+    updateAdSet: vi.fn(async () => undefined),
+    getCampaignState: vi.fn(async (id: string) => ({ campaignId: id, status: 'PAUSED', dailyBudgetCents: 2000 })),
+    getAdSet: vi.fn(async (id: string) => ({ adSetId: id, status: 'PAUSED', targeting: { countries: ['IL'], ageMin: 18, ageMax: 65 } })),
+    getAd: vi.fn(async (id: string) => ({ adId: id, creativeId: 'cr1' })),
+    getAdAccountCurrency: vi.fn(async () => 'ILS'),
+  });
+  const clients = { meta: () => meta };
+  const base = { organizationId: ctx.orgId, projectId: ctx.projectId, briefId: 'b1', destination: 'meta' as const, copy: COPY, campaignName: 'Sign fast', dailyBudget: 20, countries: ['IL'], kms, actorId: ctx.owner.id, clients };
+  const first = await publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i1', primary: IMG, square: null, landscape: null } });
+  const second = await publishAdStudioAd({ ...base, media: { kind: 'image', imageId: 'i2', primary: IMG, square: null, landscape: null }, addToAdSetOf: first.id });
+  const scope = { organizationId: ctx.orgId, projectId: ctx.projectId, exportIds: [first.id, second.id], kms, actorId: ctx.owner.id, clients };
+  return { ctx, meta, scope, first, second };
+}
+
+const NEW_AUDIENCE = { countries: ['il'], ageMin: 30, ageMax: 50, genders: ['female' as const], customAudiences: [], interests: [{ id: '6003', name: 'Law', sizeLower: null, sizeUpper: null }] };
+const REFUSED = () => new MetaAdsApiError('Meta Graph API request to s1 failed with status 400: {"error":{"code":100,"message":"Invalid parameter"}}', 400);
+
+describe('setAdStudioMetaDailyBudget', () => {
+  it('sets the budget on the campaign, where publishing put it, in minor units - and reports the currency and the old amount', async () => {
+    const { meta, scope, ctx } = await publishedPair();
+    expect(meta.createCampaign).toHaveBeenCalledWith('99', expect.objectContaining({ dailyBudgetCents: 2000 }));
+    const result = await setAdStudioMetaDailyBudget({ ...scope, dailyBudget: 35.5 });
+    expect(result).toEqual({ level: 'campaign', previousDailyBudget: 20, dailyBudget: 35.5, currency: 'ILS', objectIds: ['c1'] });
+    expect(meta.setDailyBudgetCents).toHaveBeenCalledWith('c1', 3550);
+    expect(meta.updateAdSet).not.toHaveBeenCalled();
+    expect((await listAuditLogEntriesForOrg(ctx.orgId)).map((entry) => entry.action)).toContain('ad_studio.daily_budget_changed');
+  });
+
+  it('sets it on the ad sets when the campaign has no budget of its own', async () => {
+    const { meta, scope } = await publishedPair();
+    meta.getCampaignState.mockImplementation(async (id: string) => ({ campaignId: id, status: 'PAUSED', dailyBudgetCents: null }));
+    meta.getAdSet.mockImplementation(async (id: string) => ({ adSetId: id, status: 'ACTIVE', dailyBudgetCents: 1500, targeting: { countries: ['IL'], ageMin: 18, ageMax: 65 } }));
+    const result = await setAdStudioMetaDailyBudget({ ...scope, dailyBudget: 10 });
+    expect(result).toMatchObject({ level: 'ad_set', previousDailyBudget: 15, objectIds: ['s1'] });
+    expect(meta.updateAdSet).toHaveBeenCalledWith('s1', { dailyBudgetCents: 1000 });
+    expect(meta.setDailyBudgetCents).not.toHaveBeenCalled();
+  });
+
+  it('refuses spending more while the kill switch is on (spending less is fine), and a budget that is not positive', async () => {
+    const { meta, scope, ctx } = await publishedPair();
+    await engageAutomationKillSwitch({ organizationId: ctx.orgId, reason: 'test', actorId: ctx.owner.id });
+    await expect(setAdStudioMetaDailyBudget({ ...scope, dailyBudget: 50 })).rejects.toMatchObject({ name: 'AdStudioAutomationStoppedError' });
+    expect(meta.setDailyBudgetCents).not.toHaveBeenCalled();
+    await setAdStudioMetaDailyBudget({ ...scope, dailyBudget: 5 });
+    expect(meta.setDailyBudgetCents).toHaveBeenCalledWith('c1', 500);
+    await disengageAutomationKillSwitch({ organizationId: ctx.orgId, actorId: ctx.owner.id });
+    await expect(setAdStudioMetaDailyBudget({ ...scope, dailyBudget: 0 })).rejects.toMatchObject({ name: 'AdStudioExportInvalidError' });
+    await expect(setAdStudioMetaDailyBudget({ ...scope, exportIds: ['missing'], dailyBudget: 5 })).rejects.toMatchObject({ name: 'AdStudioExportInvalidError' });
+  });
+
+  it('reads the currency without changing anything', async () => {
+    const { meta, scope } = await publishedPair();
+    expect(await readAdStudioMetaCurrency(scope)).toBe('ILS');
+    meta.getAdAccountCurrency.mockRejectedValue(new MetaAdsApiError('down', 500));
+    expect(await readAdStudioMetaCurrency(scope)).toBeNull();
+    expect(meta.setDailyBudgetCents).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateAdStudioMetaTargeting', () => {
+  it("updates the live ad set's targeting in place, with exactly the audience chosen", async () => {
+    const { meta, scope, ctx } = await publishedPair();
+    const result = await updateAdStudioMetaTargeting({ ...scope, targeting: NEW_AUDIENCE });
+    expect(result).toEqual({ mode: 'updated', adSets: [{ from: 's1', to: 's1', status: 'PAUSED' }], adSetIds: ['s1'], adIds: ['a1', 'a2'] });
+    expect(meta.updateAdSet).toHaveBeenCalledWith('s1', { targeting: { countries: ['IL'], ageMin: 30, ageMax: 50, genders: ['female'], interests: [{ id: '6003', name: 'Law' }], advantageAudience: 0 } });
+    expect(meta.createAdSet).toHaveBeenCalledTimes(1);
+    expect(meta.setObjectStatus).not.toHaveBeenCalled();
+    expect((await listAuditLogEntriesForOrg(ctx.orgId)).map((entry) => entry.action)).toContain('ad_studio.targeting_changed');
+  });
+
+  it('when Meta refuses the edit, moves the ads to a new ad set with the new audience - and keeps a running ad set running', async () => {
+    const { meta, scope, ctx } = await publishedPair();
+    meta.updateAdSet.mockRejectedValue(REFUSED());
+    meta.getAdSet.mockImplementation(async (id: string) => ({ adSetId: id, status: 'ACTIVE', targeting: { countries: ['IL'], ageMin: 18, ageMax: 65 } }));
+    meta.createAdSet.mockImplementation(async () => ({ adSetId: 's2' }));
+    const result = await updateAdStudioMetaTargeting({ ...scope, targeting: NEW_AUDIENCE, now: () => new Date('2026-11-08T10:00:00Z') });
+    expect(result).toEqual({ mode: 'replaced', adSets: [{ from: 's1', to: 's2', status: 'ACTIVE' }], adSetIds: ['s2'], adIds: ['a3', 'a4'] });
+    expect(meta.createAdSet).toHaveBeenLastCalledWith('99', { campaignId: 'c1', name: 'Sign fast - ad set 2026-11-08', targeting: expect.objectContaining({ ageMin: 30, advantageAudience: 0 }) });
+    // The same creatives, in the new ad set; the old one stops before the new one and its ads start.
+    expect(meta.createAd.mock.calls.slice(-2)).toEqual([
+      ['99', { name: 'Sign fast', adSetId: 's2', creativeId: 'cr1' }],
+      ['99', { name: 'Sign fast', adSetId: 's2', creativeId: 'cr1' }],
+    ]);
+    expect(meta.setObjectStatus.mock.calls).toEqual([['s1', 'PAUSED'], ['s2', 'ACTIVE'], ['a3', 'ACTIVE'], ['a4', 'ACTIVE']]);
+    const rows = await listAdStudioExports(ctx.orgId, ctx.projectId, 'b1');
+    expect(rows.map((row) => row.platform_refs).sort((a, b) => (a?.ad_id ?? '').localeCompare(b?.ad_id ?? ''))).toEqual([
+      expect.objectContaining({ ad_set_id: 's2', ad_id: 'a3', replaced_ad_set_id: 's1', replaced_ad_id: 'a1' }),
+      expect.objectContaining({ ad_set_id: 's2', ad_id: 'a4', replaced_ad_set_id: 's1', replaced_ad_id: 'a2' }),
+    ]);
+  });
+
+  it('a paused ad set is replaced by a paused one: nothing is turned on that was not on', async () => {
+    const { meta, scope } = await publishedPair();
+    meta.updateAdSet.mockRejectedValue(REFUSED());
+    meta.createAdSet.mockImplementation(async () => ({ adSetId: 's2' }));
+    const result = await updateAdStudioMetaTargeting({ ...scope, targeting: NEW_AUDIENCE });
+    expect(result.adSets).toEqual([{ from: 's1', to: 's2', status: 'PAUSED' }]);
+    expect(meta.setObjectStatus).not.toHaveBeenCalled();
+  });
+
+  it('removes a half-made new ad set when an ad cannot be created, and does not fall back on auth errors', async () => {
+    const { meta, scope, ctx } = await publishedPair();
+    meta.updateAdSet.mockRejectedValue(REFUSED());
+    meta.createAdSet.mockImplementation(async () => ({ adSetId: 's2' }));
+    meta.createAd.mockRejectedValueOnce(new MetaAdsApiError('no', 400));
+    await expect(updateAdStudioMetaTargeting({ ...scope, targeting: NEW_AUDIENCE })).rejects.toBeInstanceOf(MetaAdsApiError);
+    expect(meta.setObjectStatus.mock.calls).toEqual([['s2', 'DELETED']]);
+    expect((await listAdStudioExports(ctx.orgId, ctx.projectId, 'b1')).every((row) => row.platform_refs?.ad_set_id === 's1')).toBe(true);
+
+    meta.setObjectStatus.mockClear();
+    meta.createAdSet.mockClear();
+    meta.updateAdSet.mockRejectedValue(new MetaAdsApiError('expired', 401));
+    await expect(updateAdStudioMetaTargeting({ ...scope, targeting: NEW_AUDIENCE })).rejects.toMatchObject({ status: 401 });
+    expect(meta.createAdSet).not.toHaveBeenCalled();
   });
 });

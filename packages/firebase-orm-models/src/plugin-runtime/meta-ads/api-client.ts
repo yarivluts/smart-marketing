@@ -322,6 +322,11 @@ export interface MetaAdsApiClient {
    * audience of similar people within `country`, sized by `ratio`.
    */
   createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult>;
+  /**
+   * The ad account's currency (ISO 4217, e.g. `ILS`), in which every budget on it is counted - read
+   * so a person changing a budget sees the currency it is in. Optional: older fakes leave it out.
+   */
+  getAdAccountCurrency?(adAccountId: string): Promise<string | null>;
 }
 
 /**
@@ -555,6 +560,11 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
 
   async updateAd(adId: string, params: MetaUpdateAdParams): Promise<void> {
     await this.request<{ success?: boolean }>(adId, { creative: JSON.stringify({ creative_id: params.creativeId }) });
+  }
+
+  async getAdAccountCurrency(adAccountId: string): Promise<string | null> {
+    const result = await this.getRequest<{ currency?: string }>(`act_${adAccountId}`, { fields: 'currency' });
+    return typeof result.currency === 'string' && /^[A-Z]{3}$/.test(result.currency) ? result.currency : null;
   }
 
   async setDailyBudgetCents(campaignId: string, dailyBudgetCents: number): Promise<void> {
