@@ -32,15 +32,21 @@ export function isGrowthChangeArea(value: unknown): value is GrowthChangeArea {
  * - only for an approved (active) target, and never while a change to the same part is being made;
  * - ads, once they exist (made, approved, declined or failed) - not while they are being made;
  * - the landing page, once one was written, approved, declined or failed;
- * - the audience, once ads exist and it was proposed, approved, declined or failed - but not after the
- *   ads went live, since a live ad set keeps the audience it was published with.
+ * - the audience, once ads exist and it was proposed, approved, declined or failed - also after the
+ *   ads were published or turned on: the new audience then comes back as a proposal that, once the
+ *   person approves it, updates the live ad set's targeting (see {@link isLiveGrowthPublishStatus}).
  */
 export function canChangeGrowthTarget(facts: GrowthChangeFacts, area: GrowthChangeArea): boolean {
   if (facts.status !== 'active') return false;
   if (facts.pendingAreas?.includes(area)) return false;
   if (area === 'ads') return Boolean(facts.briefId) && ['ready', 'approved', 'rejected', 'failed'].includes(facts.adsStatus);
   if (area === 'landing') return ['ready', 'published', 'rejected', 'failed'].includes(facts.landingStatus);
-  return Boolean(facts.briefId) && ['ready', 'approved', 'rejected', 'failed'].includes(facts.audienceStatus) && !['published', 'running'].includes(facts.publishStatus);
+  return Boolean(facts.briefId) && ['ready', 'approved', 'rejected', 'failed'].includes(facts.audienceStatus);
+}
+
+/** Whether a target's ads exist on the ad platform: published (still off) or running. A change to them acts on the platform. */
+export function isLiveGrowthPublishStatus(status: string | null | undefined): boolean {
+  return status === 'published' || status === 'running';
 }
 
 /** Every area the pilot can redo for this target now, in a stable order. */

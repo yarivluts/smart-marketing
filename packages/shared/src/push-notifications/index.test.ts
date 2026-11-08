@@ -17,6 +17,11 @@ describe('push categories', () => {
     expect(pushCategoryForEvent('growth_pilot', 'video_ready')).toBe('ready');
     expect(pushCategoryForEvent('growth_pilot', 'ads_published')).toBe('publishing');
     expect(pushCategoryForEvent('growth_pilot', 'publish_failed')).toBe('failures');
+    // Changes to live ads: the budget and the audience, and when either could not be made.
+    expect(pushCategoryForEvent('growth_pilot', 'budget_changed')).toBe('publishing');
+    expect(pushCategoryForEvent('growth_pilot', 'audience_applied')).toBe('publishing');
+    expect(pushCategoryForEvent('growth_pilot', 'budget_change_failed')).toBe('failures');
+    expect(pushCategoryForEvent('growth_pilot', 'audience_apply_failed')).toBe('failures');
     expect(pushCategoryForEvent('ad_studio', 'run_awaiting_approval')).toBe('approvals');
     expect(pushCategoryForEvent('ad_studio', 'run_done')).toBe('ready');
     expect(pushCategoryForEvent('ad_studio', 'run_failed')).toBe('failures');
