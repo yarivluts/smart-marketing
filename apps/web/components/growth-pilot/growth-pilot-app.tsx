@@ -171,6 +171,10 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
         <span>{t('noSite')}</span>
       </p>
       <ErrorLine code={mistake ?? error} id="growth-pilot-site-error" />
+      <p data-testid="growth-pilot-safe-note" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />
+        {t('safe')}
+      </p>
       <ol className="flex flex-wrap justify-center gap-2">
         {steps.map((step, index) => (
           <li key={step.key} className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground">
@@ -190,10 +194,6 @@ function StartScreen({ onStart, pending, error, onCancel }: { onStart: (url: str
           {tf('back')}
         </button>
       ) : null}
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />
-        {t('safe')}
-      </p>
     </section>
   );
 }
