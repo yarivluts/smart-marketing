@@ -6555,7 +6555,7 @@
         "areaHint": {
           "ads": "New pictures and words for the ads. If your ads are already running, they keep running until you approve the new ones.",
           "landing": "New words for the web page. A live page keeps its current words until you approve the new ones.",
-          "audience": "Who should see the ads: places, ages, interests."
+          "audience": "Who should see the ads: places, ages, interests. If your ads are already on Facebook and Instagram, they keep reaching the same people until you approve the new audience."
         },
         "placeholder": {
           "ads": "For example: brighter pictures, mention the free trial",
