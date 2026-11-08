@@ -87,6 +87,15 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByTestId('growth-pilot-site-input')).toHaveFocus();
   });
 
+  it('shows the "nothing goes live, no money spent" reassurance right under the box, before the step list', () => {
+    stubFetch({ body: page() });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
+    const safe = screen.getByTestId('growth-pilot-safe-note');
+    expect(safe).toHaveTextContent('Nothing goes live without your approval');
+    const steps = screen.getByRole('list');
+    expect(safe.compareDocumentPosition(steps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('stops phones from capitalising or autocorrecting the website address', () => {
     stubFetch({ body: page() });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
