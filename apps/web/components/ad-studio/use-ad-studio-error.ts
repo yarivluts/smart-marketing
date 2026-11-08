@@ -65,7 +65,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
   const t = useTranslations('AdStudio');
   return (body) => {
     if (body.error === 'provider_failed' && body.code && PROVIDER_CODES.has(body.code)) return t(`providerErrors.${body.code}`);
-    if (body.error === 'quota_exceeded') return t(body.limitKind === 'image' ? 'images.quotaExceeded' : 'quotaExceeded', { used: body.used ?? 0, limit: body.limit ?? 0 });
+    if (body.error === 'quota_exceeded') return t(body.limitKind === 'image' ? 'images.quotaExceeded' : body.limitKind === 'video' ? 'videoQuotaExceeded' : 'quotaExceeded', { used: body.used ?? 0, limit: body.limit ?? 0 });
     if (body.error === 'invalid_brief') return t('errorInvalidBrief', { reasons: [...new Set((body.reasons ?? []).map((reason) => t(`briefIssues.${briefIssueKey(reason)}`)))].join(' ') });
     if (body.error === 'invalid_script') return t('errorInvalidScript');
     if (body.error === 'video_request' && body.code && VIDEO_REQUEST_CODES.has(body.code)) return t(`videoRequestErrors.${body.code}`);

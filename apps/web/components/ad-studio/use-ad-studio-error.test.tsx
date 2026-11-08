@@ -50,4 +50,19 @@ describe('useAdStudioErrorMessage', () => {
     expect(alert).toHaveTextContent(studio.briefIssues.unknown);
     expect(alert).not.toHaveTextContent(/must be|http\(s\)|from 0 to|landingPageUrl|dailyImages/);
   });
+
+  it.each([
+    ['en', enMessages.AdStudio],
+    ['he', heMessages.AdStudio],
+  ] as const)('%s: the daily video limit is counted in seconds, not as the AI text allowance', (locale, studio) => {
+    function Quota({ kind }: { kind: 'text' | 'video' | 'image' }): React.ReactElement {
+      const errorMessage = useAdStudioErrorMessage();
+      return <p role="alert">{errorMessage({ error: 'quota_exceeded', limitKind: kind, used: 60, limit: 60 })}</p>;
+    }
+    const { unmount } = renderWithIntl(<Quota kind="video" />, { locale });
+    expect(screen.getByRole('alert').textContent).toBe(studio.videoQuotaExceeded.replace('{used}', '60').replace('{limit}', '60'));
+    unmount();
+    renderWithIntl(<Quota kind="text" />, { locale });
+    expect(screen.getByRole('alert').textContent).toBe(studio.quotaExceeded.replace('{used}', '60').replace('{limit}', '60'));
+  });
 });
