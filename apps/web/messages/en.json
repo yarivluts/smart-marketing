@@ -4804,8 +4804,8 @@
       "otherCountry": "Other (code)",
       "removeCountry": "Remove {country}",
       "variantsTitle": "Try more versions of this ad",
-      "variantsHint": "Each one becomes another switched-off ad next to the first, with its own saved text, so Facebook and Instagram (Meta) can show them both and you can see which works better.",
-      "doneVariants": "Created {count} switched-off ads together on {destination}.{failed, plural, =0 {} one { # variant could not be created.} other { # variants could not be created.}}"
+      "variantsHint": "Each one becomes another switched-off ad next to the first, with its own saved text, so Facebook and Instagram can show them both and you can see which works better.",
+      "doneVariants": "Created {count} switched-off ads together on {destination}.{failed, plural, =0 {} one { # extra ad could not be created.} other { # extra ads could not be created.}}"
     },
     "imageFailure": {
       "not_configured": "making pictures is not switched on yet",
