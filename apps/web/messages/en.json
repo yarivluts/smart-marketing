@@ -6241,7 +6241,7 @@
         "rejected": "You rejected these people",
         "failed": "We could not work out who to reach ({reason})"
       },
-      "liveExplain": "These ads are already on Facebook and Instagram. Approving changes who the live ads reach right away. Meta may restart its learning, so results can dip for a few days.",
+      "liveExplain": "These ads are already on Facebook and Instagram. Approving changes who the live ads reach right away. Facebook and Instagram may need a few days to adjust to the new group, so results can dip for a while.",
       "applyLive": "Apply to the live ads"
     },
     "publish": {
