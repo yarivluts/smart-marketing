@@ -654,7 +654,7 @@
     "accept": "Accept invite",
     "acceptError": "We could not accept this invite just now. You have not joined yet - please try again in a moment.",
     "networkError": "We cannot reach GrowthOS. Check your internet connection and try again - you have not joined yet.",
-    "verifyEmailError": "Verify your email address before accepting this invite. Check your inbox for the verification link.",
+    "verifyEmailError": "Verify your email address before accepting this invite. Open the verification link in your inbox, then accept the invite again.",
     "emailMismatch": "This invite was sent to {email}, but you're signed in with a different account.",
     "switchAccount": "Sign out and switch account"
   },
