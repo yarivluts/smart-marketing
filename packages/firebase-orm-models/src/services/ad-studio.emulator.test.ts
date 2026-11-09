@@ -96,7 +96,8 @@ describe('Ad Studio briefs', () => {
 
   it('stores who speaks only for an on-screen speaker with narration, and nothing for the voice-over default', async () => {
     const { owner, orgId, projectId } = await setup();
-    const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: INPUT, createdByUserId: owner.id });
+    // Per-scene speakers are the mixed mode; the other modes decide who speaks for every scene.
+    const brief = await createAdStudioBrief({ organizationId: orgId, projectId, input: { ...INPUT, narrationMode: 'mixed' }, createdByUserId: owner.id });
     const talking = (id: string, extra: Partial<AdStudioScene>): AdStudioScene => ({ ...scene(id, 5), voiceover: 'Sign fast', ...extra });
     await saveAdStudioScript({ organizationId: orgId, projectId, briefId: brief.id, scenes: [talking('a', { delivery: 'on_screen', speaker: '  the   lawyer ' }), talking('b', { delivery: 'voiceover', speaker: 'x' }), talking('c', { delivery: 'on_screen', voiceover: '' })] });
     const stored = (await getAdStudioBrief(orgId, projectId, brief.id)).scenes;

@@ -8,6 +8,7 @@ import {
   isHebrewLanguage,
   spokenNarration,
   type AdStudioDelivery,
+  type AdStudioNarrationMode,
   type AdStudioScene,
 } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
@@ -26,6 +27,8 @@ export interface NarrationEditorProps {
   language: string;
   /** Called with the script as saved (Hebrew narration comes back vocalized). */
   onSaved?: (scenes: AdStudioScene[]) => void;
+  /** Who narrates the ad; only a mixed ad sets the speaker scene by scene. */
+  narrationMode?: AdStudioNarrationMode;
 }
 
 interface Draft {
@@ -52,6 +55,7 @@ export function NarrationEditor({
   sceneId,
   language,
   onSaved,
+  narrationMode = 'mixed',
 }: NarrationEditorProps): React.ReactElement | null {
   const t = useTranslations('AdStudio.narration');
   const router = useRouter();
@@ -281,7 +285,7 @@ export function NarrationEditor({
               className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
-          {draft.voiceover.trim() ? (
+          {draft.voiceover.trim() && narrationMode === 'mixed' ? (
             <SpeakerControl
               idPrefix={`ad-studio-review-${scene.id}`}
               delivery={draft.delivery}

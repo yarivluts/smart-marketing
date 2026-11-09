@@ -15,12 +15,14 @@ import {
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
   assemblyPlan,
+  narrationPresenter,
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
   summarizeVideoProgress,
   voiceDescription,
   type AdStudioAdCopy,
+  type AdStudioNarrationMode,
   type AdStudioVoice,
   type AdStudioVideoSettings,
   type AdStudioFormat,
@@ -46,6 +48,7 @@ import { MobileAccordionItem } from './mobile-accordion';
 import { AdCopyCard } from './ad-copy-card';
 import { NarrationEditor } from './narration-editor';
 import { VoicePicker } from './voice-picker';
+import { NarrationModePicker } from './narration-mode-picker';
 import { AdvancedVideoSettings } from './advanced-video-settings';
 import { useLocalDateTime } from './use-local-date-time';
 
@@ -72,6 +75,10 @@ export interface VideoStudioProps {
   voice?: AdStudioVoice | null;
   /** The advanced video settings; null means the defaults. */
   videoSettings?: AdStudioVideoSettings | null;
+  /** Who narrates the video as chosen; null is automatic. */
+  narrationMode?: AdStudioNarrationMode | null;
+  /** The mode the script follows now. */
+  effectiveNarrationMode?: AdStudioNarrationMode;
   initialClips: AdStudioClipView[];
   initialVideos: AdStudioVideoView[];
   /** False when no video model is configured for the deployment. */
@@ -124,6 +131,8 @@ export function VideoStudio({
   linkUrl = null,
   voice = null,
   videoSettings = null,
+  narrationMode = null,
+  effectiveNarrationMode = 'voiceover',
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -330,6 +339,17 @@ export function VideoStudio({
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {t('video.textNote')}
       </p>
+      <NarrationModePicker
+        base={base}
+        mode={narrationMode}
+        effective={effectiveNarrationMode}
+        presenter={narrationPresenter(scenes)}
+        disabled={pending !== null || generating}
+        onSaved={(saved) => {
+          if (saved.scenes) setScenes(saved.scenes);
+          router.refresh();
+        }}
+      />
       <VoicePicker
         base={base}
         voice={voiceChoice}
@@ -476,6 +496,7 @@ export function VideoStudio({
                   sceneId={scene.id}
                   language={language}
                   onSaved={setScenes}
+                  narrationMode={effectiveNarrationMode}
                 />
 
                 {inFlight ? (

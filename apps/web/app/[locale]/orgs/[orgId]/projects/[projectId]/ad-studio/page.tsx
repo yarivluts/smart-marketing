@@ -569,6 +569,7 @@ export default async function AdStudioPage({
                   aiAvailable={providers.text !== null}
                   language={selected.language}
                   references={references}
+                  narrationMode={selected.effectiveNarrationMode}
                 />
               </div>
               <ImageStudio
@@ -720,6 +721,8 @@ export default async function AdStudioPage({
                   videoCopy={selected.videoCopy}
                   voice={selected.voice}
                   videoSettings={selected.videoSettings}
+                  narrationMode={selected.narrationMode}
+                  effectiveNarrationMode={selected.effectiveNarrationMode}
                   advertiser={brandKit.brandName || selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}

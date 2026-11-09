@@ -4975,6 +4975,28 @@
       "add": "Add vowel marks",
       "adding": "Adding vowel marks…"
     },
+    "narrationMode": {
+      "title": "Who narrates the video",
+      "hint": "One choice for the whole ad, so the narration never switches to someone else mid-video.",
+      "modes": {
+        "auto": "Automatic",
+        "voiceover": "Voice-over in the background",
+        "on_camera": "A presenter on camera",
+        "mixed": "Mixed - per scene"
+      },
+      "autoNow": "Decided from what you wrote about the ad when the script is written. Now: {mode}.",
+      "explain": {
+        "voiceover": "A narrator is heard but never seen - no one in the shot speaks.",
+        "on_camera": "The same person speaks to the camera in every scene with narration.",
+        "mixed": "Choose in the script, scene by scene, who says the narration."
+      },
+      "presenterLabel": "Who is the presenter (optional)",
+      "presenterPlaceholder": "e.g. a woman in her 30s in a navy blazer",
+      "save": "Save",
+      "saved": "Saved. Changed scenes need a new clip.",
+      "outOfDateNote": "Scenes whose speaker changes become out of date.",
+      "inScript": "Who speaks is set for the whole ad (in the video tab): {mode}"
+    },
     "speaker": {
       "label": "Who says the narration",
       "voiceover": "Voice-over in the background",
