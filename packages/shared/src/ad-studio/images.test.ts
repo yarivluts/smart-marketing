@@ -110,6 +110,9 @@ describe('image concepts', () => {
     expect(free).toContain('advertising typography');
     expect(free).toContain('"30 seconds"');
     expect(free).toContain('brand strip');
+    // Lettering the model draws keeps its lines close: no big gaps between them.
+    expect(free).toContain('tight, even line spacing - no large gaps between them');
+    expect(buildImagePrompt(concept({ style: undefined }), 'square', { ...BRIEF, brand: null })).toContain('tight, even line spacing');
     const designed = buildImagePrompt(concept({ style: 'designed', headline: '' }), 'story', { ...BRIEF, brand: null }, { headlineSpace: true });
     expect(designed).toContain('No words, letters');
     expect(designed).toContain('brand strip');

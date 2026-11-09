@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { AD_STUDIO_BRAND_STRIP } from '@growthos/shared';
-import { applyBrandStrip, brandStripColours, brandStripLayer, headlineAccent, keepTogether, luminance, setHeadline, trimJoiners } from './ad-typography';
+import {
+  HEADLINE_LEADING,
+  applyBrandStrip,
+  brandStripColours,
+  brandStripLayer,
+  headlineAccent,
+  headlineLines,
+  keepTogether,
+  linesMarkup,
+  luminance,
+  renderHeadlineText,
+  setHeadline,
+  trimJoiners,
+} from './ad-typography';
 
 async function picture(width: number, height: number, background = '#7a8f9e') {
   return { bytes: await sharp({ create: { width, height, channels: 3, background } }).png().toBuffer(), mimeType: 'image/png' };
@@ -40,6 +53,53 @@ describe('ad typography', () => {
     }
     const hebrew = await setHeadline({ image: await picture(800, 800), headline: 'חותמים בדקה', format: 'square', language: 'he', emphasis: ['בדקה'], layout: 'start' });
     expect((await sharp(hebrew.bytes).metadata()).width).toBe(800);
+  });
+
+  describe('headline line spacing', () => {
+    const SIZE = 80;
+    const ADJACENT = { headline: 'Fast secure signing for every lawyer', emphasis: ['Fast', 'secure'] };
+    // "Fast and secure signature for every lawyer" in Hebrew, two emphasised words side by side (escapes: no Hebrew in code).
+    const HEBREW = {
+      headline: 'חתימה מהירה ומאובטחת לכל עורך דין',
+      emphasis: ['מהירה', 'ומאובטחת'],
+    };
+    const lines = (input: { headline: string; emphasis: string[] }, layout: 'stacked' | 'centered' | 'start' = 'stacked') => headlineLines({ ...input, layout, fontSize: SIZE, accent: '#ffd43b' });
+
+    it('builds a stacked headline as explicit lines: never two breaks in a row, none at either end', () => {
+      for (const input of [ADJACENT, HEBREW, { headline: 'Sign in 30 seconds, no printer', emphasis: ['30 seconds'] }, { headline: 'Fast, secure', emphasis: ['Fast', 'secure'] }]) {
+        const text = linesMarkup(lines(input));
+        expect(text).not.toMatch(/\n\s*(<[^>]+>\s*)*\n/);
+        expect(text.startsWith('<span')).toBe(true);
+        expect(text).not.toMatch(/^(<span[^>]*>)\n/);
+        expect(text).not.toMatch(/\n<\/span>$/);
+      }
+      // Each part on a line of its own; the joint between two emphasised words dropped.
+      expect(linesMarkup(lines(ADJACENT)).split('\n')).toHaveLength(3);
+      // Every break sits in a span no larger than the smaller of the two lines it separates.
+      const breaks = [...linesMarkup(lines(ADJACENT)).matchAll(/size="(\d+)"[^>]*>\n</g)].map((match) => Number(match[1]) / 1024);
+      expect(breaks.map((size) => Math.round(size))).toEqual([Math.round(SIZE * 1.7), Math.round(SIZE * 0.85)]);
+      // Every span sets a tight line height for its size.
+      expect(linesMarkup(lines(ADJACENT))).toContain(`line_height="${Math.round(SIZE * 1.7 * HEADLINE_LEADING * 1024)}"`);
+    });
+
+    it('keeps the space between two emphasised words on one line', () => {
+      const text = linesMarkup(lines(ADJACENT, 'centered'));
+      expect(text).not.toContain('\n');
+      expect(text).toMatch(/>Fast<\/span><span[^>]*> <\/span><span[^>]*>secure</);
+    });
+
+    it('renders a stacked headline with two adjacent emphasised phrases without a gap between the lines', async () => {
+      for (const input of [ADJACENT, HEBREW]) {
+        // The joint between the two emphasised phrases is an empty line, which is never set.
+        const parts = lines(input).filter((line) => line.some((run) => run.text.trim()));
+        const rendered = await renderHeadlineText(linesMarkup(parts), 900, 'centre');
+        // Every line at its own size, at most 1.3 times that size apart: no empty line, no loose leading.
+        const bound = parts.reduce((sum, line) => sum + Math.max(...line.map((run) => run.size)), 0) * 1.3;
+        expect(parts.length).toBe(input === ADJACENT ? 3 : 4);
+        expect(rendered.info.height).toBeLessThanOrEqual(bound);
+        expect(rendered.info.height).toBeGreaterThan(bound / 2);
+      }
+    });
   });
 
   it('covers the reserved band with an opaque strip in the brand colour, logo at the reading side', async () => {
