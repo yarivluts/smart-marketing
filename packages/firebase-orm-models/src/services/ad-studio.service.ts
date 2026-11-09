@@ -7,6 +7,11 @@ import {
   isAdStudioFormat,
   reconcilePronunciations,
   speakerFields,
+  AD_STUDIO_SPEAKER_MAX,
+  applyNarrationMode,
+  isAdStudioNarrationMode,
+  resolveNarrationMode,
+  type AdStudioNarrationMode,
   voiceIssue,
   videoSettingsIssue,
   searchKeywordsIssues,
@@ -163,8 +168,25 @@ export function normalizeAdStudioBriefInput(input: AdStudioBriefInput): AdStudio
   if (!Number.isInteger(input.targetSeconds) || input.targetSeconds < MIN_TARGET_SECONDS || input.targetSeconds > AD_STUDIO_MAX_TOTAL_SECONDS) {
     reasons.push(`targetSeconds must be a whole number from ${MIN_TARGET_SECONDS} to ${AD_STUDIO_MAX_TOTAL_SECONDS}`);
   }
+  if (input.narrationMode !== undefined && input.narrationMode !== null && !isAdStudioNarrationMode(input.narrationMode)) {
+    reasons.push('narrationMode must be voiceover, on_camera, mixed or null (automatic)');
+  }
   if (reasons.length) throw new AdStudioBriefInvalidError(reasons);
-  return { name, objective, productDescription, landingPageUrl, format: input.format, language, targetSeconds: input.targetSeconds };
+  return {
+    name,
+    objective,
+    productDescription,
+    landingPageUrl,
+    format: input.format,
+    language,
+    targetSeconds: input.targetSeconds,
+    ...(input.narrationMode !== undefined ? { narrationMode: input.narrationMode } : {}),
+  };
+}
+
+/** The narration mode an ad's script follows now (see `resolveNarrationMode`). */
+export function adStudioNarrationMode(brief: Pick<AdStudioBriefModel, 'narration_mode' | 'detected_narration_mode' | 'scenes'>): AdStudioNarrationMode {
+  return resolveNarrationMode({ chosen: brief.narration_mode ?? null, detected: brief.detected_narration_mode ?? null, scenes: brief.scenes ?? [] });
 }
 
 async function requireProject(organizationId: string, projectId: string): Promise<void> {
@@ -181,6 +203,7 @@ export function adStudioBriefInput(brief: AdStudioBriefModel): AdStudioBriefInpu
     format: brief.video_format,
     language: brief.language,
     targetSeconds: brief.target_seconds,
+    narrationMode: brief.narration_mode ?? null,
   };
 }
 
@@ -210,6 +233,8 @@ export async function createAdStudioBrief(params: {
   brief.plan = null;
   brief.plan_sources = null;
   brief.plan_generated_by = null;
+  brief.narration_mode = input.narrationMode ?? null;
+  brief.detected_narration_mode = null;
   brief.created_by = params.createdByUserId;
   brief.created_on = stamp;
   brief.last_changed_on = stamp;
@@ -244,6 +269,35 @@ export async function updateAdStudioBriefDetails(params: {
   brief.video_format = input.format;
   brief.language = input.language;
   brief.target_seconds = input.targetSeconds;
+  // A brief sent without a narration mode keeps the one it has; a new one is applied to the script.
+  if (input.narrationMode !== undefined) {
+    brief.narration_mode = input.narrationMode;
+    brief.scenes = applyNarrationMode(brief.scenes ?? [], adStudioNarrationMode(brief));
+  }
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/**
+ * Sets who narrates the ad (`null` for automatic) and applies it to the current script at once, so
+ * every scene whose delivery or speaker changes shows its clip out of date (the scene fingerprint
+ * includes both). `presenter`, for `on_camera`, names the one person who speaks in every scene;
+ * absent keeps the first one the script names.
+ */
+export async function saveAdStudioNarrationMode(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  mode: AdStudioNarrationMode | null;
+  presenter?: string | null;
+  now?: Date;
+}): Promise<AdStudioBriefModel> {
+  if (params.mode !== null && !isAdStudioNarrationMode(params.mode)) throw new AdStudioBriefInvalidError(['narrationMode must be voiceover, on_camera, mixed or null (automatic)']);
+  if ((params.presenter ?? '').trim().length > AD_STUDIO_SPEAKER_MAX) throw new AdStudioBriefInvalidError([`presenter must be at most ${AD_STUDIO_SPEAKER_MAX} characters`]);
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  brief.narration_mode = params.mode;
+  brief.scenes = applyNarrationMode(brief.scenes ?? [], adStudioNarrationMode(brief), params.presenter);
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;
@@ -260,6 +314,8 @@ export async function saveAdStudioScript(params: {
   briefId: string;
   scenes: AdStudioScene[];
   generatedBy?: AdStudioGeneratedBy | null;
+  /** The narration mode the script writer read from the brief (automatic mode); absent keeps the stored one. */
+  detectedNarrationMode?: AdStudioNarrationMode | null;
   now?: Date;
 }): Promise<AdStudioBriefModel> {
   const issues = validateAdStudioScenes(params.scenes);
@@ -267,13 +323,18 @@ export async function saveAdStudioScript(params: {
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
   const unknown = await unknownSceneReferences(params.organizationId, params.projectId, params.briefId, params.scenes);
   if (unknown.length) throw new AdStudioScriptInvalidError(unknown);
+  if (params.detectedNarrationMode !== undefined) brief.detected_narration_mode = isAdStudioNarrationMode(params.detectedNarrationMode) ? params.detectedNarrationMode : null;
+  // Resolved against the stored script, so an ad from before modes keeps its on-screen scenes.
+  const mode = adStudioNarrationMode(brief);
   // A pronunciation sent back unchanged for narration that changed belongs to the old words. It is
   // dropped here so every client (the editor, MCP, the generator) follows the same rule.
-  // Who speaks is kept only with narration, and the voice-over default is stored as nothing.
-  brief.scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map(({ delivery: _delivery, speaker: _speaker, ...scene }) => ({
+  // Who speaks is kept only with narration, and the voice-over default is stored as nothing; then
+  // the ad's narration mode decides it (a voice-over ad never puts a speaker on screen).
+  const scenes = reconcilePronunciations(brief.scenes ?? [], params.scenes).map(({ delivery: _delivery, speaker: _speaker, ...scene }) => ({
     ...scene,
     ...speakerFields({ voiceover: scene.voiceover, delivery: _delivery, speaker: _speaker }),
   }));
+  brief.scenes = applyNarrationMode(scenes, mode);
   brief.script_generated_by = params.generatedBy ?? null;
   brief.status = 'scripted';
   brief.last_changed_on = nowIso(params.now);

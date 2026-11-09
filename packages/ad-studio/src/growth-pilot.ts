@@ -78,6 +78,7 @@ import {
   buildSiteAnalysisPrompt,
   buildTargetFromRequestPrompt,
   buildTargetRevisionPrompt,
+  DEFAULT_AD_STUDIO_NARRATION_MODE,
   extractLandingPageContent,
   extractSiteLogoUrl,
   GROWTH_PILOT_MAX_PAGES,
@@ -416,7 +417,8 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
   const brief = await createAdStudioBrief({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
-    input: growthBriefInput({ analysis: pilot.analysis, target: next, siteUrl: pilot.site_url }),
+    // The pilot's video ads are narrated by an off-screen voice: no one in the shot starts talking mid-video.
+    input: { ...growthBriefInput({ analysis: pilot.analysis, target: next, siteUrl: pilot.site_url }), narrationMode: DEFAULT_AD_STUDIO_NARRATION_MODE },
     createdByUserId: ctx.actorId,
     now: ctx.now,
   });

@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildVocalizeCheckPrompt,
   buildVocalizePrompt,
+  chooseVerifiedPronunciation,
+  isFaithfulPronunciation,
   isHebrewLanguage,
   isUsablePronunciation,
+  pronunciationCoverage,
+  sameNarrationSkeleton,
   needsPronunciation,
   reconcilePronunciations,
   spokenNarration,
@@ -75,6 +80,91 @@ describe('Hebrew pronunciation helpers', () => {
     expect(prompt.system).toContain('Keep the exact words and their order');
     expect(prompt.system).toContain('grammatical gender');
     expect(JSON.parse(prompt.user.split('\n')[1])).toEqual([{ id: 's1', text: `${PLAIN} 2` }]);
+  });
+});
+
+// "Digital signature for lawyers", plain and with full nikud.
+const LINE = 'חתימה דיגיטלית לעורכי דין';
+const LINE_VOCALIZED =
+  'חֲתִימָה דִּיגִיטָלִית לְעוֹרְכֵי דִּין';
+// The same first two words, then a different word ("for managers"): a vocalizer that changed the line.
+const LINE_CHANGED = 'חֲתִימָה דִּיגִיטָלִית לִמְנַהֲלִים';
+// "5 reasons to sign today": the digit is written out as a word ("five") in the vocalized line.
+const NUMBER_LINE = '5 סיבות לחתום היום';
+const NUMBER_VOCALIZED = 'חָמֵשׁ סִיבּוֹת לַחְתּוֹם הַיּוֹם';
+// The same, with the vav of "to sign" dropped (defective spelling): a respelled word.
+const NUMBER_RESPELLED = 'חָמֵשׁ סִיבּוֹת לַחְתֹּם הַיּוֹם';
+// "In 30 seconds" with a hyphenated prefix, and its vocalization ("in thirty seconds").
+const PREFIX_LINE = 'ב-30 שניות';
+const PREFIX_VOCALIZED = 'בִּשְׁלוֹשִׁים שְׁנִיּוֹת';
+
+describe('nikud verification guards', () => {
+  it('measures how much of a line carries vowel marks where they are expected', () => {
+    expect(pronunciationCoverage(LINE_VOCALIZED)).toBe(1);
+    expect(pronunciationCoverage(NUMBER_VOCALIZED)).toBe(1);
+    expect(pronunciationCoverage(LINE)).toBe(0);
+    expect(pronunciationCoverage('GrowthOS')).toBe(1);
+    // One vowel on the last letter is not a vocalized line.
+    expect(isUsablePronunciation(`${PLAIN}ָ`)).toBe(false);
+    // Half the words vocalized, half bare: rejected.
+    expect(isUsablePronunciation(`${LINE_VOCALIZED.split(' ').slice(0, 2).join(' ')} ${LINE.split(' ').slice(2).join(' ')}`)).toBe(false);
+    expect(isUsablePronunciation(LINE_VOCALIZED)).toBe(true);
+  });
+
+  it('keeps the consonant skeleton: same letters, final forms, spacing and punctuation folded', () => {
+    expect(sameNarrationSkeleton(LINE, LINE_VOCALIZED)).toBe(true);
+    expect(sameNarrationSkeleton(`${LINE}.`, `${LINE_VOCALIZED.replace(/ /g, '  ')}!`)).toBe(true);
+    expect(sameNarrationSkeleton(`GrowthOS ${LINE}`, `growthos, ${LINE_VOCALIZED}`)).toBe(true);
+    // A changed word, a dropped word and a respelled word are all refused.
+    expect(sameNarrationSkeleton(LINE, LINE_CHANGED)).toBe(false);
+    expect(sameNarrationSkeleton(LINE, LINE_VOCALIZED.split(' ').slice(0, 3).join(' '))).toBe(false);
+    expect(sameNarrationSkeleton(NUMBER_LINE, NUMBER_RESPELLED)).toBe(false);
+    // A brand name in Latin letters must stay.
+    expect(sameNarrationSkeleton(`GrowthOS ${LINE}`, LINE_VOCALIZED)).toBe(false);
+  });
+
+  it('lets numbers and symbols become words, keeping a prefix glued to them', () => {
+    expect(sameNarrationSkeleton(NUMBER_LINE, NUMBER_VOCALIZED)).toBe(true);
+    expect(sameNarrationSkeleton(PREFIX_LINE, PREFIX_VOCALIZED)).toBe(true);
+    // The number may not simply vanish.
+    expect(sameNarrationSkeleton(NUMBER_LINE, NUMBER_VOCALIZED.split(' ').slice(1).join(' '))).toBe(false);
+    // The prefix may not be dropped.
+    expect(sameNarrationSkeleton(PREFIX_LINE, PREFIX_VOCALIZED.slice(3))).toBe(false);
+  });
+
+  it('keeps the checked line, falls back to the first one, then to none', () => {
+    expect(isFaithfulPronunciation(LINE, ` ${LINE_VOCALIZED} `)).toBe(true);
+    expect(isFaithfulPronunciation(LINE, null)).toBe(false);
+    expect(chooseVerifiedPronunciation(LINE, LINE_VOCALIZED, ` ${LINE_VOCALIZED} `)).toBe(LINE_VOCALIZED);
+    // The check changed a word: the first pass stands.
+    expect(chooseVerifiedPronunciation(LINE, LINE_VOCALIZED, LINE_CHANGED)).toBe(LINE_VOCALIZED);
+    // The check failed: the first pass stands.
+    expect(chooseVerifiedPronunciation(LINE, LINE_VOCALIZED, undefined)).toBe(LINE_VOCALIZED);
+    // The first pass was not vocalized; the check was.
+    expect(chooseVerifiedPronunciation(LINE, LINE, LINE_VOCALIZED)).toBe(LINE_VOCALIZED);
+    // Both wrong: the plain narration is spoken.
+    expect(chooseVerifiedPronunciation(LINE, LINE_CHANGED, `${PLAIN}ָ`)).toBeUndefined();
+  });
+
+  it('asks the check to review word by word with the ad context and return a verdict per line', () => {
+    const prompt = buildVocalizeCheckPrompt([{ id: 's1', text: ` ${LINE}\n`, pronunciation: LINE_VOCALIZED }], {
+      businessName: 'EasySign',
+      productDescription: 'E-signatures for lawyers',
+      objective: 'Trial signups',
+      audience: 'Small law firms',
+    });
+    for (const expected of ['word by word', 'construct-state', 'definite article', 'imperative versus infinitive', 'gender', 'Foreign names', 'verdict', 'never add or remove a vav or yod']) {
+      expect(prompt.system).toContain(expected);
+    }
+    expect(prompt.user).toContain('Business: EasySign');
+    expect(prompt.user).toContain('Product: E-signatures for lawyers');
+    expect(prompt.user).toContain('Audience: Small law firms');
+    expect(JSON.parse(prompt.user.split('\n').at(-1) as string)).toEqual([{ id: 's1', text: LINE, pronunciation: LINE_VOCALIZED }]);
+    const bare = buildVocalizeCheckPrompt([], { productDescription: 'x'.repeat(1000) });
+    expect(bare.user).not.toContain('Business:');
+    expect(bare.user).not.toContain('Audience:');
+    expect(bare.user.length).toBeLessThan(700);
+    expect(buildVocalizePrompt([]).system).toContain('never add or remove a vav or yod');
   });
 });
 
