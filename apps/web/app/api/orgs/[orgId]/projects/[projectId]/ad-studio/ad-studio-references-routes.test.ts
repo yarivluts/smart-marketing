@@ -41,8 +41,8 @@ const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
 // Hebrew as escapes (no Hebrew in code files): "shalom", plain and with full nikud.
-const PLAIN_WORD = 'שלום';
-const VOCALIZED_WORD = 'שָׁלוֹם';
+const PLAIN_WORD = '\u05e9\u05dc\u05d5\u05dd';
+const VOCALIZED_WORD = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
 
 /** Google's APIs with their documented shapes: the text model (vocalizing), the image model and Omni. */
 function fakeGoogle() {

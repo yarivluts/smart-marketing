@@ -22,8 +22,8 @@ import type { ToolResult } from './mcp-tools';
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7]);
 // Hebrew as escapes (no Hebrew in code files): "shalom", plain and with full nikud.
-const PLAIN_WORD = 'שלום';
-const VOCALIZED_WORD = 'שָׁלוֹם';
+const PLAIN_WORD = '\u05e9\u05dc\u05d5\u05dd';
+const VOCALIZED_WORD = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
 
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';

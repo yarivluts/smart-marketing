@@ -19,13 +19,13 @@ import { saveAdStudioScriptWithPronunciation, vocalizeAdStudioScenes, vocalizeNa
 
 // Hebrew is written as escapes: no Hebrew characters in code files.
 // "Digital signature for lawyers", plain, with full nikud, and with one vowel changed (a correction).
-const LINE = 'חתימה דיגיטלית לעורכי דין';
+const LINE = '\u05d7\u05ea\u05d9\u05de\u05d4 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9\u05ea \u05dc\u05e2\u05d5\u05e8\u05db\u05d9 \u05d3\u05d9\u05df';
 const FIRST =
-  'חֲתִימָה דִּיגִיטָלִית לְעוֹרְכֵי דִּין';
+  '\u05d7\u05b2\u05ea\u05b4\u05d9\u05de\u05b8\u05d4 \u05d3\u05b4\u05bc\u05d9\u05d2\u05b4\u05d9\u05d8\u05b8\u05dc\u05b4\u05d9\u05ea \u05dc\u05b0\u05e2\u05d5\u05b9\u05e8\u05b0\u05db\u05b5\u05d9 \u05d3\u05b4\u05bc\u05d9\u05df';
 const CORRECTED =
-  'חֲתִימָה דִּיגִיטָלִית לָעוֹרְכֵי דִּין';
+  '\u05d7\u05b2\u05ea\u05b4\u05d9\u05de\u05b8\u05d4 \u05d3\u05b4\u05bc\u05d9\u05d2\u05b4\u05d9\u05d8\u05b8\u05dc\u05b4\u05d9\u05ea \u05dc\u05b8\u05e2\u05d5\u05b9\u05e8\u05b0\u05db\u05b5\u05d9 \u05d3\u05b4\u05bc\u05d9\u05df';
 // The checker swapped the last word for another ("for managers"): a different line.
-const REWORDED = 'חֲתִימָה דִּיגִיטָלִית לִמְנַהֲלִים';
+const REWORDED = '\u05d7\u05b2\u05ea\u05b4\u05d9\u05de\u05b8\u05d4 \u05d3\u05b4\u05bc\u05d9\u05d2\u05b4\u05d9\u05d8\u05b8\u05dc\u05b4\u05d9\u05ea \u05dc\u05b4\u05de\u05b0\u05e0\u05b7\u05d4\u05b2\u05dc\u05b4\u05d9\u05dd';
 
 const BRIEF = { id: 'b1', organization_id: 'o', project_id: 'p', language: 'he', product_description: 'E-signatures for lawyers', objective: 'Trial signups', plan: null, plan_sources: null, scenes: [] };
 

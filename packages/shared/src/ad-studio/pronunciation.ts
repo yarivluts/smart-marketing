@@ -59,10 +59,10 @@ export function reconcilePronunciations(previous: readonly Pick<AdStudioScene, '
 }
 
 /** Vowel points, dagesh and shin/sin dots - the marks that say how a letter is read. */
-const HEBREW_VOWEL_MARK = /[ְ-ׇֽֿׁׂׅׄ]/;
+const HEBREW_VOWEL_MARK = /[\u05b0-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/;
 /** Letters that are often silent or carry their vowel on the next letter (alef, he, vav, yod). */
-const QUIET_LETTERS = new Set(['א', 'ה', 'ו', 'י']);
-const VAV = 'ו';
+const QUIET_LETTERS = new Set(['\u05d0', '\u05d4', '\u05d5', '\u05d9']);
+const VAV = '\u05d5';
 /** Below this share of marked letters, a line is not vocalized well enough to guide a speaker. */
 export const AD_STUDIO_PRONUNCIATION_MIN_COVERAGE = 0.85;
 
@@ -75,7 +75,8 @@ export const AD_STUDIO_PRONUNCIATION_MIN_COVERAGE = 0.85;
 export function pronunciationCoverage(text: string): number {
   let expected = 0;
   let marked = 0;
-  for (const word of text.match(/[א-ת֑-ׇ]+/g) ?? []) {
+  // Points first in the class: a letter written before a combining mark reads as one combined character.
+  for (const word of text.match(/[\u0591-\u05c7\u05d0-\u05ea]+/g) ?? []) {
     const letters: { letter: string; marks: string }[] = [];
     for (const char of word) {
       if (HEBREW_LETTER.test(char)) letters.push({ letter: char, marks: '' });
@@ -109,19 +110,19 @@ export function isUsablePronunciation(pronunciation: string): boolean {
   );
 }
 
-const FINAL_LETTERS: Record<string, string> = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' };
-const NUMBER_OR_SYMBOL = /[0-9%₪$€£&+@#=]/;
+const FINAL_LETTERS: Record<string, string> = { '\u05da': '\u05db', '\u05dd': '\u05de', '\u05df': '\u05e0', '\u05e3': '\u05e4', '\u05e5': '\u05e6' };
+const NUMBER_OR_SYMBOL = /[0-9%\u20aa$\u20ac\u00a3&+@#=]/;
 /** A token a narrator says as other words: a number, a symbol, an acronym (x"y) or an abbreviation ending in a geresh. */
-const SPOKEN_AS_WORDS = /[0-9%₪$€£&+@#=]|[א-ת]["״][א-ת]|['׳’]$/;
+const SPOKEN_AS_WORDS = /[0-9%\u20aa$\u20ac\u00a3&+@#=]|[\u05d0-\u05ea]["\u05f4][\u05d0-\u05ea]|['\u05f3\u2019]$/;
 /** What a number or symbol may become: a few written-out words (spaces are dropped before matching). */
-const SPOKEN_WORDS_PATTERN = '[א-תa-z0-9]{1,80}';
+const SPOKEN_WORDS_PATTERN = '[\u05d0-\u05eaa-z0-9]{1,80}';
 
 /** Letters only (Hebrew with final forms folded, Latin lower-cased, digits), without points, spaces or punctuation. */
 function skeletonLetters(text: string): string {
   return stripHebrewPoints(text)
     .toLowerCase()
-    .replace(/[ךםןףץ]/g, (letter) => FINAL_LETTERS[letter])
-    .replace(/[^א-תa-z0-9]/g, '');
+    .replace(/[\u05da\u05dd\u05df\u05e3\u05e5]/g, (letter) => FINAL_LETTERS[letter])
+    .replace(/[^\u05d0-\u05eaa-z0-9]/g, '');
 }
 
 /**
@@ -132,12 +133,12 @@ function skeletonLetters(text: string): string {
  */
 export function sameNarrationSkeleton(plain: string, pronunciation: string): boolean {
   // A maqaf or hyphen joins a prefix to a number: split there so the prefix stays literal.
-  const tokens = stripHebrewPoints(plain).replace(/־/g, ' ').split(/[\s\-/]+/).filter(Boolean);
+  const tokens = stripHebrewPoints(plain).replace(/\u05be/g, ' ').split(/[\s\-/]+/).filter(Boolean);
   const pattern = tokens
     .map((token) => {
       if (!SPOKEN_AS_WORDS.test(token)) return skeletonLetters(token);
       // A Hebrew prefix glued to a number is kept; the rest may become words.
-      const prefix = /^[א-ת]*/.exec(token)?.[0] ?? '';
+      const prefix = /^[\u05d0-\u05ea]*/.exec(token)?.[0] ?? '';
       return NUMBER_OR_SYMBOL.test(token.slice(prefix.length)) ? `${skeletonLetters(prefix)}${SPOKEN_WORDS_PATTERN}` : SPOKEN_WORDS_PATTERN;
     })
     .join('');

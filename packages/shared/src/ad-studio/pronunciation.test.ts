@@ -84,19 +84,19 @@ describe('Hebrew pronunciation helpers', () => {
 });
 
 // "Digital signature for lawyers", plain and with full nikud.
-const LINE = 'חתימה דיגיטלית לעורכי דין';
+const LINE = '\u05d7\u05ea\u05d9\u05de\u05d4 \u05d3\u05d9\u05d2\u05d9\u05d8\u05dc\u05d9\u05ea \u05dc\u05e2\u05d5\u05e8\u05db\u05d9 \u05d3\u05d9\u05df';
 const LINE_VOCALIZED =
-  'חֲתִימָה דִּיגִיטָלִית לְעוֹרְכֵי דִּין';
+  '\u05d7\u05b2\u05ea\u05b4\u05d9\u05de\u05b8\u05d4 \u05d3\u05b4\u05bc\u05d9\u05d2\u05b4\u05d9\u05d8\u05b8\u05dc\u05b4\u05d9\u05ea \u05dc\u05b0\u05e2\u05d5\u05b9\u05e8\u05b0\u05db\u05b5\u05d9 \u05d3\u05b4\u05bc\u05d9\u05df';
 // The same first two words, then a different word ("for managers"): a vocalizer that changed the line.
-const LINE_CHANGED = 'חֲתִימָה דִּיגִיטָלִית לִמְנַהֲלִים';
+const LINE_CHANGED = '\u05d7\u05b2\u05ea\u05b4\u05d9\u05de\u05b8\u05d4 \u05d3\u05b4\u05bc\u05d9\u05d2\u05b4\u05d9\u05d8\u05b8\u05dc\u05b4\u05d9\u05ea \u05dc\u05b4\u05de\u05b0\u05e0\u05b7\u05d4\u05b2\u05dc\u05b4\u05d9\u05dd';
 // "5 reasons to sign today": the digit is written out as a word ("five") in the vocalized line.
-const NUMBER_LINE = '5 סיבות לחתום היום';
-const NUMBER_VOCALIZED = 'חָמֵשׁ סִיבּוֹת לַחְתּוֹם הַיּוֹם';
+const NUMBER_LINE = '5 \u05e1\u05d9\u05d1\u05d5\u05ea \u05dc\u05d7\u05ea\u05d5\u05dd \u05d4\u05d9\u05d5\u05dd';
+const NUMBER_VOCALIZED = '\u05d7\u05b8\u05de\u05b5\u05e9\u05c1 \u05e1\u05b4\u05d9\u05d1\u05bc\u05d5\u05b9\u05ea \u05dc\u05b7\u05d7\u05b0\u05ea\u05bc\u05d5\u05b9\u05dd \u05d4\u05b7\u05d9\u05bc\u05d5\u05b9\u05dd';
 // The same, with the vav of "to sign" dropped (defective spelling): a respelled word.
-const NUMBER_RESPELLED = 'חָמֵשׁ סִיבּוֹת לַחְתֹּם הַיּוֹם';
+const NUMBER_RESPELLED = '\u05d7\u05b8\u05de\u05b5\u05e9\u05c1 \u05e1\u05b4\u05d9\u05d1\u05bc\u05d5\u05b9\u05ea \u05dc\u05b7\u05d7\u05b0\u05ea\u05b9\u05bc\u05dd \u05d4\u05b7\u05d9\u05bc\u05d5\u05b9\u05dd';
 // "In 30 seconds" with a hyphenated prefix, and its vocalization ("in thirty seconds").
-const PREFIX_LINE = 'ב-30 שניות';
-const PREFIX_VOCALIZED = 'בִּשְׁלוֹשִׁים שְׁנִיּוֹת';
+const PREFIX_LINE = '\u05d1-30 \u05e9\u05e0\u05d9\u05d5\u05ea';
+const PREFIX_VOCALIZED = '\u05d1\u05b4\u05bc\u05e9\u05b0\u05c1\u05dc\u05d5\u05b9\u05e9\u05b4\u05c1\u05d9\u05dd \u05e9\u05b0\u05c1\u05e0\u05b4\u05d9\u05bc\u05d5\u05b9\u05ea';
 
 describe('nikud verification guards', () => {
   it('measures how much of a line carries vowel marks where they are expected', () => {
@@ -105,7 +105,7 @@ describe('nikud verification guards', () => {
     expect(pronunciationCoverage(LINE)).toBe(0);
     expect(pronunciationCoverage('GrowthOS')).toBe(1);
     // One vowel on the last letter is not a vocalized line.
-    expect(isUsablePronunciation(`${PLAIN}ָ`)).toBe(false);
+    expect(isUsablePronunciation(`${PLAIN}\u05b8`)).toBe(false);
     // Half the words vocalized, half bare: rejected.
     expect(isUsablePronunciation(`${LINE_VOCALIZED.split(' ').slice(0, 2).join(' ')} ${LINE.split(' ').slice(2).join(' ')}`)).toBe(false);
     expect(isUsablePronunciation(LINE_VOCALIZED)).toBe(true);
@@ -143,7 +143,7 @@ describe('nikud verification guards', () => {
     // The first pass was not vocalized; the check was.
     expect(chooseVerifiedPronunciation(LINE, LINE, LINE_VOCALIZED)).toBe(LINE_VOCALIZED);
     // Both wrong: the plain narration is spoken.
-    expect(chooseVerifiedPronunciation(LINE, LINE_CHANGED, `${PLAIN}ָ`)).toBeUndefined();
+    expect(chooseVerifiedPronunciation(LINE, LINE_CHANGED, `${PLAIN}\u05b8`)).toBeUndefined();
   });
 
   it('asks the check to review word by word with the ad context and return a verdict per line', () => {

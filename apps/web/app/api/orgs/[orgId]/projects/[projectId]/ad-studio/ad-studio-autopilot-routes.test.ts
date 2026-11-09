@@ -79,8 +79,8 @@ afterEach(() => {
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 // Hebrew as escapes (no Hebrew in code files): "shalom", plain and with full nikud.
-const PLAIN_WORD = 'שלום';
-const VOCALIZED_WORD = 'שָׁלוֹם';
+const PLAIN_WORD = '\u05e9\u05dc\u05d5\u05dd';
+const VOCALIZED_WORD = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
 // A real 64x64 PNG: the studio decodes it when it sets a headline itself.
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAoElEQVR4nO2SQQkAQRDDKr8WzkJUroh7hIFCBSSh6cfpRSfoBNArdhfi7qITdALoFbsLcXfRCToB9Irdhbi76ASdAHrF7kLcXXSCTgC9Ynch7i46QSeAXrG7EHcXnaATQK/YXYi7i07QCaBX7C7E3UUn6ATQK3YX4u6iE3QC6BW7C3F30Qk6AfSK3YW4u+gEnQB6xe5C3F10gk4AveKfCz2fxLGlfbPmmAAAAABJRU5ErkJggg==',

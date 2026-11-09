@@ -51,7 +51,7 @@ describe('ad typography', () => {
       const meta = await sharp(result.bytes).metadata();
       expect([meta.width, meta.height, result.mimeType]).toEqual([800, 1000, 'image/jpeg']);
     }
-    const hebrew = await setHeadline({ image: await picture(800, 800), headline: 'חותמים בדקה', format: 'square', language: 'he', emphasis: ['בדקה'], layout: 'start' });
+    const hebrew = await setHeadline({ image: await picture(800, 800), headline: '\u05d7\u05d5\u05ea\u05de\u05d9\u05dd \u05d1\u05d3\u05e7\u05d4', format: 'square', language: 'he', emphasis: ['\u05d1\u05d3\u05e7\u05d4'], layout: 'start' });
     expect((await sharp(hebrew.bytes).metadata()).width).toBe(800);
   });
 
@@ -60,8 +60,8 @@ describe('ad typography', () => {
     const ADJACENT = { headline: 'Fast secure signing for every lawyer', emphasis: ['Fast', 'secure'] };
     // "Fast and secure signature for every lawyer" in Hebrew, two emphasised words side by side (escapes: no Hebrew in code).
     const HEBREW = {
-      headline: 'חתימה מהירה ומאובטחת לכל עורך דין',
-      emphasis: ['מהירה', 'ומאובטחת'],
+      headline: '\u05d7\u05ea\u05d9\u05de\u05d4 \u05de\u05d4\u05d9\u05e8\u05d4 \u05d5\u05de\u05d0\u05d5\u05d1\u05d8\u05d7\u05ea \u05dc\u05db\u05dc \u05e2\u05d5\u05e8\u05da \u05d3\u05d9\u05df',
+      emphasis: ['\u05de\u05d4\u05d9\u05e8\u05d4', '\u05d5\u05de\u05d0\u05d5\u05d1\u05d8\u05d7\u05ea'],
     };
     const lines = (input: { headline: string; emphasis: string[] }, layout: 'stacked' | 'centered' | 'start' = 'stacked') => headlineLines({ ...input, layout, fontSize: SIZE, accent: '#ffd43b' });
 
