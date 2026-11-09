@@ -5708,7 +5708,7 @@
       "session_expired": "This connection attempt expired. Start again.",
       "wrong_user": "Someone else started this connection attempt. Start your own.",
       "not_authorized": "Facebook has not returned yet for this attempt. Start again.",
-      "exchange_failed": "Facebook refused the login. Start again, and check the app settings if it repeats.",
+      "exchange_failed": "Facebook did not accept the login. Start again; if it keeps happening, contact GrowthOS support.",
       "invalid_choice": "Pick an ad account and a Page from the list.",
       "no_ad_accounts": "This Facebook login has no ad accounts. Log in with the account that manages your ads.",
       "project_not_found": "That project was not found in this organization.",
