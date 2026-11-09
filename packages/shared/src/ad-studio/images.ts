@@ -334,6 +334,9 @@ export function buildImageConceptRewritePrompt(
   };
 }
 
+/** Image models drawing lettering left large empty gaps between its lines. */
+export const HEADLINE_SPACING_PROMPT = 'Set its lines with tight, even line spacing - no large gaps between them.';
+
 /** The prompt the image model receives for one concept in one placement. */
 export function buildImagePrompt(
   concept: Pick<AdStudioImageConcept, 'visualPrompt' | 'headline' | 'style' | 'emphasis' | 'layout'>,
@@ -355,10 +358,11 @@ export function buildImagePrompt(
           emphasis.length
             ? `Make ${emphasis.map((phrase) => `"${phrase}"`).join(' and ')} the hero: clearly larger and heavier than the other words, and it may take an accent colour or sit on a simple colour block or underline; the remaining words are smaller and lighter.`
             : 'Give the key words more size and weight than the rest.',
+          HEADLINE_SPACING_PROMPT,
           'Keep the lettering on a calm area - never over a face. No other words, letters, logos, badges or icons anywhere in the image.',
         ].join(' ')
       : headline
-        ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
+        ? `Draw exactly this headline into the image, large and legible, spelled exactly, in ${languageName(brief.language)}: "${headline}". ${HEADLINE_SPACING_PROMPT} Place it on a calm, plain area of the background - never over a face, a person or the subject. No other words or letters anywhere in the image.`
         : 'No words, letters, captions or logos anywhere in the image.',
     !headline && options.headlineSpace
       ? `Leave the ${space} of the scene uncluttered - wall, ceiling, sky or soft background, part of the same continuous photograph - with no face, person or important object there: a headline will be set on it afterwards.`

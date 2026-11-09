@@ -10,6 +10,7 @@ import {
 import { AD_COPY_RULES } from './copy';
 import { UNTRUSTED_INPUT_RULE, adWritingRules, voiceoverWordBudget, voiceoverWordsPerSecond, wrapUntrusted } from './writing-rules';
 import { brandKitRules, type AdStudioBrandKit } from './brand-kit';
+import { narrationModeRules, type AdStudioNarrationMode } from './narration';
 
 /** What a person tells the studio about the ad they want. */
 export interface AdStudioBriefInput {
@@ -26,6 +27,11 @@ export interface AdStudioBriefInput {
   targetSeconds: number;
   /** The project's brand kit; absent when none is set. */
   brand?: AdStudioBrandKit | null;
+  /**
+   * Who narrates the video (see `narration.ts`): chosen by the person or agent, or null for automatic
+   * (the script writer reads it from the brief). Absent on input means "keep what the ad has".
+   */
+  narrationMode?: AdStudioNarrationMode | null;
 }
 
 /** Findings from the planning stage that the script should build on (KAN-230); absent before planning runs. */
@@ -77,6 +83,7 @@ export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioSc
       'Rules:',
       ...SCRIPT_RULES.map((rule) => `- ${rule}`),
       `- ${voiceoverBudgetRule(brief.language)}`,
+      ...narrationModeRules(brief.narrationMode ?? null).map((rule) => `- ${rule}`),
       ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
       `- ${UNTRUSTED_INPUT_RULE}`,
       // Read at call time, not at module load: copy.ts imports this module (KAN-278).
@@ -116,7 +123,10 @@ export function buildSceneRewritePrompt(
   ].filter((line): line is string => line !== null);
   const target = scenes[sceneIndex];
   const outline = scenes
-    .map((scene, index) => `${index + 1}. [${scene.durationSeconds}s] ${scene.visualPrompt}${scene.voiceover ? ` | VO: ${scene.voiceover}` : ''}${scene.onScreenText ? ` | Text: ${scene.onScreenText}` : ''}`)
+    .map(
+      (scene, index) =>
+        `${index + 1}. [${scene.durationSeconds}s] ${scene.visualPrompt}${scene.voiceover ? ` | VO: ${scene.voiceover}` : ''}${scene.voiceover && scene.delivery === 'on_screen' ? ` | Spoken on camera by: ${scene.speaker?.trim() || 'the person in the shot'}` : ''}${scene.onScreenText ? ` | Text: ${scene.onScreenText}` : ''}`,
+    )
     .join('\n');
   return {
     system: [
@@ -124,6 +134,8 @@ export function buildSceneRewritePrompt(
       'Rules:',
       ...SCRIPT_RULES.slice(1).map((rule) => `- ${rule}`),
       `- ${voiceoverBudgetRule(brief.language)}`,
+      // The ad's mode is settled by the time a scene is rewritten; the writer follows it.
+      ...narrationModeRules(brief.narrationMode ?? 'voiceover').map((rule) => `- ${rule}`),
       ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
       `- ${UNTRUSTED_INPUT_RULE}`,
       `- Keep the scene at ${target.durationSeconds} seconds unless the instruction asks otherwise.`,

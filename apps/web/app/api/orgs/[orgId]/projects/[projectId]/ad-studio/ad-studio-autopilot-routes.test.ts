@@ -78,6 +78,9 @@ afterEach(() => {
 });
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
+// Hebrew as escapes (no Hebrew in code files): "shalom", plain and with full nikud.
+const PLAIN_WORD = '\u05e9\u05dc\u05d5\u05dd';
+const VOCALIZED_WORD = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
 // A real 64x64 PNG: the studio decodes it when it sets a headline itself.
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAoElEQVR4nO2SQQkAQRDDKr8WzkJUroh7hIFCBSSh6cfpRSfoBNArdhfi7qITdALoFbsLcXfRCToB9Irdhbi76ASdAHrF7kLcXXSCTgC9Ynch7i46QSeAXrG7EHcXnaATQK/YXYi7i07QCaBX7C7E3UUn6ATQK3YX4u6iE3QC6BW7C3F30Qk6AfSK3YW4u+gEnQB6xe5C3F10gk4AveKfCz2fxLGlfbPmmAAAAABJRU5ErkJggg==',
@@ -107,10 +110,12 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
     if (url.endsWith(':generateContent')) {
       const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
       if (schema.includes('"lines"')) {
-        // The vocalizer: each line comes back with a vowel point added, standing in for the nikud.
+        // The vocalizer: each line comes back with its nikud; the check then finds it right.
         const prompt = (body?.contents as { parts: { text: string }[] }[])[0].parts[0].text;
-        const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
-        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
+        const lines = JSON.parse(prompt.trim().split('\n').at(-1) as string) as { id: string; text: string; pronunciation: string }[];
+        const checking = prompt.includes('Lines to check');
+        const answer = lines.map((line) => (checking ? { id: line.id, verdict: 'ok', pronunciation: line.pronunciation } : { id: line.id, pronunciation: line.text.split(PLAIN_WORD).join(VOCALIZED_WORD) }));
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: answer }) }] } }] });
       }
       if (schema.includes('"textInImage"')) {
         imageReviews += 1;
@@ -561,7 +566,7 @@ describe('autopilot routes', () => {
     const run = ((await (await startRun(request('POST', { options: { plan: false, images: false, video: true, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
     expect((await drive(ctx, run.id)).status).toBe('done');
 
-    const vocalized = `${plain}\u05b8`;
+    const vocalized = VOCALIZED_WORD;
     expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).scenes.map((scene) => scene.pronunciation)).toEqual([vocalized, undefined]);
     const renders = google.calls.filter((call) => call.url === `${BASE}/interactions` && call.body?.model !== 'gemini-3.1-flash-image').map((call) => String(call.body?.input));
     expect(renders).toHaveLength(2);
@@ -569,6 +574,7 @@ describe('autopilot routes', () => {
     expect(renders[0]).toContain('full nikud vowel marks');
     expect(renders[1]).toContain('No speech.');
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(1);
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize_check')).toHaveLength(1);
   });
 
   it('a waiting plan can be discarded without creating anything', async () => {

@@ -76,21 +76,77 @@ function escapeMarkup(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-interface Run {
+/** A stretch of headline text in one size, weight and colour. */
+export interface HeadlineRun {
   text: string;
   size: number;
   weight: 300 | 500 | 800 | 900;
   colour: string;
 }
+type Run = HeadlineRun;
 
-/** A Pango span per run; `colour` overrides every run's colour (for the shadow pass). */
-function markup(runs: readonly Run[], colour?: string, alpha = '100%'): string {
+/**
+ * The distance between the baselines of a set headline's lines, as a share of the font size. Heebo's
+ * own line height is about 1.48 em, which leaves wide gaps between the lines of a large headline; 1.1
+ * keeps them tight and even without the lines touching. Set per span as an absolute Pango
+ * `line_height` (Pango 1.50+), so a line is as tall as its largest run needs and no taller.
+ */
+export const HEADLINE_LEADING = 1.1;
+
+/**
+ * A Pango span per run; `colour` overrides every run's colour (for the shadow pass). `leading` sets
+ * each run's line height as a share of its size (headlines); without it the font's own applies.
+ */
+function markup(runs: readonly Run[], colour?: string, alpha = '100%', leading?: number): string {
   return runs
-    .map((run) => `<span font_family="Heebo" font_weight="${run.weight}" size="${Math.round(run.size * 1024)}" foreground="${colour ?? run.colour}" alpha="${alpha}">${escapeMarkup(run.text)}</span>`)
+    .map((run) => {
+      const lineHeight = leading ? ` line_height="${Math.round(run.size * leading * 1024)}"` : '';
+      return `<span font_family="Heebo" font_weight="${run.weight}" size="${Math.round(run.size * 1024)}"${lineHeight} foreground="${colour ?? run.colour}" alpha="${alpha}">${escapeMarkup(run.text)}</span>`;
+    })
     .join('');
 }
 
-async function renderText(text: string, width: number, align: 'left' | 'centre' | 'right'): Promise<{ data: Buffer; info: sharp.OutputInfo }> {
+/**
+ * Lines of runs as one Pango markup string. Empty lines are dropped, and each break between two lines
+ * sits in a span of its own at the smaller of their sizes: a break never makes an empty line or lends
+ * a large line height to a small one, so no gap opens between the lines.
+ */
+export function linesMarkup(lines: readonly (readonly Run[])[], colour?: string, alpha?: string): string {
+  // A space between two emphasised phrases on one line is kept: it is what separates their words.
+  const kept = lines.map((line) => line.filter((run) => run.text.length > 0)).filter((line) => line.some((run) => run.text.trim().length > 0));
+  return kept
+    .map((line, index) => {
+      if (index === 0) return markup(line, colour, alpha, HEADLINE_LEADING);
+      const previous = kept[index - 1];
+      const size = Math.min(previous[previous.length - 1].size, line[0].size);
+      const lineBreak = markup([{ text: '\n', size, weight: line[0].weight, colour: line[0].colour }], colour, alpha, HEADLINE_LEADING);
+      return `${lineBreak}${markup(line, colour, alpha, HEADLINE_LEADING)}`;
+    })
+    .join('');
+}
+
+/**
+ * The headline's runs, by line: emphasised phrases set larger, heavier and in the accent colour. In the
+ * `stacked` layout every part is a line of its own (trimmed, the comma or dash that tied a part to an
+ * emphasised phrase shed); otherwise the whole headline is one paragraph that wraps.
+ */
+export function headlineLines(params: { headline: string; emphasis?: readonly string[]; layout: AdStudioHeadlineLayout; fontSize: number; accent: string }): Run[][] {
+  const { fontSize, accent } = params;
+  const split = splitHeadlineEmphasis(params.headline, params.emphasis ?? []);
+  if (!split.some((run) => run.emphasis)) return [[{ text: params.headline.trim(), size: fontSize, weight: 800, colour: 'white' }]];
+  if (params.layout !== 'stacked') {
+    // A no-break space keeps an emphasised phrase on one line.
+    return [split.map((part) => (part.emphasis ? { text: keepTogether(part.text), size: fontSize * 1.4, weight: 900, colour: accent } : { text: part.text, size: fontSize * 0.9, weight: 300, colour: 'white' }))];
+  }
+  return split.map((part) =>
+    part.emphasis
+      ? [{ text: keepTogether(part.text.trim()), size: fontSize * 1.7, weight: 900, colour: accent }]
+      : [{ text: trimJoiners(part.text), size: fontSize * 0.85, weight: 500, colour: 'white' }],
+  );
+}
+
+/** Renders headline markup in Heebo on a transparent canvas `width` wide, as tall as the text. */
+export async function renderHeadlineText(text: string, width: number, align: 'left' | 'centre' | 'right'): Promise<{ data: Buffer; info: sharp.OutputInfo }> {
   await registerFaces();
   // dpi 72: one point is one pixel, so the run sizes are pixel sizes.
   return sharp({ text: { text, width, align, wrap: 'word', rgba: true, dpi: 72, fontfile: headlineFontFiles()[2] } })
@@ -148,33 +204,13 @@ export async function setHeadline(params: {
   const share = params.format === 'landscape' ? 0.055 : params.format === 'story' ? 0.09 : 0.075;
   const fontSize = Math.min(width * share, height * 0.085);
   const rtl = isRtlLanguage(params.language);
-  const split = splitHeadlineEmphasis(params.headline, params.emphasis ?? []);
-  const emphasised = split.some((run) => run.emphasis);
-  const accent = params.accent ?? '#ffd43b';
-  const stacked = layout === 'stacked';
-  const runs: Run[] = emphasised
-    ? split.map((part) =>
-        part.emphasis
-          ? // A no-break space keeps an emphasised phrase on one line.
-            { text: stacked ? `\n${keepTogether(part.text.trim())}\n` : keepTogether(part.text), size: fontSize * (stacked ? 1.7 : 1.4), weight: 900, colour: accent }
-          : // On its own line a run sheds the comma or dash that tied it to the emphasis.
-            { text: stacked ? trimJoiners(part.text) : part.text, size: fontSize * (stacked ? 0.85 : 0.9), weight: stacked ? 500 : 300, colour: 'white' },
-      )
-    : [{ text: params.headline.trim(), size: fontSize, weight: 800, colour: 'white' }];
-  // Stacked runs are separated by line breaks: drop empty runs and a break at either end.
-  const text = (colour?: string, alpha?: string) =>
-    markup(
-      runs.filter((run) => run.text.trim().length > 0),
-      colour,
-      alpha,
-    )
-      .replace(/^(<span[^>]*>)\n/, '$1')
-      .replace(/\n(<\/span>)$/, '$1');
+  const lines = headlineLines({ headline: params.headline, emphasis: params.emphasis, layout, fontSize, accent: params.accent ?? '#ffd43b' });
+  const text = (colour?: string, alpha?: string) => linesMarkup(lines, colour, alpha);
   const start = layout === 'start';
   const textWidth = Math.round(width * (start ? 0.7 : 0.86));
   // In a right-to-left paragraph Pango mirrors the alignment, so "left" is the reading side in both directions.
   const align = start ? 'left' : 'centre';
-  const [fill, shadow] = await Promise.all([renderText(text(), textWidth, align), renderText(text('black', '60%'), textWidth, align)]);
+  const [fill, shadow] = await Promise.all([renderHeadlineText(text(), textWidth, align), renderHeadlineText(text('black', '60%'), textWidth, align)]);
   const blurred = await sharp(shadow.data).blur(Math.max(2, fontSize / 10)).png().toBuffer();
   const top = Math.round(height * HEADLINE_TOP[params.format]);
   const margin = Math.round(width * 0.07);
@@ -273,7 +309,7 @@ export async function brandStripLayer(params: { width: number; height: number; f
     { text: name, size: nameSize, weight: 900, colour: colours.text },
     ...(slogan ? [{ text: `\n${slogan}`, size: sloganSize, weight: 300 as const, colour: colours.muted }] : []),
   ];
-  const label = await renderText(markup(runs), textWidth, 'left');
+  const label = await renderHeadlineText(markup(runs), textWidth, 'left');
   // Too long for the strip: scale the text block down to fit its height.
   const maxTextHeight = stripHeight - padding;
   const textImage =

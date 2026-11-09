@@ -13,6 +13,7 @@ import {
   isHebrewLanguage,
   voiceoverWordBudget,
   validateAdStudioScenes,
+  type AdStudioNarrationMode,
   type AdStudioReferenceUse,
   type AdStudioScene,
   type AdStudioSceneIssue,
@@ -25,7 +26,7 @@ import { useRefreshSafeDraft, useUnsavedChangesGuard } from './use-editor-draft'
 import { ServerChangedNotice } from './server-changed-notice';
 import { MobileAccordionItem } from './mobile-accordion';
 import { AddNikudButton } from './add-nikud-button';
-import { SpeakerControl } from './speaker-control';
+import { SpeakerBadge, SpeakerControl } from './speaker-control';
 import { useAdStudioErrorMessage, type AdStudioApiError } from './use-ad-studio-error';
 
 export interface ScriptEditorProps {
@@ -41,6 +42,8 @@ export interface ScriptEditorProps {
   language?: string;
   /** The ad's reference images (app screens, illustrations) a scene can hand to the video model. */
   references?: AdStudioReferenceView[];
+  /** Who narrates the ad; only a mixed ad sets the speaker scene by scene. */
+  narrationMode?: AdStudioNarrationMode;
 }
 
 function newScene(): AdStudioScene {
@@ -58,7 +61,7 @@ function issueText(t: ReturnType<typeof useTranslations>, issue: AdStudioSceneIs
  * or proposes a rewrite of one scene that the person keeps or discards - it never overwrites work
  * silently.
  */
-export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generatedByModel, aiAvailable, language = 'en', references = [] }: ScriptEditorProps): React.ReactElement {
+export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generatedByModel, aiAvailable, language = 'en', references = [], narrationMode = 'mixed' }: ScriptEditorProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -394,7 +397,14 @@ export function ScriptEditor({ orgId, projectId, briefId, initialScenes, generat
                     </span>
                   </div>
                 ) : null}
-                {scene.voiceover.trim() ? (
+                {scene.voiceover.trim() && narrationMode !== 'mixed' ? (
+                  // Who speaks is decided for the whole ad; the scene shows it.
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" data-testid={`ad-studio-scene-${index + 1}-narration`}>
+                    <SpeakerBadge delivery={scene.delivery} speaker={scene.speaker} />
+                    <span>{t('narrationMode.inScript', { mode: t(`narrationMode.modes.${narrationMode}`) })}</span>
+                  </span>
+                ) : null}
+                {scene.voiceover.trim() && narrationMode === 'mixed' ? (
                   <SpeakerControl
                     idPrefix={`ad-studio-scene-${index + 1}`}
                     delivery={scene.delivery ?? 'voiceover'}

@@ -210,7 +210,8 @@ describe('making ads for approved targets', () => {
     studio.startAdStudioAutopilot.mockResolvedValue(run({}));
     await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
     const input = orm.createAdStudioBrief.mock.calls[0][0].input;
-    expect(input).toMatchObject({ name: 'Pro plan', landingPageUrl: 'https://easysign.co.il/', language: 'en' });
+    // The pilot's videos are narrated off screen: the brief says so, so its script never puts a speaker on camera.
+    expect(input).toMatchObject({ name: 'Pro plan', landingPageUrl: 'https://easysign.co.il/', language: 'en', narrationMode: 'voiceover' });
     expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_ADS_RUN_OPTIONS }));
     expect(GROWTH_ADS_RUN_OPTIONS).toMatchObject({ images: true, video: false });
     expect(orm.linkGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', briefId: 'b1', runId: 'r1' }));

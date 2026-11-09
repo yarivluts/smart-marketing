@@ -17,6 +17,17 @@ Template for each entry:
 
 ---
 
+## 2026-11-09 — Ad Studio quality: nikud checked by AI, narration mode, tight headline spacing
+
+- **Last completed:**
+  - Nikud verification: after the vocalizer (now `effort: 'medium'`), a second, independent metered call (`vocalize_check`, `effort: 'high'`, counts toward the daily AI text limit) reviews every line word by word with the ad's context (business, product, goal, audience) and returns it corrected with a verdict. Deterministic guards in `@growthos/shared` (`pronunciation.ts`): `pronunciationCoverage` / `isUsablePronunciation` (nearly every letter that needs a vowel has one) and `sameNarrationSkeleton` (same letters as the plain line after stripping points, folding final letters, spacing and punctuation; numbers, symbols and acronyms may become words). `chooseVerifiedPronunciation`: checked > first > none. Applies to script saves, generation, render-time vocalizing and the editor's "add nikud" button; a failed check keeps the first pass. Usage label added (en/he).
+  - Narration mode on the brief (`narration_mode` chosen, `detected_narration_mode` read by the script writer; null = automatic, voice-over by default): `voiceover` / `on_camera` / `mixed`. The script writer gets the mode as a rule (or reports it from the brief when automatic), scenes carry `delivery`/`speaker`, and `saveAdStudioScript` enforces it in code on every save (voice-over clears speakers; on camera = one presenter in every narrated scene). Picker in the video tab (`NarrationModePicker`, route `PUT .../briefs/[briefId]/narration`), per-scene speaker controls only in mixed ads, MCP `set_ad_narration_mode` + `narration_mode` on create/update brief. Growth Pilot briefs are voice-over. Ads from before the mode with on-screen scenes resolve to mixed.
+  - Headline spacing: stacked headlines are explicit lines (no empty line between two adjacent emphasised phrases, breaks in a small span), every span sets a 1.1 em `line_height` (Heebo's own is ~1.48), the space between adjacent emphasised words on one line is kept; the free-style image prompt asks for tight, even line spacing.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** watch real `vocalize_check` verdicts and how often the skeleton guard rejects an answer (logged as a warning).
+- **Waiting on human:** deploy (not done by this run).
+
 ## 2026-11-08 — Growth Pilot live controls: budget, Ads Manager link, audience on live ads, suggestion thresholds
 
 - **Last completed:**
