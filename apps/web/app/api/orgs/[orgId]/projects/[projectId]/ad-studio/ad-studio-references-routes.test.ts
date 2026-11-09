@@ -40,19 +40,26 @@ afterEach(() => {
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 
+// Hebrew as escapes (no Hebrew in code files): "shalom", plain and with full nikud.
+const PLAIN_WORD = 'שלום';
+const VOCALIZED_WORD = 'שָׁלוֹם';
+
 /** Google's APIs with their documented shapes: the text model (vocalizing), the image model and Omni. */
 function fakeGoogle() {
   const omniStarts: Record<string, unknown>[] = [];
   const vocalizeCalls: { id: string; text: string }[][] = [];
+  const checkCalls: { id: string; pronunciation: string }[][] = [];
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : {};
     if (url.endsWith(':generateContent')) {
-      // The vocalizer: each line comes back with a vowel point added, standing in for the nikud.
+      // The vocalizer: each line comes back with its nikud; the check then finds it right.
       const prompt = (body.contents as { parts: { text: string }[] }[])[0].parts[0].text;
-      const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
-      vocalizeCalls.push(lines);
-      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
+      const lines = JSON.parse(prompt.trim().split('\n').at(-1) as string) as { id: string; text: string; pronunciation: string }[];
+      const checking = prompt.includes('Lines to check');
+      (checking ? checkCalls : vocalizeCalls).push(lines);
+      const answer = lines.map((line) => (checking ? { id: line.id, verdict: 'ok', pronunciation: line.pronunciation } : { id: line.id, pronunciation: line.text.split(PLAIN_WORD).join(VOCALIZED_WORD) }));
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: answer }) }] } }] });
     }
     if (url === `${GEMINI}/interactions` && body.model === 'gemini-3.1-flash-image') {
       return Response.json({ id: 'img', status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'image', mime_type: 'image/png', data: PNG.toString('base64') }] }] });
@@ -64,7 +71,7 @@ function fakeGoogle() {
     return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { omniStarts, vocalizeCalls };
+  return { omniStarts, vocalizeCalls, checkCalls };
 }
 
 function unique(prefix: string): string {
@@ -106,7 +113,7 @@ describe('Hebrew nikud at render time', () => {
   it('adds nikud to Hebrew narration that has none right before a scene renders, and once for render-all', async () => {
     const google = fakeGoogle();
     const ctx = await setup();
-    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    const plain = PLAIN_WORD;
     // Stored straight on the brief, as a script from before nikud would be: no pronunciation.
     const brief = await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId);
     brief.language = 'he';
@@ -116,15 +123,19 @@ describe('Hebrew nikud at render time', () => {
 
     expect((await renderScene(jsonRequest('POST'), ctx.p({ sceneId: 's1' }))).status).toBeLessThan(300);
     expect(google.vocalizeCalls).toEqual([[{ id: 's1', text: plain }]]);
-    expect(String(google.omniStarts[0].input)).toContain(`"${plain}\u05b8"`);
+    expect(String(google.omniStarts[0].input)).toContain(`"${VOCALIZED_WORD}"`);
+    // Every vocalization is checked by a second, independent call.
+    expect(google.checkCalls).toEqual([[{ id: 's1', text: plain, pronunciation: VOCALIZED_WORD }]]);
 
     expect((await renderAll(jsonRequest('POST'), ctx.p())).status).toBeLessThan(300);
     // One call for the two scenes still to render; s1 already has its nikud.
     expect(google.vocalizeCalls[1].map((line) => line.id)).toEqual(['s2', 's3']);
     expect(google.vocalizeCalls).toHaveLength(2);
-    expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).scenes.map((entry) => entry.pronunciation)).toEqual([`${plain}\u05b8`, `${plain}\u05b8`, `${plain}\u05b8`]);
+    expect(google.checkCalls).toHaveLength(2);
+    expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).scenes.map((entry) => entry.pronunciation)).toEqual([VOCALIZED_WORD, VOCALIZED_WORD, VOCALIZED_WORD]);
     expect(google.omniStarts.slice(1).every((start) => String(start.input).includes('full nikud vowel marks'))).toBe(true);
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(2);
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize_check')).toHaveLength(2);
   });
 });
 

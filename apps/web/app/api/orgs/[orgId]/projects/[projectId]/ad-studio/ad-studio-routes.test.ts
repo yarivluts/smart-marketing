@@ -24,6 +24,7 @@ import { POST as generateConcepts } from './briefs/[briefId]/image-concepts/gene
 import { PUT as saveCopy } from './briefs/[briefId]/copy/route';
 import { POST as writeCopy } from './briefs/[briefId]/copy/generate/route';
 import { PUT as saveVoice } from './briefs/[briefId]/voice/route';
+import { PUT as setNarration } from './briefs/[briefId]/narration/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -154,24 +155,29 @@ describe('Ad Studio routes', () => {
     const scene = (voiceover: string, pronunciation?: string) => ({ id: 'a', durationSeconds: 5, visualPrompt: 'A desk', voiceover, onScreenText: '', ...(pronunciation ? { pronunciation } : {}) });
     const vocalizations = () => listAdStudioUsage(orgId, projectId).then((rows) => rows.filter((row) => row.kind === 'vocalize'));
 
-    // The vocalizer answers with the nikud form of whatever lines it is sent.
+    // The vocalizer answers with the nikud form of whatever lines it is sent; the check finds them right.
     const vocalizer = vi.fn(async (_url: string, init: RequestInit) => {
       const prompt = (JSON.parse(String(init.body)) as { contents: { parts: { text: string }[] }[] }).contents[0].parts[0].text;
-      expect(prompt).toContain('Lines to vocalize');
-      const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
-      const answer = { lines: lines.map((line) => ({ id: line.id, pronunciation: line.text.split(plain).join(vocalized) })) };
+      const checking = prompt.includes('Lines to check');
+      expect(checking || prompt.includes('Lines to vocalize')).toBe(true);
+      const lines = JSON.parse(prompt.trim().split('\n').at(-1) as string) as { id: string; text: string; pronunciation?: string }[];
+      const answer = {
+        lines: lines.map((line) => (checking ? { id: line.id, verdict: 'ok', pronunciation: line.pronunciation } : { id: line.id, pronunciation: line.text.split(plain).join(vocalized) })),
+      };
       return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] }), { status: 200 });
     });
     vi.stubGlobal('fetch', vocalizer);
     const saved = await saveScript(request('PUT', { scenes: [scene(plain), { ...scene(''), id: 'b' }] }), params);
     expect(saved.status).toBe(200);
     expect(((await saved.json()) as { brief: { scenes: { pronunciation?: string }[] } }).brief.scenes.map((entry) => entry.pronunciation)).toEqual([vocalized, undefined]);
-    expect(vocalizer).toHaveBeenCalledTimes(1);
+    // The vocalizer, then its independent check: two metered calls.
+    expect(vocalizer).toHaveBeenCalledTimes(2);
     expect(await vocalizations()).toEqual([expect.objectContaining({ outcome: 'succeeded', provider: 'gemini' })]);
+    expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'vocalize_check')).toEqual([expect.objectContaining({ outcome: 'succeeded' })]);
 
     // Saved again as it stands: nothing to vocalize, no call.
     expect((await saveScript(request('PUT', { scenes: [scene(plain, vocalized)] }), params)).status).toBe(200);
-    expect(vocalizer).toHaveBeenCalledTimes(1);
+    expect(vocalizer).toHaveBeenCalledTimes(2);
 
     // The narration changed under an unchanged pronunciation and the model is out of credit: saved, without it.
     geminiReplies({ status: 402, message: 'Your prepayment credits are depleted.' });
@@ -182,7 +188,7 @@ describe('Ad Studio routes', () => {
     // A generated script comes back vocalized: the script call, then the vocalizer.
     const generatedScene = { durationSeconds: 5, visualPrompt: 'A phone', voiceover: `${plain} 2`, onScreenText: '' };
     const script = vi.fn(async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ title: 'Ad', scenes: [generatedScene] }) }] } }] }), { status: 200 }));
-    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => (String(init.body).includes('Lines to vocalize') ? vocalizer(url, init) : script())));
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => (/Lines to (vocalize|check)/.test(String(init.body)) ? vocalizer(url, init) : script())));
     const generated = await generateScript(request('POST'), params);
     expect(generated.status).toBe(200);
     expect(((await generated.json()) as { brief: { scenes: { pronunciation?: string }[] } }).brief.scenes[0].pronunciation).toBe(`${vocalized} 2`);
@@ -262,18 +268,79 @@ describe('Ad Studio routes', () => {
     const briefId = ((await created.json()) as { brief: { id: string } }).brief.id;
     const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
     const plain = '\u05e9\u05dc\u05d5\u05dd';
-    const fetchMock = geminiReplies(JSON.stringify({ lines: [{ id: 'line', pronunciation: `${plain}\u05b8` }] }));
+    const vocalized = '\u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd';
+    // The first pass leaves a letter bare; the check fixes it, and its version is what comes back.
+    const fetchMock = geminiReplies(
+      JSON.stringify({ lines: [{ id: 'line', pronunciation: `${plain}\u05b8` }] }),
+      JSON.stringify({ lines: [{ id: 'line', verdict: 'fixed', pronunciation: vocalized }] }),
+    );
     const response = await vocalize(request('POST', { text: ` ${plain}  ` }), params);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ pronunciation: `${plain}\u05b8` });
+    expect(await response.json()).toEqual({ pronunciation: vocalized });
     expect(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).toContain(`\\"text\\":\\"${plain}\\"`);
+    expect(String((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body)).toContain('Lines to check');
     expect((await getAdStudioBrief(orgId, projectId, briefId)).scenes).toEqual([]);
     expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(1);
+    expect((await listAdStudioUsage(orgId, projectId)).filter((row) => row.kind === 'vocalize_check')).toHaveLength(1);
 
     expect((await vocalize(request('POST', { text: '  ' }), params)).status).toBe(400);
     const english = await createBriefAs(ownerSession, orgId, projectId);
     const refused = await vocalize(request('POST', { text: 'Sign fast' }), { params: Promise.resolve({ orgId, projectId, briefId: english }) });
     expect(await refused.json()).toMatchObject({ error: 'provider_failed', code: 'invalid_output' });
+  });
+
+  it('narration mode: read from the brief by the script writer, chosen by a person, and enforced on every save', async () => {
+    const { ownerSession, orgId, projectId } = await setup();
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const created = await createBrief(request('POST', { ...BRIEF, objective: 'Signups, with our founder talking to camera' }), { params: Promise.resolve({ orgId, projectId }) });
+    const briefId = ((await created.json()) as { brief: { id: string } }).brief.id;
+    const params = { params: Promise.resolve({ orgId, projectId, briefId }) };
+    type View = { narrationMode: string | null; detectedNarrationMode: string | null; effectiveNarrationMode: string; scenes: { delivery?: string; speaker?: string }[] };
+    const who = (view: View) => view.scenes.map((scene) => [scene.delivery ?? null, scene.speaker ?? null]);
+
+    // Automatic: the writer reads the brief, says on_camera, and every narrated scene gets the same presenter.
+    const fetchMock = geminiReplies(
+      JSON.stringify({
+        title: 'Ad',
+        narrationMode: 'on_camera',
+        scenes: [
+          { durationSeconds: 5, visualPrompt: 'The founder at her desk', voiceover: 'Hi', onScreenText: '', delivery: 'on_screen', speaker: 'the founder, a woman in her 40s' },
+          { durationSeconds: 5, visualPrompt: 'A phone', voiceover: 'Sign anywhere', onScreenText: '', delivery: 'voiceover' },
+        ],
+      }),
+    );
+    const generated = (await (await generateScript(request('POST'), params)).json()) as { brief: View };
+    expect(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).toContain('narrationMode: read the brief');
+    expect(generated.brief).toMatchObject({ narrationMode: null, detectedNarrationMode: 'on_camera', effectiveNarrationMode: 'on_camera' });
+    expect(who(generated.brief)).toEqual([
+      ['on_screen', 'the founder, a woman in her 40s'],
+      ['on_screen', 'the founder, a woman in her 40s'],
+    ]);
+
+    // The person picks voice-over: the script follows at once.
+    const voiceover = await setNarration(request('PUT', { mode: 'voiceover' }), params);
+    expect(voiceover.status).toBe(200);
+    const after = ((await voiceover.json()) as { brief: View }).brief;
+    expect(after).toMatchObject({ narrationMode: 'voiceover', effectiveNarrationMode: 'voiceover' });
+    expect(who(after)).toEqual([
+      [null, null],
+      [null, null],
+    ]);
+    // A save that puts someone on screen in a voice-over ad is made to follow the mode.
+    const saved = await saveScript(request('PUT', { scenes: [{ id: 'x', durationSeconds: 5, visualPrompt: 'A desk', voiceover: 'Hi', onScreenText: '', delivery: 'on_screen', speaker: 'a man' }] }), params);
+    expect(who(((await saved.json()) as { brief: View }).brief)).toEqual([[null, null]]);
+
+    // A brief update without the mode keeps it; with one, it is applied.
+    expect((await patchBrief(request('PATCH', { ...BRIEF }), params)).status).toBe(200);
+    expect((await getAdStudioBrief(orgId, projectId, briefId)).narration_mode).toBe('voiceover');
+    const patched = await patchBrief(request('PATCH', { ...BRIEF, narrationMode: 'on_camera' }), params);
+    expect(((await patched.json()) as { brief: View }).brief.narrationMode).toBe('on_camera');
+
+    expect((await setNarration(request('PUT', { mode: 'loud' }), params)).status).toBe(400);
+    expect((await setNarration(request('PUT', { mode: 'on_camera', presenter: 5 }), params)).status).toBe(400);
+    expect((await setNarration(request('PUT', { mode: 'on_camera', presenter: 'x'.repeat(300) }), params)).status).toBe(400);
+    const automatic = await setNarration(request('PUT', { mode: null }), params);
+    expect(((await automatic.json()) as { brief: View }).brief.narrationMode).toBeNull();
   });
 
   it('sets one narrator voice for the ad, refuses an invalid one by code, and clears it', async () => {
