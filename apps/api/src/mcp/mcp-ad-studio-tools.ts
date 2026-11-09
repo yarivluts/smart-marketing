@@ -42,6 +42,8 @@ import {
   resolveAdStudioExportDestinations,
   saveAdStudioCopy,
   saveAdStudioVoice,
+  saveAdStudioNarrationMode,
+  adStudioNarrationMode,
   AdStudioVoiceInvalidError,
   saveAdStudioVideoSettings,
   AdStudioVideoSettingsInvalidError,
@@ -132,7 +134,7 @@ import {
   type AdStudioClipView,
   type AdStudioRunView,
 } from '@growthos/ad-studio';
-import { assemblyPlan, isAdStudioImageFormat, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, type AdStudioMetaTargeting, defaultMetaTargeting, metaTargetingIssues, normalizeMetaTargeting, isSearchTargeting, defaultSearchTargeting, isPlatformOperator, type Permission } from '@growthos/shared';
+import { assemblyPlan, isAdStudioImageFormat, isAdStudioNarrationMode, sceneVideoStates, summarizeVideoProgress, voiceDescription, normalizeVideoSettings, type AdStudioAdCopy, type AdStudioVoice, type AdStudioVideoSettings, type AdStudioSearchKeyword, type AdStudioSearchKeywords, type AdStudioSearchAd, type AdStudioMetaTargeting, defaultMetaTargeting, metaTargetingIssues, normalizeMetaTargeting, isSearchTargeting, defaultSearchTargeting, isPlatformOperator, type Permission } from '@growthos/shared';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -323,6 +325,8 @@ function briefSummary(brief: AdStudioBriefModel) {
     total_seconds: brief.scenes.reduce((sum, scene) => sum + scene.durationSeconds, 0),
     image_idea_count: (brief.image_concepts ?? []).length,
     has_plan: Boolean(brief.plan),
+    // Who narrates the video: chosen ("auto" when not), what the script writer read, and what the script follows.
+    narration: { mode: brief.narration_mode ?? 'auto', detected: brief.detected_narration_mode ?? null, effective: adStudioNarrationMode(brief) },
     last_changed_on: brief.last_changed_on,
   };
 }
@@ -487,7 +491,23 @@ const briefFields = {
   format: z.string().describe('Video frame: "vertical" (9:16, Reels/Stories/Shorts) or "horizontal" (16:9, YouTube).'),
   language: z.string().describe('The ad language, e.g. "en" or "he" (voiceover, on-screen text, image headlines).'),
   target_seconds: z.number().describe('Wanted video length in seconds, at most 60.'),
+  narration_mode: z
+    .string()
+    .optional()
+    .describe('Who narrates the video: "voiceover" (off-screen narrator, the default), "on_camera" (one presenter talks to the camera throughout), "mixed" (per scene) or "auto" (read from the brief). Omit to keep the current one.'),
 };
+
+/** The brief input from MCP arguments: snake case, and "auto" for an automatic narration mode. */
+function briefInputFromArgs(a: Record<string, unknown>) {
+  const mode = a.narration_mode;
+  return parseBriefInput({
+    ...a,
+    productDescription: a.product_description,
+    landingPageUrl: a.landing_page_url,
+    targetSeconds: a.target_seconds,
+    narrationMode: mode === undefined ? undefined : mode === 'auto' ? null : mode,
+  });
+}
 
 const sceneShape = z
   .array(
@@ -503,7 +523,7 @@ const sceneShape = z
       delivery: z
         .string()
         .optional()
-        .describe('Who says the narration: "voiceover" (default - an off-screen narrator, no one in the shot talks) or "on_screen" (a person in the shot says it, lip-synced).'),
+        .describe('Who says the narration: "voiceover" (default - an off-screen narrator, no one in the shot talks) or "on_screen" (a person in the shot says it, lip-synced). Kept as sent only in a "mixed" ad; otherwise the ad\'s narration mode decides (see set_ad_narration_mode).'),
       speaker: z
         .string()
         .optional()
@@ -564,7 +584,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         const brief = await createAdStudioBrief({
           organizationId: auth.organizationId,
           projectId: auth.projectId,
-          input: parseBriefInput({ ...a, productDescription: a.product_description, landingPageUrl: a.landing_page_url, targetSeconds: a.target_seconds }),
+          input: briefInputFromArgs(a),
           createdByUserId: actorId(auth),
         });
         return textResult({ ad: briefSummary(brief), web_url: webUrl(auth, brief.id) });
@@ -581,7 +601,7 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
           organizationId: auth.organizationId,
           projectId: auth.projectId,
           briefId: a.brief_id,
-          input: parseBriefInput({ ...a, productDescription: a.product_description, landingPageUrl: a.landing_page_url, targetSeconds: a.target_seconds }),
+          input: briefInputFromArgs(a),
         });
         return textResult({ ad: briefSummary(brief) });
       }),
@@ -725,6 +745,28 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         const voice = a.preset === 'none' ? null : ({ preset: a.preset, description: a.description } as AdStudioVoice);
         await saveAdStudioVoice({ ...ctx(a.brief_id), voice });
         return textResult({ narrator_voice: (await describeBrief(auth, a.brief_id)).video.narrator_voice });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'set_ad_narration_mode',
+    {
+      title: 'Set who narrates the video',
+      description:
+        'Sets who narrates the whole video ad and applies it to the script at once: "voiceover" (an off-screen narrator, no one in the shot talks), "on_camera" (one presenter speaks to the camera in every scene with narration - optionally described in presenter), "mixed" (each scene\'s delivery decides) or "auto" (the script writer reads it from the brief; voice-over unless the brief asks for a presenter). Scenes whose speaker changes render again. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        mode: z.string().describe('voiceover, on_camera, mixed or auto.'),
+        presenter: z.string().optional().describe('For "on_camera": the one person who speaks, e.g. "a woman in her 30s in a navy blazer". Omit to keep the one the script names.'),
+      }),
+    },
+    auditedToolHandler(auth, 'set_ad_narration_mode', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; mode: string; presenter?: string }) => {
+        if (a.mode !== 'auto' && !isAdStudioNarrationMode(a.mode)) return errorResult('mode must be voiceover, on_camera, mixed or auto.');
+        await saveAdStudioNarrationMode({ ...ctx(a.brief_id), mode: a.mode === 'auto' ? null : a.mode, presenter: a.presenter ?? null });
+        const described = await describeBrief(auth, a.brief_id);
+        return textResult({ narration: described.brief.narration, scenes: described.scenes.map((scene) => ({ id: scene.id, delivery: scene.delivery, speaker: scene.speaker, video_state: scene.video_state })) });
       }),
     ),
   );

@@ -21,6 +21,9 @@ import type { ToolResult } from './mcp-tools';
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 7, 7]);
+// Hebrew as escapes (no Hebrew in code files): "shalom", plain and with full nikud.
+const PLAIN_WORD = 'שלום';
+const VOCALIZED_WORD = 'שָׁלוֹם';
 
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';
@@ -47,9 +50,11 @@ beforeEach(() => {
         return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items: targets.map((target) => ({ key: target.key, headline: `Head ${target.key}`.slice(0, 30), primaryText: 'Sign from WhatsApp.', description: '' })) }) }] } }] });
       }
       if (schema.includes('"lines"')) {
-        // The vocalizer: every line comes back with a marker standing in for the nikud.
-        const lines = JSON.parse(prompt.split('\n')[1]) as { id: string; text: string }[];
-        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: lines.map((line) => ({ id: line.id, pronunciation: `${line.text}\u05b8` })) }) }] } }] });
+        // The vocalizer: every line comes back with its nikud; the independent check then finds it right.
+        const lines = JSON.parse(prompt.trim().split('\n').at(-1) as string) as { id: string; text: string; pronunciation: string }[];
+        const checking = prompt.includes('Lines to check');
+        const answer = lines.map((line) => (checking ? { id: line.id, verdict: 'ok', pronunciation: line.pronunciation } : { id: line.id, pronunciation: line.text.split(PLAIN_WORD).join(VOCALIZED_WORD) }));
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ lines: answer }) }] } }] });
       }
       if (schema.includes('"headlines"')) {
         // The search-ad writer: one headline too long, which the engine fits to 30 characters.
@@ -170,16 +175,16 @@ describe('Ad Studio MCP tools', () => {
   it('vocalizes Hebrew narration when an agent saves the script, and keeps a pronunciation it sends back', async () => {
     const { json } = await setup(['mcp.read', 'ai.use']);
     const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', { ...BRIEF, language: 'he' });
-    // Hebrew as escapes (no Hebrew in code files).
-    const plain = '\u05e9\u05dc\u05d5\u05dd';
+    const plain = PLAIN_WORD;
     const scene = { id: 's1', duration_seconds: 5, visual_prompt: 'A desk', voiceover: plain, on_screen_text: '' };
     type Scene = { id: string; pronunciation: string | null };
     const saved = await json<Scene[]>('save_ad_script', { brief_id: ad.id, scenes: [scene, { ...scene, id: 's2', voiceover: '' }] });
-    expect(saved.map((entry) => entry.pronunciation)).toEqual([`${plain}\u05b8`, null]);
+    expect(saved.map((entry) => entry.pronunciation)).toEqual([VOCALIZED_WORD, null]);
     const kept = await json<Scene[]>('save_ad_script', { brief_id: ad.id, scenes: [{ ...scene, pronunciation: `${plain}!` }] });
     expect(kept[0].pronunciation).toBe(`${plain}!`);
+    // The vocalizer and its check: two text calls.
     const usage = await json<{ today: { text_generations: number } }>('get_ad_studio_usage');
-    expect(usage.today.text_generations).toBe(1);
+    expect(usage.today.text_generations).toBe(2);
   });
 
   it('lets an agent add app screenshots and illustrations, attach them to scenes, look at them, and delete them', async () => {
@@ -239,9 +244,45 @@ describe('Ad Studio MCP tools', () => {
     expect(cleared.image_ideas[0].copy).toBeNull();
   });
 
+  it('lets an agent choose who narrates the video, enforced on the script', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string; narration: unknown } }>('create_ad_brief', { ...BRIEF, narration_mode: 'on_camera' });
+    expect(ad.narration).toEqual({ mode: 'on_camera', detected: null, effective: 'on_camera' });
+    await json('save_ad_script', {
+      brief_id: ad.id,
+      scenes: [
+        { id: 's1', duration_seconds: 5, visual_prompt: 'The founder at a desk', voiceover: 'Sign fast', delivery: 'on_screen', speaker: 'the founder', on_screen_text: '' },
+        { id: 's2', duration_seconds: 5, visual_prompt: 'A phone', voiceover: 'Done', on_screen_text: '' },
+      ],
+    });
+    type Scene = { delivery: string; speaker: string | null };
+    const who = (scenes: Scene[]) => scenes.map(({ delivery, speaker }) => ({ delivery, speaker }));
+    // On camera: the same presenter speaks every narrated scene.
+    expect(who((await json<{ scenes: Scene[] }>('get_ad_brief', { brief_id: ad.id })).scenes)).toEqual([
+      { delivery: 'on_screen', speaker: 'the founder' },
+      { delivery: 'on_screen', speaker: 'the founder' },
+    ]);
+    const voiceover = await json<{ narration: unknown; scenes: Scene[] }>('set_ad_narration_mode', { brief_id: ad.id, mode: 'voiceover' });
+    expect(voiceover.narration).toEqual({ mode: 'voiceover', detected: null, effective: 'voiceover' });
+    expect(who(voiceover.scenes)).toEqual([
+      { delivery: 'voiceover', speaker: null },
+      { delivery: 'voiceover', speaker: null },
+    ]);
+    const presenter = await json<{ scenes: Scene[] }>('set_ad_narration_mode', { brief_id: ad.id, mode: 'on_camera', presenter: 'a chef' });
+    expect(who(presenter.scenes).map((scene) => scene.speaker)).toEqual(['a chef', 'a chef']);
+    expect((await json<{ narration: unknown }>('set_ad_narration_mode', { brief_id: ad.id, mode: 'auto' })).narration).toMatchObject({ mode: 'auto' });
+    const bad = await call('set_ad_narration_mode', { brief_id: ad.id, mode: 'loud' });
+    expect((bad.content[0] as { text: string }).text).toBe('mode must be voiceover, on_camera, mixed or auto.');
+    // A brief update that leaves the mode out keeps it.
+    await json('set_ad_narration_mode', { brief_id: ad.id, mode: 'mixed' });
+    const updated = await json<{ ad: { narration: { mode: string } } }>('update_ad_brief', { brief_id: ad.id, ...BRIEF });
+    expect(updated.ad.narration.mode).toBe('mixed');
+  });
+
   it('lets an agent set who speaks each scene and the one narrator voice of the ad', async () => {
     const { json, call } = await setup(['mcp.read', 'ai.use']);
-    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    // Per-scene speakers belong to a mixed ad.
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', { ...BRIEF, narration_mode: 'mixed' });
     await json('save_ad_script', {
       brief_id: ad.id,
       scenes: [
