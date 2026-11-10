@@ -84,6 +84,20 @@ describe('MetaLookalikeAudienceControls', () => {
     expect(screen.getByText('Warm leads - Lookalike 5% · 5% · US · created 2026-08-20T00:00:00.000Z')).toBeInTheDocument();
   });
 
+  it('shows the country and "how alike" hints as visible text tied to their fields, not only as a tooltip', () => {
+    renderControls();
+    const country = screen.getByLabelText(messages.ProjectPlugins.lookalikeCountryLabel);
+    const ratio = screen.getByLabelText(messages.ProjectPlugins.lookalikeRatioLabel);
+    expect(screen.getByText(messages.ProjectPlugins.lookalikeCountryHint)).toBeVisible();
+    expect(country).toHaveAccessibleDescription(messages.ProjectPlugins.lookalikeCountryHint);
+    expect(ratio).toHaveAccessibleDescription(messages.ProjectPlugins.lookalikeRatioHint);
+  });
+
+  it('shows no hints when the form is not offered', () => {
+    renderControls({ hasSeedAudience: false });
+    expect(screen.queryByText(messages.ProjectPlugins.lookalikeCountryHint)).toBeNull();
+  });
+
   it('uses plain words in English and Hebrew, without lookalike / custom audience / ISO jargon', async () => {
     const he = (await import('../../messages/he.json')).default;
     for (const bundle of [messages, he]) {
