@@ -478,6 +478,13 @@
     "changeRoleError": "Couldn't change this member's role. Please try again.",
     "inviteEmailLabel": "Email",
     "inviteRoleLabel": "Role",
+    "inviteRoleHint": {
+      "org_admin": "Can do everything in the whole organization except billing.",
+      "viewer": "Can look at boards and results, but can't change anything.",
+      "project_admin": "Runs one project: its team, settings and keys, and can approve ad changes.",
+      "editor": "Can use Growth Pilot and Ad Studio and edit boards in one project, but can't invite people or change settings.",
+      "operator": "Can approve and carry out ad changes in one project, and nothing else."
+    },
     "inviteProjectLabel": "Project",
     "inviteProjectNone": "You don't administer any projects to invite this role to.",
     "invite": "Invite",
