@@ -57,4 +57,29 @@ describe('BriefForm ad name hint', () => {
     renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'he' });
     expect(screen.getByLabelText(heMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', heMessages.AdStudio.fieldNameHint);
   });
+
+  it('accepts a web address typed without https:// instead of blocking the form', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ brief: { id: 'b2' } }), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = renderWithIntl(<BriefForm orgId="o" projectId="p" studioHref="/s" />, { locale: 'en' });
+    for (const el of container.querySelectorAll('input[required], textarea[required]')) fireEvent.change(el, { target: { value: 'x' } });
+    const site = screen.getByLabelText(enMessages.AdStudio.fieldLandingPage);
+    expect(site).toHaveAttribute('type', 'text');
+    expect(site).toHaveAttribute('inputmode', 'url');
+    expect(site).toHaveAttribute('autocapitalize', 'off');
+    fireEvent.change(site, { target: { value: ' my-shop.com/sale ' } });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.AdStudio.createButton }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/s?brief=b2'));
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).landingPageUrl).toBe('https://my-shop.com/sale');
+  });
+
+  it('keeps an address that already has a scheme, and an empty one empty', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ brief: { id: 'b3' } }), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = renderWithIntl(<BriefForm orgId="o" projectId="p" studioHref="/s" />, { locale: 'en' });
+    for (const el of container.querySelectorAll('input[required], textarea[required]')) fireEvent.change(el, { target: { value: 'x' } });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.AdStudio.createButton }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).landingPageUrl).toBe('');
+  });
 });
