@@ -5643,7 +5643,7 @@
     },
     "platforms": {
       "meta_ads": {
-        "name": "Facebook & Instagram (Meta)",
+        "name": "Facebook & Instagram",
         "why": "Publish image and video ads to Facebook and Instagram, and plan audiences using Facebook's estimates of how many people you can reach.",
         "oauth": "Connect with Facebook",
         "oauthHint": "The easiest way: sign in to Facebook, then pick the ad account and the Page.",

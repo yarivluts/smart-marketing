@@ -15,3 +15,11 @@ describe('Connections: Facebook & Instagram purpose line', () => {
     expect(why.length).toBeGreaterThan(20);
   });
 });
+
+describe('Connections: Facebook & Instagram platform name', () => {
+  it('is named by the apps people know, without the company name (en + he)', () => {
+    expect(en.Connections.platforms.meta_ads.name).toBe('Facebook & Instagram');
+    expect(he.Connections.platforms.meta_ads.name).not.toMatch(/Meta/);
+    expect(he.Connections.platforms.meta_ads.name.length).toBeGreaterThan(5);
+  });
+});
