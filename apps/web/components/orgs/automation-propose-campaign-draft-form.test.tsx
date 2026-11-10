@@ -40,7 +40,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     expect(screen.getByLabelText('Platform')).toHaveValue('google_ads');
     fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
-    fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
+    fireEvent.change(screen.getByLabelText('Name for this group of ads'), { target: { value: 'Ad Group 1' } });
     fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText(/Headlines/), {
       target: { value: 'Buy Blue Widgets\nBest Widgets Online\nWidgets For Less' },
@@ -185,7 +185,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
-    fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
+    fireEvent.change(screen.getByLabelText('Name for this group of ads'), { target: { value: 'Ad Group 1' } });
     fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText(/Headlines/), {
       target: { value: 'Buy Blue Widgets\nBest Widgets Online\nWidgets For Less' },
