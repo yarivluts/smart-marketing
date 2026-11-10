@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
-import { advanceBriefVideo, listBriefVideo, resolveAdStudioVideoDeps } from '@/lib/ad-studio/engine';
+import { advanceBriefVideo, resolveAdStudioVideoDeps } from '@/lib/ad-studio/engine';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; briefId: string }>;
@@ -21,7 +21,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
   const deps = resolveAdStudioVideoDeps();
   const ctx = { organizationId: orgId, projectId, briefId };
   try {
-    const result = deps.omni ? await advanceBriefVideo(ctx, { ...deps, omni: deps.omni }) : await listBriefVideo(ctx);
+    // Without a video model nothing advances, but work that died is still given up on.
+    const result = await advanceBriefVideo(ctx, deps);
     return NextResponse.json(result, { headers: { 'cache-control': 'no-store' } });
   } catch (err) {
     return adStudioErrorResponse(err);

@@ -43,6 +43,8 @@ export interface AdStudioAdminPanelProps {
   videoQa?: { enabled: boolean; retries: number };
   /** The size images are rendered at; omitted by callers that predate it (2K). */
   imageSize?: '1K' | '2K';
+  /** Whether assembled video ads carry the brand banner along the bottom; omitted by callers that predate it (on). */
+  videoBrandBanner?: boolean;
   usageToday: { textGenerations: number; videoSeconds: number; images: number };
   recentUsage: AdStudioUsageRow[];
 }
@@ -83,6 +85,7 @@ export function AdStudioAdminPanel({
   limits,
   videoQa = { enabled: true, retries: 1 },
   imageSize = '2K',
+  videoBrandBanner = true,
   usageToday,
   recentUsage,
 }: AdStudioAdminPanelProps): React.ReactElement {
@@ -95,6 +98,7 @@ export function AdStudioAdminPanel({
   const [qaEnabled, setQaEnabled] = React.useState(videoQa.enabled);
   const [qaRetries, setQaRetries] = React.useState(String(videoQa.retries));
   const [size, setSize] = React.useState<'1K' | '2K'>(imageSize);
+  const [bannerEnabled, setBannerEnabled] = React.useState(videoBrandBanner);
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const formatWhen = useLocalDateTime(SHORT);
@@ -113,6 +117,7 @@ export function AdStudioAdminPanel({
           dailyImages: Number(imagesLimit),
           videoQa: { enabled: qaEnabled, retries: Number(qaRetries) },
           imageSize: size,
+          videoBrandBanner: bannerEnabled,
         }),
       });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError;
@@ -232,6 +237,14 @@ export function AdStudioAdminPanel({
               </label>
             </div>
             <p className="text-[11px] text-muted-foreground">{t('admin.qaRetriesImagesHint')}</p>
+          </fieldset>
+          <fieldset className="flex basis-full flex-col gap-2 rounded-lg border border-border p-3" data-testid="ad-studio-video-banner-settings">
+            <legend className="px-1 text-sm font-semibold">{t('admin.videoBannerTitle')}</legend>
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={bannerEnabled} onChange={(event) => setBannerEnabled(event.target.checked)} data-testid="ad-studio-video-banner" />
+              {t('admin.videoBannerEnabled')}
+            </label>
+            <p className="text-xs text-muted-foreground">{t('admin.videoBannerHint')}</p>
           </fieldset>
           <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}

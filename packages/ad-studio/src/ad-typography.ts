@@ -269,18 +269,35 @@ export async function applyBrandStrip(params: { image: AdStudioGeneratedImage; f
  * The brand strip alone, on a transparent canvas the size of the frame: a PNG laid over a picture, or
  * over every frame of a video ad (ffmpeg's overlay), so video ads carry the same strip as image ads.
  */
-export async function brandStripLayer(params: { width: number; height: number; format: AdStudioImageFormat; brand: AdBrandMark }): Promise<Buffer> {
+export async function brandStripLayer(params: {
+  width: number;
+  height: number;
+  format: AdStudioImageFormat;
+  brand: AdBrandMark;
+  /** Where the strip sits, as shares of the height; default the placement's AD_STUDIO_BRAND_STRIP band. */
+  zone?: { top: number; height: number };
+  /** The band's opacity, 0-1; default 1 (opaque). A video banner lets the footage show through a little. */
+  fillOpacity?: number;
+}): Promise<Buffer> {
   const { width, height } = params;
-  const zone = AD_STUDIO_BRAND_STRIP[params.format];
-  const top = Math.round(height * zone.top);
+  const zone = params.zone ?? AD_STUDIO_BRAND_STRIP[params.format];
   const stripHeight = Math.max(24, Math.round(height * zone.height));
+  // A band that ends at the bottom edge ends exactly there, with no rounding gap below it.
+  const top = Math.min(Math.round(height * zone.top), height - stripHeight);
   const colours = brandStripColours(params.brand.colors);
   const rtl = isRtlLanguage(params.brand.language);
   const padding = Math.round(stripHeight * 0.16);
   const tileSize = stripHeight - padding * 2;
   const gap = Math.round(stripHeight * 0.22);
+  const opacity = Math.min(1, Math.max(0, params.fillOpacity ?? 1));
   const layers: sharp.OverlayOptions[] = [
-    { input: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}"><rect width="100%" height="100%" fill="${colours.fill}"/></svg>`), top, left: 0 },
+    {
+      input: Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${stripHeight}"><rect width="100%" height="100%" fill="${colours.fill}" fill-opacity="${opacity}"/></svg>`,
+      ),
+      top,
+      left: 0,
+    },
   ];
 
   let tile: Buffer | null = null;
