@@ -355,7 +355,7 @@ export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoF
                     muted
                     playsInline
                     preload="metadata"
-                    className={cn('h-full max-w-full object-contain', videoFormat === 'vertical' ? 'aspect-[9/16]' : 'aspect-video')}
+                    className={cn('h-full max-w-full bg-black object-cover', videoFormat === 'vertical' ? 'aspect-[9/16]' : 'aspect-video')}
                   />
                   <span className="absolute inset-0 m-auto flex h-11 w-11 items-center justify-center rounded-full bg-white/85 text-pp-primary shadow-md" aria-hidden="true">
                     <Play className="h-5 w-5 translate-x-px fill-current" />

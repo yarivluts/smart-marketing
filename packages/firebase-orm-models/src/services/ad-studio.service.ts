@@ -545,6 +545,8 @@ export interface AdStudioSettingsView {
   videoQa: { enabled: boolean; retries: number };
   /** The size images are rendered at: 2K meets Meta's recommended sizes, 1K is cheaper for drafts. */
   imageSize: AdStudioImageSize;
+  /** Whether assembled video ads carry the brand banner (logo, name, slogan) along the bottom. */
+  videoBrandBanner: boolean;
   /** False while the project is still on the defaults. */
   customized: boolean;
   lastChangedOn: string | null;
@@ -559,6 +561,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
       dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
       videoQa: { enabled: true, retries: AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES },
       imageSize: DEFAULT_AD_STUDIO_IMAGE_SIZE,
+      videoBrandBanner: true,
       customized: false,
       lastChangedOn: null,
     };
@@ -569,6 +572,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
     dailyImages: settings.daily_images ?? AD_STUDIO_DEFAULT_DAILY_IMAGES,
     videoQa: { enabled: settings.video_qa_enabled ?? true, retries: settings.video_qa_retries ?? AD_STUDIO_DEFAULT_VIDEO_QA_RETRIES },
     imageSize: isAdStudioImageSize(settings.image_size) ? settings.image_size : DEFAULT_AD_STUDIO_IMAGE_SIZE,
+    videoBrandBanner: settings.video_brand_banner ?? true,
     customized: true,
     lastChangedOn: settings.last_changed_on,
   };
@@ -585,6 +589,8 @@ export async function setAdStudioSettings(params: {
   videoQa?: { enabled: boolean; retries: number };
   /** Omitted by callers that predate image sizes: the current size is kept. */
   imageSize?: string;
+  /** Omitted by callers that predate the video brand banner: the current choice is kept. */
+  videoBrandBanner?: boolean;
   actorId: string;
   now?: Date;
 }): Promise<AdStudioSettingsView> {
@@ -602,6 +608,7 @@ export async function setAdStudioSettings(params: {
     reasons.push(`videoQa.retries must be a whole number from 0 to ${AD_STUDIO_MAX_VIDEO_QA_RETRIES}`);
   }
   if (params.imageSize !== undefined && !isAdStudioImageSize(params.imageSize)) reasons.push('imageSize must be 1K or 2K');
+  if (params.videoBrandBanner !== undefined && typeof params.videoBrandBanner !== 'boolean') reasons.push('videoBrandBanner must be true or false');
   if (reasons.length) throw new AdStudioBriefInvalidError(reasons);
   await requireProject(params.organizationId, params.projectId);
 
@@ -609,6 +616,7 @@ export async function setAdStudioSettings(params: {
   const dailyImages = params.dailyImages ?? before.dailyImages;
   const videoQa = params.videoQa ?? before.videoQa;
   const imageSize = isAdStudioImageSize(params.imageSize) ? params.imageSize : before.imageSize;
+  const videoBrandBanner = params.videoBrandBanner ?? before.videoBrandBanner;
   const existing = await AdStudioSettingsModel.init(SETTINGS_ID, { organization_id: params.organizationId, project_id: params.projectId });
   const settings = existing ?? new AdStudioSettingsModel();
   settings.organization_id = params.organizationId;
@@ -619,6 +627,7 @@ export async function setAdStudioSettings(params: {
   settings.video_qa_enabled = videoQa.enabled;
   settings.video_qa_retries = videoQa.retries;
   settings.image_size = imageSize;
+  settings.video_brand_banner = videoBrandBanner;
   settings.changed_by = params.actorId;
   settings.last_changed_on = nowIso(params.now);
   settings.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
@@ -633,8 +642,8 @@ export async function setAdStudioSettings(params: {
       targetType: 'ad_studio_settings',
       targetId: params.projectId,
       summary: `Set Ad Studio daily limits to ${params.dailyTextGenerations} AI text calls, ${params.dailyVideoSeconds}s of video and ${dailyImages} images`,
-      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages, video_qa: before.videoQa, image_size: before.imageSize },
-      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages, video_qa: videoQa, image_size: imageSize },
+      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages, video_qa: before.videoQa, image_size: before.imageSize, video_brand_banner: before.videoBrandBanner },
+      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages, video_qa: videoQa, image_size: imageSize, video_brand_banner: videoBrandBanner },
     });
   } catch {
     // Best-effort.

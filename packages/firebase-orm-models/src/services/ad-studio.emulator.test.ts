@@ -142,6 +142,7 @@ describe('Ad Studio limits and usage', () => {
       dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
       videoQa: { enabled: true, retries: 1 },
       imageSize: '2K',
+      videoBrandBanner: true,
       customized: false,
       lastChangedOn: null,
     });
@@ -155,6 +156,11 @@ describe('Ad Studio limits and usage', () => {
     expect(await setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 2, dailyVideoSeconds: 20, imageSize: '1K', actorId: owner.id })).toMatchObject({ imageSize: '1K' });
     expect(await setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 3, dailyVideoSeconds: 20, actorId: owner.id })).toMatchObject({ imageSize: '1K' });
     await expect(setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 3, dailyVideoSeconds: 20, imageSize: '4K', actorId: owner.id })).rejects.toBeInstanceOf(AdStudioBriefInvalidError);
+    // The brand banner on videos: on by default, kept when omitted, switched off when asked, booleans only.
+    expect((await getAdStudioSettings(orgId, projectId)).videoBrandBanner).toBe(true);
+    expect(await setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 3, dailyVideoSeconds: 20, videoBrandBanner: false, actorId: owner.id })).toMatchObject({ videoBrandBanner: false });
+    expect(await setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 4, dailyVideoSeconds: 20, actorId: owner.id })).toMatchObject({ videoBrandBanner: false });
+    await expect(setAdStudioSettings({ organizationId: orgId, projectId, dailyTextGenerations: 4, dailyVideoSeconds: 20, videoBrandBanner: 'no' as unknown as boolean, actorId: owner.id })).rejects.toBeInstanceOf(AdStudioBriefInvalidError);
   });
 
   it('counts today per UTC day, text and video apart, failures included, and refuses a call that would pass the limit', async () => {

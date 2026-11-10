@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
   AD_STUDIO_ASPECT_RATIO,
+  AD_STUDIO_CLIP_TIMEOUT_MS,
   AD_STUDIO_MAX_TOTAL_SECONDS,
+  AD_STUDIO_VIDEO_BRAND_BANNER,
+  AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY,
   assemblyPlan,
   planDemoInserts,
   buildSceneEditInstruction,
@@ -62,13 +65,17 @@ import { resolveAdBrandMark } from './brand';
  * Each step is safe to repeat and guarded by a short per-clip lease (see the clip service).
  */
 
-/** Longer than any real render; a clip still generating after this is given up on. */
-export const CLIP_TIMEOUT_MS = 30 * 60_000;
+/** A clip still generating after this is given up on (see AD_STUDIO_CLIP_TIMEOUT_MS). */
+export const CLIP_TIMEOUT_MS = AD_STUDIO_CLIP_TIMEOUT_MS;
 /** A start call that never recorded its interaction id within this has died with its request. */
 const START_GRACE_MS = 5 * 60_000;
 const LEASE_MS = 120_000;
-/** An assembly still marked running after this died with its request. */
-export const ASSEMBLY_TIMEOUT_MS = 15 * 60_000;
+/**
+ * An assembly still marked running after this died with its request. Assembly runs inside the
+ * request, and Cloud Run ends any request at 10 minutes (web-prod's timeout), so a video still
+ * `assembling` past that will never finish; it was 15 minutes, with no poll to notice it at all.
+ */
+export const ASSEMBLY_TIMEOUT_MS = 10 * 60_000 + 30_000;
 
 /** Why a video request cannot go ahead, as a code the UI translates. */
 export type AdStudioVideoRequestCode = 'scene_not_found' | 'already_generating' | 'clip_not_editable' | 'invalid_instruction' | 'not_ready' | 'already_assembling';
@@ -429,20 +436,43 @@ async function advanceClip(ctx: Omit<BriefContext, 'actorId'>, clip: AdStudioCli
  * The status poll: advances every generating clip of the brief one step, gives up on assemblies
  * that died with their request, and returns the brief's clips and videos as they now stand.
  */
-export async function advanceBriefVideo(ctx: Omit<BriefContext, 'actorId'>, deps: AdStudioVideoDeps): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {
+export async function advanceBriefVideo(
+  ctx: Omit<BriefContext, 'actorId'>,
+  deps: Omit<AdStudioVideoDeps, 'omni'> & { omni: AdStudioOmni | null },
+): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {
   await ensureOrm();
   await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
-  await Promise.all(clips.filter((clip) => clip.status === 'generating').map((clip) => advanceClip(ctx, clip, deps)));
-  await checkNextClip(ctx, deps);
-  const now = clock(deps);
-  const videos = await listAdStudioVideos(ctx.organizationId, ctx.projectId, ctx.briefId);
-  await Promise.all(
-    videos
-      .filter((video) => video.status === 'assembling' && now.getTime() - new Date(video.requested_on).getTime() > ASSEMBLY_TIMEOUT_MS)
-      .map((video) => markAdStudioVideoFailed(video, 'timed_out', now)),
-  );
+  const generating = clips.filter((clip) => clip.status === 'generating');
+  const omni = deps.omni;
+  if (omni) {
+    await Promise.all(generating.map((clip) => advanceClip(ctx, clip, { ...deps, omni })));
+    await checkNextClip(ctx, deps);
+  }
+  await failStaleWork(ctx, omni ? [] : generating, deps);
   return listBriefVideo(ctx);
+}
+
+/**
+ * Gives up on work that died: an assembly still running past ASSEMBLY_TIMEOUT_MS, and - when there is
+ * no video model to ask - a clip generating past CLIP_TIMEOUT_MS (with one, `advanceClip` does it).
+ * Each is marked failed with `timed_out`, which the page shows with a try-again button.
+ */
+export async function failStaleWork(
+  ctx: Omit<BriefContext, 'actorId'>,
+  clipsWithoutModel: readonly AdStudioClipModel[],
+  deps: Pick<AdStudioVideoDeps, 'now'>,
+): Promise<number> {
+  const now = clock(deps);
+  const age = (iso: string) => now.getTime() - new Date(iso).getTime();
+  const videos = await listAdStudioVideos(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const staleVideos = videos.filter((video) => video.status === 'assembling' && age(video.requested_on) > ASSEMBLY_TIMEOUT_MS);
+  const staleClips = clipsWithoutModel.filter((clip) => clip.status === 'generating' && age(clip.requested_on) > CLIP_TIMEOUT_MS);
+  await Promise.all([...staleVideos.map((video) => markAdStudioVideoFailed(video, 'timed_out', now)), ...staleClips.map((clip) => markAdStudioClipFailed(clip, 'timed_out', now))]);
+  if (staleVideos.length || staleClips.length) {
+    console.warn('[ad-studio] gave up on stuck video work', { briefId: ctx.briefId, videos: staleVideos.map((video) => video.id), clips: staleClips.map((clip) => clip.id) });
+  }
+  return staleVideos.length + staleClips.length;
 }
 
 /**
@@ -509,6 +539,18 @@ export async function demoInsertsFor(
   return inserts.length ? { recording, inserts } : { recording: null, inserts: [] };
 }
 
+/** The brand banner of a video ad: a transparent PNG the size of the frame with the band at its bottom. */
+export async function videoBrandBannerLayer(brief: AdStudioBriefModel, frame: { width: number; height: number }, storage: AdStudioMediaStorage): Promise<Buffer> {
+  const brand = await resolveAdBrandMark(brief, storage);
+  return brandStripLayer({
+    ...frame,
+    format: brief.video_format === 'vertical' ? 'story' : 'landscape',
+    brand,
+    zone: AD_STUDIO_VIDEO_BRAND_BANNER[brief.video_format],
+    fillOpacity: AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY,
+  });
+}
+
 /**
  * Joins the newest ready, current clip of every scene in script order into one MP4 of at most 60
  * seconds, stores it and records it. Runs inside the request: work files go to a fresh temp folder
@@ -554,12 +596,15 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
       await deps.storage.downloadToFile(demo.recording.gcs_path as string, file);
       local.splice(1, 0, ...demo.inserts.map((insert) => ({ file, seconds: insert.seconds, startSeconds: insert.startSeconds, fit: 'screen' as const })));
     }
-    // Every video ad carries the brand strip too: drawn once as a PNG the size of the frame and laid over every frame.
+    // The brand banner (logo, name, slogan) along the bottom edge, over full-frame footage: drawn once
+    // as a PNG the size of the frame and laid over every frame. The project can switch it off.
     const resolution = normalizeVideoSettings(brief.video_settings).resolution;
-    const frame = assemblyFrame(brief.video_format, resolution);
-    const brand = await resolveAdBrandMark(brief, deps.storage);
-    const overlay = path.join(workDir, 'brand.png');
-    await writeFile(overlay, await brandStripLayer({ ...frame, format: brief.video_format === 'vertical' ? 'story' : 'landscape', brand }));
+    const settings = await getAdStudioSettings(ctx.organizationId, ctx.projectId);
+    let overlay: string | null = null;
+    if (settings.videoBrandBanner) {
+      overlay = path.join(workDir, 'brand.png');
+      await writeFile(overlay, await videoBrandBannerLayer(brief, assemblyFrame(brief.video_format, resolution), deps.storage));
+    }
     stage = 'ffmpeg_failed';
     const output = path.join(workDir, 'video.mp4');
     const { durationSeconds } = await (adStudioRuntime().concatClips ?? concatClips)({ clips: local, output, format: brief.video_format, resolution, overlay, runner: deps.runner });

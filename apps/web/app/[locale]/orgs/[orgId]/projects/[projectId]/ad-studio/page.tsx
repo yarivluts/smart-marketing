@@ -975,6 +975,7 @@ export default async function AdStudioPage({
           }}
           videoQa={settings.videoQa}
           imageSize={settings.imageSize}
+          videoBrandBanner={settings.videoBrandBanner}
           usageToday={usageToday}
           recentUsage={recentUsage.map((row) => ({
             id: row.id,

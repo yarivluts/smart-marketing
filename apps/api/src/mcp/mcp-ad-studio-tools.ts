@@ -1288,7 +1288,8 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     auditedToolHandler(auth, 'get_ad_video_status', async (args: any) =>
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string }) => {
         const deps = resolveAdStudioVideoDeps();
-        if (deps.omni) await advanceBriefVideo(ctx(a.brief_id), { ...deps, omni: deps.omni });
+        // Without a video model nothing advances, but stuck work is still given up on.
+        await advanceBriefVideo(ctx(a.brief_id), deps);
         const state = await describeBrief(auth, a.brief_id);
         return textResult({ scenes: state.scenes.map((scene) => ({ id: scene.id, video_state: scene.video_state, clip_id: scene.clip_id, qa: scene.qa })), video: state.video });
       }),

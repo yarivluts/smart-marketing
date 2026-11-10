@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AdStudioScene } from './scenes';
 import {
+  AD_STUDIO_CLIP_SLOW_MS,
+  AD_STUDIO_CLIP_TIMEOUT_MS,
+  AD_STUDIO_VIDEO_BRAND_BANNER,
+  AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY,
+  FULL_FRAME_LINE,
+  isClipSlow,
   assemblyPlan,
   buildSceneEditInstruction,
   buildScenePrompt,
@@ -50,8 +56,38 @@ describe('buildScenePrompt', () => {
   });
 
   it('builds an edit instruction that keeps everything else and repeats the no-text rule', () => {
-    expect(buildSceneEditInstruction('  make it night ')).toBe('make it night. Keep everything else the same. Do not add any readable text, captions or logos.');
+    expect(buildSceneEditInstruction('  make it night ')).toBe('make it night. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.');
     expect(buildSceneEditInstruction('Make it night.')).toMatch(/^Make it night\. Keep/);
+  });
+
+  it('asks for full-bleed footage and never mentions the brand banner laid over it afterwards', () => {
+    // Told "a brand strip covers the lower part", the model painted an empty band with made-up logos there (prod, 2026-11).
+    for (const format of ['vertical', 'horizontal'] as const) {
+      const prompt = buildScenePrompt(scene('a', 5, 'A desk', 'Hi'), { ...CONTEXT, format });
+      expect(prompt).toContain(FULL_FRAME_LINE);
+      expect(prompt).not.toMatch(/brand strip|banner|upper two thirds|lower part/i);
+      expect(prompt).toMatch(/captions, subtitles, titles, logos, signs or watermarks/);
+    }
+  });
+});
+
+describe('video brand banner and timeouts', () => {
+  it('puts the banner in a band that ends at the bottom edge of either format', () => {
+    for (const zone of Object.values(AD_STUDIO_VIDEO_BRAND_BANNER)) {
+      expect(zone.top + zone.height).toBeCloseTo(1, 5);
+      expect(zone.height).toBeGreaterThanOrEqual(0.08);
+      expect(zone.height).toBeLessThanOrEqual(0.15);
+    }
+    expect(AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY).toBeGreaterThan(0.8);
+    expect(AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY).toBeLessThanOrEqual(1);
+  });
+
+  it('calls a clip slow after the slow mark and gives up on it later', () => {
+    const start = '2026-11-10T10:00:00.000Z';
+    expect(isClipSlow(start, new Date(Date.parse(start) + AD_STUDIO_CLIP_SLOW_MS - 1))).toBe(false);
+    expect(isClipSlow(start, new Date(Date.parse(start) + AD_STUDIO_CLIP_SLOW_MS + 1))).toBe(true);
+    expect(AD_STUDIO_CLIP_TIMEOUT_MS).toBeGreaterThan(AD_STUDIO_CLIP_SLOW_MS);
+    expect(AD_STUDIO_CLIP_TIMEOUT_MS).toBeLessThanOrEqual(15 * 60_000);
   });
 });
 

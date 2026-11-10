@@ -33,6 +33,11 @@ const IMAGE_FORMAT_PREFERENCE: Record<AdPlacement, AdStudioImageFormat[]> = {
   youtube: ['landscape', 'square', 'portrait', 'story'],
 };
 
+/** A video ad's player box: the shape the video was assembled in, so it fills the box edge to edge. */
+export function videoAspectClass(vertical: boolean): string {
+  return vertical ? 'aspect-[9/16]' : 'aspect-video';
+}
+
 export type AdPreviewMedia =
   | { kind: 'image'; byFormat: Partial<Record<AdStudioImageFormat, string>>; alt: string }
   | { kind: 'video'; src: string; vertical: boolean; label: string; testId?: string };
@@ -128,6 +133,8 @@ export function AdPlacementPreview({
         </div>
       );
     if (media.kind === 'video') {
+      // Always the video's own shape: a 9:16 ad squeezed into a 4:5 feed box or a 16:9 player was
+      // shown with black bars on both sides, which read as "the video does not fill the screen".
       return (
         <video
           src={withFirstFrame(media.src)}
@@ -136,10 +143,8 @@ export function AdPlacementPreview({
           preload="metadata"
           aria-label={media.label}
           data-testid={media.testId}
-          className={cn(
-            'w-full bg-black object-contain',
-            format === 'story' ? 'aspect-[9/16]' : media.vertical ? 'aspect-[4/5]' : 'aspect-video',
-          )}
+          data-placement-format={format}
+          className={cn('block w-full bg-black object-cover', videoAspectClass(media.vertical))}
         />
       );
     }

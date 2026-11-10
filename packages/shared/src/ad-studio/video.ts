@@ -10,9 +10,11 @@ import { AD_STUDIO_VISUAL_STYLE_PROMPTS, isDefaultVideoSettings, musicPromptLine
  * so the API routes, the page and the tests all share one definition.
  *
  * Decision on on-screen text: the model is told never to render readable text (video models garble
- * letters, and Hebrew worst of all), and the assembled video carries no text overlay either - the
+ * letters, and Hebrew worst of all), and the assembled video carries no scene text either - the
  * scene's `onScreenText` stays in the script for the person to add as a caption or text layer in
- * the ad platform. It is therefore not part of the prompt or of the fingerprint: editing it does
+ * the ad platform. The only words on the finished video are the brand banner (logo, name, slogan)
+ * drawn along its bottom edge by the studio, set in Heebo with correct bidi (see
+ * AD_STUDIO_VIDEO_BRAND_BANNER). It is therefore not part of the prompt or of the fingerprint: editing it does
  * not make a clip out of date. The voiceover IS part of the prompt - Gemini Omni generates the
  * soundtrack with the picture, so the narration is spoken by the model in the ad language.
  */
@@ -38,6 +40,33 @@ export interface AdStudioVideoContext {
 
 const PRODUCT_CONTEXT_MAX = 300;
 
+/**
+ * The brand banner on a video ad: logo, business name and slogan in a band along the very bottom of
+ * the frame, as shares of the frame's height, laid over the footage after it is joined. The footage
+ * itself fills the whole frame behind it - the scene prompts never mention the banner, because a
+ * model told a strip "covers the lower part" painted an empty band there instead of the scene.
+ */
+export const AD_STUDIO_VIDEO_BRAND_BANNER: Record<AdStudioFormat, { top: number; height: number }> = {
+  vertical: { top: 0.9, height: 0.1 },
+  horizontal: { top: 0.86, height: 0.14 },
+};
+
+/**
+ * A clip still generating after this is given up on (`timed_out`) so the person can try again. Renders
+ * take one to three minutes; the old 30 minutes left a stuck scene spinning for half an hour.
+ */
+export const AD_STUDIO_CLIP_TIMEOUT_MS = 15 * 60_000;
+/** After this a generating clip is shown as slow, with when it will be stopped. */
+export const AD_STUDIO_CLIP_SLOW_MS = 6 * 60_000;
+
+/** Whether a clip requested at `requestedOn` has been generating for longer than usual at `now`. */
+export function isClipSlow(requestedOn: string, now: Date): boolean {
+  return now.getTime() - new Date(requestedOn).getTime() > AD_STUDIO_CLIP_SLOW_MS;
+}
+
+/** How opaque the banner's band is: solid enough to read on any footage, with the scene faintly behind it. */
+export const AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY = 0.95;
+
 function oneLine(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
@@ -45,6 +74,12 @@ function oneLine(value: string): string {
 function clip(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max - 1).trimEnd()}…` : value;
 }
+
+/** Every scene is footage only, filling the whole frame. */
+export const FULL_FRAME_LINE = 'Full-bleed footage to every edge, no bars or blank bands.';
+
+/** The words in the clip are added afterwards (the brand banner), never drawn by the model. */
+export const NO_TEXT_RULE = 'do not show any readable text, letters, numbers, captions, subtitles, titles, logos, signs or watermarks anywhere in the frame';
 
 /**
  * The text-to-video prompt for one scene. Every scene carries the same product context and style
@@ -82,16 +117,17 @@ export function buildScenePrompt(
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
     `This shot is one scene of a short video ad for: ${product}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.`,
     ...referencePromptLines(references),
-    // The brand strip (logo, name, slogan) is laid over every frame afterwards, as on image ads.
-    context.format === 'vertical' ? 'Keep the action in the upper two thirds; a brand strip covers the lower part.' : 'Keep faces above the bottom edge; a brand strip covers it.',
+    // Full bleed. The brand banner is laid over the bottom afterwards; it is deliberately not
+    // mentioned - told a strip covers the lower part, the model painted an empty band there.
+    FULL_FRAME_LINE,
     voiceover
       ? narrationLine
       : musicPromptLine(settings, false),
     referencesShowText(references)
-      ? 'Apart from what the attached screen or opening frame shows, do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame.'
+      ? `Apart from what the attached screen or opening frame shows, ${NO_TEXT_RULE}.`
       : // Video models fill a visible phone or laptop screen with invented, garbled writing (the AI
         // check keeps catching it): unless an attached image is the screen, keep every screen unreadable.
-        'Do not show any readable text, letters, numbers, captions, subtitles, logos or watermarks anywhere in the frame; any phone or computer screen faces away or is out of focus.',
+        `${NO_TEXT_RULE.charAt(0).toUpperCase()}${NO_TEXT_RULE.slice(1)}; any phone or computer screen faces away or is out of focus.`,
     ...(settings.avoid ? [`Never show any of these anywhere in the video: ${settings.avoid}.`] : []),
   ].join('\n');
 }
@@ -102,7 +138,7 @@ export function buildScenePrompt(
  * new generation.
  */
 export function buildSceneEditInstruction(instruction: string): string {
-  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos.`;
+  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.`;
 }
 
 /** 32-bit FNV-1a over UTF-16 code units, from a given offset basis. */
