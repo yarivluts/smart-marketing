@@ -756,7 +756,7 @@
     "noTemplates": "No templates in this organization yet.",
     "peopleHeading": "People registry",
     "noPeople": "No people registered in this organization yet.",
-    "statusLabel": "Status: {status, select, approved {Approved} pending {Waiting for approval} other {{status}}}",
+    "statusLabel": "Status: {status, select, approved {Approved} pending {Waiting for approval} rejected {Declined} detached {Removed} other {{status}}}",
     "scopeSelectionLabel": "Accounts to request (separate with commas)",
     "requestAttachment": "Request",
     "requestError": "Couldn't send that request. Please try again.",

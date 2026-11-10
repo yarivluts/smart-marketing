@@ -756,7 +756,7 @@
     "noTemplates": "אין עדיין תבניות בארגון זה.",
     "peopleHeading": "מרשם אנשי צוות",
     "noPeople": "עדיין לא נרשמו אנשי צוות בארגון זה.",
-    "statusLabel": "סטטוס: {status, select, approved {אושר} pending {ממתין לאישור} other {{status}}}",
+    "statusLabel": "סטטוס: {status, select, approved {אושר} pending {ממתין לאישור} rejected {נדחה} detached {הוסר} other {{status}}}",
     "scopeSelectionLabel": "חשבונות לבקשה (מופרדים בפסיק)",
     "requestAttachment": "בקשת צירוף",
     "requestError": "לא ניתן היה לשלוח את הבקשה. נסו שוב.",
