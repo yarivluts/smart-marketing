@@ -65,7 +65,7 @@ export function isClipSlow(requestedOn: string, now: Date): boolean {
 }
 
 /** How opaque the banner's band is: solid enough to read on any footage, with the scene faintly behind it. */
-export const AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY = 0.9;
+export const AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY = 0.95;
 
 function oneLine(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -76,12 +76,10 @@ function clip(value: string, max: number): string {
 }
 
 /** Every scene is footage only, filling the whole frame. */
-export const FULL_FRAME_LINE =
-  'The footage fills the entire frame edge to edge, top to bottom: no borders, black bars, letterboxing, frames, empty or blank bands, solid-colour areas, title cards or end cards - the scene itself continues all the way to every edge.';
+export const FULL_FRAME_LINE = 'Full-bleed footage to every edge, no bars or blank bands.';
 
 /** The words in the clip are added afterwards (the brand banner), never drawn by the model. */
-export const NO_TEXT_RULE =
-  'do not show any readable text, letters, numbers, captions, subtitles, titles, slogans, brand names, logos, signs, labels, watermarks or on-screen graphics anywhere in the frame - the video is clean footage only.';
+export const NO_TEXT_RULE = 'do not show any readable text, letters, numbers, captions, subtitles, titles, logos, signs or watermarks anywhere in the frame';
 
 /**
  * The text-to-video prompt for one scene. Every scene carries the same product context and style
@@ -126,10 +124,10 @@ export function buildScenePrompt(
       ? narrationLine
       : musicPromptLine(settings, false),
     referencesShowText(references)
-      ? `Apart from what the attached screen or opening frame shows, ${NO_TEXT_RULE}`
+      ? `Apart from what the attached screen or opening frame shows, ${NO_TEXT_RULE}.`
       : // Video models fill a visible phone or laptop screen with invented, garbled writing (the AI
         // check keeps catching it): unless an attached image is the screen, keep every screen unreadable.
-        `${NO_TEXT_RULE.charAt(0).toUpperCase()}${NO_TEXT_RULE.slice(1)} Any phone or computer screen faces away or is out of focus.`,
+        `${NO_TEXT_RULE.charAt(0).toUpperCase()}${NO_TEXT_RULE.slice(1)}; any phone or computer screen faces away or is out of focus.`,
     ...(settings.avoid ? [`Never show any of these anywhere in the video: ${settings.avoid}.`] : []),
   ].join('\n');
 }
@@ -140,7 +138,7 @@ export function buildScenePrompt(
  * new generation.
  */
 export function buildSceneEditInstruction(instruction: string): string {
-  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions, subtitles, logos or graphics, and keep the footage filling the whole frame edge to edge.`;
+  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.`;
 }
 
 /** 32-bit FNV-1a over UTF-16 code units, from a given offset basis. */

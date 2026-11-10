@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { AD_STUDIO_BRAND_STRIP } from '@growthos/shared';
+import { AD_STUDIO_BRAND_STRIP, AD_STUDIO_VIDEO_BRAND_BANNER, AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY } from '@growthos/shared';
 import {
   HEADLINE_LEADING,
   applyBrandStrip,
@@ -137,5 +137,45 @@ describe('ad typography', () => {
     const alpha = (x: number, y: number) => data[(y * info.width + x) * 4 + 3];
     expect(alpha(10, 100)).toBe(0);
     expect(alpha(710, Math.round(1280 * (AD_STUDIO_BRAND_STRIP.story.top + 0.01)))).toBe(255);
+  });
+
+  it('puts the video banner along the very bottom edge, slightly see-through, logo at the reading side', async () => {
+    const zone = AD_STUDIO_VIDEO_BRAND_BANNER.vertical;
+    const brand = { name: 'EasySign', slogan: 'Sign anywhere', logo: await LOGO, colors: ['#1e3a8a'], language: 'he' };
+    const layer = await brandStripLayer({ width: 720, height: 1280, format: 'story', brand, zone, fillOpacity: AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY });
+    const { data, info } = await sharp(layer).raw().toBuffer({ resolveWithObject: true });
+    const px = (x: number, y: number) => Array.from(data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 4));
+    // Nothing above the band, so the footage shows full-frame there.
+    expect(px(360, Math.round(1280 * zone.top) - 3)[3]).toBe(0);
+    expect(px(360, 600)[3]).toBe(0);
+    // The band reaches the last row, in the brand colour, not quite opaque.
+    const bottom = px(5, 1279);
+    expect(Math.abs(bottom[3] - 255 * AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY)).toBeLessThanOrEqual(2);
+    expect(Math.abs(bottom[2] - 0x8a)).toBeLessThan(12);
+    // Hebrew: the (red) logo tile sits at the right.
+    const tileY = Math.round(1280 * (zone.top + zone.height / 2));
+    const right = px(720 - Math.round(720 * 0.04) - 30, tileY);
+    expect(right[0]).toBeGreaterThan(200);
+    expect(right[1]).toBeLessThan(60);
+  });
+
+  it('sets a long business name smaller on one line instead of wrapping it', async () => {
+    const zone = AD_STUDIO_VIDEO_BRAND_BANNER.vertical;
+    const long = 'Galileo Centre for Guidance and Admissions';
+    const layer = await brandStripLayer({ width: 720, height: 1280, format: 'story', brand: { name: long, slogan: 'Arrive at the test confident', logo: null, colors: ['#0f2a4a'], language: 'en' }, zone });
+    const { data, info } = await sharp(layer).raw().toBuffer({ resolveWithObject: true });
+    const bandTop = Math.round(1280 * zone.top);
+    // White text pixels by row: the name is one run of rows, then a gap, then the slogan - two blocks, not three.
+    const rows: boolean[] = [];
+    for (let y = bandTop; y < 1280; y += 1) {
+      let lit = false;
+      for (let x = 0; x < info.width && !lit; x += 1) {
+        const offset = (y * info.width + x) * 4;
+        if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) lit = true;
+      }
+      rows.push(lit);
+    }
+    const blocks = rows.reduce((count, lit, index) => count + (lit && !rows[index - 1] ? 1 : 0), 0);
+    expect(blocks).toBe(2);
   });
 });

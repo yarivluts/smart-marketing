@@ -244,6 +244,9 @@ export interface AdBrandMark {
   language: string;
 }
 
+/** The sizes, as shares of the usual one, a long business name steps down through to fit the strip on one line. */
+const STRIP_NAME_SCALES = [0.9, 0.8, 0.7, 0.62] as const;
+
 /** The strip's fill and the text colour that reads on it. */
 export function brandStripColours(colors: readonly string[]): { fill: string; text: string; muted: string } {
   const fill = colors[0] ?? '#111827';
@@ -320,15 +323,22 @@ export async function brandStripLayer(params: {
   const textWidth = Math.max(40, width - textLeftEdge - sideMargin);
   const name = params.brand.name.trim();
   const slogan = params.brand.slogan.trim();
-  const nameSize = stripHeight * (slogan ? 0.34 : 0.42);
-  const sloganSize = stripHeight * 0.22;
-  const runs: Run[] = [
-    { text: name, size: nameSize, weight: 900, colour: colours.text },
-    ...(slogan ? [{ text: `\n${slogan}`, size: sloganSize, weight: 300 as const, colour: colours.muted }] : []),
-  ];
-  const label = await renderHeadlineText(markup(runs), textWidth, 'left');
-  // Too long for the strip: scale the text block down to fit its height.
   const maxTextHeight = stripHeight - padding;
+  const render = (scale: number) => {
+    const runs: Run[] = [
+      { text: name, size: stripHeight * (slogan ? 0.34 : 0.42) * scale, weight: 900, colour: colours.text },
+      ...(slogan ? [{ text: `\n${slogan}`, size: stripHeight * 0.22 * Math.max(scale, 0.85), weight: 300 as const, colour: colours.muted }] : []),
+    ];
+    return renderHeadlineText(markup(runs), textWidth, 'left');
+  };
+  // A long name is set smaller until it fits on one line, rather than wrapping onto a second line
+  // and shrinking the whole block (slogan too) to fit the strip.
+  let label = await render(1);
+  for (const scale of STRIP_NAME_SCALES) {
+    if (label.info.height <= maxTextHeight && label.info.width <= textWidth) break;
+    label = await render(scale);
+  }
+  // Still too long at the smallest size: scale the text block down to fit its height.
   const textImage =
     label.info.height > maxTextHeight || label.info.width > textWidth
       ? await sharp(label.data).resize({ width: textWidth, height: maxTextHeight, fit: 'inside' }).png().toBuffer({ resolveWithObject: true })
