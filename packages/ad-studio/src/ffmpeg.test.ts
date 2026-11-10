@@ -49,7 +49,7 @@ function runnerWith(spawnImpl: SpawnLike): FfmpegRunner {
 }
 
 describe('buildConcatArgs', () => {
-  it('trims, scales, pads and resamples every clip, adds silence for a mute clip, and caps the output at 60 seconds', () => {
+  it('trims, scales to cover, crops and resamples every clip, adds silence for a mute clip, and caps the output at 60 seconds', () => {
     const args = buildConcatArgs({
       inputs: [
         { file: 'a.mp4', seconds: 5, hasAudio: true },
@@ -61,13 +61,23 @@ describe('buildConcatArgs', () => {
     expect(args.slice(0, 7)).toEqual(['-hide_banner', '-nostdin', '-y', '-i', 'a.mp4', '-i', 'b.mp4']);
     expect(args).toContain('anullsrc=channel_layout=stereo:sample_rate=48000');
     const filter = args[args.indexOf('-filter_complex') + 1];
-    expect(filter).toContain('[0:v:0]trim=duration=5,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280');
+    // Cover, never letterbox: a clip of another shape fills the frame and is cropped from the centre.
+    expect(filter).toContain('[0:v:0]trim=duration=5,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1');
+    expect(filter).not.toContain('color=black');
     expect(filter).toContain('[0:a:0]atrim=duration=5');
     // The mute clip's audio comes from the silent source, input 2.
     expect(filter).toContain('[2:a:0]atrim=duration=7.5');
     expect(filter).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]');
     expect(args.slice(-3)).toEqual(['-t', '60', 'out.mp4']);
     expect(args).toEqual(expect.arrayContaining(['-c:v', 'libx264', '-c:a', 'aac', '-movflags', '+faststart']));
+    // Plays in every browser and on iOS: H.264 High at level 4.0, 4:2:0.
+    expect(args.join(' ')).toContain('-profile:v high -level:v 4.0');
+    expect(args.join(' ')).toContain('-pix_fmt yuv420p');
+  });
+
+  it('still letterboxes a clip asked to pad', () => {
+    const filter = buildConcatArgs({ inputs: [{ file: 'a.mp4', seconds: 3, hasAudio: true, fit: 'pad' }], output: 'o.mp4', format: 'vertical' }).join(' ');
+    expect(filter).toContain('force_original_aspect_ratio=decrease,pad=720:1280');
   });
 
   it('uses the landscape frame for horizontal ads and refuses an empty list', () => {
@@ -206,6 +216,23 @@ describe.skipIf(!hasFfmpeg)('with a real ffmpeg binary', () => {
     expect(result.durationSeconds).toBeGreaterThan(1.8);
     expect(await probeMedia(output, realRunner)).toMatchObject({ hasVideo: true, hasAudio: true });
   }, 60_000);
+
+  it('fills a vertical frame edge to edge with a landscape clip - no black bars', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-ffmpeg-'));
+    workDirs.push(dir);
+    // A plain white landscape clip: any letterbox or pillarbox would show up as black rows or columns.
+    const clip = path.join(dir, 'wide.mp4');
+    expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=white:size=1280x720:rate=24:duration=2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', clip], { windowsHide: true }).status).toBe(0);
+    const output = path.join(dir, 'filled.mp4');
+    await concatClips({ clips: [{ file: clip, seconds: 2 }], output, format: 'vertical', runner: realRunner });
+    const frame = path.join(dir, 'frame.png');
+    expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', '1', '-i', output, '-frames:v', '1', frame], { windowsHide: true }).status).toBe(0);
+    const { default: sharp } = await import('sharp');
+    const { data, info } = await sharp(frame).raw().toBuffer({ resolveWithObject: true });
+    expect([info.width, info.height]).toEqual([720, 1280]);
+    const at = (x: number, y: number) => data[(y * info.width + x) * info.channels];
+    for (const [x, y] of [[2, 2], [717, 2], [360, 2], [360, 1277], [2, 640], [717, 640], [2, 1277], [717, 1277]]) expect(at(x, y)).toBeGreaterThan(200);
+  }, 60_000);
 });
 
 describe('screen recordings in an ad', () => {
@@ -226,8 +253,8 @@ describe('screen recordings in an ad', () => {
     // The silent moment gets a silent track of its own length, from the start.
     expect(args.join(' ')).toContain('-f lavfi -t 5 -i anullsrc=channel_layout=stereo:sample_rate=48000');
     expect(graph).toContain('[2:a:0]atrim=duration=5,');
-    // The scene clip keeps the plain fit.
-    expect(graph).toContain('[0:v:0]trim=duration=4,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=decrease,pad=');
+    // The scene clip keeps the plain, full-frame fit.
+    expect(graph).toContain('[0:v:0]trim=duration=4,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280');
     expect(graph).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1');
   });
 

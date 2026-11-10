@@ -163,6 +163,10 @@ export class AdStudioSettingsModel extends BaseModel {
   @Field({ is_required: false })
   public image_size?: string | null;
 
+  /** Whether assembled video ads carry the brand banner (logo, name, slogan) along the bottom; absent means on. */
+  @Field({ is_required: false })
+  public video_brand_banner?: boolean | null;
+
   @Field({ is_required: true })
   public changed_by!: string;
 

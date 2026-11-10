@@ -8,7 +8,7 @@ import { AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat } from '@growthos/shar
  * Every clip is re-encoded rather than stream-copied: clips from the same model usually match, but
  * a concat-copy silently breaks on any difference in resolution, frame rate, timebase or audio
  * layout, and an edit may come back in a different shape. So each input is trimmed to its scene's
- * scripted length, scaled and padded to one frame size, set to one frame rate, and given a stereo
+ * scripted length, scaled to cover one frame size (cropped, never letterboxed), set to one frame rate, and given a stereo
  * 48 kHz track (silence when a clip has no audio) before the concat filter; the output is H.264 +
  * AAC with the index at the front for streaming, capped at 60 seconds.
  *
@@ -60,10 +60,12 @@ export interface ConcatInput {
   /** Where in the file the clip starts (a moment of a product walkthrough); default 0. */
   startSeconds?: number;
   /**
-   * How the picture fills the frame. `pad` (default): scaled to fit, black bars. `screen`: a screen
-   * recording shown inside the frame on a blurred, darkened copy of itself, in either orientation.
+   * How the picture fills the frame. `cover` (default): scaled until it fills the whole frame and the
+   * overflow cropped from the centre, so a clip of a slightly different shape never shows black bars.
+   * `pad`: scaled to fit, black bars. `screen`: a screen recording shown inside the frame on a
+   * blurred, darkened copy of itself, in either orientation.
    */
-  fit?: 'pad' | 'screen';
+  fit?: 'cover' | 'pad' | 'screen';
 }
 
 /** The share of the frame a `screen` clip's picture takes, so the blurred backdrop shows around it. */
@@ -87,7 +89,11 @@ export function clipVideoFilter(input: ConcatInput, index: number, frame: { widt
       `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v${index}]`,
     ].join(';');
   }
-  return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[v${index}]`;
+  if (input.fit === 'pad') {
+    return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[v${index}]`;
+  }
+  // Edge to edge: the frame is always filled, whatever shape the model returned.
+  return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps},format=yuv420p[v${index}]`;
 }
 
 function seconds(value: number): string {
@@ -154,6 +160,11 @@ export function buildConcatArgs(params: {
     '[aout]',
     '-c:v',
     'libx264',
+    // High profile at level 4.0 plays everywhere: every browser, iOS Safari and the ad platforms.
+    '-profile:v',
+    'high',
+    '-level:v',
+    '4.0',
     '-preset',
     'veryfast',
     '-crf',

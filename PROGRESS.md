@@ -17,6 +17,19 @@ Template for each entry:
 
 ---
 
+## 2026-11-10 — Ad Studio video: full-frame footage, bottom brand banner, no stuck renders
+
+- **Last completed:**
+  - Full frame. Root cause, from prod clips: the scene prompt said "Keep the action in the upper two thirds; a brand strip covers the lower part", so Gemini painted an empty cream band, often with made-up logos and Hebrew, across the bottom third. The prompt now asks for full-bleed footage and never mentions the banner (`FULL_FRAME_LINE`), and the no-text rule is broader (`NO_TEXT_RULE`, edits too). ffmpeg now scales every clip to cover the frame and crops from the centre (`fit: 'cover'`, the new default) instead of padding with black bars, and encodes H.264 High@4.0 yuv420p + AAC with faststart. The players show each video at its own shape with `object-cover`: the final ad was a 9:16 video in a 4:5 feed box (or a 16:9 box) with black bars on both sides.
+  - Bottom brand banner: `AD_STUDIO_VIDEO_BRAND_BANNER` (vertical: bottom 10%, horizontal: bottom 14%, 95% opaque brand colour) drawn by the existing `brandStripLayer` (new `zone`/`fillOpacity`), logo tile at the reading side, Heebo with bidi. A long business name now steps down in size to stay on one line instead of wrapping. Project setting `videoBrandBanner` (on by default) in the operator settings card (`video_brand_banner` on `AdStudioSettingsModel`, audited). Clips made before this run keep their baked-in empty band until they are rendered again.
+  - Stuck builds. Root causes: (1) a final video left `assembling` (request died) was never polled - the page polled only while clips generated, and the stale check ran only in the status route and only with a Gemini key - so the button spun forever; (2) the page polled with a fixed 4 s `setInterval` regardless of the previous call, and prod logs show 20 status calls landing at once (each running the AI check), queuing the players' media requests behind them; (3) a clip could spin for 30 minutes. Now: polling is sequential (`startStatusPolling`) with a 45 s request timeout and also runs while the final video is assembling; the status route always sweeps stale work (`failStaleWork`, with or without a video model; MCP status tool too); clip timeout 15 min (`AD_STUDIO_CLIP_TIMEOUT_MS`) with a "taking longer than usual" note after 6 min; assembly timeout 10.5 min (Cloud Run's 600 s request limit). Failed scenes and failed final videos show the reason and a "Try again" button (en/he).
+  - Playback: prod clips and the assembled video were checked with ffprobe (H.264 High yuv420p + AAC, even sizes); the media routes already stream with byte ranges, `video/mp4`, no signed URLs. The playback failures matched the status-call pile-up above.
+  - Sample frames (vertical Hebrew, horizontal English): scratchpad `video-samples/`.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** after deploy, re-render one scene of the Galileo ad and check the new clip has no empty band; consider auto-flagging old clips with a bottom band in the AI check.
+- **Waiting on human:** deploy (not done by this run).
+
 ## 2026-11-09 — Ad Studio quality: nikud checked by AI, narration mode, tight headline spacing
 
 - **Last completed:**

@@ -4325,7 +4325,10 @@
       "assembleAnyway": "Assemble anyway",
       "inVideo": "In the video",
       "useInVideo": "Use in the video",
-      "chosen": "This version will be used in the video. Assemble again to apply it."
+      "chosen": "This version will be used in the video. Assemble again to apply it.",
+      "retry": "Try again",
+      "assemblingHint": "Putting the video together - usually under a minute. You can leave this page. If it does not finish, it is stopped and you can try again.",
+      "slowHint": "This is taking longer than usual. If it is not ready within {minutes} minutes it is stopped and you can try again."
     },
     "clipFailure": {
       "not_configured": "making video is not switched on yet",
@@ -4840,7 +4843,10 @@
         "1K": "1K - drafts",
         "2K": "2K - recommended"
       },
-      "qaRetriesImagesHint": "Images get at least 2 guided re-renders when re-renders are on: an image costs a fraction of a clip, and each retry is told what to fix."
+      "qaRetriesImagesHint": "Images get at least 2 guided re-renders when re-renders are on: an image costs a fraction of a clip, and each retry is told what to fix.",
+      "videoBannerTitle": "Brand banner on videos",
+      "videoBannerEnabled": "Show the logo, business name and slogan along the bottom of every assembled video",
+      "videoBannerHint": "The footage fills the whole frame and stays free of text; the banner is the only text on the video. Applies to videos assembled from now on."
     },
     "pronunciation": "Pronunciation (with Hebrew vowel marks)",
     "pronunciationAuto": "Added automatically when you save: the same words with full Hebrew vowel marks (nikud) and numbers written as words, so the AI narrator reads them right.",
