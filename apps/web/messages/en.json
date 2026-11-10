@@ -4540,8 +4540,8 @@
     "stageImagesValue": "{current} of {total} images",
     "autopilot": {
       "title": "Create everything automatically",
-      "description": "One click takes this ad from your idea to finished ads: a deep plan, the script, image ad ideas and images in every size, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
-      "optionPlan": "Deep plan first",
+      "description": "One click takes this ad from your idea to finished ads: a plan, the script, image ad ideas and images in every size, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
+      "optionPlan": "Plan first",
       "optionImages": "Image ads",
       "optionVideo": "Video ad",
       "formatsLegend": "Where the images will show",
@@ -4566,7 +4566,7 @@
         "awaiting_approval": "Waiting for you to confirm the plan"
       },
       "step": {
-        "plan": "Deep plan",
+        "plan": "Plan",
         "script": "Script",
         "image_concepts": "Image ideas",
         "images": "Images",
@@ -4601,7 +4601,7 @@
         "qa_issues": "the AI check still found problems - see the scenes"
       },
       "prepareTitle": "Prepare the plan",
-      "prepareDescription": "The AI writes the deep plan, the video script and the image ideas. Nothing is made yet: you review and change them below, then confirm.",
+      "prepareDescription": "The AI writes the plan, the video script and the image ideas. Nothing is made yet: you review and change them below, then confirm.",
       "prepare": "Prepare the plan",
       "createTitle": "Creating your ads",
       "createDescription": "The confirmed plan is being turned into images and video. You can leave this page; it continues when you come back.",
