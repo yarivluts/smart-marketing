@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderWithIntl } from '../../tests/e2e/helpers/test-harness';
 import { CampaignDailyBudgetControl } from './campaign-daily-budget-control';
+import heMessages from '../../messages/he.json';
 
 const mockRefresh = vi.fn();
 vi.mock('@/i18n/navigation', () => ({
@@ -14,6 +15,22 @@ describe('CampaignDailyBudgetControl', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockRefresh.mockReset();
+  });
+
+  it('writes the per-day unit in the reader language', () => {
+    renderWithIntl(
+      <CampaignDailyBudgetControl
+        orgId="org-1"
+        projectId="proj-1"
+        targetId="target-1"
+        campaignLabel="Summer Sale"
+        initialDailyBudgetUsd={100}
+      />,
+      { locale: 'he' },
+    );
+
+    expect(screen.getByText(`$100${heMessages.Campaigns.perDay}`)).toBeInTheDocument();
+    expect(screen.queryByText('$100/day')).not.toBeInTheDocument();
   });
 
   it('renders initial budget amount and preset buttons', () => {
