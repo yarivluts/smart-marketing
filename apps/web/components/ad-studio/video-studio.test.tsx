@@ -115,8 +115,43 @@ describe('VideoStudio', () => {
       await vi.advanceTimersByTimeAsync(4100);
     });
     await waitFor(() => expect(scene1.getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Ready'));
-    expect(fetchMock).toHaveBeenCalledWith(`${BASE}/render-status`, { cache: 'no-store' });
+    // A status call that hangs is given up on, so it never blocks the next poll.
+    expect(fetchMock).toHaveBeenCalledWith(`${BASE}/render-status`, { cache: 'no-store', signal: expect.any(AbortSignal) });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it('keeps polling while the final video is being joined, then shows the stuck one as failed with a try-again button', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const qa = { status: 'passed' as const, issues: [], transcript: null, checkedOn: null };
+    const ready = [clip('c1', 'a', 1, 'ready', fp(0), { qa }), clip('c2', 'b', 1, 'ready', fp(1), { qa })];
+    const assembling: AdStudioVideoView = { id: 'v1', status: 'assembling', failureReason: null, clipIds: ['c1', 'c2'], durationSeconds: 13, requestedOn: '2026-11-10T10:00:00.000Z', assembledOn: null };
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === `${BASE}/render-status`) return json({ clips: ready, videos: [{ ...assembling, status: 'failed', failureReason: 'timed_out' }] });
+      if (url === `${BASE}/assemble`) return json({ clips: ready, videos: [{ ...assembling, id: 'v2', status: 'ready', assembledOn: '2026-11-10T10:20:00.000Z' }] });
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    // Loaded with a video still marked as being joined (its request died), and nothing else in flight.
+    renderStudio({ initialClips: ready, initialVideos: [assembling] });
+    expect(screen.getByTestId('ad-studio-final-assembling')).toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100);
+    });
+    await waitFor(() => expect(screen.getByTestId('ad-studio-final-failure')).toHaveTextContent('it took too long, so it was stopped - try again'));
+    fireEvent.click(screen.getByTestId('ad-studio-final-retry'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/assemble`, { method: 'POST' }));
+  });
+
+  it('offers a try-again button on a failed scene, and says when a render is slow', async () => {
+    const fetchMock = vi.fn(async () => json({ clips: [clip('c9', 'b', 2, 'generating', fp(1))], videos: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderStudio({ initialClips: [clip('c1', 'b', 1, 'failed', fp(1), { failureReason: 'timed_out' })] });
+    const scene2 = within(screen.getByTestId('ad-studio-video-scene-2'));
+    expect(scene2.getByTestId('ad-studio-clip-failure')).toHaveTextContent('it took too long');
+    fireEvent.click(scene2.getByTestId('ad-studio-clip-retry'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/scenes/b/render`, { method: 'POST' }));
+    // The new render was requested long ago (the fixture's date): the page says it is slow and when it stops.
+    await waitFor(() => expect(scene2.getByTestId('ad-studio-clip-slow')).toHaveTextContent('within 15 minutes'));
   });
 
   it('turns a billing refusal into a sentence and shows the failed clip with its reason', async () => {

@@ -73,6 +73,20 @@ describe('AdStudioAdminPanel audiences (KAN-363)', () => {
     vi.unstubAllGlobals();
   });
 
+  it('lets an operator switch the brand banner on videos off, on by default', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ settings: {} }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderWithIntl(<AdStudioAdminPanel {...PROPS} canConfigure />, { locale: 'en' });
+    const banner = screen.getByRole('checkbox', { name: 'Show the logo, business name and slogan along the bottom of every assembled video' });
+    expect(banner).toBeChecked();
+    fireEvent.click(banner);
+    fireEvent.click(screen.getByRole('button', { name: 'Save limits' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ videoBrandBanner: false });
+    vi.unstubAllGlobals();
+  });
+
   it('renders the calls as phone cards and a desktop table, each date kept left-to-right (KAN-343)', () => {
     renderWithIntl(<AdStudioAdminPanel {...PROPS} />, { locale: 'he' });
     const cards = within(screen.getByTestId('ad-studio-usage-cards')).getAllByRole('listitem');
