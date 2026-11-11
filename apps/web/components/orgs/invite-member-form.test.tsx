@@ -48,16 +48,46 @@ describe('InviteMemberForm', () => {
   });
 
   it('shows an inline error when the invite fails', async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 500 } as Response);
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'friend@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      "Couldn't send that invite. They may already be a member.",
-    );
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Nothing was sent - please try again.');
+    expect(alert).not.toHaveTextContent('already');
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says so when the person is already a member, instead of a generic failure', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 409 } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'friend@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('already a member');
+  });
+
+  it('catches a mistyped address before sending anything', () => {
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'friend@examplecom' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent('does not look right');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('explains a dropped connection instead of failing silently', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('offline'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'friend@example.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was sent');
   });
 
   it('shows a project picker (defaulted to the first administered project) once a project-scoped role is selected, and includes projectId in the submitted body (KAN-135)', async () => {
