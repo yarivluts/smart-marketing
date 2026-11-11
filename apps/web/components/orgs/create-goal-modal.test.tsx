@@ -40,3 +40,19 @@ describe('CreateGoalModal presets', () => {
     }
   });
 });
+
+describe('CreateGoalModal failure', () => {
+  it('announces a failed save as an alert, in the translated words', async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = (async () => new Response('{}', { status: 500 })) as typeof fetch;
+    try {
+      const { container } = renderWithIntl(<CreateGoalModal orgId="o" projectId="p" isOpen onClose={() => undefined} />);
+      fireEvent.click(screen.getByTestId('preset-cac-btn'));
+      fireEvent.submit(container.ownerDocument.querySelector('form') as HTMLFormElement);
+      const alert = await screen.findByRole('alert');
+      expect(alert.textContent).toBe(enMessages.Goals.createError);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});

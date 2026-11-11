@@ -359,7 +359,7 @@ export function CreateGoalModal({
             )}
           </div>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
 
           <div className="mt-2 flex items-center justify-end gap-2 border-t border-border pt-3">
             <Button

@@ -232,7 +232,7 @@ export function BrandKitPanel({
             </div>
           </div>
         </fieldset>
-        {issues.length ? <p className="text-xs text-destructive">{issues.map((code) => t(`issue.${code}`)).join(' · ')}</p> : null}
+        {issues.length ? <p role="alert" className="text-xs text-destructive">{issues.map((code) => t(`issue.${code}`)).join(' · ')}</p> : null}
         {canEdit ? (
           <div className="flex flex-wrap items-center gap-3">
             <button type="submit" disabled={pending || !dirty || issues.length > 0} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
