@@ -16,6 +16,15 @@ describe('Support page: plain words for a newcomer', () => {
   it('he: empty state no longer says "landed" (נחתו)', () => {
     const m = (he as unknown as Copy).Support;
     expect(m.leaderboardEmpty).not.toMatch(/נחתו/);
-    expect(m.description).toMatch(/CSAT/);
+    expect(JSON.stringify(m)).not.toMatch(/CSAT/);
+  });
+
+  it('en: no CSAT jargon and durations spell out their unit', () => {
+    const m = (en as unknown as Copy).Support;
+    expect(JSON.stringify(m)).not.toMatch(/CSAT/);
+    expect(m.durationMinutes).toMatch(/minute/);
+    expect(m.durationSeconds).toMatch(/second/);
+    expect(m.durationHours).toMatch(/hour/);
+    expect(m.durationMinutes).not.toMatch(/\}m$/);
   });
 });
