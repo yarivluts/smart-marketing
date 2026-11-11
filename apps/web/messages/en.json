@@ -4853,7 +4853,7 @@
     },
     "pronunciation": "Pronunciation (with Hebrew vowel marks)",
     "pronunciationAuto": "Added automatically when you save: the same words with full Hebrew vowel marks (nikud) and numbers written as words, so the AI narrator reads them right.",
-    "pronunciationHint": "This is what the narrator reads. Fix any word that is vocalized wrong.",
+    "pronunciationHint": "This is what the narrator reads. If a word sounds wrong, correct its vowel marks (nikud) here.",
     "pronunciationStale": "The narration changed - the pronunciation will be redone when you save.",
     "references": {
       "title": "Images for the video",
