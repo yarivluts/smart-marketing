@@ -51,6 +51,15 @@ describe('AutomationProposeKeywordEditForm', () => {
     expect(screen.getByText(/create and execute an ad draft/)).toBeInTheDocument();
   });
 
+  it('names the groups of ads by number, never by their raw resource names', () => {
+    renderForm();
+
+    const select = screen.getByLabelText('Group of ads');
+    expect(screen.getByRole('option', { name: 'Group of ads 1' })).toHaveValue('customers/999/adGroups/1');
+    expect(screen.getByRole('option', { name: 'Group of ads 2' })).toHaveValue('customers/999/adGroups/2');
+    expect(select).not.toHaveTextContent('customers/');
+  });
+
   it('submits an add-keywords edit for the selected target and ad group', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();

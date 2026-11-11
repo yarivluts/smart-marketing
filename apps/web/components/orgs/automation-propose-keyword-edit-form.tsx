@@ -104,9 +104,9 @@ export function AutomationProposeKeywordEditForm({ orgId, projectId, targets }: 
             onChange={(event) => setAdGroupResourceName(event.target.value)}
             className="h-10 rounded-md border border-input bg-background px-2 text-sm"
           >
-            {adGroupOptions.map((option) => (
+            {adGroupOptions.map((option, index) => (
               <option key={option} value={option}>
-                {option}
+                {t('proposeKeywordEditAdGroupOption', { number: index + 1 })}
               </option>
             ))}
           </select>

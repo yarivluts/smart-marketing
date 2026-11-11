@@ -3134,6 +3134,7 @@
     "proposeKeywordEditNoTargetsNote": "No ad has a group of ads yet — create and execute an ad draft above first.",
     "proposeKeywordEditTargetLabel": "Which ad",
     "proposeKeywordEditAdGroupLabel": "Group of ads",
+    "proposeKeywordEditAdGroupOption": "Group of ads {number}",
     "proposeKeywordEditAddKeywordsLabel": "Keywords to add (one per line)",
     "proposeKeywordEditAddKeywordsPlaceholder": "blue widgets\ncheap widgets",
     "proposeKeywordEditAddNegativeKeywordsLabel": "Words to avoid, so the ad is not shown for them (one per line, optional)",

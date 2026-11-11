@@ -3134,6 +3134,7 @@
     "proposeKeywordEditNoTargetsNote": "לאף יעד אין עדיין קבוצת מודעות - צרו והפעילו טיוטת מודעה למעלה תחילה.",
     "proposeKeywordEditTargetLabel": "איזו מודעה",
     "proposeKeywordEditAdGroupLabel": "קבוצת מודעות",
+    "proposeKeywordEditAdGroupOption": "קבוצת מודעות {number}",
     "proposeKeywordEditAddKeywordsLabel": "מילות מפתח להוספה (אחת בכל שורה)",
     "proposeKeywordEditAddKeywordsPlaceholder": "וידג'טים כחולים\nוידג'טים זולים",
     "proposeKeywordEditAddNegativeKeywordsLabel": "מילים להימנע מהן, כדי שהמודעה לא תוצג עבורן (אחת בכל שורה, אופציונלי)",
