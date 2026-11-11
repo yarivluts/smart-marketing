@@ -33,7 +33,7 @@ function failureKey(code: string | null): 'site' | 'slow' | 'looping' | 'blocked
   return 'provider';
 }
 
-const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'account_action_required', 'meta_account_restricted', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise', 'platform_busy', 'timed_out', 'no_concepts'];
+const KNOWN_REASONS = ['quota_exceeded', 'provider_error', 'invalid_output', 'no_images', 'publish_failed', 'auth_failed', 'invalid_credential', 'account_action_required', 'meta_account_restricted', 'rejected', 'no_secret', 'rate_limited', 'refused', 'provider_billing', 'not_configured', 'upload_failed', 'cancelled', 'nothing_to_revise', 'platform_busy', 'timed_out', 'no_concepts'];
 
 /** A stored failure code in plain words; an unknown code never reaches the screen. */
 export function useReason(): (code: string | null | undefined) => string {

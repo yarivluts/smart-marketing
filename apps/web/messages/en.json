@@ -6365,6 +6365,7 @@
       "publish_failed": "Facebook and Instagram did not accept it, check your ad account connection",
       "auth_failed": "Facebook and Instagram no longer accept the saved connection, reconnect your ad account in Ad platform connections",
       "no_secret": "your Facebook and Instagram connection has no saved login, reconnect your ad account in Ad platform connections",
+    "invalid_credential": "the saved Facebook and Instagram login looks incomplete or wrong, save the connection again in Ad platform connections",
       "account_action_required": "Facebook needs you to verify your ad account in Ads Manager (adsmanager.facebook.com) first, then try again",
       "meta_account_restricted": "Facebook has restricted your ad account, so no ads can be created. Open Ads Manager (adsmanager.facebook.com) to see why and fix it, or connect a different ad account",
       "rejected": "Facebook and Instagram refused the ad, ask for a change to the ads or check your ad account",
