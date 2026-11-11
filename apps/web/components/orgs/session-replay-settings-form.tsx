@@ -78,7 +78,7 @@ export function SessionReplaySettingsForm({
         <p className="text-xs text-muted-foreground">{t('templateHelp')}</p>
       </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {saved && !error ? <p className="text-sm text-muted-foreground">{t('saved')}</p> : null}
       {/* Saving succeeded either way — this says WHICH of the two was saved. A
           template with no placeholder is a valid choice, so this is a note, not

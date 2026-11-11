@@ -221,7 +221,7 @@ export function BackfillPanel({ orgId, projectId, environmentId, environmentLabe
         </div>
       ) : null}
 
-      {message ? <p className={cn('text-sm', message.tone === 'ok' ? 'text-success' : 'text-destructive')}>{message.text}</p> : null}
+      {message ? <p role={message.tone === 'ok' ? 'status' : 'alert'} className={cn('text-sm', message.tone === 'ok' ? 'text-success' : 'text-destructive')}>{message.text}</p> : null}
 
       <div className="flex flex-col gap-2">
         <h3 className="text-sm font-semibold">{t('historyHeading')}</h3>
