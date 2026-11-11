@@ -40,18 +40,18 @@ async function show(l: string, members: OrgMemberSummary[], canManage = false): 
 describe('MembersList', () => {
   it('shows plain role and status names, not internal ids', async () => {
     await show('en', [member({ role: 'ingest_only', status: 'invited' })]);
-    expect(screen.getByText('Data sender only (Invited – waiting for them to accept)')).toBeInTheDocument();
+    expect(screen.getByText('Data sender only – status: Invited – waiting for them to accept')).toBeInTheDocument();
     expect(screen.queryByText(/ingest_only/)).toBeNull();
   });
 
   it('shows Hebrew names on Hebrew pages', async () => {
     await show('he', [member({ role: 'org_owner', status: 'suspended' })]);
-    expect(screen.getByText('בעלים (מושעה)')).toBeInTheDocument();
+    expect(screen.getByText('בעלים – סטטוס: מושעה')).toBeInTheDocument();
   });
 
   it('labels the role dropdown options with plain names', async () => {
     await show('en', [member({ role: 'org_admin', status: 'active' })], true);
     expect(screen.getByRole('option', { name: 'Admin' })).toBeInTheDocument();
-    expect(screen.getByText('(Active)')).toBeInTheDocument();
+    expect(screen.getByText('Status: Active')).toBeInTheDocument();
   });
 });

@@ -469,8 +469,8 @@
     "nonProdNotice": "Showing {environment} data, not production. Pages without environment support still show production."
   },
   "Members": {
-    "roleAndStatus": "{role} ({status})",
-    "statusLabel": "({status})",
+    "roleAndStatus": "{role} – status: {status}",
+    "statusLabel": "Status: {status}",
     "status_invited": "Invited – waiting for them to accept",
     "status_active": "Active",
     "status_suspended": "Suspended",
@@ -491,7 +491,7 @@
     "inviteError": "Couldn't send that invite just now. Nothing was sent - please try again.",
     "inviteErrorBadEmail": "That email address does not look right. Check it for typos, such as a missing @ or a missing dot.",
     "inviteErrorAlreadyMember": "This person is already a member, or already has an invite waiting. Nothing more to do.",
-    "projectRoleAndStatus": "{role} · {project} ({status})",
+    "projectRoleAndStatus": "{role} · {project} – status: {status}",
     "remove": "Remove",
     "removeError": "Couldn't remove this member. Please try again.",
     "removeLastOwnerError": "An organization must always have at least one owner.",
