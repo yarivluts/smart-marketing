@@ -6384,5 +6384,25 @@
       "inactiveTitle": "הקישור כבר לא פעיל",
       "inactiveBody": "ייתכן שפג תוקפו או שכובה. בקשו קישור חדש ממי ששלח אותו."
     }
+  },
+  "ProactiveRecommendations": {
+    "perDay": "{amount} ליום",
+    "budgetTitle": "להשקיע יותר במודעה שמשתלמת",
+    "budgetDescription": "\"{campaign}\" החזירה ${roas} על כל $1 שהושקע בה. הגדילו את התקציב היומי שלה ב-25% כדי שיותר אנשים יראו אותה.",
+    "pauseTitle": "להשהות מודעה שלא משתלמת",
+    "pauseDescription": "\"{campaign}\" החזירה רק ${roas} על כל $1 שהושקע בה ב-30 הימים האחרונים. השהו אותה כדי להפסיק להוציא עליה כסף.",
+    "pauseBefore": "פעילה, {amount}",
+    "pauseAfter": "מושהית, לא יוצא עליה כסף",
+    "pauseBeforeValue": "פעילה",
+    "pauseAfterValue": "מושהית",
+    "pauseImpact": "חוסך עד {amount} בחודש",
+    "funnelTitle": "להחזיר אנשים שעוזבים ב\"{stage}\"",
+    "funnelDescription": "{percent}% מהאנשים שמגיעים ל\"{stage}\" עוזבים לפני השלב הבא. נכין מודעה שמיועדת לאנשים האלה כדי להחזיר אותם. זו רק טיוטה - אפשר לערוך אותה, ושום דבר לא נדלק עד שתאשרו.",
+    "funnelBefore": "{percent}% עוזבים כאן",
+    "funnelAfter": "טיוטת מודעה לאנשים שעזבו",
+    "funnelTargetLabel": "להחזיר אנשים שעזבו ב\"{stage}\"",
+    "funnelBeforeValue": "עוד אין להם מודעה",
+    "funnelAfterValue": "טיוטת מודעה, {amount}",
+    "funnelCampaignName": "{stage} - החזרת אנשים"
   }
 }

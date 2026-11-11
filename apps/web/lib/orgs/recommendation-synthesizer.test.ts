@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { synthesizeProactiveRecommendations } from './recommendation-synthesizer';
+import { enMessagesFor, heMessagesFor, t, translatorFor } from './recommendation-test-translator';
 import type { UnifiedCampaignItem } from './ads-performance-synthesizer';
 import type { FunnelStepItem } from './funnel-goals-synthesizer';
 
@@ -23,10 +24,10 @@ describe('synthesizeProactiveRecommendations', () => {
       },
     ];
 
-    const recs = synthesizeProactiveRecommendations(campaigns, []);
+    const recs = synthesizeProactiveRecommendations(t, campaigns, []);
     expect(recs.some((r) => r.category === 'budget')).toBe(true);
     const budgetRec = recs.find((r) => r.category === 'budget');
-    expect(budgetRec?.afterDiff).toBe('$250/day');
+    expect(budgetRec?.afterDiff).toBe('$250 a day');
   });
 
   it('generates fatigue pause recommendation for low ROAS campaigns', () => {
@@ -48,7 +49,7 @@ describe('synthesizeProactiveRecommendations', () => {
       },
     ];
 
-    const recs = synthesizeProactiveRecommendations(campaigns, []);
+    const recs = synthesizeProactiveRecommendations(t, campaigns, []);
     expect(recs.some((r) => r.category === 'ad_fatigue')).toBe(true);
   });
 
@@ -58,7 +59,7 @@ describe('synthesizeProactiveRecommendations', () => {
       { stepOrder: 1, stageKey: 'cart', stageLabel: 'Add to Cart', customerCount: 300, conversionPercent: 30, dropOffPercent: 70 },
     ];
 
-    const recs = synthesizeProactiveRecommendations([], funnelSteps);
+    const recs = synthesizeProactiveRecommendations(t, [], funnelSteps);
     expect(recs.some((r) => r.category === 'funnel_dropoff')).toBe(true);
   });
 });
@@ -88,11 +89,12 @@ describe('synthesizeProactiveRecommendations - unmeasured campaigns', () => {
   };
 
   it('raises no campaign recommendation when nothing has been measured', () => {
-    expect(synthesizeProactiveRecommendations([unmeasured], [])).toEqual([]);
+    expect(synthesizeProactiveRecommendations(t, [unmeasured], [])).toEqual([]);
   });
 
   it('raises a funnel recommendation from a real drop-off, with no invented forecast', () => {
     const recs = synthesizeProactiveRecommendations(
+      t,
       [unmeasured],
       [
         { stageKey: 'view', stageLabel: 'Product View', stepOrder: 0, customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
@@ -109,9 +111,46 @@ describe('synthesizeProactiveRecommendations - unmeasured campaigns', () => {
   });
 
   it('still acts on a campaign once its ROAS is genuinely measured', () => {
-    const recs = synthesizeProactiveRecommendations([{ ...unmeasured, roas: 4.2 }], []);
+    const recs = synthesizeProactiveRecommendations(t, [{ ...unmeasured, roas: 4.2 }], []);
     expect(recs).toHaveLength(1);
     expect(recs[0].category).toBe('budget');
     expect(recs[0].actionProposal.targetId).toBe('tgt-1');
+  });
+});
+
+describe('synthesizeProactiveRecommendations - plain words in both languages', () => {
+  const funnel = [
+    { stageKey: 'view', stageLabel: 'Product View', stepOrder: 0, customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
+    { stageKey: 'cart', stageLabel: 'Cart', stepOrder: 1, customerCount: 300, conversionPercent: 30, dropOffPercent: 70 },
+  ];
+  const measured = (roas: number, spend30dUsd: number) => ({
+    id: 'c', targetId: 'tgt', label: 'Brand', platform: 'meta_ads' as const, status: 'enabled' as const,
+    dailyBudgetUsd: 100, spend30dUsd, impressions: null, clicks: null, ctrPct: null, cpaUsd: null, conversions: null, roas,
+  });
+  const jargon = /ROAS|retarget|drop-off|conversion/i;
+
+  function texts(translate: ReturnType<typeof translatorFor>): string[] {
+    return [...synthesizeProactiveRecommendations(translate, [measured(4.2, 0)], funnel), ...synthesizeProactiveRecommendations(translate, [measured(1.1, 800)], [])]
+      .flatMap((r) => [r.title, r.description, r.beforeDiff, r.afterDiff, r.projectedImpact, r.actionProposal.beforeValue, r.actionProposal.afterValue, r.actionProposal.estimatedImpact].map(String));
+  }
+
+  it('explains the funnel recommendation in everyday English with the measured percentage', () => {
+    const [rec] = synthesizeProactiveRecommendations(t, [], funnel);
+    expect(rec.description).toContain('70% of the people who reach "Cart" leave before the next step');
+    expect(rec.title).toBe('Win back people who leave at "Cart"');
+    expect(rec.actionProposal.afterValue).toBe('Draft ad, $150 a day');
+  });
+
+  it('uses no marketing jargon in English', () => {
+    for (const text of texts(t)) expect(text).not.toMatch(jargon);
+  });
+
+  it('has every message in Hebrew, with no English words left and no unfilled placeholders', () => {
+    const he = translatorFor(heMessagesFor);
+    expect(Object.keys(heMessagesFor).sort()).toEqual(Object.keys(enMessagesFor).sort());
+    for (const text of texts(he)) {
+      expect(text).not.toMatch(/\{\w+\}/);
+      expect(text.replace(/Brand|Cart|Product View/g, '')).not.toMatch(/[A-Za-z]{3,}/);
+    }
   });
 });

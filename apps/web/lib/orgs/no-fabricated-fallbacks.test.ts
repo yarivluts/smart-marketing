@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { buildFunnelGoalsCockpitData } from './funnel-goals-synthesizer';
 import { buildUnifiedAdsCockpitData } from './ads-performance-synthesizer';
 import { buildExecutiveReportData } from './executive-reporting-synthesizer';
+import { t } from './recommendation-test-translator';
 import { synthesizeProactiveRecommendations } from './recommendation-synthesizer';
 import type { AutomationTargetView } from './automation-view';
 
@@ -133,12 +134,12 @@ describe('no synthesizer invents data when real data is absent (Jira B15)', () =
   });
 
   it('synthesizeProactiveRecommendations: nothing measured - no recommendations', () => {
-    expect(synthesizeProactiveRecommendations([], [])).toEqual([]);
+    expect(synthesizeProactiveRecommendations(t, [], [])).toEqual([]);
     const unmeasured = buildUnifiedAdsCockpitData(
       [{ id: 't1', label: 'Brand', dailyBudgetUsd: 500, campaignStatus: 'enabled' }] as unknown as AutomationTargetView[],
       null,
     ).items;
-    expect(synthesizeProactiveRecommendations(unmeasured, [])).toEqual([]);
+    expect(synthesizeProactiveRecommendations(t, unmeasured, [])).toEqual([]);
   });
 });
 

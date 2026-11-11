@@ -112,7 +112,9 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   const funnelSteps =
     funnelOutcome && funnelOutcome.ok ? calculateFunnelStepItems(funnelOutcome.steps) : [];
 
+  const tRecommendations = await getTranslations('ProactiveRecommendations');
   const proactiveRecs = synthesizeProactiveRecommendations(
+    tRecommendations,
     targetViews.map((tv) => ({
       id: tv.id,
       targetId: tv.id,

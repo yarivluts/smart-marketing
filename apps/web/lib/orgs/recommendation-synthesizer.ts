@@ -13,11 +13,17 @@ import type { FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
  * budget, which meant this function could propose pausing a live campaign as
  * "underperforming" on the strength of a figure nothing had measured.
  */
+/** The `ProactiveRecommendations` message namespace's translator (next-intl's `t`), so the text is read in the viewer's language. */
+export type RecommendationTranslator = (key: string, values?: Record<string, string | number>) => string;
+
 export function synthesizeProactiveRecommendations(
+  t: RecommendationTranslator,
   campaigns: readonly UnifiedCampaignItem[] = [],
   funnelSteps: readonly FunnelStepItem[] = [],
 ): Omit<SmartRecommendationCardProps, 'onApprove' | 'onDismiss'>[] {
   const recommendations: Omit<SmartRecommendationCardProps, 'onApprove' | 'onDismiss'>[] = [];
+  const perDay = (amount: number): string => t('perDay', { amount: `$${amount}` });
+  const perMonth = (amount: number): string => `$${amount.toLocaleString('en-US')}`;
 
   const measured = campaigns.filter(
     (c): c is UnifiedCampaignItem & { roas: number } => typeof c.roas === 'number',
@@ -33,20 +39,20 @@ export function synthesizeProactiveRecommendations(
     recommendations.push({
       id: `rec-budget-${highRoasCampaign.targetId}`,
       category: 'budget',
-      title: 'Scale High-Performing Campaign Budget',
+      title: t('budgetTitle'),
       // States only the measured ROAS. "with strong conversion headroom" used to follow it -
       // a claim about demand that nothing here measures.
-      description: `Campaign "${highRoasCampaign.label}" has a measured ${highRoasCampaign.roas.toFixed(1)}x ROAS. Increase its daily budget by 25%.`,
-      beforeDiff: `$${highRoasCampaign.dailyBudgetUsd}/day`,
-      afterDiff: `$${nextBudget}/day`,
+      description: t('budgetDescription', { campaign: highRoasCampaign.label, roas: highRoasCampaign.roas.toFixed(1) }),
+      beforeDiff: perDay(highRoasCampaign.dailyBudgetUsd),
+      afterDiff: perDay(nextBudget),
       // No forecast: projecting one needs a performance baseline, and '+28%' was a literal.
       projectedImpact: '',
       actionProposal: {
         actionType: 'budget_change',
         targetId: highRoasCampaign.targetId,
         targetLabel: highRoasCampaign.label,
-        beforeValue: `$${highRoasCampaign.dailyBudgetUsd}/day`,
-        afterValue: `$${nextBudget}/day`,
+        beforeValue: perDay(highRoasCampaign.dailyBudgetUsd),
+        afterValue: perDay(nextBudget),
         estimatedImpact: '',
         impactBadge: 'high',
         payload: {
@@ -69,20 +75,20 @@ export function synthesizeProactiveRecommendations(
     recommendations.push({
       id: `rec-fatigue-${lowRoasCampaign.targetId}`,
       category: 'ad_fatigue',
-      title: 'Pause Underperforming Campaign',
+      title: t('pauseTitle'),
       // No "target": this used to say the campaign was "falling below your 2.5x target
       // threshold" - a target no project ever set (and not even the 1.8x this rule filters on).
-      description: `Campaign "${lowRoasCampaign.label}" has a measured ${lowRoasCampaign.roas.toFixed(1)}x ROAS over the last 30 days. Pause delivery to stop its spend.`,
-      beforeDiff: `Status: ENABLED ($${lowRoasCampaign.dailyBudgetUsd}/day)`,
-      afterDiff: 'Status: PAUSED ($0/day)',
-      projectedImpact: `Saves ~$${(lowRoasCampaign.dailyBudgetUsd * 30).toLocaleString()}/month in inefficient spend`,
+      description: t('pauseDescription', { campaign: lowRoasCampaign.label, roas: lowRoasCampaign.roas.toFixed(1) }),
+      beforeDiff: t('pauseBefore', { amount: perDay(lowRoasCampaign.dailyBudgetUsd) }),
+      afterDiff: t('pauseAfter'),
+      projectedImpact: t('pauseImpact', { amount: perMonth(lowRoasCampaign.dailyBudgetUsd * 30) }),
       actionProposal: {
         actionType: 'campaign_activation',
         targetId: lowRoasCampaign.targetId,
         targetLabel: lowRoasCampaign.label,
-        beforeValue: 'Enabled',
-        afterValue: 'Paused',
-        estimatedImpact: `Saves $${lowRoasCampaign.dailyBudgetUsd * 30}/month`,
+        beforeValue: t('pauseBeforeValue'),
+        afterValue: t('pauseAfterValue'),
+        estimatedImpact: t('pauseImpact', { amount: perMonth(lowRoasCampaign.dailyBudgetUsd * 30) }),
         impactBadge: 'medium',
         payload: {
           targetId: lowRoasCampaign.targetId,
@@ -99,21 +105,21 @@ export function synthesizeProactiveRecommendations(
       recommendations.push({
         id: `rec-funnel-${highDropoffStep.stageKey}`,
         category: 'funnel_dropoff',
-        title: `Recover ${highDropoffStep.stageLabel} Stage Drop-off`,
-        description: `Stage "${highDropoffStep.stageLabel}" has a ${highDropoffStep.dropOffPercent.toFixed(0)}% drop-off rate. Deploy a high-intent retargeting campaign to rescue incomplete conversions.`,
-        beforeDiff: `Drop-off: ${highDropoffStep.dropOffPercent.toFixed(0)}%`,
-        afterDiff: 'Retargeting campaign draft',
+        title: t('funnelTitle', { stage: highDropoffStep.stageLabel }),
+        description: t('funnelDescription', { stage: highDropoffStep.stageLabel, percent: highDropoffStep.dropOffPercent.toFixed(0) }),
+        beforeDiff: t('funnelBefore', { percent: highDropoffStep.dropOffPercent.toFixed(0) }),
+        afterDiff: t('funnelAfter'),
         projectedImpact: '',
         actionProposal: {
           actionType: 'campaign_draft_create',
           targetId: `target-funnel-${highDropoffStep.stageKey}`,
-          targetLabel: `${highDropoffStep.stageLabel} Drop-off Recovery`,
-          beforeValue: 'No Retargeting',
-          afterValue: 'Retargeting ($150/day)',
+          targetLabel: t('funnelTargetLabel', { stage: highDropoffStep.stageLabel }),
+          beforeValue: t('funnelBeforeValue'),
+          afterValue: t('funnelAfterValue', { amount: perDay(150) }),
           estimatedImpact: '',
           impactBadge: 'high',
           payload: {
-            campaignName: `${highDropoffStep.stageLabel} Retargeting Leads`,
+            campaignName: t('funnelCampaignName', { stage: highDropoffStep.stageLabel }),
             // A starting point for the draft, which the user edits before approving - not a
             // recommended spend derived from anything.
             dailyBudgetUsd: 150,

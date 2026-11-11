@@ -6384,5 +6384,25 @@
       "inactiveTitle": "This link is no longer active",
       "inactiveBody": "It may have expired or been turned off. Ask whoever sent it for a new link."
     }
+  },
+  "ProactiveRecommendations": {
+    "perDay": "{amount} a day",
+    "budgetTitle": "Spend more on an ad that is paying off",
+    "budgetDescription": "\"{campaign}\" brought back ${roas} for every $1 spent on it. Raise its daily budget by 25% so more people see it.",
+    "pauseTitle": "Pause an ad that is not paying off",
+    "pauseDescription": "\"{campaign}\" brought back only ${roas} for every $1 spent on it over the last 30 days. Pause it to stop spending on it.",
+    "pauseBefore": "Running, {amount}",
+    "pauseAfter": "Paused, nothing spent",
+    "pauseBeforeValue": "Running",
+    "pauseAfterValue": "Paused",
+    "pauseImpact": "Stops up to {amount} a month of spending",
+    "funnelTitle": "Win back people who leave at \"{stage}\"",
+    "funnelDescription": "{percent}% of the people who reach \"{stage}\" leave before the next step. Prepare an ad aimed at those people to bring them back. It is only a draft - you can edit it, and nothing is turned on until you approve.",
+    "funnelBefore": "{percent}% leave here",
+    "funnelAfter": "A draft ad for people who left",
+    "funnelTargetLabel": "Win back people who left at \"{stage}\"",
+    "funnelBeforeValue": "No ad for them yet",
+    "funnelAfterValue": "Draft ad, {amount}",
+    "funnelCampaignName": "{stage} - win back"
   }
 }
