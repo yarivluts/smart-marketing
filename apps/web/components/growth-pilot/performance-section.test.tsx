@@ -45,7 +45,7 @@ describe('GrowthPerformanceSection', () => {
     await screen.findByTestId('growth-pilot-kpis');
     fireEvent.click(screen.getByRole('button', { name: 'Last 7 days' }));
     await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith('/b/performance?days=7'));
-    expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Connect your Facebook and Instagram (Meta) ad account');
+    expect(await screen.findByTestId('growth-pilot-performance-unavailable')).toHaveTextContent('Connect your Facebook and Instagram ad account');
   });
 
   it('says the ads have not been shown yet when Meta has no impressions, and hides itself before anything is published', async () => {
@@ -83,5 +83,20 @@ describe('GrowthPerformanceSection', () => {
     renderWithIntl(<GrowthPerformanceSection base="/b" metaConnectHref="/x" />, { locale: 'en' });
     await screen.findByTestId('growth-pilot-performance-unavailable');
     expect(screen.queryByTestId('growth-pilot-performance-connect-meta')).toBeNull();
+  });
+
+  it('lets the person try again after a temporary failure, but not when the account is simply not connected', async () => {
+    const fetchMock = stub({ status: 'unavailable', reason: 'error' }, { status: 'ok', since: 'a', until: 'b', summary: SUMMARY });
+    renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
+    fireEvent.click(await screen.findByRole('button', { name: 'Try again' }));
+    expect(await screen.findByTestId('growth-pilot-kpis')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows no try-again button when the ad account is not connected', async () => {
+    stub({ status: 'unavailable', reason: 'no_meta_credential' });
+    renderWithIntl(<GrowthPerformanceSection base="/b" />, { locale: 'en' });
+    await screen.findByTestId('growth-pilot-performance-unavailable');
+    expect(screen.queryByTestId('growth-pilot-performance-retry')).toBeNull();
   });
 });

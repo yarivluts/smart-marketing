@@ -207,7 +207,7 @@ export function CampaignDailyBudgetControl({
               onClick={() => setIsEditing(true)}
               className="group inline-flex items-center gap-1.5 rounded-lg border border-transparent px-2 py-1 text-xs font-bold text-foreground hover:border-border hover:bg-muted/50 transition-all disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
-              <span dir="ltr">{`$${budget}/day`}</span>
+              <span dir="ltr">{`$${budget}${t('perDay')}`}</span>
               {!disabled && !isSyncing && (
                 <Edit2 className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
               )}

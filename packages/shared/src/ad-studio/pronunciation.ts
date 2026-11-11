@@ -58,14 +58,163 @@ export function reconcilePronunciations(previous: readonly Pick<AdStudioScene, '
   });
 }
 
+/** Vowel points, dagesh and shin/sin dots - the marks that say how a letter is read. */
+const HEBREW_VOWEL_MARK = /[\u05b0-\u05bd\u05bf\u05c1\u05c2\u05c4\u05c5\u05c7]/;
+/** Letters that are often silent or carry their vowel on the next letter (alef, he, vav, yod). */
+const QUIET_LETTERS = new Set(['\u05d0', '\u05d4', '\u05d5', '\u05d9']);
+const VAV = '\u05d5';
+/** Below this share of marked letters, a line is not vocalized well enough to guide a speaker. */
+export const AD_STUDIO_PRONUNCIATION_MIN_COVERAGE = 0.85;
+
+/**
+ * The share of Hebrew letters that carry a vowel mark where one is expected (0-1; 1 for a line with
+ * no Hebrew). Letters that are correctly left bare in full nikud are not counted: the last letter of a
+ * word, a silent or vowel letter (alef, he, vav, yod) without a mark, and a letter whose vowel sits
+ * on the vav after it (holam male, shuruk).
+ */
+export function pronunciationCoverage(text: string): number {
+  let expected = 0;
+  let marked = 0;
+  // Points first in the class: a letter written before a combining mark reads as one combined character.
+  for (const word of text.match(/[\u0591-\u05c7\u05d0-\u05ea]+/g) ?? []) {
+    const letters: { letter: string; marks: string }[] = [];
+    for (const char of word) {
+      if (HEBREW_LETTER.test(char)) letters.push({ letter: char, marks: '' });
+      else if (letters.length) letters[letters.length - 1].marks += char;
+    }
+    letters.forEach(({ letter, marks }, index) => {
+      const pointed = HEBREW_VOWEL_MARK.test(marks);
+      const next = letters[index + 1];
+      const vowelOnNextVav = next?.letter === VAV && HEBREW_VOWEL_MARK.test(next.marks);
+      if (!pointed && (index === letters.length - 1 || QUIET_LETTERS.has(letter) || vowelOnNextVav)) return;
+      expected += 1;
+      if (pointed) marked += 1;
+    });
+  }
+  return expected === 0 ? 1 : marked / expected;
+}
+
 /**
  * Whether a vocalizer's answer can stand in for the narration: non-empty, within the limit, still
- * Hebrew. Numbers become words, so the letters may differ from the plain line - this only rejects
- * an answer that is plainly not a vocalization of a Hebrew line.
+ * Hebrew, and vocalized throughout - nearly every letter that needs a vowel mark has one. Numbers
+ * become words, so the letters may differ from the plain line; {@link sameNarrationSkeleton} is what
+ * ties an answer to its line.
  */
 export function isUsablePronunciation(pronunciation: string): boolean {
   const text = pronunciation.trim();
-  return text.length > 0 && text.length <= AD_STUDIO_PRONUNCIATION_MAX && HEBREW_LETTER.test(stripHebrewPoints(text));
+  return (
+    text.length > 0 &&
+    text.length <= AD_STUDIO_PRONUNCIATION_MAX &&
+    HEBREW_LETTER.test(stripHebrewPoints(text)) &&
+    pronunciationCoverage(text) >= AD_STUDIO_PRONUNCIATION_MIN_COVERAGE
+  );
+}
+
+const FINAL_LETTERS: Record<string, string> = { '\u05da': '\u05db', '\u05dd': '\u05de', '\u05df': '\u05e0', '\u05e3': '\u05e4', '\u05e5': '\u05e6' };
+const NUMBER_OR_SYMBOL = /[0-9%\u20aa$\u20ac\u00a3&+@#=]/;
+/** A token a narrator says as other words: a number, a symbol, an acronym (x"y) or an abbreviation ending in a geresh. */
+const SPOKEN_AS_WORDS = /[0-9%\u20aa$\u20ac\u00a3&+@#=]|[\u05d0-\u05ea]["\u05f4][\u05d0-\u05ea]|['\u05f3\u2019]$/;
+/** What a number or symbol may become: a few written-out words (spaces are dropped before matching). */
+const SPOKEN_WORDS_PATTERN = '[\u05d0-\u05eaa-z0-9]{1,80}';
+
+/** Letters only (Hebrew with final forms folded, Latin lower-cased, digits), without points, spaces or punctuation. */
+function skeletonLetters(text: string): string {
+  return stripHebrewPoints(text)
+    .toLowerCase()
+    .replace(/[\u05da\u05dd\u05df\u05e3\u05e5]/g, (letter) => FINAL_LETTERS[letter])
+    .replace(/[^\u05d0-\u05eaa-z0-9]/g, '');
+}
+
+/**
+ * Whether a pronunciation is the same words as the plain narration: after removing the nikud and
+ * cantillation, folding final letters and dropping spacing and punctuation, the letters must match
+ * exactly - except that a number, symbol, acronym or abbreviation may be written out as words. A
+ * vocalizer that adds, drops, swaps or respells a word fails, so its answer is never spoken.
+ */
+export function sameNarrationSkeleton(plain: string, pronunciation: string): boolean {
+  // A maqaf or hyphen joins a prefix to a number: split there so the prefix stays literal.
+  const tokens = stripHebrewPoints(plain).replace(/\u05be/g, ' ').split(/[\s\-/]+/).filter(Boolean);
+  const pattern = tokens
+    .map((token) => {
+      if (!SPOKEN_AS_WORDS.test(token)) return skeletonLetters(token);
+      // A Hebrew prefix glued to a number is kept; the rest may become words.
+      const prefix = /^[\u05d0-\u05ea]*/.exec(token)?.[0] ?? '';
+      return NUMBER_OR_SYMBOL.test(token.slice(prefix.length)) ? `${skeletonLetters(prefix)}${SPOKEN_WORDS_PATTERN}` : SPOKEN_WORDS_PATTERN;
+    })
+    .join('');
+  if (!pattern) return false;
+  return new RegExp(`^${pattern}$`).test(skeletonLetters(pronunciation));
+}
+
+/** A usable pronunciation of these exact words - the guard every model answer passes before it is spoken. */
+export function isFaithfulPronunciation(plain: string, pronunciation: string | null | undefined): pronunciation is string {
+  const text = (pronunciation ?? '').trim();
+  return isUsablePronunciation(text) && sameNarrationSkeleton(plain, text);
+}
+
+/**
+ * Which pronunciation a line keeps after vocalizing and checking: the checked one when it is still a
+ * faithful vocalization of the line, else the first one when that is, else none (the plain narration
+ * is spoken). A check that rewrote words is never trusted over the first pass.
+ */
+export function chooseVerifiedPronunciation(plain: string, first: string | null | undefined, checked: string | null | undefined): string | undefined {
+  if (isFaithfulPronunciation(plain, checked)) return checked.trim();
+  if (isFaithfulPronunciation(plain, first)) return first.trim();
+  return undefined;
+}
+
+/** What the nikud check knows about the ad, so a word spelled two ways is read in the sense the ad means. */
+export interface AdStudioVocalizeCheckContext {
+  businessName?: string | null;
+  productDescription: string;
+  objective?: string | null;
+  audience?: string | null;
+}
+
+const CHECK_CONTEXT_MAX = 400;
+
+/**
+ * The instructions for the independent nikud check (a second model call): review each vocalized line
+ * word by word against its plain text and return it corrected, with a verdict. The brief's context
+ * is given so homographs resolve to the meaning the ad intends.
+ */
+export function buildVocalizeCheckPrompt(
+  lines: readonly { id: string; text: string; pronunciation: string }[],
+  context: AdStudioVocalizeCheckContext,
+): AdStudioPrompt {
+  const short = (value: string | null | undefined) => {
+    const line = oneLine(value ?? '');
+    return line.length > CHECK_CONTEXT_MAX ? `${line.slice(0, CHECK_CONTEXT_MAX - 1)}…` : line;
+  };
+  const contextLines = [
+    context.businessName?.trim() ? `Business: ${short(context.businessName)}` : null,
+    `Product: ${short(context.productDescription)}`,
+    context.objective?.trim() ? `Ad goal: ${short(context.objective)}` : null,
+    context.audience?.trim() ? `Audience: ${short(context.audience)}` : null,
+  ].filter((line): line is string => line !== null);
+  return {
+    system: [
+      'You are a meticulous Hebrew language editor checking the nikud (vowel points) of narration that an AI voice will read aloud in a video ad.',
+      'Another model vocalized each line. Review every line word by word against its plain text, as a careful proofreader would, and fix every mistake.',
+      'Check especially:',
+      '- Wrong vowels: construct-state (smichut) forms, the definite article and the dagesh that follows it, the prefixes vav, he, bet, kaf, lamed, mem and shin with their correct vowel (including before sheva and gutturals), and imperative versus infinitive verb forms.',
+      '- Meaning and stress: a word that can be read two ways must be vocalized in the sense the sentence and this ad mean (use the ad context below).',
+      '- Numbers written out as words: correct gender and construct form agreeing with the noun they count, fully vocalized.',
+      '- Foreign names written in Hebrew letters: vowels that match how the name is actually said. Names written in Latin letters stay exactly as they are.',
+      '- Every Hebrew word carries full nikud; no letter that needs a vowel is left bare.',
+      'Rules:',
+      '- Keep the exact words, their spelling letter for letter (never add or remove a vav or yod) and their order. Never translate, rephrase, correct the wording or add words - only the vowel marks may change, and numbers or symbols may be written out as words.',
+      '- Keep the punctuation that marks pauses and questions.',
+      '- Return every line with its id unchanged: verdict "ok" when the vocalization was already right (return it unchanged), "fixed" when you corrected it (return the corrected line). An empty vocalization must be vocalized from scratch.',
+    ].join('\n'),
+    user: [
+      'The ad:',
+      ...contextLines,
+      '',
+      'Lines to check (JSON; text is the plain narration, pronunciation is the vocalization to check):',
+      JSON.stringify(lines.map((line) => ({ id: line.id, text: oneLine(line.text), pronunciation: oneLine(line.pronunciation) }))),
+    ].join('\n'),
+  };
 }
 
 /** The instructions for vocalizing narration lines: same words, full nikud, numbers as words. */
@@ -76,6 +225,7 @@ export function buildVocalizePrompt(lines: readonly { id: string; text: string }
       'For every line, return the same words with full nikud (vowel points) on every Hebrew word, so the pronunciation is unambiguous to a speaker who cannot guess from context.',
       'Rules:',
       '- Keep the exact words and their order. Do not translate, shorten, rephrase, correct or add words.',
+      '- Keep the spelling letter for letter: only add vowel marks, never add or remove a vav or yod.',
       '- Write every number, digit, percentage, price, date, time and symbol out as vocalized Hebrew words, in the grammatical gender and construct form that agree with the noun it counts (a number before a masculine noun takes the masculine form).',
       '- Write abbreviations and acronyms the way a narrator says them, as vocalized words.',
       '- Keep brand and product names written in Latin letters exactly as they are.',

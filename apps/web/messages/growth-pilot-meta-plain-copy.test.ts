@@ -4,15 +4,16 @@ import he from './he.json';
 
 const p = { en: en.GrowthPilot, he: he.GrowthPilot };
 
-describe('Growth Pilot cards explain what "Meta" is the first time they say it', () => {
-  it('names Facebook and Instagram next to Meta on the publish card and the missing-connection hints', () => {
+describe('Growth Pilot cards say Facebook and Instagram without the brand name in brackets', () => {
+  it('names Facebook and Instagram, not the bare brand, on the publish card and the missing-connection hints', () => {
     for (const text of [
       p.en.publish.description,
       p.en.publish.status.needs_meta,
       p.en.audience.metaMissing,
       p.en.performance.unavailableMeta,
     ]) {
-      expect(text).toMatch(/Facebook and Instagram \(Meta\)/);
+      expect(text).toMatch(/Facebook and Instagram/);
+      expect(text).not.toMatch(/Meta/);
     }
     for (const text of [
       p.he.publish.description,
@@ -20,7 +21,8 @@ describe('Growth Pilot cards explain what "Meta" is the first time they say it',
       p.he.audience.metaMissing,
       p.he.performance.unavailableMeta,
     ]) {
-      expect(text).toMatch(/פייסבוק ואינסטגרם \(Meta\)|פייסבוק ולאינסטגרם \(Meta\)/);
+      expect(text).toMatch(/פייסבוק ואינסטגרם|פייסבוק ולאינסטגרם/);
+      expect(text).not.toMatch(/Meta/);
     }
   });
 

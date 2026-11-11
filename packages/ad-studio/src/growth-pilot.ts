@@ -41,7 +41,26 @@ import {
   getGrowthPilot,
   requestGrowthProposalChange,
   saveGrowthPilotAnalysis,
+  startGrowthTargetChange,
+  finishGrowthTargetChange,
+  proposeGrowthLandingChange,
+  updateGrowthProposalLandingContent,
+  GrowthTargetChangeNotAllowedError,
+  AdStudioAutomationStoppedError,
+  decideGrowthProposal,
+  getLiveAudienceProposal,
+  getLiveGrowthTarget,
+  markGrowthLiveAudienceApplied,
+  MetaAdsApiError,
+  readAdStudioMetaCurrency,
+  recordGrowthBudgetChange,
+  recordGrowthBudgetChangeFailure,
+  recordGrowthLiveAudienceFailure,
+  setAdStudioMetaDailyBudget,
+  updateAdStudioMetaTargeting,
+  type AdStudioExportModel,
   type AdStudioRunModel,
+  type GrowthTargetMetaRefs,
   type GrowthPilotModel,
   type GrowthTargetModel,
   type GrowthProposalModel,
@@ -59,17 +78,22 @@ import {
   buildSiteAnalysisPrompt,
   buildTargetFromRequestPrompt,
   buildTargetRevisionPrompt,
+  DEFAULT_AD_STUDIO_NARRATION_MODE,
   extractLandingPageContent,
   extractSiteLogoUrl,
   GROWTH_PILOT_MAX_PAGES,
   GROWTH_TARGET_KINDS,
   growthBriefInput,
+  isValidGrowthDailyBudget,
+  isLiveGrowthPublishStatus,
   pickSiteLinks,
   proposedTargetsFromAnalysis,
   sanitizeAudienceDraft,
   sanitizeLandingContent,
   sanitizeSiteAnalysis,
   sanitizeTargetDraft,
+  tidyGrowthChangeRequest,
+  type GrowthChangeArea,
   type GrowthAudienceDraft,
   type GrowthAudiencePlan,
   type GrowthInterestCandidate,
@@ -393,7 +417,8 @@ async function progressGrowthAds(ctx: AdsContext, pilot: GrowthPilotModel): Prom
   const brief = await createAdStudioBrief({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
-    input: growthBriefInput({ analysis: pilot.analysis, target: next, siteUrl: pilot.site_url }),
+    // The pilot's video ads are narrated by an off-screen voice: no one in the shot starts talking mid-video.
+    input: { ...growthBriefInput({ analysis: pilot.analysis, target: next, siteUrl: pilot.site_url }), narrationMode: DEFAULT_AD_STUDIO_NARRATION_MODE },
     createdByUserId: ctx.actorId,
     now: ctx.now,
   });
@@ -459,11 +484,14 @@ async function reviseGrowthLanding(ctx: AdStudioCallContext, held: GrowthProposa
     ]);
     if (!pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
     const request = held.change_requests[held.change_requests.length - 1].text;
-    const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current: page.content, request });
+    // New words proposed for a page that is already public are revised in the proposal, never on the live page.
+    const current = held.landing_content ?? page.content;
+    const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current, request });
     const raw = await meteredCall(ctx, 'landing_page', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthLandingContentSchema, effort: 'high' }));
     const content = sanitizeLandingContent(raw as GrowthLandingContent);
     if (!content) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'invalid_output' });
-    await updateGrowthLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, pageId: page.id, content, now: ctx.now });
+    if (held.landing_content) await updateGrowthProposalLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: held.id, content, now: ctx.now });
+    else await updateGrowthLandingContent({ organizationId: ctx.organizationId, projectId: ctx.projectId, pageId: page.id, content, now: ctx.now });
     return await completeGrowthProposalRevision({ ...scope, draft: held.draft ?? null });
   } catch (error) {
     return completeGrowthProposalRevision({ ...scope, draft: null, failureCode: growthFailureCode(error) });
@@ -535,14 +563,7 @@ async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthPropos
     if (!held.audience || !held.target_id) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
     const [pilot, target] = await Promise.all([getGrowthPilot(ctx.organizationId, ctx.projectId, held.pilot_id), getGrowthTarget(ctx.organizationId, ctx.projectId, held.target_id)]);
     if (!pilot.analysis) return await completeGrowthProposalRevision({ ...scope, draft: null, failureCode: 'nothing_to_revise' });
-    const current: GrowthAudienceDraft = {
-      summary: held.audience.summary,
-      countries: held.audience.targeting.countries,
-      ageMin: held.audience.targeting.ageMin,
-      ageMax: held.audience.targeting.ageMax,
-      genders: held.audience.targeting.genders,
-      interestKeywords: [...held.audience.targeting.interests.map((interest) => interest.name), ...held.audience.unresolvedInterests],
-    };
+    const current = audienceDraftOf(held.audience);
     const request = held.change_requests[held.change_requests.length - 1].text;
     const draft = await writeAudienceDraft(ctx, pilot, target, current, request);
     const plan = await resolveAudiencePlan(ctx, draft, { analysis: pilot.analysis, target });
@@ -553,6 +574,109 @@ async function reviseGrowthAudience(ctx: AdStudioCallContext, held: GrowthPropos
   }
 }
 
+/** The proposal kind that carries each part a person can ask to change. */
+const CHANGE_PROPOSAL_KIND = { ads: 'ads', landing: 'landing_page', audience: 'audience' } as const;
+
+function audienceDraftOf(plan: GrowthAudiencePlan): GrowthAudienceDraft {
+  return {
+    summary: plan.summary,
+    countries: plan.targeting.countries,
+    ageMin: plan.targeting.ageMin,
+    ageMax: plan.targeting.ageMax,
+    genders: plan.targeting.genders,
+    interestKeywords: [...plan.targeting.interests.map((interest) => interest.name), ...plan.unresolvedInterests],
+  };
+}
+
+/**
+ * The person asks, in their own words, for a change to one part of a target they already approved:
+ * its ads, its landing page or its audience. While that part still waits for their decision, this is
+ * the proposal's own "ask for a change" (the proposal is revised and comes back). Otherwise the pilot
+ * redoes the part with their words - new ads are rendered, a new page or new page words are written,
+ * a new audience is planned - and it comes back as a proposal like everything else. The request and
+ * how it went are kept on the target and in the feed.
+ */
+export async function changeGrowthTarget(ctx: AdStudioCallContext & { targetId: string; area: GrowthChangeArea; request: string }): Promise<void> {
+  await ensureOrm();
+  const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, ctx.targetId);
+  const proposals = (await listGrowthProposals(ctx.organizationId, ctx.projectId, target.pilot_id)).filter((proposal) => proposal.target_id === target.id && proposal.kind === CHANGE_PROPOSAL_KIND[ctx.area]);
+  const open = proposals.find((proposal) => proposal.status === 'pending' || proposal.status === 'revising');
+  if (open) {
+    if (open.status === 'revising') throw new GrowthProposalNotPendingError(open.status);
+    await reviseGrowthProposal({ ...ctx, proposalId: open.id });
+    return;
+  }
+  await startGrowthTargetChange({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, area: ctx.area, text: ctx.request, actorId: ctx.actorId, now: ctx.now });
+  const request = tidyGrowthChangeRequest(ctx.request);
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, area: ctx.area, now: ctx.now };
+  try {
+    if (ctx.area === 'ads') {
+      // Every image idea is rewritten by the request and rendered again; the new ads come back when ready (see finishGrowthTargetAds).
+      const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!);
+      for (const concept of brief.image_concepts ?? []) {
+        await rewriteAdStudioImageConcept({ ...ctx, briefId: brief.id, conceptId: concept.id, instruction: request });
+      }
+      const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, actorId: ctx.actorId, options: GROWTH_ADS_RUN_OPTIONS });
+      await linkGrowthTargetAds({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, briefId: brief.id, runId: run.id, now: ctx.now });
+      return;
+    }
+    const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, target.pilot_id);
+    if (!pilot.analysis) {
+      await finishGrowthTargetChange({ ...scope, failureCode: 'nothing_to_revise' });
+      return;
+    }
+    if (ctx.area === 'landing') {
+      const page = target.landing_page_id ? await getGrowthLandingPage(ctx.organizationId, ctx.projectId, target.landing_page_id).catch(() => null) : null;
+      const prompt = buildLandingPagePrompt({ analysis: pilot.analysis, target, current: page?.content, request });
+      const raw = await meteredCall(ctx, 'landing_page', null, () => ctx.llm.generateJson({ ...prompt, schema: GrowthLandingContentSchema, effort: 'high' }));
+      const content = sanitizeLandingContent(raw as GrowthLandingContent);
+      if (!content) {
+        await finishGrowthTargetChange({ ...scope, failureCode: 'invalid_output' });
+        return;
+      }
+      // A public page gets new words to approve (it stays as it is meanwhile); a declined or failed one, a new page.
+      if (target.landing_status === 'published' && page) await proposeGrowthLandingChange({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, content, now: ctx.now });
+      else await saveGrowthLandingDraft({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, content, language: pilot.analysis.language || 'en', siteUrl: pilot.site_url, now: ctx.now });
+      await finishGrowthTargetChange(scope);
+      return;
+    }
+    const last = proposals.filter((proposal) => proposal.audience).at(-1)?.audience;
+    const draft = await writeAudienceDraft(ctx, pilot, target, last ? audienceDraftOf(last) : undefined, request);
+    const plan = await resolveAudiencePlan(ctx, draft, { analysis: pilot.analysis, target });
+    await saveGrowthAudienceProposal({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, plan, now: ctx.now });
+    await finishGrowthTargetChange(scope);
+  } catch (error) {
+    await finishGrowthTargetChange({ ...scope, failureCode: growthFailureCode(error) });
+  }
+}
+
+export class GrowthVideoUnavailableError extends Error {
+  constructor() {
+    super('Video ads are not available.');
+    this.name = 'GrowthVideoUnavailableError';
+  }
+}
+
+/**
+ * The person asks for the target's video ad (none was made, or it failed): the pilot starts making it
+ * from the target's ads, as it does by itself when a video model is configured.
+ */
+export async function requestGrowthTargetVideo(ctx: AdsContext & { targetId: string }): Promise<void> {
+  await ensureOrm();
+  if (!ctx.autopilot.video?.omni) throw new GrowthVideoUnavailableError();
+  const target = await getGrowthTarget(ctx.organizationId, ctx.projectId, ctx.targetId);
+  if (target.status !== 'active' || !target.brief_id || !['ready', 'approved'].includes(target.ads_status ?? 'none') || !['none', 'failed'].includes(target.video_status ?? 'none')) {
+    throw new GrowthTargetChangeNotAllowedError('video');
+  }
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, now: ctx.now };
+  try {
+    const run = await startAdStudioAutopilot({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: target.brief_id, actorId: ctx.actorId, options: GROWTH_VIDEO_RUN_OPTIONS });
+    await linkGrowthTargetVideo({ ...scope, runId: run.id });
+  } catch (error) {
+    await finishGrowthTargetVideo({ ...scope, failureCode: growthFailureCode(error) });
+  }
+}
+
 /** The person has had their say on this part (approved, rejected, or it failed) - nothing waits on it. */
 function decided(status: string | null | undefined): boolean {
   return Boolean(status) && status !== 'none' && status !== 'ready';
@@ -560,7 +684,6 @@ function decided(status: string | null | undefined): boolean {
 
 /** The default daily budget a publish proposal suggests, in the ad account's currency; the person sets their own. */
 export const GROWTH_DEFAULT_DAILY_BUDGET = 20;
-const MAX_DAILY_BUDGET = 100_000;
 
 /**
  * Proposes publishing a target whose ads are approved and whose audience and page are decided: the
@@ -580,7 +703,8 @@ async function proposeGrowthPublish(ctx: AdsContext, pilot: GrowthPilotModel, ta
     listGrowthLandingPages(ctx.organizationId, ctx.projectId, pilot.id),
     getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!),
   ]);
-  const ads = proposals.find((proposal) => proposal.kind === 'ads' && proposal.status === 'approved' && proposal.target_id === target.id);
+  // The newest approved ads: after the person asked for new ones, those are what gets published.
+  const ads = proposals.filter((proposal) => proposal.kind === 'ads' && proposal.status === 'approved' && proposal.target_id === target.id).at(-1);
   const imageIds = ads?.preview_image_ids ?? [];
   if (!imageIds.length) return false;
   const page = pages.find((candidate) => candidate.target_id === target.id && candidate.status === 'published');
@@ -603,7 +727,7 @@ async function proposeGrowthPublish(ctx: AdsContext, pilot: GrowthPilotModel, ta
 
 export class GrowthPublishInvalidError extends Error {
   constructor() {
-    super('The daily budget must be a positive number.');
+    super('The daily budget must be a positive number within the allowed range.');
     this.name = 'GrowthPublishInvalidError';
   }
 }
@@ -611,6 +735,32 @@ export class GrowthPublishInvalidError extends Error {
 export interface GrowthPlatformDeps {
   publish?: typeof publishBriefAd;
   setStatus?: typeof setAdStudioMetaAdsStatus;
+  setBudget?: typeof setAdStudioMetaDailyBudget;
+  readCurrency?: typeof readAdStudioMetaCurrency;
+  retarget?: typeof updateAdStudioMetaTargeting;
+}
+
+/** Where the published ads live on Meta, from their export rows; null when the rows do not say. */
+export function growthMetaRefs(rows: readonly Pick<AdStudioExportModel, 'platform_refs'>[]): GrowthTargetMetaRefs | null {
+  const refs = rows.map((row) => row.platform_refs ?? {});
+  const account = refs.find((ref) => ref.ad_account_id)?.ad_account_id;
+  const campaign = refs.find((ref) => ref.campaign_id)?.campaign_id;
+  if (!account || !campaign) return null;
+  const unique = (key: string) => [...new Set(refs.map((ref) => ref[key]).filter((value): value is string => Boolean(value)))];
+  return { ad_account_id: account.replace(/^act_/i, ''), campaign_id: campaign, ad_set_ids: unique('ad_set_id'), ad_ids: unique('ad_id') };
+}
+
+/** A failure on the ad platform as a stable code the page words. */
+export function growthPlatformFailureCode(error: unknown): string {
+  if (error instanceof AdStudioAutomationStoppedError) return 'automation_stopped';
+  if (error instanceof AdStudioExportUnavailableError) return 'meta_unavailable';
+  if (error instanceof MetaAdsApiError) {
+    if (error.status === 401 || error.status === 403) return 'auth_failed';
+    if (error.status === 429) return 'platform_busy';
+    if (error.status >= 400 && error.status < 500) return 'rejected';
+  }
+  if (error instanceof AdStudioProviderError) return error.code;
+  return 'platform_error';
 }
 
 /**
@@ -623,7 +773,7 @@ export async function approveGrowthPublish(ctx: AdStudioCallContext & { proposal
   const proposal = await getGrowthProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
   if (proposal.status !== 'pending' || proposal.kind !== 'publish' || !proposal.publish || !proposal.target_id) throw new GrowthProposalNotPendingError(proposal.status);
   const budget = ctx.dailyBudget ?? proposal.publish.dailyBudget;
-  if (!Number.isFinite(budget) || budget <= 0 || budget > MAX_DAILY_BUDGET) throw new GrowthPublishInvalidError();
+  if (!isValidGrowthDailyBudget(budget)) throw new GrowthPublishInvalidError();
   // Before anything is read or created: is there a Meta ad account to publish to?
   const destinations = await resolveAdStudioExportDestinations(ctx.organizationId, ctx.projectId);
   if (!destinations.meta.available) throw new AdStudioExportUnavailableError('meta', destinations.meta.reason);
@@ -631,9 +781,17 @@ export async function approveGrowthPublish(ctx: AdStudioCallContext & { proposal
   const pilot = await getGrowthPilot(ctx.organizationId, ctx.projectId, proposal.pilot_id);
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, target.brief_id!);
   const images = await listBriefImages({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id });
+  // New ads replacing ones already on Meta: the old ones are paused first, so the target never spends twice.
+  // If they cannot be paused, nothing new is published.
+  if (target.ad_export_ids?.length) {
+    const kms = serverKms();
+    if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');
+    await (deps.setStatus ?? setAdStudioMetaAdsStatus)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: target.ad_export_ids, status: 'PAUSED', actorId: ctx.actorId, kms });
+  }
   const publish = deps.publish ?? publishBriefAd;
   const plan = proposal.publish;
   const done: string[] = [];
+  const doneRows: AdStudioExportModel[] = [];
   for (const imageId of plan.imageIds) {
     const concept = (brief.image_concepts ?? []).find((candidate) => candidate.id === images.find((image) => image.id === imageId)?.conceptId);
     const copy = concept?.copy;
@@ -656,13 +814,93 @@ export async function approveGrowthPublish(ctx: AdStudioCallContext & { proposal
       ...(done.length ? { addToAdSetOf: done[0] } : {}),
       actorId: ctx.actorId,
     });
-    if (row.status === 'done') done.push(row.id);
-    else if (!done.length) {
+    if (row.status === 'done') {
+      done.push(row.id);
+      doneRows.push(row);
+    } else if (!done.length) {
       await failGrowthPublish({ organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, failureCode: row.failure_code ?? 'publish_failed', now: ctx.now });
       return proposal;
     }
   }
-  return markGrowthAdsPublished({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: proposal.id, exportIds: done, dailyBudget: budget, actorId: ctx.actorId, now: ctx.now });
+  // The account's currency, so the page can say what the budget is in. A read only; without it the page says "your ad account's currency".
+  const kms = serverKms();
+  let currency: string | null = null;
+  try {
+    if (kms) currency = (await (deps.readCurrency ?? readAdStudioMetaCurrency)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: done, kms })) ?? null;
+  } catch {
+    // The ads are published either way; the page then speaks of "your ad account's currency".
+  }
+  return markGrowthAdsPublished({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    proposalId: proposal.id,
+    exportIds: done,
+    dailyBudget: budget,
+    metaRefs: growthMetaRefs(doneRows),
+    currency,
+    actorId: ctx.actorId,
+    now: ctx.now,
+  });
+}
+
+/**
+ * The person changed the daily budget of a target's live ads (an explicit decision, with the publish
+ * permission checked by the caller): Meta is updated where the budget lives - the campaign, as
+ * publishing set it - and the target and its feed show the new amount. A failure is recorded in the
+ * feed (the ads keep the budget they had) and thrown, so the person sees why.
+ */
+export async function changeGrowthBudget(ctx: { organizationId: string; projectId: string; actorId: string; targetId: string; dailyBudget: number; now?: Date }, deps: GrowthPlatformDeps = {}): Promise<GrowthTargetModel> {
+  await ensureOrm();
+  if (!isValidGrowthDailyBudget(ctx.dailyBudget)) throw new GrowthPublishInvalidError();
+  const target = await getLiveGrowthTarget(ctx.organizationId, ctx.projectId, ctx.targetId);
+  const kms = serverKms();
+  if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, targetId: target.id, actorId: ctx.actorId, now: ctx.now };
+  let result: Awaited<ReturnType<typeof setAdStudioMetaDailyBudget>>;
+  try {
+    result = await (deps.setBudget ?? setAdStudioMetaDailyBudget)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: target.ad_export_ids ?? [], dailyBudget: ctx.dailyBudget, actorId: ctx.actorId, kms });
+  } catch (error) {
+    await quietly(() => recordGrowthBudgetChangeFailure({ ...scope, dailyBudget: ctx.dailyBudget, failureCode: growthPlatformFailureCode(error) }));
+    throw error;
+  }
+  return recordGrowthBudgetChange({ ...scope, dailyBudget: ctx.dailyBudget, previousDailyBudget: result.previousDailyBudget, currency: result.currency });
+}
+
+/** Runs a best-effort record: its failure never hides the error the person needs to see. */
+async function quietly(run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch {
+    // Best-effort.
+  }
+}
+
+/**
+ * The person approved a new audience for ads already on Meta (with the publish permission checked by
+ * the caller): the live ad set's targeting is updated - or, where Meta refuses that, the ads move to a
+ * new ad set with it, keeping their on/off state - and the proposal is decided. A failure is recorded
+ * in the feed, the proposal stays waiting, and the error is thrown so the person sees why.
+ */
+export async function approveGrowthLiveAudience(ctx: { organizationId: string; projectId: string; actorId: string; proposalId: string; now?: Date }, deps: GrowthPlatformDeps = {}): Promise<GrowthProposalModel> {
+  await ensureOrm();
+  // Proposed while the ads were on Meta, but they are not any more (new ads replaced them): an ordinary audience decision, kept for the next publish.
+  const pending = await getGrowthProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
+  const owner = pending.target_id ? await getGrowthTarget(ctx.organizationId, ctx.projectId, pending.target_id) : null;
+  if (owner && !isLiveGrowthPublishStatus(owner.publish_status)) {
+    return decideGrowthProposal({ organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: pending.id, decision: 'approve', actorId: ctx.actorId, now: ctx.now });
+  }
+  const { proposal, target } = await getLiveAudienceProposal(ctx.organizationId, ctx.projectId, ctx.proposalId);
+  const kms = serverKms();
+  if (!kms) throw new AdStudioProviderError('not_configured', 'The credential vault is not configured.');
+  const scope = { organizationId: ctx.organizationId, projectId: ctx.projectId, proposalId: proposal.id, actorId: ctx.actorId, now: ctx.now };
+  let result: Awaited<ReturnType<typeof updateAdStudioMetaTargeting>>;
+  try {
+    result = await (deps.retarget ?? updateAdStudioMetaTargeting)({ organizationId: ctx.organizationId, projectId: ctx.projectId, exportIds: target.ad_export_ids ?? [], targeting: proposal.audience!.targeting, actorId: ctx.actorId, kms });
+  } catch (error) {
+    await quietly(() => recordGrowthLiveAudienceFailure({ ...scope, failureCode: growthPlatformFailureCode(error) }));
+    throw error;
+  }
+  return markGrowthLiveAudienceApplied({ ...scope, mode: result.mode, adSetIds: result.adSetIds, adIds: result.adIds });
 }
 
 /** The person approved turning the ads on: from now they spend up to the daily budget. Refused while the kill switch is on. */

@@ -420,16 +420,8 @@ export async function setAdStudioMetaAdsStatus(params: {
   clients?: { meta?: (accessToken: string) => MetaAdsApiClient };
 }): Promise<{ campaigns: number; adSets: number; ads: number }> {
   if (params.status === 'ACTIVE' && (await isAutomationKillSwitchEngaged(params.organizationId))) throw new AdStudioAutomationStoppedError();
-  const rows = (await Promise.all(params.exportIds.map((id) => AdStudioExportModel.init(id, { organization_id: params.organizationId, project_id: params.projectId })))).filter(
-    (row): row is AdStudioExportModel => Boolean(row && row.destination === 'meta' && row.result_kind === 'ad' && row.status === 'done'),
-  );
-  if (!rows.length) throw new AdStudioExportInvalidError(['no published Meta ads to change']);
-  const destinations = await resolveAdStudioExportDestinations(params.organizationId, params.projectId);
-  const target = destinations.meta;
-  if (!target.available) throw new AdStudioExportUnavailableError('meta', target.reason);
-  const secret = parseMetaAdsCredentialSecret(await revealSharedCredentialSecret({ organizationId: params.organizationId, credentialId: target.credentialId, kms: params.kms }));
-  const client = params.clients?.meta?.(secret.accessToken) ?? new MetaAdsHttpApiClient({ accessToken: secret.accessToken });
-  const pick = (key: string) => [...new Set(rows.map((row) => row.platform_refs?.[key]).filter((value): value is string => Boolean(value)))];
+  const { rows, client } = await publishedMetaAds(params);
+  const pick = (key: string) => uniqueRefs(rows, key);
   const campaigns = pick('campaign_id');
   const adSets = pick('ad_set_id');
   const ads = pick('ad_id');
@@ -452,4 +444,203 @@ export async function setAdStudioMetaAdsStatus(params: {
     // Best-effort: the platform change already happened.
   }
   return { campaigns: campaigns.length, adSets: adSets.length, ads: ads.length };
+}
+
+interface MetaAdsScope {
+  organizationId: string;
+  projectId: string;
+  exportIds: string[];
+  kms: KmsProvider;
+  clients?: { meta?: (accessToken: string) => MetaAdsApiClient };
+}
+
+/** The finished Meta ads among `exportIds`, and a client for the project's connected Meta account. */
+async function publishedMetaAds(params: MetaAdsScope): Promise<{ rows: AdStudioExportModel[]; client: MetaAdsApiClient; adAccountId: string }> {
+  const rows = (await Promise.all(params.exportIds.map((id) => AdStudioExportModel.init(id, { organization_id: params.organizationId, project_id: params.projectId })))).filter(
+    (row): row is AdStudioExportModel => Boolean(row && row.destination === 'meta' && row.result_kind === 'ad' && row.status === 'done'),
+  );
+  if (!rows.length) throw new AdStudioExportInvalidError(['no published Meta ads to change']);
+  const destinations = await resolveAdStudioExportDestinations(params.organizationId, params.projectId);
+  const target = destinations.meta;
+  if (!target.available) throw new AdStudioExportUnavailableError('meta', target.reason);
+  const secret = parseMetaAdsCredentialSecret(await revealSharedCredentialSecret({ organizationId: params.organizationId, credentialId: target.credentialId, kms: params.kms }));
+  const client = params.clients?.meta?.(secret.accessToken) ?? new MetaAdsHttpApiClient({ accessToken: secret.accessToken });
+  return { rows, client, adAccountId: secret.adAccountId };
+}
+
+function uniqueRefs(rows: readonly AdStudioExportModel[], key: string): string[] {
+  return [...new Set(rows.map((row) => row.platform_refs?.[key]).filter((value): value is string => Boolean(value)))];
+}
+
+async function auditBestEffort(params: Parameters<typeof recordAuditLogEntry>[0]): Promise<void> {
+  try {
+    await recordAuditLogEntry(params);
+  } catch {
+    // Best-effort: the platform change already happened.
+  }
+}
+
+/** The ad account's currency, or null when it cannot be read (a client without the call, or Meta refused). */
+async function accountCurrency(client: MetaAdsApiClient, adAccountId: string): Promise<string | null> {
+  try {
+    return (await client.getAdAccountCurrency?.(adAccountId)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Where a budget lives on Meta: `campaign` (Advantage campaign budget, what publishing sets) or `ad_set`. */
+export type AdStudioMetaBudgetLevel = 'campaign' | 'ad_set';
+
+export interface AdStudioMetaBudgetResult {
+  level: AdStudioMetaBudgetLevel;
+  /** The daily budget before the change, in the account's currency (major units); null when Meta did not report one. */
+  previousDailyBudget: number | null;
+  dailyBudget: number;
+  currency: string | null;
+  /** The campaign or ad set ids whose budget was set. */
+  objectIds: string[];
+}
+
+/** Where the budget of these ads lives and how much it is now (in minor units, as Meta counts). */
+async function budgetPlan(client: MetaAdsApiClient, rows: readonly AdStudioExportModel[]): Promise<{ level: AdStudioMetaBudgetLevel; objectIds: string[]; previousCents: number | null }> {
+  const campaigns = uniqueRefs(rows, 'campaign_id');
+  if (!campaigns.length) throw new AdStudioExportInvalidError(['the published ads have no campaign on record']);
+  const states = await Promise.all(campaigns.map((id) => client.getCampaignState(id)));
+  // Publishing sets the budget on the campaign; a campaign without one keeps it on its ad sets instead.
+  if (states.every((state) => state.dailyBudgetCents !== null)) {
+    return { level: 'campaign', objectIds: campaigns, previousCents: states[0].dailyBudgetCents };
+  }
+  const adSets = uniqueRefs(rows, 'ad_set_id');
+  if (!adSets.length) throw new AdStudioExportInvalidError(['the published ads have no ad set on record']);
+  const sets = await Promise.all(adSets.map((id) => client.getAdSet(id)));
+  return { level: 'ad_set', objectIds: adSets, previousCents: sets[0].dailyBudgetCents ?? null };
+}
+
+/** The ad account's currency for these published ads, read-only; null when Meta does not say. */
+export async function readAdStudioMetaCurrency(params: MetaAdsScope): Promise<string | null> {
+  const { client, adAccountId } = await publishedMetaAds(params);
+  return accountCurrency(client, adAccountId);
+}
+
+/**
+ * Sets the daily budget of published Meta ads at the level it lives at: the campaign (Advantage
+ * campaign budget) for everything GrowthOS publishes, otherwise each ad set. Every read happens
+ * before anything is changed. Spending more is refused while the organization's automation kill
+ * switch is engaged; spending less is not. Audited.
+ */
+export async function setAdStudioMetaDailyBudget(params: MetaAdsScope & { dailyBudget: number; actorId: string }): Promise<AdStudioMetaBudgetResult> {
+  if (!Number.isFinite(params.dailyBudget) || params.dailyBudget <= 0) throw new AdStudioExportInvalidError(['daily budget must be a positive number']);
+  const { rows, client, adAccountId } = await publishedMetaAds(params);
+  const plan = await budgetPlan(client, rows);
+  const cents = Math.round(params.dailyBudget * 100);
+  if ((plan.previousCents === null || cents > plan.previousCents) && (await isAutomationKillSwitchEngaged(params.organizationId))) throw new AdStudioAutomationStoppedError();
+  const currency = await accountCurrency(client, adAccountId);
+  for (const id of plan.objectIds) {
+    if (plan.level === 'campaign') await client.setDailyBudgetCents(id, cents);
+    else await client.updateAdSet(id, { dailyBudgetCents: cents });
+  }
+  const previous = plan.previousCents === null ? null : plan.previousCents / 100;
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    actorType: 'user',
+    actorId: params.actorId,
+    action: 'ad_studio.daily_budget_changed',
+    targetType: 'ad_studio_export',
+    targetId: rows[0].id,
+    summary: `Set the daily budget of ${plan.objectIds.length} Meta ${plan.level === 'campaign' ? 'campaign(s)' : 'ad set(s)'} to ${params.dailyBudget}${currency ? ` ${currency}` : ''}`,
+    before: { daily_budget: previous, level: plan.level },
+    after: { daily_budget: params.dailyBudget, level: plan.level, currency, objects: plan.objectIds },
+  });
+  return { level: plan.level, previousDailyBudget: previous, dailyBudget: params.dailyBudget, currency, objectIds: plan.objectIds };
+}
+
+/** What a targeting change did to each ad set: updated in place, or replaced by a new one holding the same ads. */
+export interface AdStudioMetaRetargetResult {
+  mode: 'updated' | 'replaced';
+  adSets: { from: string; to: string; status: 'ACTIVE' | 'PAUSED' }[];
+  /** The ad set and ad ids the ads live in now. */
+  adSetIds: string[];
+  adIds: string[];
+}
+
+/** Whether Meta refused a targeting edit for the ad set itself (a 400), as opposed to auth, limits, a locked account or an outage. */
+function refusedEdit(error: unknown): boolean {
+  return error instanceof MetaAdsApiError && error.status === 400 && platformError(error)?.code !== 31;
+}
+
+/**
+ * Changes who published Meta ads reach. Each ad set's targeting is updated in place (Meta may restart
+ * its learning). When Meta refuses to edit an ad set's targeting, a new ad set is made in the same
+ * campaign with the new targeting and the same ads (their creatives), and the old one is paused -
+ * the new one is turned on only if the old one was on, so nothing starts that was not running. The
+ * export rows then point at the new ad set and ads. Audited.
+ */
+export async function updateAdStudioMetaTargeting(params: MetaAdsScope & { targeting: AdStudioMetaTargeting; actorId: string; now?: () => Date }): Promise<AdStudioMetaRetargetResult> {
+  const { rows, client, adAccountId } = await publishedMetaAds(params);
+  const spec = { ...metaAdSetTargeting(params.targeting), countries: params.targeting.countries.map((country) => country.toUpperCase()), advantageAudience: 0 as const };
+  const now = params.now ?? (() => new Date());
+  const result: AdStudioMetaRetargetResult = { mode: 'updated', adSets: [], adSetIds: [], adIds: [] };
+  for (const adSetId of uniqueRefs(rows, 'ad_set_id')) {
+    const members = rows.filter((row) => row.platform_refs?.ad_set_id === adSetId);
+    try {
+      await client.updateAdSet(adSetId, { targeting: spec });
+      result.adSets.push({ from: adSetId, to: adSetId, status: (await client.getAdSet(adSetId).catch(() => null))?.status === 'ACTIVE' ? 'ACTIVE' : 'PAUSED' });
+      continue;
+    } catch (error) {
+      if (!refusedEdit(error)) throw error;
+    }
+    result.mode = 'replaced';
+    const old = await client.getAdSet(adSetId);
+    const wasActive = old.status === 'ACTIVE';
+    if (wasActive && (await isAutomationKillSwitchEngaged(params.organizationId))) throw new AdStudioAutomationStoppedError();
+    const campaignId = members[0].platform_refs?.campaign_id;
+    if (!campaignId) throw new AdStudioExportInvalidError(['the published ads have no campaign on record']);
+    // Created paused, like everything GrowthOS creates.
+    const { adSetId: replacement } = await client.createAdSet(adAccountId, { campaignId, name: `${members[0].title} - ad set ${now().toISOString().slice(0, 10)}`, targeting: spec });
+    const created: { row: AdStudioExportModel; adId: string }[] = [];
+    try {
+      for (const row of members) {
+        const refs = row.platform_refs ?? {};
+        const creativeId = refs.creative_id || (refs.ad_id ? (await client.getAd(refs.ad_id)).creativeId : '');
+        if (!creativeId) throw new AdStudioExportInvalidError(['a published ad has no creative on record']);
+        const { adId } = await client.createAd(adAccountId, { name: row.title, adSetId: replacement, creativeId });
+        created.push({ row, adId });
+      }
+    } catch (error) {
+      // Nothing half-made is left behind: the new ad set goes, with any ads already in it. The old one is untouched.
+      await client.setObjectStatus(replacement, 'DELETED').catch(() => undefined);
+      throw error;
+    }
+    // The old ad set stops before the new one starts, so the two never run together.
+    if (wasActive) {
+      await client.setObjectStatus(adSetId, 'PAUSED');
+      await client.setObjectStatus(replacement, 'ACTIVE');
+      for (const entry of created) await client.setObjectStatus(entry.adId, 'ACTIVE');
+    }
+    for (const entry of created) {
+      const refs = entry.row.platform_refs ?? {};
+      entry.row.platform_refs = { ...refs, ad_set_id: replacement, ad_id: entry.adId, replaced_ad_set_id: adSetId, ...(refs.ad_id ? { replaced_ad_id: refs.ad_id } : {}) };
+      entry.row.external_id = entry.adId;
+      entry.row.external_url = `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${adAccountId}&selected_campaign_ids=${campaignId}&selected_ad_ids=${entry.adId}`;
+      entry.row.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+      await entry.row.save();
+    }
+    result.adSets.push({ from: adSetId, to: replacement, status: wasActive ? 'ACTIVE' : 'PAUSED' });
+  }
+  result.adSetIds = result.adSets.map((entry) => entry.to);
+  result.adIds = uniqueRefs(rows, 'ad_id');
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    actorType: 'user',
+    actorId: params.actorId,
+    action: 'ad_studio.targeting_changed',
+    targetType: 'ad_studio_export',
+    targetId: rows[0].id,
+    summary: result.mode === 'updated' ? `Changed who ${result.adSets.length} Meta ad set(s) reach` : `Moved Meta ads to ${result.adSets.filter((entry) => entry.from !== entry.to).length} new ad set(s) with the new audience`,
+    after: { mode: result.mode, ad_sets: result.adSets, targeting: spec },
+  });
+  return result;
 }

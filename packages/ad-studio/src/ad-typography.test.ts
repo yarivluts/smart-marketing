@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { AD_STUDIO_BRAND_STRIP } from '@growthos/shared';
-import { applyBrandStrip, brandStripColours, brandStripLayer, headlineAccent, keepTogether, luminance, setHeadline, trimJoiners } from './ad-typography';
+import { AD_STUDIO_BRAND_STRIP, AD_STUDIO_VIDEO_BRAND_BANNER, AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY } from '@growthos/shared';
+import {
+  HEADLINE_LEADING,
+  applyBrandStrip,
+  brandStripColours,
+  brandStripLayer,
+  headlineAccent,
+  headlineLines,
+  keepTogether,
+  linesMarkup,
+  luminance,
+  renderHeadlineText,
+  setHeadline,
+  trimJoiners,
+} from './ad-typography';
 
 async function picture(width: number, height: number, background = '#7a8f9e') {
   return { bytes: await sharp({ create: { width, height, channels: 3, background } }).png().toBuffer(), mimeType: 'image/png' };
@@ -38,8 +51,55 @@ describe('ad typography', () => {
       const meta = await sharp(result.bytes).metadata();
       expect([meta.width, meta.height, result.mimeType]).toEqual([800, 1000, 'image/jpeg']);
     }
-    const hebrew = await setHeadline({ image: await picture(800, 800), headline: 'חותמים בדקה', format: 'square', language: 'he', emphasis: ['בדקה'], layout: 'start' });
+    const hebrew = await setHeadline({ image: await picture(800, 800), headline: '\u05d7\u05d5\u05ea\u05de\u05d9\u05dd \u05d1\u05d3\u05e7\u05d4', format: 'square', language: 'he', emphasis: ['\u05d1\u05d3\u05e7\u05d4'], layout: 'start' });
     expect((await sharp(hebrew.bytes).metadata()).width).toBe(800);
+  });
+
+  describe('headline line spacing', () => {
+    const SIZE = 80;
+    const ADJACENT = { headline: 'Fast secure signing for every lawyer', emphasis: ['Fast', 'secure'] };
+    // "Fast and secure signature for every lawyer" in Hebrew, two emphasised words side by side (escapes: no Hebrew in code).
+    const HEBREW = {
+      headline: '\u05d7\u05ea\u05d9\u05de\u05d4 \u05de\u05d4\u05d9\u05e8\u05d4 \u05d5\u05de\u05d0\u05d5\u05d1\u05d8\u05d7\u05ea \u05dc\u05db\u05dc \u05e2\u05d5\u05e8\u05da \u05d3\u05d9\u05df',
+      emphasis: ['\u05de\u05d4\u05d9\u05e8\u05d4', '\u05d5\u05de\u05d0\u05d5\u05d1\u05d8\u05d7\u05ea'],
+    };
+    const lines = (input: { headline: string; emphasis: string[] }, layout: 'stacked' | 'centered' | 'start' = 'stacked') => headlineLines({ ...input, layout, fontSize: SIZE, accent: '#ffd43b' });
+
+    it('builds a stacked headline as explicit lines: never two breaks in a row, none at either end', () => {
+      for (const input of [ADJACENT, HEBREW, { headline: 'Sign in 30 seconds, no printer', emphasis: ['30 seconds'] }, { headline: 'Fast, secure', emphasis: ['Fast', 'secure'] }]) {
+        const text = linesMarkup(lines(input));
+        expect(text).not.toMatch(/\n\s*(<[^>]+>\s*)*\n/);
+        expect(text.startsWith('<span')).toBe(true);
+        expect(text).not.toMatch(/^(<span[^>]*>)\n/);
+        expect(text).not.toMatch(/\n<\/span>$/);
+      }
+      // Each part on a line of its own; the joint between two emphasised words dropped.
+      expect(linesMarkup(lines(ADJACENT)).split('\n')).toHaveLength(3);
+      // Every break sits in a span no larger than the smaller of the two lines it separates.
+      const breaks = [...linesMarkup(lines(ADJACENT)).matchAll(/size="(\d+)"[^>]*>\n</g)].map((match) => Number(match[1]) / 1024);
+      expect(breaks.map((size) => Math.round(size))).toEqual([Math.round(SIZE * 1.7), Math.round(SIZE * 0.85)]);
+      // Every span sets a tight line height for its size.
+      expect(linesMarkup(lines(ADJACENT))).toContain(`line_height="${Math.round(SIZE * 1.7 * HEADLINE_LEADING * 1024)}"`);
+    });
+
+    it('keeps the space between two emphasised words on one line', () => {
+      const text = linesMarkup(lines(ADJACENT, 'centered'));
+      expect(text).not.toContain('\n');
+      expect(text).toMatch(/>Fast<\/span><span[^>]*> <\/span><span[^>]*>secure</);
+    });
+
+    it('renders a stacked headline with two adjacent emphasised phrases without a gap between the lines', async () => {
+      for (const input of [ADJACENT, HEBREW]) {
+        // The joint between the two emphasised phrases is an empty line, which is never set.
+        const parts = lines(input).filter((line) => line.some((run) => run.text.trim()));
+        const rendered = await renderHeadlineText(linesMarkup(parts), 900, 'centre');
+        // Every line at its own size, at most 1.3 times that size apart: no empty line, no loose leading.
+        const bound = parts.reduce((sum, line) => sum + Math.max(...line.map((run) => run.size)), 0) * 1.3;
+        expect(parts.length).toBe(input === ADJACENT ? 3 : 4);
+        expect(rendered.info.height).toBeLessThanOrEqual(bound);
+        expect(rendered.info.height).toBeGreaterThan(bound / 2);
+      }
+    });
   });
 
   it('covers the reserved band with an opaque strip in the brand colour, logo at the reading side', async () => {
@@ -77,5 +137,45 @@ describe('ad typography', () => {
     const alpha = (x: number, y: number) => data[(y * info.width + x) * 4 + 3];
     expect(alpha(10, 100)).toBe(0);
     expect(alpha(710, Math.round(1280 * (AD_STUDIO_BRAND_STRIP.story.top + 0.01)))).toBe(255);
+  });
+
+  it('puts the video banner along the very bottom edge, slightly see-through, logo at the reading side', async () => {
+    const zone = AD_STUDIO_VIDEO_BRAND_BANNER.vertical;
+    const brand = { name: 'EasySign', slogan: 'Sign anywhere', logo: await LOGO, colors: ['#1e3a8a'], language: 'he' };
+    const layer = await brandStripLayer({ width: 720, height: 1280, format: 'story', brand, zone, fillOpacity: AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY });
+    const { data, info } = await sharp(layer).raw().toBuffer({ resolveWithObject: true });
+    const px = (x: number, y: number) => Array.from(data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 4));
+    // Nothing above the band, so the footage shows full-frame there.
+    expect(px(360, Math.round(1280 * zone.top) - 3)[3]).toBe(0);
+    expect(px(360, 600)[3]).toBe(0);
+    // The band reaches the last row, in the brand colour, not quite opaque.
+    const bottom = px(5, 1279);
+    expect(Math.abs(bottom[3] - 255 * AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY)).toBeLessThanOrEqual(2);
+    expect(Math.abs(bottom[2] - 0x8a)).toBeLessThan(12);
+    // Hebrew: the (red) logo tile sits at the right.
+    const tileY = Math.round(1280 * (zone.top + zone.height / 2));
+    const right = px(720 - Math.round(720 * 0.04) - 30, tileY);
+    expect(right[0]).toBeGreaterThan(200);
+    expect(right[1]).toBeLessThan(60);
+  });
+
+  it('sets a long business name smaller on one line instead of wrapping it', async () => {
+    const zone = AD_STUDIO_VIDEO_BRAND_BANNER.vertical;
+    const long = 'Galileo Centre for Guidance and Admissions';
+    const layer = await brandStripLayer({ width: 720, height: 1280, format: 'story', brand: { name: long, slogan: 'Arrive at the test confident', logo: null, colors: ['#0f2a4a'], language: 'en' }, zone });
+    const { data, info } = await sharp(layer).raw().toBuffer({ resolveWithObject: true });
+    const bandTop = Math.round(1280 * zone.top);
+    // White text pixels by row: the name is one run of rows, then a gap, then the slogan - two blocks, not three.
+    const rows: boolean[] = [];
+    for (let y = bandTop; y < 1280; y += 1) {
+      let lit = false;
+      for (let x = 0; x < info.width && !lit; x += 1) {
+        const offset = (y * info.width + x) * 4;
+        if (data[offset] > 200 && data[offset + 1] > 200 && data[offset + 2] > 200) lit = true;
+      }
+      rows.push(lit);
+    }
+    const blocks = rows.reduce((count, lit, index) => count + (lit && !rows[index - 1] ? 1 : 0), 0);
+    expect(blocks).toBe(2);
   });
 });

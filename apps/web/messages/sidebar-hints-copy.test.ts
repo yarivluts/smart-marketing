@@ -53,4 +53,13 @@ describe('sidebar hints say what Ad Studio and the AI helper do', () => {
     expect(en.AppShell.resourcesHint).not.toMatch(/credential|oauth|api|token/i);
     expect(he.AppShell.resourcesHint).toMatch(/[\u0590-\u05ff]/);
   });
+
+  it('the Resource library link says it covers the whole organization, not this project', () => {
+    const layout = readFileSync(join(__dirname, '../app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx'), 'utf8');
+    expect(layout).toContain("hint: tShell('libraryHint')");
+    expect(en.AppShell.libraryHint).toMatch(/whole organization/i);
+    expect(en.AppShell.libraryHint).toMatch(/nothing to do/i);
+    expect(en.AppShell.libraryHint).not.toMatch(/credential|oauth|api|token/i);
+    expect(he.AppShell.libraryHint).toMatch(/[\u0590-\u05ff]/);
+  });
 });

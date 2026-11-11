@@ -303,6 +303,7 @@ describe('McpController (e2e)', () => {
           'delete_ad_reference',
           'get_ad_image',
           'set_ad_voice',
+          'set_ad_narration_mode',
           'set_ad_video_settings',
           'research_ad_keywords',
           'get_ad_audiences',

@@ -51,13 +51,22 @@ describe('AutomationProposeKeywordEditForm', () => {
     expect(screen.getByText(/create and execute an ad draft/)).toBeInTheDocument();
   });
 
+  it('names the groups of ads by number, never by their raw resource names', () => {
+    renderForm();
+
+    const select = screen.getByLabelText('Group of ads');
+    expect(screen.getByRole('option', { name: 'Group of ads 1' })).toHaveValue('customers/999/adGroups/1');
+    expect(screen.getByRole('option', { name: 'Group of ads 2' })).toHaveValue('customers/999/adGroups/2');
+    expect(select).not.toHaveTextContent('customers/');
+  });
+
   it('submits an add-keywords edit for the selected target and ad group', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    expect(screen.getByLabelText('Ad group')).toHaveValue('customers/999/adGroups/1');
+    expect(screen.getByLabelText('Group of ads')).toHaveValue('customers/999/adGroups/1');
     fireEvent.change(screen.getByLabelText(/^Keywords to add/), { target: { value: 'blue widgets\ncheap widgets' } });
-    fireEvent.change(screen.getByLabelText(/^Negative keywords to add/), { target: { value: 'free' } });
+    fireEvent.change(screen.getByLabelText(/^Words to avoid/), { target: { value: 'free' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Propose keyword edit' }));
 
@@ -81,7 +90,7 @@ describe('AutomationProposeKeywordEditForm', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
 
-    fireEvent.change(screen.getByLabelText('Ad group'), { target: { value: 'customers/999/adGroups/2' } });
+    fireEvent.change(screen.getByLabelText('Group of ads'), { target: { value: 'customers/999/adGroups/2' } });
     fireEvent.change(screen.getByLabelText(/^Keywords to add/), { target: { value: 'blue widgets' } });
     fireEvent.click(screen.getByRole('button', { name: 'Propose keyword edit' }));
 
@@ -96,7 +105,7 @@ describe('AutomationProposeKeywordEditForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Propose keyword edit' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Enter at least one keyword or negative keyword to add.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter at least one keyword or word to avoid.');
     expect(fetch).not.toHaveBeenCalled();
   });
 

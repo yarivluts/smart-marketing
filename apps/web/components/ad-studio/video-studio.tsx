@@ -13,14 +13,18 @@ import {
   Wand2,
 } from 'lucide-react';
 import {
+  AD_STUDIO_CLIP_TIMEOUT_MS,
   AD_STUDIO_MAX_TOTAL_SECONDS,
   assemblyPlan,
+  isClipSlow,
+  narrationPresenter,
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
   summarizeVideoProgress,
   voiceDescription,
   type AdStudioAdCopy,
+  type AdStudioNarrationMode,
   type AdStudioVoice,
   type AdStudioVideoSettings,
   type AdStudioFormat,
@@ -46,11 +50,13 @@ import { MobileAccordionItem } from './mobile-accordion';
 import { AdCopyCard } from './ad-copy-card';
 import { NarrationEditor } from './narration-editor';
 import { VoicePicker } from './voice-picker';
+import { NarrationModePicker } from './narration-mode-picker';
 import { AdvancedVideoSettings } from './advanced-video-settings';
 import { useLocalDateTime } from './use-local-date-time';
 
 const MEDIUM = { dateStyle: 'medium', timeStyle: 'short' } as const;
 import { withFirstFrame } from './media-src';
+import { startStatusPolling } from './status-polling';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -72,6 +78,10 @@ export interface VideoStudioProps {
   voice?: AdStudioVoice | null;
   /** The advanced video settings; null means the defaults. */
   videoSettings?: AdStudioVideoSettings | null;
+  /** Who narrates the video as chosen; null is automatic. */
+  narrationMode?: AdStudioNarrationMode | null;
+  /** The mode the script follows now. */
+  effectiveNarrationMode?: AdStudioNarrationMode;
   initialClips: AdStudioClipView[];
   initialVideos: AdStudioVideoView[];
   /** False when no video model is configured for the deployment. */
@@ -81,6 +91,7 @@ export interface VideoStudioProps {
 }
 
 const POLL_MS = 4000;
+const POLL_TIMEOUT_MS = 45_000;
 
 const STATE_TONE: Record<AdStudioSceneVideoState, string> = {
   none: 'bg-muted-foreground/25',
@@ -124,6 +135,8 @@ export function VideoStudio({
   linkUrl = null,
   voice = null,
   videoSettings = null,
+  narrationMode = null,
+  effectiveNarrationMode = 'voiceover',
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -181,23 +194,25 @@ export function VideoStudio({
 
   const refreshStatus = React.useCallback(async () => {
     try {
-      const response = await fetch(`${base}/render-status`, { cache: 'no-store' });
+      // A status call that hangs is given up on, so it never holds the next poll back.
+      const response = await fetch(`${base}/render-status`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
+      });
       if (response.ok) apply((await response.json()) as Listing);
     } catch {
       // The next poll tries again.
     }
   }, [apply, base]);
 
-  // Poll while anything is generating or waits for its check; the status route also advances each clip.
+  // Poll while anything is generating, waits for its check, or the final video is being joined; the
+  // status route advances each clip and gives up on work that died with its request.
+  const finalAssembling = newestVideo?.status === 'assembling';
+  const shouldPoll = generating || (awaitingCheck && videoAvailable) || finalAssembling;
   React.useEffect(() => {
-    if (!generating && !awaitingCheck) return;
-    const poll = setInterval(() => void refreshStatus(), POLL_MS);
-    const tick = setInterval(() => setNow(new Date()), 1000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(tick);
-    };
-  }, [generating, awaitingCheck, refreshStatus]);
+    if (!shouldPoll) return;
+    return startStatusPolling(refreshStatus, POLL_MS, () => setNow(new Date()));
+  }, [shouldPoll, refreshStatus]);
 
   // When the last clip finishes, refresh the server parts of the page (pipeline stage, usage).
   const wasGenerating = React.useRef(generating);
@@ -330,6 +345,17 @@ export function VideoStudio({
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         {t('video.textNote')}
       </p>
+      <NarrationModePicker
+        base={base}
+        mode={narrationMode}
+        effective={effectiveNarrationMode}
+        presenter={narrationPresenter(scenes)}
+        disabled={pending !== null || generating}
+        onSaved={(saved) => {
+          if (saved.scenes) setScenes(saved.scenes);
+          router.refresh();
+        }}
+      />
       <VoicePicker
         base={base}
         voice={voiceChoice}
@@ -476,6 +502,7 @@ export function VideoStudio({
                   sceneId={scene.id}
                   language={language}
                   onSaved={setScenes}
+                  narrationMode={effectiveNarrationMode}
                 />
 
                 {inFlight ? (
@@ -496,12 +523,29 @@ export function VideoStudio({
                     <span className="text-xs text-muted-foreground">
                       {t('video.generatingHint')}
                     </span>
+                    {now && isClipSlow(inFlight.requestedOn, now) ? (
+                      <span className="text-xs text-warning" data-testid="ad-studio-clip-slow">
+                        {t('video.slowHint', { minutes: Math.round(AD_STUDIO_CLIP_TIMEOUT_MS / 60_000) })}
+                      </span>
+                    ) : null}
                   </div>
                 ) : null}
                 {!inFlight && lastFailed ? (
-                  <p className="text-sm text-destructive" data-testid="ad-studio-clip-failure">
-                    {t('video.failed', { reason: failure.clip(lastFailed.failureReason) })}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2" role="alert">
+                    <p className="text-sm text-destructive" data-testid="ad-studio-clip-failure">
+                      {t('video.failed', { reason: failure.clip(lastFailed.failureReason) })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => act(`render:${scene.id}`, `/scenes/${scene.id}/render`, undefined, t('video.started'))}
+                      disabled={!canRender}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+                      data-testid="ad-studio-clip-retry"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t('video.retry')}
+                    </button>
+                  </div>
                 ) : null}
                 {shownClip && !inFlight ? <ClipQaNote clip={shownClip} /> : null}
                 {state.state === 'out_of_date' ? (
@@ -674,7 +718,7 @@ export function VideoStudio({
                       controls
                       playsInline
                       preload="metadata"
-                      className={cn('rounded-xl bg-black object-contain', frameClass)}
+                      className={cn('rounded-xl bg-black object-cover', frameClass)}
                       aria-label={t('video.clipPlayer', {
                         number: index + 1,
                         version: shownClip.version,
@@ -760,8 +804,25 @@ export function VideoStudio({
           )}
         </div>
         {newestVideo?.status === 'failed' ? (
-          <p className="text-sm text-destructive">
-            {t('video.finalFailed', { reason: failure.video(newestVideo.failureReason) })}
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2" role="alert">
+            <p className="text-sm text-destructive" data-testid="ad-studio-final-failure">
+              {t('video.finalFailed', { reason: failure.video(newestVideo.failureReason) })}
+            </p>
+            <button
+              type="button"
+              onClick={() => void act('assemble', '/assemble', undefined, t('video.assembled'))}
+              disabled={!progress.canAssemble || pending !== null || assembling || generating}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              data-testid="ad-studio-final-retry"
+            >
+              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('video.retry')}
+            </button>
+          </div>
+        ) : null}
+        {finalAssembling && pending !== 'assemble' ? (
+          <p className="text-xs text-muted-foreground" role="status" data-testid="ad-studio-final-assembling">
+            {t('video.assemblingHint')}
           </p>
         ) : null}
         {finalVideo ? (

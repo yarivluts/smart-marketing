@@ -38,8 +38,20 @@ const orm = vi.hoisted(() => ({
   updateGrowthLandingContent: vi.fn(),
   getAdStudioBrief: vi.fn(),
   getAdStudioRun: vi.fn(),
+  startGrowthTargetChange: vi.fn(),
+  finishGrowthTargetChange: vi.fn(),
+  proposeGrowthLandingChange: vi.fn(),
+  updateGrowthProposalLandingContent: vi.fn(),
   assertAdStudioQuota: vi.fn(),
   recordAdStudioUsage: vi.fn(),
+  getLiveGrowthTarget: vi.fn(),
+  recordGrowthBudgetChange: vi.fn(),
+  recordGrowthBudgetChangeFailure: vi.fn(),
+  getLiveAudienceProposal: vi.fn(),
+  markGrowthLiveAudienceApplied: vi.fn(),
+  recordGrowthLiveAudienceFailure: vi.fn(),
+  readAdStudioMetaCurrency: vi.fn(),
+  decideGrowthProposal: vi.fn(),
 }));
 
 vi.mock('@growthos/firebase-orm-models', async (importOriginal) => ({ ...(await importOriginal<object>()), ...orm }));
@@ -53,8 +65,9 @@ vi.mock('./image-pipeline', () => ({ listBriefImages: studio.listBriefImages, re
 const brand = vi.hoisted(() => ({ fillAdStudioBrandFromSite: vi.fn(async () => undefined) }));
 vi.mock('./brand', () => brand);
 
-import { AdStudioQuotaExceededError } from '@growthos/firebase-orm-models';
-import { advanceGrowthPilot, approveGrowthActivation, GROWTH_SCHEDULER_UNITS_PER_PILOT, loadGrowthPerformance, runScheduledGrowthPilots, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_VIDEO_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
+import { AdStudioAutomationStoppedError, AdStudioQuotaExceededError, MetaAdsApiError } from '@growthos/firebase-orm-models';
+import { approveGrowthLiveAudience, changeGrowthBudget, growthMetaRefs, growthPlatformFailureCode, GrowthPublishInvalidError } from './growth-pilot';
+import { advanceGrowthPilot, approveGrowthActivation, changeGrowthTarget, requestGrowthTargetVideo, GrowthVideoUnavailableError, GROWTH_SCHEDULER_UNITS_PER_PILOT, loadGrowthPerformance, runScheduledGrowthPilots, approveGrowthPublish, GROWTH_ADS_RUN_OPTIONS, GROWTH_VIDEO_RUN_OPTIONS, GROWTH_DEFAULT_DAILY_BUDGET, growthFailureCode, readGrowthSite, requestGrowthTarget, reviseGrowthProposal } from './growth-pilot';
 import { AdStudioProviderError, type AdStudioLlm } from './llm';
 
 const publicResolver = vi.fn(async () => ['93.184.215.14']);
@@ -197,7 +210,8 @@ describe('making ads for approved targets', () => {
     studio.startAdStudioAutopilot.mockResolvedValue(run({}));
     await advanceGrowthPilot({ ...ctx(llm(ANALYSIS)), pilotId: 'g1', autopilot });
     const input = orm.createAdStudioBrief.mock.calls[0][0].input;
-    expect(input).toMatchObject({ name: 'Pro plan', landingPageUrl: 'https://easysign.co.il/', language: 'en' });
+    // The pilot's videos are narrated off screen: the brief says so, so its script never puts a speaker on camera.
+    expect(input).toMatchObject({ name: 'Pro plan', landingPageUrl: 'https://easysign.co.il/', language: 'en', narrationMode: 'voiceover' });
     expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_ADS_RUN_OPTIONS }));
     expect(GROWTH_ADS_RUN_OPTIONS).toMatchObject({ images: true, video: false });
     expect(orm.linkGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', briefId: 'b1', runId: 'r1' }));
@@ -333,6 +347,18 @@ describe('landing pages for approved targets', () => {
     expect(orm.updateGrowthLandingContent).toHaveBeenCalledWith(expect.objectContaining({ pageId: 'page1', content: expect.objectContaining({ headline: 'Sign fast' }) }));
     expect(orm.completeGrowthProposalRevision).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'lp1', draft: { name: 'Pro plan' } }));
   });
+
+  it('revises proposed new words for a public page in the proposal, never on the live page', async () => {
+    const held = { id: 'lp2', kind: 'landing_page', pilot_id: 'g1', target_id: 't1', landing_page_id: 'page1', landing_content: { ...PAGE, headline: 'Proposed words' }, draft: { name: 'Pro plan' }, change_requests: [{ text: 'Warmer' }] };
+    orm.requestGrowthProposalChange.mockResolvedValue(held);
+    orm.getGrowthLandingPage.mockResolvedValue({ id: 'page1', content: PAGE });
+    orm.getGrowthTarget.mockResolvedValue(TARGET);
+    const model = llm({ ...PAGE, headline: 'Warmer words' });
+    await reviseGrowthProposal({ ...ctx(model), proposalId: 'lp2', request: 'Warmer' });
+    expect(model.generateJson.mock.calls[0][0].user).toContain('"headline": "Proposed words"');
+    expect(orm.updateGrowthProposalLandingContent).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'lp2', content: expect.objectContaining({ headline: 'Warmer words' }) }));
+    expect(orm.updateGrowthLandingContent).not.toHaveBeenCalled();
+  });
 });
 
 describe('audiences for targets with ads', () => {
@@ -447,6 +473,7 @@ describe('publishing and turning on', () => {
   });
 
   it('publishes every approved image, paused, into one ad set with its idea words and the chosen budget', async () => {
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, ad_export_ids: null });
     orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
     orm.getGrowthProposal.mockResolvedValue({ id: 'pub1', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: PLAN });
     studio.listBriefImages.mockResolvedValue([{ id: 'i1', conceptId: 'c1' }, { id: 'i2', conceptId: 'c2' }]);
@@ -461,6 +488,7 @@ describe('publishing and turning on', () => {
   });
 
   it('publishes nothing more when the first ad fails, says why, and refuses a bad budget', async () => {
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, ad_export_ids: null });
     orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
     orm.getGrowthProposal.mockResolvedValue({ id: 'pub1', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: PLAN });
     studio.listBriefImages.mockResolvedValue([{ id: 'i1', conceptId: 'c1' }]);
@@ -471,6 +499,42 @@ describe('publishing and turning on', () => {
     expect(orm.markGrowthAdsPublished).not.toHaveBeenCalled();
     await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: -5 }, { publish: publish as never })).rejects.toThrow('daily budget');
     await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: Number.NaN }, { publish: publish as never })).rejects.toThrow('daily budget');
+  });
+
+  it('new ads replacing live ones: pauses the old ones first, and publishes nothing when they cannot be paused', async () => {
+    orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
+    orm.getGrowthProposal.mockResolvedValue({ id: 'pub2', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: { ...PLAN, imageIds: ['i1'] } });
+    studio.listBriefImages.mockResolvedValue([{ id: 'i1', conceptId: 'c1' }]);
+    const order: string[] = [];
+    const setStatus = vi.fn(async () => {
+      order.push('pause');
+      return { campaigns: 1, adSets: 1, ads: 2 };
+    });
+    const publish = vi.fn(async () => {
+      order.push('publish');
+      return { id: 'e9', status: 'done' };
+    });
+    await approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub2' }, { publish: publish as never, setStatus: setStatus as never });
+    expect(setStatus).toHaveBeenCalledWith(expect.objectContaining({ exportIds: ['e1', 'e2'], status: 'PAUSED' }));
+    expect(order).toEqual(['pause', 'publish']);
+    expect(orm.markGrowthAdsPublished).toHaveBeenCalledWith(expect.objectContaining({ exportIds: ['e9'] }));
+
+    publish.mockClear();
+    const failing = vi.fn(async () => {
+      throw new Error('meta down');
+    });
+    await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub2' }, { publish: publish as never, setStatus: failing as never })).rejects.toThrow('meta down');
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('proposes publishing the newest approved ads after the person asked for new ones', async () => {
+    orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
+    orm.listGrowthProposals.mockResolvedValue([
+      { kind: 'ads', status: 'approved', target_id: 't1', preview_image_ids: ['old'] },
+      { kind: 'ads', status: 'approved', target_id: 't1', preview_image_ids: ['new1', 'new2'] },
+    ]);
+    await advanceGrowthPilot({ ...ctx(llm({})), pilotId: 'g1', autopilot: {} as never, publicWebUrl: 'https://app.growthos.io/' });
+    expect(orm.saveGrowthPublishProposal.mock.calls[0][0].plan.imageIds).toEqual(['new1', 'new2']);
   });
 
   it('refuses to publish without a Meta ad account before reading or creating anything', async () => {
@@ -495,6 +559,206 @@ describe('publishing and turning on', () => {
     });
     await expect(approveGrowthActivation({ ...ctx(llm({})), proposalId: 'act1' }, { setStatus: stopped as never })).rejects.toThrow('kill switch');
     expect(orm.markGrowthAdsRunning).not.toHaveBeenCalled();
+  });
+
+  it('keeps where the published ads live on Meta, and the account currency when Meta says it', async () => {
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, ad_export_ids: null });
+    orm.resolveAdStudioExportDestinations.mockResolvedValue({ meta: { available: true, credentialId: 'cr' } });
+    orm.getGrowthProposal.mockResolvedValue({ id: 'pub1', kind: 'publish', status: 'pending', pilot_id: 'g1', target_id: 't1', publish: PLAN });
+    studio.listBriefImages.mockResolvedValue([{ id: 'i1', conceptId: 'c1' }, { id: 'i2', conceptId: 'c2' }]);
+    let n = 0;
+    const publish = vi.fn(async () => {
+      n += 1;
+      return { id: `e${n}`, status: 'done', platform_refs: { ad_account_id: '99', campaign_id: '2385', ad_set_id: '2386', ad_id: `239${n}` } };
+    });
+    const readCurrency = vi.fn(async () => 'ILS');
+    await approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: 35 }, { publish: publish as never, readCurrency: readCurrency as never });
+    expect(readCurrency).toHaveBeenCalledWith(expect.objectContaining({ exportIds: ['e1', 'e2'], kms: { kind: 'test-kms' } }));
+    expect(orm.markGrowthAdsPublished).toHaveBeenCalledWith(expect.objectContaining({ dailyBudget: 35, currency: 'ILS', metaRefs: { ad_account_id: '99', campaign_id: '2385', ad_set_ids: ['2386'], ad_ids: ['2391', '2392'] } }));
+
+    // The currency is a read for the page only: when Meta does not answer, the ads are still published.
+    n = 0;
+    orm.markGrowthAdsPublished.mockClear();
+    const down = vi.fn(async () => {
+      throw new Error('down');
+    });
+    await approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: 35 }, { publish: publish as never, readCurrency: down as never });
+    expect(orm.markGrowthAdsPublished).toHaveBeenCalledWith(expect.objectContaining({ currency: null }));
+    // Below the minimum is refused before anything is published.
+    publish.mockClear();
+    await expect(approveGrowthPublish({ ...ctx(llm({})), proposalId: 'pub1', dailyBudget: 0.5 }, { publish: publish as never })).rejects.toBeInstanceOf(GrowthPublishInvalidError);
+    expect(publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('changing live ads', () => {
+  const LIVE = { id: 't1', pilot_id: 'g1', name: 'Free plan', status: 'active', publish_status: 'running', ad_export_ids: ['e1', 'e2'], brief_id: 'b1' };
+  const AUDIENCE = { summary: 'Older', targeting: { countries: ['IL'], ageMin: 40, ageMax: 65, genders: [], customAudiences: [], interests: [] }, unresolvedInterests: [], reach: null, meta: 'ok' };
+
+  it('changes the budget on Meta only for a valid amount, and records it with the old amount and the currency', async () => {
+    orm.getLiveGrowthTarget.mockResolvedValue(LIVE);
+    const setBudget = vi.fn(async () => ({ level: 'campaign', previousDailyBudget: 20, dailyBudget: 45, currency: 'ILS', objectIds: ['2385'] }));
+    await changeGrowthBudget({ organizationId: 'o', projectId: 'p', actorId: 'u', targetId: 't1', dailyBudget: 45 }, { setBudget: setBudget as never });
+    expect(setBudget).toHaveBeenCalledWith(expect.objectContaining({ exportIds: ['e1', 'e2'], dailyBudget: 45, actorId: 'u', kms: { kind: 'test-kms' } }));
+    expect(orm.recordGrowthBudgetChange).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', dailyBudget: 45, previousDailyBudget: 20, currency: 'ILS', actorId: 'u' }));
+
+    setBudget.mockClear();
+    for (const bad of [0, 0.5, -3, 100_001, Number.NaN]) {
+      await expect(changeGrowthBudget({ organizationId: 'o', projectId: 'p', actorId: 'u', targetId: 't1', dailyBudget: bad }, { setBudget: setBudget as never })).rejects.toBeInstanceOf(GrowthPublishInvalidError);
+    }
+    expect(setBudget).not.toHaveBeenCalled();
+  });
+
+  it('records why a budget change failed on Meta and passes the error on; the target keeps its budget', async () => {
+    orm.getLiveGrowthTarget.mockResolvedValue(LIVE);
+    const refused = vi.fn(async () => {
+      throw new MetaAdsApiError('Meta Graph API request failed with status 400: {}', 400);
+    });
+    await expect(changeGrowthBudget({ organizationId: 'o', projectId: 'p', actorId: 'u', targetId: 't1', dailyBudget: 45 }, { setBudget: refused as never })).rejects.toBeInstanceOf(MetaAdsApiError);
+    expect(orm.recordGrowthBudgetChangeFailure).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', dailyBudget: 45, failureCode: 'rejected' }));
+    expect(orm.recordGrowthBudgetChange).not.toHaveBeenCalled();
+
+    const stopped = vi.fn(async () => {
+      throw new AdStudioAutomationStoppedError();
+    });
+    await expect(changeGrowthBudget({ organizationId: 'o', projectId: 'p', actorId: 'u', targetId: 't1', dailyBudget: 45 }, { setBudget: stopped as never })).rejects.toBeInstanceOf(AdStudioAutomationStoppedError);
+    expect(orm.recordGrowthBudgetChangeFailure).toHaveBeenLastCalledWith(expect.objectContaining({ failureCode: 'automation_stopped' }));
+  });
+
+  it('applies an approved live audience to the ad set, and keeps the proposal waiting when Meta refuses', async () => {
+    orm.getGrowthProposal.mockResolvedValue({ id: 'aud1', kind: 'audience', target_id: 't1', applies_to_live: true });
+    orm.getGrowthTarget.mockResolvedValue(LIVE);
+    orm.getLiveAudienceProposal.mockResolvedValue({ proposal: { id: 'aud1', audience: AUDIENCE }, target: LIVE });
+    const retarget = vi.fn(async () => ({ mode: 'replaced', adSets: [{ from: 's1', to: 's2', status: 'ACTIVE' }], adSetIds: ['s2'], adIds: ['a3'] }));
+    await approveGrowthLiveAudience({ organizationId: 'o', projectId: 'p', actorId: 'u', proposalId: 'aud1' }, { retarget: retarget as never });
+    expect(retarget).toHaveBeenCalledWith(expect.objectContaining({ exportIds: ['e1', 'e2'], targeting: AUDIENCE.targeting, kms: { kind: 'test-kms' } }));
+    expect(orm.markGrowthLiveAudienceApplied).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'aud1', mode: 'replaced', adSetIds: ['s2'], adIds: ['a3'] }));
+
+    orm.markGrowthLiveAudienceApplied.mockClear();
+    const refused = vi.fn(async () => {
+      throw new MetaAdsApiError('expired', 401);
+    });
+    await expect(approveGrowthLiveAudience({ organizationId: 'o', projectId: 'p', actorId: 'u', proposalId: 'aud1' }, { retarget: refused as never })).rejects.toBeInstanceOf(MetaAdsApiError);
+    expect(orm.recordGrowthLiveAudienceFailure).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'aud1', failureCode: 'auth_failed' }));
+    expect(orm.markGrowthLiveAudienceApplied).not.toHaveBeenCalled();
+  });
+
+  it('approves as an ordinary audience when the ads are no longer on Meta, without touching Meta', async () => {
+    orm.getGrowthProposal.mockResolvedValue({ id: 'aud1', kind: 'audience', target_id: 't1', applies_to_live: true });
+    orm.getGrowthTarget.mockResolvedValue({ ...LIVE, publish_status: 'none' });
+    const retarget = vi.fn();
+    await approveGrowthLiveAudience({ organizationId: 'o', projectId: 'p', actorId: 'u', proposalId: 'aud1' }, { retarget: retarget as never });
+    expect(retarget).not.toHaveBeenCalled();
+    expect(orm.decideGrowthProposal).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'aud1', decision: 'approve', actorId: 'u' }));
+  });
+
+  it('reads Meta ids from export rows and words platform failures as stable codes', () => {
+    expect(growthMetaRefs([{ platform_refs: { ad_account_id: 'act_99', campaign_id: 'c', ad_set_id: 's', ad_id: 'a1' } }, { platform_refs: { ad_set_id: 's', ad_id: 'a2' } }])).toEqual({ ad_account_id: '99', campaign_id: 'c', ad_set_ids: ['s'], ad_ids: ['a1', 'a2'] });
+    expect(growthMetaRefs([{ platform_refs: null }])).toBeNull();
+    expect(growthPlatformFailureCode(new MetaAdsApiError('x', 429))).toBe('platform_busy');
+    expect(growthPlatformFailureCode(new MetaAdsApiError('x', 403))).toBe('auth_failed');
+    expect(growthPlatformFailureCode(new MetaAdsApiError('x', 500))).toBe('platform_error');
+    expect(growthPlatformFailureCode(new Error('x'))).toBe('platform_error');
+  });
+});
+
+describe('changes the person asks for on an approved target', () => {
+  const ACTIVE = { ...PILOT, status: 'active', site_url: 'https://easy-sign.co.il/', analysis: { ...ANALYSIS, language: 'he', offerings: [], audiences: [] } };
+  const TARGET = { id: 't1', pilot_id: 'g1', kind: 'service', name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active', brief_id: 'b1', ads_status: 'approved', landing_status: 'published', landing_page_id: 'page1', audience_status: 'approved', publish_status: 'none' };
+  const PAGE = { eyebrow: 'For offices', headline: 'Sign 20 documents', subheadline: 'On WhatsApp', benefits: [{ title: 'Fast', text: 'Seconds' }], steps: [], faq: [], ctaText: 'Start now', closingHeadline: 'Ready?' };
+  const AUDIENCE = { summary: 'Freelancers', targeting: { countries: ['IL'], ageMin: 25, ageMax: 55, genders: [], customAudiences: [], interests: [{ id: 'i1', name: 'Freelancer', sizeLower: 1, sizeUpper: 2 }] }, unresolvedInterests: [], reach: null, meta: 'ok' };
+
+  beforeEach(() => {
+    orm.getGrowthPilot.mockResolvedValue(ACTIVE);
+    orm.getGrowthTarget.mockResolvedValue(TARGET);
+    orm.listGrowthProposals.mockResolvedValue([]);
+    orm.getGrowthLandingPage.mockResolvedValue({ id: 'page1', content: PAGE });
+  });
+
+  it('asks the waiting proposal for the change when that part still waits for a decision, and refuses while one is being made', async () => {
+    orm.listGrowthProposals.mockResolvedValue([{ id: 'ads1', kind: 'ads', status: 'pending', target_id: 't1' }]);
+    orm.requestGrowthProposalChange.mockResolvedValue({ id: 'ads1', kind: 'ads', pilot_id: 'g1', target_id: 't1', brief_id: 'b1', change_requests: [{ text: 'Brighter' }] });
+    orm.getAdStudioBrief.mockResolvedValue({ id: 'b1', image_concepts: [] });
+    studio.startAdStudioAutopilot.mockResolvedValue({ id: 'r2' });
+    await changeGrowthTarget({ ...ctx(llm({})), targetId: 't1', area: 'ads', request: 'Brighter' });
+    expect(orm.requestGrowthProposalChange).toHaveBeenCalledWith(expect.objectContaining({ proposalId: 'ads1', text: 'Brighter' }));
+    expect(orm.startGrowthTargetChange).not.toHaveBeenCalled();
+
+    orm.listGrowthProposals.mockResolvedValue([{ id: 'ads1', kind: 'ads', status: 'revising', target_id: 't1' }]);
+    await expect(changeGrowthTarget({ ...ctx(llm({})), targetId: 't1', area: 'ads', request: 'Again' })).rejects.toMatchObject({ name: 'GrowthProposalNotPendingError' });
+  });
+
+  it('renders new ads for approved ones with the request; the new ones come back when ready', async () => {
+    orm.getAdStudioBrief.mockResolvedValue({ id: 'b1', image_concepts: [{ id: 'c1' }, { id: 'c2' }] });
+    studio.startAdStudioAutopilot.mockResolvedValue({ id: 'r3' });
+    await changeGrowthTarget({ ...ctx(llm({})), targetId: 't1', area: 'ads', request: '  A  clearer headline ' });
+    expect(orm.startGrowthTargetChange).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', area: 'ads', text: '  A  clearer headline ', actorId: 'u' }));
+    expect(studio.rewriteAdStudioImageConcept.mock.calls.map((call) => [call[0].conceptId, call[0].instruction])).toEqual([
+      ['c1', 'A clearer headline'],
+      ['c2', 'A clearer headline'],
+    ]);
+    expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_ADS_RUN_OPTIONS }));
+    expect(orm.linkGrowthTargetAds).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', runId: 'r3' }));
+    expect(orm.finishGrowthTargetChange).not.toHaveBeenCalled();
+
+    studio.startAdStudioAutopilot.mockRejectedValueOnce(new AdStudioQuotaExceededError('text', 50, 50));
+    await changeGrowthTarget({ ...ctx(llm({})), targetId: 't1', area: 'ads', request: 'Again' });
+    expect(orm.finishGrowthTargetChange).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', area: 'ads', failureCode: 'quota_exceeded' }));
+  });
+
+  it('a public page gets new words to approve; a declined or failed one is written again with the request', async () => {
+    const model = llm({ ...PAGE, headline: 'Sign fast' });
+    await changeGrowthTarget({ ...ctx(model), targetId: 't1', area: 'landing', request: 'Shorter headline' });
+    expect(model.generateJson.mock.calls[0][0].user).toContain('"headline": "Sign 20 documents"');
+    expect(model.generateJson.mock.calls[0][0].user).toContain('Shorter headline');
+    expect(orm.proposeGrowthLandingChange).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', content: expect.objectContaining({ headline: 'Sign fast' }) }));
+    expect(orm.saveGrowthLandingDraft).not.toHaveBeenCalled();
+    expect(orm.finishGrowthTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({ area: 'landing' }));
+    expect(orm.finishGrowthTargetChange.mock.lastCall?.[0].failureCode).toBeUndefined();
+
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, landing_status: 'failed', landing_page_id: null });
+    const fresh = llm({ ...PAGE, headline: 'Free trial' });
+    await changeGrowthTarget({ ...ctx(fresh), targetId: 't1', area: 'landing', request: 'Mention the free trial' });
+    expect(fresh.generateJson.mock.calls[0][0].user).toContain('What the owner asked for: Mention the free trial');
+    expect(orm.saveGrowthLandingDraft).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', language: 'he', siteUrl: 'https://easy-sign.co.il/' }));
+
+    await changeGrowthTarget({ ...ctx(llm({ ...PAGE, headline: '' })), targetId: 't1', area: 'landing', request: 'x' });
+    expect(orm.finishGrowthTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({ area: 'landing', failureCode: 'invalid_output' }));
+  });
+
+  it('plans a new audience from the last one and the request, and proposes it', async () => {
+    orm.listGrowthProposals.mockResolvedValue([{ id: 'a1', kind: 'audience', status: 'approved', target_id: 't1', audience: AUDIENCE }]);
+    meta.searchAdStudioMetaInterests.mockResolvedValue({ status: 'unavailable', reason: 'no_credential' });
+    const model = llm({ summary: 'Women', countries: ['IL'], ageMin: 30, ageMax: 45, genders: ['female'], interestKeywords: ['Freelancer'] });
+    await changeGrowthTarget({ ...ctx(model), targetId: 't1', area: 'audience', request: 'Only women 30-45' });
+    expect(model.generateJson.mock.calls[0][0].user).toContain('"Freelancer"');
+    expect(model.generateJson.mock.calls[0][0].user).toContain('Only women 30-45');
+    expect(orm.saveGrowthAudienceProposal).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', plan: expect.objectContaining({ targeting: expect.objectContaining({ genders: ['female'], ageMin: 30 }) }) }));
+    expect(orm.finishGrowthTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({ area: 'audience' }));
+  });
+
+  it('does not redo anything when the change is refused', async () => {
+    orm.startGrowthTargetChange.mockRejectedValueOnce(Object.assign(new Error('no'), { name: 'GrowthTargetChangeNotAllowedError' }));
+    await expect(changeGrowthTarget({ ...ctx(llm({})), targetId: 't1', area: 'ads', request: 'x' })).rejects.toThrow('no');
+    expect(studio.startAdStudioAutopilot).not.toHaveBeenCalled();
+  });
+
+  it('makes the video ad on request when a video model is configured, and refuses otherwise', async () => {
+    const withVideo = { video: { omni: {} } } as never;
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, video_status: 'failed' });
+    studio.startAdStudioAutopilot.mockResolvedValue({ id: 'v2' });
+    await requestGrowthTargetVideo({ ...ctx(llm({})), targetId: 't1', autopilot: withVideo });
+    expect(studio.startAdStudioAutopilot).toHaveBeenCalledWith(expect.objectContaining({ briefId: 'b1', options: GROWTH_VIDEO_RUN_OPTIONS }));
+    expect(orm.linkGrowthTargetVideo).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', runId: 'v2' }));
+
+    await expect(requestGrowthTargetVideo({ ...ctx(llm({})), targetId: 't1', autopilot: {} as never })).rejects.toBeInstanceOf(GrowthVideoUnavailableError);
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, video_status: 'building' });
+    await expect(requestGrowthTargetVideo({ ...ctx(llm({})), targetId: 't1', autopilot: withVideo })).rejects.toMatchObject({ name: 'GrowthTargetChangeNotAllowedError' });
+
+    orm.getGrowthTarget.mockResolvedValue({ ...TARGET, video_status: 'none' });
+    studio.startAdStudioAutopilot.mockRejectedValueOnce(new AdStudioProviderError('not_configured', 'no'));
+    await requestGrowthTargetVideo({ ...ctx(llm({})), targetId: 't1', autopilot: withVideo });
+    expect(orm.finishGrowthTargetVideo).toHaveBeenCalledWith(expect.objectContaining({ targetId: 't1', failureCode: 'not_configured' }));
   });
 });
 

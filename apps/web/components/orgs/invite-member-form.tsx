@@ -89,6 +89,7 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
           id="invite-role"
           value={role}
           onChange={(event) => setRole(event.target.value as InviteRole)}
+          aria-describedby="invite-role-hint"
           className="h-10 rounded-md border border-input bg-background px-2 text-sm"
         >
           {ALL_INVITE_ROLES.map((value) => (
@@ -97,6 +98,9 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
             </option>
           ))}
         </select>
+        <p id="invite-role-hint" className="max-w-xs text-xs text-muted-foreground">
+          {t(`inviteRoleHint.${role}`)}
+        </p>
       </div>
       {projectScoped ? (
         <div className="flex flex-col gap-1.5">

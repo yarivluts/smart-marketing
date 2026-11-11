@@ -1,5 +1,5 @@
 import { isAdStudioHeadlineLayout, isAdStudioImageStyle } from '@growthos/shared';
-import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioDelivery, AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
+import type { AdStudioBriefInput, AdStudioFormat, AdStudioImageConcept, AdStudioImageFormat, AdStudioDelivery, AdStudioNarrationMode, AdStudioReferenceUse, AdStudioScene } from '@growthos/shared';
 
 /**
  * Shapes request bodies into service inputs without deciding what is valid - the services own the
@@ -25,6 +25,8 @@ export function parseBriefInput(body: Record<string, unknown>): AdStudioBriefInp
     format: text(body.format) as AdStudioFormat,
     language: text(body.language),
     targetSeconds: wholeNumber(body.targetSeconds),
+    // Absent keeps the ad's narration mode; null is automatic; anything else is checked by the service.
+    ...(body.narrationMode === undefined ? {} : { narrationMode: body.narrationMode === null ? null : (text(body.narrationMode) as AdStudioNarrationMode) }),
   };
 }
 

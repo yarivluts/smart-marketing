@@ -45,7 +45,7 @@ describe('CopilotEngine NLP & Action Proposals', () => {
     });
 
     it('declines to propose a cross-channel rebalance', () => {
-      const result = processCopilotQuery('Reallocate Google to Meta budget', CONTEXT, EN);
+      const result = processCopilotQuery('Move budget from Google to Facebook and Instagram', CONTEXT, EN);
       expect(result.actionProposal).toBeUndefined();
       expect(result.message.content).not.toContain('$500');
     });

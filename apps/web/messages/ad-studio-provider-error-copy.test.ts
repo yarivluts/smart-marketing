@@ -34,3 +34,19 @@ describe('Ad Studio AI-service failures are explained without "provider" / "mode
     });
   }
 });
+
+describe('Ad Studio "out of credit" failure does not hand our billing problem to the customer', () => {
+  it('en: says it is on our side and to contact support, no credit / top-up talk', () => {
+    const text = (en.AdStudio as unknown as Studio).providerErrors.provider_billing;
+    expect(text).toMatch(/our side/i);
+    expect(text).toMatch(/contact GrowthOS support/i);
+    expect(text).not.toMatch(/credit|top it up|account admin/i);
+  });
+
+  it('he: says it is on our side and to contact support, no credit / top-up talk', () => {
+    const text = (he.AdStudio as unknown as Studio).providerErrors.provider_billing;
+    expect(text).toMatch(/בצד שלנו/);
+    expect(text).toMatch(/תמיכה/);
+    expect(text).not.toMatch(/קרדיט|מנהל החשבון/);
+  });
+});

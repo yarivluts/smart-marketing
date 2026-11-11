@@ -1,16 +1,20 @@
 import { z } from 'zod/v4';
 import { AdCopySchema } from './copy-writing';
 import {
+  DEFAULT_AD_STUDIO_NARRATION_MODE,
+  applyNarrationMode,
   buildSceneRewritePrompt,
   buildScriptPrompt,
   fitAdCopy,
   fitAdStudioScenes,
   isAdCopyEmpty,
+  isAdStudioDelivery,
+  isAdStudioNarrationMode,
   planToScriptContext,
   type AdStudioScene,
   type AdStudioScriptContext,
 } from '@growthos/shared';
-import { getAdStudioBrief, newAdStudioSceneId, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
+import { adStudioNarrationMode, getAdStudioBrief, newAdStudioSceneId, saveAdStudioCopy, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
 import { briefPromptInput } from './brand';
 import { ensureOrm } from './runtime';
 import { AdStudioProviderError } from './llm';
@@ -22,15 +26,24 @@ const GeneratedSceneSchema = z.object({
   visualPrompt: z.string().describe('What the camera sees, in English, for a text-to-video model.'),
   voiceover: z.string().describe('Narration in the ad language, or empty.'),
   onScreenText: z.string().describe('Text shown in the frame, in the ad language, or empty.'),
+  delivery: z.string().optional().describe('Who says the voiceover: "voiceover" (an off-screen narrator, never seen) or "on_screen" (a person in the shot, to the camera). Follow the narration mode.'),
+  speaker: z.string().optional().describe('For "on_screen": the one person who speaks, described the same way in every scene (age, gender, look, clothing). Empty otherwise.'),
 });
 
 export const GeneratedScriptSchema = z.object({
   title: z.string(),
+  narrationMode: z.string().optional().describe('Who narrates the ad: "voiceover", "on_camera" or "mixed", as the narration rules say.'),
   scenes: z.array(GeneratedSceneSchema),
   copy: AdCopySchema.optional().describe('The ad text that runs next to the finished video in the feed, in the ad language (KAN-278).'),
 });
 
 export type GeneratedScript = z.infer<typeof GeneratedScriptSchema>;
+type GeneratedScene = z.infer<typeof GeneratedSceneSchema>;
+
+/** A generated scene's delivery fields, when the model gave a valid one; the narration mode settles the rest. */
+function generatedDelivery(scene: GeneratedScene): Pick<AdStudioScene, 'delivery' | 'speaker'> {
+  return isAdStudioDelivery(scene.delivery) ? { delivery: scene.delivery, ...(scene.speaker?.trim() ? { speaker: scene.speaker } : {}) } : {};
+}
 
 function toScenes(generated: GeneratedScript['scenes']): AdStudioScene[] {
   return generated.map((scene) => ({
@@ -39,6 +52,7 @@ function toScenes(generated: GeneratedScript['scenes']): AdStudioScene[] {
     visualPrompt: scene.visualPrompt,
     voiceover: scene.voiceover,
     onScreenText: scene.onScreenText,
+    ...generatedDelivery(scene),
   }));
 }
 
@@ -71,6 +85,9 @@ export async function generateAdStudioScript(
     actorId: ctx.actorId,
     llm: ctx.llm,
     generatedBy: { provider: ctx.llm.provider, model: ctx.llm.model, generated_at: (ctx.now ?? new Date()).toISOString() },
+    // In automatic mode the writer read the mode from the brief; it is stored, and the saved script is
+    // made to follow it in code (voice-over clears every on-screen speaker). A chosen mode is never replaced.
+    detectedNarrationMode: brief.narration_mode ? undefined : isAdStudioNarrationMode(generated.narrationMode) ? generated.narrationMode : DEFAULT_AD_STUDIO_NARRATION_MODE,
     now: ctx.now,
   });
 }
@@ -96,9 +113,16 @@ export async function proposeAdStudioSceneRewrite(
   const index = scenes.findIndex((scene) => scene.id === ctx.sceneId);
   if (index < 0) throw new AdStudioProviderError('invalid_output', 'That scene is no longer in the script.');
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildSceneRewritePrompt(await briefPromptInput(brief), scenes, index, ctx.instruction, context);
+  const mode = adStudioNarrationMode(brief);
+  const prompt = buildSceneRewritePrompt({ ...(await briefPromptInput(brief)), narrationMode: mode }, scenes, index, ctx.instruction, context);
   const generated = await meteredCall(ctx, 'scene_rewrite', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedSceneSchema }));
-  const [fitted] = fitAdStudioScenes([{ id: ctx.sceneId, ...generated }], newAdStudioSceneId);
+  const { delivery: _delivery, speaker: _speaker, ...rest } = generated;
+  const [fitted] = fitAdStudioScenes([{ id: ctx.sceneId, ...rest, ...generatedDelivery(generated) }], newAdStudioSceneId);
   if (!fitted || fitted.visualPrompt.length === 0) throw new AdStudioProviderError('invalid_output', 'The model returned a scene without a visual description.');
-  return fitted;
+  // The proposal follows the ad's narration mode as the saved script will (one presenter on camera).
+  const proposed = applyNarrationMode(
+    scenes.map((scene) => (scene.id === ctx.sceneId ? fitted : scene)),
+    mode,
+  ).find((scene) => scene.id === ctx.sceneId);
+  return proposed ?? fitted;
 }

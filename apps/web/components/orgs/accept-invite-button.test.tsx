@@ -54,7 +54,7 @@ describe('AcceptInviteButton', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Verify your email address before accepting this invite. Check your inbox for the verification link.',
+      'Verify your email address before accepting this invite. Open the verification link in your inbox, then accept the invite again.',
     );
     expect(push).not.toHaveBeenCalled();
   });

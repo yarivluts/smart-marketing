@@ -33,6 +33,12 @@ const EMPTY: BriefFormValues = { name: '', objective: '', productDescription: ''
 const inputClass = 'rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring';
 
 /** Creates an ad from a brief, or edits the brief's details. The server validates; its reasons are shown as they come. */
+/** "my-shop.com" as typed becomes "https://my-shop.com"; an address that already has a scheme is left alone. */
+function withScheme(input: string): string {
+  const trimmed = input.trim();
+  return trimmed && !/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? `https://${trimmed}` : trimmed;
+}
+
 export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: BriefFormProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -61,7 +67,7 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
       const response = await fetch(briefId ? `${base}/${briefId}` : base, {
         method: briefId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, landingPageUrl: withScheme(values.landingPageUrl) }),
       });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError & { brief?: { id: string } };
       if (!response.ok || !body.brief) {
@@ -99,7 +105,7 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
       </label>
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         {t('fieldLandingPage')}
-        <input value={values.landingPageUrl} onChange={(event) => set('landingPageUrl', event.target.value)} type="url" dir="ltr" placeholder={t('landingPagePlaceholder')} className={inputClass} />
+        <input value={values.landingPageUrl} onChange={(event) => set('landingPageUrl', event.target.value)} type="text" inputMode="url" autoComplete="url" autoCapitalize="off" autoCorrect="off" spellCheck={false} dir="ltr" placeholder={t('landingPagePlaceholder')} className={inputClass} />
       </label>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">

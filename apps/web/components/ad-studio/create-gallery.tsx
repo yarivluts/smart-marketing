@@ -89,7 +89,7 @@ export function CreateGallery({
             <li key={scene.id} className="flex flex-col gap-1" data-testid="ad-studio-gallery-scene">
               <span className={cn('relative flex items-center justify-center overflow-hidden rounded-2xl bg-muted', videoFormat === 'vertical' ? 'aspect-[9/16]' : 'aspect-video')}>
                 {scene.clip?.status === 'ready' ? (
-                  <video src={withFirstFrame(`${mediaBase}/clips/${scene.clip.id}/media`)} muted playsInline preload="metadata" controls className="h-full w-full object-contain" />
+                  <video src={withFirstFrame(`${mediaBase}/clips/${scene.clip.id}/media`)} muted playsInline preload="metadata" controls className="h-full w-full bg-black object-cover" />
                 ) : (
                   <Clapperboard className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
                 )}

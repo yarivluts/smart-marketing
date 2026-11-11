@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { AutomationProposeCampaignDraftForm } from './automation-propose-campaign-draft-form';
 import type { AutomationTargetView } from '@/lib/orgs/automation-view';
 import messages from '../../messages/en.json';
+import heMessages from '../../messages/he.json';
 
 const refresh = vi.fn();
 
@@ -39,7 +40,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     expect(screen.getByLabelText('Platform')).toHaveValue('google_ads');
     fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
-    fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
+    fireEvent.change(screen.getByLabelText('Name for this group of ads'), { target: { value: 'Ad Group 1' } });
     fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText(/Headlines/), {
       target: { value: 'Buy Blue Widgets\nBest Widgets Online\nWidgets For Less' },
@@ -68,6 +69,16 @@ describe('AutomationProposeCampaignDraftForm', () => {
       dailyBudgetUsd: 25,
     });
     expect((body.draft.adGroups as unknown[]).length).toBe(1);
+  });
+
+  it('names the Facebook and Instagram option in plain words, not "Meta" (en + he)', () => {
+    renderForm();
+    expect(screen.getByRole('option', { name: 'Facebook & Instagram' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'Meta' })).toBeNull();
+    const label = (heMessages as unknown as { Automation: Record<string, string> }).Automation
+      .proposeDraftPlatformMetaOption;
+    expect(label).toBeTruthy();
+    expect(label).not.toMatch(/Meta/);
   });
 
   it('switches to Meta and submits a meta discriminated-union draft with the right shape', async () => {
@@ -174,7 +185,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
 
     fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Winning Themes' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '25' } });
-    fireEvent.change(screen.getByLabelText('Ad group name'), { target: { value: 'Ad Group 1' } });
+    fireEvent.change(screen.getByLabelText('Name for this group of ads'), { target: { value: 'Ad Group 1' } });
     fireEvent.change(screen.getByLabelText('Page people land on (web address)'), { target: { value: 'https://example.com/widgets' } });
     fireEvent.change(screen.getByLabelText(/Headlines/), {
       target: { value: 'Buy Blue Widgets\nBest Widgets Online\nWidgets For Less' },

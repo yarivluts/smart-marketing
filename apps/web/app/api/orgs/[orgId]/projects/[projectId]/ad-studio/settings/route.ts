@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
   if (!isPlatformOperator(user.email)) {
     return NextResponse.json({ error: 'platform_operator_required' }, { status: 403 });
   }
-  const parsed = await parseJsonBody<{ dailyTextGenerations?: unknown; dailyVideoSeconds?: unknown; dailyImages?: unknown; videoQa?: unknown; imageSize?: unknown }>(request);
+  const parsed = await parseJsonBody<{ dailyTextGenerations?: unknown; dailyVideoSeconds?: unknown; dailyImages?: unknown; videoQa?: unknown; imageSize?: unknown; videoBrandBanner?: unknown }>(request);
   if (parsed.error) return parsed.error;
   const toNumber = (value: unknown) => (typeof value === 'number' ? value : Number.NaN);
   try {
@@ -42,6 +42,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
       ...(parsed.body?.videoQa !== undefined ? { videoQa: parseVideoQa(parsed.body.videoQa) } : {}),
       // 1K or 2K; anything else is refused by the service.
       ...(parsed.body?.imageSize !== undefined ? { imageSize: String(parsed.body.imageSize) } : {}),
+      // On or off; anything but a boolean is refused by the service.
+      ...(parsed.body?.videoBrandBanner !== undefined ? { videoBrandBanner: parsed.body.videoBrandBanner as boolean } : {}),
       actorId: user.id,
     });
     return NextResponse.json({ settings });

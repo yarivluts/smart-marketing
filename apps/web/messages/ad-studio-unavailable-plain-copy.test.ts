@@ -17,12 +17,12 @@ describe('Ad Studio "not available" messages are in plain words', () => {
   it('en: no deployment/model/provider talk, and a next step where it matters', () => {
     for (const text of pick(en)) expect(text).not.toMatch(/deployment|configured|provider|model/i);
     expect(en.AdStudio.video.notConfigured).toMatch(/AI helper|admin/);
-    expect(en.AdStudio.providerErrors.provider_billing).toMatch(/admin/);
+    expect(en.AdStudio.providerErrors.provider_billing).toMatch(/support/);
   });
 
   it('he: no "environment"/"model" talk', () => {
     for (const text of pick(he)) expect(text).not.toMatch(/בסביבה|מודל|ספק|הוגדר/);
     expect(he.AdStudio.video.notConfigured).toMatch(/מנהל החשבון/);
-    expect(he.AdStudio.providerErrors.provider_billing).toMatch(/מנהל החשבון/);
+    expect(he.AdStudio.providerErrors.provider_billing).toMatch(/תמיכה/);
   });
 });

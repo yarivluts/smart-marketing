@@ -120,4 +120,15 @@ describe('InviteMemberForm role names', () => {
     expect(screen.getByRole('option', { name: 'Admin' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'org_admin' })).toBeNull();
   });
+
+  it('explains in one line what the chosen role can do', () => {
+    renderForm(PROJECTS);
+    const select = screen.getByLabelText('Role');
+    const hint = (): string => document.getElementById(select.getAttribute('aria-describedby') ?? '')?.textContent ?? '';
+    expect(hint()).toBe(messages.Members.inviteRoleHint.viewer);
+    for (const role of ['org_admin', 'project_admin', 'editor', 'operator'] as const) {
+      fireEvent.change(select, { target: { value: role } });
+      expect(hint()).toBe(messages.Members.inviteRoleHint[role]);
+    }
+  });
 });

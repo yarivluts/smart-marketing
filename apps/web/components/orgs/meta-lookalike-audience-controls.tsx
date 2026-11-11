@@ -72,7 +72,7 @@ export function MetaLookalikeAudienceControls({ orgId, projectId, installId, has
             <Input id={`${installId}-lookalike-name`} value={name} onChange={(event) => setName(event.target.value)} required className="h-9 w-48" />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor={`${installId}-lookalike-country`} className="text-xs text-muted-foreground" title={t('lookalikeCountryHint')}>
+            <label htmlFor={`${installId}-lookalike-country`} className="text-xs text-muted-foreground">
               {t('lookalikeCountryLabel')}
             </label>
             <Input
@@ -80,12 +80,13 @@ export function MetaLookalikeAudienceControls({ orgId, projectId, installId, has
               value={country}
               onChange={(event) => setCountry(event.target.value)}
               maxLength={2}
+              aria-describedby={`${installId}-lookalike-country-hint`}
               required
               className="h-9 w-16 uppercase"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label htmlFor={`${installId}-lookalike-ratio`} className="text-xs text-muted-foreground" title={t('lookalikeRatioHint')}>
+            <label htmlFor={`${installId}-lookalike-ratio`} className="text-xs text-muted-foreground">
               {t('lookalikeRatioLabel')}
             </label>
             <Input
@@ -94,6 +95,7 @@ export function MetaLookalikeAudienceControls({ orgId, projectId, installId, has
               min={1}
               max={20}
               step={1}
+              aria-describedby={`${installId}-lookalike-ratio-hint`}
               value={ratioPercent}
               onChange={(event) => setRatioPercent(Number(event.target.value))}
               required
@@ -105,6 +107,12 @@ export function MetaLookalikeAudienceControls({ orgId, projectId, installId, has
           </Button>
         </form>
       )}
+      {hasSeedAudience ? (
+        <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+          <p id={`${installId}-lookalike-country-hint`}>{t('lookalikeCountryHint')}</p>
+          <p id={`${installId}-lookalike-ratio-hint`}>{t('lookalikeRatioHint')}</p>
+        </div>
+      ) : null}
       {error ? (
         <p role="alert" className="text-xs text-destructive">
           {t('lookalikeCreateError')}

@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioNarrationMode, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -85,6 +85,17 @@ export class AdStudioBriefModel extends BaseModel {
   @Field({ is_required: false })
   public narrator_voice?: AdStudioVoice | null;
 
+  /**
+   * Who narrates the video - `voiceover`, `on_camera` or `mixed` - as a person or agent chose it;
+   * absent or null is automatic (the script writer reads it from the brief, voice-over by default).
+   */
+  @Field({ is_required: false })
+  public narration_mode?: AdStudioNarrationMode | null;
+
+  /** The narration mode the script writer read from the brief when it last wrote the script (automatic mode). */
+  @Field({ is_required: false })
+  public detected_narration_mode?: AdStudioNarrationMode | null;
+
   /** Advanced video settings (resolution, style, music, what to avoid); absent means the defaults. */
   @Field({ is_required: false })
   public video_settings?: AdStudioVideoSettings | null;
@@ -152,6 +163,10 @@ export class AdStudioSettingsModel extends BaseModel {
   @Field({ is_required: false })
   public image_size?: string | null;
 
+  /** Whether assembled video ads carry the brand banner (logo, name, slogan) along the bottom; absent means on. */
+  @Field({ is_required: false })
+  public video_brand_banner?: boolean | null;
+
   @Field({ is_required: true })
   public changed_by!: string;
 
@@ -170,7 +185,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan', 'keyword_choice', 'demo_tour'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'vocalize_check', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan', 'keyword_choice', 'demo_tour'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**

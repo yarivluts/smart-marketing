@@ -7,6 +7,7 @@ import {
   acceptInvite,
   createAdStudioClip,
   createAdStudioDemoRecording,
+  createAdStudioVideo,
   createOrganizationWithOwner,
   markAdStudioDemoRecordingReady,
   createProject,
@@ -19,7 +20,7 @@ import {
   listAdStudioVideos,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { advanceBriefVideo, CLIP_TIMEOUT_MS, configureAdStudioRuntime, createMemoryMediaStorage, createOmniClient } from '@/lib/ad-studio/engine';
+import { advanceBriefVideo, ASSEMBLY_TIMEOUT_MS, CLIP_TIMEOUT_MS, configureAdStudioRuntime, createMemoryMediaStorage, createOmniClient } from '@/lib/ad-studio/engine';
 import { POST as createBrief } from './briefs/route';
 import { DELETE as deleteBrief } from './briefs/[briefId]/route';
 import { PUT as saveScript } from './briefs/[briefId]/script/route';
@@ -517,6 +518,51 @@ describe('Ad Studio video routes (KAN-231)', () => {
       { omni, storage: storage(), runner: { ffmpegPath: 'ffmpeg', spawnImpl: vi.fn(), timeoutMs: 1 }, now: () => new Date(Date.parse('2026-09-27T10:00:00Z') + CLIP_TIMEOUT_MS + 1) },
     );
     expect(result.clips.find((entry) => entry.id === clip.id)).toMatchObject({ status: 'failed', failureReason: 'timed_out' });
+  });
+
+  it('lays the brand banner along the bottom of the assembled video, unless the project switched it off', async () => {
+    const ctx = await setup();
+    fakeOmni();
+    await renderAll(request('POST'), ctx.p());
+    await poll(ctx.p());
+    await poll(ctx.p());
+    const { default: sharp } = await import('sharp');
+    const overlays: (string | null)[] = [];
+    concatClipsMock.mockImplementation(async ({ output, overlay }: { output: string; overlay?: string | null }) => {
+      overlays.push(overlay ?? null);
+      if (overlay) {
+        // A transparent frame with the band only at the bottom: the footage shows full-frame above it.
+        const { data, info } = await sharp(overlay).raw().toBuffer({ resolveWithObject: true });
+        expect([info.width, info.height]).toEqual([720, 1280]);
+        const alpha = (x: number, y: number) => data[(y * info.width + x) * 4 + 3];
+        expect(alpha(360, 200)).toBe(0);
+        expect(alpha(360, 1100)).toBe(0);
+        expect(alpha(5, 1279)).toBeGreaterThan(200);
+      }
+      await writeFile(output, Buffer.from('mp4'));
+      return { durationSeconds: 13 };
+    });
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
+    const pp = { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }) };
+    const saved = await putSettings(request('PUT', { dailyTextGenerations: 50, dailyVideoSeconds: 300, videoBrandBanner: false }), pp);
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { settings: { videoBrandBanner: boolean } }).settings.videoBrandBanner).toBe(false);
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
+    expect(overlays[0]).toEqual(expect.any(String));
+    expect(overlays[1]).toBeNull();
+    expect((await putSettings(request('PUT', { dailyTextGenerations: 50, dailyVideoSeconds: 300, videoBrandBanner: 'yes' }), pp)).status).toBe(400);
+  });
+
+  it('gives up on an assembly whose request died, even with no video model configured, so it can be tried again', async () => {
+    const ctx = await setup();
+    delete process.env.GEMINI_API_KEY;
+    const long = new Date(Date.now() - ASSEMBLY_TIMEOUT_MS - 60_000);
+    const video = await createAdStudioVideo({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, clipIds: [], sceneIds: [], aspectRatio: '9:16', durationSeconds: 13, requestedBy: ctx.owner.id, now: long });
+    const clip = await createAdStudioClip({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, sceneId: 's1', sceneFingerprint: 'fp', kind: 'render', prompt: 'x', model: 'gemini-omni-1.1-flash', aspectRatio: '9:16', durationSeconds: 5, requestedBy: ctx.owner.id, now: new Date(Date.now() - CLIP_TIMEOUT_MS - 60_000) });
+    const listing = await poll(ctx.p());
+    expect(listing.videos.find((entry) => entry.id === video.id)).toMatchObject({ status: 'failed' });
+    expect(listing.clips.find((entry) => entry.id === clip.id)).toMatchObject({ status: 'failed', failureReason: 'timed_out' });
+    expect((await listAdStudioVideos(ctx.orgId, ctx.projectId, ctx.briefId))[0]).toMatchObject({ status: 'failed', failure_reason: 'timed_out' });
   });
 
   it('gates media and generation on ai.use, and deleting the brief removes its stored files', async () => {

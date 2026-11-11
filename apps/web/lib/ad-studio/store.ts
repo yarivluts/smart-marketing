@@ -1,6 +1,7 @@
 import 'server-only';
-import type { AdStudioAdCopy, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioNarrationMode, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
+  adStudioNarrationMode,
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
   getAdStudioBrief as getAdStudioBriefInOrganization,
@@ -160,6 +161,12 @@ export interface AdStudioBriefView {
   voice: AdStudioVoice | null;
   /** The advanced video settings; null means the defaults. */
   videoSettings: AdStudioVideoSettings | null;
+  /** Who narrates the video as chosen by a person or agent; null is automatic. */
+  narrationMode: AdStudioNarrationMode | null;
+  /** The mode the script writer read from the brief (automatic mode); null until a script is written. */
+  detectedNarrationMode: AdStudioNarrationMode | null;
+  /** The mode the script follows now. */
+  effectiveNarrationMode: AdStudioNarrationMode;
   /** The keywords the search ad bids on; null until chosen. */
   searchKeywords: AdStudioSearchKeywords | null;
   /** The responsive search ad; null until written. */
@@ -194,6 +201,9 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
     videoCopy: brief.video_copy ? { ...brief.video_copy } : null,
     voice: brief.narrator_voice ? { ...brief.narrator_voice } : null,
     videoSettings: brief.video_settings ? { ...brief.video_settings } : null,
+    narrationMode: brief.narration_mode ?? null,
+    detectedNarrationMode: brief.detected_narration_mode ?? null,
+    effectiveNarrationMode: adStudioNarrationMode(brief),
     searchKeywords: brief.search_keywords
       ? { targeting: { ...brief.search_keywords.targeting }, keywords: brief.search_keywords.keywords.map((keyword) => ({ ...keyword })), negatives: [...brief.search_keywords.negatives] }
       : null,

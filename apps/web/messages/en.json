@@ -108,6 +108,7 @@
     "homeLink": "Home",
     "homeHint": "All your projects, and the people on your team",
     "resourcesHint": "Shared logins, templates and the people list your organization already set up. Nothing to do here to get started.",
+    "libraryHint": "Shared logins, templates and people for your whole organization, not just this project. Nothing to do here to get started.",
     "adsAndPerformance": "Ads & results",
     "funnelAndGoals": "Customer journey & goals",
     "aiCopilotAndAutomation": "AI helper",
@@ -118,6 +119,8 @@
     "moreTools": "More tools",
     "moreToolsHint": "Extra tools for later. You don't need any of them to get started.",
     "openMenu": "Open menu",
+    "mainNavigation": "Main menu",
+    "quickNavigation": "Quick links",
     "closeMenu": "Close menu",
     "userMenu": "Account menu",
     "signedInAs": "Signed in as",
@@ -155,7 +158,7 @@
     "emptyPreview": "Select a page to see what it is for",
     "enterHint": "↵ to open",
     "arrowsHint": "↑↓ to move",
-    "badgeLive": "Live",
+    "badgeLive": "Up to date",
     "badgeAi": "AI powered",
     "categories": {
       "Core": "Main",
@@ -294,9 +297,9 @@
     "createFirstProject": "Create your first project",
     "orgHiddenProjects": "{count, plural, one {# more project is} other {# more projects are}} not shown here - open the organization to see them all.",
     "cardNeverIngested": "Never",
-    "cardAgo_minutes": "{value}m ago",
-    "cardAgo_hours": "{value}h ago",
-    "cardAgo_days": "{value}d ago",
+    "cardAgo_minutes": "{value, plural, one {# minute ago} other {# minutes ago}}",
+    "cardAgo_hours": "{value, plural, one {# hour ago} other {# hours ago}}",
+    "cardAgo_days": "{value, plural, one {# day ago} other {# days ago}}",
     "cardStatus_ok": "Healthy: fresh data and all your main data sources connected",
     "cardStatus_warn": "Needs attention: stale data or setup incomplete",
     "cardStatus_error": "Failing: only rejected records are arriving",
@@ -475,6 +478,13 @@
     "changeRoleError": "Couldn't change this member's role. Please try again.",
     "inviteEmailLabel": "Email",
     "inviteRoleLabel": "Role",
+    "inviteRoleHint": {
+      "org_admin": "Can do everything in the whole organization except billing.",
+      "viewer": "Can look at boards and results, but can't change anything.",
+      "project_admin": "Runs one project: its team, settings and keys, and can approve ad changes.",
+      "editor": "Can use Growth Pilot and Ad Studio and edit boards in one project, but can't invite people or change settings.",
+      "operator": "Can approve and carry out ad changes in one project, and nothing else."
+    },
     "inviteProjectLabel": "Project",
     "inviteProjectNone": "You don't administer any projects to invite this role to.",
     "invite": "Invite",
@@ -588,7 +598,7 @@
     "journeyStep_sources": "Data source",
     "journeyStep_funnel": "Customer path",
     "journeyStep_board": "Starter board",
-    "journeyStep_done": "Live",
+    "journeyStep_done": "Finished",
     "journeyStartedOn": "Started {date}",
     "journeyNotStarted": "Not started yet",
     "journeyPackNone": "No starting point chosen yet",
@@ -651,7 +661,7 @@
     "accept": "Accept invite",
     "acceptError": "We could not accept this invite just now. You have not joined yet - please try again in a moment.",
     "networkError": "We cannot reach GrowthOS. Check your internet connection and try again - you have not joined yet.",
-    "verifyEmailError": "Verify your email address before accepting this invite. Check your inbox for the verification link.",
+    "verifyEmailError": "Verify your email address before accepting this invite. Open the verification link in your inbox, then accept the invite again.",
     "emailMismatch": "This invite was sent to {email}, but you're signed in with a different account.",
     "switchAccount": "Sign out and switch account"
   },
@@ -746,7 +756,7 @@
     "noTemplates": "No templates in this organization yet.",
     "peopleHeading": "People registry",
     "noPeople": "No people registered in this organization yet.",
-    "statusLabel": "Status: {status, select, approved {Approved} pending {Waiting for approval} other {{status}}}",
+    "statusLabel": "Status: {status, select, approved {Approved} pending {Waiting for approval} rejected {Declined} detached {Removed} other {{status}}}",
     "scopeSelectionLabel": "Accounts to request (separate with commas)",
     "requestAttachment": "Request",
     "requestError": "Couldn't send that request. Please try again.",
@@ -1736,7 +1746,7 @@
     "setupIntro": "Install the Feedback & NPS pack to start collecting NPS surveys and scoring them.",
     "npsHeading": "NPS score",
     "npsEmpty": "No customer ratings have come in for this project yet.",
-    "npsBreakdownLine": "{promoters} promoters, {passives} passives, {detractors} detractors ({total} responses)",
+    "npsBreakdownLine": "{promoters} promoters (very happy), {passives} passives (neutral), {detractors} detractors (unhappy) - {total} responses in all",
     "trendSparklineLabel": "Daily NPS trend",
     "trendPointEmpty": "no responses",
     "themeDigestHeading": "Top feedback themes this month",
@@ -1776,7 +1786,7 @@
     "kpiPercent": "{percent}%",
     "kpiNoValue": "No data yet",
     "sampledNotice": "These numbers cover the {limit} most recent responses, not your full history - more exist.",
-    "sentimentHeading": "Sentiment split",
+    "sentimentHeading": "How happy your customers are",
     "sentimentDescription": "Every response by NPS category, with the score in the middle.",
     "npsCenterLabel": "NPS",
     "npsEmptyDetail": "Send survey answers with a 0-10 score - the NPS (a happiness score from 0 to 100) updates as each one comes in.",
@@ -1793,18 +1803,18 @@
   "Support": {
     "metaTitle": "Support",
     "title": "Support for {projectName}",
-    "description": "Customer questions still waiting for an answer, and how each team member is doing: tickets solved, how fast they reply and solve, and how satisfied customers were (CSAT score).",
+    "description": "Customer questions still waiting for an answer, and how each team member is doing: tickets solved, how fast they reply and solve, and how satisfied customers were (their rating of the help).",
     "setupIntro": "Install the Customer Support pack to see your customer questions here, from the moment they are opened until they are solved.",
     "backlogHeading": "Open backlog",
     "backlogLine": "{opened} tickets opened",
     "leaderboardHeading": "Agent leaderboard",
     "leaderboardEmpty": "No solved tickets yet. They show up here once your support tool sends them.",
     "rankedName": "{rank}. {name}",
-    "rowSummary": "{resolved} resolved · {firstResponse} first response · {resolution} resolution · {csat} CSAT",
+    "rowSummary": "{resolved} resolved · {firstResponse} first response · {resolution} resolution · {csat} customer rating",
     "rowValueUnavailable": "—",
-    "durationSeconds": "{value}s",
-    "durationMinutes": "{value}m",
-    "durationHours": "{value}h",
+    "durationSeconds": "{value, plural, one {# second} other {# seconds}}",
+    "durationMinutes": "{value, plural, one {# minute} other {# minutes}}",
+    "durationHours": "{value, plural, one {# hour} other {# hours}}",
     "sampledNotice": "These numbers cover the {limit} most recent ticket events, not your full history - more exist. The ranking is a ranking within that window: an agent whose resolved tickets fall outside it places lower, or does not appear at all.",
     "backlogUnavailable": "Not computable from a capped read. A ticket is opened and resolved weeks apart, so a window of recent events holds resolutions whose openings have already aged out - subtracting one from the other would not count outstanding tickets.",
     "eyebrow": "Customer support",
@@ -1815,19 +1825,19 @@
     "setupFeatureSpeedTitle": "Response and resolution time",
     "setupFeatureSpeedDescription": "Average first-response and resolution time for every agent, side by side.",
     "setupFeatureLeaderboardTitle": "Agent leaderboard",
-    "setupFeatureLeaderboardDescription": "Agents ranked by tickets resolved, with their CSAT.",
+    "setupFeatureLeaderboardDescription": "Agents ranked by tickets resolved, with their customer rating.",
     "kpiResolved": "Resolved by agents",
     "kpiFastestFirstResponse": "Fastest first response",
-    "kpiTopCsat": "Top CSAT",
+    "kpiTopCsat": "Best customer rating",
     "leaderboardDescription": "Agents ranked by tickets resolved. The bar shows each agent against the leader.",
     "leaderboardEmptyDetail": "Send support tickets that are marked solved and say who handled them - the ranking fills in as they land.",
     "firstResponseHeading": "First response time",
     "firstResponseDescription": "Average time to first response per agent - shorter is better.",
     "firstResponseEmpty": "No reply times have come in yet.",
     "resolutionSublabel": "Resolution {resolution}",
-    "csatHeading": "CSAT by agent",
-    "csatDescription": "Average customer satisfaction score per agent.",
-    "csatEmpty": "No customer satisfaction scores have come in yet."
+    "csatHeading": "Customer rating by agent",
+    "csatDescription": "Average rating customers gave each agent.",
+    "csatEmpty": "No customer ratings have come in yet."
   },
   "Demos": {
     "metaTitle": "Booked demo calls",
@@ -3076,10 +3086,10 @@
     "proposeDraftTargetLabel": "Which ad",
     "proposeDraftPlatformLabel": "Platform",
     "proposeDraftPlatformGoogleAdsOption": "Google Ads",
-    "proposeDraftPlatformMetaOption": "Meta",
+    "proposeDraftPlatformMetaOption": "Facebook & Instagram",
     "proposeDraftCampaignNameLabel": "Name for this set of ads",
     "proposeDraftBudgetLabel": "Daily budget (USD)",
-    "proposeDraftAdGroupNameLabel": "Ad group name",
+    "proposeDraftAdGroupNameLabel": "Name for this group of ads",
     "proposeDraftFinalUrlLabel": "Page people land on (web address)",
     "proposeDraftHeadlinesLabel": "Headlines (3-15, one per line, max 30 characters)",
     "proposeDraftHeadlinesPlaceholder": "Buy Blue Widgets\nBest Widgets Online\nWidgets For Less",
@@ -3121,15 +3131,16 @@
     "proposeActivateButton": "Propose activation",
     "proposeActivateError": "Couldn't propose the activation. Please try again.",
     "proposeKeywordEditHeading": "Propose a keyword edit",
-    "proposeKeywordEditNoTargetsNote": "No target has an ad group yet — create and execute an ad draft above first.",
+    "proposeKeywordEditNoTargetsNote": "No ad has a group of ads yet — create and execute an ad draft above first.",
     "proposeKeywordEditTargetLabel": "Which ad",
-    "proposeKeywordEditAdGroupLabel": "Ad group",
+    "proposeKeywordEditAdGroupLabel": "Group of ads",
+    "proposeKeywordEditAdGroupOption": "Group of ads {number}",
     "proposeKeywordEditAddKeywordsLabel": "Keywords to add (one per line)",
     "proposeKeywordEditAddKeywordsPlaceholder": "blue widgets\ncheap widgets",
-    "proposeKeywordEditAddNegativeKeywordsLabel": "Negative keywords to add (one per line, optional)",
+    "proposeKeywordEditAddNegativeKeywordsLabel": "Words to avoid, so the ad is not shown for them (one per line, optional)",
     "proposeKeywordEditAddNegativeKeywordsPlaceholder": "free",
     "proposeKeywordEditButton": "Propose keyword edit",
-    "proposeKeywordEditEmptyError": "Enter at least one keyword or negative keyword to add.",
+    "proposeKeywordEditEmptyError": "Enter at least one keyword or word to avoid.",
     "proposeKeywordEditError": "Couldn't propose the keyword edit. Please try again.",
     "proposeAdEditHeading": "Propose an ad edit",
     "proposeAdEditNoTargetsNote": "No target has an ad yet — create and execute an ad draft above first.",
@@ -3180,7 +3191,7 @@
     "diffFieldDailyBudgetUsd": "Daily budget",
     "diffFieldCampaignDraft": "Ad draft",
     "diffFieldCampaignStatus": "Ad status",
-    "diffFieldAdGroupResourceName": "Ad group",
+    "diffFieldAdGroupResourceName": "Group of ads",
     "diffFieldAddKeywords": "Keywords added",
     "diffFieldAddNegativeKeywords": "Words to avoid, added",
     "diffFieldAddedKeywordResourceNames": "Reference codes of added keywords",
@@ -3818,7 +3829,7 @@
     "metaTitle": "Executive Report",
     "title": "How your ads are doing",
     "subtitle": "Your Facebook, Instagram and Google ads together, with nothing to set up",
-    "description": "A no-setup overview of how your Meta and Google ads perform together: what you spend, what a new customer costs, what you earn per $1 of ads, and how many failed payments you win back.",
+    "description": "A no-setup overview of how your Facebook, Instagram and Google ads perform together: what you spend, what a new customer costs, what you earn per $1 of ads, and how many failed payments you win back.",
     "liveBadge": "Live numbers",
     "window7d": "7 Days",
     "window30d": "30 Days",
@@ -3948,6 +3959,7 @@
         "reallocate",
         "rebalance",
         "shift budget",
+        "move budget",
         "איזון תקציב",
         "העבר תקציב",
         "העבירו תקציב",
@@ -3979,7 +3991,7 @@
     "chipNewCampaignLabel": "New ad",
     "chipNewCampaignQuery": "Create a new ad for my business",
     "chipRebalanceLabel": "Move budget",
-    "chipRebalanceQuery": "Reallocate Google to Meta budget",
+    "chipRebalanceQuery": "Move budget from Google to Facebook and Instagram",
     "clearChat": "Clear chat"
   },
   "AutomationHub": {
@@ -4136,13 +4148,14 @@
     "scriptSaved": "Script saved.",
     "providerErrors": {
       "not_configured": "The AI helper is not switched on yet. Trying again will not help - contact GrowthOS support.",
-      "provider_billing": "The AI service stopped because its account is out of credit. Ask your account admin to top it up, then try again.",
+      "provider_billing": "The AI helper is not available because of a problem on our side, not yours. Trying again will not help - please contact GrowthOS support.",
       "rate_limited": "The AI service is too busy right now. Try again in a minute.",
       "refused": "The AI declined this request. Rephrase what the ad is about and try again.",
       "invalid_output": "The AI returned an answer that could not be used. Try again.",
       "provider_error": "The AI service had a problem on its side, not yours. Wait a minute and try again."
     },
     "quotaExceeded": "You have used today's AI allowance ({used} of {limit}). It starts again tomorrow, or a project admin can raise it in the studio settings.",
+    "videoQuotaExceeded": "You have used today's video allowance ({used} of {limit} seconds of video). It starts again tomorrow, or a project admin can raise it in the studio settings.",
     "errorInvalidBrief": "Check what the ad is about: {reasons}",
     "briefIssues": {
       "name": "Give the ad a short name (up to 120 characters).",
@@ -4211,6 +4224,7 @@
       "image_edit": "Image edit",
       "video_qa": "AI video check",
       "vocalize": "Narration vowel marks",
+      "vocalize_check": "Vowel marks check",
       "reference_image": "Scene illustration",
       "ad_copy": "Ad text",
       "search_ad": "Search ad",
@@ -4312,7 +4326,10 @@
       "assembleAnyway": "Assemble anyway",
       "inVideo": "In the video",
       "useInVideo": "Use in the video",
-      "chosen": "This version will be used in the video. Assemble again to apply it."
+      "chosen": "This version will be used in the video. Assemble again to apply it.",
+      "retry": "Try again",
+      "assemblingHint": "Putting the video together - usually under a minute. You can leave this page. If it does not finish, it is stopped and you can try again.",
+      "slowHint": "This is taking longer than usual. If it is not ready within {minutes} minutes it is stopped and you can try again."
     },
     "clipFailure": {
       "not_configured": "making video is not switched on yet",
@@ -4801,8 +4818,8 @@
       "otherCountry": "Other (code)",
       "removeCountry": "Remove {country}",
       "variantsTitle": "Try more versions of this ad",
-      "variantsHint": "Each one becomes another switched-off ad next to the first, with its own saved text, so Facebook and Instagram (Meta) can show them both and you can see which works better.",
-      "doneVariants": "Created {count} switched-off ads together on {destination}.{failed, plural, =0 {} one { # variant could not be created.} other { # variants could not be created.}}"
+      "variantsHint": "Each one becomes another switched-off ad next to the first, with its own saved text, so Facebook and Instagram can show them both and you can see which works better.",
+      "doneVariants": "Created {count} switched-off ads together on {destination}.{failed, plural, =0 {} one { # extra ad could not be created.} other { # extra ads could not be created.}}"
     },
     "imageFailure": {
       "not_configured": "making pictures is not switched on yet",
@@ -4827,7 +4844,10 @@
         "1K": "1K - drafts",
         "2K": "2K - recommended"
       },
-      "qaRetriesImagesHint": "Images get at least 2 guided re-renders when re-renders are on: an image costs a fraction of a clip, and each retry is told what to fix."
+      "qaRetriesImagesHint": "Images get at least 2 guided re-renders when re-renders are on: an image costs a fraction of a clip, and each retry is told what to fix.",
+      "videoBannerTitle": "Brand banner on videos",
+      "videoBannerEnabled": "Show the logo, business name and slogan along the bottom of every assembled video",
+      "videoBannerHint": "The footage fills the whole frame and stays free of text; the banner is the only text on the video. Applies to videos assembled from now on."
     },
     "pronunciation": "Pronunciation (with Hebrew vowel marks)",
     "pronunciationAuto": "Added automatically when you save: the same words with full Hebrew vowel marks (nikud) and numbers written as words, so the AI narrator reads them right.",
@@ -4968,6 +4988,28 @@
     "nikud": {
       "add": "Add vowel marks",
       "adding": "Adding vowel marks…"
+    },
+    "narrationMode": {
+      "title": "Who narrates the video",
+      "hint": "One choice for the whole ad, so the narration never switches to someone else mid-video.",
+      "modes": {
+        "auto": "Automatic",
+        "voiceover": "Voice-over in the background",
+        "on_camera": "A presenter on camera",
+        "mixed": "Mixed - per scene"
+      },
+      "autoNow": "Decided from what you wrote about the ad when the script is written. Now: {mode}.",
+      "explain": {
+        "voiceover": "A narrator is heard but never seen - no one in the shot speaks.",
+        "on_camera": "The same person speaks to the camera in every scene with narration.",
+        "mixed": "Choose in the script, scene by scene, who says the narration."
+      },
+      "presenterLabel": "Who is the presenter (optional)",
+      "presenterPlaceholder": "e.g. a woman in her 30s in a navy blazer",
+      "save": "Save",
+      "saved": "Saved. Changed scenes need a new clip.",
+      "outOfDateNote": "Scenes whose speaker changes become out of date.",
+      "inScript": "Who speaks is set for the whole ad (in the video tab): {mode}"
     },
     "speaker": {
       "label": "Who says the narration",
@@ -5608,8 +5650,8 @@
     },
     "platforms": {
       "meta_ads": {
-        "name": "Facebook & Instagram (Meta)",
-        "why": "Publish image and video ads to Facebook and Instagram, and plan audiences with Meta's reach numbers.",
+        "name": "Facebook & Instagram",
+        "why": "Publish image and video ads to Facebook and Instagram, and plan audiences using Facebook's estimates of how many people you can reach.",
         "oauth": "Connect with Facebook",
         "oauthHint": "The easiest way: sign in to Facebook, then pick the ad account and the Page.",
         "manual": "Or enter the details by hand",
@@ -5680,7 +5722,7 @@
       "session_expired": "This connection attempt expired. Start again.",
       "wrong_user": "Someone else started this connection attempt. Start your own.",
       "not_authorized": "Facebook has not returned yet for this attempt. Start again.",
-      "exchange_failed": "Facebook refused the login. Start again, and check the app settings if it repeats.",
+      "exchange_failed": "Facebook did not accept the login. Start again; if it keeps happening, contact GrowthOS support.",
       "invalid_choice": "Pick an ad account and a Page from the list.",
       "no_ad_accounts": "This Facebook login has no ad accounts. Log in with the account that manages your ads.",
       "project_not_found": "That project was not found in this organization.",
@@ -6058,7 +6100,7 @@
       "slow": "The site took too long to answer. Try again in a few minutes, or try another page of your site.",
       "looping": "The address keeps sending visitors in a circle, so we could not reach a page. Open your site in a browser and copy the address you end up on.",
       "blocked": "That address is not a public website page, so we did not read it. Enter your website address, like example.com.",
-      "unreadable": "The page has no text we can read (it may be built only from images or scripts). Try the page that lists what you sell.",
+      "unreadable": "The page has no text we can read (it may be made only of pictures, or show its words in a way we cannot read). Try the page that lists what you sell.",
       "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
       "nothing_found": "We read the site but found nothing to promote. Try the page that lists what you sell.",
       "unavailable": "The AI service was not available on our side. Try again in a few minutes - if it keeps happening, contact GrowthOS support.",
@@ -6093,7 +6135,8 @@
         "target": "Approve and the AI starts making ads, a web page for the people who click them and a list of who to reach. Nothing goes live yet.",
         "ads": "Approve to keep these ads. They are not published yet - you will be asked before anything is sent.",
         "landing": "Approve and the page goes online at a public address that anyone with the link can open.",
-        "audience": "Approve to show the ads to these people. Nothing is published yet."
+        "audience": "Approve to show the ads to these people. Nothing is published yet.",
+        "audienceLive": "Approve and the live ads reach these people instead. Whether they are on or off stays as it is."
       },
       "change": "Ask for a change",
       "changePlaceholder": "What should change? For example: only small offices in Tel Aviv",
@@ -6102,7 +6145,9 @@
       "revising": "The AI is updating this proposal...",
       "asked": "You asked: {text}",
       "changeFailed": "The AI could not make that change ({reason}). The proposal is unchanged.",
-      "for": "For"
+      "for": "For",
+      "readOnly": "You can see this, but only someone who can use the AI in this project can decide on it.",
+      "rejectHintAudienceLive": "Not right? Reject it - the live ads keep the people they reach now."
     },
     "kind": {
       "product": "Product",
@@ -6153,7 +6198,11 @@
         "audience_failed": "Could not work out who to reach for {subject}",
         "ads_published": "{count, plural, one {Sent # switched-off ad to Facebook and Instagram} other {Sent # switched-off ads to Facebook and Instagram}} for {subject}",
         "publish_failed": "Could not publish the ads for {subject}",
-        "ads_activated": "You turned on the ads for {subject}"
+        "ads_activated": "You turned on the ads for {subject}",
+        "budget_changed": "You set the daily budget for {subject} to {budget}",
+        "budget_change_failed": "Could not change the daily budget for {subject}",
+        "audience_applied": "You changed who the live ads for {subject} reach",
+        "audience_apply_failed": "Could not change who the live ads for {subject} reach"
       }
     },
     "errors": {
@@ -6167,13 +6216,18 @@
       "not_ready": "We are still reading your site. Give it a minute, then try again.",
       "not_found": "We could not find that any more. Reload the page to see the latest.",
       "generic": "We could not do that just now, and nothing was changed. Try again in a minute. If it keeps happening, reload the page.",
-      "invalid_budget": "Enter a daily budget above zero.",
+      "invalid_budget": "Enter a daily budget from 1 to 100,000.",
       "automationOpen": "Open AI helper",
       "automation_stopped": "Automation is paused for your organization, so nothing can go out. Open AI helper and choose Resume automation, then try again.",
       "meta_unavailable": "We cannot reach your Facebook & Instagram ad account yet. Connect it in Ad platform connections (it takes a couple of minutes), then try again.",
       "unauthorized": "You were signed out. Reload the page and sign in again - nothing was lost.",
       "forbidden": "You do not have permission to make this change in this project. Ask the project owner to give you access, then try again.",
-      "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost."
+      "offline": "We could not reach GrowthOS. Check your internet connection and try again - nothing was lost.",
+      "not_changeable": "This part cannot be changed right now - it may still be in the making. Reload the page to see where it stands.",
+      "video_unavailable": "Video ads are not available on our side yet, so a video cannot be made. Please contact GrowthOS support.",
+      "not_live": "These ads are not on Facebook and Instagram any more. Reload the page to see the latest.",
+      "platform_failed": "Facebook and Instagram did not accept the change, so nothing changed. Try again in a minute, or make it in Facebook Ads Manager.",
+      "invalid_thresholds": "Some values are out of range. Fix the highlighted fields and save again."
     },
     "ads": {
       "title": "Ads for {name}",
@@ -6203,7 +6257,8 @@
         "rejected": "You rejected the web page",
         "failed": "The web page could not be written ({reason})",
         "open": "Open"
-      }
+      },
+      "explainChange": "New words for your live web page. The page keeps its current words until you approve these."
     },
     "audience": {
       "title": "Who will see the ads for {name}",
@@ -6214,7 +6269,7 @@
         "female": "Women"
       },
       "reach": "Facebook and Instagram estimate {lower}-{upper} people a month",
-      "metaMissing": "Connect your Facebook and Instagram (Meta) ad account to see how many people the ads can reach and to match what they care about. Until then, the ads use the countries, ages and genders above.",
+      "metaMissing": "Connect your Facebook and Instagram ad account to see how many people the ads can reach and to match what they care about. Until then, the ads use the countries, ages and genders above.",
       "metaFailed": "Facebook and Instagram did not answer, so we could not match what these people care about yet. You can approve the rest now.",
       "revising": "The AI is updating who the ads reach...",
       "changePlaceholder": "Who should the ads reach? For example: only women 30-45, add accountants",
@@ -6223,12 +6278,14 @@
         "approved": "Approved - the ads will be shown to these people once you publish them",
         "rejected": "You rejected these people",
         "failed": "We could not work out who to reach ({reason})"
-      }
+      },
+      "liveExplain": "These ads are already on Facebook and Instagram. Approving changes who the live ads reach right away. Facebook and Instagram may need a few days to adjust to the new group, so results can dip for a while.",
+      "applyLive": "Apply to the live ads"
     },
     "publish": {
       "title": "Publish the ads for {name}",
       "activateTitle": "Turn on the ads for {name}",
-      "description": "{count, plural, one {The approved image goes to Facebook and Instagram (Meta) as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram (Meta) as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
+      "description": "{count, plural, one {The approved image goes to Facebook and Instagram as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
       "activateDescription": "The ads are on Facebook and Instagram, switched off. Turning them on makes them visible and starts spending - up to {budget} a day in your ad account currency.",
       "link": "The page people open after clicking",
       "countries": "Countries",
@@ -6239,7 +6296,7 @@
       "approve": "Publish (switched off)",
       "activate": "Turn on the ads",
       "status": {
-        "needs_meta": "Ready to publish once your Facebook and Instagram (Meta) ad account is connected.",
+        "needs_meta": "Ready to publish once your Facebook and Instagram ad account is connected.",
         "ready": "Publishing waits for your approval",
         "published": "On Facebook and Instagram, switched off - not showing to anyone",
         "running": "Ads are running",
@@ -6247,7 +6304,8 @@
         "failed": "Publishing failed ({reason}). No ad was switched on, so nothing was spent.",
         "connect": "Connect Facebook and Instagram",
         "turnOnWaiting": "When you are ready, turn them on in the \"Turn on the ads\" card waiting for your approval.",
-        "turnOnDeclined": "The ads stay switched off and nothing is spent. When you want them on, turn them on in your Facebook and Instagram ad account."
+        "turnOnDeclined": "The ads stay switched off and nothing is spent. When you want them on, turn them on in your Facebook and Instagram ad account.",
+        "adsManager": "Open in Facebook Ads Manager"
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",
       "confirmCancel": "Not yet"
@@ -6258,7 +6316,8 @@
       "days": "Last {count} days",
       "loading": "Reading the numbers from Facebook and Instagram...",
       "unavailable": "Facebook and Instagram did not return the numbers right now. Try again in a few minutes.",
-      "unavailableMeta": "Connect your Facebook and Instagram (Meta) ad account to see how the ads are doing.",
+      "retry": "Try again",
+      "unavailableMeta": "Connect your Facebook and Instagram ad account to see how the ads are doing.",
       "noDelivery": "The ads have not been shown yet in this period - switched-off ads show no results until you turn them on.",
       "chart": "Clicks, sign-ups and sales per day",
       "ctr": "{value} of the people who saw an ad clicked it",
@@ -6318,6 +6377,331 @@
       "timed_out": "it took too long and was given up, ask for a change to try again",
       "no_concepts": "the AI could not come up with ideas for this, ask for a change worded differently",
       "generic": "something went wrong, try again in a minute"
+    },
+    "overview": {
+      "title": "Where things stand",
+      "percent": "{percent}%",
+      "progressLabel": "Overall progress",
+      "explain": "Across {count, plural, one {the # item} other {the # items}} the pilot is promoting for you.",
+      "counts": {
+        "done": "{count, plural, one {step done} other {steps done}}",
+        "inProgress": "in progress",
+        "waiting": "{count, plural, one {decision waits for you} other {decisions wait for you}}"
+      },
+      "nextTitle": "What to do next",
+      "next": {
+        "target": "Say yes or no to a new idea: {name}",
+        "ads": "Look at the ads made for {name}",
+        "audience": "Check who will see the ads for {name}",
+        "landing_page": "Look at the web page for {name}",
+        "publish": "Decide whether to publish the ads for {name}",
+        "activate": "Decide whether to turn on the ads for {name}",
+        "connect_meta": "Connect your Facebook & Instagram ad account so the ads for {name} can be published"
+      },
+      "go": "Go to it",
+      "connect": "Connect",
+      "nextWorking": "Nothing waits for you right now - the pilot is working on the next step.",
+      "nextNone": "Nothing waits for you right now."
+    },
+    "detail": {
+      "open": "Details and progress",
+      "back": "Back to Growth Pilot",
+      "paused": "Pilot paused",
+      "percent": "{percent}%",
+      "progressLabel": "Progress",
+      "progressTitle": "How far it got",
+      "progressExplain": "{done} of {total} steps done. Steps that do not apply to this item are not counted.",
+      "missing": {
+        "title": "This item is not here any more",
+        "body": "It may belong to an earlier start of Growth Pilot. Go back to see what the pilot is promoting now."
+      },
+      "stages": {
+        "idea": "Idea approved",
+        "audience": "Who sees the ads",
+        "landing": "Web page",
+        "images": "Ad images",
+        "video": "Video ad",
+        "published": "Ads sent to Facebook & Instagram (still off)",
+        "live": "Ads turned on",
+        "results": "Collecting results"
+      },
+      "states": {
+        "done": "Done",
+        "in_progress": "The pilot is working on it",
+        "waiting": "Waiting for you",
+        "failed": "Did not work",
+        "failedWhy": "Did not work: {reason}",
+        "declined": "You said no",
+        "not_started": "Not started yet",
+        "skipped": "Not needed for this item"
+      },
+      "stepsTitle": "All the steps",
+      "waitingTitle": "Waiting for you",
+      "waitingNone": "Nothing waits for you on this item right now.",
+      "needsMeta": "The ads are ready to publish. Connect your Facebook & Instagram ad account to continue.",
+      "inProgressTitle": "In progress",
+      "inProgressNone": "Nothing is running for this item right now.",
+      "inProgressPaused": "The pilot is paused, so nothing runs. Resume it on the Growth Pilot page to continue.",
+      "inProgress": {
+        "idea": "The AI is updating this idea the way you asked.",
+        "audience": "The AI is choosing who should see the ads.",
+        "landing": "The AI is writing the web page people see after they click.",
+        "images": "The AI is making the ad images and checking them.",
+        "video": "The AI is making a short video ad.",
+        "published": "The ads are being sent to Facebook and Instagram.",
+        "live": "The ads are being turned on.",
+        "results": "The ads are running. Facebook usually reports the first numbers within a day."
+      },
+      "inProgressChange": "You asked for a change to the {area}: \"{text}\". The pilot is working on it.",
+      "doneTitle": "Done",
+      "doneNone": "Nothing is finished yet - it shows up here step by step.",
+      "done": {
+        "idea": "Idea approved",
+        "audience": "Who sees the ads",
+        "landing": "Web page",
+        "images": "Ad images",
+        "video": "Video ad",
+        "published": "Ads sent to Facebook & Instagram (still off)",
+        "live": "Ads turned on",
+        "results": "Collecting results"
+      },
+      "doneLink": {
+        "audience": "See it in the Ad Studio",
+        "landing": "Open the page",
+        "images": "See the ads",
+        "video": "See the video",
+        "published": "See the published ads"
+      },
+      "resultsTitle": "Results in the last 30 days",
+      "results": {
+        "clicks": "Clicks",
+        "impressions": "Times shown",
+        "spend": "Spent",
+        "conversions": "Sign-ups or sales"
+      },
+      "resultsNote": "The numbers come straight from Facebook and Instagram. Money is shown in your ad account's currency.",
+      "moreTitle": "What else can be done",
+      "actions": {
+        "turnOn": {
+          "title": "Turn on the ads",
+          "why": "Until they are on, nobody sees them. You set the daily budget, and you can turn them off at any time."
+        },
+        "publish": {
+          "title": "Publish the ads",
+          "why": "Sends the ads to Facebook and Instagram, switched off - nothing is spent yet."
+        },
+        "connectMeta": {
+          "title": "Connect your ad account",
+          "why": "Needed once, so the pilot can publish ads on Facebook and Instagram for you."
+        },
+        "makeVideo": {
+          "title": "Make a video ad",
+          "why": "Short videos often reach more people than images. The pilot makes one from your ads."
+        },
+        "askChange": {
+          "title": "Ask for a change",
+          "why": "Not happy with something? Say it in your own words and the pilot redoes it."
+        },
+        "viewPage": {
+          "title": "Open the web page",
+          "why": "See exactly what people see after they click your ad."
+        },
+        "openStudio": {
+          "title": "Open in the Ad Studio",
+          "why": "For fine-tuning the ads yourself, word by word."
+        },
+        "adsManager": {
+          "title": "Open in Facebook Ads Manager",
+          "why": "See and manage these ads where Facebook and Instagram run them."
+        },
+        "thresholds": {
+          "title": "Suggestion settings",
+          "why": "Choose when the pilot suggests changes, for every item in this project."
+        }
+      },
+      "suggestionsTitle": "Suggestions for changes",
+      "suggestionApply": "Do it",
+      "suggestionDismiss": "Not now",
+      "suggestions": {
+        "no_clicks": {
+          "title": "Try a new headline and picture",
+          "why": "People saw the ads for a few days but nobody clicked. A clearer headline and a different picture often fix that.",
+          "request": "Nobody clicks on these ads. Write a clearer, more direct headline and use a different picture that shows the main benefit."
+        },
+        "low_ctr": {
+          "title": "Make the ads speak more directly",
+          "why": "Many people saw the ads but very few clicked. A sharper message usually gets more clicks.",
+          "request": "Very few people click on these ads. Make the headline shorter and more direct, and lead with the main benefit."
+        },
+        "no_conversions": {
+          "title": "Make the web page clearer",
+          "why": "People click the ads but nobody signs up or buys. The page may not say clearly enough what to do next.",
+          "request": "People arrive but nobody signs up or buys. Make the headline and the main button clearer, and put the main benefit first."
+        },
+        "add_video": {
+          "title": "Add a video ad",
+          "why": "There is no video ad yet. Short videos often reach more people than images."
+        },
+        "retry_video": {
+          "title": "Try the video again",
+          "why": "The last video could not be made. Trying again often works."
+        },
+        "ads_failed": {
+          "title": "Make the ads again",
+          "why": "The ads could not be made last time. The pilot can try again.",
+          "request": "Make the ads again."
+        },
+        "ads_declined": {
+          "title": "Get new ads",
+          "why": "You said no to the last ads. The pilot can make different ones.",
+          "request": "Make different ads with new pictures and new headlines."
+        },
+        "landing_failed": {
+          "title": "Write the web page again",
+          "why": "The page could not be written last time. The pilot can try again.",
+          "request": "Write the page again."
+        },
+        "landing_declined": {
+          "title": "Get a different web page",
+          "why": "You said no to the last page. Without one, the ads send people to your site.",
+          "request": "Write a different page with a new headline and a clearer button."
+        },
+        "audience_failed": {
+          "title": "Choose who sees the ads again",
+          "why": "The audience could not be chosen last time. The pilot can try again.",
+          "request": "Choose the audience again."
+        },
+        "raise_budget": {
+          "title": "Raise the daily budget",
+          "why": "People click and sign up or buy, and the ads spend nearly all of their budget every day. A bigger budget can reach more people like them.",
+          "request": "Raise the daily budget."
+        }
+      },
+      "areas": {
+        "ads": "ads",
+        "landing": "web page",
+        "audience": "audience"
+      },
+      "change": {
+        "title": "Ask for a change",
+        "hint": "Tell the pilot what to change in your own words. It redoes that part and shows it to you before anything goes live.",
+        "which": "What should change?",
+        "areaLabel": {
+          "ads": "Ads",
+          "landing": "Web page",
+          "audience": "Audience"
+        },
+        "areaHint": {
+          "ads": "New pictures and words for the ads. If your ads are already running, they keep running until you approve the new ones.",
+          "landing": "New words for the web page. A live page keeps its current words until you approve the new ones.",
+          "audience": "Who should see the ads: places, ages, interests. If your ads are already on Facebook and Instagram, they keep reaching the same people until you approve the new audience."
+        },
+        "placeholder": {
+          "ads": "For example: brighter pictures, mention the free trial",
+          "landing": "For example: a shorter headline, put the price lower down",
+          "audience": "For example: only women 30-45 in Tel Aviv"
+        },
+        "send": "Send to the pilot",
+        "sent": "Sent. The pilot is on it - you will see the result here.",
+        "unavailable": "Nothing can be changed right now - the pilot is still making the parts, or a change is already on its way.",
+        "notActive": "Approve this idea first; then you can ask for changes.",
+        "history": "What you asked for",
+        "outcome": {
+          "pending": "The pilot is working on it",
+          "done": "Done - waiting for your decision above, or already decided",
+          "failed": "Did not work: {reason}"
+        }
+      },
+      "readOnly": "You can see this item, but only someone who can use the AI in this project can decide or ask for changes.",
+      "activityTitle": "What happened with this item",
+      "budget": {
+        "title": "Daily budget",
+        "perDay": "{amount} a day",
+        "unknown": "Not known yet",
+        "accountCurrency": "In your ad account currency",
+        "needsOwner": "Only someone who may publish ads in this project can change the budget.",
+        "change": "Change budget",
+        "newAmount": "New daily budget",
+        "hint": "The most Facebook and Instagram will spend on these ads each day. You confirm it on the next step.",
+        "invalid": "Enter an amount from {min} to {max}.",
+        "unchanged": "That is the budget now.",
+        "review": "Review the change",
+        "cancel": "Cancel",
+        "confirmTitle": "Set the daily budget to {amount}?",
+        "confirmBody": "Facebook and Instagram will spend up to this amount in {currency} every day the ads run, starting now. You can change it again at any time.",
+        "confirmBodyNoCurrency": "Facebook and Instagram will spend up to this amount, in your ad account currency, every day the ads run, starting now. You can change it again at any time.",
+        "confirmYes": "Yes, set {amount} a day",
+        "confirmBack": "Back"
+      },
+      "thresholdsLink": "Change when the pilot makes these suggestions",
+      "adsManagerLink": "Open in Facebook Ads Manager"
+    },
+    "settings": {
+      "metaTitle": "Growth Pilot suggestion settings",
+      "title": "When the pilot makes suggestions",
+      "intro": "The pilot looks at how each item's ads are doing and suggests what to change. These numbers decide when. Leave a field empty to use the default.",
+      "back": "Back to Growth Pilot",
+      "thisProject": "This project",
+      "defaultValue": "Default: {value}",
+      "range": "From {min} to {max}",
+      "usingDefaults": "This project uses the defaults.",
+      "customized": "This project has its own values. Last changed {date}.",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved. New suggestions use these values.",
+      "reset": "Reset to defaults",
+      "resetDone": "Back on the defaults.",
+      "invalid": "Fix the highlighted fields: each value must be within its range.",
+      "failed": "We could not save that just now, and nothing was changed. Try again in a minute.",
+      "groupResults": "When results say the ads or the page need work",
+      "groupBudget": "When to suggest a bigger budget",
+      "fields": {
+        "noClicksAfterDays": {
+          "label": "Days on before \"nobody clicks\" counts",
+          "help": "Ads that are on for fewer days than this are not judged on clicks yet."
+        },
+        "noClicksMinImpressions": {
+          "label": "Times shown before \"nobody clicks\" counts",
+          "help": "With fewer views than this, no clicks is still too early to judge."
+        },
+        "lowCtr": {
+          "label": "Low share of clicks (%)",
+          "help": "Below this share of people who see the ad and click, the pilot suggests a clearer ad."
+        },
+        "lowCtrMinImpressions": {
+          "label": "Times shown before the share of clicks is judged",
+          "help": "The share of clicks is only judged once the ads were shown at least this many times."
+        },
+        "noConversionsMinClicks": {
+          "label": "Clicks with no result before the web page is suspected",
+          "help": "After this many clicks and no sign-up or purchase, the pilot suggests a clearer web page."
+        },
+        "raiseBudgetAfterDays": {
+          "label": "Days on before more budget is suggested",
+          "help": "More budget is only suggested after the ads have been on at least this many days."
+        },
+        "raiseBudgetMinCtr": {
+          "label": "Good share of clicks for more budget (%)",
+          "help": "More budget is only suggested when at least this share of people who see the ad click it."
+        },
+        "raiseBudgetMinConversions": {
+          "label": "Results needed for more budget",
+          "help": "Sign-ups or purchases from the ads needed before more budget is suggested."
+        },
+        "raiseBudgetSpendShare": {
+          "label": "Share of the daily budget spent (%)",
+          "help": "When the ads spend at least this share of their daily budget on average, the budget is what holds them back."
+        }
+      },
+      "operatorTitle": "Default suggestion settings",
+      "operatorIntro": "Every project starts from these values. A project's admins can set their own on its Growth Pilot settings page.",
+      "operatorBack": "Back to all pilots",
+      "operatorCustomized": "Changed from the built-in values. Last changed {date}.",
+      "operatorUsingBuiltIn": "Using the built-in values.",
+      "history": "Recent changes",
+      "historyEntry": "{date} - {count, plural, one {# value set} other {# values set}}",
+      "historyEmpty": "No changes yet.",
+      "operatorLink": "Suggestion settings"
     }
   },
   "ErrorPage": {
@@ -6383,6 +6767,209 @@
       "empty": "No finished ads to show yet. Check back soon.",
       "inactiveTitle": "This link is no longer active",
       "inactiveBody": "It may have expired or been turned off. Ask whoever sent it for a new link."
+    }
+  },
+  "PushNotifications": {
+    "metaTitle": "Notifications & app",
+    "eyebrow": "Your account",
+    "title": "Notifications & app",
+    "intro": "Get told on your phone or computer when something needs you: ideas and ads waiting for your approval, ads and videos that are ready, publishing results, and anything that failed.",
+    "backToDashboard": "Back to my account",
+    "menuLink": "Notifications & app",
+    "dashboardLink": "Notifications & app",
+    "prompt": {
+      "region": "Turn on notifications",
+      "title": "Turn on notifications?",
+      "body": "Hear right away when something waits for your approval, when ads and videos are ready, and when something fails.",
+      "enable": "Turn on",
+      "notNow": "Not now",
+      "enabled": "Notifications are on for this device.",
+      "blocked": "The browser blocked notifications. You can allow them again in the browser's site settings.",
+      "failed": "Notifications could not be turned on. Try again from Notifications & app in your account.",
+      "iosTitle": "Notifications on your iPhone",
+      "iosBody": "On iPhone and iPad, notifications work once GrowthOS is on your home screen: tap Share, then Add to Home Screen, and open it from there."
+    },
+    "status": {
+      "title": "This device",
+      "description": "What this browser allows, and whether it gets notifications.",
+      "notConfigured": "Notifications are not set up on this site yet. Everything else works as usual.",
+      "unsupported": "This browser can't show notifications from websites.",
+      "permissionLabel": "Browser permission",
+      "permission": {
+        "default": "Not asked yet",
+        "granted": "Allowed",
+        "denied": "Blocked",
+        "unsupported": "Not available"
+      },
+      "deviceLabel": "On this device",
+      "deviceOn": "Notifications on",
+      "deviceOff": "Notifications off",
+      "enableButton": "Turn on notifications",
+      "disableButton": "Turn off on this device",
+      "deniedHelp": "Notifications are blocked for this site. To allow them again, open the browser's site settings (the lock icon next to the address), set Notifications to Allow, and reload the page.",
+      "enabledToast": "Notifications are on for this device.",
+      "disabledToast": "Notifications are off for this device.",
+      "failedToast": "Notifications could not be changed. Try again."
+    },
+    "install": {
+      "title": "Install the app",
+      "description": "Open GrowthOS from your home screen or dock, like any other app.",
+      "button": "Install app",
+      "installed": "GrowthOS is installed on this device.",
+      "iosSteps": "On iPhone or iPad: in Safari, tap Share, then Add to Home Screen.",
+      "iosPushNote": "On iPhone and iPad, notifications only work in the installed app: add it to your home screen, open it from there, and turn notifications on.",
+      "unavailable": "To install, open your browser's menu and look for Install app or Add to Home Screen."
+    },
+    "preferences": {
+      "title": "What to tell you about",
+      "description": "These choices apply to all your devices.",
+      "master": "All notifications",
+      "masterHint": "Off stops every notification on all your devices.",
+      "categories": {
+        "approvals": {
+          "label": "Waiting for your approval",
+          "hint": "Ideas, web pages, audiences and plans that need your OK."
+        },
+        "ready": {
+          "label": "Ads and videos ready",
+          "hint": "Ads, images and videos that finished being made."
+        },
+        "publishing": {
+          "label": "Publishing results",
+          "hint": "Ads that were published or turned on, and web pages that went live."
+        },
+        "failures": {
+          "label": "Problems",
+          "hint": "Anything that did not work and needs you."
+        }
+      },
+      "saved": "Saved.",
+      "failed": "Your choice could not be saved. Try again."
+    },
+    "devices": {
+      "title": "Your devices",
+      "description": "Every browser that gets notifications. Remove one you no longer use.",
+      "empty": "No device gets notifications yet.",
+      "current": "This device",
+      "added": "Added {date}",
+      "lastUsed": "Last notified {date}",
+      "unnamed": "Unknown device",
+      "remove": "Remove",
+      "removeLabel": "Remove {device}",
+      "removed": "The device was removed.",
+      "removeFailed": "The device could not be removed. Try again."
+    },
+    "test": {
+      "button": "Send a test notification",
+      "sent": "Test sent. It should appear in a few seconds.",
+      "noDevices": "Turn on notifications on a device first.",
+      "failed": "The test notification could not be sent."
+    },
+    "testNotification": {
+      "title": "GrowthOS notifications work",
+      "body": "This is how you'll hear when something needs you."
+    },
+    "fallback": {
+      "title": "Update in {project}",
+      "body": "Something changed in {project}. Open it to see."
+    },
+    "events": {
+      "growth_pilot": {
+        "targets_proposed": {
+          "title": "New ideas to approve",
+          "body": "Growth Pilot suggested {count, plural, one {# thing} other {# things}} to grow in {project}."
+        },
+        "proposal_revised": {
+          "title": "A change is ready to review",
+          "body": "{subject} was rewritten as you asked, in {project}."
+        },
+        "landing_ready": {
+          "title": "Web page waiting for approval",
+          "body": "A web page for {subject} is waiting for your approval in {project}."
+        },
+        "audience_ready": {
+          "title": "Audience waiting for approval",
+          "body": "An audience for {subject} is waiting for your approval in {project}."
+        },
+        "ads_ready": {
+          "title": "Ads ready",
+          "body": "New ads for {subject} are ready to review in {project}."
+        },
+        "video_ready": {
+          "title": "Video ad ready",
+          "body": "The video ad for {subject} is ready in {project}."
+        },
+        "ads_published": {
+          "title": "Ads published",
+          "body": "The ads for {subject} were sent to the ad platform, still paused, in {project}."
+        },
+        "landing_published": {
+          "title": "Web page live",
+          "body": "The web page for {subject} is live in {project}."
+        },
+        "ads_activated": {
+          "title": "Ads running",
+          "body": "The ads for {subject} are running now in {project}."
+        },
+        "analysis_failed": {
+          "title": "Your website could not be read",
+          "body": "Growth Pilot could not read the website for {project}. Open it to see what to do."
+        },
+        "revision_failed": {
+          "title": "The change was not made",
+          "body": "The change to {subject} could not be made in {project}."
+        },
+        "ads_failed": {
+          "title": "Ads were not made",
+          "body": "The ads for {subject} could not be made in {project}. Open it to see why."
+        },
+        "video_failed": {
+          "title": "Video ad was not made",
+          "body": "The video ad for {subject} could not be made in {project}."
+        },
+        "landing_failed": {
+          "title": "Web page was not written",
+          "body": "The web page for {subject} could not be written in {project}."
+        },
+        "audience_failed": {
+          "title": "Audience was not built",
+          "body": "An audience for {subject} could not be built in {project}."
+        },
+        "publish_failed": {
+          "title": "Publishing failed",
+          "body": "The ads for {subject} could not be published in {project}. Open it to see why."
+        },
+        "budget_changed": {
+          "title": "Daily budget changed",
+          "body": "The daily budget for {subject} is now {count} in {project}."
+        },
+        "audience_applied": {
+          "title": "Audience changed",
+          "body": "The live ads for {subject} reach a new audience in {project}."
+        },
+        "budget_change_failed": {
+          "title": "Budget not changed",
+          "body": "The daily budget for {subject} could not be changed in {project}."
+        },
+        "audience_apply_failed": {
+          "title": "Audience not changed",
+          "body": "Who the live ads for {subject} reach could not be changed in {project}."
+        }
+      },
+      "ad_studio": {
+        "run_awaiting_approval": {
+          "title": "Plan waiting for your OK",
+          "body": "The plan for {subject} in {project} is waiting for your OK before images and video are made."
+        },
+        "run_done": {
+          "title": "Ads ready",
+          "body": "The images and video for {subject} are ready in {project}."
+        },
+        "run_failed": {
+          "title": "Ads were not finished",
+          "body": "Making {subject} in {project} stopped. Open it to see why."
+        }
+      }
     }
   }
 }
