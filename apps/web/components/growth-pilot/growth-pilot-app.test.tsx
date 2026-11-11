@@ -603,6 +603,18 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByText(/reconnect your ad account in Ad platform connections/)).toBeInTheDocument();
     });
 
+    it('says what to do when the saved Facebook login is incomplete instead of "try again"', () => {
+      const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'invalid_credential', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
+      const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
+      expect(view.container).toHaveTextContent('login looks incomplete or wrong, save the connection again in Ad platform connections');
+      expect(view.container).not.toHaveTextContent('something went wrong');
+      expect(view.container).not.toHaveTextContent('invalid_credential');
+      view.unmount();
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'he' });
+      expect(he.container).toHaveTextContent('נראים חסרים או שגויים');
+      expect(he.container).not.toHaveTextContent('invalid_credential');
+    });
+
     it('does not blame the daily AI limit when the ad platform rate-limits a publish', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'quota_exceeded', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
