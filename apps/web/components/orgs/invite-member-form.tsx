@@ -12,6 +12,15 @@ const ALL_INVITE_ROLES: readonly InviteRole[] = [
   ...invitableRolesForScope('project'),
 ];
 
+// Deliberately loose: one @ and a dot in the domain. The server is the real check.
+const LOOKS_LIKE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const ERROR_KEY = {
+  bad_email: 'inviteErrorBadEmail',
+  already_member: 'inviteErrorAlreadyMember',
+  failed: 'inviteError',
+} as const;
+
 export interface InviteMemberFormProject {
   id: string;
   name: string;
@@ -37,7 +46,7 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
   const [role, setRole] = useState<InviteRole>('viewer');
   const [projectId, setProjectId] = useState(administeredProjects[0]?.id ?? '');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<'bad_email' | 'already_member' | 'failed' | null>(null);
 
   const projectScoped = isProjectInvitableRole(role);
   const canSubmit = !projectScoped || (administeredProjects.length > 0 && projectId.length > 0);
@@ -47,7 +56,11 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
     if (!canSubmit) {
       return;
     }
-    setError(false);
+    if (!LOOKS_LIKE_EMAIL.test(email.trim())) {
+      setError('bad_email');
+      return;
+    }
+    setError(null);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/invites`, {
@@ -56,11 +69,13 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
         body: JSON.stringify(projectScoped ? { email, role, projectId } : { email, role }),
       });
       if (!response.ok) {
-        setError(true);
+        setError(response.status === 409 ? 'already_member' : 'failed');
         return;
       }
       setEmail('');
       router.refresh();
+    } catch {
+      setError('failed');
     } finally {
       setSubmitting(false);
     }
@@ -128,9 +143,9 @@ export function InviteMemberForm({ orgId, administeredProjects }: InviteMemberFo
       <Button type="submit" disabled={submitting || !canSubmit}>
         {t('invite')}
       </Button>
-      {error ? (
+      {error !== null ? (
         <p role="alert" className="w-full text-sm text-destructive">
-          {t('inviteError')}
+          {t(ERROR_KEY[error])}
         </p>
       ) : null}
     </form>
