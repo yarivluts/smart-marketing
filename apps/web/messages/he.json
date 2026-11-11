@@ -469,8 +469,8 @@
     "nonProdNotice": "מוצגים נתוני {environment}, לא נתוני ייצור. דפים שאינם תומכים בבחירת סביבה עדיין מציגים נתוני ייצור."
   },
   "Members": {
-    "roleAndStatus": "{role} ({status})",
-    "statusLabel": "({status})",
+    "roleAndStatus": "{role} – סטטוס: {status}",
+    "statusLabel": "סטטוס: {status}",
     "status_invited": "הוזמן – ממתין לאישור",
     "status_active": "פעיל",
     "status_suspended": "מושעה",
@@ -491,7 +491,7 @@
     "inviteError": "לא הצלחנו לשלוח את ההזמנה כרגע. שום דבר לא נשלח - נסו שוב.",
     "inviteErrorBadEmail": "כתובת האימייל הזו לא נראית תקינה. בדקו שאין בה שגיאת הקלדה, למשל חסר @ או חסרה נקודה.",
     "inviteErrorAlreadyMember": "האדם הזה כבר חבר, או שכבר מחכה לו הזמנה. אין מה לעשות.",
-    "projectRoleAndStatus": "{role} · {project} ({status})",
+    "projectRoleAndStatus": "{role} · {project} – סטטוס: {status}",
     "remove": "הסרה",
     "removeError": "לא ניתן היה להסיר את החבר. נסו שוב.",
     "removeLastOwnerError": "לארגון חייב להיות תמיד לפחות בעלים אחד.",
