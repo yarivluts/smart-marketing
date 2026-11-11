@@ -4,7 +4,7 @@ import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
-import { BriefForm } from './brief-form';
+import { BriefForm, defaultAdName } from './brief-form';
 
 const push = vi.fn();
 vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
@@ -52,10 +52,34 @@ describe('BriefForm video shape label', () => {
 describe('BriefForm ad name hint', () => {
   it('shows an example for the name so a newcomer knows what to type, in both languages', () => {
     const { unmount } = renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'en' });
-    expect(screen.getByLabelText(enMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', enMessages.AdStudio.fieldNameHint);
+    expect(screen.getByLabelText(enMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', enMessages.AdStudio.fieldNameHintNew);
     unmount();
     renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'he' });
-    expect(screen.getByLabelText(heMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', heMessages.AdStudio.fieldNameHint);
+    expect(screen.getByLabelText(heMessages.AdStudio.fieldName)).toHaveAttribute('placeholder', heMessages.AdStudio.fieldNameHintNew);
+  });
+
+  it('does not ask a newcomer to name a new ad, but still requires the name when editing', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ brief: { id: 'b9' } }), { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container, unmount } = renderWithIntl(<BriefForm orgId="o" projectId="p" studioHref="/s" />, { locale: 'en' });
+    expect(screen.getByLabelText(enMessages.AdStudio.fieldName)).not.toBeRequired();
+    for (const el of container.querySelectorAll('input[required], textarea[required]')) fireEvent.change(el, { target: { value: 'Accounting app for freelancers' } });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.AdStudio.createButton }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/s?brief=b9'));
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).name).toBe('Accounting app for freelancers');
+    unmount();
+    renderWithIntl(
+      <BriefForm orgId="o" projectId="p" briefId="b" initial={{ name: 'n', objective: 'o', productDescription: 'd', landingPageUrl: '', format: 'vertical', language: 'en', targetSeconds: 30 }} />,
+      { locale: 'en' },
+    );
+    expect(screen.getByLabelText(enMessages.AdStudio.fieldName)).toBeRequired();
+  });
+
+  it('names an ad after what it sells, shortened, falling back to the goal', () => {
+    expect(defaultAdName('  Accounting\n app  ', 'x')).toBe('Accounting app');
+    expect(defaultAdName('', 'More signups')).toBe('More signups');
+    expect(defaultAdName('a'.repeat(80), '')).toHaveLength(60);
+    expect(defaultAdName('a'.repeat(80), '').endsWith('...')).toBe(true);
   });
 
   it('accepts a web address typed without https:// instead of blocking the form', async () => {

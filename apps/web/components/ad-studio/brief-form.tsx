@@ -39,6 +39,12 @@ function withScheme(input: string): string {
   return trimmed && !/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? `https://${trimmed}` : trimmed;
 }
 
+/** A name for an ad whose creator left the name empty: the first words of what is being sold (only the creator sees it). */
+export function defaultAdName(productDescription: string, objective: string): string {
+  const text = (productDescription.trim() || objective.trim()).replace(/\s+/g, ' ');
+  return text.length <= 60 ? text : `${text.slice(0, 57).trimEnd()}...`;
+}
+
 export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: BriefFormProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -67,7 +73,12 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
       const response = await fetch(briefId ? `${base}/${briefId}` : base, {
         method: briefId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...values, landingPageUrl: withScheme(values.landingPageUrl) }),
+        body: JSON.stringify({
+          ...values,
+          // A new ad does not need a name from a newcomer: it is named after what it sells.
+          name: values.name.trim() || (briefId ? values.name : defaultAdName(values.productDescription, values.objective)),
+          landingPageUrl: withScheme(values.landingPageUrl),
+        }),
       });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError & { brief?: { id: string } };
       if (!response.ok || !body.brief) {
@@ -93,7 +104,7 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
     <form method="post" onSubmit={submit} className="flex flex-col gap-3" data-testid={briefId ? 'ad-studio-brief-edit' : 'ad-studio-brief-create'}>
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         {t('fieldName')}
-        <input value={values.name} onChange={(event) => set('name', event.target.value)} maxLength={120} required placeholder={t('fieldNameHint')} className={inputClass} />
+        <input value={values.name} onChange={(event) => set('name', event.target.value)} maxLength={120} required={Boolean(briefId)} placeholder={t(briefId ? 'fieldNameHint' : 'fieldNameHintNew')} className={inputClass} />
       </label>
       <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
         {t('fieldObjective')}
