@@ -46,3 +46,19 @@ describe('dailyCountsFrom', () => {
     ]);
   });
 });
+
+describe('formatReadableDateTime', () => {
+  it('turns an ISO timestamp into a readable date and time, not the raw text', async () => {
+    const { formatReadableDateTime } = await import('./recency');
+    const out = formatReadableDateTime('2026-11-10T12:00:00.000Z', 'en');
+    expect(out).toContain('2026');
+    expect(out).not.toContain('T12:00');
+    expect(formatReadableDateTime('2026-11-10T12:00:00.000Z', 'he')).not.toBe(out);
+  });
+
+  it('keeps the original text when it is not a date, and is empty for nothing', async () => {
+    const { formatReadableDateTime } = await import('./recency');
+    expect(formatReadableDateTime('not a date', 'en')).toBe('not a date');
+    expect(formatReadableDateTime(null, 'en')).toBe('');
+  });
+});

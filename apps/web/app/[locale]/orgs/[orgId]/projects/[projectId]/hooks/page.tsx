@@ -9,7 +9,7 @@ import { listEnvironmentsForProject, listHookDeliveriesForProject, listHookEndpo
 import { hookApiUrl } from '@/lib/orgs/hook-api-url';
 import { hookDeliveryStatusLabelKey, hookSignatureModeLabelKey } from '@/lib/orgs/hook-view';
 import { dailyDeliveriesByStatus, deliveryStatusCounts, endpointDeliveryStats } from '@/lib/orgs/hook-viz';
-import { formatRelativeTime } from '@/lib/orgs/recency';
+import { formatReadableDateTime, formatRelativeTime } from '@/lib/orgs/recency';
 import { CreateHookEndpointForm } from '@/components/orgs/create-hook-endpoint-form';
 import { DisableHookEndpointButton } from '@/components/orgs/disable-hook-endpoint-button';
 import { EnableHookEndpointButton } from '@/components/orgs/enable-hook-endpoint-button';
@@ -297,7 +297,7 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
                         <div className="flex min-w-0 flex-col gap-1">
                           <span className="font-medium">
                             {t('deliverySummary', {
-                              receivedAt: delivery.received_at,
+                              receivedAt: formatReadableDateTime(delivery.received_at, locale),
                               status: t(hookDeliveryStatusLabelKey(delivery.status)),
                             })}
                           </span>

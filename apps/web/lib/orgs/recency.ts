@@ -67,3 +67,10 @@ export function dailyCountsFrom(timestamps: readonly (string | null | undefined)
   }
   return buckets;
 }
+
+/** "Nov 10, 2026, 12:00 PM UTC" (or its Hebrew equivalent) instead of a raw ISO timestamp. Falls back to the original text when it is not a date. */
+export function formatReadableDateTime(iso: string | null | undefined, locale: string): string {
+  const ms = parse(iso);
+  if (ms === null) return iso ?? '';
+  return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short' }).format(ms);
+}
