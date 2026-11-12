@@ -99,3 +99,11 @@ describe('Ad details copy says ad, not campaign', () => {
     });
   }
 });
+
+describe('Campaign page spend card with nothing to show', () => {
+  it('explains the empty spend card in both languages', () => {
+    expect(en.Campaigns.spendCardNoDataHint).toMatch(/once the ad has been shown/);
+    expect(he.Campaigns.spendCardNoDataHint.length).toBeGreaterThan(10);
+    expect(he.Campaigns.spendCardNoDataHint).not.toMatch(/[A-Za-z]/);
+  });
+});

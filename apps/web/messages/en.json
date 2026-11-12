@@ -3504,6 +3504,7 @@
     "spendAmount": "${amount}",
     "spendChartLabel": "Daily ad spend",
     "spendNoData": "No spend recorded for this ad yet - the platform has not reported any delivery.",
+    "spendCardNoDataHint": "No spend reported yet. It shows up here once the ad has been shown.",
     "cockpitTitle": "Ads & Performance",
     "cockpitDescription": "All your Facebook, Instagram and Google ads in one place: the ads, what you spent, and how much you earned back for each dollar.",
     "tabOverview": "Ads & results",
