@@ -2,7 +2,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, getAdStudioBrief, listAdStudioUsage, saveAdStudioScript } from '@growthos/firebase-orm-models';
+import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession, getAdStudioBrief, listAdStudioClips, listAdStudioUsage, saveAdStudioScript } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { configureAdStudioRuntime, createMemoryMediaStorage, type AdStudioReferenceView } from '@/lib/ad-studio/engine';
 import { POST as createBrief } from './briefs/route';
@@ -123,7 +123,10 @@ describe('Hebrew nikud at render time', () => {
 
     expect((await renderScene(jsonRequest('POST'), ctx.p({ sceneId: 's1' }))).status).toBeLessThan(300);
     expect(google.vocalizeCalls).toEqual([[{ id: 's1', text: plain }]]);
-    expect(String(google.omniStarts[0].input)).toContain(`"${VOCALIZED_WORD}"`);
+    // A voice-over: the narrator (not the video model) reads the vocalized line once the clip is made.
+    const narrations = async () => Object.fromEntries((await listAdStudioClips(ctx.orgId, ctx.projectId, ctx.briefId)).map((clip) => [clip.scene_id, clip.narration_text]));
+    expect((await narrations()).s1).toBe(VOCALIZED_WORD);
+    expect(String(google.omniStarts[0].input)).not.toContain(VOCALIZED_WORD);
     // Every vocalization is checked by a second, independent call.
     expect(google.checkCalls).toEqual([[{ id: 's1', text: plain, pronunciation: VOCALIZED_WORD }]]);
 
@@ -133,7 +136,7 @@ describe('Hebrew nikud at render time', () => {
     expect(google.vocalizeCalls).toHaveLength(2);
     expect(google.checkCalls).toHaveLength(2);
     expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).scenes.map((entry) => entry.pronunciation)).toEqual([VOCALIZED_WORD, VOCALIZED_WORD, VOCALIZED_WORD]);
-    expect(google.omniStarts.slice(1).every((start) => String(start.input).includes('full nikud vowel marks'))).toBe(true);
+    expect(await narrations()).toEqual({ s1: VOCALIZED_WORD, s2: VOCALIZED_WORD, s3: VOCALIZED_WORD });
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(2);
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize_check')).toHaveLength(2);
   });

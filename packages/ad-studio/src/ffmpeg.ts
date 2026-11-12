@@ -313,6 +313,7 @@ export const NARRATION_MAX_TEMPO = 1.25;
 export const NARRATION_FADE_SECONDS = 0.3;
 /** The clip's own sound level while the narrator speaks. */
 export const NARRATION_DUCKED_VOLUME = 0.25;
+const NARRATION_MIX_TIMEOUT_MS = 60_000;
 
 export interface NarrationFit {
   /** atempo factor, 1 when the line fits as spoken. */
@@ -398,7 +399,8 @@ export async function mixNarration(params: { video: string; narration: string; o
   const voice = await probeMedia(params.narration, params.runner);
   if (!voice.hasAudio || !voice.durationSeconds) throw new FfmpegFailedError('The narration has no audio.', '');
   const args = buildNarrationMixArgs({ video: params.video, narration: params.narration, output: params.output, clipSeconds: clip.durationSeconds, narrationSeconds: voice.durationSeconds, clipHasAudio: clip.hasAudio });
-  const { code, stderr } = await runFfmpeg(args, params.runner);
+  // A 10-second clip mixes in seconds; a stuck run is stopped well inside the clip's 2-minute lease.
+  const { code, stderr } = await runFfmpeg(args, { ...params.runner, timeoutMs: Math.min(params.runner.timeoutMs, NARRATION_MIX_TIMEOUT_MS) });
   if (code !== 0) throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
   return { ...fitNarration(clip.durationSeconds, voice.durationSeconds), clipSeconds: clip.durationSeconds };
 }

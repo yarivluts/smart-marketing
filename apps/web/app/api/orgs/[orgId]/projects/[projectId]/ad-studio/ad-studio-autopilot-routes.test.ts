@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { randomBytes } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { copyFile, writeFile } from 'node:fs/promises';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
@@ -67,7 +67,12 @@ beforeEach(() => {
     return { durationSeconds: 13 };
   });
   memoryStorage.current = createMemoryMediaStorage();
-  configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage, concatClips: concatClipsMock });
+  // The fake clips are not real video: the narration "mix" keeps the clip's bytes.
+  const mixNarration = async ({ video, output }: { video: string; output: string }) => {
+    await copyFile(video, output);
+    return { tempo: 1, seconds: 1, trimmed: false, clipSeconds: 5 };
+  };
+  configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage, concatClips: concatClipsMock, mixNarration });
   process.env.GEMINI_API_KEY = 'test-gemini-key';
   delete process.env.ANTHROPIC_API_KEY;
 });
@@ -144,6 +149,13 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
     if (url === `${BASE}/interactions` && body?.model === 'gemini-3.1-flash-image') {
       if (options.imageStatus) return new Response(JSON.stringify({ error: { message: options.imageMessage ?? 'failed' } }), { status: options.imageStatus });
       return Response.json({ id: 'img', status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'image', mime_type: 'image/png', data: PNG.toString('base64') }] }] });
+    }
+    if (url === `${BASE}/interactions` && body?.model === 'gemini-3.8-flash-tts') {
+      // The voice-over narrator: a WAV header is all the (faked) mix needs.
+      const wav = Buffer.alloc(44);
+      wav.write('RIFF', 0, 'ascii');
+      wav.write('WAVE', 8, 'ascii');
+      return Response.json({ id: 'tts', status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'audio', mime_type: 'audio/wav', data: wav.toString('base64') }] }] });
     }
     if (url === `${BASE}/interactions`) {
       omniStarts += 1;
@@ -550,7 +562,7 @@ describe('autopilot routes', () => {
     expect(google.reviews()).toBe(3);
   });
 
-  it('vocalizes Hebrew narration saved before pronunciations existed, before Omni renders it', async () => {
+  it('vocalizes Hebrew narration saved before pronunciations existed, before the narrator speaks it', async () => {
     const google = fakeGoogle();
     const ctx = await setup();
     const plain = '\u05e9\u05dc\u05d5\u05dd';
@@ -568,11 +580,17 @@ describe('autopilot routes', () => {
 
     const vocalized = VOCALIZED_WORD;
     expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).scenes.map((scene) => scene.pronunciation)).toEqual([vocalized, undefined]);
-    const renders = google.calls.filter((call) => call.url === `${BASE}/interactions` && call.body?.model !== 'gemini-3.1-flash-image').map((call) => String(call.body?.input));
+    const renders = google.calls.filter((call) => call.url === `${BASE}/interactions` && call.body?.model === 'gemini-omni-1.1-flash').map((call) => String(call.body?.input));
     expect(renders).toHaveLength(2);
-    expect(renders[0]).toContain(`"${vocalized}"`);
-    expect(renders[0]).toContain('full nikud vowel marks');
+    // A voice-over: the clip is asked for without speech, and the narrator reads the vocalized line.
+    expect(renders[0]).not.toContain(vocalized);
+    expect(renders[0]).toContain('No speech of any kind');
     expect(renders[1]).toContain('No speech.');
+    const spoken = google.calls.filter((call) => call.url === `${BASE}/interactions` && call.body?.model === 'gemini-3.8-flash-tts');
+    expect(spoken).toHaveLength(1);
+    expect(JSON.stringify(spoken[0].body)).toContain(JSON.stringify(vocalized).slice(1, -1));
+    expect(JSON.stringify(spoken[0].body)).toContain('in Hebrew');
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'narration_tts')).toHaveLength(1);
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize')).toHaveLength(1);
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'vocalize_check')).toHaveLength(1);
   });

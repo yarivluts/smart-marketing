@@ -1,7 +1,9 @@
 /**
  * The narrator's voice of one ad (KAN-239): one choice for the whole ad, so every scene - generated
  * separately by the video model - speaks with the same voice. Gemini Omni has no voice id; the voice
- * is described in words, identically in every scene prompt, which is what keeps it consistent. Pure.
+ * is described in words, identically in every scene prompt, which is what keeps it consistent (for a
+ * person on camera). A voice-over is spoken by the TTS narrator instead, by voice name (see
+ * `ttsVoiceName`). Pure.
  */
 
 export const AD_STUDIO_VOICE_PRESETS = ['woman_warm', 'woman_energetic', 'man_warm', 'man_deep', 'man_energetic'] as const;
