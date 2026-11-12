@@ -4190,6 +4190,7 @@
     "languageEn": "English",
     "languageHe": "Hebrew",
     "fieldLength": "Length in seconds (up to 60)",
+    "fieldLengthHint": "Short ads usually work best: 15 to 30 seconds is a good start.",
     "saveDetails": "Save details",
     "createButton": "Create ad",
     "adminTitle": "Studio settings",

@@ -107,3 +107,13 @@ describe('BriefForm ad name hint', () => {
     expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).landingPageUrl).toBe('');
   });
 });
+
+describe('BriefForm video length hint', () => {
+  it('tells a newcomer what length to pick, in both languages', () => {
+    const { unmount } = renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'en' });
+    expect(screen.getByLabelText(new RegExp(enMessages.AdStudio.fieldLength.replace(/[()]/g, '\\$&')))).toHaveAccessibleDescription(enMessages.AdStudio.fieldLengthHint);
+    unmount();
+    renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'he' });
+    expect(screen.getByLabelText(new RegExp(heMessages.AdStudio.fieldLength.replace(/[()]/g, '\\$&')))).toHaveAccessibleDescription(heMessages.AdStudio.fieldLengthHint);
+  });
+});
