@@ -12,4 +12,10 @@ describe('Growth Pilot "site did not open" failure', () => {
     expect(he.GrowthPilot.failure.site).toContain('בדקו את הכתובת');
     expect(he.GrowthPilot.failure.site).toContain('דף אחר באתר שלכם');
   });
+
+  it('explains the reason without technical words', () => {
+    expect(en.GrowthPilot.failure.site).not.toMatch(/automated|bots?\b|crawler/i);
+    expect(en.GrowthPilot.failure.site).toContain('typo');
+    expect(he.GrowthPilot.failure.site).not.toContain('אוטומטי');
+  });
 });
