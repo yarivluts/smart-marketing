@@ -54,7 +54,7 @@ test.describe('Inbound hooks: create endpoint, copy receive URL, review queue (K
     // The "no signature check" copy also appears as a `<select>` option in the create form further
     // down this same page — scope to the endpoint's own list item to avoid Playwright's strict-mode
     // ambiguity error over which element `getByText` should resolve to.
-    const endpointRow = page.getByRole('listitem').filter({ hasText: 'Zapier (Prod)' });
+    const endpointRow = page.getByRole('listitem').filter({ hasText: 'Zapier (Prod (real data))' });
     await expect(endpointRow).toBeVisible();
     await expect(endpointRow.getByText('No signature check (URL is the credential)')).toBeVisible();
 
