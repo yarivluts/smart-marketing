@@ -1,6 +1,6 @@
 import { LocalKmsProvider, loadLocalKmsKeyRingFromEnv, type KmsProvider } from '@growthos/firebase-orm-models';
 import type { AdStudioMediaStorage } from './media-storage';
-import type { concatClips } from './ffmpeg';
+import type { concatClips, mixNarration } from './ffmpeg';
 import type { PlanningSourceDeps } from './planning-sources';
 import type { DemoBrowserLauncher } from './demo-recorder';
 
@@ -19,6 +19,8 @@ export interface AdStudioRuntime {
    */
   mediaStorage?: () => AdStudioMediaStorage;
   concatClips?: typeof concatClips;
+  /** Lays a voice-over onto its clip (a fake in route tests, whose clips are not real video). */
+  mixNarration?: typeof mixNarration;
   /** How Growth Pilot reads websites (a fake fetch and resolver); production reads the real site. */
   siteReader?: PlanningSourceDeps;
   /** The browser the walkthrough recorder drives (a fake in tests); production launches Chromium. */

@@ -17,6 +17,13 @@ import {
   sceneVideoStates,
   voiceDescription,
   normalizeVideoSettings,
+  languageName,
+  narrationIsSeparate,
+  spokenNarration,
+  ttsNarrationStyle,
+  ttsVoiceName,
+  AD_STUDIO_DEFAULT_TTS_VOICE,
+  type AdStudioScene,
   type AdStudioClipSummary,
   type AdStudioVideoContext,
 } from '@growthos/shared';
@@ -53,7 +60,8 @@ import { englishForModel } from './translate';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioClipView, AdStudioVideoView } from './view';
-import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, type FfmpegRunner } from './ffmpeg';
+import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, mixNarration, type FfmpegRunner } from './ffmpeg';
+import { resolveAdStudioTts, type AdStudioTts } from './tts';
 import { brandStripLayer } from './ad-typography';
 import { resolveAdBrandMark } from './brand';
 
@@ -104,18 +112,35 @@ export interface AdStudioVideoDeps {
   reviewer?: AdStudioReviewer | null;
   /** The text model that vocalizes Hebrew narration before a render; absent or null renders it as written. */
   llm?: AdStudioLlm | null;
+  /** The speech model that narrates voice-over scenes; absent or null fails a clip that needs narration. */
+  tts?: AdStudioTts | null;
   now?: () => Date;
 }
 
-/** Media storage and ffmpeg always; the video model only when GEMINI_API_KEY is configured. */
+/** Media storage and ffmpeg always; the video and speech models only when GEMINI_API_KEY is configured. */
 export function resolveAdStudioVideoDeps(env: NodeJS.ProcessEnv = process.env): {
   omni: AdStudioOmni | null;
   storage: AdStudioMediaStorage;
   runner: FfmpegRunner;
   reviewer: AdStudioReviewer | null;
   llm: AdStudioLlm | null;
+  tts: AdStudioTts | null;
 } {
-  return { omni: resolveAdStudioOmni(env), storage: resolveAdStudioMediaStorage(env), runner: defaultFfmpegRunner(env), reviewer: resolveAdStudioReviewer(env), llm: resolveAdStudioLlm(env) };
+  return {
+    omni: resolveAdStudioOmni(env),
+    storage: resolveAdStudioMediaStorage(env),
+    runner: defaultFfmpegRunner(env),
+    reviewer: resolveAdStudioReviewer(env),
+    llm: resolveAdStudioLlm(env),
+    tts: resolveAdStudioTts(env),
+  };
+}
+
+/** What a clip's narrator says and how, for a voice-over scene; null when the clip speaks for itself or is silent. */
+export function clipNarration(scene: Pick<AdStudioScene, 'voiceover' | 'pronunciation' | 'delivery'>, brief: Pick<AdStudioBriefModel, 'narrator_voice' | 'language'>): { text: string; voice: string; style: string } | null {
+  if (!narrationIsSeparate(scene)) return null;
+  // The vocalized line when there is one: the speech model reads nikud as written.
+  return { text: spokenNarration(scene), voice: ttsVoiceName(brief.narrator_voice), style: ttsNarrationStyle(brief.narrator_voice, languageName(brief.language)) };
 }
 
 interface BriefContext {
@@ -183,9 +208,68 @@ function clock(deps: Pick<AdStudioVideoDeps, 'now'>): Date {
 const FINAL_PROVIDER_CODES: ReadonlySet<AdStudioProviderErrorCode> = new Set(['provider_billing', 'not_configured', 'refused', 'invalid_output']);
 const FAILED_INTERACTION = new Set(['failed', 'cancelled', 'incomplete']);
 
-async function storeInline(ctx: Omit<BriefContext, 'actorId'>, clip: AdStudioClipModel, data: Buffer, deps: AdStudioVideoDeps): Promise<void> {
+/**
+ * Speaks a voice-over clip's narration with the speech model (metered as `narration_tts`, 1 unit) and
+ * lays it onto the speechless clip; returns the narrated MP4. Throws the provider's error, or an
+ * ffmpeg error when the mix fails.
+ */
+async function narrateClip(ctx: Omit<BriefContext, 'actorId'>, clip: AdStudioClipModel, video: Buffer, deps: AdStudioVideoDeps): Promise<Buffer> {
+  const tts = deps.tts;
+  if (!tts) throw new AdStudioProviderError('not_configured', 'No speech model is configured for the narration.');
+  const usage = {
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    kind: 'narration_tts' as const,
+    provider: 'gemini',
+    model: tts.model,
+    units: 1,
+    briefId: ctx.briefId,
+    actorId: clip.requested_by,
+    now: clock(deps),
+  };
+  let narration: Buffer;
+  try {
+    narration = await tts.synthesize({ text: clip.narration_text ?? '', voice: clip.narration_voice ?? AD_STUDIO_DEFAULT_TTS_VOICE, style: clip.narration_style ?? '' });
+  } catch (error) {
+    await recordAdStudioUsage({ ...usage, outcome: 'failed', failureReason: error instanceof AdStudioProviderError ? error.code : 'provider_error' });
+    throw error;
+  }
+  await recordAdStudioUsage({ ...usage, outcome: 'succeeded', failureReason: null });
+  const workDir = await mkdtemp(path.join(tmpdir(), 'ad-studio-narration-'));
+  try {
+    const videoFile = path.join(workDir, 'clip.mp4');
+    const narrationFile = path.join(workDir, 'narration.wav');
+    const output = path.join(workDir, 'narrated.mp4');
+    await writeFile(videoFile, video);
+    await writeFile(narrationFile, narration);
+    await (adStudioRuntime().mixNarration ?? mixNarration)({ video: videoFile, narration: narrationFile, output, runner: deps.runner });
+    return await readFile(output);
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Stores a clip the video model finished and marks it ready - after laying on its narration, for a
+ * voice-over clip, so the stored clip (the scene preview and the assembly both read it) carries the
+ * narrator. A narration that cannot be made fails the clip with a reason the person can act on
+ * (try again, or the provider's code); a clip is never stored silently without its narration.
+ * Storage errors are thrown, for the next status poll to retry.
+ */
+async function finishClip(ctx: Omit<BriefContext, 'actorId'>, clip: AdStudioClipModel, video: Buffer, deps: AdStudioVideoDeps): Promise<void> {
+  let media = video;
+  if (clip.narration_text?.trim()) {
+    try {
+      media = await narrateClip(ctx, clip, video, deps);
+    } catch (error) {
+      const code = error instanceof AdStudioProviderError ? error.code : 'narration_failed';
+      console.error('[ad-studio] narrating a clip failed', { clipId: clip.id, code, error: error instanceof Error ? error.message : String(error) });
+      await markAdStudioClipFailed(clip, code, clock(deps));
+      return;
+    }
+  }
   const objectPath = adStudioClipObjectPath({ ...ctx, clipId: clip.id });
-  await deps.storage.upload(objectPath, data, 'video/mp4');
+  await deps.storage.upload(objectPath, media, 'video/mp4');
   await markAdStudioClipReady(clip, { gcsPath: objectPath, now: clock(deps) });
 }
 
@@ -196,7 +280,7 @@ async function applyInteraction(ctx: Omit<BriefContext, 'actorId'>, clip: AdStud
     return;
   }
   await recordAdStudioClipProgress(clip, { interactionId: interaction.id, fileName: interaction.video?.fileName ?? null });
-  if (interaction.video?.inlineData) await storeInline(ctx, clip, interaction.video.inlineData, deps);
+  if (interaction.video?.inlineData) await finishClip(ctx, clip, interaction.video.inlineData, deps);
   else if (interaction.status === 'completed' && !interaction.video) await markAdStudioClipFailed(clip, 'invalid_output', clock(deps));
 }
 
@@ -214,11 +298,15 @@ async function startClip(
     aspectRatio: '9:16' | '16:9';
     resolution: string;
     durationSeconds: number;
+    /** A voice-over to speak and lay on once the clip is made (see `clipNarration`). */
+    narration: { text: string; voice: string; style: string } | null;
     call: () => Promise<OmniInteraction>;
   },
 ): Promise<AdStudioClipModel> {
   const now = clock(deps);
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: params.kind, units: params.durationSeconds, now });
+  // The narrator call comes after the paid render, so its allowance is checked before the render starts.
+  if (params.narration) await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'narration_tts', units: 1, now });
   const clip = await createAdStudioClip({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -233,6 +321,7 @@ async function startClip(
     resolution: params.resolution,
     durationSeconds: params.durationSeconds,
     requestedBy: ctx.actorId,
+    narration: params.narration,
     now,
   });
   const usage = {
@@ -325,6 +414,8 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
     aspectRatio,
     resolution,
     durationSeconds: scene.durationSeconds,
+    // A voice-over is not in the prompt: the clip comes back speechless and the narrator is laid on.
+    narration: clipNarration(scene, brief),
     call: () => deps.omni.startSceneGeneration({ prompt, aspectRatio, resolution, ...(images.length ? { images } : {}) }),
   });
 }
@@ -346,9 +437,12 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
     .filter((clip) => clip.scene_id === ctx.sceneId && clip.status === 'ready' && clip.interaction_id)
     .sort((a, b) => b.version - a.version)[0];
   if (!parent?.interaction_id) throw new AdStudioVideoRequestError('clip_not_editable');
-  const text = buildSceneEditInstruction(instruction);
+  // A voice-over clip stays speechless through the edit, and its narration is laid on again after it.
+  const narration = parent.narration_text?.trim() ? { text: parent.narration_text, voice: parent.narration_voice ?? AD_STUDIO_DEFAULT_TTS_VOICE, style: parent.narration_style ?? '' } : null;
+  const speechless = narration !== null;
+  const text = buildSceneEditInstruction(instruction, { speechless });
   // The person's words are kept on the clip; the video model gets them in English.
-  const modelText = buildSceneEditInstruction(await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() }));
+  const modelText = buildSceneEditInstruction(await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() }), { speechless });
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   const previousInteractionId = parent.interaction_id;
   // An edit continues its clip, so it keeps that clip's resolution (720p for clips made before the setting).
@@ -363,6 +457,7 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
     aspectRatio,
     resolution,
     durationSeconds: parent.duration_seconds,
+    narration,
     call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: modelText, aspectRatio, resolution }),
   });
 }
@@ -380,6 +475,9 @@ export async function startRenderAll(ctx: BriefContext, deps: AdStudioVideoDeps)
   const cost = renderAllCost(states, brief.scenes);
   if (cost.sceneIds.length === 0) return [];
   await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'video_scene', units: cost.seconds, now: clock(deps) });
+  // Every voice-over scene also needs one narrator call once its clip is made.
+  const narrated = brief.scenes.filter((scene) => cost.sceneIds.includes(scene.id) && narrationIsSeparate(scene)).length;
+  if (narrated) await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'narration_tts', units: narrated, now: clock(deps) });
   // One vocalizing call for every scene about to render, instead of one per scene.
   await vocalizeBeforeRender(brief, new Set(cost.sceneIds), ctx, deps);
   const started: AdStudioClipModel[] = [];
@@ -416,9 +514,7 @@ async function advanceClip(ctx: Omit<BriefContext, 'actorId'>, clip: AdStudioCli
       return;
     }
     const bytes = await deps.omni.downloadFile(fileName);
-    const objectPath = adStudioClipObjectPath({ ...ctx, clipId: clip.id });
-    await deps.storage.upload(objectPath, bytes, 'video/mp4');
-    await markAdStudioClipReady(clip, { gcsPath: objectPath, now: clock(deps) });
+    await finishClip(ctx, clip, bytes, deps);
   } catch (error) {
     if (error instanceof AdStudioProviderError && FINAL_PROVIDER_CODES.has(error.code)) {
       await markAdStudioClipFailed(clip, error.code, clock(deps));

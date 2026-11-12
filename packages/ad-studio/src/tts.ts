@@ -22,7 +22,8 @@ import { AD_STUDIO_TEST_OMNI_BASE_URL, adStudioTestOverride, isLoopbackHttpUrl }
 
 export const AD_STUDIO_TTS_MODEL = 'gemini-3.8-flash-tts';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const CALL_TIMEOUT_MS = 60_000;
+/** Two tries fit well inside the clip lease (120 s) with the mix after them. */
+const CALL_TIMEOUT_MS = 45_000;
 /** A 10-second line is ~0.5 MB of WAV; anything this large is not a scene's narration. */
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 export const AD_STUDIO_TTS_SAMPLE_RATE = 24_000;
