@@ -71,7 +71,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(billingRequirement).toContainText('1 record was set aside because something was wrong with it ("order_completed"): missing_required_field:amount');
     await expect(page.getByTestId('setup-requirement-ad_spend')).toContainText('Not connected');
 
-    await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
+    await expect(page.getByText('ord-3 (Events, Prod (real data))')).toBeVisible();
     await expect(page.getByText('Reasons: missing_required_field:amount')).toBeVisible();
 
     // Replaying without first fixing the schema (KAN-34) leaves the record quarantined, with its
@@ -115,7 +115,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await page.getByRole('link', { name: 'Data health' }).first().click();
     await expect(page.getByText(/No data has arrived for this project yet/)).toBeVisible();
     // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
-    await expect(page.getByText('0 of 6 setup requirements connected in the Prod environment.')).toBeVisible();
+    await expect(page.getByText('0 of 6 setup requirements connected in the Prod (real data) environment.')).toBeVisible();
     await expect(page.getByText('No rejected records for this project. Everything that arrived was usable.')).toBeVisible();
     await expect(page.getByText('Nothing is stuck. All data was passed on.')).toBeVisible();
     await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();

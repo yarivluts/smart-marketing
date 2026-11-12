@@ -48,7 +48,7 @@ test.describe('Inbound hooks: create endpoint, copy receive URL, review queue (K
     await expect(page.getByText('No incoming data links yet. Create one below, then paste its address into the tool that should send you data.')).toBeVisible();
 
     await page.getByLabel('Name').fill('Zapier');
-    await page.getByLabel('Environment').selectOption({ label: 'Prod' });
+    await page.getByLabel('Environment').selectOption({ label: 'Prod (real data)' });
     await page.getByRole('button', { name: 'Create endpoint' }).click();
 
     // The "no signature check" copy also appears as a `<select>` option in the create form further

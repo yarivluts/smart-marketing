@@ -47,7 +47,7 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     await expect(page.getByText('No access keys yet. You only need one if another tool will send data to GrowthOS or read from it.')).toBeVisible();
 
     await page.getByLabel('Name').fill('CI key');
-    await page.getByLabel('Environment').selectOption({ label: 'Prod' });
+    await page.getByLabel('Environment').selectOption({ label: 'Prod (real data)' });
     // A browser (publishable) key: the kind that goes into a website, so the snippet comes with it.
     await page.getByRole('radio', { name: /Browser key/ }).check();
     await page.getByLabel('Allowed domains (one per line)').fill('https://www.example.com');
