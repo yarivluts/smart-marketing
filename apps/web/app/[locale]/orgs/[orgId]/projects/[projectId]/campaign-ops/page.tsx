@@ -190,7 +190,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
             {!campaignPaybackOutcome || !campaignPaybackOutcome.ok ? (
               <EmptyState compact icon={DatabaseZap} title={t('campaignPaybackUnavailable')} />
             ) : campaignPaybackOutcome.rows.length === 0 ? (
-              <EmptyState compact icon={Scale} title={t('campaignPaybackEmpty')} />
+              <EmptyState compact icon={Scale} title={t('campaignPaybackEmpty')} description={t('campaignPaybackEmptyHint')} />
             ) : (
               <BarList
                 items={campaignPaybackOutcome.rows.map((row) => ({
@@ -251,7 +251,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
         {!spendOutcome.ok ? (
           <EmptyState icon={DatabaseZap} title={t('spendTargetsUnavailable')} description={t('spendTargetsUnavailableHint')} />
         ) : spendOutcome.rows.length === 0 || !spendSummary ? (
-          <EmptyState icon={Target} title={t('spendTargetsEmpty')} />
+          <EmptyState icon={Target} title={t('spendTargetsEmpty')} description={t('spendTargetsEmptyHint')} />
         ) : (
           <div className="grid gap-6 lg:grid-cols-3">
             <DonutChart
