@@ -2094,6 +2094,7 @@
     "kpiConversions": "הרשמות ומכירות",
     "kpiSignificantWins": "מנצחות ברורות",
     "kpiSignificantLossesSub": "{count, plural, one {גרסה אחת גרועה בבירור} other {# גרסאות גרועות בבירור}}",
+    "kpiNoDataSub": "לא הצלחנו לטעון תוצאות עכשיו. הן יופיעו כאן ברגע שהנתונים שלכם יחוברו.",
     "resultsEmptyHint": "התוצאות יופיעו כאן כשהאתר שלכם ידווח מי ראה כל גרסה ומי נרשם או קנה. בקשו מעוזר ה-AI להגדיר את זה.",
     "experimentSummary": "המקור: {control} · {variants} גרסאות · {exposures} אנשים ראו",
     "rateChartLabel": "שיעור מי שנרשמו או קנו, לפי גרסה, עבור {experimentKey}",

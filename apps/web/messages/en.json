@@ -2094,6 +2094,7 @@
     "kpiConversions": "Sign-ups and sales",
     "kpiSignificantWins": "Clear winners",
     "kpiSignificantLossesSub": "{count, plural, one {# version clearly worse} other {# versions clearly worse}}",
+    "kpiNoDataSub": "Results could not be loaded just now. They show here once your data is connected.",
     "resultsEmptyHint": "Results appear here once your site reports who saw each version and who signed up or bought. Ask the AI helper to set it up.",
     "experimentSummary": "Original: {control} · {variants} versions · {exposures} people saw it",
     "rateChartLabel": "Share who signed up or bought, by version, for {experimentKey}",
