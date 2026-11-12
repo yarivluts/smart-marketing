@@ -147,7 +147,11 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
             value={values.targetSeconds}
             onChange={(event) => set('targetSeconds', Number(event.target.value))}
             className={inputClass}
+            aria-describedby="ad-studio-length-hint"
           />
+          <span id="ad-studio-length-hint" className="font-normal">
+            {t('fieldLengthHint')}
+          </span>
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-3">
