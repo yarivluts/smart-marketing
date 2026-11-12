@@ -63,7 +63,7 @@ describe('FunnelGoalsDashboard Component', () => {
     expect(screen.getByTestId('funnel-goals-dashboard')).toBeInTheDocument();
     for (const label of [
       'People who reach the last step',
-      'Goals on Track',
+      'Goals on track',
       'Customers still here after 1 month',
       'Time to become a customer',
       'Money earned in the first 40 days',
@@ -176,10 +176,17 @@ describe('FunnelGoalsDashboard Component', () => {
       B22 (EasySign): its first real funnel had 4 entrants. The rate is real but must say how
       little it rests on, and nothing may recommend acting on it.
     */
-    it('says a paused goal is not counted in Goals on Track (KAN-213)', () => {
+    it('says a paused goal is not counted in Goals on track (KAN-213)', () => {
       const cockpit = buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] });
       renderDashboard({ ...cockpit, summary: { ...cockpit.summary, goalsPausedCount: 1 } });
       expect(screen.getByTestId('kpi-goals-paused')).toHaveTextContent('1 paused goal not counted');
+    });
+
+    it('says in plain words how many customers left instead of "churn"', () => {
+      const cockpit = buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] });
+      renderDashboard({ ...cockpit, summary: { ...cockpit.summary, dunningRecoveryRatePct: 50, churnRatePct: 7 } });
+      expect(screen.getByText('7% of customers left')).toBeInTheDocument();
+      expect(screen.queryByText(/churn/i)).not.toBeInTheDocument();
     });
 
     it('marks a rate on a handful of people and raises no alert or recommendation on it', () => {

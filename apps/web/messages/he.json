@@ -3734,7 +3734,7 @@
     "payingRate": "% שהפכו ללקוחות",
     "avg40dRevenue": "כסף ממוצע ב-40 ימים",
     "kpiTimeToSign": "זמן עד לחתימה",
-    "kpiChurnRate": "{rate}% נטישה",
+    "kpiChurnRate": "{rate}% מהלקוחות עזבו",
     "paybackDayWindow": "נגבה עד יום {days}",
     "funnelEmptyTitle": "מסלול הלקוחות שלכם עדיין לא הוגדר",
     "funnelUnavailableTitle": "אי אפשר להציג כרגע את מסלול הלקוחות",
