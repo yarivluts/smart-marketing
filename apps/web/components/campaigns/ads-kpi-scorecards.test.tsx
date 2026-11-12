@@ -114,11 +114,28 @@ describe('AdsKpiScorecards', () => {
     );
 
     expect(screen.getAllByText('No data')).toHaveLength(5);
+    // Each empty card says when it fills in, instead of leaving a dead end.
+    expect(screen.getAllByText('Shows up here once your ads have been shown to people.')).toHaveLength(5);
     expect(screen.queryByText('2.85%')).not.toBeInTheDocument();
     expect(screen.queryByText(/14\.2/)).not.toBeInTheDocument();
     expect(screen.queryByText(/22\.1/)).not.toBeInTheDocument();
 
     // The campaign counts come from the target list, so they still render.
     expect(screen.getByText('2 / 5')).toBeInTheDocument();
+  });
+
+  it('does not add the reason line when the numbers are measured', () => {
+    renderWithIntl(<AdsKpiScorecards summary={mockSummary} />);
+    expect(screen.queryByText('Shows up here once your ads have been shown to people.')).not.toBeInTheDocument();
+  });
+
+  it('explains empty cards in Hebrew too', () => {
+    renderWithIntl(
+      <AdsKpiScorecards
+        summary={{ ...mockSummary, totalSpendUsd: null, blendedRoas: null, totalImpressions: null, blendedCtrPct: null, blendedCpaUsd: null }}
+      />,
+      { locale: 'he' },
+    );
+    expect(screen.getAllByText(/^\u05D9\u05D5\u05E4\u05D9\u05E2 \u05DB\u05D0\u05DF/)).toHaveLength(5);
   });
 });
