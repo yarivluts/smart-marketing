@@ -87,10 +87,10 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     // the sparkline list has one "<schemaName> (<environment>)" row, the prod one.
     // The tracking-alerts card says why there is no alert for it, instead of a bare
     // "no alerts" beside a schema the page itself lists as never received.
-    const prodEventVolumeRow = page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod\)/ });
+    const prodEventVolumeRow = page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod \(real data\)\)/ });
     await expect(prodEventVolumeRow).toBeVisible();
     await expect(prodEventVolumeRow.getByText('Not connected yet: no record received.')).toBeVisible();
-    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev \(test\)\)/ })).toHaveCount(0);
     await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
     await expect(page.getByTestId('tracking-alerts-not-connected-note')).toContainText('do not raise tracking alerts');
 
@@ -114,8 +114,8 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await expect(page.getByRole('radio', { name: 'Prod' })).toHaveAttribute('aria-checked', 'true');
     await page.getByRole('radio', { name: 'Dev' }).click();
     await expect(page.getByRole('radio', { name: 'Dev' })).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
-    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ })).toBeVisible();
-    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod\)/ })).toHaveCount(0);
-    await expect(page.getByText(/^Showing Dev data, not production\./)).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev \(test\)\)/ })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod \(real data\)\)/ })).toHaveCount(0);
+    await expect(page.getByText(/^Showing Dev \(test\) data, not your real data\./)).toBeVisible();
   });
 });
