@@ -17,6 +17,20 @@ Template for each entry:
 
 ---
 
+## 2026-11-12 — Ad Studio video: voice-over narration made separately (TTS) and mixed on
+
+- **Last completed:** (PR #1269)
+  - Owner report: in voice-over mode people in the clips still spoke / lip-synced the narration. Root cause: the narration text was in the Omni prompt (it generates picture + sound together) and "no one in the shot speaks" was ignored. Now, for every voice-over scene with narration (`narrationIsSeparate`: `delivery !== 'on_screen'`), the clip prompt carries no narration at all - only a consistent music/ambience line plus `NO_SPEECH_RULE` (no speech, dialogue or voices; no one moves their lips). Conversational edits of such clips repeat the rule (`buildSceneEditInstruction(..., { speechless })`). On-camera scenes are unchanged.
+  - Narration: Gemini TTS over the Interactions API (`gemini-3.8-flash-tts`, `packages/ad-studio/src/tts.ts`), WAV out (raw PCM is wrapped, `pcmToWav`), one retry for rate-limit/network errors. Voice per ad, fixed: `ttsVoiceName` maps presets woman_warm→Sulafat, woman_energetic→Laomedeia, man_warm→Achird, man_deep→Charon, man_energetic→Puck; a custom description by its words (`presetForVoiceDescription`); none→Sulafat. One constant style per ad (`ttsNarrationStyle`, includes the language). Hebrew uses the nikud `pronunciation` via `spokenNarration`. Stored on the clip (`narration_text/voice/style`), so an edit re-narrates the same line.
+  - Mix (`mixNarration` / `buildNarrationMixArgs` in `ffmpeg.ts`): narration at 0.2 s, clip sound ducked to 0.25 while it speaks, output = clip length, a long line sped up (atempo ≤ 1.25) and otherwise cut with a 0.3 s fade; H.264 High yuv420p + AAC 48 kHz + faststart; 60 s run cap. The mixed file is the clip's stored media, so preview, AI check and assembly all have the narration; assembly unchanged.
+  - Metering: new usage kind `narration_tts` (1 text unit per call, en/he label on the usage screen); the text allowance is checked before the paid render starts (single render, render-all, edit). Failures fail the clip with the provider code or `narration_failed` (en/he copy, retry button works); a clip is never stored without its narration.
+  - Fingerprint: voice-over scenes with narration get `{ narration: 'separate' }`, so old voice-over clips read out of date; on-camera and silent fingerprints are pinned unchanged in tests.
+  - Live check: one Hebrew TTS call (4.2 s, 161 KB WAV, 24 kHz mono, 3.2 s) mixed onto a 5 s synthetic clip → 5.0 s H.264 yuv420p + AAC 48 kHz stereo; files in the session scratchpad `tts-samples/`.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** after deploy, re-render a voice-over scene of a Hebrew ad and listen; consider making "a person visibly mouthing the narration" a major (not minor) AI-check issue for voice-over clips.
+- **Waiting on human:** deploy (not done by this run).
+
 ## 2026-11-10 — Ad Studio video: full-frame footage, bottom brand banner, no stuck renders
 
 - **Last completed:**

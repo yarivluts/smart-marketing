@@ -4230,6 +4230,7 @@
       "video_qa": "AI video check",
       "vocalize": "Narration vowel marks",
       "vocalize_check": "Vowel marks check",
+      "narration_tts": "Narrator voice",
       "reference_image": "Scene illustration",
       "ad_copy": "Ad text",
       "search_ad": "Search ad",
@@ -4343,7 +4344,8 @@
       "refused": "the AI would not make this scene - reword the scene and try again",
       "invalid_output": "the AI made a clip that could not be used - try again",
       "provider_error": "the AI video maker had a problem on its side - wait a minute and try again",
-      "timed_out": "it took too long, so it was stopped - try again"
+      "timed_out": "it took too long, so it was stopped - try again",
+      "narration_failed": "the narrator's voice could not be added to the clip - try again"
     },
     "videoFailure": {
       "ffmpeg_unavailable": "the video could not be put together on our side, so please contact GrowthOS support",

@@ -6,6 +6,7 @@
 export * from './runtime';
 export * from './llm';
 export * from './omni';
+export * from './tts';
 export * from './ffmpeg';
 export * from './media-storage';
 export * from './metering';

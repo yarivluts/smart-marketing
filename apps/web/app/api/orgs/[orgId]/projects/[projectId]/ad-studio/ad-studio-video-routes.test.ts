@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
@@ -35,11 +35,14 @@ import { POST as chooseClip } from './briefs/[briefId]/clips/[clipId]/choose/rou
 import { GET as videoMedia } from './briefs/[briefId]/videos/[videoId]/media/route';
 import { PUT as putSettings } from './settings/route';
 import { PUT as putVideoSettings } from './briefs/[briefId]/video-settings/route';
+import { PUT as saveVoice } from './briefs/[briefId]/voice/route';
+import { PUT as saveNarrationMode } from './briefs/[briefId]/narration/route';
 
-const { getServerSessionMock, memoryStorage, concatClipsMock } = vi.hoisted(() => ({
+const { getServerSessionMock, memoryStorage, concatClipsMock, mixNarrationMock } = vi.hoisted(() => ({
   getServerSessionMock: vi.fn(),
   memoryStorage: { current: null as unknown },
   concatClipsMock: vi.fn(),
+  mixNarrationMock: vi.fn(),
 }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
 vi.mock('server-only', () => ({}));
@@ -56,9 +59,16 @@ beforeAll(async () => {
 beforeEach(() => {
   getServerSessionMock.mockReset();
   concatClipsMock.mockReset();
+  mixNarrationMock.mockReset();
+  // The fake clips are not real video: "mixing" appends a marker, so a test can see the narration was laid on.
+  mixNarrationMock.mockImplementation(async ({ video, narration, output }: { video: string; narration: string; output: string }) => {
+    expect((await readFile(narration)).toString('ascii', 0, 4)).toBe('RIFF');
+    await writeFile(output, Buffer.concat([await readFile(video), Buffer.from(NARRATED)]));
+    return { tempo: 1, seconds: 1, trimmed: false, clipSeconds: 5 };
+  });
   memoryStorage.current = createMemoryMediaStorage();
   // The engine's test seams stand in for GCS and ffmpeg (the engine lives in @growthos/ad-studio).
-  configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage, concatClips: concatClipsMock });
+  configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage, concatClips: concatClipsMock, mixNarration: mixNarrationMock });
   process.env.GEMINI_API_KEY = 'test-gemini-key';
 });
 
@@ -69,14 +79,38 @@ afterEach(() => {
 });
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
+/** What the fake mixer appends to a clip it laid narration onto. */
+const NARRATED = '+narration';
+const TTS_MODEL = 'gemini-3.8-flash-tts';
+
+/** 0.1 s of 24 kHz 16-bit mono silence as WAV, the speech model's answer. */
+function fakeWav(): Buffer {
+  const pcm = Buffer.alloc(4800);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0, 'ascii');
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVEfmt ', 8, 'ascii');
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(24000, 24);
+  header.writeUInt32LE(48000, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36, 'ascii');
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
+}
 
 /**
  * A stand-in for Gemini Omni's HTTP API with the documented shapes: a background start returns
  * `in_progress`, the next interaction read is `completed` with the video in the model_output step,
- * the file is PROCESSING once and then ACTIVE, and the download returns bytes.
+ * the file is PROCESSING once and then ACTIVE, and the download returns bytes. The speech model
+ * (same endpoint, its own model) answers at once with a WAV, or with `ttsStatus` as an error.
  */
-function fakeOmni(options: { startStatus?: number; startMessage?: string; qa?: (n: number) => unknown } = {}) {
+function fakeOmni(options: { startStatus?: number; startMessage?: string; qa?: (n: number) => unknown; ttsStatus?: () => number | null; ttsMessage?: string } = {}) {
   const starts: Record<string, unknown>[] = [];
+  const speech: Record<string, unknown>[] = [];
   const reviews: { parts: Record<string, unknown>[] }[] = [];
   const fileReads = new Map<string, number>();
   const fetchMock = vi.fn(async (input: string | URL, init?: RequestInit) => {
@@ -84,6 +118,12 @@ function fakeOmni(options: { startStatus?: number; startMessage?: string; qa?: (
     expect(url.startsWith(BASE)).toBe(true);
     expect(url).not.toContain('test-gemini-key');
     expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-gemini-key');
+    if (url === `${BASE}/interactions` && init?.method === 'POST' && JSON.parse(String(init.body)).model === TTS_MODEL) {
+      speech.push(JSON.parse(String(init.body)));
+      const status = options.ttsStatus?.() ?? null;
+      if (status) return new Response(JSON.stringify({ error: { message: options.ttsMessage ?? 'failed' } }), { status });
+      return Response.json({ id: `tts_${speech.length}`, status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'audio', mime_type: 'audio/wav', data: fakeWav().toString('base64') }] }] });
+    }
     if (url === `${BASE}/interactions` && init?.method === 'POST') {
       if (options.startStatus) return new Response(JSON.stringify({ error: { message: options.startMessage ?? 'failed' } }), { status: options.startStatus });
       starts.push(JSON.parse(String(init.body)));
@@ -114,7 +154,7 @@ function fakeOmni(options: { startStatus?: number; startMessage?: string; qa?: (
     return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
   });
   vi.stubGlobal('fetch', fetchMock);
-  return { fetchMock, starts, reviews };
+  return { fetchMock, starts, speech, reviews };
 }
 
 function unique(prefix: string): string {
@@ -158,6 +198,10 @@ async function setup() {
   expect((await saveScript(request('PUT', { scenes: SCENES }), { params: Promise.resolve({ orgId, projectId, briefId }) })).status).toBe(200);
   const p = (extra: Record<string, string> = {}) => ({ params: Promise.resolve({ orgId, projectId, briefId, ...extra }) }) as never;
   return { ownerSession, owner, orgId, projectId, briefId, p };
+}
+
+async function putVoice(ctx: Awaited<ReturnType<typeof setup>>, voice: { preset: string; description?: string }) {
+  expect((await saveVoice(request('PUT', { voice }), ctx.p())).status).toBe(200);
 }
 
 type ClipJson = {
@@ -267,13 +311,14 @@ describe('Ad Studio video routes (KAN-231)', () => {
     const done = await poll(ctx.p());
     expect(done.clips[0]).toMatchObject({ status: 'ready' });
     const objectPath = `orgs/${ctx.orgId}/projects/${ctx.projectId}/briefs/${ctx.briefId}/clips/${clipId}.mp4`;
-    expect(storage().objects.get(objectPath)?.data.toString()).toBe('mp4-bytes-of-f1');
+    // A voice-over scene: the stored clip is the one with the narration laid on.
+    expect(storage().objects.get(objectPath)?.data.toString()).toBe(`mp4-bytes-of-f1${NARRATED}`);
     expect((await getAdStudioClip(ctx.orgId, ctx.projectId, ctx.briefId, clipId)).gcs_path).toBe(objectPath);
 
     const whole = await clipMedia(request('GET'), ctx.p({ clipId }));
     expect(whole.status).toBe(200);
     expect(whole.headers.get('content-type')).toBe('video/mp4');
-    expect(await whole.text()).toBe('mp4-bytes-of-f1');
+    expect(await whole.text()).toBe(`mp4-bytes-of-f1${NARRATED}`);
     const partial = await clipMedia(request('GET', undefined, { range: 'bytes=0-2' }), ctx.p({ clipId }));
     expect(partial.status).toBe(206);
     expect(await partial.text()).toBe('mp4');
@@ -297,7 +342,7 @@ describe('Ad Studio video routes (KAN-231)', () => {
     for (let i = 0; i < 3 && !listing.clips[0].qa; i += 1) listing = await poll(ctx.p());
     expect(listing.clips[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', issues: [], transcript: 'Too much paper?' } });
     // The reviewer got the stored clip as video bytes, with the scene's narration in the prompt.
-    expect(reviews[0].parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: Buffer.from('mp4-bytes-of-f1').toString('base64') } });
+    expect(reviews[0].parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: Buffer.from(`mp4-bytes-of-f1${NARRATED}`).toString('base64') } });
     expect(String(reviews[0].parts[1].text)).toContain('Intended narration, word for word: "Too much paper?"');
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).find((row) => row.kind === 'video_qa')).toMatchObject({ units: 1, outcome: 'succeeded' });
     // Later polls do not check the same clip again.
@@ -379,6 +424,99 @@ describe('Ad Studio video routes (KAN-231)', () => {
     expect(editClip).toMatchObject({ sceneId: 's1', version: 2, status: 'generating', instruction: 'make it night' });
     expect(starts[2]).toMatchObject({ previous_interaction_id: 'v1_1', input: expect.stringContaining('make it night. Keep everything else the same.') });
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId))[0]).toMatchObject({ kind: 'video_edit', units: 5 });
+  });
+
+  it('a voice-over scene: the clip is asked for without speech, the narration is spoken separately in the ad voice, metered, and laid on', async () => {
+    const ctx = await setup();
+    const { starts, speech } = fakeOmni();
+    await putVoice(ctx, { preset: 'man_deep' });
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    const prompt = String(starts[0].input);
+    expect(prompt).not.toContain('Too much paper?');
+    expect(prompt).toContain('No speech of any kind: no narration, no dialogue, no voices');
+    expect(speech).toHaveLength(0);
+    await poll(ctx.p());
+    const done = await poll(ctx.p());
+    expect(done.clips[0]).toMatchObject({ status: 'ready' });
+    expect(speech).toHaveLength(1);
+    expect(speech[0]).toMatchObject({
+      model: TTS_MODEL,
+      input: [{ type: 'user_input', content: [{ type: 'text', text: 'Too much paper?', annotations: [{ type: 'speech_metadata', style: expect.stringContaining('in English') }] }] }],
+      generation_config: { speech_config: [{ voice: 'Charon' }] },
+    });
+    expect(mixNarrationMock).toHaveBeenCalledTimes(1);
+    const clip = await getAdStudioClip(ctx.orgId, ctx.projectId, ctx.briefId, done.clips[0].id);
+    expect(clip).toMatchObject({ narration_text: 'Too much paper?', narration_voice: 'Charon' });
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).filter((row) => row.kind === 'narration_tts')).toEqual([
+      expect.objectContaining({ units: 1, provider: 'gemini', model: TTS_MODEL, outcome: 'succeeded' }),
+    ]);
+
+    // A conversational edit keeps the clip speechless, and the narration is laid on again afterwards.
+    await editScene(request('POST', { instruction: 'make it night' }), ctx.p({ sceneId: 's1' }));
+    expect(String(starts[1].input)).toContain('make it night. Keep everything else the same.');
+    expect(String(starts[1].input)).toContain('No speech of any kind');
+    await poll(ctx.p());
+    const edited = await poll(ctx.p());
+    expect(edited.clips.find((entry) => entry.kind === 'edit')).toMatchObject({ status: 'ready', instruction: 'make it night' });
+    expect(speech).toHaveLength(2);
+    expect(mixNarrationMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('a person speaking on camera keeps speaking in the clip, with no separate narration', async () => {
+    const ctx = await setup();
+    const { starts, speech } = fakeOmni();
+    // A mixed ad keeps each scene's own delivery (voice-over mode would turn it back into a voice-over).
+    expect((await saveNarrationMode(request('PUT', { mode: 'mixed' }), ctx.p())).status).toBe(200);
+    expect((await saveScript(request('PUT', { scenes: [{ ...SCENES[0], delivery: 'on_screen' }, SCENES[1]] }), ctx.p())).status).toBe(200);
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    expect(String(starts[0].input)).toContain('says, in English: "Too much paper?"');
+    await poll(ctx.p());
+    const done = await poll(ctx.p());
+    expect(done.clips[0]).toMatchObject({ status: 'ready' });
+    expect(speech).toHaveLength(0);
+    expect(mixNarrationMock).not.toHaveBeenCalled();
+    const objectPath = `orgs/${ctx.orgId}/projects/${ctx.projectId}/briefs/${ctx.briefId}/clips/${done.clips[0].id}.mp4`;
+    expect(storage().objects.get(objectPath)?.data.toString()).toBe('mp4-bytes-of-f1');
+  });
+
+  it('a narration the speech model refuses fails the clip with its reason, is logged, and trying again works', async () => {
+    const ctx = await setup();
+    let billing = true;
+    const { speech } = fakeOmni({ ttsStatus: () => (billing ? 402 : null), ttsMessage: 'Your prepayment credits are depleted.' });
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    await poll(ctx.p());
+    const failed = await poll(ctx.p());
+    // Never stored without its narration.
+    expect(failed.clips[0]).toMatchObject({ status: 'failed', failureReason: 'provider_billing' });
+    expect(storage().objects.size).toBe(0);
+    expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).find((row) => row.kind === 'narration_tts')).toMatchObject({ outcome: 'failed', failure_reason: 'provider_billing' });
+    expect(speech).toHaveLength(1);
+
+    billing = false;
+    expect((await renderScene(request('POST'), ctx.p({ sceneId: 's1' }))).status).toBe(200);
+    await poll(ctx.p());
+    const retried = await poll(ctx.p());
+    expect(retried.clips.find((entry) => entry.version === 2)).toMatchObject({ status: 'ready' });
+  });
+
+  it('a mix that fails marks the clip narration_failed', async () => {
+    const ctx = await setup();
+    fakeOmni();
+    mixNarrationMock.mockRejectedValue(new Error('ffmpeg exited with code 1.'));
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    await poll(ctx.p());
+    expect((await poll(ctx.p())).clips[0]).toMatchObject({ status: 'failed', failureReason: 'narration_failed' });
+  });
+
+  it('a spent daily AI allowance refuses a voice-over render before the video is paid for', async () => {
+    const ctx = await setup();
+    expect((await putSettings(request('PUT', { dailyTextGenerations: 0, dailyVideoSeconds: 300 }), { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }) })).status).toBe(200);
+    const { starts } = fakeOmni();
+    const refused = await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    expect(refused.status).toBe(429);
+    expect(starts).toHaveLength(0);
+    // A scene with no narration needs no narrator.
+    expect((await renderScene(request('POST'), ctx.p({ sceneId: 's2' }))).status).toBe(200);
   });
 
   it('renders with the advanced settings: the resolution in the request, style and exclusions in the prompt, edits and assembly at the same resolution', async () => {

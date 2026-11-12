@@ -170,12 +170,14 @@ describe('nikud verification guards', () => {
 
 describe('pronunciation in the scene prompt, fingerprint and rules', () => {
   it('has the narrator read the vocalized line exactly, and the plain line as before without one', () => {
-    const plain = buildScenePrompt(scene(), HE);
+    // Only a person on camera speaks in the clip; a voice-over is spoken separately (see the speech narrator).
+    const onCamera = (overrides: Partial<AdStudioScene> = {}) => scene({ delivery: 'on_screen', ...overrides });
+    const plain = buildScenePrompt(onCamera(), HE);
     expect(plain).toContain(`says, in Hebrew: "${PLAIN}"`);
     expect(plain).not.toContain('nikud');
     // Every narration is asked not to stutter or repeat a word (the AI check caught one doing it).
     expect(plain).toContain('without repeating or stuttering');
-    const vocalized = buildScenePrompt(scene({ pronunciation: VOCALIZED }), HE);
+    const vocalized = buildScenePrompt(onCamera({ pronunciation: VOCALIZED }), HE);
     expect(vocalized).toContain('full nikud vowel marks');
     expect(vocalized).toContain(`"${VOCALIZED}"`);
     expect(vocalized).not.toContain(`"${PLAIN}"`);

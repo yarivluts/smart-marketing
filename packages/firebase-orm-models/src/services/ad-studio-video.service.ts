@@ -81,6 +81,8 @@ export async function createAdStudioClip(params: {
   resolution?: string | null;
   durationSeconds: number;
   requestedBy: string;
+  /** A voice-over spoken by the speech model and mixed onto the speechless clip once it is made. */
+  narration?: { text: string; voice: string; style: string } | null;
   now?: Date;
 }): Promise<AdStudioClipModel> {
   const existing = await listAdStudioClips(params.organizationId, params.projectId, params.briefId);
@@ -119,6 +121,9 @@ export async function createAdStudioClip(params: {
   clip.lease_token = null;
   clip.lease_until = null;
   clip.chosen = false;
+  clip.narration_text = params.narration?.text ?? null;
+  clip.narration_voice = params.narration?.voice ?? null;
+  clip.narration_style = params.narration?.style ?? null;
   clip.setPathParams(pathParams(params.organizationId, params.projectId));
   await clip.save();
   return clip;

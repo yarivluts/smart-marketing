@@ -7,6 +7,8 @@ import {
   AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY,
   FULL_FRAME_LINE,
   isClipSlow,
+  NO_SPEECH_RULE,
+  narrationIsSeparate,
   assemblyPlan,
   buildSceneEditInstruction,
   buildScenePrompt,
@@ -37,16 +39,37 @@ describe('buildScenePrompt', () => {
     expect(buildScenePrompt(scene('a', 6), { ...CONTEXT, format: 'horizontal' })).toContain('horizontal 16:9 frame');
   });
 
-  it('never asks for readable text, and speaks the voiceover in the ad language', () => {
+  it('never asks for readable text, and never sends a voice-over to the video model: the clip is asked for without any speech', () => {
+    // Told "no one in the shot speaks", Omni still had people mouthing the narration (prod, 2026-11):
+    // the narration is now spoken separately and mixed on, so the clip prompt carries none of it.
     const prompt = buildScenePrompt(scene('a', 5, 'A desk', 'Signed in seconds'), CONTEXT);
     expect(prompt).toContain('Do not show any readable text');
-    expect(prompt).toContain('narrator says, in Hebrew: "Signed in seconds"');
-    // Omni made an on-screen person the speaker and the lips drifted out of sync (seen on prod, 2026-10-01).
-    expect(prompt).toContain('the narrator is never seen, and no one in the shot speaks or moves their lips as if talking.');
-    expect(buildScenePrompt({ ...scene('a', 5, 'A desk', 'Signed in seconds'), pronunciation: 'Signed in seconds!' }, CONTEXT)).toContain('no one in the shot speaks or moves their lips');
+    expect(prompt).not.toContain('Signed in seconds');
+    expect(prompt).not.toMatch(/narrator says|says, in/);
+    expect(prompt).toContain(NO_SPEECH_RULE);
+    expect(prompt).toMatch(/no dialogue, no voices/);
+    expect(prompt).toMatch(/no one moves their lips as if speaking/);
+    expect(prompt).toContain('Audio: soft background music that fits the mood, the same music in every scene, with natural ambient sound.');
+    const vocalized = buildScenePrompt({ ...scene('a', 5, 'A desk', 'Signed in seconds'), pronunciation: 'Signed in seconds!' }, CONTEXT);
+    expect(vocalized).not.toContain('Signed in seconds');
+    expect(vocalized).not.toContain('nikud');
     const silent = buildScenePrompt(scene('a', 5, 'A desk', '   '), CONTEXT);
     expect(silent).toContain('No speech.');
     expect(silent).not.toContain('narrator');
+  });
+
+  it('keeps a person speaking on camera in the clip itself, lips in sync', () => {
+    const prompt = buildScenePrompt({ ...scene('a', 5, 'A desk', 'Signed in seconds'), delivery: 'on_screen' }, CONTEXT);
+    expect(prompt).toContain('says, in Hebrew: "Signed in seconds"');
+    expect(prompt).toContain('Their lips move in sync with every word.');
+    expect(prompt).not.toContain(NO_SPEECH_RULE);
+  });
+
+  it('decides which scenes get their narration mixed on separately', () => {
+    expect(narrationIsSeparate(scene('a', 5, 'A desk', 'Hi'))).toBe(true);
+    expect(narrationIsSeparate({ ...scene('a', 5, 'A desk', 'Hi'), delivery: 'voiceover' })).toBe(true);
+    expect(narrationIsSeparate({ ...scene('a', 5, 'A desk', 'Hi'), delivery: 'on_screen' })).toBe(false);
+    expect(narrationIsSeparate(scene('a', 5, 'A desk', '  '))).toBe(false);
   });
 
   it('shortens a long product description so every scene prompt stays compact', () => {
@@ -58,6 +81,10 @@ describe('buildScenePrompt', () => {
   it('builds an edit instruction that keeps everything else and repeats the no-text rule', () => {
     expect(buildSceneEditInstruction('  make it night ')).toBe('make it night. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.');
     expect(buildSceneEditInstruction('Make it night.')).toMatch(/^Make it night\. Keep/);
+    // A voice-over clip stays speechless through every edit: its narration is mixed on again afterwards.
+    const speechless = buildSceneEditInstruction('make it night', { speechless: true });
+    expect(speechless.endsWith(NO_SPEECH_RULE)).toBe(true);
+    expect(buildSceneEditInstruction('make it night', { speechless: false })).not.toContain(NO_SPEECH_RULE);
   });
 
   it('asks for full-bleed footage and never mentions the brand banner laid over it afterwards', () => {
@@ -111,6 +138,19 @@ describe('sceneFingerprint', () => {
       sceneFingerprint(base, { ...CONTEXT, language: 'en' }),
     ];
     expect(new Set([fingerprint, ...variants]).size).toBe(6);
+  });
+
+  it('marks voice-over scenes whose narration is mixed on separately, leaving silent and on-camera scenes as before', () => {
+    // Fingerprints computed by the code before the separate narration (origin/main at a9922447): a
+    // voice-over clip made then - narration spoken by the video model - must now read as out of date,
+    // while on-camera and narration-free scenes keep their fingerprints, so their clips stay current.
+    const VOICED = { ...CONTEXT, voice: 'a warm woman' };
+    const before = { voiceOver: '67e2e5e4f25068eb', voiceOverWithVoice: '594d675c4c8709cf', onCamera: '6b18db02c9df62a1', silent: 'd209e673ec35e536' };
+    expect(sceneFingerprint(base, CONTEXT)).not.toBe(before.voiceOver);
+    expect(sceneFingerprint(base, VOICED)).not.toBe(before.voiceOverWithVoice);
+    expect(sceneFingerprint({ ...base, delivery: 'voiceover' }, CONTEXT)).toBe(sceneFingerprint(base, CONTEXT));
+    expect(sceneFingerprint({ ...base, delivery: 'on_screen', speaker: 'the lawyer' }, VOICED)).toBe(before.onCamera);
+    expect(sceneFingerprint({ ...base, voiceover: '' }, CONTEXT)).toBe(before.silent);
   });
 });
 

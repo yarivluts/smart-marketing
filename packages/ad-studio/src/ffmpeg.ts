@@ -300,6 +300,111 @@ export async function concatClips(params: {
   return { durationSeconds: Math.round(Math.min(measured, AD_STUDIO_MAX_TOTAL_SECONDS) * 100) / 100 };
 }
 
+/**
+ * How a voice-over is laid onto its speechless clip: the narration starts just after the cut, the
+ * clip's own sound (music and ambience) is ducked under it, and the clip keeps its length. A line
+ * longer than the room it has is sped up a little (at most 25%, which still sounds natural) and, if
+ * it still does not fit, cut with a short fade rather than running past the scene.
+ */
+export const NARRATION_START_SECONDS = 0.2;
+/** Silence left after the narration before the next scene's cut. */
+export const NARRATION_TAIL_SECONDS = 0.15;
+export const NARRATION_MAX_TEMPO = 1.25;
+export const NARRATION_FADE_SECONDS = 0.3;
+/** The clip's own sound level while the narrator speaks. */
+export const NARRATION_DUCKED_VOLUME = 0.25;
+const NARRATION_MIX_TIMEOUT_MS = 60_000;
+
+export interface NarrationFit {
+  /** atempo factor, 1 when the line fits as spoken. */
+  tempo: number;
+  /** How long the narration runs once placed (after tempo and any cut). */
+  seconds: number;
+  /** True when even sped up it is longer than the room it has, so it is cut with a fade. */
+  trimmed: boolean;
+}
+
+/** How a line of `narrationSeconds` fits a clip of `clipSeconds` (see NARRATION_*). */
+export function fitNarration(clipSeconds: number, narrationSeconds: number): NarrationFit {
+  const room = Math.max(0.5, clipSeconds - NARRATION_START_SECONDS - NARRATION_TAIL_SECONDS);
+  if (narrationSeconds <= room) return { tempo: 1, seconds: narrationSeconds, trimmed: false };
+  const tempo = Math.min(narrationSeconds / room, NARRATION_MAX_TEMPO);
+  const spoken = narrationSeconds / tempo;
+  return spoken <= room + 0.001 ? { tempo, seconds: spoken, trimmed: false } : { tempo, seconds: room, trimmed: true };
+}
+
+/** The ffmpeg arguments that lay `narration` (a WAV) onto `video`, keeping the clip's length. */
+export function buildNarrationMixArgs(params: { video: string; narration: string; output: string; clipSeconds: number; narrationSeconds: number; clipHasAudio: boolean }): string[] {
+  const { video, narration, output, clipSeconds } = params;
+  const fit = fitNarration(clipSeconds, params.narrationSeconds);
+  const start = NARRATION_START_SECONDS;
+  const end = start + fit.seconds;
+  const args = ['-hide_banner', '-nostdin', '-y', '-i', video, '-i', narration];
+  // A clip with no sound of its own gets a silent bed, so the mix always has two inputs.
+  if (!params.clipHasAudio) args.push('-f', 'lavfi', '-t', seconds(clipSeconds), '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+  const bedInput = params.clipHasAudio ? 0 : 2;
+  const narrationChain = [
+    'aresample=48000',
+    'aformat=sample_fmts=fltp:channel_layouts=stereo',
+    ...(fit.tempo > 1 ? [`atempo=${fit.tempo.toFixed(4)}`] : []),
+    ...(fit.trimmed ? [`atrim=duration=${seconds(fit.seconds)}`, `afade=t=out:st=${seconds(Math.max(0, fit.seconds - NARRATION_FADE_SECONDS))}:d=${seconds(NARRATION_FADE_SECONDS)}`] : []),
+    'asetpts=PTS-STARTPTS',
+    `adelay=${Math.round(start * 1000)}:all=1`,
+  ].join(',');
+  const filters = [
+    `[1:a:0]${narrationChain}[narration]`,
+    // The clip's sound, ducked while the narrator speaks (with a short ramp on either side).
+    `[${bedInput}:a:0]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,volume='if(between(t,${seconds(start - 0.1)},${seconds(end + 0.2)}),${NARRATION_DUCKED_VOLUME},1)':eval=frame[bed]`,
+    `[bed][narration]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,alimiter=limit=0.95[aout]`,
+  ];
+  args.push(
+    '-filter_complex',
+    filters.join(';'),
+    '-map',
+    '0:v:0',
+    '-map',
+    '[aout]',
+    '-c:v',
+    'libx264',
+    '-profile:v',
+    'high',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '18',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-ar',
+    '48000',
+    '-movflags',
+    '+faststart',
+    '-t',
+    seconds(clipSeconds),
+    output,
+  );
+  return args;
+}
+
+/**
+ * Lays a voice-over (WAV) onto its speechless clip (MP4) and writes `output`, an MP4 of the clip's
+ * length: H.264 + AAC, index at the front. Returns how the narration was fitted.
+ */
+export async function mixNarration(params: { video: string; narration: string; output: string; runner: FfmpegRunner }): Promise<NarrationFit & { clipSeconds: number }> {
+  const clip = await probeMedia(params.video, params.runner);
+  if (!clip.hasVideo || !clip.durationSeconds) throw new FfmpegFailedError('The clip has no video stream.', '');
+  const voice = await probeMedia(params.narration, params.runner);
+  if (!voice.hasAudio || !voice.durationSeconds) throw new FfmpegFailedError('The narration has no audio.', '');
+  const args = buildNarrationMixArgs({ video: params.video, narration: params.narration, output: params.output, clipSeconds: clip.durationSeconds, narrationSeconds: voice.durationSeconds, clipHasAudio: clip.hasAudio });
+  // A 10-second clip mixes in seconds; a stuck run is stopped well inside the clip's 2-minute lease.
+  const { code, stderr } = await runFfmpeg(args, { ...params.runner, timeoutMs: Math.min(params.runner.timeoutMs, NARRATION_MIX_TIMEOUT_MS) });
+  if (code !== 0) throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
+  return { ...fitNarration(clip.durationSeconds, voice.durationSeconds), clipSeconds: clip.durationSeconds };
+}
+
 let availability: { path: string; result: Promise<boolean> } | null = null;
 
 /** Whether the configured ffmpeg runs, for the admin panel. Checked once per process. */

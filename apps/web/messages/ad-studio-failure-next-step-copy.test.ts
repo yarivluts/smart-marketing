@@ -24,6 +24,7 @@ describe('Ad Studio failure reasons say what to do next and avoid model/provider
         a.clipFailure.invalid_output,
         a.clipFailure.provider_error,
         a.clipFailure.timed_out,
+        a.clipFailure.narration_failed,
         a.imageFailure.refused,
         a.imageFailure.invalid_output,
         a.imageFailure.provider_error,
