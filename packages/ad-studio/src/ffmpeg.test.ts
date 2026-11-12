@@ -7,7 +7,12 @@ import path from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   buildConcatArgs,
+  buildNarrationMixArgs,
   concatClips,
+  fitNarration,
+  mixNarration,
+  NARRATION_DUCKED_VOLUME,
+  NARRATION_MAX_TEMPO,
   defaultFfmpegRunner,
   FfmpegFailedError,
   FfmpegUnavailableError,
@@ -232,6 +237,74 @@ describe.skipIf(!hasFfmpeg)('with a real ffmpeg binary', () => {
     expect([info.width, info.height]).toEqual([720, 1280]);
     const at = (x: number, y: number) => data[(y * info.width + x) * info.channels];
     for (const [x, y] of [[2, 2], [717, 2], [360, 2], [360, 1277], [2, 640], [717, 640], [2, 1277], [717, 1277]]) expect(at(x, y)).toBeGreaterThan(200);
+  }, 60_000);
+});
+
+describe('laying a voice-over onto its speechless clip', () => {
+  it('fits the narration: as spoken when it fits, sped up to at most 25%, then cut with a fade', () => {
+    expect(fitNarration(5, 3)).toEqual({ tempo: 1, seconds: 3, trimmed: false });
+    const faster = fitNarration(5, 5);
+    expect(faster.tempo).toBeCloseTo(5 / 4.65, 4);
+    expect(faster.seconds).toBeCloseTo(4.65, 4);
+    expect(faster.trimmed).toBe(false);
+    expect(fitNarration(5, 8)).toEqual({ tempo: NARRATION_MAX_TEMPO, seconds: expect.closeTo(4.65, 6), trimmed: true });
+  });
+
+  it('starts the narration at 0.2s, ducks the clip sound under it, keeps the clip length and encodes H.264/AAC with faststart', () => {
+    const args = buildNarrationMixArgs({ video: 'clip.mp4', narration: 'voice.wav', output: 'out.mp4', clipSeconds: 6, narrationSeconds: 4, clipHasAudio: true });
+    const graph = args[args.indexOf('-filter_complex') + 1];
+    expect(graph).toContain('adelay=200:all=1');
+    expect(graph).not.toContain('atempo');
+    expect(graph).toContain(`volume='if(between(t,0.1,4.4),${NARRATION_DUCKED_VOLUME},1)':eval=frame`);
+    expect(graph).toContain('amix=inputs=2:duration=first');
+    expect(args).toEqual(expect.arrayContaining(['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart']));
+    expect(args.slice(-3)).toEqual(['-t', '6', 'out.mp4']);
+    // A clip with no sound gets a silent bed; a long line is sped up and cut with a fade.
+    const long = buildNarrationMixArgs({ video: 'clip.mp4', narration: 'voice.wav', output: 'out.mp4', clipSeconds: 5, narrationSeconds: 9, clipHasAudio: false });
+    const longGraph = long[long.indexOf('-filter_complex') + 1];
+    expect(long.join(' ')).toContain('-f lavfi -t 5 -i anullsrc');
+    expect(longGraph).toContain('[2:a:0]');
+    expect(longGraph).toContain('atempo=1.2500');
+    expect(longGraph).toContain('atrim=duration=4.65,afade=t=out:st=4.35:d=0.3');
+  });
+});
+
+describe.skipIf(!hasFfmpeg)('a voice-over mixed with a real ffmpeg binary', () => {
+  async function makeFiles(clipArgs: string[], toneSeconds: number) {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-narration-'));
+    workDirs.push(dir);
+    const clip = path.join(dir, 'clip.mp4');
+    const voice = path.join(dir, 'voice.wav');
+    const make = (args: string[]) => expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { windowsHide: true }).status).toBe(0);
+    make([...clipArgs, clip]);
+    // The "narration": a tone at the speech model's format, 24 kHz 16-bit mono WAV.
+    make(['-f', 'lavfi', '-i', `sine=frequency=660:sample_rate=24000:duration=${toneSeconds}`, '-ac', '1', '-c:a', 'pcm_s16le', voice]);
+    return { dir, clip, voice, output: path.join(dir, 'narrated.mp4') };
+  }
+
+  it('lays the narration onto a clip with music: same length, H.264 + AAC, audio present', async () => {
+    const files = await makeFiles(['-f', 'lavfi', '-i', 'testsrc=size=360x640:rate=24:duration=4', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest'], 2);
+    const fit = await mixNarration({ video: files.clip, narration: files.voice, output: files.output, runner: realRunner });
+    expect(fit).toMatchObject({ tempo: 1, trimmed: false });
+    const probe = await runFfmpeg(['-hide_banner', '-nostdin', '-i', files.output], realRunner);
+    const info = parseProbeOutput(probe.stderr);
+    expect(info).toMatchObject({ hasVideo: true, hasAudio: true });
+    expect(info.durationSeconds).toBeGreaterThan(3.8);
+    expect(info.durationSeconds).toBeLessThan(4.2);
+    expect(probe.stderr).toMatch(/Video: h264/);
+    expect(probe.stderr).toMatch(/yuv420p/);
+    expect(probe.stderr).toMatch(/Audio: aac/);
+  }, 60_000);
+
+  it('speeds up and cuts a narration longer than a silent clip, and the result still runs the clip length', async () => {
+    const files = await makeFiles(['-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=25:duration=3', '-c:v', 'libx264', '-pix_fmt', 'yuv420p'], 6);
+    const fit = await mixNarration({ video: files.clip, narration: files.voice, output: files.output, runner: realRunner });
+    expect(fit).toMatchObject({ tempo: NARRATION_MAX_TEMPO, trimmed: true });
+    const info = await probeMedia(files.output, realRunner);
+    expect(info).toMatchObject({ hasVideo: true, hasAudio: true });
+    expect(info.durationSeconds).toBeGreaterThan(2.8);
+    expect(info.durationSeconds).toBeLessThan(3.2);
+    expect((await stat(files.output)).size).toBeGreaterThan(1000);
   }, 60_000);
 });
 

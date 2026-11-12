@@ -185,7 +185,7 @@ export interface AdStudioClipQaIssue {
   at_seconds: number | null;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'vocalize_check', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan', 'keyword_choice', 'demo_tour'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit', 'video_qa', 'vocalize', 'vocalize_check', 'narration_tts', 'reference_image', 'ad_copy', 'search_ad', 'translate', 'image_qa', 'site_analysis', 'target_writing', 'landing_page', 'audience_plan', 'keyword_choice', 'demo_tour'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**
@@ -332,6 +332,21 @@ export class AdStudioClipModel extends BaseModel {
   /** The version the person chose for the assembled video; absent or false lets the newest current clip be used. */
   @Field({ is_required: false })
   public chosen?: boolean | null;
+
+  /**
+   * A voice-over clip's narration: the words the speech model says (the vocalized line when there is
+   * one), the prebuilt voice and the delivery style. The video model makes the clip without speech and
+   * the narration is mixed on before the clip is stored, so `gcs_path` already carries it. Absent for
+   * an on-camera speaker, a scene without narration, and clips made before narration was separate.
+   */
+  @Field({ is_required: false })
+  public narration_text?: string | null;
+
+  @Field({ is_required: false })
+  public narration_voice?: string | null;
+
+  @Field({ is_required: false })
+  public narration_style?: string | null;
 
   /**
    * The AI quality check of a ready clip: Gemini watches it, compares the speech with the scene's

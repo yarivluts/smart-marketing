@@ -92,7 +92,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
   };
 }
 
-const CLIP_FAILURES = new Set([...PROVIDER_CODES, 'timed_out']);
+const CLIP_FAILURES = new Set([...PROVIDER_CODES, 'timed_out', 'narration_failed']);
 const VIDEO_FAILURES = new Set([...ASSEMBLY_CODES, 'timed_out']);
 const IMAGE_FAILURES = new Set([...PROVIDER_CODES, 'storage_error', 'timed_out']);
 
