@@ -20,7 +20,7 @@ describe('empty states do not ask for a data warehouse', () => {
     const h = (he as unknown as Record<string, Record<string, string>>);
     const enHits = Object.values(e).flatMap((ns) => Object.values(ns)).filter((v) => typeof v === 'string' && v.includes('once your data is connected'));
     const heHits = Object.values(h).flatMap((ns) => Object.values(ns)).filter((v) => typeof v === 'string' && v.includes('ברגע שהנתונים שלכם יחוברו'));
-    expect(enHits.length).toBe(14);
-    expect(heHits.length).toBe(14);
+    expect(enHits.length).toBe(15);
+    expect(heHits.length).toBe(15);
   });
 });

@@ -119,14 +119,14 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={FlaskConical} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard title={t('kpiExperiments')} value={summary ? integer.format(summary.experiments) : t('noData')} icon={FlaskConical} />
-          <StatCard title={t('kpiExposures')} value={summary ? integer.format(summary.exposures) : t('noData')} icon={Users} />
-          <StatCard title={t('kpiConversions')} value={summary ? integer.format(summary.conversions) : t('noData')} icon={MousePointerClick} />
+          <StatCard title={t('kpiExperiments')} value={summary ? integer.format(summary.experiments) : t('noData')} icon={FlaskConical} subtext={summary ? undefined : t('kpiNoDataSub')} />
+          <StatCard title={t('kpiExposures')} value={summary ? integer.format(summary.exposures) : t('noData')} icon={Users} subtext={summary ? undefined : t('kpiNoDataSub')} />
+          <StatCard title={t('kpiConversions')} value={summary ? integer.format(summary.conversions) : t('noData')} icon={MousePointerClick} subtext={summary ? undefined : t('kpiNoDataSub')} />
           <StatCard
             title={t('kpiSignificantWins')}
             value={summary ? integer.format(summary.significantWins) : t('noData')}
             icon={Trophy}
-            subtext={summary && summary.significantLosses > 0 ? t('kpiSignificantLossesSub', { count: summary.significantLosses }) : undefined}
+            subtext={summary ? (summary.significantLosses > 0 ? t('kpiSignificantLossesSub', { count: summary.significantLosses }) : undefined) : t('kpiNoDataSub')}
           />
         </div>
       </PageHero>
