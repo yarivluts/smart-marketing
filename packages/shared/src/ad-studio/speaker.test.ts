@@ -9,10 +9,10 @@ function scene(overrides: Partial<AdStudioScene> = {}): AdStudioScene {
 }
 
 describe('who speaks a scene', () => {
-  it('reads the narration as an off-screen voice-over by default, with no one on screen speaking', () => {
+  it('treats the narration as an off-screen voice-over by default: the clip is asked for with no one speaking at all', () => {
     const prompt = buildScenePrompt(scene(), CONTEXT);
-    expect(prompt).toContain('voice-over narrator says, in English: "Sign in seconds."');
-    expect(prompt).toContain('the narrator is never seen, and no one in the shot speaks');
+    expect(prompt).not.toContain('Sign in seconds.');
+    expect(prompt).toContain('No one in the shot talks, and no one moves their lips as if speaking');
   });
 
   it('has a person in the shot say the line, lip-synced, and only the named one when there are several', () => {
@@ -27,7 +27,7 @@ describe('who speaks a scene', () => {
     expect(buildScenePrompt(scene({ delivery: 'on_screen', pronunciation: 'Sign in seconds!' }), { ...CONTEXT, language: 'he' })).toContain('full nikud vowel marks');
   });
 
-  it('keeps every earlier fingerprint for the voice-over default, and changes it with an on-screen speaker', () => {
+  it('reads an explicit voice-over like the default, and changes the fingerprint with an on-screen speaker', () => {
     const base = sceneFingerprint(scene(), CONTEXT);
     expect(sceneFingerprint(scene({ delivery: 'voiceover' }), CONTEXT)).toBe(base);
     const onScreen = sceneFingerprint(scene({ delivery: 'on_screen' }), CONTEXT);

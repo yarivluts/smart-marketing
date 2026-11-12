@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { AdStudioScene } from './scenes';
 import { buildScenePrompt, sceneFingerprint } from './video';
-import { AD_STUDIO_VOICE_PRESET_DESCRIPTIONS, voiceDescription, voiceIssue } from './voice';
+import {
+  AD_STUDIO_DEFAULT_TTS_VOICE,
+  AD_STUDIO_TTS_VOICES,
+  AD_STUDIO_VOICE_PRESET_DESCRIPTIONS,
+  AD_STUDIO_VOICE_PRESETS,
+  presetForVoiceDescription,
+  ttsNarrationStyle,
+  ttsVoiceName,
+  voiceDescription,
+  voiceIssue,
+} from './voice';
 
 const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers', voice: null, settings: null };
 
@@ -26,15 +36,36 @@ describe('the narrator voice of an ad', () => {
     expect(voiceIssue({ preset: 'custom', description: 'x'.repeat(300) })).toBeNull();
   });
 
-  it('asks for the same voice in every scene, for a voice-over and for a person on screen', () => {
+  it('asks the video model for the voice only for a person on screen; a voice-over clip is speechless', () => {
     const voice = voiceDescription({ preset: 'woman_warm' });
     const narrated = buildScenePrompt(scene(), { ...CONTEXT, voice });
-    expect(narrated).toContain(`a voice-over narrator - ${voice} - says, in English: "Sign in seconds."`);
-    expect(narrated).toContain('It is exactly the same narrator voice in every scene of this ad.');
+    expect(narrated).not.toContain(voice as string);
+    expect(narrated).not.toContain('Sign in seconds.');
     const spoken = buildScenePrompt(scene({ delivery: 'on_screen' }), { ...CONTEXT, voice });
     expect(spoken).toContain(`They speak with the voice of ${voice} - the same voice in every scene of this ad.`);
-    // No voice chosen: the earlier prompt, word for word.
-    expect(buildScenePrompt(scene(), CONTEXT)).toContain('a warm, clear voice-over narrator says, in English');
+  });
+
+  it('maps every preset to one fixed speech voice, a custom description by its words, and no voice to the default', () => {
+    expect(new Set(Object.values(AD_STUDIO_TTS_VOICES)).size).toBe(AD_STUDIO_VOICE_PRESETS.length);
+    for (const preset of AD_STUDIO_VOICE_PRESETS) expect(ttsVoiceName({ preset })).toBe(AD_STUDIO_TTS_VOICES[preset]);
+    expect(ttsVoiceName(null)).toBe(AD_STUDIO_DEFAULT_TTS_VOICE);
+    expect(ttsVoiceName({ preset: 'custom', description: '  ' })).toBe(AD_STUDIO_DEFAULT_TTS_VOICE);
+    expect(ttsVoiceName({ preset: 'robot' as never })).toBe(AD_STUDIO_DEFAULT_TTS_VOICE);
+    expect(presetForVoiceDescription('an older man with a slight raspy voice, slow and warm')).toBe('man_deep');
+    expect(presetForVoiceDescription('A friendly guy next door')).toBe('man_warm');
+    expect(presetForVoiceDescription('an energetic young man')).toBe('man_energetic');
+    expect(presetForVoiceDescription('a cheerful woman')).toBe('woman_energetic');
+    expect(presetForVoiceDescription('a calm grandmother')).toBe('woman_warm');
+    expect(presetForVoiceDescription('soothing and soft')).toBe('woman_warm');
+    // Deterministic: the same words always give the same voice, so every scene sounds alike.
+    expect(ttsVoiceName({ preset: 'custom', description: 'A deep male voice' })).toBe(ttsVoiceName({ preset: 'custom', description: 'A deep male voice' }));
+    expect(ttsVoiceName({ preset: 'custom', description: 'A deep male voice' })).toBe(AD_STUDIO_TTS_VOICES.man_deep);
+  });
+
+  it('gives the speech narrator one short style per ad, in the ad language', () => {
+    expect(ttsNarrationStyle({ preset: 'woman_warm' }, 'Hebrew')).toBe('Warm, friendly and clear video ad narration in Hebrew, at a natural, unhurried pace.');
+    expect(ttsNarrationStyle({ preset: 'man_energetic' }, 'English')).toMatch(/^Upbeat, lively and clear .* in English/);
+    expect(ttsNarrationStyle(null, 'English')).toMatch(/^Warm/);
   });
 
   it('makes narrated clips out of date when the voice changes, and leaves silent scenes and earlier clips alone', () => {

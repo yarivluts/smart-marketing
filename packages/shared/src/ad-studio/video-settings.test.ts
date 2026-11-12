@@ -32,8 +32,11 @@ describe('advanced video settings', () => {
     const narrated = buildScenePrompt(scene(), { ...CONTEXT, settings });
     expect(narrated).toContain('authentic, handheld smartphone look of a real customer video');
     expect(narrated).not.toContain('polished commercial style');
-    expect(narrated).toContain('Background music: upbeat acoustic guitar, softly under the voice - the same music in every scene.');
-    expect(narrated).not.toContain('Soft background music under the voice.');
+    // A voice-over clip is speechless (its narration is mixed on afterwards): the music is asked for alone.
+    expect(narrated).toContain('Audio: background music - upbeat acoustic guitar, the same music in every scene - kept soft, with natural ambient sound.');
+    expect(buildScenePrompt(scene(), { ...CONTEXT, settings: { ...settings, music: 'none' } })).toContain('Audio: natural ambient sound that fits the shot, kept low. No music.');
+    // A person on camera speaks in the clip, with the music under their voice.
+    expect(buildScenePrompt(scene({ delivery: 'on_screen' }), { ...CONTEXT, settings })).toContain('Background music: upbeat acoustic guitar, softly under the voice - the same music in every scene.');
     expect(narrated).toContain('Never show any of these anywhere in the video: animals, cars.');
     const silent = buildScenePrompt(scene({ voiceover: '' }), { ...CONTEXT, settings: { ...settings, music: 'none' } });
     expect(silent).toContain('Audio: natural ambient sound that fits the shot. No music. No speech.');
