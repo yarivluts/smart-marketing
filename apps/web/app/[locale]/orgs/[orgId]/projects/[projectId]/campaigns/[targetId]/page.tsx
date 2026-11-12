@@ -201,7 +201,7 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
             value={spendView.ok && spendSummary ? money.format(spendView.totalSpendUsd) : t('noData')}
             icon={CircleDollarSign}
             trendData={spendView.ok ? spendView.days.map((day) => day.spendUsd) : undefined}
-            subtext={spendSummary ? t('spendActiveDays', { count: spendSummary.activeDays }) : undefined}
+            subtext={spendSummary ? t('spendActiveDays', { count: spendSummary.activeDays }) : t('spendCardNoDataHint')}
           />
           <StatCard
             title={t('kpiActionsTaken')}
