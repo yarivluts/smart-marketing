@@ -3512,6 +3512,7 @@
     "tabCreatives": "גלריית מודעות",
     "tabAnalytics": "הוצאה ותוצאות",
     "noData": "אין נתונים",
+    "noDataReason": "יופיע כאן אחרי שהמודעות שלכם יוצגו לאנשים.",
     "metricTotalSpend": "סך ההוצאה",
     "metricBlendedRoas": "מכירות על כל $1 פרסום",
     "metricImpressionsClicks": "פעמים שהוצגה והקלקות",

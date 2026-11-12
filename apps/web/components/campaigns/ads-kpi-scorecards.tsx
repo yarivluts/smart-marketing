@@ -33,6 +33,8 @@ export interface AdsKpiScorecardsProps {
 export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps): React.ReactElement {
   const t = useTranslations('Campaigns');
   const noData = t('noData');
+  // A bare "No data" is a dead end for a newcomer: say when the card fills in.
+  const noDataReason = t('noDataReason');
 
   const activeProgress =
     summary.totalCampaignsCount > 0
@@ -54,7 +56,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         title={t('metricTotalSpend')}
         value={summary.totalSpendUsd === null ? noData : `$${summary.totalSpendUsd.toLocaleString()}`}
         icon={DollarSign}
-        subtext={spendSubtext}
+        subtext={summary.totalSpendUsd === null ? noDataReason : spendSubtext}
       />
 
       {/* 2. Blended ROAS */}
@@ -62,6 +64,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         title={t('metricBlendedRoas')}
         value={summary.blendedRoas === null ? noData : `${summary.blendedRoas.toFixed(1)}x`}
         icon={TrendingUp}
+        subtext={summary.blendedRoas === null ? noDataReason : undefined}
         // No target and no progress bar. Both used to be rendered against a
         // hardcoded 3.5x that no project ever set: the card showed
         // "Target: 3.5x" beside a bar filled to roas/3.5, capped at 100, so a
@@ -84,7 +87,9 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         }
         icon={MousePointerClick}
         subtext={
-          summary.totalClicks === null || summary.totalConversions === null
+          summary.totalImpressions === null
+            ? noDataReason
+            : summary.totalClicks === null || summary.totalConversions === null
             ? undefined
             : `${t('clicksCount', { count: summary.totalClicks })} · ${t('conversionsCountShort', { count: summary.totalConversions })}`
         }
@@ -95,6 +100,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         title={t('metricAvgCtr')}
         value={summary.blendedCtrPct === null ? noData : `${summary.blendedCtrPct}%`}
         icon={Percent}
+        subtext={summary.blendedCtrPct === null ? noDataReason : undefined}
       />
 
       {/* 5. Blended CPA */}
@@ -103,7 +109,11 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         value={summary.blendedCpaUsd === null ? noData : `$${summary.blendedCpaUsd.toFixed(2)}`}
         icon={Target}
         subtext={
-          summary.totalConversions === null ? undefined : t('conversionsCount', { count: summary.totalConversions })
+          summary.blendedCpaUsd === null
+            ? noDataReason
+            : summary.totalConversions === null
+              ? undefined
+              : t('conversionsCount', { count: summary.totalConversions })
         }
       />
 

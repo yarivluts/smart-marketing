@@ -3512,6 +3512,7 @@
     "tabCreatives": "Ad gallery",
     "tabAnalytics": "Spend and results",
     "noData": "No data",
+    "noDataReason": "Shows up here once your ads have been shown to people.",
     "metricTotalSpend": "Total Spend",
     "metricBlendedRoas": "Sales per $1 of ads",
     "metricImpressionsClicks": "Times shown & clicks",
