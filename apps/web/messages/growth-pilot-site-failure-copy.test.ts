@@ -13,3 +13,10 @@ describe('Growth Pilot "site did not open" failure', () => {
     expect(he.GrowthPilot.failure.site).toContain('דף אחר באתר שלכם');
   });
 });
+
+describe('Growth Pilot "site did not open" failure wording', () => {
+  it('does not use the phrase "automated readers"', () => {
+    expect(en.GrowthPilot.failure.site).not.toContain('automated');
+    expect(he.GrowthPilot.failure.site).not.toContain('אוטומטי');
+  });
+});
