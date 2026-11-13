@@ -4537,7 +4537,7 @@
       "upload_failed": "The upload failed. Try again.",
       "no_secret": "This connection has no login saved yet. Add it in Ad platform connections.",
       "invalid_credential": "The saved login looks incomplete or wrong. Save it again in Ad platform connections.",
-      "account_action_required": "Facebook and Instagram need you to verify the account in Ads Manager (adsmanager.facebook.com) before ads can be created or changed."
+      "account_action_required": "Facebook and Instagram need you to verify the account in Facebook's ad tool (Ads Manager, at adsmanager.facebook.com) before ads can be created or changed."
     },
     "exportVideoNotReady": "That video is not assembled yet.",
     "exportHistory": "Exports",
@@ -5625,7 +5625,7 @@
       },
       "adAccountId": {
         "label": "Ad account ID",
-        "help": "The number after act_ in Ads Manager, e.g. 1646897415410557."
+        "help": "The number after act_ in Facebook's ad tool (Ads Manager, at adsmanager.facebook.com), e.g. 1646897415410557."
       },
       "pageId": {
         "label": "Facebook Page ID",
@@ -5670,7 +5670,7 @@
         "steps": {
           "1": "In Meta Business Settings, open System users, add a system user (admin) and give it full control of your ad account and your Page.",
           "2": "Click \"Generate new token\" for your app with the permissions ads_management, ads_read, business_management, pages_show_list and pages_read_engagement, and set it to never expire.",
-          "3": "Copy the ad account ID from Ads Manager (the number after act_).",
+          "3": "Copy the ad account ID from Facebook's ad tool (Ads Manager, at adsmanager.facebook.com) - the number after act_.",
           "4": "Copy the Page ID from your Facebook Page: Settings, About, Page ID."
         }
       },
