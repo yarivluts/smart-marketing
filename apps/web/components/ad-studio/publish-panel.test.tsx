@@ -196,7 +196,7 @@ describe('PublishPanel', () => {
     );
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(
-        'Facebook and Instagram need you to verify the account in Ads Manager',
+        'Facebook and Instagram need you to verify the account in Facebook\'s ad tool (Ads Manager, at adsmanager.facebook.com)',
       ),
     );
     expect(screen.getByTestId('ad-studio-publish-detail')).toHaveTextContent(
