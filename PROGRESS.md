@@ -19,7 +19,7 @@ Template for each entry:
 
 ## 2026-11-13 — Ad Studio video: voice-over clips muted, people in them silent
 
-- **Last completed:** (PR #PRNUM)
+- **Last completed:** (PR #1282)
   - Owner report: after #1269 the characters in voice-over clips still talked. Prod clip SK6n0DNmG5yrbWArKV1R (Galileo brief RiUkR5e9b7no6OQG5weq): the raw Omni output had the mother and the child talking on camera and Hebrew-sounding speech in its audio (which #1269 only ducked to 25%; the AI check had flagged "another voice speaking").
   - Docs checked (Omni guide + Interactions API reference): no audio-off option and no negative prompt - `VideoResponseFormat` is type/delivery/aspect_ratio/duration/resolution only; `response_format.generate_audio` is rejected with 400 "Unknown parameter". (`duration` now exists in the format - not used yet.)
   - Live experiment, same scene, 5 renders (samples + 5 fps contact sheets in the session scratchpad `silent-samples/`): baseline (silence only in the audio line, Hebrew product description verbatim) - talking. Silence direction inside the shot description + no product description: with music (v1) and with a silent audio line (v2), on scene 1 and scene 2 (v4) - closed mouths throughout, no speech heard. Hebrew product kept (v5, v6): mouths closed, but v5's audio had a hum - so the product text stays out.
