@@ -6252,7 +6252,7 @@
         "building": "The AI is making ads for this one...",
         "ready": "Ads are waiting for your approval",
         "approved": "Ads approved - publishing comes next",
-        "rejected": "You rejected the ads",
+        "rejected": "You rejected the ads - nothing was published and no money was spent",
         "failed": "The ads could not be made ({reason})"
       }
     },
@@ -6266,7 +6266,7 @@
       "status": {
         "ready": "Web page waiting for your approval",
         "published": "Web page live",
-        "rejected": "You rejected the web page",
+        "rejected": "You rejected the web page - nothing was changed",
         "failed": "The web page could not be written ({reason})",
         "open": "Open"
       },
@@ -6288,7 +6288,7 @@
       "status": {
         "ready": "The people to reach are waiting for your approval",
         "approved": "Approved - the ads will be shown to these people once you publish them",
-        "rejected": "You rejected these people",
+        "rejected": "You rejected these people - nothing was changed and no money was spent",
         "failed": "We could not work out who to reach ({reason})"
       },
       "liveExplain": "These ads are already on Facebook and Instagram. Approving changes who the live ads reach right away. Facebook and Instagram may need a few days to adjust to the new group, so results can dip for a while.",
