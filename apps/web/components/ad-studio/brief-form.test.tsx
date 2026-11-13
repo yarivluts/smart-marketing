@@ -4,7 +4,7 @@ import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
-import { BriefForm, defaultAdName } from './brief-form';
+import { BriefForm, lengthChoices, defaultAdName } from './brief-form';
 
 const push = vi.fn();
 vi.mock('@/i18n/navigation', () => ({ useRouter: () => ({ push, refresh: vi.fn() }) }));
@@ -105,5 +105,22 @@ describe('BriefForm ad name hint', () => {
     fireEvent.click(screen.getByRole('button', { name: enMessages.AdStudio.createButton }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(JSON.parse(String((fetchMock.mock.calls[0] as [string, RequestInit])[1].body)).landingPageUrl).toBe('');
+  });
+});
+
+describe('BriefForm video length', () => {
+  it('offers a few lengths to pick from, 30 seconds by default, in both languages', () => {
+    const { unmount } = renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'en' });
+    const select = screen.getByLabelText(enMessages.AdStudio.fieldLength);
+    expect(select).toHaveValue('30');
+    expect(screen.getAllByRole('option', { name: /seconds$/ }).map((o) => o.getAttribute('value'))).toEqual(expect.arrayContaining(['15', '30', '45', '60']));
+    unmount();
+    renderWithIntl(<BriefForm orgId="o" projectId="p" />, { locale: 'he' });
+    expect(screen.getByLabelText(heMessages.AdStudio.fieldLength)).toHaveValue('30');
+  });
+
+  it('keeps an unusual saved length as an extra choice', () => {
+    expect(lengthChoices(30)).toEqual([15, 30, 45, 60]);
+    expect(lengthChoices(20)).toEqual([15, 20, 30, 45, 60]);
   });
 });
