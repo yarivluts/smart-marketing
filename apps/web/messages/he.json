@@ -302,7 +302,7 @@
     "cardAgo_days": "{value, plural, one {לפני יום} two {לפני יומיים} other {לפני # ימים}}",
     "cardStatus_ok": "תקין: נתונים עדכניים וכל מקורות הנתונים העיקריים מחוברים",
     "cardStatus_warn": "דורש תשומת לב: נתונים ישנים או הגדרה חלקית",
-    "cardStatus_error": "כושל: מגיעות רק רשומות שנדחו",
+    "cardStatus_error": "תקלה: הנתונים שמגיעים אינם ניתנים לשימוש",
     "cardStatus_idle": "עדיין אין נתונים",
     "cardNoVertical": "סוג העסק לא הוגדר",
     "cardSetupHealthIn": "הגדרת נתונים · {environment}",
