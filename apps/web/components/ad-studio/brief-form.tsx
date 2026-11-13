@@ -30,6 +30,13 @@ export interface BriefFormProps {
 
 const EMPTY: BriefFormValues = { name: '', objective: '', productDescription: '', landingPageUrl: '', format: 'vertical', language: 'en', targetSeconds: 30 };
 
+const LENGTH_CHOICES = [15, 30, 45, AD_STUDIO_MAX_TOTAL_SECONDS];
+
+/** The usual lengths; an ad saved earlier with another length keeps it as an extra choice so nothing changes silently. */
+export function lengthChoices(current: number): number[] {
+  return LENGTH_CHOICES.includes(current) ? LENGTH_CHOICES : [...LENGTH_CHOICES, current].sort((x, y) => x - y);
+}
+
 const inputClass = 'rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring';
 
 /** Creates an ad from a brief, or edits the brief's details. The server validates; its reasons are shown as they come. */
@@ -139,15 +146,13 @@ export function BriefForm({ orgId, projectId, briefId, initial, studioHref }: Br
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           {t('fieldLength')}
-          <input
-            type="number"
-            min={5}
-            max={AD_STUDIO_MAX_TOTAL_SECONDS}
-            step={1}
-            value={values.targetSeconds}
-            onChange={(event) => set('targetSeconds', Number(event.target.value))}
-            className={inputClass}
-          />
+          <select value={values.targetSeconds} onChange={(event) => set('targetSeconds', Number(event.target.value))} className={inputClass}>
+            {lengthChoices(values.targetSeconds).map((seconds) => (
+              <option key={seconds} value={seconds}>
+                {t('lengthOption', { seconds })}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
       <div className="flex flex-wrap items-center gap-3">
