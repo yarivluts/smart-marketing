@@ -49,6 +49,25 @@ const mockItems: UnifiedCampaignItem[] = [
 ];
 
 describe('CampaignListTable', () => {
+  it('explains empty result cells once, and only when some are empty', () => {
+    const { unmount } = renderWithIntl(
+      <CampaignListTable orgId="org-1" projectId="proj-1" items={mockItems} canExecute={true} />,
+    );
+    expect(screen.queryByTestId('campaign-list-no-data-reason')).not.toBeInTheDocument();
+    unmount();
+    renderWithIntl(
+      <CampaignListTable
+        orgId="org-1"
+        projectId="proj-1"
+        items={[{ ...mockItems[0], spend30dUsd: null, roas: null, ctrPct: null, cpaUsd: null }]}
+        canExecute={true}
+      />,
+    );
+    expect(screen.getByTestId('campaign-list-no-data-reason')).toHaveTextContent(
+      'Shows up here once your ads have been shown to people.',
+    );
+  });
+
   it('labels the results columns in plain words, not bare ad acronyms', () => {
     renderWithIntl(
       <CampaignListTable orgId="org-1" projectId="proj-1" items={mockItems} canExecute={true} />,
