@@ -42,6 +42,9 @@ describe('AdvancedVideoSettings', () => {
       'true',
     );
     expect(screen.getByRole('button', { name: en.save })).toBeDisabled();
+    // Says that voice-over scenes carry only the narrator, so the music choice does not reach them.
+    expect(screen.getByText(en.musicHint)).toBeInTheDocument();
+    expect(he.musicHint.length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole('radio', { name: en.resolution['1080p'] }));
     fireEvent.click(screen.getByRole('radio', { name: en.style.ugc_phone }));

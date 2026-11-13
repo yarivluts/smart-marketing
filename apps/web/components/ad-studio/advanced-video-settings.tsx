@@ -187,6 +187,7 @@ export function AdvancedVideoSettings({
           onChange={(music) => patch({ music })}
           text={(value) => t(`music.${value}`)}
         />
+        <p className="-mt-2 text-xs text-muted-foreground">{t('musicHint')}</p>
         {draft.music === 'custom' ? (
           <label className="-mt-2 flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('musicDescriptionLabel')}

@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-11-13 — Ad Studio video: voice-over clips muted, people in them silent
+
+- **Last completed:** (PR #PRNUM)
+  - Owner report: after #1269 the characters in voice-over clips still talked. Prod clip SK6n0DNmG5yrbWArKV1R (Galileo brief RiUkR5e9b7no6OQG5weq): the raw Omni output had the mother and the child talking on camera and Hebrew-sounding speech in its audio (which #1269 only ducked to 25%; the AI check had flagged "another voice speaking").
+  - Docs checked (Omni guide + Interactions API reference): no audio-off option and no negative prompt - `VideoResponseFormat` is type/delivery/aspect_ratio/duration/resolution only; `response_format.generate_audio` is rejected with 400 "Unknown parameter". (`duration` now exists in the format - not used yet.)
+  - Live experiment, same scene, 5 renders (samples + 5 fps contact sheets in the session scratchpad `silent-samples/`): baseline (silence only in the audio line, Hebrew product description verbatim) - talking. Silence direction inside the shot description + no product description: with music (v1) and with a silent audio line (v2), on scene 1 and scene 2 (v4) - closed mouths throughout, no speech heard. Hebrew product kept (v5, v6): mouths closed, but v5's audio had a hum - so the product text stays out.
+  - Implemented: voice-over scenes (`narrationIsSeparate`) get `SILENT_PEOPLE_LINE` appended to the shot description (silent, lips closed, listen/smile/nod/react, never talk to each other or the camera), `VOICE_OVER_AUDIO_LINE` (a silent shot, no music, + `NO_SPEECH_RULE`) and no product description; edits of such clips repeat both lines. On-camera and narration-free prompts unchanged.
+  - Mute: `buildNarrationMixArgs` never reads the clip's audio - narration over an `anullsrc` bed the clip's length, AAC track always present. So the music setting no longer applies to voice-over scenes; the advanced-settings card says so (`musicHint`, en/he). Real-ffmpeg test: a 3 kHz tone in the clip is gone after the mix, the 660 Hz narration is there, the tail is silent, audio runs the clip length.
+  - AI check: anyone talking or mouthing words in a voice-over clip is now a major visual issue (was minor), so autopilot re-renders it within the existing per-scene `videoQa.retries` cap. The reviewer watches clips at 5 fps (`videoMetadata.fps`, `AD_STUDIO_QA_VIDEO_FPS`) instead of Gemini's default 1 fps; at 5 fps it caught the mother talking in the prod clip.
+  - Fingerprint: the voice-over marker is now `{ narration: 'separate', silent: 2 }` - #1269's voice-over clips read out of date (pinned: 45476aad6c2fd770 / 4a42b7c3d8815862), on-camera and silent fingerprints unchanged.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** after deploy, re-render the Galileo ad's voice-over scenes and watch them; consider sending the scene's length as `response_format.duration` and a background-music bed for voice-over ads (now silent under the narration).
+- **Waiting on human:** deploy (not done by this run).
+
 ## 2026-11-12 — Ad Studio video: voice-over narration made separately (TTS) and mixed on
 
 - **Last completed:** (PR #1269)

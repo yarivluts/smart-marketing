@@ -341,8 +341,10 @@ describe('Ad Studio video routes (KAN-231)', () => {
     let listing = await poll(ctx.p());
     for (let i = 0; i < 3 && !listing.clips[0].qa; i += 1) listing = await poll(ctx.p());
     expect(listing.clips[0]).toMatchObject({ status: 'ready', qa: { status: 'passed', issues: [], transcript: 'Too much paper?' } });
-    // The reviewer got the stored clip as video bytes, with the scene's narration in the prompt.
-    expect(reviews[0].parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: Buffer.from(`mp4-bytes-of-f1${NARRATED}`).toString('base64') } });
+    // The reviewer got the stored clip as video bytes, watched at 5 fps so a few mouthed words are not
+    // stepped over, with the scene's narration in the prompt.
+    expect(reviews[0].parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: Buffer.from(`mp4-bytes-of-f1${NARRATED}`).toString('base64') }, videoMetadata: { fps: 5 } });
+    expect(String(reviews[0].parts[1].text)).toContain('anyone in the shot visibly talking, mouthing words or moving their lips as if speaking, at any moment, is a major visual problem');
     expect(String(reviews[0].parts[1].text)).toContain('Intended narration, word for word: "Too much paper?"');
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId)).find((row) => row.kind === 'video_qa')).toMatchObject({ units: 1, outcome: 'succeeded' });
     // Later polls do not check the same clip again.

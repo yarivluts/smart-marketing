@@ -20,8 +20,9 @@ import { AD_STUDIO_VISUAL_STYLE_PROMPTS, isDefaultVideoSettings, musicPromptLine
  * Narration: a person speaking on camera (`delivery: 'on_screen'`) is part of the prompt - Gemini
  * Omni generates the soundtrack with the picture, so their lips move with the words. A voice-over is
  * NOT: told "no one in the shot speaks", the video model still had people mouthing the narration, so
- * a voice-over scene's clip is asked for without any speech (music and ambient sound only), and the
- * narration is spoken separately by a text-to-speech model and mixed onto the clip afterwards (see
+ * a voice-over scene's clip is asked for as a silent shot of silent people (said inside the picture
+ * description, and without the ad-language product description), the narration is spoken separately
+ * by a text-to-speech model, and the clip's own sound is replaced by it entirely (see
  * `narrationIsSeparate` and the Ad Studio engine's narration step).
  */
 
@@ -30,7 +31,7 @@ export interface AdStudioVideoContext {
   format: AdStudioFormat;
   /** BCP 47 code of the ad language; the narration is spoken in it. */
   language: string;
-  /** What is being sold - repeated in every scene prompt so the scenes look like one ad. */
+  /** What is being sold - repeated in every scene prompt but a voice-over one, so the scenes look like one ad. */
   productDescription: string;
   /**
    * The ad's narrator voice in words (see `voice.ts`), or null to let the model choose. Required on
@@ -95,6 +96,22 @@ export const NO_SPEECH_RULE =
   'No speech of any kind: no narration, no dialogue, no voices, no singing with words. No one in the shot talks, and no one moves their lips as if speaking - mouths stay closed or relaxed.';
 
 /**
+ * Said inside the picture description itself, right after the scene's own words, for a voice-over
+ * scene: it gives the people something to do other than talk. Told only "no one speaks" in a later
+ * audio line, Gemini Omni still had a mother and child chatting; with this line (and a silent audio
+ * line) a live test of the same scene came back with closed mouths every time.
+ */
+export const SILENT_PEOPLE_LINE =
+  'Everyone in the shot stays silent the whole time with their lips closed: they listen, smile, nod and react with their faces and hands, and never talk to each other or to the camera.';
+
+/**
+ * The audio asked of a voice-over scene's clip. The clip's own sound is discarded when the narration
+ * is mixed on (see the Ad Studio engine's narration mix), so the model is asked for silence rather
+ * than music: a soundtrack the model is not composing is one it is not tempted to fill with voices.
+ */
+export const VOICE_OVER_AUDIO_LINE = `Audio: a silent shot - no speech, no dialogue, no voices, no narration, no music; at most faint room tone. ${NO_SPEECH_RULE}`;
+
+/**
  * Whether a scene's narration is spoken by the text-to-speech narrator and mixed onto a speechless
  * clip, rather than generated with the picture: every voice-over scene that has narration. A person
  * on camera (`on_screen`) keeps speaking in the clip itself so the lips match the words.
@@ -103,16 +120,9 @@ export function narrationIsSeparate(scene: Pick<AdStudioScene, 'voiceover' | 'de
   return scene.delivery !== 'on_screen' && scene.voiceover.trim().length > 0;
 }
 
-/** The background sound line of a speechless voice-over clip, the same in every scene so the music carries across the ad. */
-function voiceOverSoundLine(settings: AdStudioVideoSettings): string {
-  if (settings.music === 'none') return 'Audio: natural ambient sound that fits the shot, kept low. No music.';
-  if (settings.music === 'custom' && settings.musicDescription) return `Audio: background music - ${settings.musicDescription}, the same music in every scene - kept soft, with natural ambient sound.`;
-  return 'Audio: soft background music that fits the mood, the same music in every scene, with natural ambient sound.';
-}
-
 /**
- * The text-to-video prompt for one scene. Every scene carries the same product context and style
- * line so separately generated clips read as one ad; the length is stated in seconds and as a
+ * The text-to-video prompt for one scene. Every scene carries the same style line (and, except a
+ * voice-over scene, the same product context) so separately generated clips read as one ad; the length is stated in seconds and as a
  * timecode because the API has no duration parameter; readable text is forbidden (see above),
  * except what an attached screen or opening frame shows. `references` describe the images sent with
  * the prompt, in their order (KAN-243).
@@ -138,17 +148,21 @@ export function buildScenePrompt(
   const voice = context.voice ? oneLine(context.voice) : null;
   const settings = normalizeVideoSettings(context.settings);
   const music = musicPromptLine(settings, true);
-  // A voice-over is never sent to the video model: the clip comes back speechless and the narration
-  // is spoken separately and mixed on afterwards (see the file comment).
+  // A voice-over is never sent to the video model: the clip comes back silent, with silent people,
+  // and the narration is spoken separately and mixed on afterwards (see the file comment).
+  const separate = narrationIsSeparate(scene);
   const audioLine = !voiceover
     ? musicPromptLine(settings, false)
     : onScreen
       ? `Audio: ${who ? `${who} in the shot` : 'the person in the shot'} looks at the camera and says, in ${language}${exactly}: "${voiceover}". Each word once, fluently, without repeating or stuttering. Their lips move in sync with every word. ${who ? 'No one else in the shot speaks.' : 'Only this one person speaks.'}${voice ? ` They speak with the voice of ${voice} - the same voice in every scene of this ad.` : ''} There is no off-screen narrator. ${music}`
-      : `${voiceOverSoundLine(settings)} ${NO_SPEECH_RULE}`;
+      : VOICE_OVER_AUDIO_LINE;
+  // A voice-over scene leaves the product description out: it is usually written in the ad language
+  // (Hebrew, for most ads here), and a live test with it verbatim brought voices back into the clip.
+  const adFor = separate ? 'a short video ad' : `a short video ad for: ${product}`;
   return [
-    `[0-${seconds}s] ${oneLine(scene.visualPrompt)}`,
+    `[0-${seconds}s] ${oneLine(scene.visualPrompt)}${separate ? ` ${SILENT_PEOPLE_LINE}` : ''}`,
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
-    `This shot is one scene of a short video ad for: ${product}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.`,
+    `This shot is one scene of ${adFor}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.`,
     ...referencePromptLines(references),
     // Full bleed. The brand banner is laid over the bottom afterwards; it is deliberately not
     // mentioned - told a strip covers the lower part, the model painted an empty band there.
@@ -169,7 +183,7 @@ export function buildScenePrompt(
  * new generation, and so is the no-speech rule for a clip whose narration is mixed on separately.
  */
 export function buildSceneEditInstruction(instruction: string, options: { speechless?: boolean } = {}): string {
-  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.${options.speechless ? ` ${NO_SPEECH_RULE}` : ''}`;
+  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.${options.speechless ? ` ${SILENT_PEOPLE_LINE} ${NO_SPEECH_RULE}` : ''}`;
 }
 
 /** 32-bit FNV-1a over UTF-16 code units, from a given offset basis. */
@@ -202,8 +216,10 @@ export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 
     ...(pronunciation ? [pronunciation] : []),
     // Who speaks, only for a person on screen: the voice-over default keeps every earlier fingerprint.
     ...(scene.delivery === 'on_screen' ? [{ delivery: 'on_screen', speaker: oneLine(scene.speaker ?? '') }] : []),
-    // A voice-over mixed on separately: clips whose narration the video model spoke are out of date.
-    ...(narrationIsSeparate(scene) ? [{ narration: 'separate' }] : []),
+    // A voice-over mixed on separately onto a silent clip of silent people: clips whose narration the
+    // video model spoke, and the first separate-narration clips (people still talking, model audio
+    // ducked under the narration), are out of date.
+    ...(narrationIsSeparate(scene) ? [{ narration: 'separate', silent: 2 }] : []),
     // The narrator voice, only for a scene with narration and an ad that chose one.
     ...(context.voice && scene.voiceover.trim() ? [{ voice: oneLine(context.voice) }] : []),
     // The attached images and how each is used, also only when present (KAN-243).

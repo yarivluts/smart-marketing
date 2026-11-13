@@ -147,7 +147,9 @@ async function geminiJson<T>(
   const { timeoutMs = 90_000, attempts = 3, sleep = defaultSleep } = options;
   const parts: Record<string, unknown>[] = [];
   const media = request.media === undefined ? [] : Array.isArray(request.media) ? request.media : [request.media as AdStudioMediaInput];
-  for (const item of media) parts.push({ inlineData: { mimeType: item.mimeType, data: Buffer.from(item.data).toString('base64') } });
+  for (const item of media) {
+    parts.push({ inlineData: { mimeType: item.mimeType, data: Buffer.from(item.data).toString('base64') }, ...(item.fps ? { videoMetadata: { fps: item.fps } } : {}) });
+  }
   parts.push({ text: request.user });
   const payload = JSON.stringify({
     systemInstruction: { parts: [{ text: request.system }] },
@@ -213,6 +215,11 @@ export function createGeminiLlm(apiKey: string, fetchImpl: FetchLike = fetch, ba
 export interface AdStudioMediaInput {
   mimeType: string;
   data: Uint8Array;
+  /**
+   * For a video: how many frames per second the model samples (Gemini's `videoMetadata.fps`). Its
+   * default of 1 fps can step right over a few words mouthed between two frames.
+   */
+  fps?: number;
 }
 
 /**
