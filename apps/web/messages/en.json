@@ -5086,6 +5086,7 @@
         "none": "No music",
         "custom": "Describe it"
       },
+      "musicHint": "Music plays in scenes without narration and under a person speaking on camera. Scenes with a voice-over carry only the narrator's voice, so no one in the picture seems to talk.",
       "musicDescriptionLabel": "What music? (in English works best)",
       "musicDescriptionPlaceholder": "e.g. upbeat acoustic guitar",
       "avoidLabel": "Never show",

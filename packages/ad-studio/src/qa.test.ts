@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AdStudioClipQaSchema, buildClipQaPrompt } from './qa';
+import { AD_STUDIO_QA_VIDEO_FPS, AdStudioClipQaSchema, buildClipQaPrompt } from './qa';
 import { createGeminiReviewer, resolveAdStudioReviewer } from './llm';
 
 function geminiResponse(body: unknown): Response {
@@ -21,7 +21,7 @@ describe('the clip quality check prompt', () => {
 
   it('tells the reviewer who should speak: no lip movement for a voice-over, lip-sync for a named person on screen', () => {
     const voiceover = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast' }, 'en').user;
-    expect(voiceover).toContain('Who speaks: an off-screen voice-over narrator. No one in the shot should speak: a closed or still mouth is correct');
+    expect(voiceover).toContain('Who speaks: an off-screen voice-over narrator only. Everyone in the shot must stay silent: closed or still mouths are correct.');
     const onScreen = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast', delivery: 'on_screen', speaker: 'the woman' }, 'en').user;
     expect(onScreen).toContain('Who speaks: the woman, on camera. Their lips must move in sync with the words');
     expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '' }, 'en').user).not.toContain('Who speaks');
@@ -34,6 +34,19 @@ describe('the clip quality check prompt', () => {
     const onScreen = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast', delivery: 'on_screen' }, 'en').user;
     expect(onScreen).toContain('a speaking mouth clearly out of sync with the narration');
     expect(onScreen).not.toContain('Do not report lip sync');
+  });
+
+  it('makes anyone talking in a voice-over clip a major problem, so the clip is re-rendered, and nowhere calls it minor', () => {
+    // Prod, 2026-11-13: a mother and child chatting under the narration were only a minor finding.
+    const voiceover = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast' }, 'en').user;
+    expect(voiceover).toContain('anyone in the shot visibly talking, mouthing words or moving their lips as if speaking, at any moment, is a major visual problem');
+    expect(voiceover).toMatch(/Major visual problems: [^\n]*; anyone in the shot talking or mouthing words\./);
+    expect(voiceover).toContain('Watch every mouth frame by frame');
+    expect(voiceover).not.toMatch(/mouthing[^\n]*minor problem/);
+    // Not for a person meant to speak on camera, nor for a scene without narration.
+    const onScreen = buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: 'Sign fast', delivery: 'on_screen' }, 'en').user;
+    expect(onScreen).not.toContain('anyone in the shot talking or mouthing words');
+    expect(buildClipQaPrompt({ visualPrompt: 'A desk', voiceover: '' }, 'en').user).not.toContain('anyone in the shot talking or mouthing words');
   });
 
   it('requires every issue detail in the ad language, in the system instruction too', () => {
@@ -65,6 +78,18 @@ describe('the reviewer', () => {
     expect(url).toMatch(/\/models\/[\w.-]+:generateContent$/);
     const body = JSON.parse(String(init.body)) as { contents: { parts: Record<string, unknown>[] }[] };
     expect(body.contents[0].parts).toEqual([{ inlineData: { mimeType: 'video/mp4', data: Buffer.from(bytes).toString('base64') } }, { text: 'u' }]);
+  });
+
+  it('asks Gemini to sample a video at the given frame rate, and leaves the default when none is given', async () => {
+    const fetchImpl = vi.fn(async () => geminiResponse({ candidates: [{ content: { parts: [{ text: JSON.stringify({ transcript: '', issues: [] }) }] } }] }));
+    const reviewer = createGeminiReviewer('k', fetchImpl);
+    const bytes = new Uint8Array([9]);
+    const image = new Uint8Array([7]);
+    await reviewer.reviewJson({ system: 's', user: 'u', schema: AdStudioClipQaSchema, media: [{ mimeType: 'video/mp4', data: bytes, fps: AD_STUDIO_QA_VIDEO_FPS }, { mimeType: 'image/png', data: image }] });
+    const body = JSON.parse(String((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body)) as { contents: { parts: Record<string, unknown>[] }[] };
+    expect(AD_STUDIO_QA_VIDEO_FPS).toBe(5);
+    expect(body.contents[0].parts[0]).toEqual({ inlineData: { mimeType: 'video/mp4', data: Buffer.from(bytes).toString('base64') }, videoMetadata: { fps: 5 } });
+    expect(body.contents[0].parts[1]).toEqual({ inlineData: { mimeType: 'image/png', data: Buffer.from(image).toString('base64') } });
   });
 
   it('exists only with a Gemini key', () => {

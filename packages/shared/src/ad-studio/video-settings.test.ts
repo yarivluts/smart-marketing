@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AdStudioScene } from './scenes';
-import { buildScenePrompt, sceneFingerprint } from './video';
+import { buildScenePrompt, sceneFingerprint, VOICE_OVER_AUDIO_LINE } from './video';
 import { DEFAULT_AD_STUDIO_VIDEO_SETTINGS, isDefaultVideoSettings, normalizeVideoSettings, videoSettingsIssue } from './video-settings';
 
 const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers', voice: null, settings: null };
@@ -32,9 +32,11 @@ describe('advanced video settings', () => {
     const narrated = buildScenePrompt(scene(), { ...CONTEXT, settings });
     expect(narrated).toContain('authentic, handheld smartphone look of a real customer video');
     expect(narrated).not.toContain('polished commercial style');
-    // A voice-over clip is speechless (its narration is mixed on afterwards): the music is asked for alone.
-    expect(narrated).toContain('Audio: background music - upbeat acoustic guitar, the same music in every scene - kept soft, with natural ambient sound.');
-    expect(buildScenePrompt(scene(), { ...CONTEXT, settings: { ...settings, music: 'none' } })).toContain('Audio: natural ambient sound that fits the shot, kept low. No music.');
+    // A voice-over clip is a silent shot whatever the music setting: its own sound is replaced by the
+    // narration when it is mixed on, so the model is never asked for music there.
+    expect(narrated).toContain(VOICE_OVER_AUDIO_LINE);
+    expect(narrated).not.toContain('upbeat acoustic guitar');
+    expect(buildScenePrompt(scene(), { ...CONTEXT, settings: { ...settings, music: 'none' } })).toContain(VOICE_OVER_AUDIO_LINE);
     // A person on camera speaks in the clip, with the music under their voice.
     expect(buildScenePrompt(scene({ delivery: 'on_screen' }), { ...CONTEXT, settings })).toContain('Background music: upbeat acoustic guitar, softly under the voice - the same music in every scene.');
     expect(narrated).toContain('Never show any of these anywhere in the video: animals, cars.');

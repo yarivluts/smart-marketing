@@ -9,6 +9,8 @@ import {
   isClipSlow,
   NO_SPEECH_RULE,
   narrationIsSeparate,
+  SILENT_PEOPLE_LINE,
+  VOICE_OVER_AUDIO_LINE,
   assemblyPlan,
   buildSceneEditInstruction,
   buildScenePrompt,
@@ -49,7 +51,10 @@ describe('buildScenePrompt', () => {
     expect(prompt).toContain(NO_SPEECH_RULE);
     expect(prompt).toMatch(/no dialogue, no voices/);
     expect(prompt).toMatch(/no one moves their lips as if speaking/);
-    expect(prompt).toContain('Audio: soft background music that fits the mood, the same music in every scene, with natural ambient sound.');
+    // A silent shot: the clip's own sound is discarded when the narration is mixed on.
+    expect(prompt).toContain(VOICE_OVER_AUDIO_LINE);
+    expect(prompt).toMatch(/Audio: a silent shot - no speech, no dialogue, no voices, no narration, no music/);
+    expect(prompt).not.toMatch(/background music/);
     const vocalized = buildScenePrompt({ ...scene('a', 5, 'A desk', 'Signed in seconds'), pronunciation: 'Signed in seconds!' }, CONTEXT);
     expect(vocalized).not.toContain('Signed in seconds');
     expect(vocalized).not.toContain('nikud');
@@ -58,11 +63,33 @@ describe('buildScenePrompt', () => {
     expect(silent).not.toContain('narrator');
   });
 
+  it('directs the people of a voice-over scene to stay silent inside the picture description itself, and leaves the ad-language product description out', () => {
+    // Live test on prod's Galileo brief (2026-11-13): with the silence only in a later audio line and
+    // the Hebrew product description verbatim, mother and child talked; with the silence in the shot
+    // description and no product text, five renders of two scenes came back with closed mouths.
+    const hebrew = { ...CONTEXT, productDescription: 'הכנה למבחנים' };
+    const prompt = buildScenePrompt(scene('a', 5, 'A parent and child at a desk.', 'Ready for the test?'), hebrew);
+    expect(prompt.split('\n')[0]).toBe(`[0-5s] A parent and child at a desk. ${SILENT_PEOPLE_LINE}`);
+    expect(SILENT_PEOPLE_LINE).toMatch(/lips closed: they listen, smile, nod and react/);
+    expect(SILENT_PEOPLE_LINE).toMatch(/never talk to each other or to the camera/);
+    expect(prompt).not.toContain(hebrew.productDescription);
+    expect(prompt).not.toMatch(/[֐-׿]/);
+    expect(prompt).toContain('This shot is one scene of a short video ad. Keep the look consistent');
+    // Scenes without a separate narration keep the product context and no silence direction.
+    for (const other of [scene('b', 5, 'A desk', ''), { ...scene('c', 5, 'A desk', 'Hi'), delivery: 'on_screen' as const }]) {
+      const text = buildScenePrompt(other, hebrew);
+      expect(text).toContain(`short video ad for: ${hebrew.productDescription}`);
+      expect(text).not.toContain(SILENT_PEOPLE_LINE);
+      expect(text).not.toContain(VOICE_OVER_AUDIO_LINE);
+    }
+  });
+
   it('keeps a person speaking on camera in the clip itself, lips in sync', () => {
     const prompt = buildScenePrompt({ ...scene('a', 5, 'A desk', 'Signed in seconds'), delivery: 'on_screen' }, CONTEXT);
     expect(prompt).toContain('says, in Hebrew: "Signed in seconds"');
     expect(prompt).toContain('Their lips move in sync with every word.');
     expect(prompt).not.toContain(NO_SPEECH_RULE);
+    expect(prompt).not.toContain(SILENT_PEOPLE_LINE);
   });
 
   it('decides which scenes get their narration mixed on separately', () => {
@@ -83,7 +110,7 @@ describe('buildScenePrompt', () => {
     expect(buildSceneEditInstruction('Make it night.')).toMatch(/^Make it night\. Keep/);
     // A voice-over clip stays speechless through every edit: its narration is mixed on again afterwards.
     const speechless = buildSceneEditInstruction('make it night', { speechless: true });
-    expect(speechless.endsWith(NO_SPEECH_RULE)).toBe(true);
+    expect(speechless.endsWith(`${SILENT_PEOPLE_LINE} ${NO_SPEECH_RULE}`)).toBe(true);
     expect(buildSceneEditInstruction('make it night', { speechless: false })).not.toContain(NO_SPEECH_RULE);
   });
 
@@ -148,6 +175,12 @@ describe('sceneFingerprint', () => {
     const before = { voiceOver: '67e2e5e4f25068eb', voiceOverWithVoice: '594d675c4c8709cf', onCamera: '6b18db02c9df62a1', silent: 'd209e673ec35e536' };
     expect(sceneFingerprint(base, CONTEXT)).not.toBe(before.voiceOver);
     expect(sceneFingerprint(base, VOICED)).not.toBe(before.voiceOverWithVoice);
+    // ...and so must the first separate-narration clips (PR #1269, origin/main at ca90c79c): their
+    // people still talked on camera and the model's own audio, voices included, was ducked under the
+    // narration rather than removed.
+    const firstSeparate = { voiceOver: '45476aad6c2fd770', voiceOverWithVoice: '4a42b7c3d8815862' };
+    expect(sceneFingerprint(base, CONTEXT)).not.toBe(firstSeparate.voiceOver);
+    expect(sceneFingerprint(base, VOICED)).not.toBe(firstSeparate.voiceOverWithVoice);
     expect(sceneFingerprint({ ...base, delivery: 'voiceover' }, CONTEXT)).toBe(sceneFingerprint(base, CONTEXT));
     expect(sceneFingerprint({ ...base, delivery: 'on_screen', speaker: 'the lawyer' }, VOICED)).toBe(before.onCamera);
     expect(sceneFingerprint({ ...base, voiceover: '' }, CONTEXT)).toBe(before.silent);

@@ -24,6 +24,12 @@ import { readAdStudioObject, type AdStudioMediaStorage } from './media-storage';
 /** Clips are short (3-10 s); anything bigger than this is not a clip and is not sent. */
 const MAX_CLIP_BYTES = 40 * 1024 * 1024;
 const MAX_ISSUES = 12;
+/**
+ * Frames per second the reviewer watches a clip at. Gemini samples video at 1 fps by default, which
+ * can miss a mouth moving for a word or two; at 5 fps a 10-second clip is 50 frames - still cheap -
+ * and a live check of the talking prod clip at this rate caught the mother talking under the narration.
+ */
+export const AD_STUDIO_QA_VIDEO_FPS = 5;
 
 const QaIssueSchema = z.object({
   kind: z.enum(['audio', 'visual']),
@@ -69,6 +75,8 @@ export function buildClipQaPrompt(
   const pronunciation = narration ? (scene.pronunciation ?? '').trim() : '';
   // Lip sync only matters when someone speaks on camera; with a narrator, a closed mouth is correct.
   const onCamera = Boolean(narration) && scene.delivery === 'on_screen';
+  // A voice-over: the people in the shot must not look like they are talking (see buildScenePrompt).
+  const voiceOver = Boolean(narration) && !onCamera;
   return {
     system: [
       'You check short AI-generated video clips for a video ad before a person sees them. Be strict about anything that would embarrass the brand in an ad, and never invent a problem you did not see or hear.',
@@ -80,7 +88,7 @@ export function buildClipQaPrompt(
       narration
         ? scene.delivery === 'on_screen'
           ? `Who speaks: ${scene.speaker?.trim() || 'the person in the shot'}, on camera. Their lips must move in sync with the words; lips out of sync, a different person speaking, or the words coming from an unseen narrator are major problems.`
-          : 'Who speaks: an off-screen voice-over narrator. No one in the shot should speak: a closed or still mouth is correct, and a person visibly mouthing the narration is a minor problem.'
+          : 'Who speaks: an off-screen voice-over narrator only. Everyone in the shot must stay silent: closed or still mouths are correct. Watch every mouth frame by frame - anyone in the shot visibly talking, mouthing words or moving their lips as if speaking, at any moment, is a major visual problem (the narrator is not them, so it looks dubbed). Smiling, laughing silently or a mouth briefly opening without forming words is fine.'
         : null,
       pronunciation ? `Pronunciation guide (the same words with vowel marks, numbers written out): "${pronunciation}". Judge the pronunciation against this guide.` : null,
       `Intended picture: ${scene.visualPrompt}`,
@@ -90,8 +98,8 @@ export function buildClipQaPrompt(
       `2) issues: every problem, each with kind (audio or visual), severity, a short detail a person can act on, and atSeconds when you can tell. Write each detail in ${languageName}, the language of the people making this ad.`,
       'Major audio problems: a missing, extra or different word compared with the intended narration; a word mispronounced so that a native speaker would notice; a stutter or a cut-off word; a grammar error (for example the wrong gender of a number); speech in another language.',
       'Minor audio problems: odd pacing or intonation, music too loud.',
-      `Major visual problems: letters, words or numbers drawn in the picture that are gibberish or misspelled; a deformed face, hand or body (extra or missing fingers, melting features); objects that morph or appear from nowhere${onCamera ? '; a speaking mouth clearly out of sync with the narration' : ''}.`,
-      onCamera ? null : 'Do not report lip sync or a closed mouth: the narration is not spoken by anyone in the shot.',
+      `Major visual problems: letters, words or numbers drawn in the picture that are gibberish or misspelled; a deformed face, hand or body (extra or missing fingers, melting features); objects that morph or appear from nowhere${onCamera ? '; a speaking mouth clearly out of sync with the narration' : voiceOver ? '; anyone in the shot talking or mouthing words' : ''}.`,
+      onCamera ? null : voiceOver ? 'Do not report lip sync or a closed mouth: no one in the shot should be speaking at all.' : 'Do not report lip sync or a closed mouth: the narration is not spoken by anyone in the shot.',
       'Minor visual problems: slight blur, small background artifacts, a small continuity slip.',
       'If you find nothing, return an empty issues list.',
     ]
@@ -153,7 +161,7 @@ export async function checkAdStudioClip(params: CheckAdStudioClipParams): Promis
     const review = await reviewer.reviewJson({
       ...buildClipQaPrompt(params.scene, params.language, references),
       schema: AdStudioClipQaSchema,
-      media: [{ mimeType: 'video/mp4', data: bytes }, ...references.map((reference) => reference.image)],
+      media: [{ mimeType: 'video/mp4', data: bytes, fps: AD_STUDIO_QA_VIDEO_FPS }, ...references.map((reference) => reference.image)],
     });
     await usage('succeeded');
     const issues: AdStudioClipQaIssue[] = review.issues.slice(0, MAX_ISSUES).map((issue) => ({

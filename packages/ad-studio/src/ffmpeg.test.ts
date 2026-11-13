@@ -11,7 +11,6 @@ import {
   concatClips,
   fitNarration,
   mixNarration,
-  NARRATION_DUCKED_VOLUME,
   NARRATION_MAX_TEMPO,
   defaultFfmpegRunner,
   FfmpegFailedError,
@@ -250,20 +249,24 @@ describe('laying a voice-over onto its speechless clip', () => {
     expect(fitNarration(5, 8)).toEqual({ tempo: NARRATION_MAX_TEMPO, seconds: expect.closeTo(4.65, 6), trimmed: true });
   });
 
-  it('starts the narration at 0.2s, ducks the clip sound under it, keeps the clip length and encodes H.264/AAC with faststart', () => {
-    const args = buildNarrationMixArgs({ video: 'clip.mp4', narration: 'voice.wav', output: 'out.mp4', clipSeconds: 6, narrationSeconds: 4, clipHasAudio: true });
+  it('starts the narration at 0.2s over a silent bed, never reads the clip sound, keeps the clip length and encodes H.264/AAC with faststart', () => {
+    const args = buildNarrationMixArgs({ video: 'clip.mp4', narration: 'voice.wav', output: 'out.mp4', clipSeconds: 6, narrationSeconds: 4 });
     const graph = args[args.indexOf('-filter_complex') + 1];
     expect(graph).toContain('adelay=200:all=1');
     expect(graph).not.toContain('atempo');
-    expect(graph).toContain(`volume='if(between(t,0.1,4.4),${NARRATION_DUCKED_VOLUME},1)':eval=frame`);
+    expect(args.join(' ')).toContain('-f lavfi -t 6 -i anullsrc');
+    expect(graph).toContain('[2:a:0]aresample=48000');
+    // The video model's own sound is muted outright: no input-0 audio anywhere in the graph or maps.
+    expect(graph).not.toContain('[0:a');
+    expect(graph).not.toContain('volume=');
+    expect(args.filter((arg, index) => args[index - 1] === '-map')).toEqual(['0:v:0', '[aout]']);
     expect(graph).toContain('amix=inputs=2:duration=first');
     expect(args).toEqual(expect.arrayContaining(['-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart']));
     expect(args.slice(-3)).toEqual(['-t', '6', 'out.mp4']);
-    // A clip with no sound gets a silent bed; a long line is sped up and cut with a fade.
-    const long = buildNarrationMixArgs({ video: 'clip.mp4', narration: 'voice.wav', output: 'out.mp4', clipSeconds: 5, narrationSeconds: 9, clipHasAudio: false });
+    // A long line is sped up and cut with a fade.
+    const long = buildNarrationMixArgs({ video: 'clip.mp4', narration: 'voice.wav', output: 'out.mp4', clipSeconds: 5, narrationSeconds: 9 });
     const longGraph = long[long.indexOf('-filter_complex') + 1];
     expect(long.join(' ')).toContain('-f lavfi -t 5 -i anullsrc');
-    expect(longGraph).toContain('[2:a:0]');
     expect(longGraph).toContain('atempo=1.2500');
     expect(longGraph).toContain('atrim=duration=4.65,afade=t=out:st=4.35:d=0.3');
   });
@@ -294,6 +297,34 @@ describe.skipIf(!hasFfmpeg)('a voice-over mixed with a real ffmpeg binary', () =
     expect(probe.stderr).toMatch(/Video: h264/);
     expect(probe.stderr).toMatch(/yuv420p/);
     expect(probe.stderr).toMatch(/Audio: aac/);
+  }, 60_000);
+
+  it('mutes the clip: a loud tone in the clip sound is gone after the mix, only the narration is heard, and the audio runs the clip length', async () => {
+    // The clip's "voices": a 3 kHz tone for its whole length. The narration is a 660 Hz tone.
+    const files = await makeFiles(['-f', 'lavfi', '-i', 'testsrc=size=360x640:rate=24:duration=4', '-f', 'lavfi', '-i', 'sine=frequency=3000:duration=4', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest'], 2);
+    // Peak level (dB) of one frequency band of a file's audio, optionally only from `from` seconds on.
+    const bandPeak = async (file: string, frequency: number, from = 0) => {
+      const { stderr } = await runFfmpeg(['-hide_banner', '-nostdin', '-ss', String(from), '-i', file, '-vn', '-af', `bandpass=f=${frequency}:width_type=h:w=200,volumedetect`, '-f', 'null', '-'], realRunner);
+      const match = /max_volume: (-?[\d.]+|-inf) dB/.exec(stderr);
+      return match ? (match[1] === '-inf' ? -Infinity : Number(match[1])) : Number.NaN;
+    };
+    // lavfi's sine peaks at 1/8 full scale (about -18 dB), the same for both tones.
+    expect(await bandPeak(files.clip, 3000)).toBeGreaterThan(-25);
+    await mixNarration({ video: files.clip, narration: files.voice, output: files.output, runner: realRunner });
+    // Ducked to 25% the clip tone would still peak near -30 dB; muted, all that is left in its band is
+    // the narration's own skirt and codec noise, and nothing at all once the narration has ended.
+    expect(await bandPeak(files.output, 3000)).toBeLessThan(-45);
+    expect(await bandPeak(files.output, 3000, 2.6)).toBeLessThan(-70);
+    expect(await bandPeak(files.output, 660)).toBeGreaterThan(-25);
+    // After the narration ends (0.2 s + 2 s) the soundtrack is the silent bed, still running.
+    const tail = await runFfmpeg(['-hide_banner', '-nostdin', '-ss', '2.6', '-i', files.output, '-vn', '-af', 'volumedetect', '-f', 'null', '-'], realRunner);
+    expect(tail.stderr).toMatch(/max_volume: (-inf|-[6-9]\d(\.\d+)?|-\d{3}(\.\d+)?) dB/);
+    const info = await probeMedia(files.output, realRunner);
+    expect(info).toMatchObject({ hasVideo: true, hasAudio: true });
+    const audioOnly = await runFfmpeg(['-hide_banner', '-nostdin', '-i', files.output, '-vn', '-f', 'null', '-'], realRunner);
+    const audioSeconds = parseEncodedSeconds(audioOnly.stderr) ?? 0;
+    expect(audioSeconds).toBeGreaterThan(3.8);
+    expect(audioSeconds).toBeLessThan(4.2);
   }, 60_000);
 
   it('speeds up and cuts a narration longer than a silent clip, and the result still runs the clip length', async () => {
