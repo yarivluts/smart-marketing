@@ -595,7 +595,7 @@ describe('GrowthPilotApp', () => {
     it('explains a publish failure the person can act on instead of "try again"', () => {
       const target = { ...ACTIVE_TARGET, publishStatus: 'failed' as const, publishFailure: 'account_action_required', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
       const view = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [target] })} />, { locale: 'en' });
-      expect(view.container).toHaveTextContent('verify your ad account in Ads Manager');
+      expect(view.container).toHaveTextContent("verify your ad account in Facebook's ad tool (Ads Manager");
       expect(view.container).not.toHaveTextContent('account_action_required');
       view.unmount();
       const auth = { ...target, publishFailure: 'auth_failed', videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
