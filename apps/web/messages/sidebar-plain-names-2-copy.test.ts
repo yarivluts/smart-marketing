@@ -34,3 +34,22 @@ describe('Firmographics, Campaign ops and Rep collections are named in words a b
     expect(he.RepCollections.title).toContain('{projectName}');
   });
 });
+
+describe('Customer types page speaks plainly', () => {
+  it('has no "# vs $", "composition measures" or pack name in the intro or headings', () => {
+    for (const messages of [en, he]) {
+      const f = messages.Firmographics;
+      for (const text of [
+        f.description,
+        f.setupIntro,
+        f.byIndustryHeading,
+        f.byEmployeeCountHeading,
+        f.byRegionHeading,
+      ]) {
+        expect(text).not.toMatch(/# (vs|מול) \$|Firmographic|SDK/);
+      }
+    }
+    expect(en.Firmographics.byIndustryHeading).toBe('Customers and revenue by industry');
+    expect(he.Firmographics.byIndustryHeading).toMatch(HEBREW);
+  });
+});
