@@ -47,3 +47,19 @@ describe('dashboard figures wording', () => {
     }
   });
 });
+
+describe('dashboard project card wording', () => {
+  it('en: no "14d" shorthand and no "Failing / rejected records" status', () => {
+    const page = (en as unknown as Copy).DashboardPage;
+    expect(page.cardAccepted).toBe('Received (last 14 days)');
+    expect(page.cardRejected).toBe('Set aside (last 14 days)');
+    expect(page.cardStatus_error).toBe('Problem: the data arriving cannot be used');
+    expect(page.cardStatus_error).not.toMatch(/failing|rejected|records/i);
+  });
+
+  it('he: the error status says a problem and no longer says failed / rejected records', () => {
+    const page = (he as unknown as Copy).DashboardPage;
+    expect(page.cardStatus_error).not.toMatch(/כושל|רשומות|נדחו/);
+    expect(page.cardStatus_error.startsWith('תקלה:')).toBe(true);
+  });
+});
