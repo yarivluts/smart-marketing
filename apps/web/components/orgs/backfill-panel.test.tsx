@@ -29,6 +29,20 @@ afterEach(() => {
 });
 
 describe('BackfillPanel', () => {
+  it('explains the backfill in plain words, without go-live or ingest API jargon', () => {
+    renderWithIntl(<BackfillPanel {...baseProps} />, { locale: 'en' });
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('customers who existed before you connected it are missing');
+    expect(text).not.toMatch(/go-live|ingest API/i);
+  });
+
+  it('explains the backfill in plain Hebrew without the English API term', () => {
+    renderWithIntl(<BackfillPanel {...baseProps} />, { locale: 'he' });
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('לקוחות שהיו קיימים לפני החיבור חסרים');
+    expect(text).not.toMatch(/API|העלייה לאוויר/);
+  });
+
   it('registers an endpoint with the selected schemas and shows the secret exactly once', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ url: 'https://x.example/hook', schemas: [], signingSecret: 'whsec_abc' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

@@ -3876,7 +3876,7 @@
   },
   "Backfill": {
     "heading": "Backfill existing records",
-    "description": "Integrations send a customer only when it changes, so records that existed before go-live are missing. Register the integrator's backfill endpoint for {environment}, then ask it to resend everything through the normal ingest API.",
+    "description": "A connected tool sends a customer only when something about them changes, so customers who existed before you connected it are missing. Save the web address your developer gives you for sending old customers again ({environment}), then ask it to send everything once more.",
     "endpointSchemas": "Resends: {schemas}",
     "noEndpoint": "No backfill endpoint is registered for this environment yet.",
     "registerEndpoint": "Register backfill endpoint",
