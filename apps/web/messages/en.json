@@ -5657,7 +5657,7 @@
       },
       "advertiserId": {
         "label": "Advertiser ID",
-        "help": "In TikTok Ads Manager: the account menu at the top shows it."
+        "help": "In TikTok's ad tool (TikTok Ads Manager): the account menu at the top shows it."
       }
     },
     "platforms": {
@@ -5691,7 +5691,7 @@
         "steps": {
           "1": "In TikTok API for Business, create a developer app with access to the Marketing API (Ads Management) and wait for approval.",
           "2": "Open your app's advertiser authorization link, approve it for your advertiser account, and exchange the auth_code for a long-term access token.",
-          "3": "Copy your advertiser ID from TikTok Ads Manager.",
+          "3": "Copy your advertiser ID from TikTok's ad tool (TikTok Ads Manager).",
           "4": "Paste both below and save: GrowthOS checks them with TikTok before saving."
         }
       }
