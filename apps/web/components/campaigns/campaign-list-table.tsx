@@ -236,6 +236,11 @@ export function CampaignListTable({
           })}
         </tbody>
       </table>
+      {items.some((i) => i.spend30dUsd === null || i.roas === null || (i.ctrPct === null && i.cpaUsd === null)) ? (
+        <p className="border-t border-border/40 px-4 py-3 text-xs text-muted-foreground" data-testid="campaign-list-no-data-reason">
+          {t('noDataReason')}
+        </p>
+      ) : null}
     </div>
   );
 }
