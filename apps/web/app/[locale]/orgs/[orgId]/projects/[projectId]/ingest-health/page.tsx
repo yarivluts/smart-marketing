@@ -46,6 +46,7 @@ import { BackfillPanel } from '@/components/orgs/backfill-panel';
 import { Activity, CheckCircle2, Clock, Inbox, Workflow, XCircle } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard, DonutChart, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec } from '@/components/viz';
+import { formatReadableDateTime } from '@/lib/orgs/recency';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -449,7 +450,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
               {orchestrationRunViews.map((run: OrchestrationRunView) => (
                 <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
                   <span className="font-medium">
-                    {t('orchestrationRunSummary', { status: t(runStatusLabelKey(run.status)), startedAt: run.startedAt })}
+                    {t('orchestrationRunSummary', { status: t(runStatusLabelKey(run.status)), startedAt: formatReadableDateTime(run.startedAt, locale) })}
                   </span>
                   {run.errorMessage ? (
                     <span className="text-xs text-destructive">{t('orchestrationRunError', { message: run.errorMessage })}</span>
