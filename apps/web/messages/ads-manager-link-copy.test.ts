@@ -30,3 +30,11 @@ describe('failure reasons introduce Ads Manager as Facebook\'s ad tool', () => {
     expect(all).toContain("Open Facebook's ad tool (Ads Manager");
   });
 });
+
+describe('the "platform did not accept it" error explains what Ads Manager is', () => {
+  it('english', () => {
+    const text = (en.GrowthPilot as unknown as Record<string, any>).errors.platform_failed as string;
+    expect(text).toContain("Facebook's ad tool (Ads Manager)");
+    expect(text).not.toContain('Facebook Ads Manager');
+  });
+});
