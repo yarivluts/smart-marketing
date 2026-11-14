@@ -55,6 +55,18 @@ describe('ProjectSettingsForm', () => {
     supported.mockRestore();
   });
 
+  it('names each suggested currency so nobody has to know what ILS or USD means', async () => {
+    const supported = vi.spyOn(Intl as unknown as { supportedValuesOf: (key: string) => string[] }, 'supportedValuesOf');
+    supported.mockImplementation((key: string) => (key === 'currency' ? ['ILS', 'USD'] : []));
+    renderForm();
+
+    await waitFor(() => expect(document.querySelectorAll('#project-settings-currency-options option')).toHaveLength(2));
+    const labels = Array.from(document.querySelectorAll('#project-settings-currency-options option')).map((o) => o.getAttribute('label'));
+    expect(labels[0]).toMatch(/shekel/i);
+    expect(labels[1]).toMatch(/dollar/i);
+    supported.mockRestore();
+  });
+
   it('submits the edited fields and refreshes on success', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
     renderForm();
