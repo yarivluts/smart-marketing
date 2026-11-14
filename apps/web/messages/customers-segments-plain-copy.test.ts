@@ -33,3 +33,17 @@ describe('Customers and Segments pages: plain words', () => {
     }
   });
 });
+
+describe('Customer groups page uses the same name as the menu', () => {
+  const keys = ['metaTitle', 'title', 'segmentsHeading', 'kpiSegments', 'membersChartTitle', 'noSegments'];
+  it('en headings say "Customer groups", not "Segments"', () => {
+    const m = (en as unknown as Copy).Segments;
+    expect(m.segmentsHeading).toBe((en as unknown as Copy).Nav?.projectSegmentsLink ?? 'Customer groups');
+    for (const key of keys) expect(m[key], key).not.toMatch(/segment/i);
+  });
+  it('he headings say "קבוצות לקוחות", not "פלחים"', () => {
+    const m = (he as unknown as Copy).Segments;
+    for (const key of keys) expect(m[key], key).not.toMatch(/פלח/);
+    expect(m.segmentsHeading).toBe('קבוצות לקוחות');
+  });
+});
