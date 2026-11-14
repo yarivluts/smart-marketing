@@ -6238,7 +6238,7 @@
       "not_changeable": "This part cannot be changed right now - it may still be in the making. Reload the page to see where it stands.",
       "video_unavailable": "Video ads are not available on our side yet, so a video cannot be made. Please contact GrowthOS support.",
       "not_live": "These ads are not on Facebook and Instagram any more. Reload the page to see the latest.",
-      "platform_failed": "Facebook and Instagram did not accept the change, so nothing changed. Try again in a minute, or make it in Facebook Ads Manager.",
+      "platform_failed": "Facebook and Instagram did not accept the change, so nothing changed. Try again in a minute, or make the change in Facebook's ad tool (Ads Manager).",
       "invalid_thresholds": "Some values are out of range. Fix the highlighted fields and save again."
     },
     "ads": {
