@@ -22,6 +22,8 @@ export interface AutopilotPanelProps {
   stepHrefs?: { create: string; review: string };
   /** `prepare`: the Plan step (start, then confirm); `progress`: the Create step (watch it render). */
   mode?: 'prepare' | 'progress';
+  /** Optional collapsible breakdown tucked cleanly inside the progress card on Create. */
+  pipelineDrawer?: React.ReactNode;
 }
 
 /** Pause between advance calls; each call itself does real work (an image, a plan), so this only spaces them. */
@@ -79,7 +81,7 @@ const STEP_TONE = {
  * unit of work per call, and refreshes the rest of the page as steps finish, so every result is
  * editable below as soon as it exists. Exporting stays a separate, deliberate act.
  */
-export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, available, stepHrefs, mode = 'prepare' }: AutopilotPanelProps): React.ReactElement {
+export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, available, stepHrefs, mode = 'prepare', pipelineDrawer }: AutopilotPanelProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -233,35 +235,74 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
     (entry): entry is string => entry !== null,
   );
 
+  const runTotalSteps = run?.steps.length ?? 0;
+  const runDoneSteps = run ? run.steps.filter((step) => step.status === 'done' || step.status === 'skipped').length : 0;
+  const runPercent = run && runTotalSteps > 0
+    ? Math.round(
+        (run.steps.reduce((acc, step) => {
+          if (step.status === 'done' || step.status === 'skipped') return acc + 1;
+          if (step.status === 'running' && step.progress && step.progress.total > 0) {
+            return acc + Math.min(1, step.progress.done / step.progress.total);
+          }
+          return acc;
+        }, 0) /
+          runTotalSteps) *
+          100,
+      )
+    : 0;
+
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-5 shadow-sm" aria-labelledby="ad-studio-autopilot-heading" data-testid="ad-studio-autopilot">
-      <header className="flex items-start gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Rocket className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <div className="flex-1">
-          <h2 id="ad-studio-autopilot-heading" className="text-lg font-semibold">
-            {mode === 'prepare' ? t('autopilot.prepareTitle') : t('autopilot.createTitle')}
-          </h2>
-          <p className="text-sm text-muted-foreground">{mode === 'prepare' ? t('autopilot.prepareDescription') : t('autopilot.createDescription')}</p>
+    <section
+      className="relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-3xl border border-pp-outline-variant/45 bg-card p-4 shadow-pp-candy sm:p-5"
+      aria-labelledby="ad-studio-autopilot-heading"
+      data-testid="ad-studio-autopilot"
+    >
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-l from-pp-primary via-pp-primary-fixed-dim to-pp-secondary-container"
+        aria-hidden="true"
+      />
+      <header className="flex items-start justify-between gap-3 pt-1">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-pp-primary-fixed text-pp-primary">
+            <Rocket className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="ad-studio-autopilot-heading" className="font-pp-display text-base font-bold tracking-tight sm:text-lg">
+              {mode === 'prepare' ? t('autopilot.prepareTitle') : t('autopilot.createTitle')}
+            </h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+              {mode === 'prepare' ? t('autopilot.prepareDescription') : t('autopilot.createDescription')}
+            </p>
+          </div>
         </div>
+        {running && !paused ? (
+          <button
+            type="button"
+            onClick={() => void cancel()}
+            disabled={pending !== null}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-pp-outline-variant/50 bg-pp-surface-container-low px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            <Square className="h-3 w-3" aria-hidden="true" />
+            {t('autopilot.cancel')}
+          </button>
+        ) : null}
       </header>
 
       {awaiting ? (
-        <div className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4" data-testid="ad-studio-confirm-plan">
-          <p className="text-sm font-semibold">{t('autopilot.awaitingTitle')}</p>
-          <p className="text-sm text-muted-foreground">{t('autopilot.awaitingDescription')}</p>
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-3 rounded-2xl border border-pp-primary/35 bg-pp-primary-fixed/45 p-4" data-testid="ad-studio-confirm-plan">
+          <p className="font-pp-display text-sm font-bold text-foreground">{t('autopilot.awaitingTitle')}</p>
+          <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{t('autopilot.awaitingDescription')}</p>
+          <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
               onClick={() => void approve()}
               disabled={pending !== null}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-transform hover:bg-primary/90 active:scale-95 disabled:opacity-50"
             >
               {pending === 'approve' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
               {t('autopilot.confirmPlan')}
             </button>
-            <button type="button" onClick={() => void cancel()} disabled={pending !== null} className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50">
+            <button type="button" onClick={() => void cancel()} disabled={pending !== null} className="inline-flex h-10 items-center rounded-full border border-pp-outline-variant/50 bg-card px-4 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-50">
               {t('autopilot.discardPlan')}
             </button>
           </div>
@@ -270,23 +311,23 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
 
       {!running && !awaiting && mode === 'prepare' ? (
         <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
-            <label className="inline-flex items-center gap-2">
+          <div className="flex flex-wrap gap-2 text-xs sm:text-sm">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-pp-outline-variant/45 bg-pp-surface-container-low px-3 py-1.5 font-medium">
               <input type="checkbox" checked={plan} onChange={(event) => setPlan(event.target.checked)} />
               {t('autopilot.optionPlan')}
             </label>
-            <label className="inline-flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-pp-outline-variant/45 bg-pp-surface-container-low px-3 py-1.5 font-medium">
               <input type="checkbox" checked={images} onChange={(event) => setImages(event.target.checked)} />
               {t('autopilot.optionImages')}
             </label>
-            <label className="inline-flex items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-pp-outline-variant/45 bg-pp-surface-container-low px-3 py-1.5 font-medium">
               <input type="checkbox" checked={video} onChange={(event) => setVideo(event.target.checked)} />
               {t('autopilot.optionVideo')}
             </label>
           </div>
           {images ? (
-            <fieldset className="flex flex-wrap items-center gap-2">
-              <legend className="mb-1 text-xs font-medium text-muted-foreground">{t('autopilot.formatsLegend')}</legend>
+            <fieldset className="flex flex-wrap items-center gap-1.5">
+              <legend className="mb-1.5 text-xs font-medium text-muted-foreground">{t('autopilot.formatsLegend')}</legend>
               {AD_STUDIO_IMAGE_FORMATS.map((format) => (
                 <button
                   key={format}
@@ -294,8 +335,10 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
                   aria-pressed={formats.includes(format)}
                   onClick={() => toggleFormat(format)}
                   className={cn(
-                    'rounded-full border px-3 py-1 text-xs font-medium',
-                    formats.includes(format) ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted',
+                    'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                    formats.includes(format)
+                      ? 'border-pp-primary bg-pp-primary-fixed text-pp-on-primary-fixed'
+                      : 'border-pp-outline-variant/45 bg-card text-muted-foreground hover:bg-muted',
                   )}
                 >
                   {t(`images.format.${format}`)}
@@ -314,7 +357,7 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
               type="button"
               onClick={() => void start()}
               disabled={pending !== null || nothingChosen || noFormats}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-sm transition-transform hover:bg-primary/90 active:scale-95 disabled:opacity-50"
             >
               {pending === 'start' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Rocket className="h-4 w-4" aria-hidden="true" />}
               {run ? t('autopilot.runAgain') : t('autopilot.prepare')}
@@ -325,45 +368,71 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
       ) : null}
 
       {run ? (
-        <div className="flex flex-col gap-2" data-testid="ad-studio-autopilot-run">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className={cn('text-sm font-semibold', run.status === 'failed' ? 'text-destructive' : run.status === 'done' ? 'text-success' : 'text-foreground')} role="status">
-              {t(`autopilot.runStatus.${run.status}`)}
-            </p>
-            {running && paused ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setMessage(null);
-                  setPaused(false);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
-                data-testid="ad-studio-autopilot-resume"
-              >
-                {t('autopilot.resume')}
-              </button>
-            ) : null}
-            {running ? (
-              <button
-                type="button"
-                onClick={() => void cancel()}
-                disabled={pending !== null}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-              >
-                <Square className="h-3 w-3" aria-hidden="true" />
-                {t('autopilot.cancel')}
-              </button>
-            ) : null}
+        <div className="flex flex-col gap-3" data-testid="ad-studio-autopilot-run">
+          <div className="flex flex-col gap-2 rounded-2xl border border-pp-outline-variant/35 bg-pp-surface-container-low/75 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className={cn('text-xs font-semibold sm:text-sm', run.status === 'failed' ? 'text-destructive' : run.status === 'done' ? 'text-emerald-700' : 'text-foreground')} role="status">
+                {t(`autopilot.runStatus.${run.status}`)}
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-semibold tabular-nums text-pp-primary">
+                  {t('stepWorkspace.progressPercent', { percent: runPercent })}
+                </span>
+                {running && paused ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessage(null);
+                      setPaused(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+                    data-testid="ad-studio-autopilot-resume"
+                  >
+                    {t('autopilot.resume')}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            <div
+              role="progressbar"
+              aria-label={t('stepWorkspace.stepsDone', { done: runDoneSteps, total: runTotalSteps })}
+              aria-valuenow={runPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="h-2 w-full overflow-hidden rounded-full bg-pp-surface-container"
+            >
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all duration-300',
+                  run.status === 'failed'
+                    ? 'bg-destructive'
+                    : run.status === 'done'
+                      ? 'bg-emerald-500'
+                      : 'bg-gradient-to-l from-pp-primary to-pp-primary-fixed-dim',
+                )}
+                style={{ width: `${runPercent}%` }}
+              />
+            </div>
           </div>
-          <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+
+          <ol className={cn('grid gap-2', mode === 'progress' ? 'grid-cols-2 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3')}>
             {run.steps.map((step) => {
               const Icon = STEP_ICON[step.status];
               return (
-                <li key={step.id} className="flex items-start gap-2 rounded-xl border border-border bg-card px-3 py-2" data-testid={`ad-studio-autopilot-step-${step.id}`}>
+                <li
+                  key={step.id}
+                  className={cn(
+                    'flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5',
+                    step.status === 'running'
+                      ? 'border-pp-primary/40 bg-pp-primary-fixed/40'
+                      : 'border-pp-outline-variant/35 bg-card',
+                  )}
+                  data-testid={`ad-studio-autopilot-step-${step.id}`}
+                >
                   <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', STEP_TONE[step.status], step.status === 'running' && 'animate-spin')} aria-hidden="true" />
                   <span className="flex min-w-0 flex-col">
-                    <span className="text-sm font-medium">{t(`autopilot.step.${step.id}`)}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="truncate text-xs font-semibold sm:text-sm">{t(`autopilot.step.${step.id}`)}</span>
+                    <span className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
                       {t(`autopilot.stepStatus.${step.status}`)}
                       {step.progress && step.progress.total > 0 ? ` · ${t('autopilot.progress', { done: step.progress.done, total: step.progress.total })}` : ''}
                       {step.reason && KNOWN_REASONS.has(step.reason) ? ` · ${t(`autopilot.reason.${step.reason}`)}` : ''}
@@ -377,6 +446,9 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
           {run.status === 'done' ? <p className="text-xs text-muted-foreground">{t('autopilot.doneHint')}</p> : null}
         </div>
       ) : null}
+
+      {pipelineDrawer}
+
       {message ? (
         <p role="alert" className="text-sm text-destructive">
           {message}

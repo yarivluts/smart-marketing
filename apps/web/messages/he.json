@@ -5494,7 +5494,27 @@
     },
     "adHeader": {
       "usageLabel": "שימוש ב-AI היום",
-      "limitReached": "מכסה מלאה"
+      "limitReached": "מכסה מלאה",
+      "toggleUsage": "מכסות AI",
+      "showGoal": "הצג מטרה",
+      "hideGoal": "הסתר מטרה"
+    },
+    "stepWorkspace": {
+      "stepCounter": "שלב {current} מתוך {total}",
+      "planTabsLabel": "אזורי התכנון",
+      "planTabStrategy": "תוכנית ומחקר",
+      "planTabScript": "תסריט ({count})",
+      "planTabIdeas": "רעיונות לתמונות ({count})",
+      "progressPercent": "{percent}% הושלם",
+      "stepsDone": "{done} מתוך {total} הושלמו",
+      "pipelineToggle": "מה נבנה בכל שלב",
+      "galleryFilterLabel": "סינון תוצרים",
+      "filterAll": "הכל ({count})",
+      "filterImages": "תמונות ({count})",
+      "filterScenes": "סצנות ({count})",
+      "imagesCount": "תמונות שנוצרו ({count})",
+      "scenesCount": "סצנות וידאו ({count})",
+      "publishLibraryTitle": "העלאות לערוצים ושיתוף"
     },
     "fromSite": {
       "title": "חדשים כאן? רק תכניסו את האתר שלכם",

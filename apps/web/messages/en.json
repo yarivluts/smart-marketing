@@ -5494,7 +5494,27 @@
     },
     "adHeader": {
       "usageLabel": "Today's AI usage",
-      "limitReached": "Limit reached"
+      "limitReached": "Limit reached",
+      "toggleUsage": "AI limits",
+      "showGoal": "Show goal",
+      "hideGoal": "Hide goal"
+    },
+    "stepWorkspace": {
+      "stepCounter": "Step {current} of {total}",
+      "planTabsLabel": "Plan sections",
+      "planTabStrategy": "Plan & research",
+      "planTabScript": "Script ({count})",
+      "planTabIdeas": "Image ideas ({count})",
+      "progressPercent": "{percent}% complete",
+      "stepsDone": "{done} of {total} done",
+      "pipelineToggle": "How everything is built",
+      "galleryFilterLabel": "Filter created items",
+      "filterAll": "All ({count})",
+      "filterImages": "Images ({count})",
+      "filterScenes": "Scenes ({count})",
+      "imagesCount": "Generated images ({count})",
+      "scenesCount": "Video scenes ({count})",
+      "publishLibraryTitle": "Channel uploads & share"
     },
     "fromSite": {
       "title": "New here? Just enter your website",
