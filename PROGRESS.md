@@ -17,6 +17,22 @@ Template for each entry:
 
 ---
 
+## 2026-11-14 — Ad Studio mobile ads list redesign (Stitch)
+
+- **Stitch design**: generated mobile-first 390px Hebrew RTL screen `895a21c6f4864db2af23d31d318edb42` in Stitch project `15388075487680927533` using the Pastel Pulse design system (`assets/80713eeffe4f4cd59c5ad94a0b11e269`).
+- **UI & Components**:
+  - Added [`AdStudioAdsHub`](apps/web/components/ad-studio/ad-studio-ads-hub.tsx) so mobile puts the 1-tap `+ New ad` shortcut, live search box, stage filter chips (`All` / `Draft` / `Planned` / `Scripted`), rich creative-mix cards, compact scene timeline, and quick-create from website (`AdFromSite`) front and center while collapsing manual `BriefForm` entry behind a toggle on small screens (and keeping `BriefForm` immediately visible on `md+` desktop).
+  - Updated [`StudioStats`](apps/web/components/ad-studio/studio-stats.tsx) into a swipeable horizontal mobile KPI tray (`lg:grid lg:grid-cols-5`) with real quota progress bars while keeping `data-testid="ad-studio-stats"` and returning `null` when `overview.briefs === 0`.
+  - Added `compact?: boolean` to [`SceneTimeline`](apps/web/components/ad-studio/scene-timeline.tsx).
+  - Updated [the Ad Studio route page](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx) to render `AdStudioAdsHub` and tuck `ShareLinksPanel` and `ad-studio-admin-details` into collapsible drawers.
+- **i18n**: added `AdStudio.list` (21 keys) in `apps/web/messages/en.json` and `apps/web/messages/he.json`.
+- **Verification**:
+  - `pnpm typecheck` (`16/16` tasks passed) and `pnpm lint` (`9/9` tasks passed).
+  - Vitest: Ad Studio component specs (`ad-studio-ads-hub.test.tsx`, `studio-stats.test.tsx`, `ad-from-site.test.tsx`, `brief-form.test.tsx`: `4` files, `19` tests passed) and `messages/` copy specs excluding Firestore-emulator `ingest-health` routes (`236` files, `812` tests passed).
+  - `pnpm exec turbo run build --env-mode=loose` (`10/10` tasks built cleanly).
+
+---
+
 ## 2026-11-14 — Ad Studio video: edit all ready clips with one instruction
 
 - **Last completed:**

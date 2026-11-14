@@ -14,7 +14,9 @@ describe('StudioStats', () => {
   });
 
   it('shows the figures and limits once there is an ad', () => {
-    renderWithIntl(<StudioStats overview={{ briefs: 2, scripted: 1, scriptedSeconds: 30 }} usageToday={usageToday} limits={limits} />);
-    expect(screen.getByTestId('ad-studio-stats')).toBeTruthy();
+    renderWithIntl(<StudioStats overview={{ briefs: 2, scripted: 1, scriptedSeconds: 30 }} usageToday={{ textGenerations: 10, videoSeconds: 60, images: 5 }} limits={limits} />);
+    const stats = screen.getByTestId('ad-studio-stats');
+    expect(stats).toBeTruthy();
+    expect(screen.getAllByRole('progressbar')).toHaveLength(3);
   });
 });

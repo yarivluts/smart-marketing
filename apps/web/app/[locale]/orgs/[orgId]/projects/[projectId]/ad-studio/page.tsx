@@ -12,11 +12,13 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  ChevronDown,
   Clapperboard,
   Clock,
   FileText,
   ImageIcon,
-  Plus,
+  Share2,
+  SlidersHorizontal,
   Sparkles,
   Workflow,
 } from 'lucide-react';
@@ -64,7 +66,6 @@ import { Link } from '@/i18n/navigation';
 import { StudioStats } from '@/components/ad-studio/studio-stats';
 import {
   ChartCard,
-  EmptyState,
   FlowDiagram,
   PageHero,
   type FlowEdgeSpec,
@@ -72,13 +73,12 @@ import {
   type VizStatus,
 } from '@/components/viz';
 import { BriefForm } from '@/components/ad-studio/brief-form';
-import { AdFromSite } from '@/components/ad-studio/ad-from-site';
+import { AdStudioAdsHub, type AdStudioListBrief } from '@/components/ad-studio/ad-studio-ads-hub';
 import { getAdStudioDemoAccess, getCurrentGrowthPilot, listAdStudioDemoRecordings, toAdStudioDemoRecordingView } from '@growthos/firebase-orm-models';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
 import { ReferenceLibrary } from '@/components/ad-studio/reference-library';
 import { VideoStudio } from '@/components/ad-studio/video-studio';
 import { ExportPanel } from '@/components/ad-studio/export-panel';
-import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { BrandKitPanel } from '@/components/ad-studio/brand-kit-panel';
 import { DemoAccessPanel } from '@/components/ad-studio/demo-access-panel';
@@ -96,7 +96,6 @@ import {
   type AdStudioStepId,
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
-import { cn } from '@/lib/utils';
 import { CreateGallery } from '@/components/ad-studio/create-gallery';
 import { ReviewOverview } from '@/components/ad-studio/review-overview';
 import { AdHeader } from '@/components/ad-studio/ad-header';
@@ -860,97 +859,81 @@ export default async function AdStudioPage({
         </ClaimSourcesProvider>
         </BrandLogoProvider>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <ChartCard title={t('newAdTitle')} description={t('newAdDescription')} icon={Plus}>
-            <div className="flex flex-col gap-4">
-              <AdFromSite orgId={orgId} projectId={projectId} studioHref={base} defaultSiteUrl={knownSite} />
-              <p className="text-center text-xs font-medium text-muted-foreground">{t('fromSite.or')}</p>
-              <BriefForm orgId={orgId} projectId={projectId} studioHref={base} />
-            </div>
-          </ChartCard>
-
-          {/* On phones the person's existing ads come first; the new-ad form follows. */}
-          <section className="order-first flex flex-col gap-3 lg:order-none" aria-labelledby="ad-studio-ads-heading">
-            <h2 id="ad-studio-ads-heading" className="text-lg font-semibold">
-              {t('adsListTitle')}
-            </h2>
-            {briefs.length === 0 ? (
-              <EmptyState
-                icon={Clapperboard}
-                title={t('adsListEmptyTitle')}
-                description={t('adsListEmpty')}
-              />
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {briefs.map((brief) => (
-                  <li key={brief.id}>
-                    <Link
-                      href={`${base}?brief=${brief.id}`}
-                      className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-primary/50"
-                      data-testid="ad-studio-brief-card"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold">{brief.name}</p>
-                          <p className="line-clamp-2 text-xs text-muted-foreground">
-                            {brief.objective}
-                          </p>
-                        </div>
-                        <span className="flex flex-wrap gap-1.5">
-                          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">
-                            {t(
-                              brief.format === 'vertical'
-                                ? 'formatVerticalShort'
-                                : 'formatHorizontalShort',
-                            )}
-                          </span>
-                          <span
-                            className={cn(
-                              'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                              brief.scenes.length > 0
-                                ? 'bg-success/10 text-success'
-                                : 'bg-muted text-muted-foreground',
-                            )}
-                          >
-                            {t(`status.${brief.status}`)}
-                          </span>
-                        </span>
-                      </div>
-                      {brief.scenes.length > 0 ? (
-                        <SceneTimeline scenes={brief.scenes} />
-                      ) : (
-                        <p className="text-xs text-muted-foreground">{t('noScenesYetShort')}</p>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+        <div className="flex min-w-0 flex-col gap-5">
+          <AdStudioAdsHub
+            orgId={orgId}
+            projectId={projectId}
+            studioHref={base}
+            knownSite={knownSite}
+            briefs={briefs.map((brief): AdStudioListBrief => ({
+              id: brief.id,
+              name: brief.name,
+              objective: brief.objective,
+              format: brief.format,
+              language: brief.language,
+              status: brief.status,
+              host: displayHost(brief.landingPageUrl),
+              scenes: brief.scenes.map((scene) => ({ id: scene.id, durationSeconds: scene.durationSeconds })),
+              hasPlan: Boolean(brief.plan),
+              imageConceptCount: brief.imageConcepts.length,
+              hasSearchAd: Boolean(
+                brief.searchAd &&
+                  (brief.searchAd.headlines.some((line) => Boolean(line.trim())) ||
+                    brief.searchAd.descriptions.some((line) => Boolean(line.trim()))),
+              ),
+              keywordCount: brief.searchKeywords?.keywords.length ?? 0,
+              lastChangedOn: brief.lastChangedOn,
+            }))}
+          />
           {canEditBrand && briefs.length > 0 ? (
-            <div className="lg:col-span-2">
-              <ShareLinksPanel
-                orgId={orgId}
-                projectId={projectId}
-                briefs={briefs.map((brief) => ({ id: brief.id, name: brief.name }))}
-                initialLinks={shareLinks}
-              />
-            </div>
+            <details className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy">
+              <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 transition-colors hover:bg-pp-surface-container-low/60 [&::-webkit-details-marker]:hidden">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
+                    <Share2 className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0 text-start">
+                    <p className="font-pp-display text-sm font-bold text-foreground">{tShare('title')}</p>
+                    <p className="line-clamp-1 text-xs text-muted-foreground">{tShare('intro')}</p>
+                  </div>
+                </div>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="border-t border-border/50 p-4">
+                <ShareLinksPanel
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefs={briefs.map((brief) => ({ id: brief.id, name: brief.name }))}
+                  initialLinks={shareLinks}
+                />
+              </div>
+            </details>
           ) : null}
         </div>
       )}
 
-      {/* Studio-wide settings and usage: open on the studio home, one line under an open ad. */}
-      <details open={!selected} className="group rounded-2xl" data-testid="ad-studio-admin-details">
-        <summary
-          className={cn(
-            'cursor-pointer rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold shadow-sm',
-            !selected && 'sr-only',
-          )}
-        >
-          {t('admin.collapsed')}
+      {/* Studio-wide settings, brand kit and AI usage collapse behind a thumb-friendly drawer on every screen. */}
+      <details className="group rounded-3xl" data-testid="ad-studio-admin-details">
+        <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-3xl border border-pp-outline-variant/40 bg-card px-4 py-3.5 shadow-pp-candy transition-colors hover:border-pp-primary/40 [&::-webkit-details-marker]:hidden">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
+              <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 text-start">
+              <p className="font-pp-display text-sm font-bold text-foreground">{t('admin.collapsed')}</p>
+              <p className="line-clamp-1 text-xs text-muted-foreground">{t('list.adminHint')}</p>
+            </div>
+          </div>
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+            aria-hidden="true"
+          />
         </summary>
-        <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} logoUrl={logoUrl} />
+        <div className="mt-4 flex flex-col gap-4">
+          <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} logoUrl={logoUrl} />
         <DemoAccessPanel
           orgId={orgId}
           projectId={projectId}
@@ -988,6 +971,7 @@ export default async function AdStudioPage({
             occurredOn: row.occurred_on,
           }))}
         />
+        </div>
       </details>
     </div>
   );
