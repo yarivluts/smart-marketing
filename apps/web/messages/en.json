@@ -2867,7 +2867,7 @@
     "statusChartTitle": "Work-list status",
     "statusChartDescription": "Where the follow-up on each segment stands.",
     "statusChartCenter": "segments",
-    "noSegmentsDetail": "Create one below, or let an agent create one over MCP.",
+    "noSegmentsDetail": "Create your first group below.",
     "filterChip": "{field} {op} {value}",
     "filterOpContains": "contains",
     "eventChipHas": "Has {schemaName}",

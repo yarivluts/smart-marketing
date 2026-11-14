@@ -2867,7 +2867,7 @@
     "statusChartTitle": "מצב רשימות העבודה",
     "statusChartDescription": "איפה עומד הטיפול בכל פלח.",
     "statusChartCenter": "פלחים",
-    "noSegmentsDetail": "צרו פלח למטה, או תנו לסוכן ליצור אחד דרך MCP.",
+    "noSegmentsDetail": "צרו את הקבוצה הראשונה שלכם למטה.",
     "filterChip": "{field} {op} {value}",
     "filterOpContains": "מכיל",
     "eventChipHas": "יש {schemaName}",
