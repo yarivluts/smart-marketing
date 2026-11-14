@@ -93,7 +93,6 @@ import {
   type AdStudioStepId,
   type AdStudioStepNav,
 } from '@/components/ad-studio/ad-studio-stepper';
-import { CreateGallery } from '@/components/ad-studio/create-gallery';
 import { ReviewOverview } from '@/components/ad-studio/review-overview';
 import { AdHeader } from '@/components/ad-studio/ad-header';
 import { adTextDirection, displayHost, parseReviewItem, reviewItemParam, summarizeImageCreatives, summarizeSearchCreative, summarizeVideoCreative, type ReviewItem } from '@/lib/ad-studio/review-overview';
@@ -382,13 +381,6 @@ export default async function AdStudioPage({
           href: stepHref('plan'),
         },
         {
-          id: 'create',
-          label: t('stepper.create.label'),
-          hint: planConfirmed ? t('stepper.create.hint') : t('stepper.create.hintLocked'),
-          state: steps.states.create,
-          href: stepHref('create'),
-        },
-        {
           id: 'review',
           label: t('stepper.review.label'),
           hint: steps.states.review !== 'locked' ? t('stepper.review.hint') : t('stepper.review.hintLocked'),
@@ -517,7 +509,7 @@ export default async function AdStudioPage({
                       images: imagesAvailable,
                       video: videoAvailable,
                     }}
-                    stepHrefs={{ create: stepHref('create'), review: stepHref('review') }}
+                    stepHrefs={{ create: stepHref('review'), review: stepHref('review') }}
                   />
                   <PlanningPanel
                     orgId={orgId}
@@ -614,8 +606,8 @@ export default async function AdStudioPage({
             />
           ) : null}
 
-          {activeStep === 'create' ? (
-            <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[380px_minmax(0,1fr)] lg:items-start lg:gap-5">
+          {activeStep === 'review' && !reviewItem ? (
+            <div className="flex min-w-0 flex-col gap-5">
               <AutopilotPanel
                 mode="progress"
                 orgId={orgId}
@@ -632,7 +624,7 @@ export default async function AdStudioPage({
                   images: imagesAvailable,
                   video: videoAvailable,
                 }}
-                stepHrefs={{ create: stepHref('create'), review: stepHref('review') }}
+                stepHrefs={{ create: stepHref('review'), review: stepHref('review') }}
                 pipelineDrawer={
                   <details className="group rounded-2xl border border-pp-outline-variant/35 bg-pp-surface-container-low/60">
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-pp-primary [&::-webkit-details-marker]:hidden">
@@ -653,44 +645,29 @@ export default async function AdStudioPage({
                   </details>
                 }
               />
-              <CreateGallery
+              <ReviewOverview
                 mediaBase={mediaBase}
                 videoFormat={selected.format}
-                images={imageSlots.flatMap((slot) => {
-                  const latest = slot.selected ?? slot.versions[0];
-                  return latest ? [{ id: latest.id, status: latest.status, format: slot.format, label: `${t('images.ideaLabel', { index: conceptIndex(slot.conceptId) })} · ${t(`images.format.${slot.format}`)}` }] : [];
+                adDirection={adTextDirection(selected.language)}
+                hrefs={{
+                  image: Object.fromEntries(selected.imageConcepts.map((concept) => [concept.id, reviewHref({ kind: 'image', conceptId: concept.id })])),
+                  images: reviewHref({ kind: 'images' }),
+                  video: reviewHref({ kind: 'video' }),
+                  search: reviewHref({ kind: 'search' }),
+                }}
+                images={summarizeImageCreatives(selected.imageConcepts, imageSlots)}
+                video={summarizeVideoCreative({
+                  scenes: selected.scenes,
+                  clips,
+                  assembled: Boolean(videoStage?.assembled),
+                  assembledSeconds: videoStage?.assembledSeconds ?? 0,
+                  hasCopy: Boolean(selected.videoCopy && (selected.videoCopy.headline.trim() || selected.videoCopy.primaryText.trim())),
                 })}
-                scenes={selected.scenes.map((scene, index) => {
-                  const latest = clips.filter((clip) => clip.sceneId === scene.id).sort((a, b) => b.version - a.version)[0];
-                  return { id: scene.id, number: index + 1, clip: latest ? { id: latest.id, status: latest.status } : null };
-                })}
+                search={summarizeSearchCreative(selected.searchAd, selected.searchKeywords?.keywords.length ?? 0)}
+                publishHref={steps.states.publish !== 'locked' ? stepHref('publish') : null}
+                searchHost={displayHost(selected.landingPageUrl)}
               />
             </div>
-          ) : null}
-
-          {activeStep === 'review' && !reviewItem ? (
-            <ReviewOverview
-              mediaBase={mediaBase}
-              videoFormat={selected.format}
-              adDirection={adTextDirection(selected.language)}
-              hrefs={{
-                image: Object.fromEntries(selected.imageConcepts.map((concept) => [concept.id, reviewHref({ kind: 'image', conceptId: concept.id })])),
-                images: reviewHref({ kind: 'images' }),
-                video: reviewHref({ kind: 'video' }),
-                search: reviewHref({ kind: 'search' }),
-              }}
-              images={summarizeImageCreatives(selected.imageConcepts, imageSlots)}
-              video={summarizeVideoCreative({
-                scenes: selected.scenes,
-                clips,
-                assembled: Boolean(videoStage?.assembled),
-                assembledSeconds: videoStage?.assembledSeconds ?? 0,
-                hasCopy: Boolean(selected.videoCopy && (selected.videoCopy.headline.trim() || selected.videoCopy.primaryText.trim())),
-              })}
-              search={summarizeSearchCreative(selected.searchAd, selected.searchKeywords?.keywords.length ?? 0)}
-              publishHref={steps.states.publish !== 'locked' ? stepHref('publish') : null}
-              searchHost={displayHost(selected.landingPageUrl)}
-            />
           ) : null}
 
           {activeStep === 'review' && reviewItem ? (

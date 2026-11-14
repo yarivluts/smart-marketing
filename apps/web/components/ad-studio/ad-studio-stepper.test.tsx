@@ -15,8 +15,7 @@ vi.mock('@/i18n/navigation', () => ({
 const STEPS: AdStudioStepNav[] = [
   { id: 'brief', label: 'Brief', hint: 'What the ad is for', state: 'done', href: '?step=brief' },
   { id: 'plan', label: 'Plan', hint: 'Review and confirm', state: 'current', href: '?step=plan' },
-  { id: 'create', label: 'Create', hint: 'Confirm the plan first', state: 'locked', href: '?step=create' },
-  { id: 'review', label: 'Review & edit', hint: 'Nothing created yet', state: 'locked', href: '?step=review' },
+  { id: 'review', label: 'Create & review', hint: 'Confirm the plan first', state: 'locked', href: '?step=review' },
   { id: 'publish', label: 'Publish', hint: 'Create the ads first', state: 'locked', href: '?step=publish' },
 ];
 
@@ -27,9 +26,9 @@ describe('AdStudioStepper', () => {
     expect(within(nav).getAllByRole('link')).toHaveLength(2);
     expect(screen.getByTestId('ad-studio-step-plan').querySelector('a')).toHaveAttribute('aria-current', 'step');
     expect(screen.getByTestId('ad-studio-step-brief').querySelector('a')).toHaveAttribute('href', '?step=brief');
-    const create = screen.getByTestId('ad-studio-step-create');
-    expect(create).toHaveAttribute('data-state', 'locked');
-    expect(create.querySelector('a')).toBeNull();
-    expect(create.querySelector('[aria-disabled="true"]')).toHaveAttribute('title', 'Confirm the plan first');
+    const review = screen.getByTestId('ad-studio-step-review');
+    expect(review).toHaveAttribute('data-state', 'locked');
+    expect(review.querySelector('a')).toBeNull();
+    expect(review.querySelector('[aria-disabled="true"]')).toHaveAttribute('title', 'Confirm the plan first');
   });
 });

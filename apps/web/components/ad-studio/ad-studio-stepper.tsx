@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 
-export type AdStudioStepId = 'brief' | 'plan' | 'create' | 'review' | 'publish';
+export type AdStudioStepId = 'brief' | 'plan' | 'review' | 'publish';
 export type AdStudioStepState = 'done' | 'current' | 'next' | 'locked';
 
 export interface AdStudioStepNav {
@@ -17,8 +17,8 @@ export interface AdStudioStepNav {
 }
 
 /**
- * Pastel Pulse 5-step stepper: a thumb-friendly horizontal pill bar on phones with a clear
- * "Step X of 5" summary header, expanding into a clean 5-column progress track on desktop.
+ * Pastel Pulse 4-step stepper: a thumb-friendly horizontal pill bar on phones with a clear
+ * "Step X of 4" summary header, expanding into a clean 4-column progress track on desktop.
  */
 export function AdStudioStepper({
   steps,
@@ -53,7 +53,7 @@ export function AdStudioStepper({
         </div>
       ) : null}
 
-      <ol className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-5 md:gap-0 md:overflow-visible md:pb-0">
+      <ol className="flex min-w-0 items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-4 md:gap-0 md:overflow-visible md:pb-0">
         {steps.map((step, index) => {
           const isActive = step.id === active;
           const next = steps[index + 1];

@@ -4802,9 +4802,9 @@
         "hintLocked": "Confirm the plan first"
       },
       "review": {
-        "label": "Review & edit",
-        "hint": "Change anything",
-        "hintLocked": "Nothing created yet"
+        "label": "Create & review",
+        "hint": "Images, video and edits",
+        "hintLocked": "Confirm the plan first"
       },
       "publish": {
         "label": "Publish",

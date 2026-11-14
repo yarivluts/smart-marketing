@@ -1,5 +1,5 @@
-/** The Ad Studio stepper: Brief -> Plan -> Create -> Review -> Publish. */
-export type AdStudioStepId = 'brief' | 'plan' | 'create' | 'review' | 'publish';
+/** The Ad Studio stepper: Brief -> Plan -> Create & review -> Publish. */
+export type AdStudioStepId = 'brief' | 'plan' | 'review' | 'publish';
 export type AdStudioStepState = 'done' | 'current' | 'next' | 'locked';
 
 export interface AdStudioStepFacts {
@@ -33,21 +33,21 @@ export function planAdStudioSteps(facts: AdStudioStepFacts): AdStudioStepPlan {
   const { hasMedia, hasContent, run, publishable, published } = facts;
   const planConfirmed = Boolean(run && (run.planApproved || run.status === 'done')) || hasMedia || hasContent;
   const rendering = run?.status === 'running' && run.planApproved;
-  const reviewOpen = hasMedia || (planConfirmed && hasContent);
+  const reviewOpen = planConfirmed;
   const states: Record<AdStudioStepId, AdStudioStepState> = {
     brief: 'done',
     plan: planConfirmed ? 'done' : 'current',
-    create: !planConfirmed ? 'locked' : rendering ? 'current' : hasMedia ? 'done' : 'next',
-    review: reviewOpen ? (published ? 'done' : 'next') : 'locked',
+    review: !reviewOpen ? 'locked' : rendering ? 'current' : hasMedia ? 'done' : 'next',
     publish: publishable === 0 ? 'locked' : published ? 'done' : 'next',
   };
-  const defaultStep: AdStudioStepId = !planConfirmed ? 'plan' : rendering ? 'create' : hasMedia ? 'review' : hasContent && !run ? 'review' : 'create';
+  const defaultStep: AdStudioStepId = !planConfirmed ? 'plan' : 'review';
   return { states, defaultStep, rendering: Boolean(rendering), planConfirmed };
 }
 
-/** The step to show: the one asked for when it is open, otherwise the default. */
+/** The step to show: maps legacy `create` to `review`, then opens it if unlocked, otherwise default. */
 export function resolveAdStudioStep(plan: AdStudioStepPlan, requested: string | undefined): AdStudioStepId {
+  const normalized = requested === 'create' ? 'review' : requested;
   const ids = Object.keys(plan.states) as AdStudioStepId[];
-  const asked = ids.find((id) => id === requested);
+  const asked = ids.find((id) => id === normalized);
   return asked && plan.states[asked] !== 'locked' ? asked : plan.defaultStep;
 }
