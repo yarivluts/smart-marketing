@@ -319,6 +319,7 @@ describe('McpController (e2e)', () => {
           'render_ad_video',
           'render_ad_scene',
           'edit_ad_scene_clip',
+          'edit_all_ad_scene_clips',
           'get_ad_video_status',
           'assemble_ad_video',
           'record_product_walkthrough',

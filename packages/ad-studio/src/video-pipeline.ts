@@ -384,6 +384,54 @@ function generatingFor(clips: readonly AdStudioClipModel[], sceneId: string): bo
   return clips.some((clip) => clip.scene_id === sceneId && clip.status === 'generating');
 }
 
+/** The ready clip an edit chains from: a version the person chose, else the newest ready one. */
+function editableParentClip(clips: readonly AdStudioClipModel[], sceneId: string): AdStudioClipModel | null {
+  const ready = clips
+    .filter((clip) => clip.scene_id === sceneId && clip.status === 'ready' && Boolean(clip.interaction_id))
+    .sort((a, b) => b.version - a.version);
+  return ready.find((clip) => clip.chosen) ?? ready[0] ?? null;
+}
+
+/** Voice-over clips stay speechless through an edit and get their narration mixed back on afterwards. */
+function clipEditNarration(parent: Pick<AdStudioClipModel, 'narration_text' | 'narration_voice' | 'narration_style'>): { text: string; voice: string; style: string } | null {
+  return parent.narration_text?.trim()
+    ? {
+        text: parent.narration_text,
+        voice: parent.narration_voice ?? AD_STUDIO_DEFAULT_TTS_VOICE,
+        style: parent.narration_style ?? '',
+      }
+    : null;
+}
+
+function editClipFromParent(
+  ctx: BriefContext & { sceneId: string; instruction: string; modelInstruction: string },
+  brief: Pick<AdStudioBriefModel, 'video_format'>,
+  parent: AdStudioClipModel,
+  narration: { text: string; voice: string; style: string } | null,
+  deps: AdStudioVideoDeps,
+): Promise<AdStudioClipModel> {
+  const speechless = narration !== null;
+  const prompt = buildSceneEditInstruction(ctx.instruction, { speechless });
+  const modelText = buildSceneEditInstruction(ctx.modelInstruction, { speechless });
+  const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
+  const previousInteractionId = parent.interaction_id as string;
+  // An edit continues its clip, so it keeps that clip's resolution (720p for clips made before the setting).
+  const resolution = parent.resolution ?? '720p';
+  return startClip(ctx, deps, {
+    kind: 'video_edit',
+    sceneId: ctx.sceneId,
+    fingerprint: parent.scene_fingerprint,
+    clipKind: 'edit',
+    parentClipId: parent.id,
+    prompt,
+    aspectRatio,
+    resolution,
+    durationSeconds: parent.duration_seconds,
+    narration,
+    call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: modelText, aspectRatio, resolution }),
+  });
+}
+
 /** Renders one scene from its current script (units = the scene's seconds, kind `video_scene`). */
 export async function startSceneRender(ctx: BriefContext & { sceneId: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel> {
   await ensureOrm();
@@ -421,9 +469,9 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
 }
 
 /**
- * Edits the scene's newest ready clip by an instruction, chaining from its Gemini interaction
- * (kind `video_edit`, units = that clip's seconds). The edit belongs to the same version of the
- * scene as the clip it started from, so it inherits that clip's fingerprint.
+ * Edits the scene's chosen (or newest) ready clip by an instruction, chaining from its Gemini
+ * interaction (kind `video_edit`, units = that clip's seconds). The edit belongs to the same
+ * version of the scene as the clip it started from, so it inherits that clip's fingerprint.
  */
 export async function startSceneEdit(ctx: BriefContext & { sceneId: string; instruction: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel> {
   const instruction = ctx.instruction.trim();
@@ -433,33 +481,56 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
   if (!brief.scenes.some((candidate) => candidate.id === ctx.sceneId)) throw new AdStudioVideoRequestError('scene_not_found');
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
   if (generatingFor(clips, ctx.sceneId)) throw new AdStudioVideoRequestError('already_generating');
-  const parent = clips
-    .filter((clip) => clip.scene_id === ctx.sceneId && clip.status === 'ready' && clip.interaction_id)
-    .sort((a, b) => b.version - a.version)[0];
+  const parent = editableParentClip(clips, ctx.sceneId);
   if (!parent?.interaction_id) throw new AdStudioVideoRequestError('clip_not_editable');
-  // A voice-over clip stays speechless through the edit, and its narration is laid on again after it.
-  const narration = parent.narration_text?.trim() ? { text: parent.narration_text, voice: parent.narration_voice ?? AD_STUDIO_DEFAULT_TTS_VOICE, style: parent.narration_style ?? '' } : null;
-  const speechless = narration !== null;
-  const text = buildSceneEditInstruction(instruction, { speechless });
   // The person's words are kept on the clip; the video model gets them in English.
-  const modelText = buildSceneEditInstruction(await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() }), { speechless });
-  const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
-  const previousInteractionId = parent.interaction_id;
-  // An edit continues its clip, so it keeps that clip's resolution (720p for clips made before the setting).
-  const resolution = parent.resolution ?? '720p';
-  return startClip(ctx, deps, {
-    kind: 'video_edit',
-    sceneId: ctx.sceneId,
-    fingerprint: parent.scene_fingerprint,
-    clipKind: 'edit',
-    parentClipId: parent.id,
-    prompt: text,
-    aspectRatio,
-    resolution,
-    durationSeconds: parent.duration_seconds,
-    narration,
-    call: () => deps.omni.startSceneEdit({ previousInteractionId, instruction: modelText, aspectRatio, resolution }),
+  const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
+  return editClipFromParent({ ...ctx, instruction, modelInstruction }, brief, parent, clipEditNarration(parent), deps);
+}
+
+/**
+ * Applies one edit instruction across every scene with a ready clip and nothing in flight. Checks
+ * the whole batch against the daily video-seconds and TTS quotas first so it either starts or is
+ * refused as one, translates a non-English instruction once, and stops at the first provider failure.
+ */
+export async function startEditAll(ctx: BriefContext & { instruction: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel[]> {
+  const instruction = ctx.instruction.trim();
+  if (instruction.length === 0) throw new AdStudioVideoRequestError('invalid_instruction');
+  await ensureOrm();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const targets = brief.scenes.flatMap((scene) => {
+    if (generatingFor(clips, scene.id)) return [];
+    const parent = editableParentClip(clips, scene.id);
+    if (!parent?.interaction_id) return [];
+    return [{ sceneId: scene.id, parent, narration: clipEditNarration(parent) }];
   });
+  if (targets.length === 0) {
+    if (brief.scenes.some((scene) => generatingFor(clips, scene.id))) {
+      throw new AdStudioVideoRequestError('already_generating');
+    }
+    throw new AdStudioVideoRequestError('clip_not_editable');
+  }
+  const now = clock(deps);
+  const totalSeconds = targets.reduce((sum, entry) => sum + entry.parent.duration_seconds, 0);
+  await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'video_edit', units: totalSeconds, now });
+  const narrated = targets.filter((entry) => entry.narration !== null).length;
+  if (narrated > 0) await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'narration_tts', units: narrated, now });
+  // One translation call for the whole batch instead of one per scene.
+  const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
+  const started: AdStudioClipModel[] = [];
+  for (const target of targets) {
+    started.push(
+      await editClipFromParent(
+        { ...ctx, sceneId: target.sceneId, instruction, modelInstruction },
+        brief,
+        target.parent,
+        target.narration,
+        deps,
+      ),
+    );
+  }
+  return started;
 }
 
 /**

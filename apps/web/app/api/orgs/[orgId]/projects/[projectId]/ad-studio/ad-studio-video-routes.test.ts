@@ -26,6 +26,7 @@ import { DELETE as deleteBrief } from './briefs/[briefId]/route';
 import { PUT as saveScript } from './briefs/[briefId]/script/route';
 import { POST as renderScene } from './briefs/[briefId]/scenes/[sceneId]/render/route';
 import { POST as editScene } from './briefs/[briefId]/scenes/[sceneId]/edit/route';
+import { POST as editAll } from './briefs/[briefId]/edit-all/route';
 import { POST as renderAll } from './briefs/[briefId]/render-all/route';
 import { GET as renderStatus } from './briefs/[briefId]/render-status/route';
 import { POST as assemble } from './briefs/[briefId]/assemble/route';
@@ -426,6 +427,89 @@ describe('Ad Studio video routes (KAN-231)', () => {
     expect(editClip).toMatchObject({ sceneId: 's1', version: 2, status: 'generating', instruction: 'make it night' });
     expect(starts[2]).toMatchObject({ previous_interaction_id: 'v1_1', input: expect.stringContaining('make it night. Keep everything else the same.') });
     expect((await listAdStudioUsage(ctx.orgId, ctx.projectId))[0]).toMatchObject({ kind: 'video_edit', units: 5 });
+  });
+
+  it('edit-all edits every ready scene with one prompt, translates Hebrew once, preserves voice-over TTS, and enforces batch quota and RBAC', async () => {
+    const ctx = await setup();
+    const { fetchMock, starts, speech } = fakeOmni();
+
+    // No ready clips yet -> 409 clip_not_editable; empty instruction -> 400.
+    expect((await editAll(request('POST', { instruction: '   ' }), ctx.p())).status).toBe(400);
+    expect((await editAll(request('POST', { instruction: 'Warm light' }), ctx.p())).status).toBe(409);
+
+    // Render only s1 first -> partial edit-all edits s1 and leaves unrendered s2 untouched.
+    await renderScene(request('POST'), ctx.p({ sceneId: 's1' }));
+    await poll(ctx.p());
+    await poll(ctx.p());
+    const partialRes = await editAll(request('POST', { instruction: 'Slightly brighter' }), ctx.p());
+    expect(partialRes.status).toBe(200);
+    expect(((await partialRes.json()) as { started: number }).started).toBe(1);
+
+    // While s1 is generating and s2 has no ready clip, another edit-all returns 409 already_generating.
+    const conflict = await editAll(request('POST', { instruction: 'Another pass' }), ctx.p());
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({ error: 'video_request', code: 'already_generating' });
+
+    // Finish s1 edit and render + finish s2 so both scenes are ready.
+    await poll(ctx.p());
+    await poll(ctx.p());
+    await renderScene(request('POST'), ctx.p({ sceneId: 's2' }));
+    await poll(ctx.p());
+    await poll(ctx.p());
+
+    // Refuse the entire 13s batch up front when only 10s remain in the daily limit.
+    expect((await putSettings(request('PUT', { dailyTextGenerations: 20, dailyVideoSeconds: 20 }), { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }) })).status).toBe(200);
+    // Usage so far today: s1 render (5s) + s1 edit (5s) + s2 render (8s) = 18s -> raise limit to 28s (10s left < 13s needed).
+    expect((await putSettings(request('PUT', { dailyTextGenerations: 20, dailyVideoSeconds: 28 }), { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }) })).status).toBe(200);
+    const callsBeforeQuotaRefusal = fetchMock.mock.calls.length;
+    const overQuota = await editAll(request('POST', { instruction: 'Evening glow' }), ctx.p());
+    expect(overQuota.status).toBe(429);
+    expect(await overQuota.json()).toMatchObject({ error: 'quota_exceeded', limitKind: 'video' });
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeQuotaRefusal);
+
+    // Raise limit back up and run batch edit with a Hebrew instruction (escaped: no Hebrew literals in code).
+    expect((await putSettings(request('PUT', { dailyTextGenerations: 20, dailyVideoSeconds: 300 }), { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId }) })).status).toBe(200);
+    const hebrewEdit = '\u05ea\u05d0\u05d5\u05e8\u05ea \u05e2\u05e8\u05d1 \u05d7\u05de\u05d4';
+    const generateContentCallsBefore = fetchMock.mock.calls.filter(([u]) => String(u).endsWith(':generateContent')).length;
+    const startsBefore = starts.length;
+    const batch = await editAll(request('POST', { instruction: hebrewEdit }), ctx.p());
+    expect(batch.status).toBe(200);
+    const batchJson = (await batch.json()) as Listing & { started: number };
+    expect(batchJson.started).toBe(2);
+
+    // Translated once for the whole batch (1 :generateContent call, not 2).
+    const generateContentCallsAfter = fetchMock.mock.calls.filter(([u]) => String(u).endsWith(':generateContent')).length;
+    expect(generateContentCallsAfter - generateContentCallsBefore).toBe(1);
+
+    // Chained from v1_2 (s1 v2 edit) and v1_3 (s2 v1 render), s1 keeps speechless rule, s2 does not.
+    const batchStarts = starts.slice(startsBefore);
+    expect(batchStarts).toHaveLength(2);
+    expect(batchStarts[0]).toMatchObject({ previous_interaction_id: 'v1_2', input: expect.stringContaining('No speech of any kind') });
+    expect(String(batchStarts[1].input)).not.toContain('No speech of any kind');
+    expect(batchStarts[1]).toMatchObject({ previous_interaction_id: 'v1_3' });
+
+    // Both edited clips carry the original user instruction in clip.instruction.
+    const s1Latest = batchJson.clips.find((c) => c.sceneId === 's1' && c.version === 3);
+    const s2Latest = batchJson.clips.find((c) => c.sceneId === 's2' && c.version === 2);
+    expect(s1Latest).toMatchObject({ status: 'generating', kind: 'edit', instruction: hebrewEdit });
+    expect(s2Latest).toMatchObject({ status: 'generating', kind: 'edit', instruction: hebrewEdit });
+
+    // Poll until ready: voice-over s1 receives separate TTS narration again, silent s2 does not.
+    const speechBefore = speech.length;
+    await poll(ctx.p());
+    const finished = await poll(ctx.p());
+    expect(finished.clips.find((c) => c.id === s1Latest?.id)).toMatchObject({ status: 'ready' });
+    expect(finished.clips.find((c) => c.id === s2Latest?.id)).toMatchObject({ status: 'ready' });
+    expect(speech.length - speechBefore).toBe(1);
+
+    // RBAC: a viewer cannot invoke edit-all.
+    const email = `${unique('viewer')}@example.com`;
+    const invitation = await inviteMemberToOrganization({ organizationId: ctx.orgId, email, role: 'viewer', invitedByUserId: ctx.owner.id });
+    const viewerSession = await sessionFor(email);
+    const viewer = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email });
+    await acceptInvite({ organizationId: ctx.orgId, membershipId: invitation.id, userId: viewer.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    expect([403, 404]).toContain((await editAll(request('POST', { instruction: 'Nope' }), ctx.p())).status);
   });
 
   it('a voice-over scene: the clip is asked for without speech, the narration is spoken separately in the ad voice, metered, and laid on', async () => {

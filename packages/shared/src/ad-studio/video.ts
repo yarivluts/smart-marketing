@@ -336,6 +336,32 @@ export function renderAllCost(states: readonly AdStudioSceneVideo[], scenes: rea
   return { sceneIds: chosen.map((scene) => scene.id), seconds: chosen.reduce((sum, scene) => sum + scene.durationSeconds, 0) };
 }
 
+/**
+ * Seconds of video "edit all" would request: every scene with a ready clip and nothing in flight,
+ * in script order, at the duration of the clip it would edit (the chosen ready clip if any, else
+ * the newest ready clip). Shown before starting so the daily limit is never a surprise.
+ */
+export function editAllCost<T extends AdStudioClipSummary>(
+  scenes: readonly Pick<AdStudioScene, 'id'>[],
+  clips: readonly T[],
+): { sceneIds: string[]; seconds: number } {
+  const grouped = clipsByScene(clips);
+  const sceneIds: string[] = [];
+  let seconds = 0;
+  for (const scene of scenes) {
+    const list = grouped.get(scene.id) ?? [];
+    if (list.some((candidate) => candidate.status === 'generating')) continue;
+    const target =
+      list.find((candidate) => candidate.chosen && candidate.status === 'ready') ??
+      list.find((candidate) => candidate.status === 'ready') ??
+      null;
+    if (!target) continue;
+    sceneIds.push(scene.id);
+    seconds += target.durationSeconds;
+  }
+  return { sceneIds, seconds };
+}
+
 /** The clips an assembly concatenates, in script order, each trimmed to its scene's length; null until every scene has a usable clip. */
 export function assemblyPlan<T extends AdStudioClipSummary>(
   scenes: readonly Pick<AdStudioScene, 'id' | 'durationSeconds' | 'visualPrompt' | 'voiceover' | 'pronunciation' | 'references' | 'delivery' | 'speaker'>[],

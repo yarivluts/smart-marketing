@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-11-14 — Ad Studio video: edit all ready clips with one instruction
+
+- **Last completed:**
+  - Added single-instruction batch video editing across all idle ready scene clips (`Ad Studio -> Video` review tab, Web API, and MCP):
+    - `packages/shared/src/ad-studio/video.ts`: added `editAllCost(scenes, clips)` computing editable scenes and total video seconds (preferring each scene's `chosen` ready clip or newest ready clip, skipping scenes currently `generating` or without any ready clip) + unit tests in `packages/shared/src/ad-studio/video.test.ts`.
+    - `packages/ad-studio/src/video-pipeline.ts`: extracted `editableParentClip`, `clipEditNarration`, and `editClipFromParent`; added `startEditAll` which validates the whole batch against daily `video_edit` seconds and voice-over `narration_tts` quotas before calling Gemini Omni, translates Hebrew instructions once via `englishForModel`, and preserves `speechless` + separate TTS narration on voice-over clips.
+    - `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/briefs/[briefId]/edit-all/route.ts`: added `POST` handler gated on `requireProjectPermission(orgId, projectId, 'ai.use')`, plus Firestore emulator tests in `ad-studio-video-routes.test.ts`.
+    - `apps/api/src/mcp/mcp-ad-studio-tools.ts`: registered `edit_all_ad_scene_clips` tool gated on `ai.use` and updated `mcp-tool-isolation.spec.ts`, `mcp-ad-studio-tools.spec.ts`, and `mcp.controller.e2e.spec.ts`.
+    - `apps/web/components/ad-studio/video-studio.tsx` + `messages/{en,he}.json` + `video-studio.test.tsx`: added the batch-edit card above the scenes list showing ready scene count, total seconds, daily limit guard, error retention, and status polling.
+  - Verified locally: `pnpm lint`, `pnpm typecheck`, `turbo run build --env-mode=loose`, `@growthos/shared` tests (1025 passed), `@growthos/ad-studio` tests (230 passed, 9 pre-existing skipped), `@growthos/api` emulator tests (27 suites / 261 tests passed), and `@growthos/web` `test:unit:emulator` (783 files / 4711 tests passed).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** none.
+- **Next step:** verify in production after deploy (`web-prod` / `api-prod`).
+- **Waiting on human:** none.
+
 ## 2026-11-13 — Ad Studio video: voice-over clips muted, people in them silent
 
 - **Last completed:** (PR #1282)

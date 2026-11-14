@@ -123,6 +123,7 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   render_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
   render_ad_scene: { kind: 'per-call-permission', permission: 'ai.use' },
   edit_ad_scene_clip: { kind: 'per-call-permission', permission: 'ai.use' },
+  edit_all_ad_scene_clips: { kind: 'per-call-permission', permission: 'ai.use' },
   get_ad_video_status: { kind: 'per-call-permission', permission: 'ai.use' },
   assemble_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
   record_product_walkthrough: { kind: 'per-call-permission', permission: 'ai.use' },

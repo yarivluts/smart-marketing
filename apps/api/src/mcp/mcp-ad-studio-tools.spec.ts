@@ -449,4 +449,101 @@ describe('Ad Studio MCP tools', () => {
     const readOnly = await setup(['mcp.read']);
     expect((await readOnly.call('list_product_walkthroughs')).isError).toBe(true);
   });
+
+  it('edits all ready scene clips with one instruction over MCP, translating once and checking batch quota', async () => {
+    const agent = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await agent.json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    await agent.json('save_ad_script', {
+      brief_id: ad.id,
+      scenes: [
+        { id: 's1', duration_seconds: 5, visual_prompt: 'A desk', voiceover: '', on_screen_text: '' },
+        { id: 's2', duration_seconds: 8, visual_prompt: 'A phone', voiceover: '', on_screen_text: '' },
+      ],
+    });
+
+    const omniStarts: Record<string, unknown>[] = [];
+    let translations = 0;
+    const prevImpl = fetchSpy.getMockImplementation();
+    fetchSpy.mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null;
+      if (url === `${BASE}/interactions` && init?.method === 'POST' && String(body?.model ?? '').includes('gemini-omni')) {
+        omniStarts.push(body as Record<string, unknown>);
+        return Response.json({ id: `omni_${omniStarts.length}`, status: 'in_progress' });
+      }
+      if (/\/interactions\/omni_\d+$/.test(url)) {
+        const n = url.split('omni_')[1];
+        return Response.json({
+          id: `omni_${n}`,
+          status: 'completed',
+          steps: [{ type: 'model_output', content: [{ type: 'video', mime_type: 'video/mp4', uri: `${BASE}/files/f${n}:download?alt=media` }] }],
+        });
+      }
+      if (/\/files\/f\d+$/.test(url)) {
+        return Response.json({ name: url.split('/v1beta/')[1], state: 'ACTIVE' });
+      }
+      if (/\/files\/f\d+:download\?alt=media$/.test(url)) {
+        return new Response(Buffer.from('mp4-bytes'), { status: 200 });
+      }
+      if (url.endsWith(':generateContent') && JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {}).includes('"english"')) {
+        translations += 1;
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ english: 'Warm sunset light' }) }] } }] });
+      }
+      if (url.endsWith(':generateContent')) {
+        return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify({ transcript: '', issues: [] }) }] } }] });
+      }
+      return prevImpl ? prevImpl(input, init) : new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
+    });
+
+    await agent.json('render_ad_video', { brief_id: ad.id });
+    for (let i = 0; i < 4; i += 1) {
+      const status = await agent.json<{ scenes: { video_state: string }[] }>('get_ad_video_status', { brief_id: ad.id });
+      if (status.scenes.every((scene) => scene.video_state === 'ready')) break;
+    }
+    const afterRenderCount = omniStarts.length;
+
+    // Batch quota guard: 13s needed when only 10s remain (13s used + 10s left = 23s cap) fails before calling Omni.
+    const operator = agent.asOwner();
+    process.env.GROWTHOS_PLATFORM_OPERATORS = agent.owner.email;
+    try {
+      await operator.json('set_ad_studio_limits', { daily_text_generations: 100, daily_video_seconds: 23 });
+    } finally {
+      delete process.env.GROWTHOS_PLATFORM_OPERATORS;
+    }
+
+    const overLimit = await agent.call('edit_all_ad_scene_clips', { brief_id: ad.id, instruction: 'Make it warmer' });
+    expect(overLimit.isError).toBe(true);
+    expect((overLimit.content[0] as { text: string }).text).toContain('daily Ad Studio limit');
+    expect(omniStarts).toHaveLength(afterRenderCount);
+
+    process.env.GROWTHOS_PLATFORM_OPERATORS = agent.owner.email;
+    try {
+      await operator.json('set_ad_studio_limits', { daily_text_generations: 100, daily_video_seconds: 300 });
+    } finally {
+      delete process.env.GROWTHOS_PLATFORM_OPERATORS;
+    }
+
+    const started = await agent.json<{
+      started_scene_ids: string[];
+      clip_ids: string[];
+      next: string;
+    }>('edit_all_ad_scene_clips', { brief_id: ad.id, instruction: '\u05ea\u05d0\u05d5\u05e8\u05ea \u05e2\u05e8\u05d1' });
+
+    expect(started).toEqual({
+      started_scene_ids: ['s1', 's2'],
+      clip_ids: expect.any(Array),
+      next: expect.stringContaining('get_ad_video_status'),
+    });
+    expect(started.clip_ids).toHaveLength(2);
+    expect(translations).toBe(1);
+
+    const editCalls = omniStarts.slice(afterRenderCount);
+    expect(editCalls).toHaveLength(2);
+    expect(editCalls.map((call) => call.previous_interaction_id)).toEqual(['omni_1', 'omni_2']);
+
+    const readOnly = await setup(['mcp.read']);
+    const refused = await readOnly.call('edit_all_ad_scene_clips', { brief_id: ad.id, instruction: 'Make it warmer' });
+    expect(refused.isError).toBe(true);
+    expect((refused.content[0] as { text: string }).text).toContain('"ai.use"');
+  });
 });
