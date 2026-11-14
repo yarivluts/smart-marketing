@@ -2,17 +2,25 @@
 
 import * as React from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { AlertTriangle, ChevronDown, ChevronLeft } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronLeft, Clock, ImageIcon, Sparkles } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
+
+export type AdUsageMeterIcon = 'images' | 'text' | 'video';
+
+const METER_ICONS: Record<AdUsageMeterIcon, LucideIcon> = {
+  images: ImageIcon,
+  text: Sparkles,
+  video: Clock,
+};
 
 export interface AdUsageMeter {
   key: string;
   label: string;
   used: number;
   limit: number;
-  icon: LucideIcon;
+  icon: AdUsageMeterIcon;
 }
 
 /** How far into a daily limit: a share for the bar, and whether it is used up. */
@@ -123,7 +131,7 @@ export function AdHeader({
             >
               {usage.meters.map((meter) => {
                 const { percent, reached } = meterLevel(meter.used, meter.limit);
-                const Icon = reached ? AlertTriangle : meter.icon;
+                const Icon = reached ? AlertTriangle : METER_ICONS[meter.icon];
                 return (
                   <li
                     key={meter.key}

@@ -14,12 +14,9 @@ import {
   ArrowRight,
   ChevronDown,
   Clapperboard,
-  Clock,
   FileText,
-  ImageIcon,
   Share2,
   SlidersHorizontal,
-  Sparkles,
   Workflow,
 } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
@@ -427,9 +424,9 @@ export default async function AdStudioPage({
             label: t('adHeader.usageLabel'),
             limitReached: t('adHeader.limitReached'),
             meters: [
-              { key: 'images', label: t('usageTodayImages'), used: usageToday.images, limit: settings.dailyImages, icon: ImageIcon },
-              { key: 'text', label: t('kpiTextToday'), used: usageToday.textGenerations, limit: settings.dailyTextGenerations, icon: Sparkles },
-              { key: 'video', label: t('kpiVideoToday'), used: usageToday.videoSeconds, limit: settings.dailyVideoSeconds, icon: Clock },
+              { key: 'images', label: t('usageTodayImages'), used: usageToday.images, limit: settings.dailyImages, icon: 'images' },
+              { key: 'text', label: t('kpiTextToday'), used: usageToday.textGenerations, limit: settings.dailyTextGenerations, icon: 'text' },
+              { key: 'video', label: t('kpiVideoToday'), used: usageToday.videoSeconds, limit: settings.dailyVideoSeconds, icon: 'video' },
             ],
           }}
         />

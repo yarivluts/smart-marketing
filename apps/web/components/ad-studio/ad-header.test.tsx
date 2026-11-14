@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import React from 'react';
-import { Clock, ImageIcon, Sparkles } from 'lucide-react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { AdHeader, meterLevel } from './ad-header';
 
@@ -36,9 +35,9 @@ describe('AdHeader', () => {
           label: "Today's AI usage",
           limitReached: 'Limit reached',
           meters: [
-            { key: 'images', label: 'Images today', used: 184, limit: 40, icon: ImageIcon },
-            { key: 'text', label: 'Ad texts written today', used: 12, limit: 50, icon: Sparkles },
-            { key: 'video', label: 'Video seconds today', used: 15, limit: 300, icon: Clock },
+            { key: 'images', label: 'Images today', used: 184, limit: 40, icon: 'images' },
+            { key: 'text', label: 'Ad texts written today', used: 12, limit: 50, icon: 'text' },
+            { key: 'video', label: 'Video seconds today', used: 15, limit: 300, icon: 'video' },
           ],
         }}
       />,
@@ -68,8 +67,8 @@ describe('AdHeader', () => {
           label: "Today's AI usage",
           limitReached: 'Limit reached',
           meters: [
-            { key: 'images', label: 'Images today', used: 0, limit: 40, icon: ImageIcon },
-            { key: 'text', label: 'Ad texts written today', used: 0, limit: 50, icon: Sparkles },
+            { key: 'images', label: 'Images today', used: 0, limit: 40, icon: 'images' },
+            { key: 'text', label: 'Ad texts written today', used: 0, limit: 50, icon: 'text' },
           ],
         }}
       />,

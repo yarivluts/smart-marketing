@@ -39,6 +39,7 @@ test.describe('AI Ad Studio (KAN-229)', () => {
     await page.getByRole('button', { name: 'Create ad' }).click();
     await expect(page).toHaveURL(/\?brief=/);
 
+    await page.getByTestId('ad-studio-plan-tab-script').click();
     await page.getByRole('button', { name: 'Add scene' }).click();
     const scene = page.getByTestId('ad-studio-scene-1');
     await expect(scene.getByText('Scene 1 needs a description of what the camera shows.')).toBeVisible();
