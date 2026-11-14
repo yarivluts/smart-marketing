@@ -17,6 +17,17 @@ Template for each entry:
 
 ---
 
+## 2026-11-14 — Ad Studio Review Video (`?step=review&item=video`) mobile-first + desktop redesign
+
+- **Stitch designs**: generated mobile (`886c2ffbba40499ba51858f900034820`) and desktop (`e422d34bfb7145be83d3540f0a461943`) Step 4 Video Review Pastel Pulse layouts in Stitch project `15388075487680927533` (`assets/80713eeffe4f4cd59c5ad94a0b11e269`).
+- **UI & Components**:
+  - Redesigned [`VideoStudio`](apps/web/components/ad-studio/video-studio.tsx) in Stitch Pastel Pulse: slim top action header (`AdvancedVideoSettings` + `Make all scenes` pill), a two-column workspace on `lg+` (`order-1` sticky final video & `AdCopyCard` rail on desktop / top-of-page hero on mobile), a collapsible `Voice & narration` drawer (`NarrationModePicker`, `VoicePicker`, `video.textNote`), a Pastel Pulse timeline progress card, a highlighted `Edit all clips` prompt card, and rounded Pastel Pulse scene accordion cards.
+  - Removed the redundant outer card wrapper around `<VideoStudio>` in [the Ad Studio page](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx) so its cards sit cleanly on the canvas.
+- **i18n**: added `AdStudio.video.voiceSectionTitle` and `AdStudio.video.voiceSectionHint` to `apps/web/messages/en.json` and `apps/web/messages/he.json`.
+- **Verification**: `vitest` (`video-studio.test.tsx` + `messages/`: `241` files, `836` tests passed).
+
+---
+
 ## 2026-11-14 — Ad Studio 5-step creation workspace redesign (mobile-first + desktop)
 
 - **Stitch designs**: generated mobile (`ab8a987e713f4484b60e17c2b00f0909`) and desktop (`63fbfece723f4053abdfe01e1b5bfe7d`) Step 3 (`?step=create`) Pastel Pulse layouts in Stitch project `15388075487680927533` (`assets/80713eeffe4f4cd59c5ad94a0b11e269`).

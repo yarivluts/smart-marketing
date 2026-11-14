@@ -728,7 +728,6 @@ export default async function AdStudioPage({
               />
               ) : null}
               {reviewItem.kind === 'video' ? (
-              <div className="rounded-3xl border border-pp-outline-variant/40 bg-card p-4 shadow-pp-candy sm:p-5">
                 <VideoStudio
                   orgId={orgId}
                   projectId={projectId}
@@ -752,7 +751,6 @@ export default async function AdStudioPage({
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}
                 />
-              </div>
               ) : null}
               {reviewItem.kind === 'search' ? (
               <div className="rounded-3xl border border-pp-outline-variant/40 bg-card p-4 shadow-pp-candy sm:p-5">
