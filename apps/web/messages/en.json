@@ -5099,7 +5099,7 @@
         "720p": "720p - standard",
         "1080p": "1080p - sharp, high quality"
       },
-      "resolutionHint": "The finished video is assembled in 1080p when the clips are 1080p, otherwise in 720p.",
+      "resolutionHint": "The finished video is sharp (1080p) when all its clips are sharp, and standard (720p) otherwise.",
       "styleLabel": "Visual style",
       "style": {
         "commercial": "Polished commercial",
