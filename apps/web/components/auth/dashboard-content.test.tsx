@@ -179,6 +179,20 @@ describe('DashboardContent', () => {
     expect(screen.queryByRole('link', { name: /pending invite/ })).not.toBeInTheDocument();
   });
 
+  it('greets a first-time person without "back" and offers one create button, not two', () => {
+    renderDashboard({ orgs: [], pendingInviteCount: 0 });
+    expect(screen.getByText('Welcome, ada@example.com')).toBeInTheDocument();
+    expect(screen.queryByText(/welcome back/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Create organization' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /create/i })).toHaveLength(1);
+  });
+
+  it('keeps the welcome-back greeting and the create button once there is an organization', () => {
+    renderDashboard(healthyOverview);
+    expect(screen.getByText('Welcome back, ada@example.com')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Create organization' })).toHaveAttribute('href', '/orgs/new');
+  });
+
   it('signs out and returns to the login page', async () => {
     renderDashboard({ orgs: [], pendingInviteCount: 0 });
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));

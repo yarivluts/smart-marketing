@@ -69,15 +69,17 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
         icon={LayoutDashboard}
         eyebrow={t('eyebrow')}
         title={t('title')}
-        description={t('welcome', { email })}
+        description={t(overview.orgs.length === 0 ? 'welcomeFirst' : 'welcome', { email })}
         actions={
           <>
-            <Button asChild size="sm">
-              <Link href="/orgs/new">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                {t('createOrganization')}
-              </Link>
-            </Button>
+            {overview.orgs.length > 0 ? (
+              <Button asChild size="sm">
+                <Link href="/orgs/new">
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  {t('createOrganization')}
+                </Link>
+              </Button>
+            ) : null}
             <Button asChild size="sm" variant="outline">
               <Link href="/dashboard/notifications">
                 <Bell className="h-4 w-4" aria-hidden="true" />
