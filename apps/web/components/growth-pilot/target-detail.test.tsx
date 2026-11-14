@@ -89,6 +89,15 @@ describe('GrowthTargetDetail', () => {
     expect(heMessages.GrowthPilot.detail.stages.published).not.toBe(en.GrowthPilot.detail.stages.published);
   });
 
+  it('says a declined idea changed nothing and cost nothing', () => {
+    render(pageData({ targets: [targetView({ status: 'rejected' })], proposals: [], landingPages: [] }));
+    const idea = screen.getByTestId('growth-pilot-stepper').querySelector('[data-stage="idea"]');
+    expect(idea).toHaveAttribute('data-state', 'declined');
+    expect(idea).toHaveTextContent(en.GrowthPilot.detail.states.declinedOther);
+    expect(en.GrowthPilot.detail.states.declinedOther).toMatch(/Nothing was changed and no money is spent/);
+    expect(heMessages.GrowthPilot.detail.states.declinedOther).not.toBe(en.GrowthPilot.detail.states.declinedOther);
+  });
+
   it('says what a declined turn-on means: the ads stay off and cost nothing', () => {
     render(pageData({ targets: [liveTarget({ publishStatus: 'published', liveAds: 0 })], proposals: [proposalView({ id: 'on', kind: 'activate', status: 'rejected', targetId: 't1' })], landingPages: [PAGE] }));
     const live = screen.getByTestId('growth-pilot-stepper').querySelector('[data-stage="live"]');
