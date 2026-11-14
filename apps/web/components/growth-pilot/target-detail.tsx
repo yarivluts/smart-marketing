@@ -100,12 +100,12 @@ function useTargetResults(base: string, targetId: string, enabled: boolean): Gro
   return results;
 }
 
-/** A declined send or turn-on says what that meant (nothing sent / ads stay off); other states use the plain state name. */
+/** A declined step says what that meant (nothing sent / ads stay off / nothing changed); other states use the plain state name. */
 function declinedKey(stage: GrowthStage): string | null {
   if (stage.state !== 'declined') return null;
   if (stage.id === 'published') return 'states.declinedPublished';
   if (stage.id === 'live') return 'states.declinedLive';
-  return null;
+  return 'states.declinedOther';
 }
 
 function Stepper({ stages }: { stages: GrowthStage[] }): React.ReactElement {
