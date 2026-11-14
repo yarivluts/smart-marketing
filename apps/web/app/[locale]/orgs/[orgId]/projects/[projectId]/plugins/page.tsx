@@ -38,6 +38,7 @@ import { PageHero } from '@/components/viz/page-hero';
 import { TrendChart } from '@/components/viz/trend-chart';
 import { sourceRunSeries } from '@/lib/orgs/workspace-view';
 import { Boxes, DownloadCloud, PackageCheck, PauseCircle, PieChart, Puzzle, RefreshCw, Sparkles, Users } from 'lucide-react';
+import { formatReadableDateTime } from '@/lib/orgs/recency';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -215,7 +216,7 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
                           {runs.map((run) => (
                             <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
                               <span className="font-medium">
-                                {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: run.startedAt })}
+                                {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: formatReadableDateTime(run.startedAt, locale) })}
                               </span>
                               <span className="text-muted-foreground">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
                               <span className="text-muted-foreground">
