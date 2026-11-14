@@ -4764,7 +4764,7 @@
         "label": "About the ad",
         "hint": "What the ad is for",
         "title": "What the ad is about",
-        "description": "What you want the ad to achieve, what you sell and to whom, the frame, language and length. Changes here apply to the next plan."
+        "description": "What you want the ad to achieve, what you sell and to whom, whether it is tall or wide, the language and the length. Changes here apply to the next plan."
       },
       "plan": {
         "label": "Plan",
