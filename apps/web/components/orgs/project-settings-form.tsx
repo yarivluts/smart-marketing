@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,15 @@ function supportedValues(key: 'currency' | 'timeZone'): string[] {
   }
 }
 
+/** "ILS" -> "Israeli New Shekel" (in the viewer's language), so a suggestion says what it is. */
+function currencyName(code: string, locale: string): string | undefined {
+  try {
+    return new Intl.DisplayNames([locale], { type: 'currency' }).of(code);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * The admin surface for a project's own `name`/`vertical`
  * (CLAUDE.md: "anything user-manageable gets an admin surface") — until now
@@ -44,6 +53,7 @@ export function ProjectSettingsForm({
   initialTimezone = '',
 }: ProjectSettingsFormProps): React.ReactElement {
   const t = useTranslations('ProjectSettings');
+  const locale = useLocale();
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [vertical, setVertical] = useState(initialVertical);
@@ -130,7 +140,7 @@ export function ProjectSettingsForm({
         <Input id="project-settings-currency" value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} maxLength={3} dir="ltr" list="project-settings-currency-options" autoComplete="off" />
         <datalist id="project-settings-currency-options">
           {currencies.map((code) => (
-            <option key={code} value={code} />
+            <option key={code} value={code} label={currencyName(code, locale)} />
           ))}
         </datalist>
         <p className="text-xs text-muted-foreground">{t('currencyHelp')}</p>
