@@ -17,6 +17,23 @@ Template for each entry:
 
 ---
 
+## 2026-11-14 — Ad Studio 5-step creation workspace redesign (mobile-first + desktop)
+
+- **Stitch designs**: generated mobile (`ab8a987e713f4484b60e17c2b00f0909`) and desktop (`63fbfece723f4053abdfe01e1b5bfe7d`) Step 3 (`?step=create`) Pastel Pulse layouts in Stitch project `15388075487680927533` (`assets/80713eeffe4f4cd59c5ad94a0b11e269`).
+- **UI & Components**:
+  - Slimmed [`AdHeader`](apps/web/components/ad-studio/ad-header.tsx) into a compact Pastel Pulse top strip with a mobile toggleable AI-quota pill (`ad-studio-usage-toggle`) and single-row desktop inline meters, cutting mobile above-the-fold bloat.
+  - Redesigned [`AdStudioStepper`](apps/web/components/ad-studio/ad-studio-stepper.tsx) with a mobile `Step X of 5` summary row and horizontally scrollable step pills (`md:` expands cleanly into the 5-column progress track).
+  - Added [`PlanWorkspaceTabs`](apps/web/components/ad-studio/plan-workspace-tabs.tsx) (+ `plan-workspace-tabs.test.tsx`) to organize Step 2 (`plan`) into three focused tabs — `Plan & research` (default, keeping planning + keyword/audience/reference sections immediately accessible), `Script`, and `Image ideas` — eliminating the 7-panel vertical dump.
+  - Upgraded [`AutopilotPanel`](apps/web/components/ad-studio/autopilot-panel.tsx) with Pastel Pulse styling, a real weighted step progress bar (`progressbar`), mobile 2-column / desktop sidebar step checklist in `progress` mode, and an optional `pipelineDrawer` slot.
+  - Upgraded [`CreateGallery`](apps/web/components/ad-studio/create-gallery.tsx) with mobile horizontal snap-scroll trays, desktop grids, and All/Images/Scenes filter pills, plus updated [`PlanSection`](apps/web/components/ad-studio/plan-section.tsx) and [the Ad Studio page](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx) (two-column Step 3 workspace on `lg+`, collapsible `FlowDiagram` drawer, unified Pastel Pulse `review`/`publish` cards, and sticky bottom navigation).
+- **i18n**: added `AdStudio.adHeader` toggles and `AdStudio.stepWorkspace` keys in `apps/web/messages/en.json` and `apps/web/messages/he.json`.
+- **Verification**:
+  - `pnpm typecheck` (`16/16` tasks passed) and `pnpm lint` (`9/9` tasks passed).
+  - Vitest: Ad Studio component specs (`ad-header.test.tsx`, `ad-studio-stepper.test.tsx`, `autopilot-panel.test.tsx`, `create-gallery.test.tsx`, `plan-workspace-tabs.test.tsx`, `review-overview.test.tsx`: `6` files, `26` tests passed) and `messages/` copy specs excluding `ingest-health` (`237` files, `814` tests passed).
+  - `pnpm exec turbo run build --env-mode=loose` (`10/10` tasks built cleanly).
+
+---
+
 ## 2026-11-14 — Ad Studio mobile ads list redesign (Stitch)
 
 - **Stitch design**: generated mobile-first 390px Hebrew RTL screen `895a21c6f4864db2af23d31d318edb42` in Stitch project `15388075487680927533` using the Pastel Pulse design system (`assets/80713eeffe4f4cd59c5ad94a0b11e269`).
