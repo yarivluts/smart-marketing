@@ -6452,6 +6452,8 @@
         "failed": "Did not work",
         "failedWhy": "Did not work: {reason}",
         "declined": "You said no",
+        "declinedPublished": "You said no. Nothing was sent to Facebook or Instagram.",
+        "declinedLive": "You said no. The ads stay off, so no money is spent. You can still turn them on yourself in Facebook's ad tool.",
         "not_started": "Not started yet",
         "skipped": "Not needed for this item"
       },

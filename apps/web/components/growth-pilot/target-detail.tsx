@@ -100,6 +100,14 @@ function useTargetResults(base: string, targetId: string, enabled: boolean): Gro
   return results;
 }
 
+/** A declined send or turn-on says what that meant (nothing sent / ads stay off); other states use the plain state name. */
+function declinedKey(stage: GrowthStage): string | null {
+  if (stage.state !== 'declined') return null;
+  if (stage.id === 'published') return 'states.declinedPublished';
+  if (stage.id === 'live') return 'states.declinedLive';
+  return null;
+}
+
 function Stepper({ stages }: { stages: GrowthStage[] }): React.ReactElement {
   const t = useTranslations('GrowthPilot.detail');
   const reasonOf = useReason();
@@ -118,7 +126,7 @@ function Stepper({ stages }: { stages: GrowthStage[] }): React.ReactElement {
             <span className="flex min-w-0 flex-col pt-0.5">
               <span className={cn('text-sm font-semibold', stage.state === 'skipped' && 'text-muted-foreground line-through decoration-muted-foreground/40')}>{t(`stages.${stage.id}`)}</span>
               <span className="text-xs text-muted-foreground">
-                {stage.state === 'failed' ? t('states.failedWhy', { reason: reasonOf(stage.failure) }) : t(`states.${stage.state}`)}
+                {stage.state === 'failed' ? t('states.failedWhy', { reason: reasonOf(stage.failure) }) : t(declinedKey(stage) ?? `states.${stage.state}`)}
                 {stage.state === 'done' && stage.on ? <span className="ms-1.5">{when(stage.on)}</span> : null}
               </span>
             </span>

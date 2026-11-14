@@ -89,6 +89,17 @@ describe('GrowthTargetDetail', () => {
     expect(heMessages.GrowthPilot.detail.stages.published).not.toBe(en.GrowthPilot.detail.stages.published);
   });
 
+  it('says what a declined turn-on means: the ads stay off and cost nothing', () => {
+    render(pageData({ targets: [liveTarget({ publishStatus: 'published', liveAds: 0 })], proposals: [proposalView({ id: 'on', kind: 'activate', status: 'rejected', targetId: 't1' })], landingPages: [PAGE] }));
+    const live = screen.getByTestId('growth-pilot-stepper').querySelector('[data-stage="live"]');
+    expect(live).toHaveAttribute('data-state', 'declined');
+    expect(live).toHaveTextContent(en.GrowthPilot.detail.states.declinedLive);
+    expect(en.GrowthPilot.detail.states.declinedLive).toMatch(/no money is spent/);
+    expect(en.GrowthPilot.detail.states.declinedPublished).toMatch(/Nothing was sent/);
+    expect(heMessages.GrowthPilot.detail.states.declinedLive).not.toBe(en.GrowthPilot.detail.states.declinedLive);
+    expect(heMessages.GrowthPilot.detail.states.declinedPublished).not.toBe(en.GrowthPilot.detail.states.declinedPublished);
+  });
+
   it('puts what waits for the person on the page with the same buttons, and points at it as the next step', async () => {
     const fetchMock = stubServer({ post: { body: pageData({ targets: [targetView({ adsStatus: 'approved', landingStatus: 'ready', audienceStatus: 'ready' })] }) } });
     const ads = proposalView({ id: 'ads1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1'] });
