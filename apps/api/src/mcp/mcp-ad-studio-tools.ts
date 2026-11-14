@@ -125,6 +125,7 @@ import {
   saveAdStudioScriptWithPronunciation,
   selectBriefImage,
   startAdStudioAutopilot,
+  startEditAll,
   startRenderAll,
   startSceneEdit,
   startSceneRender,
@@ -1274,6 +1275,34 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         if (!deps.omni) return errorResult('No video model is configured for this deployment.');
         const clip = await startSceneEdit({ ...ctx(a.brief_id), actorId: actorId(auth), sceneId: a.scene_id, instruction: a.instruction }, { ...deps, omni: deps.omni });
         return textResult({ clip_id: clip.id, status: clip.status });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'edit_all_ad_scene_clips',
+    {
+      title: 'Change every ready scene clip',
+      description:
+        'Applies one instruction ("warmer evening light", "slower camera") to every scene clip that is ready and not currently generating, continuing each clip from its Gemini interaction. Checks the whole batch against the daily video-seconds limit first. Poll get_ad_video_status. Requires "ai.use".',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        instruction: z.string().min(1).describe('What should change across every ready scene clip, up to 500 characters.'),
+      }),
+    },
+    auditedToolHandler(auth, 'edit_all_ad_scene_clips', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; instruction: string }) => {
+        const deps = resolveAdStudioVideoDeps();
+        if (!deps.omni) return errorResult('No video model is configured for this deployment.');
+        const started = await startEditAll(
+          { ...ctx(a.brief_id), actorId: actorId(auth), instruction: a.instruction.slice(0, 500) },
+          { ...deps, omni: deps.omni },
+        );
+        return textResult({
+          started_scene_ids: started.map((clip) => clip.scene_id),
+          clip_ids: started.map((clip) => clip.id),
+          next: 'Poll get_ad_video_status until every edited clip is ready, then assemble_ad_video.',
+        });
       }),
     ),
   );

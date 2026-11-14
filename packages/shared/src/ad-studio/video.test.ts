@@ -15,6 +15,7 @@ import {
   buildSceneEditInstruction,
   buildScenePrompt,
   clipsByScene,
+  editAllCost,
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
@@ -244,5 +245,26 @@ describe('scene video states, progress and the assembly plan', () => {
     const long = Array.from({ length: 7 }, (_, index) => scene(`l${index}`, 10));
     const longClips = long.map((entry) => clip(`${entry.id}c`, entry.id, 1, 'ready', sceneFingerprint(entry, CONTEXT)));
     expect(assemblyPlan(long, longClips, CONTEXT)).toBeNull();
+  });
+
+  it('counts batch edit cost across idle ready scenes, preferring the chosen version and skipping generating or missing ones', () => {
+    expect(editAllCost([], [])).toEqual({ sceneIds: [], seconds: 0 });
+    expect(editAllCost(scenes, [])).toEqual({ sceneIds: [], seconds: 0 });
+
+    const mixed = [
+      // Scene a: chosen older 4s clip wins over newer 6s ready clip (out-of-date fingerprint still editable).
+      { ...clip('a1', 'a', 1, 'ready', 'old-fp', 4), chosen: true },
+      clip('a2', 'a', 2, 'ready', fp(0), 6),
+      // Scene b: has a ready clip AND an in-flight clip -> skipped.
+      clip('b1', 'b', 1, 'ready', fp(1), 8),
+      clip('b2', 'b', 2, 'generating', fp(1), 8),
+      // Scene c: latest clip failed, but v1 is ready -> uses v1's 7s duration.
+      clip('c1', 'c', 1, 'ready', 'stale', 7),
+      clip('c2', 'c', 2, 'failed', fp(2), 9),
+    ];
+    expect(editAllCost([...scenes, scene('d', 3)], mixed)).toEqual({
+      sceneIds: ['a', 'c'],
+      seconds: 11,
+    });
   });
 });

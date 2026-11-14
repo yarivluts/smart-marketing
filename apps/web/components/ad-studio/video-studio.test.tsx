@@ -185,6 +185,72 @@ describe('VideoStudio', () => {
     expect(scene1.getByText('Edit: make it night')).toBeInTheDocument();
   });
 
+  it('edits all ready scene clips with one instruction, respects the daily limit, keeps the prompt on failure, and polls until ready', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Hidden until at least one scene clip is ready.
+    const noReady = renderStudio({ initialClips: [clip('g1', 'a', 1, 'generating', fp(0))] });
+    expect(screen.queryByTestId('ad-studio-edit-all')).not.toBeInTheDocument();
+    noReady.unmount();
+
+    // Over daily limit across ready clips (5s + 8s = 13s > 10s left).
+    const twoReady = [clip('c1', 'a', 1, 'ready', fp(0), { durationSeconds: 5 }), clip('c2', 'b', 1, 'ready', fp(1), { durationSeconds: 8 })];
+    const overLimit = renderStudio({ initialClips: twoReady, videoSecondsLeft: 10 });
+    expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Needs 13s of video across 2 clips, but only 10s are left today.');
+    expect(screen.getByTestId('ad-studio-edit-all-submit')).toBeDisabled();
+    overLimit.unmount();
+
+    // Failure keeps the typed instruction so it can be retried; success clears it and polls until ready.
+    const editedGenerating = [
+      twoReady[0],
+      twoReady[1],
+      clip('e1', 'a', 2, 'generating', fp(0), { kind: 'edit', durationSeconds: 5, instruction: 'Make it night' }),
+      clip('e2', 'b', 2, 'generating', fp(1), { kind: 'edit', durationSeconds: 8, instruction: 'Make it night' }),
+    ];
+    const editedReady = [
+      twoReady[0],
+      twoReady[1],
+      { ...editedGenerating[2], status: 'ready' as const },
+      { ...editedGenerating[3], status: 'ready' as const },
+    ];
+    let attempt = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === `${BASE}/edit-all`) {
+        attempt += 1;
+        if (attempt === 1) return json({ error: 'provider_failed', code: 'rate_limited' }, 429);
+        return json({ started: 2, clips: editedGenerating, videos: [] });
+      }
+      if (url === `${BASE}/render-status`) return json({ clips: editedReady, videos: [] });
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderStudio({ initialClips: twoReady, videoSecondsLeft: 300 });
+    expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Applies to 2 ready clips (13s of 300s left today).');
+    const input = screen.getByTestId('ad-studio-edit-all-input');
+    fireEvent.change(input, { target: { value: 'Make it night' } });
+    fireEvent.click(screen.getByTestId('ad-studio-edit-all-submit'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent(/try again/i));
+    expect(input).toHaveValue('Make it night');
+
+    fireEvent.click(screen.getByTestId('ad-studio-edit-all-submit'));
+    await waitFor(() => expect(input).toHaveValue(''));
+    const editCall = fetchMock.mock.calls.find(([u]) => u === `${BASE}/edit-all`) as unknown as [string, RequestInit];
+    expect(JSON.parse(String(editCall[1].body))).toEqual({ instruction: 'Make it night' });
+    expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Wait for clips currently generating to finish.');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100);
+    });
+    await waitFor(() => expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Applies to 2 ready clips (13s of 300s left today).'));
+  });
+
+  it('shows the batch edit card in Hebrew with the scene count', () => {
+    const ready = [clip('c1', 'a', 1, 'ready', fp(0), { durationSeconds: 5 }), clip('c2', 'b', 1, 'ready', fp(1), { durationSeconds: 8 })];
+    renderStudio({ initialClips: ready, videoSecondsLeft: 40 }, 'he');
+    expect(screen.getByTestId('ad-studio-edit-all')).toHaveTextContent(heMessages.AdStudio.video.editAllLabel);
+    expect(screen.getByTestId('ad-studio-edit-all-submit')).toBeDisabled();
+  });
+
   it('assembles once every scene has a current clip and shows the finished player with its length', async () => {
     const clips = [clip('c1', 'a', 1, 'ready', fp(0)), clip('c2', 'b', 1, 'ready', fp(1))];
     const video: AdStudioVideoView = { id: 'v1', status: 'ready', failureReason: null, clipIds: ['c1', 'c2'], durationSeconds: 12.97, requestedOn: '2026-09-27T10:00:00.000Z', assembledOn: '2026-09-27T10:01:00.000Z' };

@@ -16,6 +16,7 @@ import {
   AD_STUDIO_CLIP_TIMEOUT_MS,
   AD_STUDIO_MAX_TOTAL_SECONDS,
   assemblyPlan,
+  editAllCost,
   isClipSlow,
   narrationPresenter,
   renderAllCost,
@@ -152,6 +153,8 @@ export function VideoStudio({
   const [pending, setPending] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [instructions, setInstructions] = React.useState<Record<string, string>>({});
+  const [editAllInstruction, setEditAllInstruction] = React.useState('');
+  const editAllInputId = React.useId();
   const [shown, setShown] = React.useState<Record<string, string>>({});
   // The clock starts in the browser: an elapsed time rendered on the server never matches the one the
   // browser renders a second later, and React rejects the page (hydration error #418).
@@ -170,6 +173,8 @@ export function VideoStudio({
   const states = sceneVideoStates(scenes, clips, context);
   const progress = summarizeVideoProgress(states, scenes);
   const cost = renderAllCost(states, scenes);
+  const editCost = editAllCost(scenes, clips);
+  const readySceneCount = scenes.filter((scene) => clips.some((clip) => clip.sceneId === scene.id && clip.status === 'ready')).length;
   const plan = assemblyPlan(scenes, clips, context);
   const { latest: finalVideo, current: finalCurrent } = currentAssembledVideo(
     videos,
@@ -277,6 +282,13 @@ export function VideoStudio({
 
   const segments = buildSceneTimeline(scenes);
   const overLimit = cost.seconds > videoSecondsLeft;
+  const editAllOverLimit = editCost.seconds > videoSecondsLeft;
+  const canEditAll =
+    videoAvailable &&
+    pending === null &&
+    editCost.sceneIds.length > 0 &&
+    !editAllOverLimit &&
+    editAllInstruction.trim().length > 0;
   const frameClass =
     format === 'vertical' ? 'aspect-[9/16] w-44' : 'aspect-video w-full max-w-sm md:w-80';
   const clipUrl = (clipId: string) => `${base}/clips/${clipId}/media`;
@@ -415,6 +427,83 @@ export function VideoStudio({
           ))}
         </div>
       </div>
+
+      {readySceneCount > 0 ? (
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!canEditAll) return;
+            const ok = await act(
+              'edit-all',
+              '/edit-all',
+              { instruction: editAllInstruction },
+              t('video.started'),
+            );
+            // Keep the instruction when the batch edit fails, so it can be retried without retyping.
+            if (ok) setEditAllInstruction('');
+          }}
+          className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm"
+          data-testid="ad-studio-edit-all"
+        >
+          <label
+            htmlFor={editAllInputId}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold"
+          >
+            <Wand2 className="h-4 w-4 text-primary" aria-hidden="true" />
+            {t('video.editAllLabel')}
+          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              id={editAllInputId}
+              value={editAllInstruction}
+              onChange={(event) => setEditAllInstruction(event.target.value)}
+              placeholder={t('video.editPlaceholder')}
+              maxLength={500}
+              dir="auto"
+              data-testid="ad-studio-edit-all-input"
+              className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm text-foreground"
+            />
+            <button
+              type="submit"
+              disabled={!canEditAll}
+              data-testid="ad-studio-edit-all-submit"
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            >
+              {pending === 'edit-all' ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Wand2 className="h-4 w-4" aria-hidden="true" />
+              )}
+              {pending === 'edit-all'
+                ? t('video.editAllEditing')
+                : t('video.editAllRun', { count: editCost.sceneIds.length || readySceneCount })}
+            </button>
+          </div>
+          <p
+            className={cn(
+              'text-xs',
+              editCost.sceneIds.length > 0 && editAllOverLimit
+                ? 'text-destructive'
+                : 'text-muted-foreground',
+            )}
+            data-testid="ad-studio-edit-all-cost"
+          >
+            {editCost.sceneIds.length === 0
+              ? t('video.editAllBusy')
+              : editAllOverLimit
+                ? t('video.editAllOverLimit', {
+                    seconds: editCost.seconds,
+                    count: editCost.sceneIds.length,
+                    left: videoSecondsLeft,
+                  })
+                : t('video.editAllHint', {
+                    count: editCost.sceneIds.length,
+                    seconds: editCost.seconds,
+                    left: videoSecondsLeft,
+                  })}
+          </p>
+        </form>
+      ) : null}
 
       <ol className="flex flex-col gap-3">
         {scenes.map((scene, index) => {
