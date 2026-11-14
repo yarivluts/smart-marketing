@@ -17,6 +17,16 @@ Template for each entry:
 
 ---
 
+## 2026-11-15 — Unify Ad Studio "Create" and "Review & edit" into a 4-step flow
+
+- **Last completed:** Merged the redundant `create` and `review` steps into 4 unified steps (`brief` → `plan` → `review` → `publish`) in [`steps.ts`](apps/web/lib/ad-studio/steps.ts), [`ad-studio-stepper.tsx`](apps/web/components/ad-studio/ad-studio-stepper.tsx), [`page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), and `en.json` / `he.json` (`"Create & review"` / `"יצירה ועריכה"`). Kept `?step=create` URL normalization to `review` for backwards compatibility and placed `AutopilotPanel mode="progress"` above `ReviewOverview` inside Step 3.
+- **In progress (exact stopping point):** Running unit tests, `typecheck`, `lint`, merging PR, and deploying to Cloud Run.
+- **Blocked + why:** None.
+- **Next step:** Verify CI and Cloud Run `/v1/health` + `/api/health`.
+- **Waiting on human:** None.
+
+---
+
 ## 2026-11-14 — Ad Studio Review Video (`?step=review&item=video`) mobile-first + desktop redesign
 
 - **Stitch designs**: generated mobile (`886c2ffbba40499ba51858f900034820`) and desktop (`e422d34bfb7145be83d3540f0a461943`) Step 4 Video Review Pastel Pulse layouts in Stitch project `15388075487680927533` (`assets/80713eeffe4f4cd59c5ad94a0b11e269`).
