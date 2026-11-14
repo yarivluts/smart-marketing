@@ -4317,6 +4317,8 @@
       "editAllBusy": "Wait for clips currently generating to finish.",
       "editAllRun": "{count, plural, one {Edit # clip} other {Edit all (# clips)}}",
       "editAllEditing": "Starting...",
+      "voiceSectionTitle": "Voice & narration",
+      "voiceSectionHint": "Choose narrator voice, mode & notes",
       "versions": "{count, plural, one {# version} other {# versions}}",
       "versionLabel": "Version {version}",
       "versionRender": "From the script",

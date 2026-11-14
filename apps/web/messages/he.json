@@ -4317,6 +4317,8 @@
       "editAllBusy": "המתינו לסיום הקליפים שנמצאים כעת ביצירה.",
       "editAllRun": "{count, plural, one {עריכת קליפ אחד} other {עריכת כל הקליפים (#)}}",
       "editAllEditing": "מתחיל...",
+      "voiceSectionTitle": "קריינות וקול",
+      "voiceSectionHint": "בחירת קול, סגנון קריינות והנחיות",
       "versions": "{count, plural, one {גרסה אחת} other {# גרסאות}}",
       "versionLabel": "גרסה {version}",
       "versionRender": "מהתסריט",
