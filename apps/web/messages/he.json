@@ -3029,7 +3029,7 @@
     "staleBanner": "אין עדכון - רענון אחרון לפני {minutes, plural, one {דקה אחת} other {# דקות}}. המספרים למטה קפואים מאותו רגע ואינם עדכניים."
   },
   "Automation": {
-    "metaTitle": "אוטומציה",
+    "metaTitle": "עוזר AI",
     "title": "אוטומציה עבור {projectName}",
     "killSwitchHeading": "עצירת חירום",
     "killSwitchEngagedNote": "האוטומציה מושהית עבור ארגון זה: {reason}",
@@ -3240,7 +3240,7 @@
     "violationBlastRadius": "הגעתם למגבלת השינויים האוטומטיים להיום. נסו שוב מחר",
     "violationAutomationPaused": "השינויים האוטומטיים מושהים. הפעילו אותם מחדש כדי להחיל את זה",
     "violationInsufficientWriteTier": "לחשבון המודעות הזה מותר רק לצפות. תנו לו הרשאה רחבה יותר (שינוי תקציבים, או שליטה מלאה) כדי לבצע את השינוי",
-    "hubTitle": "שינויים מוצעים",
+    "hubTitle": "עוזר AI",
     "hubDescription": "GrowthOS עוקבת אחרי המודעות שלכם ומציעה שינויים. אתם מאשרים כל שינוי בלחיצה, ואפשר לבטל אותו אחר כך.",
     "tabProposals": "שינויים מוצעים",
     "tabHistory": "היסטוריה (עם אפשרות ביטול)",
