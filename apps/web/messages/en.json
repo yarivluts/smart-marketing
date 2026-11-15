@@ -1363,7 +1363,7 @@
     "warehouseFreshnessLine": "Your reports are based on data up to {latestLandedAt} UTC ({count} records in the {environment} environment). They refresh every hour by themselves.",
     "warehouseFreshnessEmpty": "Your reports are ready, but no data has reached them yet for this project's {environment} environment.",
     "warehouseFreshnessNotConfigured": "Report storage is not set up on our side yet, so this cannot be shown. Please contact GrowthOS support.",
-    "warehouseFreshnessError": "Couldn't read warehouse freshness: {message}",
+    "warehouseFreshnessError": "We could not check how up to date your reports are just now. Try again in a few minutes; if it keeps happening, send this detail to whoever set up your data: {message}",
     "eyebrow": "Your data",
     "heroDescription": "Everything this environment received, what was accepted or rejected, and how far it got toward your reports.",
     "kpiReceived": "Records received",
