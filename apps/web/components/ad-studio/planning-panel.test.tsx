@@ -149,7 +149,7 @@ describe('PlanningPanel', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderPanel({ plan: null, sources: null, generatedBy: null });
     fireEvent.click(screen.getByRole('button', { name: 'Run deep analysis' }));
-    expect(await screen.findByText("You have used today's AI allowance (50 of 50). It starts again tomorrow, or a project admin can raise it in the studio settings.")).toBeInTheDocument();
+    expect(await screen.findByText("You have used today's AI allowance (50 of 50). It starts again tomorrow. Daily limits come from your GrowthOS plan - contact us if you need more.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/orgs/o/projects/p/ad-studio/briefs/b1/plan', { method: 'POST' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Run deep analysis' }));
