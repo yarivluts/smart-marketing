@@ -713,7 +713,7 @@ function TargetAdsLine({ target }: { target: GrowthTargetView }): React.ReactEle
   return (
     <p className={cn('mt-auto flex items-center gap-1.5 border-t border-border/60 pt-2 text-xs', tone)} data-testid="growth-pilot-target-ads" data-ads={status}>
       {status === 'building' ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
-      {status === 'none' ? t('next') : status === 'failed' ? ta('failed', { reason: reasonOf(target.adsFailure) }) : ta(status)}
+      {target.status === 'paused' ? t('pausedNote') : status === 'none' ? t('next') : status === 'failed' ? ta('failed', { reason: reasonOf(target.adsFailure) }) : ta(status)}
     </p>
   );
 }
