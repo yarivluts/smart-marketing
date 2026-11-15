@@ -17,6 +17,10 @@ Template for each entry:
 
 ---
 
+## UX hourly
+
+- 2026-11-15 — audited (f)/(c) error copy, empty states and project home/navigation: error mapping and nav hints are already plain-language; fixed the Ads page title ("Ads & Performance" / "מודעות וביצועים") to match its menu link "Ads & results" / "מודעות ותוצאות" (PR: ux/ads-title-matches-menu). Next candidates: (1) Funnel page title "Customer journey, goals & returning customers" vs menu "Customer journey & goals"; (2) Ads page first tab repeats the page title "Ads & results" - rename to "Overview"; (3) audit Hebrew/RTL copy (g) and signup/onboarding (e), not yet covered.
+
 ## 2026-11-15 — Unify Ad Studio "Create" and "Review & edit" into a 4-step flow
 
 - **Last completed:** Merged the redundant `create` and `review` steps into 4 unified steps (`brief` → `plan` → `review` → `publish`) in [`steps.ts`](apps/web/lib/ad-studio/steps.ts), [`ad-studio-stepper.tsx`](apps/web/components/ad-studio/ad-studio-stepper.tsx), [`page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), and `en.json` / `he.json` (`"Create & review"` / `"יצירה ועריכה"`). Kept `?step=create` URL normalization to `review` for backwards compatibility and placed `AutopilotPanel mode="progress"` above `ReviewOverview` inside Step 3.

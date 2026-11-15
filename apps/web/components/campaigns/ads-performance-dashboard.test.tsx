@@ -109,7 +109,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.getByTestId('campaign-list-table')).toBeInTheDocument();
 
     // Tab navigation
-    expect(screen.getByText('Ads & results')).toBeInTheDocument();
+    expect(screen.getAllByText('Ads & results')).toHaveLength(2); // page title + first tab
     expect(screen.getByText('Ad gallery')).toBeInTheDocument();
     expect(screen.getByText('Spend and results')).toBeInTheDocument();
   });
