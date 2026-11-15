@@ -1363,7 +1363,7 @@
     "warehouseFreshnessLine": "הדוחות שלכם מבוססים על נתונים עד {latestLandedAt} UTC ({count} רשומות בסביבת {environment}). הם מתרעננים מעצמם כל שעה.",
     "warehouseFreshnessEmpty": "הדוחות שלכם מוכנים, אבל עדיין לא הגיעו אליהם נתונים עבור סביבת {environment} של הפרויקט הזה.",
     "warehouseFreshnessNotConfigured": "אחסון הדוחות עדיין לא הוגדר מצדנו, ולכן אי אפשר להציג זאת. אפשר לפנות לתמיכת GrowthOS.",
-    "warehouseFreshnessError": "לא ניתן היה לקרוא את עדכניות מחסן הנתונים: {message}",
+    "warehouseFreshnessError": "לא הצלחנו לבדוק עכשיו עד כמה הדוחות שלכם מעודכנים. נסו שוב בעוד כמה דקות; אם זה חוזר, שלחו את הפרט הזה למי שהגדיר את הנתונים שלכם: {message}",
     "eyebrow": "הנתונים שלכם",
     "heroDescription": "כל מה שהסביבה הזו קיבלה, מה התקבל ומה נדחה, ועד כמה זה התקדם לכיוון הדוחות שלכם.",
     "kpiReceived": "רשומות שהתקבלו",
