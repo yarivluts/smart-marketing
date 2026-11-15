@@ -356,6 +356,13 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
+  it('points to the new-idea button when nothing is waiting and nothing is being grown', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [] })} />, { locale: 'en' });
+    expect(screen.getByText(/Press “Something else to grow” above/)).toBeInTheDocument();
+    expect(screen.queryByText('Approve a proposal and it becomes something the pilot works on.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('growth-pilot-new-target')).toHaveTextContent('Something else to grow');
+  });
+
   it('puts every proposal in front of the person to approve, reject or change', async () => {
     const approved = page({ proposals: [{ ...PROPOSAL, status: 'approved' }], targets: [{ ...page().targets[0], status: 'active' }] });
     const fetchMock = stubFetch({ body: approved });

@@ -38,3 +38,11 @@ describe('Growth Pilot list of things to grow reads the same in Hebrew and Engli
     }
   });
 });
+
+describe('Growth Pilot empty "what we are growing" list', () => {
+  it('names the button to press when nothing is waiting, in both languages', () => {
+    expect(en.GrowthPilot.targets.emptyNothingWaiting).toContain(en.GrowthPilot.header.newTarget);
+    expect(he.GrowthPilot.targets.emptyNothingWaiting).toContain(he.GrowthPilot.header.newTarget);
+    expect(en.GrowthPilot.targets.emptyNothingWaiting).not.toMatch(/target/i);
+  });
+});

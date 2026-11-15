@@ -6169,6 +6169,7 @@
     "targets": {
       "title": "What we are growing",
       "empty": "Approve a proposal and it becomes something the pilot works on.",
+      "emptyNothingWaiting": "Nothing is being grown yet. Press “Something else to grow” above, say it in a few words, and we will set it up for you to approve.",
       "status": {
         "proposed": "Waiting for approval",
         "active": "Active",
