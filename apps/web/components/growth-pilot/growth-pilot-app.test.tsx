@@ -495,6 +495,13 @@ describe('GrowthPilotApp', () => {
     const ACTIVE_TARGET = { id: 't1', kind: 'service' as const, name: 'Pro plan', description: '20 documents', audience: 'Small offices', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'ready' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'none' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
     const ADS: GrowthProposalView = { ...PROPOSAL, id: 'ad1', kind: 'ads', briefId: 'b1', previewImageIds: ['i1', 'i2'], draft: { kind: 'service', name: 'Pro plan', description: '', audience: '', reason: '' } };
 
+    it('says a paused target makes nothing new instead of promising "Next: ads"', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [{ ...ACTIVE_TARGET, status: 'paused' as const }] })} />, { locale: 'en' });
+      const line = screen.getByTestId('growth-pilot-target-ads');
+      expect(line).toHaveTextContent('Paused: nothing new is made for this one');
+      expect(line).not.toHaveTextContent('Next:');
+    });
+
     it('says approving ads publishes nothing yet', () => {
       renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [ADS], targets: [ACTIVE_TARGET] })} />, { locale: 'en' });
       expect(screen.getByTestId('growth-pilot-approve-hint')).toHaveTextContent('They are not published yet');

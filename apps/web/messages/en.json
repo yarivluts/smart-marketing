@@ -6230,6 +6230,7 @@
         "rejected": "Rejected"
       },
       "requested": "You asked for it",
+      "pausedNote": "Paused: nothing new is made for this one. Ads you already turned on keep running.",
       "next": "Next: ads, a web page for people who click them and who to reach for this one."
     },
     "newTarget": {
