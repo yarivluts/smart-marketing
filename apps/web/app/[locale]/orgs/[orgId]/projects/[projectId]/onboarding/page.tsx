@@ -388,7 +388,18 @@ async function SourcesStep({
           hasReceivedData={hasReceivedData}
         />
       ) : (
-        <p className="text-sm text-muted-foreground">{t('sourceStepContinueHint')}</p>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p>{t('sourceStepContinueHint')}</p>
+          <p>
+            {t('sourceStepNoDataHint')}{' '}
+            <Link
+              className="font-medium underline"
+              href={`/orgs/${orgId}/projects/${projectId}/growth-pilot`}
+            >
+              {t('sourceStepNoDataLink')}
+            </Link>
+          </p>
+        </div>
       )}
     </section>
   );

@@ -58,3 +58,14 @@ describe('onboarding intro copy explains itself to a beginner', () => {
     expect(he.Onboarding.sourceStepPushYourOwnIntro).not.toMatch(/אירוע/);
   });
 });
+
+describe('source step never dead-ends a newcomer with nothing to connect', () => {
+  it('offers Growth Pilot as the way forward in both languages', () => {
+    for (const lang of [en, he]) {
+      expect(lang.Onboarding.sourceStepNoDataHint).toBeTruthy();
+      expect(lang.Onboarding.sourceStepNoDataLink).toBeTruthy();
+    }
+    expect(en.Onboarding.sourceStepNoDataLink).toMatch(/Growth Pilot/);
+    expect(he.Onboarding.sourceStepNoDataLink).not.toMatch(/[A-Za-z]/);
+  });
+});

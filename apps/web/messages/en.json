@@ -561,6 +561,8 @@
     "sourceStepNoEnvironments": "This project has no data space yet, so a key cannot be created. Open the project settings to add one.",
     "sourceStepNoEnvironmentsLink": "Open project settings",
     "sourceStepContinueHint": "Connect a source above to continue.",
+    "sourceStepNoDataHint": "Nothing to connect yet? You do not need any data to start.",
+    "sourceStepNoDataLink": "Let Growth Pilot read your website instead",
     "sourceContinueButton": "Continue",
     "funnelStepHeading": "Confirm your customer path",
     "funnelStepIntro": "Here is the path we think your customers take, from first visit to paying, based on what already happened on your site. Move steps up or down, change a step's type, or leave one out, then confirm.",
