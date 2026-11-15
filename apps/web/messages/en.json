@@ -6829,7 +6829,7 @@
       "title": "Your ads",
       "titleWithBrand": "Ads for {brand}",
       "logoAlt": "Logo",
-      "intro": "This is how your ads will look. Pick a placement above each ad to see it on another platform.",
+      "intro": "This is how your ads will look. Use the choices above each ad to see how it looks somewhere else, such as Stories.",
       "viewOnly": "View only - link valid until {date}",
       "idea": "Idea {index}",
       "video": "Video ({seconds} sec)",
