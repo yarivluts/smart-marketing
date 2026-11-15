@@ -81,6 +81,17 @@ describe('AutomationProposeCampaignDraftForm', () => {
     expect(label).not.toMatch(/Meta/);
   });
 
+  it('names the Meta goals in plain words', () => {
+    renderForm();
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
+    const options = Array.from(
+      (screen.getByLabelText('What should the ads achieve?') as HTMLSelectElement).options,
+    ).map((o) => o.textContent);
+    expect(options).toContain('Visits to your website');
+    expect(options).toContain('Purchases');
+    expect(options.join(' ')).not.toMatch(/Traffic|Awareness|Engagement/);
+  });
+
   it('switches to Meta and submits a meta discriminated-union draft with the right shape', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();
@@ -88,7 +99,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
     fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
     fireEvent.change(screen.getByLabelText('Name for this set of ads'), { target: { value: 'Summer Sale' } });
     fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
-    fireEvent.change(screen.getByLabelText('Objective'), { target: { value: 'OUTCOME_LEADS' } });
+    fireEvent.change(screen.getByLabelText('What should the ads achieve?'), { target: { value: 'OUTCOME_LEADS' } });
     fireEvent.change(screen.getByLabelText('Audience group name'), { target: { value: 'Ad Set 1' } });
     fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
     fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '55' } });
