@@ -3029,7 +3029,7 @@
     "staleBanner": "Not updating - last refreshed {minutes, plural, one {# minute} other {# minutes}} ago. The numbers below are frozen at that point, not current."
   },
   "Automation": {
-    "metaTitle": "Automation",
+    "metaTitle": "AI helper",
     "title": "Automation for {projectName}",
     "killSwitchHeading": "Emergency stop",
     "killSwitchEngagedNote": "Automation is paused for this organization: {reason}",
@@ -3240,7 +3240,7 @@
     "violationBlastRadius": "Today's limit on automatic changes has been reached. Try again tomorrow",
     "violationAutomationPaused": "Automatic changes are paused. Turn them back on to apply this",
     "violationInsufficientWriteTier": "This ad account is only allowed to look. Give it more access (adjust budgets, or full control) to make this change",
-    "hubTitle": "Changes GrowthOS suggests",
+    "hubTitle": "AI helper",
     "hubDescription": "GrowthOS watches your ads and suggests changes. You approve each one with a click, and you can undo it later.",
     "tabProposals": "Suggested changes",
     "tabHistory": "History (with undo)",

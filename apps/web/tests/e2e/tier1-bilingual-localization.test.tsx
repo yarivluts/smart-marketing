@@ -98,8 +98,8 @@ describe('Tier 1: Bilingual Symmetrical Localization & RTL/LTR (R4)', () => {
     expect(he.AppShell.brandName).toBe('GrowthOS');
     expect(en.Campaigns.metaTitle).toBe('Ads & results');
     expect(he.Campaigns.metaTitle).toBe(he.Campaigns.tabOverview);
-    expect(en.Automation.metaTitle).toBe('Automation');
-    expect(he.Automation.metaTitle).toBe('אוטומציה');
+    expect(en.Automation.metaTitle).toBe(en.AppShell.aiCopilotAndAutomation);
+    expect(he.Automation.metaTitle).toBe(he.AppShell.aiCopilotAndAutomation);
   });
 
   it('7.7 Directional Icon Mirroring: flips navigation arrows and progress chevrons in RTL', () => {
