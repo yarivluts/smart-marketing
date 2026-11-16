@@ -6063,7 +6063,7 @@
       "responseTitle": "Responses",
       "responseBody": "<code>202</code> with the counts of accepted, quarantined and duplicate records; every record that was not accepted is listed with its status and reasons (for example <code>missing_required_field:plan</code>, <code>unregistered_field:...</code>, <code>field_type_mismatch:...</code> or <code>schema_not_registered</code>). The batch endpoint returns the result of every record.",
       "metricsTitle": "Read metrics",
-      "metricsBody": "Register a metric (here through MCP's <code>register_metric</code>, which needs <code>metrics.write</code>), list the catalog and query a time series. New records reach the warehouse in its hourly refresh, so a fresh project returns an empty series at first.",
+      "metricsBody": "Register a metric (here through MCP's <code>register_metric</code>, which needs <code>metrics.write</code>), list the catalog and query a time series. New records show up in your reports within the hour, so a fresh project returns an empty series at first.",
       "contractTitle": "Machine-readable contract",
       "contractBody": "The ingest contract as an OpenAPI 3.1 document - request envelopes, the batch response and the rules a JSON schema cannot express. No key needed.",
       "errorsTitle": "Errors and limits",

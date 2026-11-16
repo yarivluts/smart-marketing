@@ -6063,7 +6063,7 @@
       "responseTitle": "תשובות",
       "responseBody": "<code>202</code> עם מספר הרשומות שנקלטו, שעברו להסגר ושהיו כפולות; כל רשומה שלא נקלטה מופיעה עם הסטטוס והסיבות (למשל <code>missing_required_field:plan</code>, <code>unregistered_field:...</code>, <code>field_type_mismatch:...</code> או <code>schema_not_registered</code>). נקודת הקצה של האצווה מחזירה את התוצאה של כל רשומה.",
       "metricsTitle": "קריאת מדדים",
-      "metricsBody": "רשמו מדד (כאן דרך <code>register_metric</code> של MCP, שדורש <code>metrics.write</code>), הציגו את הקטלוג והריצו שאילתה לסדרת זמן. רשומות חדשות מגיעות למחסן הנתונים ברענון השעתי שלו, כך שבפרויקט חדש הסדרה ריקה בהתחלה.",
+      "metricsBody": "רשמו מדד (כאן דרך <code>register_metric</code> של MCP, שדורש <code>metrics.write</code>), הציגו את הקטלוג והריצו שאילתה לסדרת זמן. רשומות חדשות מופיעות בדוחות שלכם תוך שעה, כך שבפרויקט חדש הסדרה ריקה בהתחלה.",
       "contractTitle": "חוזה קריא למכונה",
       "contractBody": "חוזה הקליטה כמסמך OpenAPI 3.1 - מבני הבקשות, תשובת האצווה והכללים שסכמת JSON לא יכולה לבטא. לא צריך מפתח.",
       "errorsTitle": "שגיאות ומגבלות",
