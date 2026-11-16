@@ -13,6 +13,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+const OPERATOR_KEYS: Record<SegmentFilterOperator, string> = {
+  '=': 'eq',
+  '!=': 'ne',
+  '>': 'gt',
+  '>=': 'gte',
+  '<': 'lt',
+  '<=': 'lte',
+  contains: 'contains',
+};
+
 export interface FilterRow {
   field: string;
   op: SegmentFilterOperator;
@@ -199,7 +209,7 @@ export function SegmentConditionEditor({
             >
               {SEGMENT_FILTER_OPERATORS.map((op) => (
                 <option key={op} value={op}>
-                  {op}
+                  {t(`filterOperators.${OPERATOR_KEYS[op]}`)}
                 </option>
               ))}
             </select>

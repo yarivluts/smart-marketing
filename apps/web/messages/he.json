@@ -2781,17 +2781,18 @@
     "filtersLabel": "מסננים",
     "filterFieldLabel": "שדה",
     "filterFieldPlaceholder": "לדוגמה: plan",
-    "filterOpLabel": "אופרטור",
+    "filterOpLabel": "השוואה",
+    "filterOperators": {"eq": "שווה ל", "ne": "שונה מ", "gt": "גדול מ", "gte": "לפחות", "lt": "קטן מ", "lte": "לכל היותר", "contains": "מכיל"},
     "filterValueLabel": "ערך",
     "filterValuePlaceholder": "לדוגמה: pro",
     "addFilterButton": "הוסף מסנן",
     "removeFilterButton": "הסר",
-    "eventConditionsLabel": "תנאי אירועים",
-    "eventConditionsHint": "התאמה לפי האם ללקוח יש (או אף פעם לא היה) אירוע תואם מסוג אחר, למשל \"משלמים, ללא הדגמה\".",
+    "eventConditionsLabel": "מה הלקוחות עשו",
+    "eventConditionsHint": "התאמה לפי האם הלקוח עשה משהו (או לא עשה אותו אף פעם), למשל \"משלמים, לא קבעו הדגמה\".",
     "eventConditionKindLabel": "תנאי",
     "eventConditionKind": {
-      "has_event": "יש אירוע",
-      "no_event": "אין אירוע"
+      "has_event": "עשה זאת",
+      "no_event": "לא עשה זאת אף פעם"
     },
     "eventConditionSchemaLabel": "אירוע",
     "eventConditionWithinDaysLabel": "בתוך ימים",
