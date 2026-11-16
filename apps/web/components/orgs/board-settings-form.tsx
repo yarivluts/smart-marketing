@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { filterOperatorKey } from '@/lib/orgs/filter-operator-key';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -216,7 +217,7 @@ export function BoardSettingsForm({
             >
               {METRIC_FILTER_OPERATORS.map((operator) => (
                 <option key={operator} value={operator}>
-                  {operator}
+                  {t(filterOperatorKey(operator))}
                 </option>
               ))}
             </select>
