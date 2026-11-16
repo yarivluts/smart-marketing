@@ -26,14 +26,14 @@ describe('CreateSegmentForm', () => {
 
   it('disables the submit button until name and every filter row is filled', () => {
     renderForm();
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pro customers' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
   });
 
   it('creates a segment and refreshes the page', async () => {
@@ -43,7 +43,7 @@ describe('CreateSegmentForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pro customers' } });
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -81,9 +81,9 @@ describe('CreateSegmentForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pro customers' } });
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the segment. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the group. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 
@@ -96,7 +96,7 @@ describe('CreateSegmentForm', () => {
     } as Response);
     renderForm();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByText('High-value customers (85% match)');
     fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
@@ -104,7 +104,7 @@ describe('CreateSegmentForm', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('High-value customers');
     expect(screen.getByLabelText('Field')).toHaveValue('mrr_usd');
     expect(screen.getByLabelText('Value')).toHaveValue('100');
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
   });
 
   it('never overwrites a name the user already typed when applying a suggestion', async () => {
@@ -117,7 +117,7 @@ describe('CreateSegmentForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My own name' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByText('High-value customers (85% match)');
     fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
@@ -141,7 +141,7 @@ describe('CreateSegmentForm', () => {
     } as Response);
     renderForm(['demo_event']);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByText('Paying customers with no demo (100% match)');
     fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
@@ -150,7 +150,7 @@ describe('CreateSegmentForm', () => {
     expect(screen.getByLabelText('Field')).toHaveValue('status');
     expect(screen.getByLabelText('Value')).toHaveValue('active');
     expect(screen.getByLabelText('Event')).toHaveValue('demo_event');
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
   });
 
   it('does not render the event conditions section when no event schemas are registered', () => {
@@ -163,16 +163,16 @@ describe('CreateSegmentForm', () => {
     renderForm(['demo_event']);
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'No demo yet' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeDisabled();
 
     // Adding an event condition unlocks removing the single default (empty)
     // filter row — a segment can now stand on an event condition alone. The
     // filter row's own remove button is the first "Remove" in DOM order.
     fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -198,7 +198,7 @@ describe('CreateSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
     fireEvent.change(screen.getByLabelText('Condition'), { target: { value: 'has_event' } });
     fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '30' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -220,13 +220,13 @@ describe('CreateSegmentForm', () => {
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '-5' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '10' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
   });
 
   it('adds and removes event condition rows', () => {
@@ -274,7 +274,7 @@ describe('CreateSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
     fireEvent.change(screen.getByLabelText('Event filter field'), { target: { value: 'is_paid' } });
     fireEvent.change(screen.getByLabelText('Event filter value'), { target: { value: 'true' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -295,15 +295,15 @@ describe('CreateSegmentForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Event filter field'), { target: { value: 'is_paid' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Event filter value'), { target: { value: 'true' } });
-    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
   });
 });

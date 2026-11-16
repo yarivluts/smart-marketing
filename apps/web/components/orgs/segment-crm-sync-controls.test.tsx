@@ -66,7 +66,7 @@ describe('SegmentCrmSyncControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sync to CRM' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sync this segment. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sync this group. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 
