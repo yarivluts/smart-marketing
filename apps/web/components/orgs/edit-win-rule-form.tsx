@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { filterOperatorKey } from '@/lib/orgs/filter-operator-key';
 import { WIN_RULE_FILTER_OPERATORS, WIN_TYPES, type WinRuleFilter, type WinRuleFilterOperator, type WinType } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
@@ -153,7 +154,7 @@ export function EditWinRuleForm({
             >
               {WIN_RULE_FILTER_OPERATORS.map((operator) => (
                 <option key={operator} value={operator}>
-                  {operator}
+                  {t(filterOperatorKey(operator))}
                 </option>
               ))}
             </select>

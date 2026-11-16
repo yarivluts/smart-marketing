@@ -78,6 +78,7 @@ describe('CreateWinRuleForm', () => {
 
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'properties.amount' } });
     fireEvent.change(screen.getByLabelText('Condition'), { target: { value: '>' } });
+    expect(screen.getByRole('option', { name: 'is at least' })).toHaveValue('>=');
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: '100' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
 

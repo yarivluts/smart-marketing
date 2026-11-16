@@ -2,6 +2,7 @@
 
 import { useId } from 'react';
 import { useTranslations } from 'next-intl';
+import { filterOperatorKey } from '@/lib/orgs/filter-operator-key';
 import { METRIC_UNIT_KINDS, parseMetricUnit, type MetricUnitKind } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -240,7 +241,7 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
                 >
                   {METRIC_FILTER_OPERATORS.map((operator) => (
                     <option key={operator} value={operator}>
-                      {operator}
+                      {t(filterOperatorKey(operator))}
                     </option>
                   ))}
                 </select>
