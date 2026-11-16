@@ -89,7 +89,7 @@ describe('SegmentWorkListControls', () => {
 
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'done' } });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update the segment. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update the group. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });

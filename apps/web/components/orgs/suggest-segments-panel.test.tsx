@@ -20,13 +20,13 @@ describe('SuggestSegmentsPanel', () => {
 
   it('is collapsed by default', () => {
     renderPanel();
-    expect(screen.getByRole('button', { name: 'Suggest segments' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Suggest groups' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Suggest' })).not.toBeInTheDocument();
   });
 
   it('is disabled until an entity schema is chosen', () => {
     renderPanel(vi.fn(), '');
-    expect(screen.getByRole('button', { name: 'Suggest segments' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Suggest groups' })).toBeDisabled();
   });
 
   it('requests suggestions for the chosen schema and lists them', async () => {
@@ -38,7 +38,7 @@ describe('SuggestSegmentsPanel', () => {
     } as Response);
     renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
     await waitFor(() =>
@@ -59,7 +59,7 @@ describe('SuggestSegmentsPanel', () => {
     } as Response);
     const onApplySuggestion = renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByText('Recently churned customers (100% match)');
 
@@ -87,7 +87,7 @@ describe('SuggestSegmentsPanel', () => {
     } as Response);
     const onApplySuggestion = renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
     await screen.findByText('Paying customers with no demo (100% match)');
 
@@ -104,7 +104,7 @@ describe('SuggestSegmentsPanel', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ suggestions: [] }) } as Response);
     renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
     expect(await screen.findByText('No confident suggestions for this type of record yet.')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('SuggestSegmentsPanel', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't get suggestions. Please try again.");
@@ -122,10 +122,10 @@ describe('SuggestSegmentsPanel', () => {
 
   it('closes the panel via the close button', () => {
     renderPanel();
-    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest groups' }));
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(screen.getByRole('button', { name: 'Suggest segments' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Suggest groups' })).toBeInTheDocument();
   });
 });

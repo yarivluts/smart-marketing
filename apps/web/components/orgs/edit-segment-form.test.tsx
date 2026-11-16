@@ -176,7 +176,7 @@ describe('EditSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update the segment. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update the group. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
