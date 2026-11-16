@@ -21,7 +21,7 @@ describe('ReexportRawRecordsButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, status: 200, json: async () => ({ attempted: 5, exported: 5, failed: 0 }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Re-export records to warehouse' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send past records to your reports again' }));
 
     expect(await screen.findByText('5 of 5 record(s) exported, 0 failed')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/ingest-health/reexport-raw-records', {
@@ -31,21 +31,21 @@ describe('ReexportRawRecordsButton', () => {
     });
   });
 
-  it('explains a 409 as "no warehouse export configured"', async () => {
+  it('explains a 409 as "report storage not set up"', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 409 } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Re-export records to warehouse' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send past records to your reports again' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('This deployment has no warehouse export configured, so there is nothing to backfill into.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Report storage is not set up on our side yet, so there is nowhere to send them. Please contact GrowthOS support.');
   });
 
   it('shows a generic inline error for any other failure', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, status: 500 } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Re-export records to warehouse' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Send past records to your reports again' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't re-export raw records. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Could not send the past records to your reports. Please try again.");
   });
 });
