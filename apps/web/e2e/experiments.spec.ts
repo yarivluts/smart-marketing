@@ -39,9 +39,9 @@ test.describe('Experiments (KAN-89)', () => {
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     await openMoreTools(page);
-    await page.getByRole('link', { name: 'A/B tests' }).click();
+    await page.getByRole('link', { name: 'Compare versions' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/experiments$`));
-    await expect(page.getByRole('heading', { name: `A/B tests for Client Delta` })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `Compare versions for Client Delta` })).toBeVisible();
     await expect(page.getByText('Turn on A/B tracking to see which version of a page or ad works better.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Install' }).click();

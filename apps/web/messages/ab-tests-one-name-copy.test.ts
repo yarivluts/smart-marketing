@@ -6,8 +6,8 @@ type Copy = Record<string, Record<string, string>>;
 
 describe('A/B tests: one name everywhere', () => {
   it.each([
-    ['en', en, 'A/B tests', /experiment/i],
-    ['he', he, 'בדיקות A/B', /ניסוי/],
+    ['en', en, 'Compare versions', /experiment/i],
+    ['he', he, 'השוואת גרסאות', /ניסוי/],
   ])('%s: page label, counter and install pack all say the same name', (_l, m, name, old) => {
     const c = m as unknown as Copy;
     for (const value of [
