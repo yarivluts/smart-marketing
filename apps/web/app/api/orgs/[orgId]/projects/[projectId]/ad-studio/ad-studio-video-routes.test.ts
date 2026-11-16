@@ -635,6 +635,53 @@ describe('Ad Studio video routes (KAN-231)', () => {
     expect((await assemble(request('POST'), ctx.p())).status).toBe(409);
   });
 
+  it('saving Hebrew general video instructions marks old clips out of date, translates once on render-all, and applies to every scene prompt', async () => {
+    const ctx = await setup();
+    const { fetchMock, starts } = fakeOmni();
+    concatClipsMock.mockImplementation(async ({ output }: { output: string }) => {
+      await writeFile(output, Buffer.from('mp4'));
+      return { durationSeconds: 13 };
+    });
+
+    await renderAll(request('POST'), ctx.p());
+    await poll(ctx.p());
+    await poll(ctx.p());
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
+
+    // Save Hebrew general video instructions (escaped: no Hebrew literals in code).
+    const hebrewInstructions = '\u05e9\u05d4\u05d3\u05de\u05d5\u05d9\u05d5\u05ea \u05d9\u05e8\u05d0\u05d5 \u05d9\u05e9\u05e8\u05d0\u05dc\u05d9\u05d5\u05ea';
+    const saved = await putVideoSettings(request('PUT', { settings: { instructions: hebrewInstructions } }), ctx.p());
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { brief: { videoSettings: { instructions?: string } } }).brief.videoSettings.instructions).toBe(hebrewInstructions);
+    expect((await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId)).video_settings?.instructions).toBe(hebrewInstructions);
+
+    // Old clips no longer match the saved instructions, so assembly is refused until re-rendered.
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(409);
+
+    const generateContentCallsBefore = fetchMock.mock.calls.filter(([u]) => String(u).endsWith(':generateContent')).length;
+    const startsBefore = starts.length;
+    const rerendered = await renderAll(request('POST'), ctx.p());
+    expect(rerendered.status).toBe(200);
+    expect(((await rerendered.json()) as { started: number }).started).toBe(2);
+
+    // Translated once for the whole batch (1 :generateContent call, not 2).
+    const generateContentCallsAfter = fetchMock.mock.calls.filter(([u]) => String(u).endsWith(':generateContent')).length;
+    expect(generateContentCallsAfter - generateContentCallsBefore).toBe(1);
+
+    const batchStarts = starts.slice(startsBefore);
+    expect(batchStarts).toHaveLength(2);
+    for (const call of batchStarts) {
+      const prompt = String(call.input);
+      expect(prompt).toContain('Mandatory direction for this video (overrides any conflicting detail): A lawyer signing at a desk by the window.');
+      expect(prompt).toContain('Every scene must follow: A lawyer signing at a desk by the window.');
+      expect(prompt).not.toMatch(/[\u0590-\u05ff]/);
+    }
+
+    await poll(ctx.p());
+    await poll(ctx.p());
+    expect((await assemble(request('POST'), ctx.p())).status).toBe(200);
+  });
+
   it('assembles the current clips in script order, streams the result, and refuses once a scene changed', async () => {
     const ctx = await setup();
     fakeOmni();

@@ -11,6 +11,7 @@ import {
   planDemoInserts,
   buildSceneEditInstruction,
   buildScenePrompt,
+  isDefaultVideoSettings,
   needsPronunciation,
   renderAllCost,
   sceneFingerprint,
@@ -26,6 +27,7 @@ import {
   type AdStudioScene,
   type AdStudioClipSummary,
   type AdStudioVideoContext,
+  type AdStudioVideoSettings,
 } from '@growthos/shared';
 import {
   acquireAdStudioClipLease,
@@ -404,7 +406,7 @@ function clipEditNarration(parent: Pick<AdStudioClipModel, 'narration_text' | 'n
 }
 
 function editClipFromParent(
-  ctx: BriefContext & { sceneId: string; instruction: string; modelInstruction: string },
+  ctx: BriefContext & { sceneId: string; instruction: string; modelInstruction: string; generalInstructions?: string },
   brief: Pick<AdStudioBriefModel, 'video_format'>,
   parent: AdStudioClipModel,
   narration: { text: string; voice: string; style: string } | null,
@@ -412,7 +414,10 @@ function editClipFromParent(
 ): Promise<AdStudioClipModel> {
   const speechless = narration !== null;
   const prompt = buildSceneEditInstruction(ctx.instruction, { speechless });
-  const modelText = buildSceneEditInstruction(ctx.modelInstruction, { speechless });
+  const modelText = buildSceneEditInstruction(ctx.modelInstruction, {
+    speechless,
+    generalInstructions: ctx.generalInstructions,
+  });
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   const previousInteractionId = parent.interaction_id as string;
   // An edit continues its clip, so it keeps that clip's resolution (720p for clips made before the setting).
@@ -432,8 +437,34 @@ function editClipFromParent(
   });
 }
 
+/** Translates any Hebrew text inside the ad's advanced video settings into English once before rendering. */
+async function englishVideoSettingsForModel(
+  settings: AdStudioVideoSettings | null | undefined,
+  ctx: BriefContext & { llm?: AdStudioLlm | null; now?: Date },
+): Promise<AdStudioVideoSettings | null> {
+  const normalized = normalizeVideoSettings(settings);
+  if (isDefaultVideoSettings(normalized)) return null;
+  const [instructions, avoid, musicDescription] = await Promise.all([
+    normalized.instructions ? englishForModel(normalized.instructions, ctx) : Promise.resolve(undefined),
+    normalized.avoid ? englishForModel(normalized.avoid, ctx) : Promise.resolve(undefined),
+    normalized.music === 'custom' && normalized.musicDescription
+      ? englishForModel(normalized.musicDescription, ctx)
+      : Promise.resolve(normalized.musicDescription),
+  ]);
+  return {
+    ...normalized,
+    ...(instructions ? { instructions } : {}),
+    ...(avoid ? { avoid } : {}),
+    ...(musicDescription ? { musicDescription } : {}),
+  };
+}
+
 /** Renders one scene from its current script (units = the scene's seconds, kind `video_scene`). */
-export async function startSceneRender(ctx: BriefContext & { sceneId: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel> {
+export async function startSceneRender(
+  ctx: BriefContext & { sceneId: string },
+  deps: AdStudioVideoDeps,
+  pretranslatedSettings?: AdStudioVideoSettings | null,
+): Promise<AdStudioClipModel> {
   await ensureOrm();
   let brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   if (!brief.scenes.some((candidate) => candidate.id === ctx.sceneId)) throw new AdStudioVideoRequestError('scene_not_found');
@@ -446,9 +477,15 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
   const context = videoContext(brief);
   // The scene's reference images (app screens, illustrations) go to the model with the prompt (KAN-243).
   const references = await loadSceneReferences(ctx, scene, deps.storage);
-  // A shot described in Hebrew reaches the video model in English; the fingerprint keeps the words as written.
-  const visualPrompt = await englishForModel(scene.visualPrompt, { ...ctx, llm: deps.llm, now: deps.now?.() });
-  const prompt = buildScenePrompt({ ...scene, visualPrompt }, context, references.map((reference) => reference.prompt));
+  // A shot or video setting described in Hebrew reaches the video model in English; the fingerprint keeps the words as written.
+  const translateCtx = { ...ctx, llm: deps.llm, now: deps.now?.() };
+  const [visualPrompt, promptSettings] = await Promise.all([
+    englishForModel(scene.visualPrompt, translateCtx),
+    pretranslatedSettings !== undefined
+      ? Promise.resolve(pretranslatedSettings)
+      : englishVideoSettingsForModel(brief.video_settings, translateCtx),
+  ]);
+  const prompt = buildScenePrompt({ ...scene, visualPrompt }, { ...context, settings: promptSettings }, references.map((reference) => reference.prompt));
   const images = references.map((reference) => reference.image);
   const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
   const { resolution } = normalizeVideoSettings(brief.video_settings);
@@ -483,9 +520,14 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
   if (generatingFor(clips, ctx.sceneId)) throw new AdStudioVideoRequestError('already_generating');
   const parent = editableParentClip(clips, ctx.sceneId);
   if (!parent?.interaction_id) throw new AdStudioVideoRequestError('clip_not_editable');
-  // The person's words are kept on the clip; the video model gets them in English.
-  const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
-  return editClipFromParent({ ...ctx, instruction, modelInstruction }, brief, parent, clipEditNarration(parent), deps);
+  // The person's words are kept on the clip; the video model gets them (and any general instructions) in English.
+  const translateCtx = { ...ctx, llm: deps.llm, now: deps.now?.() };
+  const rawGeneral = brief.video_settings?.instructions?.trim();
+  const [modelInstruction, generalInstructions] = await Promise.all([
+    englishForModel(instruction, translateCtx),
+    rawGeneral ? englishForModel(rawGeneral, translateCtx) : Promise.resolve(undefined),
+  ]);
+  return editClipFromParent({ ...ctx, instruction, modelInstruction, generalInstructions }, brief, parent, clipEditNarration(parent), deps);
 }
 
 /**
@@ -517,12 +559,17 @@ export async function startEditAll(ctx: BriefContext & { instruction: string }, 
   const narrated = targets.filter((entry) => entry.narration !== null).length;
   if (narrated > 0) await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'narration_tts', units: narrated, now });
   // One translation call for the whole batch instead of one per scene.
-  const modelInstruction = await englishForModel(instruction, { ...ctx, llm: deps.llm, now: deps.now?.() });
+  const translateCtx = { ...ctx, llm: deps.llm, now: deps.now?.() };
+  const rawGeneral = brief.video_settings?.instructions?.trim();
+  const [modelInstruction, generalInstructions] = await Promise.all([
+    englishForModel(instruction, translateCtx),
+    rawGeneral ? englishForModel(rawGeneral, translateCtx) : Promise.resolve(undefined),
+  ]);
   const started: AdStudioClipModel[] = [];
   for (const target of targets) {
     started.push(
       await editClipFromParent(
-        { ...ctx, sceneId: target.sceneId, instruction, modelInstruction },
+        { ...ctx, sceneId: target.sceneId, instruction, modelInstruction, generalInstructions },
         brief,
         target.parent,
         target.narration,
@@ -549,10 +596,11 @@ export async function startRenderAll(ctx: BriefContext, deps: AdStudioVideoDeps)
   // Every voice-over scene also needs one narrator call once its clip is made.
   const narrated = brief.scenes.filter((scene) => cost.sceneIds.includes(scene.id) && narrationIsSeparate(scene)).length;
   if (narrated) await assertAdStudioQuota({ organizationId: ctx.organizationId, projectId: ctx.projectId, kind: 'narration_tts', units: narrated, now: clock(deps) });
-  // One vocalizing call for every scene about to render, instead of one per scene.
+  // One vocalizing call and one video-settings translation for every scene about to render, instead of one per scene.
   await vocalizeBeforeRender(brief, new Set(cost.sceneIds), ctx, deps);
+  const promptSettings = await englishVideoSettingsForModel(brief.video_settings, { ...ctx, llm: deps.llm, now: deps.now?.() });
   const started: AdStudioClipModel[] = [];
-  for (const sceneId of cost.sceneIds) started.push(await startSceneRender({ ...ctx, sceneId }, deps));
+  for (const sceneId of cost.sceneIds) started.push(await startSceneRender({ ...ctx, sceneId }, deps, promptSettings));
   return started;
 }
 

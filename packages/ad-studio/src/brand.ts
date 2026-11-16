@@ -21,7 +21,12 @@ import type { AdBrandMark } from './ad-typography';
 export async function briefPromptInput(brief: AdStudioBriefModel): Promise<AdStudioBriefInput> {
   const kit = await getAdStudioBrandKit(brief.organization_id, brief.project_id);
   const brand = { brandName: kit.brandName, slogan: kit.slogan, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors };
-  return { ...adStudioBriefInput(brief), brand: isAdStudioBrandKitEmpty(brand) ? null : brand };
+  const videoInstructions = brief.video_settings?.instructions?.trim();
+  return {
+    ...adStudioBriefInput(brief),
+    brand: isAdStudioBrandKitEmpty(brand) ? null : brand,
+    ...(videoInstructions ? { videoInstructions } : {}),
+  };
 }
 
 /** A stored logo is at most AD_STUDIO_MAX_LOGO_BYTES; reading one is capped a little above that. */

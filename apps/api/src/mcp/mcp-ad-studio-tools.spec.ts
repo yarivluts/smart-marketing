@@ -305,12 +305,14 @@ describe('Ad Studio MCP tools', () => {
     expect(await json('set_ad_voice', { brief_id: ad.id, preset: 'none' })).toEqual({ narrator_voice: null });
 
     // The advanced video settings: defaults first, then field by field.
-    const defaults = { resolution: '720p', style: 'commercial', music: 'auto', music_description: null, avoid: null };
+    const defaults = { resolution: '720p', style: 'commercial', music: 'auto', music_description: null, instructions: null, avoid: null };
     expect((await json<{ video: { settings: unknown } }>('get_ad_brief', { brief_id: ad.id })).video.settings).toEqual(defaults);
     expect(await json('set_ad_video_settings', { brief_id: ad.id, resolution: '1080p', music: 'custom', music_description: 'upbeat guitar' })).toEqual({
       settings: { ...defaults, resolution: '1080p', music: 'custom', music_description: 'upbeat guitar' },
     });
-    expect(await json('set_ad_video_settings', { brief_id: ad.id, avoid: 'cars' })).toEqual({ settings: { ...defaults, resolution: '1080p', music: 'custom', music_description: 'upbeat guitar', avoid: 'cars' } });
+    expect(await json('set_ad_video_settings', { brief_id: ad.id, instructions: 'Israeli characters', avoid: 'cars' })).toEqual({
+      settings: { ...defaults, resolution: '1080p', music: 'custom', music_description: 'upbeat guitar', instructions: 'Israeli characters', avoid: 'cars' },
+    });
     const badSettings = await call('set_ad_video_settings', { brief_id: ad.id, style: 'noir' });
     expect((badSettings.content[0] as { text: string }).text).toBe('Invalid video settings: unknown_style.');
   });

@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   Clapperboard,
   Film,
@@ -12,19 +13,23 @@ import {
   Mic,
   Play,
   RefreshCw,
+  Save,
   Wand2,
 } from 'lucide-react';
 import {
   AD_STUDIO_CLIP_TIMEOUT_MS,
   AD_STUDIO_MAX_TOTAL_SECONDS,
+  AD_STUDIO_VIDEO_INSTRUCTIONS_MAX,
   assemblyPlan,
-  editAllCost,
   isClipSlow,
+  isDefaultVideoSettings,
   narrationPresenter,
+  normalizeVideoSettings,
   renderAllCost,
   sceneFingerprint,
   sceneVideoStates,
   summarizeVideoProgress,
+  videoSettingsIssue,
   voiceDescription,
   type AdStudioAdCopy,
   type AdStudioNarrationMode,
@@ -60,6 +65,7 @@ import { useLocalDateTime } from './use-local-date-time';
 const MEDIUM = { dateStyle: 'medium', timeStyle: 'short' } as const;
 import { withFirstFrame } from './media-src';
 import { startStatusPolling } from './status-polling';
+import { useUnsavedChangesGuard } from './use-editor-draft';
 
 export interface VideoStudioProps {
   orgId: string;
@@ -155,8 +161,6 @@ export function VideoStudio({
   const [pending, setPending] = React.useState<string | null>(null);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [instructions, setInstructions] = React.useState<Record<string, string>>({});
-  const [editAllInstruction, setEditAllInstruction] = React.useState('');
-  const editAllInputId = React.useId();
   const [shown, setShown] = React.useState<Record<string, string>>({});
   // The clock starts in the browser: an elapsed time rendered on the server never matches the one the
   // browser renders a second later, and React rejects the page (hydration error #418).
@@ -171,12 +175,39 @@ export function VideoStudio({
   React.useEffect(() => setVoiceChoice(voice), [voice]);
   const [settingsChoice, setSettingsChoice] = React.useState(videoSettings);
   React.useEffect(() => setSettingsChoice(videoSettings), [videoSettings]);
+  const savedInstructions = normalizeVideoSettings(settingsChoice).instructions ?? '';
+  const [draftInstructions, setDraftInstructions] = React.useState(savedInstructions);
+  const lastSavedInstructions = React.useRef(savedInstructions);
+  React.useEffect(() => {
+    if (savedInstructions !== lastSavedInstructions.current) {
+      if (draftInstructions.replace(/\s+/g, ' ').trim() === lastSavedInstructions.current) {
+        setDraftInstructions(savedInstructions);
+      }
+      lastSavedInstructions.current = savedInstructions;
+    }
+  }, [savedInstructions, draftInstructions]);
+  const instructionsInputId = React.useId();
+  const normalizedDraft = draftInstructions.replace(/\s+/g, ' ').trim();
+  const instructionsDirty = normalizedDraft !== savedInstructions;
+  const instructionsTooLong = videoSettingsIssue({ instructions: draftInstructions }) !== null;
+  useUnsavedChangesGuard(instructionsDirty, t('editing.leaveUnsaved'));
+
   const context = { format, language, voice: voiceDescription(voiceChoice), settings: settingsChoice };
   const states = sceneVideoStates(scenes, clips, context);
   const progress = summarizeVideoProgress(states, scenes);
   const cost = renderAllCost(states, scenes);
-  const editCost = editAllCost(scenes, clips);
-  const readySceneCount = scenes.filter((scene) => clips.some((clip) => clip.sceneId === scene.id && clip.status === 'ready')).length;
+  const prospectiveSettings = normalizeVideoSettings({
+    ...normalizeVideoSettings(settingsChoice),
+    instructions: normalizedDraft,
+  });
+  const prospectiveContext = {
+    format,
+    language,
+    voice: voiceDescription(voiceChoice),
+    settings: isDefaultVideoSettings(prospectiveSettings) ? null : prospectiveSettings,
+  };
+  const prospectiveStates = sceneVideoStates(scenes, clips, prospectiveContext);
+  const prospectiveCost = renderAllCost(prospectiveStates, scenes);
   const plan = assemblyPlan(scenes, clips, context);
   const { latest: finalVideo, current: finalCurrent } = currentAssembledVideo(
     videos,
@@ -265,6 +296,93 @@ export function VideoStudio({
     }
   }
 
+  async function persistInstructions(): Promise<boolean> {
+    const response = await fetch(`${base}/video-settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: { instructions: draftInstructions } }),
+    });
+    const result = (await response.json().catch(() => ({}))) as AdStudioApiError & {
+      brief?: { videoSettings?: AdStudioVideoSettings | null };
+    };
+    if (!response.ok) {
+      setMessage({ tone: 'error', text: errorMessage(result) });
+      return false;
+    }
+    const savedSettings = result.brief?.videoSettings ?? null;
+    const nextSaved = normalizeVideoSettings(savedSettings).instructions ?? '';
+    lastSavedInstructions.current = nextSaved;
+    setSettingsChoice(savedSettings);
+    setDraftInstructions(nextSaved);
+    return true;
+  }
+
+  async function handleInstructionsSaveOnly(): Promise<void> {
+    setPending('instructions-save');
+    setMessage(null);
+    try {
+      if (await persistInstructions()) {
+        setMessage({ tone: 'ok', text: t('video.instructionsSaved') });
+        setNow(new Date());
+        router.refresh();
+      }
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function handleRenderAll(source: 'all' | 'instructions-run'): Promise<void> {
+    const willSave = instructionsDirty;
+    const runSeconds = willSave ? prospectiveCost.seconds : cost.seconds;
+    setPending(source);
+    setMessage(null);
+    try {
+      if (willSave) {
+        const savedOk = await persistInstructions();
+        if (!savedOk) return;
+      }
+      if (runSeconds === 0) {
+        setMessage({ tone: 'ok', text: t('video.instructionsSaved') });
+        setNow(new Date());
+        router.refresh();
+        return;
+      }
+      const response = await fetch(`${base}/render-all`, { method: 'POST' });
+      const result = (await response.json().catch(() => ({}))) as AdStudioApiError & Listing;
+      apply(result);
+      if (!response.ok) {
+        setMessage({ tone: 'error', text: errorMessage(result) });
+        await refreshStatus();
+      } else {
+        setMessage({ tone: 'ok', text: t('video.started') });
+      }
+      setNow(new Date());
+      router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function handleSceneRender(sceneId: string): Promise<void> {
+    if (instructionsDirty) {
+      setPending(`render:${sceneId}`);
+      setMessage(null);
+      try {
+        if (!(await persistInstructions())) return;
+      } catch {
+        setMessage({ tone: 'error', text: t('errorGeneric') });
+        return;
+      } finally {
+        setPending(null);
+      }
+    }
+    await act(`render:${sceneId}`, `/scenes/${sceneId}/render`, undefined, t('video.started'));
+  }
+
   if (scenes.length === 0) {
     return (
       <section
@@ -283,14 +401,20 @@ export function VideoStudio({
   }
 
   const segments = buildSceneTimeline(scenes);
-  const overLimit = cost.seconds > videoSecondsLeft;
-  const editAllOverLimit = editCost.seconds > videoSecondsLeft;
-  const canEditAll =
-    videoAvailable &&
+  const effectiveCost = prospectiveCost;
+  const overLimit = effectiveCost.seconds > videoSecondsLeft;
+  const prospectiveOverLimit = prospectiveCost.seconds > videoSecondsLeft;
+  const canConfirmInstructions =
     pending === null &&
-    editCost.sceneIds.length > 0 &&
-    !editAllOverLimit &&
-    editAllInstruction.trim().length > 0;
+    !instructionsTooLong &&
+    ((instructionsDirty && prospectiveCost.seconds === 0) ||
+      (prospectiveCost.seconds > 0 &&
+        (instructionsDirty || savedInstructions.length > 0) &&
+        videoAvailable &&
+        !generating &&
+        !prospectiveOverLimit));
+  const canSaveInstructionsOnly =
+    pending === null && !instructionsTooLong && instructionsDirty && prospectiveCost.seconds > 0;
   const frameClass =
     format === 'vertical' ? 'aspect-[9/16] w-44' : 'aspect-video w-full max-w-sm md:w-80';
   const clipUrl = (clipId: string) => `${base}/clips/${clipId}/media`;
@@ -326,8 +450,8 @@ export function VideoStudio({
             />
             <button
               type="button"
-              onClick={() => act('all', '/render-all', undefined, t('video.started'))}
-              disabled={!videoAvailable || pending !== null || cost.seconds === 0 || overLimit}
+              onClick={() => void handleRenderAll('all')}
+              disabled={!videoAvailable || pending !== null || effectiveCost.seconds === 0 || overLimit || instructionsTooLong}
               className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               {pending === 'all' ? (
@@ -335,8 +459,8 @@ export function VideoStudio({
               ) : (
                 <Clapperboard className="h-4 w-4" aria-hidden="true" />
               )}
-              {cost.seconds > 0
-                ? t('video.renderAll', { seconds: cost.seconds })
+              {effectiveCost.seconds > 0
+                ? t('video.renderAll', { seconds: effectiveCost.seconds })
                 : t('video.renderAllIdle')}
             </button>
           </div>
@@ -344,11 +468,11 @@ export function VideoStudio({
             className={cn('text-xs', overLimit ? 'text-destructive' : 'text-muted-foreground')}
             data-testid="ad-studio-render-all-cost"
           >
-            {cost.seconds === 0
+            {effectiveCost.seconds === 0
               ? t('video.renderAllNothing')
               : overLimit
-                ? t('video.renderAllOverLimit', { seconds: cost.seconds, left: videoSecondsLeft })
-                : t('video.renderAllCost', { seconds: cost.seconds, left: videoSecondsLeft })}
+                ? t('video.renderAllOverLimit', { seconds: effectiveCost.seconds, left: videoSecondsLeft })
+                : t('video.renderAllCost', { seconds: effectiveCost.seconds, left: videoSecondsLeft })}
           </span>
         </div>
       </div>
@@ -463,84 +587,122 @@ export function VideoStudio({
             </div>
           </div>
 
-          {readySceneCount > 0 ? (
-            <form
-              onSubmit={async (event) => {
-                event.preventDefault();
-                if (!canEditAll) return;
-                const ok = await act(
-                  'edit-all',
-                  '/edit-all',
-                  { instruction: editAllInstruction },
-                  t('video.started'),
-                );
-                // Keep the instruction when the batch edit fails, so it can be retried without retyping.
-                if (ok) setEditAllInstruction('');
-              }}
-              className="flex flex-col gap-2.5 rounded-3xl border border-pp-primary/30 bg-pp-primary-fixed/25 p-4 shadow-pp-candy sm:p-5"
-              data-testid="ad-studio-edit-all"
-            >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!canConfirmInstructions) return;
+              void handleRenderAll('instructions-run');
+            }}
+            className="flex flex-col gap-2.5 rounded-3xl border border-pp-primary/30 bg-pp-primary-fixed/25 p-4 shadow-pp-candy sm:p-5"
+            data-testid="ad-studio-video-instructions"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <label
-                htmlFor={editAllInputId}
+                htmlFor={instructionsInputId}
                 className="inline-flex items-center gap-2 font-pp-display text-sm font-bold text-foreground"
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                   <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
-                {t('video.editAllLabel')}
+                {t('video.instructionsLabel')}
               </label>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  id={editAllInputId}
-                  value={editAllInstruction}
-                  onChange={(event) => setEditAllInstruction(event.target.value)}
-                  placeholder={t('video.editPlaceholder')}
-                  maxLength={500}
-                  dir="auto"
-                  data-testid="ad-studio-edit-all-input"
-                  className="h-10 min-w-0 flex-1 rounded-2xl border border-pp-outline-variant/60 bg-card px-3.5 text-sm text-foreground"
-                />
+              {instructionsDirty ? (
+                <span
+                  className="rounded-full bg-warning/15 px-2.5 py-0.5 text-[11px] font-medium text-warning"
+                  data-testid="ad-studio-video-instructions-status"
+                >
+                  {t('video.instructionsUnsavedBadge')}
+                </span>
+              ) : savedInstructions ? (
+                <span
+                  className="rounded-full bg-success/10 px-2.5 py-0.5 text-[11px] font-medium text-success"
+                  data-testid="ad-studio-video-instructions-status"
+                >
+                  {t('video.instructionsSavedBadge')}
+                </span>
+              ) : null}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <textarea
+                id={instructionsInputId}
+                value={draftInstructions}
+                onChange={(event) => setDraftInstructions(event.target.value)}
+                placeholder={t('video.instructionsPlaceholder')}
+                maxLength={AD_STUDIO_VIDEO_INSTRUCTIONS_MAX}
+                rows={2}
+                dir="auto"
+                data-testid="ad-studio-video-instructions-input"
+                className="min-h-[3.5rem] min-w-0 flex-1 rounded-2xl border border-pp-outline-variant/60 bg-card px-3.5 py-2 text-sm text-foreground"
+              />
+              <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
+                {instructionsDirty && prospectiveCost.seconds > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleInstructionsSaveOnly()}
+                    disabled={!canSaveInstructionsOnly}
+                    data-testid="ad-studio-video-instructions-save"
+                    className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-pp-outline-variant/60 bg-card px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted disabled:opacity-50"
+                  >
+                    {pending === 'instructions-save' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Save className="h-4 w-4" aria-hidden="true" />
+                    )}
+                    {pending === 'instructions-save'
+                      ? t('video.instructionsSaving')
+                      : t('video.instructionsSaveOnly')}
+                  </button>
+                ) : null}
                 <button
                   type="submit"
-                  disabled={!canEditAll}
-                  data-testid="ad-studio-edit-all-submit"
-                  className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+                  disabled={!canConfirmInstructions}
+                  data-testid="ad-studio-video-instructions-run"
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
                 >
-                  {pending === 'edit-all' ? (
+                  {pending === 'instructions-run' ? (
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                   ) : (
-                    <Wand2 className="h-4 w-4" aria-hidden="true" />
+                    <Check className="h-4 w-4" aria-hidden="true" />
                   )}
-                  {pending === 'edit-all'
-                    ? t('video.editAllEditing')
-                    : t('video.editAllRun', { count: editCost.sceneIds.length || readySceneCount })}
+                  {pending === 'instructions-run'
+                    ? t('video.instructionsSaving')
+                    : prospectiveCost.seconds > 0
+                      ? t('video.instructionsConfirmRun', { seconds: prospectiveCost.seconds })
+                      : t('video.instructionsConfirmSave')}
                 </button>
               </div>
-              <p
-                className={cn(
-                  'text-xs',
-                  editCost.sceneIds.length > 0 && editAllOverLimit
-                    ? 'text-destructive'
-                    : 'text-muted-foreground',
-                )}
-                data-testid="ad-studio-edit-all-cost"
-              >
-                {editCost.sceneIds.length === 0
-                  ? t('video.editAllBusy')
-                  : editAllOverLimit
-                    ? t('video.editAllOverLimit', {
-                        seconds: editCost.seconds,
-                        count: editCost.sceneIds.length,
-                        left: videoSecondsLeft,
-                      })
-                    : t('video.editAllHint', {
-                        count: editCost.sceneIds.length,
-                        seconds: editCost.seconds,
-                        left: videoSecondsLeft,
-                      })}
-              </p>
-            </form>
-          ) : null}
+            </div>
+            <p
+              className={cn(
+                'text-xs',
+                prospectiveCost.seconds > 0 &&
+                  (instructionsDirty || savedInstructions.length > 0) &&
+                  !generating &&
+                  prospectiveOverLimit
+                  ? 'text-destructive'
+                  : 'text-muted-foreground',
+              )}
+              data-testid="ad-studio-video-instructions-hint"
+            >
+              {generating
+                ? t('video.instructionsHintBusy')
+                : prospectiveCost.seconds === 0
+                  ? t('video.instructionsHintUpToDate')
+                  : !instructionsDirty && savedInstructions.length === 0
+                    ? t('video.instructionsHintIdle')
+                    : prospectiveOverLimit
+                      ? t('video.instructionsHintOverLimit', {
+                          seconds: prospectiveCost.seconds,
+                          count: prospectiveCost.sceneIds.length,
+                          left: videoSecondsLeft,
+                        })
+                      : t('video.instructionsHintCost', {
+                          count: prospectiveCost.sceneIds.length,
+                          seconds: prospectiveCost.seconds,
+                          left: videoSecondsLeft,
+                        })}
+            </p>
+          </form>
 
       <ol className="flex flex-col gap-3">
         {scenes.map((scene, index) => {
@@ -562,6 +724,7 @@ export function VideoStudio({
             videoAvailable &&
             pending === null &&
             !inFlight &&
+            !instructionsTooLong &&
             scene.durationSeconds <= videoSecondsLeft;
           const lastFailed = history[0]?.status === 'failed' ? history[0] : null;
           return (
@@ -663,7 +826,7 @@ export function VideoStudio({
                     </p>
                     <button
                       type="button"
-                      onClick={() => act(`render:${scene.id}`, `/scenes/${scene.id}/render`, undefined, t('video.started'))}
+                      onClick={() => void handleSceneRender(scene.id)}
                       disabled={!canRender}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-2.5 py-1 text-xs font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
                       data-testid="ad-studio-clip-retry"
@@ -687,14 +850,7 @@ export function VideoStudio({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      act(
-                        `render:${scene.id}`,
-                        `/scenes/${scene.id}/render`,
-                        undefined,
-                        t('video.started'),
-                      )
-                    }
+                    onClick={() => void handleSceneRender(scene.id)}
                     disabled={!canRender}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
                   >

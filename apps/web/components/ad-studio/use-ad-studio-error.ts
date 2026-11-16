@@ -19,7 +19,7 @@ const VIDEO_REQUEST_CODES = new Set(['scene_not_found', 'already_generating', 'c
 const ASSEMBLY_CODES = new Set(['ffmpeg_unavailable', 'ffmpeg_failed', 'storage_error']);
 const IMAGE_REQUEST_CODES = new Set(['concept_not_found', 'format_not_in_concept', 'image_not_editable', 'invalid_instruction', 'image_not_ready']);
 const VOICE_CODES = new Set(['unknown_voice', 'voice_description_required', 'voice_description_too_long']);
-const VIDEO_SETTINGS_CODES = new Set(['unknown_resolution', 'unknown_style', 'unknown_music', 'music_description_required', 'music_description_too_long', 'avoid_too_long']);
+const VIDEO_SETTINGS_CODES = new Set(['unknown_resolution', 'unknown_style', 'unknown_music', 'music_description_required', 'music_description_too_long', 'instructions_too_long', 'avoid_too_long']);
 const TARGETING_CODES = new Set(['no_countries', 'too_many_countries', 'invalid_country', 'invalid_age', 'invalid_gender', 'too_many_audiences', 'too_many_interests', 'invalid_audience']);
 const SEARCH_CODES = new Set([
   'invalid_targeting',

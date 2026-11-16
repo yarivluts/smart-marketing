@@ -11,7 +11,7 @@ interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; briefId: string }>;
 }
 
-const FIELDS = ['resolution', 'style', 'music', 'musicDescription', 'avoid'] as const;
+const FIELDS = ['resolution', 'style', 'music', 'musicDescription', 'instructions', 'avoid'] as const;
 
 /** The string fields of a settings object from a request body; undefined when it is not an object. */
 function parseSettings(value: unknown): Partial<AdStudioVideoSettings> | undefined {

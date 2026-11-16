@@ -11,7 +11,7 @@ const orm = vi.hoisted(() => ({
 vi.mock('@growthos/firebase-orm-models', async (importOriginal) => ({ ...(await importOriginal<object>()), ...orm }));
 vi.mock('./runtime', () => ({ ensureOrm: vi.fn(async () => undefined) }));
 
-import { fillAdStudioBrandFromSite, resolveAdBrandMark } from './brand';
+import { briefPromptInput, fillAdStudioBrandFromSite, resolveAdBrandMark } from './brand';
 import type { AdStudioMediaStorage } from './media-storage';
 
 const EMPTY = { brandName: '', slogan: '', toneOfVoice: '', avoidWords: [], colors: [], lastChangedOn: null, logo: null };
@@ -73,5 +73,30 @@ describe('resolveAdBrandMark', () => {
     const brief = { organization_id: 'o', project_id: 'p', language: 'he' };
     expect(await resolveAdBrandMark(brief, storage({ 'logo.png': logo }))).toEqual({ name: 'EasySign Project', slogan: 'Sign anywhere', logo, colors: ['#1e3a8a'], language: 'he' });
     expect((await resolveAdBrandMark(brief, storage())).logo).toBeNull();
+  });
+});
+
+describe('briefPromptInput', () => {
+  it('includes trimmed video_settings.instructions as videoInstructions when set, and omits when empty', async () => {
+    orm.getAdStudioBrandKit.mockResolvedValue(EMPTY);
+    const baseBrief = {
+      organization_id: 'o',
+      project_id: 'p',
+      name: 'Launch',
+      objective: 'Signups',
+      product_description: 'E-sign',
+      landing_page_url: null,
+      video_format: 'vertical' as const,
+      language: 'he',
+      target_seconds: 15,
+      narration_mode: null,
+    };
+    const withInstructions = await briefPromptInput({
+      ...baseBrief,
+      video_settings: { resolution: '720p', style: 'commercial', music: 'auto', instructions: '  Israeli actors  ' },
+    } as never);
+    expect(withInstructions.videoInstructions).toBe('Israeli actors');
+    const withoutInstructions = await briefPromptInput({ ...baseBrief, video_settings: null } as never);
+    expect(withoutInstructions.videoInstructions).toBeUndefined();
   });
 });

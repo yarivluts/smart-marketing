@@ -413,7 +413,7 @@ async function describeBrief(auth: McpAuthContext, briefId: string) {
 /** The ad's advanced video settings in snake case, every field filled. */
 function settingsOutput(settings: AdStudioVideoSettings | null | undefined) {
   const full = normalizeVideoSettings(settings);
-  return { resolution: full.resolution, style: full.style, music: full.music, music_description: full.musicDescription ?? null, avoid: full.avoid ?? null };
+  return { resolution: full.resolution, style: full.style, music: full.music, music_description: full.musicDescription ?? null, instructions: full.instructions ?? null, avoid: full.avoid ?? null };
 }
 
 /** The search ad's keywords and responsive search ad in snake case. */
@@ -777,23 +777,25 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     {
       title: 'Set the advanced video settings',
       description:
-        'Changes the advanced video settings of the ad; fields left out keep their value. resolution: 360p, 720p (default) or 1080p - the assembled video follows (1080p, else 720p). style: commercial (default), cinematic, ugc_phone, studio_product, documentary, animation_3d or illustration_2d. music: auto (default), none, or custom with music_description. avoid: what must never appear, in words ("" clears it). Every clip made with the old settings becomes out of date. Requires "ai.use".',
+        'Changes the advanced video settings of the ad; fields left out keep their value. resolution: 360p, 720p (default) or 1080p - the assembled video follows (1080p, else 720p). style: commercial (default), cinematic, ugc_phone, studio_product, documentary, animation_3d or illustration_2d. music: auto (default), none, or custom with music_description. instructions: general direction applied to every scene ("" clears it). avoid: what must never appear, in words ("" clears it). Every clip made with the old settings becomes out of date. Requires "ai.use".',
       inputSchema: toolInputSchema({
         brief_id: briefId,
         resolution: z.string().optional().describe('360p, 720p or 1080p.'),
         style: z.string().optional().describe('commercial, cinematic, ugc_phone, studio_product, documentary, animation_3d or illustration_2d.'),
         music: z.string().optional().describe('auto, none or custom.'),
         music_description: z.string().optional().describe('For custom music, in English: e.g. "upbeat acoustic guitar".'),
+        instructions: z.string().optional().describe('General instructions applied to every scene of the video, e.g. "Israeli characters in a warm home setting". "" clears it.'),
         avoid: z.string().optional().describe('What must never appear in the video, e.g. "animals, cars". "" clears it.'),
       }),
     },
     auditedToolHandler(auth, 'set_ad_video_settings', async (args: any) =>
-      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; resolution?: string; style?: string; music?: string; music_description?: string; avoid?: string }) => {
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; resolution?: string; style?: string; music?: string; music_description?: string; instructions?: string; avoid?: string }) => {
         const settings = {
           ...(a.resolution !== undefined ? { resolution: a.resolution } : {}),
           ...(a.style !== undefined ? { style: a.style } : {}),
           ...(a.music !== undefined ? { music: a.music } : {}),
           ...(a.music_description !== undefined ? { musicDescription: a.music_description } : {}),
+          ...(a.instructions !== undefined ? { instructions: a.instructions } : {}),
           ...(a.avoid !== undefined ? { avoid: a.avoid } : {}),
         } as Partial<AdStudioVideoSettings>;
         const brief = await saveAdStudioVideoSettings({ ...ctx(a.brief_id), settings });

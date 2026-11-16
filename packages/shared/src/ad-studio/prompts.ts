@@ -32,6 +32,8 @@ export interface AdStudioBriefInput {
    * (the script writer reads it from the brief). Absent on input means "keep what the ad has".
    */
   narrationMode?: AdStudioNarrationMode | null;
+  /** General video instructions applied across every scene (from video settings), or null when none. */
+  videoInstructions?: string | null;
 }
 
 /** Findings from the planning stage that the script should build on (KAN-230); absent before planning runs. */
@@ -70,6 +72,7 @@ function voiceoverBudgetRule(language: string): string {
 
 /** The instructions for writing a full script from a brief. */
 export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioScriptContext = {}): AdStudioPrompt {
+  const videoInstructions = brief.videoInstructions?.trim();
   const contextLines = [
     context.landingPageSummary ? `Landing page summary: ${context.landingPageSummary}` : null,
     context.audience ? `Audience: ${context.audience}` : null,
@@ -85,6 +88,9 @@ export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioSc
       `- ${voiceoverBudgetRule(brief.language)}`,
       ...narrationModeRules(brief.narrationMode ?? null).map((rule) => `- ${rule}`),
       ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
+      ...(videoInstructions
+        ? ["- Follow the general video instructions in <editor_request> across every scene's visualPrompt, overriding any default appearance or setting."]
+        : []),
       `- ${UNTRUSTED_INPUT_RULE}`,
       // Read at call time, not at module load: copy.ts imports this module (KAN-278).
       '- copy is the ad text that runs next to the finished video in the feed.',
@@ -99,6 +105,7 @@ export function buildScriptPrompt(brief: AdStudioBriefInput, context: AdStudioSc
       `Ad language: ${languageName(brief.language)}`,
       `Requested length: ${Math.min(brief.targetSeconds, AD_STUDIO_MAX_TOTAL_SECONDS)} seconds`,
       ...(contextLines.length ? ['', 'Context from the planning stage:', ...contextLines] : []),
+      ...(videoInstructions ? ['', 'General video instructions (apply to every scene):', wrapUntrusted('editor_request', videoInstructions)] : []),
       '',
       'Write the script.',
     ]
@@ -115,6 +122,7 @@ export function buildSceneRewritePrompt(
   instruction: string,
   context: AdStudioScriptContext = {},
 ): AdStudioPrompt {
+  const videoInstructions = brief.videoInstructions?.trim();
   // The plan's audience and angles, so a rewrite stays on the strategy the full script was written for.
   const contextLines = [
     context.audience ? `Audience: ${context.audience}` : null,
@@ -137,6 +145,9 @@ export function buildSceneRewritePrompt(
       // The ad's mode is settled by the time a scene is rewritten; the writer follows it.
       ...narrationModeRules(brief.narrationMode ?? 'voiceover').map((rule) => `- ${rule}`),
       ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
+      ...(videoInstructions
+        ? ["- Follow the general video instructions in <editor_request> across every scene's visualPrompt, overriding any default appearance or setting."]
+        : []),
       `- ${UNTRUSTED_INPUT_RULE}`,
       `- Keep the scene at ${target.durationSeconds} seconds unless the instruction asks otherwise.`,
     ].join('\n'),
@@ -145,6 +156,7 @@ export function buildSceneRewritePrompt(
       `Product: ${brief.productDescription}`,
       `Ad language: ${languageName(brief.language)}`,
       ...(contextLines.length ? ['', 'Context from the planning stage:', ...contextLines] : []),
+      ...(videoInstructions ? ['', 'General video instructions (apply to every scene):', wrapUntrusted('editor_request', videoInstructions)] : []),
       '',
       'Current script:',
       outline,

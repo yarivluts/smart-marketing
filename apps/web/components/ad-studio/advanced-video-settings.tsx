@@ -7,6 +7,7 @@ import {
   AD_STUDIO_AVOID_MAX,
   AD_STUDIO_MUSIC_DESCRIPTION_MAX,
   AD_STUDIO_MUSIC_MODES,
+  AD_STUDIO_VIDEO_INSTRUCTIONS_MAX,
   AD_STUDIO_VIDEO_RESOLUTIONS,
   AD_STUDIO_VISUAL_STYLES,
   isDefaultVideoSettings,
@@ -118,6 +119,7 @@ export function AdvancedVideoSettings({
           settings: {
             ...draft,
             musicDescription: draft.musicDescription ?? '',
+            instructions: draft.instructions ?? '',
             avoid: draft.avoid ?? '',
           },
         }),
@@ -203,6 +205,20 @@ export function AdvancedVideoSettings({
         ) : null}
 
         <label className="flex flex-col gap-1 text-sm font-medium">
+          {t('instructionsLabel')}
+          <textarea
+            value={draft.instructions ?? ''}
+            maxLength={AD_STUDIO_VIDEO_INSTRUCTIONS_MAX}
+            rows={2}
+            onChange={(event) => patch({ instructions: event.target.value })}
+            placeholder={t('instructionsPlaceholder')}
+            dir="auto"
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal text-foreground"
+          />
+          <span className="text-xs font-normal text-muted-foreground">{t('instructionsHint')}</span>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
           {t('avoidLabel')}
           <textarea
             value={draft.avoid ?? ''}
@@ -229,6 +245,7 @@ export function AdvancedVideoSettings({
               patch({
                 ...normalizeVideoSettings(null),
                 musicDescription: undefined,
+                instructions: undefined,
                 avoid: undefined,
               })
             }
