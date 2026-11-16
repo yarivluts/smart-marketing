@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AdStudioScene } from './scenes';
 import { buildScenePrompt, sceneFingerprint, VOICE_OVER_AUDIO_LINE } from './video';
-import { DEFAULT_AD_STUDIO_VIDEO_SETTINGS, isDefaultVideoSettings, normalizeVideoSettings, videoSettingsIssue } from './video-settings';
+import { AD_STUDIO_VIDEO_INSTRUCTIONS_MAX, DEFAULT_AD_STUDIO_VIDEO_SETTINGS, isDefaultVideoSettings, normalizeVideoSettings, videoSettingsIssue } from './video-settings';
 
 const CONTEXT = { format: 'vertical' as const, language: 'en', productDescription: 'E-signatures for lawyers', voice: null, settings: null };
 
@@ -14,24 +14,40 @@ describe('advanced video settings', () => {
     expect(normalizeVideoSettings(null)).toEqual(DEFAULT_AD_STUDIO_VIDEO_SETTINGS);
     expect(normalizeVideoSettings({ resolution: '4k' as never, style: 'cinematic' })).toEqual({ resolution: '720p', style: 'cinematic', music: 'auto' });
     expect(normalizeVideoSettings({ music: 'custom', musicDescription: '  ' })).toMatchObject({ music: 'auto' });
-    expect(normalizeVideoSettings({ music: 'none', musicDescription: 'drums', avoid: '  no   cars ' })).toEqual({ resolution: '720p', style: 'commercial', music: 'none', avoid: 'no cars' });
+    expect(normalizeVideoSettings({ music: 'none', musicDescription: 'drums', instructions: '  Israeli   characters ', avoid: '  no   cars ' })).toEqual({
+      resolution: '720p',
+      style: 'commercial',
+      music: 'none',
+      instructions: 'Israeli characters',
+      avoid: 'no cars',
+    });
   });
 
   it('refuses unknown values and over-long text, and needs a description for custom music', () => {
-    expect(videoSettingsIssue({ resolution: '1080p', style: 'ugc_phone', music: 'none' })).toBeNull();
+    expect(videoSettingsIssue({ resolution: '1080p', style: 'ugc_phone', music: 'none', instructions: 'Israeli characters' })).toBeNull();
     expect(videoSettingsIssue({ resolution: '4k' as never })).toBe('unknown_resolution');
     expect(videoSettingsIssue({ style: 'noir' as never })).toBe('unknown_style');
     expect(videoSettingsIssue({ music: 'loud' as never })).toBe('unknown_music');
     expect(videoSettingsIssue({ music: 'custom' })).toBe('music_description_required');
     expect(videoSettingsIssue({ music: 'custom', musicDescription: 'x'.repeat(201) })).toBe('music_description_too_long');
+    expect(videoSettingsIssue({ instructions: 'x'.repeat(AD_STUDIO_VIDEO_INSTRUCTIONS_MAX + 1) })).toBe('instructions_too_long');
     expect(videoSettingsIssue({ avoid: 'x'.repeat(301) })).toBe('avoid_too_long');
   });
 
-  it('writes the style, the music and what to avoid into every scene prompt', () => {
-    const settings = { resolution: '1080p' as const, style: 'ugc_phone' as const, music: 'custom' as const, musicDescription: 'upbeat acoustic guitar', avoid: 'animals, cars' };
+  it('writes the style, instructions, music and what to avoid into every scene prompt', () => {
+    const settings = {
+      resolution: '1080p' as const,
+      style: 'ugc_phone' as const,
+      music: 'custom' as const,
+      musicDescription: 'upbeat acoustic guitar',
+      instructions: 'Characters should look Israeli in Tel Aviv',
+      avoid: 'animals, cars',
+    };
     const narrated = buildScenePrompt(scene(), { ...CONTEXT, settings });
     expect(narrated).toContain('authentic, handheld smartphone look of a real customer video');
     expect(narrated).not.toContain('polished commercial style');
+    expect(narrated.split('\n')[0]).toMatch(/^\[0-5s\] Mandatory direction for this video \(overrides any conflicting detail\): Characters should look Israeli in Tel Aviv\. Two lawyers at a desk/);
+    expect(narrated).toContain('Every scene must follow: Characters should look Israeli in Tel Aviv.');
     // A voice-over clip is a silent shot whatever the music setting: its own sound is replaced by the
     // narration when it is mixed on, so the model is never asked for music there.
     expect(narrated).toContain(VOICE_OVER_AUDIO_LINE);
@@ -49,10 +65,14 @@ describe('advanced video settings', () => {
   it('keeps every earlier prompt and fingerprint with the defaults, and makes clips out of date once a setting changes', () => {
     const defaults = { ...CONTEXT, settings: DEFAULT_AD_STUDIO_VIDEO_SETTINGS };
     expect(isDefaultVideoSettings(DEFAULT_AD_STUDIO_VIDEO_SETTINGS)).toBe(true);
+    expect(isDefaultVideoSettings({ ...DEFAULT_AD_STUDIO_VIDEO_SETTINGS, instructions: 'Israeli look' })).toBe(false);
     expect(buildScenePrompt(scene(), defaults)).toBe(buildScenePrompt(scene(), CONTEXT));
     expect(sceneFingerprint(scene(), defaults)).toBe(sceneFingerprint(scene(), CONTEXT));
     const before = sceneFingerprint(scene(), CONTEXT);
     expect(sceneFingerprint(scene(), { ...CONTEXT, settings: { ...DEFAULT_AD_STUDIO_VIDEO_SETTINGS, resolution: '1080p' } })).not.toBe(before);
     expect(sceneFingerprint(scene(), { ...CONTEXT, settings: { ...DEFAULT_AD_STUDIO_VIDEO_SETTINGS, avoid: 'cars' } })).not.toBe(before);
+    const withInstructions = sceneFingerprint(scene(), { ...CONTEXT, settings: { ...DEFAULT_AD_STUDIO_VIDEO_SETTINGS, instructions: 'Israeli characters' } });
+    expect(withInstructions).not.toBe(before);
+    expect(sceneFingerprint(scene(), { ...CONTEXT, settings: { ...DEFAULT_AD_STUDIO_VIDEO_SETTINGS, instructions: 'Different look' } })).not.toBe(withInstructions);
   });
 });

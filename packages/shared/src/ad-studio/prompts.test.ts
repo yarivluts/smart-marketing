@@ -27,11 +27,16 @@ describe('buildScriptPrompt', () => {
     expect(prompt.user).not.toContain('Context from the planning stage');
   });
 
-  it('adds planning findings only when there are some', () => {
-    const prompt = buildScriptPrompt(BRIEF, { audience: 'Solo lawyers', messagingAngles: ['Speed', 'Legal validity'], keywordThemes: [] });
+  it('adds planning findings and general video instructions only when there are some', () => {
+    const prompt = buildScriptPrompt(
+      { ...BRIEF, videoInstructions: 'Characters should look Israeli' },
+      { audience: 'Solo lawyers', messagingAngles: ['Speed', 'Legal validity'], keywordThemes: [] },
+    );
     expect(prompt.user).toContain('Audience: Solo lawyers');
     expect(prompt.user).toContain('Messaging angles to build on: Speed; Legal validity');
     expect(prompt.user).not.toContain('What people search for');
+    expect(prompt.system).toContain("Follow the general video instructions in <editor_request> across every scene's visualPrompt");
+    expect(prompt.user).toContain(['General video instructions (apply to every scene):', '<editor_request>', 'Characters should look Israeli', '</editor_request>'].join('\n'));
   });
 });
 
@@ -41,14 +46,16 @@ describe('buildSceneRewritePrompt', () => {
       { id: 'a', durationSeconds: 4, visualPrompt: 'A lawyer at a cluttered desk', voiceover: 'Too much paper?', onScreenText: '' },
       { id: 'b', durationSeconds: 6, visualPrompt: 'Phone showing a signature', voiceover: '', onScreenText: 'Signed' },
     ];
-    const prompt = buildSceneRewritePrompt(BRIEF, scenes, 1, 'more energy', { audience: 'Solo lawyers', messagingAngles: ['Speed'] });
+    const prompt = buildSceneRewritePrompt({ ...BRIEF, videoInstructions: 'Israeli look' }, scenes, 1, 'more energy', { audience: 'Solo lawyers', messagingAngles: ['Speed'] });
     expect(prompt.user).toContain('1. [4s] A lawyer at a cluttered desk | VO: Too much paper?');
     expect(prompt.user).toContain('2. [6s] Phone showing a signature | Text: Signed');
+    expect(prompt.user).toContain(['General video instructions (apply to every scene):', '<editor_request>', 'Israeli look', '</editor_request>'].join('\n'));
     expect(prompt.user).toContain(['Rewrite scene 2 as the editor asks:', '<editor_request>', 'more energy', '</editor_request>'].join('\n'));
     // The rewrite keeps the plan's strategy and the shared rules.
     expect(prompt.user).toContain('Audience: Solo lawyers');
     expect(prompt.user).toContain('Messaging angles: Speed');
     expect(prompt.system).toContain('Never invent facts');
+    expect(prompt.system).toContain("Follow the general video instructions in <editor_request> across every scene's visualPrompt");
     expect(prompt.system).toContain('<editor_request>');
     expect(prompt.system).toContain('Keep the scene at 6 seconds');
   });

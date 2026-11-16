@@ -6,6 +6,7 @@ import {
   AD_STUDIO_VIDEO_BRAND_BANNER,
   AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY,
   FULL_FRAME_LINE,
+  HEBREW_DEFAULT_CASTING_LINE,
   isClipSlow,
   NO_SPEECH_RULE,
   narrationIsSeparate,
@@ -76,6 +77,16 @@ describe('buildScenePrompt', () => {
     expect(prompt).not.toContain(hebrew.productDescription);
     expect(prompt).not.toMatch(/[֐-׿]/);
     expect(prompt).toContain('This shot is one scene of a short video ad. Keep the look consistent');
+    expect(prompt).toContain(HEBREW_DEFAULT_CASTING_LINE);
+    expect(buildScenePrompt(scene('a', 5, 'A desk', 'Hi'), { ...CONTEXT, language: 'en' })).not.toContain(HEBREW_DEFAULT_CASTING_LINE);
+    // Custom instructions override the default Hebrew casting line.
+    const withCustom = buildScenePrompt(scene('a', 5, 'A desk', 'Hi'), {
+      ...hebrew,
+      settings: { resolution: '720p', style: 'commercial', music: 'auto', instructions: 'Israeli characters in Tel Aviv' },
+    });
+    expect(withCustom.split('\n')[0]).toContain('Mandatory direction for this video (overrides any conflicting detail): Israeli characters in Tel Aviv.');
+    expect(withCustom).toContain('Every scene must follow: Israeli characters in Tel Aviv.');
+    expect(withCustom).not.toContain(HEBREW_DEFAULT_CASTING_LINE);
     // Scenes without a separate narration keep the product context and no silence direction.
     for (const other of [scene('b', 5, 'A desk', ''), { ...scene('c', 5, 'A desk', 'Hi'), delivery: 'on_screen' as const }]) {
       const text = buildScenePrompt(other, hebrew);
@@ -113,6 +124,9 @@ describe('buildScenePrompt', () => {
     const speechless = buildSceneEditInstruction('make it night', { speechless: true });
     expect(speechless.endsWith(`${SILENT_PEOPLE_LINE} ${NO_SPEECH_RULE}`)).toBe(true);
     expect(buildSceneEditInstruction('make it night', { speechless: false })).not.toContain(NO_SPEECH_RULE);
+    expect(buildSceneEditInstruction('make it night', { generalInstructions: 'Israeli characters.' })).toBe(
+      'make it night. Keep everything else the same. Keep following this video direction: Israeli characters. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.',
+    );
   });
 
   it('asks for full-bleed footage and never mentions the brand banner laid over it afterwards', () => {

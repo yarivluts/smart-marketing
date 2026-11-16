@@ -185,70 +185,132 @@ describe('VideoStudio', () => {
     expect(scene1.getByText('Edit: make it night')).toBeInTheDocument();
   });
 
-  it('edits all ready scene clips with one instruction, respects the daily limit, keeps the prompt on failure, and polls until ready', async () => {
+  it('keeps general video instructions saved and re-editable, guards daily limits, retains text on failure, and saves + runs on confirm', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    // Hidden until at least one scene clip is ready.
-    const noReady = renderStudio({ initialClips: [clip('g1', 'a', 1, 'generating', fp(0))] });
-    expect(screen.queryByTestId('ad-studio-edit-all')).not.toBeInTheDocument();
-    noReady.unmount();
+    // Always shown whenever scenes exist, even before any clip is ready.
+    const noClips = renderStudio({ initialClips: [] });
+    expect(screen.getByTestId('ad-studio-video-instructions')).toBeInTheDocument();
+    expect(screen.getByTestId('ad-studio-video-instructions-run')).toBeDisabled();
+    noClips.unmount();
 
-    // Over daily limit across ready clips (5s + 8s = 13s > 10s left).
-    const twoReady = [clip('c1', 'a', 1, 'ready', fp(0), { durationSeconds: 5 }), clip('c2', 'b', 1, 'ready', fp(1), { durationSeconds: 8 })];
-    const overLimit = renderStudio({ initialClips: twoReady, videoSecondsLeft: 10 });
-    expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Needs 13s of video across 2 clips, but only 10s are left today.');
-    expect(screen.getByTestId('ad-studio-edit-all-submit')).toBeDisabled();
-    overLimit.unmount();
+    // Pre-saved instructions appear in the input with the saved badge; confirm stays disabled until edited when clips match.
+    const savedSettings = { resolution: '720p' as const, style: 'commercial' as const, music: 'auto' as const, instructions: 'Israeli characters' };
+    const savedFp = (index: number) => sceneFingerprint(SCENES[index], { ...CONTEXT, settings: savedSettings });
+    const readyWithInstructions = [
+      clip('c1', 'a', 1, 'ready', savedFp(0), { durationSeconds: 5 }),
+      clip('c2', 'b', 1, 'ready', savedFp(1), { durationSeconds: 8 }),
+    ];
+    const alreadySaved = renderStudio({
+      initialClips: readyWithInstructions,
+      videoSettings: savedSettings,
+      videoSecondsLeft: 10,
+    });
+    expect(screen.getByTestId('ad-studio-video-instructions-input')).toHaveValue('Israeli characters');
+    expect(screen.getByTestId('ad-studio-video-instructions-status')).toHaveTextContent(enMessages.AdStudio.video.instructionsSavedBadge);
+    expect(screen.getByTestId('ad-studio-video-instructions-run')).toBeDisabled();
 
-    // Failure keeps the typed instruction so it can be retried; success clears it and polls until ready.
-    const editedGenerating = [
-      twoReady[0],
-      twoReady[1],
-      clip('e1', 'a', 2, 'generating', fp(0), { kind: 'edit', durationSeconds: 5, instruction: 'Make it night' }),
-      clip('e2', 'b', 2, 'generating', fp(1), { kind: 'edit', durationSeconds: 8, instruction: 'Make it night' }),
+    // Editing instructions recalculates prospective cost (13s > 10s left): confirm & run disables, Save only remains enabled.
+    fireEvent.change(screen.getByTestId('ad-studio-video-instructions-input'), { target: { value: 'Israeli characters in Tel Aviv' } });
+    expect(screen.getByTestId('ad-studio-video-instructions-status')).toHaveTextContent(enMessages.AdStudio.video.instructionsUnsavedBadge);
+    expect(screen.getByTestId('ad-studio-video-instructions-hint')).toHaveTextContent('Needs 13s of video across 2 scenes, but only 10s are left today.');
+    expect(screen.getByTestId('ad-studio-video-instructions-run')).toBeDisabled();
+    expect(screen.getByTestId('ad-studio-video-instructions-save')).toBeEnabled();
+    alreadySaved.unmount();
+
+    // Failure keeps typed instructions intact; Save only persists without running; Confirm & make saves, runs, keeps text, and polls.
+    const newSettings = { ...savedSettings, instructions: 'Israeli characters in Tel Aviv' };
+    const newGenerating = [
+      ...readyWithInstructions,
+      clip('r1', 'a', 2, 'generating', sceneFingerprint(SCENES[0], { ...CONTEXT, settings: newSettings }), { durationSeconds: 5 }),
+      clip('r2', 'b', 2, 'generating', sceneFingerprint(SCENES[1], { ...CONTEXT, settings: newSettings }), { durationSeconds: 8 }),
     ];
-    const editedReady = [
-      twoReady[0],
-      twoReady[1],
-      { ...editedGenerating[2], status: 'ready' as const },
-      { ...editedGenerating[3], status: 'ready' as const },
+    const newReady = [
+      ...readyWithInstructions,
+      { ...newGenerating[2], status: 'ready' as const },
+      { ...newGenerating[3], status: 'ready' as const },
     ];
-    let attempt = 0;
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === `${BASE}/edit-all`) {
-        attempt += 1;
-        if (attempt === 1) return json({ error: 'provider_failed', code: 'rate_limited' }, 429);
-        return json({ started: 2, clips: editedGenerating, videos: [] });
+    let putCount = 0;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === `${BASE}/video-settings` && init?.method === 'PUT') {
+        putCount += 1;
+        if (putCount === 1) return json({ error: 'invalid_video_settings', code: 'instructions_too_long' }, 400);
+        const body = JSON.parse(String(init.body)) as { settings: { instructions: string } };
+        return json({ brief: { videoSettings: { ...savedSettings, instructions: body.settings.instructions } } });
       }
-      if (url === `${BASE}/render-status`) return json({ clips: editedReady, videos: [] });
+      if (url === `${BASE}/render-all`) return json({ started: 2, clips: newGenerating, videos: [] });
+      if (url === `${BASE}/render-status`) return json({ clips: newReady, videos: [] });
       return json({}, 404);
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    renderStudio({ initialClips: twoReady, videoSecondsLeft: 300 });
-    expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Applies to 2 ready clips (13s of 300s left today).');
-    const input = screen.getByTestId('ad-studio-edit-all-input');
-    fireEvent.change(input, { target: { value: 'Make it night' } });
-    fireEvent.click(screen.getByTestId('ad-studio-edit-all-submit'));
-    await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent(/try again/i));
-    expect(input).toHaveValue('Make it night');
+    renderStudio({ initialClips: readyWithInstructions, videoSettings: savedSettings, videoSecondsLeft: 300 });
+    const input = screen.getByTestId('ad-studio-video-instructions-input');
+    fireEvent.change(input, { target: { value: 'Israeli characters in Tel Aviv' } });
+    fireEvent.click(screen.getByTestId('ad-studio-video-instructions-run'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent(enMessages.AdStudio.advanced.errors.instructions_too_long));
+    expect(input).toHaveValue('Israeli characters in Tel Aviv');
 
-    fireEvent.click(screen.getByTestId('ad-studio-edit-all-submit'));
-    await waitFor(() => expect(input).toHaveValue(''));
-    const editCall = fetchMock.mock.calls.find(([u]) => u === `${BASE}/edit-all`) as unknown as [string, RequestInit];
-    expect(JSON.parse(String(editCall[1].body))).toEqual({ instruction: 'Make it night' });
-    expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Wait for clips currently generating to finish.');
+    // Confirm & make saves via PUT /video-settings, calls POST /render-all, keeps the saved text, and polls until ready.
+    fireEvent.click(screen.getByTestId('ad-studio-video-instructions-run'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-video-instructions-status')).toHaveTextContent(enMessages.AdStudio.video.instructionsSavedBadge));
+    expect(input).toHaveValue('Israeli characters in Tel Aviv');
+    const putCall = fetchMock.mock.calls.find(([u, i]) => u === `${BASE}/video-settings` && (i as RequestInit)?.method === 'PUT' && putCount >= 2) as unknown as [string, RequestInit];
+    expect(JSON.parse(String(putCall[1].body))).toEqual({ settings: { instructions: 'Israeli characters in Tel Aviv' } });
+    expect(fetchMock).toHaveBeenCalledWith(`${BASE}/render-all`, { method: 'POST' });
+    expect(screen.getByTestId('ad-studio-video-instructions-hint')).toHaveTextContent(enMessages.AdStudio.video.instructionsHintBusy);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4100);
     });
-    await waitFor(() => expect(screen.getByTestId('ad-studio-edit-all-cost')).toHaveTextContent('Applies to 2 ready clips (13s of 300s left today).'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-video-instructions-hint')).toHaveTextContent(enMessages.AdStudio.video.instructionsHintUpToDate));
   });
 
-  it('shows the batch edit card in Hebrew with the scene count', () => {
-    const ready = [clip('c1', 'a', 1, 'ready', fp(0), { durationSeconds: 5 }), clip('c2', 'b', 1, 'ready', fp(1), { durationSeconds: 8 })];
-    renderStudio({ initialClips: ready, videoSecondsLeft: 40 }, 'he');
-    expect(screen.getByTestId('ad-studio-edit-all')).toHaveTextContent(heMessages.AdStudio.video.editAllLabel);
-    expect(screen.getByTestId('ad-studio-edit-all-submit')).toBeDisabled();
+  it('saves general instructions via Save only and before top-header Make all scenes when dirty', async () => {
+    const savedSettings = { resolution: '720p' as const, style: 'commercial' as const, music: 'auto' as const, instructions: 'Warm Tel Aviv light' };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === `${BASE}/video-settings` && init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body)) as { settings: { instructions: string } };
+        return json({ brief: { videoSettings: { ...savedSettings, instructions: body.settings.instructions } } });
+      }
+      if (url === `${BASE}/render-all` || url === `${BASE}/scenes/a/render`) return json({ started: 2, clips: [], videos: [] });
+      return json({}, 404);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderStudio({ initialClips: [], videoSecondsLeft: 300 });
+    const input = screen.getByTestId('ad-studio-video-instructions-input');
+    fireEvent.change(input, { target: { value: 'Warm Tel Aviv light' } });
+    fireEvent.click(screen.getByTestId('ad-studio-video-instructions-save'));
+    await waitFor(() => expect(screen.getByTestId('ad-studio-video-message')).toHaveTextContent(enMessages.AdStudio.video.instructionsSaved));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(input).toHaveValue('Warm Tel Aviv light');
+
+    // Editing again and clicking header "Make all scenes (13s)" saves instructions first, then starts render-all.
+    fireEvent.change(input, { target: { value: 'Israeli office' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Make all scenes (13s)' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/render-all`, { method: 'POST' }));
+    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([`${BASE}/video-settings`, `${BASE}/video-settings`, `${BASE}/render-all`]);
+    expect(input).toHaveValue('Israeli office');
+
+    // Editing again and rendering a single scene also saves dirty instructions first.
+    fireEvent.change(input, { target: { value: 'Tel Aviv cafe' } });
+    const scene1 = within(screen.getByTestId('ad-studio-video-scene-1'));
+    fireEvent.click(scene1.getByRole('button', { name: 'Make (5s)' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(`${BASE}/scenes/a/render`, { method: 'POST' }));
+    expect(fetchMock.mock.calls.map(([u]) => u)).toEqual([
+      `${BASE}/video-settings`,
+      `${BASE}/video-settings`,
+      `${BASE}/render-all`,
+      `${BASE}/video-settings`,
+      `${BASE}/scenes/a/render`,
+    ]);
+    expect(input).toHaveValue('Tel Aviv cafe');
+  });
+
+  it('shows the general video instructions card in Hebrew', () => {
+    renderStudio({ initialClips: [], videoSecondsLeft: 40 }, 'he');
+    expect(screen.getByTestId('ad-studio-video-instructions')).toHaveTextContent(heMessages.AdStudio.video.instructionsLabel);
+    expect(screen.getByTestId('ad-studio-video-instructions-run')).toBeDisabled();
   });
 
   it('assembles once every scene has a current clip and shows the finished player with its length', async () => {

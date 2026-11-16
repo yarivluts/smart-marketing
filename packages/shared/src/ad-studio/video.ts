@@ -45,7 +45,7 @@ export interface AdStudioVideoContext {
   settings: AdStudioVideoSettings | null;
 }
 
-const PRODUCT_CONTEXT_MAX = 300;
+const PRODUCT_CONTEXT_MAX = 160;
 
 /**
  * The brand banner on a video ad: logo, business name and slogan in a band along the very bottom of
@@ -112,6 +112,13 @@ export const SILENT_PEOPLE_LINE =
 export const VOICE_OVER_AUDIO_LINE = `Audio: a silent shot - no speech, no dialogue, no voices, no narration, no music; at most faint room tone. ${NO_SPEECH_RULE}`;
 
 /**
+ * Default visual casting/setting line for Hebrew ads when no custom general video instructions are
+ * set, so Gemini Omni does not fall back to East Asian or generic stock actors and backdrops.
+ */
+export const HEBREW_DEFAULT_CASTING_LINE =
+  'Unless the shot specifies otherwise, people and everyday places look naturally Israeli (local Israeli / Mediterranean appearance and setting).';
+
+/**
  * Whether a scene's narration is spoken by the text-to-speech narrator and mixed onto a speechless
  * clip, rather than generated with the picture: every voice-over scene that has narration. A person
  * on camera (`on_screen`) keeps speaking in the clip itself so the lips match the words.
@@ -147,6 +154,7 @@ export function buildScenePrompt(
   // The ad's one narrator voice, described the same way in every scene so the scenes sound alike.
   const voice = context.voice ? oneLine(context.voice) : null;
   const settings = normalizeVideoSettings(context.settings);
+  const instructions = settings.instructions ? oneLine(settings.instructions).replace(/[.!\s]+$/, '') : '';
   const music = musicPromptLine(settings, true);
   // A voice-over is never sent to the video model: the clip comes back silent, with silent people,
   // and the narration is spoken separately and mixed on afterwards (see the file comment).
@@ -159,10 +167,15 @@ export function buildScenePrompt(
   // A voice-over scene leaves the product description out: it is usually written in the ad language
   // (Hebrew, for most ads here), and a live test with it verbatim brought voices back into the clip.
   const adFor = separate ? 'a short video ad' : `a short video ad for: ${product}`;
+  const castingOrInstructions = instructions
+    ? ` Every scene must follow: ${instructions}.`
+    : isHebrewLanguage(context.language)
+      ? ` ${HEBREW_DEFAULT_CASTING_LINE}`
+      : '';
   return [
-    `[0-${seconds}s] ${oneLine(scene.visualPrompt)}${separate ? ` ${SILENT_PEOPLE_LINE}` : ''}`,
+    `[0-${seconds}s] ${instructions ? `Mandatory direction for this video (overrides any conflicting detail): ${instructions}. ` : ''}${oneLine(scene.visualPrompt)}${separate ? ` ${SILENT_PEOPLE_LINE}` : ''}`,
     `One continuous ${seconds}-second shot in a single unbroken scene, no scene cuts, in a ${frame}.`,
-    `This shot is one scene of ${adFor}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.`,
+    `This shot is one scene of ${adFor}. Keep the look consistent with the other scenes of the ad: ${AD_STUDIO_VISUAL_STYLE_PROMPTS[settings.style]}, colour grading and lighting, and the same product, people and setting whenever they appear.${castingOrInstructions}`,
     ...referencePromptLines(references),
     // Full bleed. The brand banner is laid over the bottom afterwards; it is deliberately not
     // mentioned - told a strip covers the lower part, the model painted an empty band there.
@@ -182,8 +195,12 @@ export function buildScenePrompt(
  * prompts that say to keep everything else; the no-text rule is repeated because each edit is a
  * new generation, and so is the no-speech rule for a clip whose narration is mixed on separately.
  */
-export function buildSceneEditInstruction(instruction: string, options: { speechless?: boolean } = {}): string {
-  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.${options.speechless ? ` ${SILENT_PEOPLE_LINE} ${NO_SPEECH_RULE}` : ''}`;
+export function buildSceneEditInstruction(
+  instruction: string,
+  options: { speechless?: boolean; generalInstructions?: string } = {},
+): string {
+  const general = options.generalInstructions ? oneLine(options.generalInstructions).replace(/[.!\s]+$/, '') : '';
+  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same.${general ? ` Keep following this video direction: ${general}.` : ''} Do not add any readable text, captions or logos, and keep the footage full-bleed to every edge.${options.speechless ? ` ${SILENT_PEOPLE_LINE} ${NO_SPEECH_RULE}` : ''}`;
 }
 
 /** 32-bit FNV-1a over UTF-16 code units, from a given offset basis. */
@@ -225,7 +242,20 @@ export function sceneFingerprint(scene: Pick<AdStudioScene, 'durationSeconds' | 
     // The attached images and how each is used, also only when present (KAN-243).
     ...(scene.references?.length ? [{ references: scene.references.map((reference) => [reference.imageId, reference.use]) }] : []),
     // The advanced video settings, only when changed from the defaults.
-    ...(isDefaultVideoSettings(settings) ? [] : [{ settings: [settings.resolution, settings.style, settings.music, settings.musicDescription ?? '', settings.avoid ?? ''] }]),
+    ...(isDefaultVideoSettings(settings)
+      ? []
+      : [
+          {
+            settings: [
+              settings.resolution,
+              settings.style,
+              settings.music,
+              settings.musicDescription ?? '',
+              settings.avoid ?? '',
+              ...(settings.instructions ? [settings.instructions] : []),
+            ],
+          },
+        ]),
   ]);
   const high = fnv1a(canonical, 0x811c9dc5).toString(16).padStart(8, '0');
   const low = fnv1a(`${canonical}#`, 0x01000193).toString(16).padStart(8, '0');

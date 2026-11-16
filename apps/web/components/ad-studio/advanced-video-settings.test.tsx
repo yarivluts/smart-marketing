@@ -26,6 +26,7 @@ describe('AdvancedVideoSettings', () => {
       style: 'ugc_phone',
       music: 'custom',
       musicDescription: 'upbeat guitar',
+      instructions: 'Israeli characters',
       avoid: 'cars',
     };
     const fetchMock = vi.fn(async () => json({ brief: { videoSettings: saved } }));
@@ -53,6 +54,9 @@ describe('AdvancedVideoSettings', () => {
     expect(screen.getByRole('button', { name: en.save })).toBeDisabled();
     fireEvent.change(screen.getByPlaceholderText(en.musicDescriptionPlaceholder), {
       target: { value: 'upbeat guitar' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(en.instructionsPlaceholder), {
+      target: { value: 'Israeli characters' },
     });
     fireEvent.change(screen.getByPlaceholderText(en.avoidPlaceholder), {
       target: { value: 'cars' },
@@ -92,6 +96,7 @@ describe('AdvancedVideoSettings', () => {
         style: 'commercial',
         music: 'auto',
         musicDescription: '',
+        instructions: '',
         avoid: '',
       },
     });

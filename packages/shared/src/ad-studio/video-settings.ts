@@ -27,6 +27,7 @@ export const AD_STUDIO_MUSIC_MODES = ['auto', 'none', 'custom'] as const;
 export type AdStudioMusicMode = (typeof AD_STUDIO_MUSIC_MODES)[number];
 
 export const AD_STUDIO_MUSIC_DESCRIPTION_MAX = 200;
+export const AD_STUDIO_VIDEO_INSTRUCTIONS_MAX = 500;
 export const AD_STUDIO_AVOID_MAX = 300;
 
 export interface AdStudioVideoSettings {
@@ -35,6 +36,8 @@ export interface AdStudioVideoSettings {
   music: AdStudioMusicMode;
   /** For `custom` music: the music in words ("upbeat acoustic guitar"). */
   musicDescription?: string;
+  /** General instructions applied to every scene of this video ("Israeli characters, warm natural light"). */
+  instructions?: string;
   /** What never to show, in words ("no animals, no cars"). */
   avoid?: string;
 }
@@ -54,17 +57,19 @@ export function normalizeVideoSettings(raw: Partial<AdStudioVideoSettings> | nul
   const defaults = DEFAULT_AD_STUDIO_VIDEO_SETTINGS;
   const music = oneOf(AD_STUDIO_MUSIC_MODES, raw?.music, defaults.music);
   const musicDescription = oneLine(raw?.musicDescription);
+  const instructions = oneLine(raw?.instructions);
   const avoid = oneLine(raw?.avoid);
   return {
     resolution: oneOf(AD_STUDIO_VIDEO_RESOLUTIONS, raw?.resolution, defaults.resolution),
     style: oneOf(AD_STUDIO_VISUAL_STYLES, raw?.style, defaults.style),
     music: music === 'custom' && !musicDescription ? 'auto' : music,
     ...(music === 'custom' && musicDescription ? { musicDescription } : {}),
+    ...(instructions ? { instructions } : {}),
     ...(avoid ? { avoid } : {}),
   };
 }
 
-export type AdStudioVideoSettingsIssueCode = 'unknown_resolution' | 'unknown_style' | 'unknown_music' | 'music_description_required' | 'music_description_too_long' | 'avoid_too_long';
+export type AdStudioVideoSettingsIssueCode = 'unknown_resolution' | 'unknown_style' | 'unknown_music' | 'music_description_required' | 'music_description_too_long' | 'instructions_too_long' | 'avoid_too_long';
 
 /** Why settings sent by a person or an agent cannot be saved; null when they can. */
 export function videoSettingsIssue(raw: Partial<AdStudioVideoSettings>): AdStudioVideoSettingsIssueCode | null {
@@ -73,6 +78,7 @@ export function videoSettingsIssue(raw: Partial<AdStudioVideoSettings>): AdStudi
   if (raw.music !== undefined && !(AD_STUDIO_MUSIC_MODES as readonly string[]).includes(raw.music)) return 'unknown_music';
   if (raw.music === 'custom' && !oneLine(raw.musicDescription)) return 'music_description_required';
   if (oneLine(raw.musicDescription).length > AD_STUDIO_MUSIC_DESCRIPTION_MAX) return 'music_description_too_long';
+  if (oneLine(raw.instructions).length > AD_STUDIO_VIDEO_INSTRUCTIONS_MAX) return 'instructions_too_long';
   if (oneLine(raw.avoid).length > AD_STUDIO_AVOID_MAX) return 'avoid_too_long';
   return null;
 }
@@ -83,6 +89,7 @@ export function isDefaultVideoSettings(settings: AdStudioVideoSettings): boolean
     settings.resolution === DEFAULT_AD_STUDIO_VIDEO_SETTINGS.resolution &&
     settings.style === DEFAULT_AD_STUDIO_VIDEO_SETTINGS.style &&
     settings.music === DEFAULT_AD_STUDIO_VIDEO_SETTINGS.music &&
+    !settings.instructions &&
     !settings.avoid
   );
 }

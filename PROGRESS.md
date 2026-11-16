@@ -17,6 +17,16 @@ Template for each entry:
 
 ---
 
+## 2026-11-16 — Ad Studio video: persistent, re-editable general instructions + Israeli casting
+
+- **Last completed:** Persisted general video instructions per brief under `video_settings.instructions` across [`video-settings.ts`](packages/shared/src/ad-studio/video-settings.ts), [`video-settings/route.ts`](apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/briefs/[briefId]/video-settings/route.ts), and [`mcp-ad-studio-tools.ts`](apps/api/src/mcp/mcp-ad-studio-tools.ts). Replaced the ephemeral one-shot edit box in [`video-studio.tsx`](apps/web/components/ad-studio/video-studio.tsx) with an always-visible General Video Instructions card featuring Save and Confirm & run buttons, unsaved-changes guard, and daily quota guard, and exposed the field in [`advanced-video-settings.tsx`](apps/web/components/ad-studio/advanced-video-settings.tsx). Updated [`writing-rules.ts`](packages/shared/src/ad-studio/writing-rules.ts), [`prompts.ts`](packages/shared/src/ad-studio/prompts.ts), [`video.ts`](packages/shared/src/ad-studio/video.ts), [`brand.ts`](packages/ad-studio/src/brand.ts), [`translate.ts`](packages/ad-studio/src/translate.ts), and [`video-pipeline.ts`](packages/ad-studio/src/video-pipeline.ts) so Hebrew ads default to Israeli people/settings, script generation/rewrites and scene renders/edits enforce general video instructions, Hebrew settings are translated once per batch to English for Gemini Omni, and changing instructions marks older clips out of date. Verified `@growthos/shared` (90 files, 1025 tests), `@growthos/ad-studio` (22 passed, 231 tests), `@growthos/web` UI + copy suites (242 files, 840 tests), Firestore-emulated route (`25/25`) and MCP (`12/12`) tests, `pnpm lint`, `pnpm typecheck`, and full `turbo build`.
+- **In progress (exact stopping point):** Self-reviewing diff, opening PR, merging to `main`, and deploying `api-prod` + `web-prod` to Cloud Run.
+- **Blocked + why:** None.
+- **Next step:** Verify GitHub Actions CI and Cloud Run `/v1/health` + `/api/health`.
+- **Waiting on human:** None.
+
+---
+
 ## 2026-11-15 — Unify Ad Studio "Create" and "Review & edit" into a 4-step flow
 
 - **Last completed:** Merged the redundant `create` and `review` steps into 4 unified steps (`brief` → `plan` → `review` → `publish`) in [`steps.ts`](apps/web/lib/ad-studio/steps.ts), [`ad-studio-stepper.tsx`](apps/web/components/ad-studio/ad-studio-stepper.tsx), [`page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), and `en.json` / `he.json` (`"Create & review"` / `"יצירה ועריכה"`). Kept `?step=create` URL normalization to `review` for backwards compatibility and placed `AutopilotPanel mode="progress"` above `ReviewOverview` inside Step 3.

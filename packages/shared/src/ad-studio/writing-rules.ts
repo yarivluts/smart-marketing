@@ -16,6 +16,7 @@ export const HEBREW_WRITING_RULES = [
   'Use full spelling (ktiv male) without vowel points in written copy. Use gershayim in acronyms and a geresh in abbreviations, never ASCII quotes.',
   'Do not start or end a line with a Latin-script word, a number or a symbol: in a right-to-left feed it jumps to the wrong side. Put such words mid-sentence.',
   'At most one exclamation mark in the whole ad, and no English call-to-action words inside Hebrew copy.',
+  'In visualPrompt (written in English), unless the brief or editor asks otherwise, describe people and everyday places that look naturally Israeli (diverse Mediterranean / Middle Eastern Israeli appearance, everyday Israeli casual dress, local Israeli homes, offices and streets) rather than foreign stock-footage tropes.',
 ];
 
 /** Instructions about text the model must treat as data, never as instructions to it. */
