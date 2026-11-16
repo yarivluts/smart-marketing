@@ -18,7 +18,7 @@ describe('A/B tests and alerts pages: plain names', () => {
 
   it('en names say what the page holds, not a bare noun', () => {
     const m = en as unknown as Copy;
-    expect(m.OrgDetailPage.projectExperimentsLink).toBe('A/B tests');
+    expect(m.OrgDetailPage.projectExperimentsLink).toBe('Compare versions');
     expect(m.OrgDetailPage.projectInsightsLink).toBe('Alerts and wins');
   });
 });
