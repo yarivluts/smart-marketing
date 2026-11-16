@@ -155,7 +155,7 @@ describe('CreateSegmentForm', () => {
 
   it('does not render the event conditions section when no event schemas are registered', () => {
     renderForm([]);
-    expect(screen.queryByText('Event conditions')).not.toBeInTheDocument();
+    expect(screen.queryByText('What customers did')).not.toBeInTheDocument();
   });
 
   it('lets a segment be created from only an event condition, with zero entity filters (the "paying_no_demo" case, KAN-93)', async () => {
@@ -305,5 +305,15 @@ describe('CreateSegmentForm', () => {
 
     fireEvent.change(screen.getByLabelText('Event filter value'), { target: { value: 'true' } });
     expect(screen.getByRole('button', { name: 'Create group' })).toBeEnabled();
+  });
+});
+
+describe('CreateSegmentForm comparison choices', () => {
+  it('shows plain words instead of symbols', () => {
+    renderForm();
+    const select = screen.getByLabelText('Comparison');
+    expect(select).toHaveDisplayValue('is');
+    expect(screen.getByRole('option', { name: 'is at least' })).toHaveValue('>=');
+    expect(screen.queryByRole('option', { name: '>=' })).not.toBeInTheDocument();
   });
 });

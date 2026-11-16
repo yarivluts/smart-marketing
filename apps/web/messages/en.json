@@ -2781,17 +2781,18 @@
     "filtersLabel": "Filters",
     "filterFieldLabel": "Field",
     "filterFieldPlaceholder": "e.g. plan",
-    "filterOpLabel": "Operator",
+    "filterOpLabel": "Comparison",
+    "filterOperators": {"eq": "is", "ne": "is not", "gt": "is more than", "gte": "is at least", "lt": "is less than", "lte": "is at most", "contains": "contains"},
     "filterValueLabel": "Value",
     "filterValuePlaceholder": "e.g. pro",
     "addFilterButton": "Add filter",
     "removeFilterButton": "Remove",
-    "eventConditionsLabel": "Event conditions",
-    "eventConditionsHint": "Match on whether a customer has (or has never had) a matching event of another type, e.g. \"paying, no demo\".",
+    "eventConditionsLabel": "What customers did",
+    "eventConditionsHint": "Match on whether a customer did something (or never did it), such as \"paying, never booked a demo\".",
     "eventConditionKindLabel": "Condition",
     "eventConditionKind": {
-      "has_event": "Has event",
-      "no_event": "No event"
+      "has_event": "Did this",
+      "no_event": "Never did this"
     },
     "eventConditionSchemaLabel": "Event",
     "eventConditionWithinDaysLabel": "Within days",
