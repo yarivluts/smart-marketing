@@ -7,10 +7,12 @@ import { AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat } from '@growthos/shar
  *
  * Every clip is re-encoded rather than stream-copied: clips from the same model usually match, but
  * a concat-copy silently breaks on any difference in resolution, frame rate, timebase or audio
- * layout, and an edit may come back in a different shape. So each input is trimmed to its scene's
- * scripted length, scaled to cover one frame size (cropped, never letterboxed), set to one frame rate, and given a stereo
- * 48 kHz track (silence when a clip has no audio) before the concat filter; the output is H.264 +
- * AAC with the index at the front for streaming, capped at 60 seconds.
+ * layout, and an edit may come back in a different shape. So each input is trimmed and tail-locked
+ * to its scene's scripted length (`tpad=stop_mode=clone` so 1-3 missing tail frames never jump),
+ * scaled to cover one frame size (cropped, never letterboxed), set to one frame rate and uniform
+ * `1/fps` timebase, and given a stereo 48 kHz track (silence when a clip has no audio) before
+ * joining consecutive clips with a fast `0.25s` crossfade (`xfade=transition=fade` + `acrossfade`);
+ * the output is H.264 + AAC with the index at the front for streaming, capped at 60 seconds.
  *
  * The only thing drawn onto the video is the brand strip (logo, name, slogan) every ad carries, laid
  * over every frame from a PNG; scene text is not: see the on-screen text decision in
@@ -32,8 +34,37 @@ export function assemblyFrame(format: AdStudioFormat, resolution?: string | null
   return resolution === '1080p' ? AD_STUDIO_FRAME_1080P[format] : AD_STUDIO_FRAME[format];
 }
 export const AD_STUDIO_FPS = 30;
+/** Fast crossfade between consecutive clips during assembly (short enough to fit inside scene narration margins). */
+export const AD_STUDIO_TRANSITION_SECONDS = 0.25;
+const MIN_TRANSITION_SECONDS = 0.05;
 const DEFAULT_TIMEOUT_MS = 240_000;
 const STDERR_KEEP_BYTES = 64 * 1024;
+
+/** Transition duration between two adjacent segments, clamped safely below short-clip lengths. */
+export function transitionSecondsBetween(
+  beforeSeconds: number,
+  afterSeconds: number,
+  requested = AD_STUDIO_TRANSITION_SECONDS,
+): number {
+  if (requested <= 0) return 0;
+  const cap = Math.min(requested, beforeSeconds / 3, afterSeconds / 3);
+  const rounded = Math.floor(cap * 1000 + 1e-9) / 1000;
+  return rounded >= MIN_TRANSITION_SECONDS ? rounded : 0;
+}
+
+/** Expected joined duration across `inputs` after accounting for overlapping crossfades. */
+export function plannedConcatSeconds(
+  inputs: readonly Pick<ConcatInput, 'seconds'>[],
+  transitionSeconds = AD_STUDIO_TRANSITION_SECONDS,
+): number {
+  if (inputs.length === 0) return 0;
+  let total = inputs[0].seconds;
+  for (let i = 1; i < inputs.length; i += 1) {
+    const fade = transitionSecondsBetween(total, inputs[i].seconds, transitionSeconds);
+    total = total + inputs[i].seconds - fade;
+  }
+  return Math.round(total * 1000) / 1000;
+}
 
 export class FfmpegUnavailableError extends Error {
   constructor(message: string) {
@@ -78,7 +109,10 @@ function even(value: number): number {
 /** The video filter chain for one input, ending in `[v<index>]`. */
 export function clipVideoFilter(input: ConcatInput, index: number, frame: { width: number; height: number }, fps: number): string {
   const { width, height } = frame;
-  const trim = input.startSeconds ? `trim=start=${seconds(input.startSeconds)}:duration=${seconds(input.seconds)}` : `trim=duration=${seconds(input.seconds)}`;
+  const duration = seconds(input.seconds);
+  const trim = input.startSeconds ? `trim=start=${seconds(input.startSeconds)}:duration=${duration}` : `trim=duration=${duration}`;
+  // Pad with the final frame and re-trim to `duration` so a clip whose stream ends slightly short never jumps on xfade.
+  const tail = `tpad=stop_mode=clone:stop_duration=${seconds(AD_STUDIO_TRANSITION_SECONDS)},trim=duration=${duration},setpts=PTS-STARTPTS,format=yuv420p,settb=1/${fps}[v${index}]`;
   if (input.fit === 'screen') {
     const innerWidth = even(width * SCREEN_INSET);
     const innerHeight = even(height * SCREEN_INSET);
@@ -86,14 +120,14 @@ export function clipVideoFilter(input: ConcatInput, index: number, frame: { widt
       `[${index}:v:0]${trim},setpts=PTS-STARTPTS,fps=${fps},split=2[bgsrc${index}][fgsrc${index}]`,
       `[bgsrc${index}]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=24:2,eq=brightness=-0.22[bg${index}]`,
       `[fgsrc${index}]scale=${innerWidth}:${innerHeight}:force_original_aspect_ratio=decrease:force_divisible_by=2[fg${index}]`,
-      `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v${index}]`,
+      `[bg${index}][fg${index}]overlay=(W-w)/2:(H-h)/2,setsar=1,${tail}`,
     ].join(';');
   }
   if (input.fit === 'pad') {
-    return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[v${index}]`;
+    return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},${tail}`;
   }
   // Edge to edge: the frame is always filled, whatever shape the model returned.
-  return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps},format=yuv420p[v${index}]`;
+  return `[${index}:v:0]${trim},setpts=PTS-STARTPTS,scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},setsar=1,fps=${fps},${tail}`;
 }
 
 function seconds(value: number): string {
@@ -108,6 +142,7 @@ export function buildConcatArgs(params: {
   resolution?: string | null;
   fps?: number;
   maxSeconds?: number;
+  transitionSeconds?: number;
   /** A PNG the size of the frame (the brand strip on transparency), laid over every frame. */
   overlay?: string | null;
 }): string[] {
@@ -138,17 +173,40 @@ export function buildConcatArgs(params: {
     const audioTrim = input.hasAudio && input.startSeconds ? `atrim=start=${seconds(input.startSeconds)}:duration=${duration}` : `atrim=duration=${duration}`;
     filters.push(
       clipVideoFilter(input, index, { width, height }, fps),
-      `[${audioSource.get(index)}:a:0]${audioTrim},asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=${duration}[a${index}]`,
+      `[${audioSource.get(index)}:a:0]${audioTrim},asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad=whole_dur=${duration},atrim=duration=${duration},asetpts=PTS-STARTPTS[a${index}]`,
     );
   });
-  const pairs = inputs.map((_, index) => `[v${index}][a${index}]`).join('');
+
+  const requestedTransition = params.transitionSeconds ?? AD_STUDIO_TRANSITION_SECONDS;
+  const finalVideoLabel = params.overlay ? '[vjoined]' : '[vout]';
+  if (inputs.length === 1) {
+    filters.push(`[v0][a0]concat=n=1:v=1:a=1${finalVideoLabel}[aout]`);
+  } else {
+    let currentVideo = '[v0]';
+    let currentAudio = '[a0]';
+    let timeline = inputs[0].seconds;
+    for (let i = 1; i < inputs.length; i += 1) {
+      const isLast = i === inputs.length - 1;
+      const vNext = isLast ? finalVideoLabel : `[vx${i}]`;
+      const aNext = isLast ? '[aout]' : `[ax${i}]`;
+      const fade = transitionSecondsBetween(timeline, inputs[i].seconds, requestedTransition);
+      if (fade > 0) {
+        const offset = Math.max(0, timeline - fade);
+        filters.push(`${currentVideo}[v${i}]xfade=transition=fade:duration=${seconds(fade)}:offset=${seconds(offset)}${vNext}`);
+        filters.push(`${currentAudio}[a${i}]acrossfade=d=${seconds(fade)}:c1=tri:c2=tri${aNext}`);
+        timeline = timeline + inputs[i].seconds - fade;
+      } else {
+        filters.push(`${currentVideo}${currentAudio}[v${i}][a${i}]concat=n=2:v=1:a=1${vNext}${aNext}`);
+        timeline += inputs[i].seconds;
+      }
+      currentVideo = vNext;
+      currentAudio = aNext;
+    }
+  }
   if (params.overlay) {
     // One still image after every other input; overlay repeats its only frame for the whole ad.
     args.push('-i', params.overlay);
-    filters.push(`${pairs}concat=n=${inputs.length}:v=1:a=1[vjoined][aout]`);
     filters.push(`[${next}:v:0]scale=${width}:${height},format=rgba[brand]`, `[vjoined][brand]overlay=0:0:format=auto,format=yuv420p[vout]`);
-  } else {
-    filters.push(`${pairs}concat=n=${inputs.length}:v=1:a=1[vout][aout]`);
   }
 
   args.push(
@@ -295,7 +353,7 @@ export async function concatClips(params: {
   const { code, stderr } = await runFfmpeg(buildConcatArgs({ inputs, output: params.output, format: params.format, resolution: params.resolution, overlay: params.overlay }), params.runner);
   if (code !== 0) throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
   // The container's own length is the most accurate; the last progress mark trails it slightly.
-  const planned = inputs.reduce((sum, input) => sum + input.seconds, 0);
+  const planned = plannedConcatSeconds(inputs);
   const measured = (await probeMedia(params.output, params.runner).catch(() => null))?.durationSeconds ?? parseEncodedSeconds(stderr) ?? planned;
   return { durationSeconds: Math.round(Math.min(measured, AD_STUDIO_MAX_TOTAL_SECONDS) * 100) / 100 };
 }

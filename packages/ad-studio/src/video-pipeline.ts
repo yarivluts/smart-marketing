@@ -76,7 +76,7 @@ import {
   normalizeVideoClipForScene,
   resolveGallerySource,
 } from './gallery';
-import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, mixNarration, type FfmpegRunner } from './ffmpeg';
+import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, mixNarration, plannedConcatSeconds, type FfmpegRunner } from './ffmpeg';
 import { resolveAdStudioTts, type AdStudioTts } from './tts';
 import { brandStripLayer } from './ad-typography';
 import { resolveAdBrandMark } from './brand';
@@ -799,6 +799,11 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
   const sceneSeconds = plan.reduce((sum, entry) => sum + entry.seconds, 0);
   // The product in action: selected moments of the newest walkthrough go in after the hook.
   const demo = await demoInsertsFor(ctx, sceneSeconds);
+  const orderedSegments: { seconds: number }[] = [...plan];
+  if (demo.recording && demo.inserts.length) {
+    orderedSegments.splice(1, 0, ...demo.inserts.map((insert) => ({ seconds: insert.seconds })));
+  }
+  const plannedDurationSeconds = Math.min(AD_STUDIO_MAX_TOTAL_SECONDS, plannedConcatSeconds(orderedSegments));
   const video = await createAdStudioVideo({
     organizationId: ctx.organizationId,
     projectId: ctx.projectId,
@@ -806,7 +811,7 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
     clipIds: plan.map((entry) => entry.clip.id),
     sceneIds: plan.map((entry) => entry.sceneId),
     aspectRatio: AD_STUDIO_ASPECT_RATIO[brief.video_format],
-    durationSeconds: sceneSeconds + demo.inserts.reduce((sum, insert) => sum + insert.seconds, 0),
+    durationSeconds: plannedDurationSeconds,
     requestedBy: ctx.actorId,
     demoSegments: demo.recording ? demo.inserts.map((insert) => ({ recording_id: demo.recording!.id, segment_id: insert.segmentId, start_seconds: insert.startSeconds, seconds: insert.seconds })) : [],
     now,

@@ -17,6 +17,28 @@ Template for each entry:
 
 ---
 
+## 2026-11-17 — Ad Studio video assembly: smooth fast crossfade transitions between clips
+
+### Shipped
+- **Fast crossfade & tail-locked clip assembly (`packages/ad-studio`)**:
+  - Replaced hard `concat` scene cuts in `packages/ad-studio/src/ffmpeg.ts` with a frame-locked `0.25s` crossfade (`xfade=transition=fade` + `acrossfade=c1=tri:c2=tri` via `AD_STUDIO_TRANSITION_SECONDS` and `transitionSecondsBetween`), fitting cleanly inside narration margins while preserving `t=0` first frames for video thumbnails.
+  - Added `tpad=stop_mode=clone:stop_duration=0.25,trim=duration=<clip>,setpts=PTS-STARTPTS,format=yuv420p,settb=1/30` and exact-duration audio re-trimming so container frame/audio tails never stall or jump at transitions.
+  - Added `plannedConcatSeconds` in `packages/ad-studio/src/video-pipeline.ts` (`assembleBriefVideo`) and `concatClips` so initial & fallback assembled durations account for transition overlaps.
+- **UI transition note & translations (`apps/web`)**:
+  - Added `AdStudio.video.assembleTransitionHint` in `messages/{en,he}.json` and rendered `[data-testid="ad-studio-final-transition-hint"]` in `VideoStudio` once scenes are ready to assemble.
+
+### Verified
+- `@growthos/ad-studio`: `build` + `vitest --pool=forks` (23 passed / 1 skipped files, 247 passed / 2 skipped tests, including real `ffmpeg` pixel luminance verification across a white-to-black crossfade cut).
+- `@growthos/web`: `ad-studio-video-routes.test.ts` under Firestore emulator (25 tests passed) + `video-studio.test.tsx`, `hardcoded-strings.test.ts`, `messages.test.ts`, `ad-studio-plain-video-copy.test.ts`, and `hebrew-neutral-address-copy.test.ts` (5 files, 40 tests passed).
+- Monorepo `pnpm lint` (9/9) and `pnpm typecheck` passed with zero Hebrew literals in code files.
+
+### Key files
+- `packages/ad-studio/src/{ffmpeg.ts,ffmpeg.test.ts,video-pipeline.ts}`
+- `apps/web/components/ad-studio/{video-studio.tsx,video-studio.test.tsx}`
+- `apps/web/messages/{en,he}.json`
+
+---
+
 ## 2026-11-17 — Ad Studio: project media gallery, computer video/image uploads, and automatic URL page scanner
 
 ### Shipped
