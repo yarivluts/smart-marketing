@@ -1256,7 +1256,11 @@ export function VideoStudio({
             <h3 className="font-pp-display text-base font-bold">{t('video.finalTitle')}</h3>
             {!progress.canAssemble ? (
               <p className="text-xs text-muted-foreground">{t('video.assembleHint')}</p>
-            ) : null}
+            ) : (
+              <p className="text-xs text-muted-foreground" data-testid="ad-studio-final-transition-hint">
+                {t('video.assembleTransitionHint')}
+              </p>
+            )}
           </div>
           {confirmAssemble ? (
             <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-warning/40 bg-warning/10 px-3 py-1.5 text-sm" role="alertdialog" aria-label={t('video.assembleFlagged', { scenes: flaggedScenesText, count: flaggedScenes.length })}>

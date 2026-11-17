@@ -6,12 +6,15 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
+  AD_STUDIO_TRANSITION_SECONDS,
   buildConcatArgs,
   buildNarrationMixArgs,
   concatClips,
   fitNarration,
   mixNarration,
   NARRATION_MAX_TEMPO,
+  plannedConcatSeconds,
+  transitionSecondsBetween,
   defaultFfmpegRunner,
   FfmpegFailedError,
   FfmpegUnavailableError,
@@ -66,17 +69,66 @@ describe('buildConcatArgs', () => {
     expect(args).toContain('anullsrc=channel_layout=stereo:sample_rate=48000');
     const filter = args[args.indexOf('-filter_complex') + 1];
     // Cover, never letterbox: a clip of another shape fills the frame and is cropped from the centre.
-    expect(filter).toContain('[0:v:0]trim=duration=5,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1');
+    expect(filter).toContain('[0:v:0]trim=duration=5,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=0.25,trim=duration=5,setpts=PTS-STARTPTS,format=yuv420p,settb=1/30[v0]');
     expect(filter).not.toContain('color=black');
     expect(filter).toContain('[0:a:0]atrim=duration=5');
     // The mute clip's audio comes from the silent source, input 2.
     expect(filter).toContain('[2:a:0]atrim=duration=7.5');
-    expect(filter).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]');
+    expect(filter).toContain('[v0][v1]xfade=transition=fade:duration=0.25:offset=4.75[vout]');
+    expect(filter).toContain('[a0][a1]acrossfade=d=0.25:c1=tri:c2=tri[aout]');
     expect(args.slice(-3)).toEqual(['-t', '60', 'out.mp4']);
     expect(args).toEqual(expect.arrayContaining(['-c:v', 'libx264', '-c:a', 'aac', '-movflags', '+faststart']));
     // Plays in every browser and on iOS: H.264 High at level 4.0, 4:2:0.
     expect(args.join(' ')).toContain('-profile:v high -level:v 4.0');
     expect(args.join(' ')).toContain('-pix_fmt yuv420p');
+  });
+
+  it('chains 3 clips with cumulative offsets, keeps single-clip concat, and supports short/zero transition opt-outs', () => {
+    expect(AD_STUDIO_TRANSITION_SECONDS).toBe(0.25);
+    expect(transitionSecondsBetween(5, 5)).toBe(0.25);
+    expect(transitionSecondsBetween(0.3, 5)).toBe(0.1);
+    expect(transitionSecondsBetween(0.1, 5)).toBe(0);
+    expect(transitionSecondsBetween(5, 5, 0)).toBe(0);
+    expect(plannedConcatSeconds([{ seconds: 5 }, { seconds: 6 }, { seconds: 4 }])).toBe(14.5);
+
+    const single = buildConcatArgs({ inputs: [{ file: 'a.mp4', seconds: 3, hasAudio: true }], output: 'o.mp4', format: 'vertical' });
+    expect(single[single.indexOf('-filter_complex') + 1]).toContain('[v0][a0]concat=n=1:v=1:a=1[vout][aout]');
+
+    const three = buildConcatArgs({
+      inputs: [
+        { file: 'a.mp4', seconds: 4, hasAudio: true },
+        { file: 'b.mp4', seconds: 3, hasAudio: false },
+        { file: 'c.mp4', seconds: 5, hasAudio: true },
+      ],
+      output: 'o.mp4',
+      format: 'vertical',
+    });
+    const threeFilter = three[three.indexOf('-filter_complex') + 1];
+    expect(threeFilter).toContain('[v0][v1]xfade=transition=fade:duration=0.25:offset=3.75[vx1]');
+    expect(threeFilter).toContain('[a0][a1]acrossfade=d=0.25:c1=tri:c2=tri[ax1]');
+    expect(threeFilter).toContain('[vx1][v2]xfade=transition=fade:duration=0.25:offset=6.5[vout]');
+    expect(threeFilter).toContain('[ax1][a2]acrossfade=d=0.25:c1=tri:c2=tri[aout]');
+
+    const noFade = buildConcatArgs({
+      inputs: [
+        { file: 'a.mp4', seconds: 4, hasAudio: true },
+        { file: 'b.mp4', seconds: 4, hasAudio: true },
+      ],
+      output: 'o.mp4',
+      format: 'vertical',
+      transitionSeconds: 0,
+    });
+    expect(noFade[noFade.indexOf('-filter_complex') + 1]).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]');
+
+    const tinyClip = buildConcatArgs({
+      inputs: [
+        { file: 'a.mp4', seconds: 4, hasAudio: true },
+        { file: 'b.mp4', seconds: 0.1, hasAudio: true },
+      ],
+      output: 'o.mp4',
+      format: 'vertical',
+    });
+    expect(tinyClip[tinyClip.indexOf('-filter_complex') + 1]).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1[vout][aout]');
   });
 
   it('still letterboxes a clip asked to pad', () => {
@@ -110,7 +162,8 @@ describe('buildConcatArgs', () => {
     // Clips 0-1, the silence for clip b is 2, the overlay is 3.
     expect(args.slice(args.lastIndexOf('-i'), args.lastIndexOf('-i') + 2)).toEqual(['-i', 'brand.png']);
     const filter = args[args.indexOf('-filter_complex') + 1];
-    expect(filter).toContain('concat=n=2:v=1:a=1[vjoined][aout]');
+    expect(filter).toContain('[v0][v1]xfade=transition=fade:duration=0.25:offset=4.75[vjoined]');
+    expect(filter).toContain('[a0][a1]acrossfade=d=0.25:c1=tri:c2=tri[aout]');
     expect(filter).toContain('[3:v:0]scale=720:1280,format=rgba[brand]');
     expect(filter).toContain('[vjoined][brand]overlay=0:0');
     expect(filter).toMatch(/\[vout\]$/);
@@ -196,12 +249,44 @@ describe.skipIf(!hasFfmpeg)('with a real ffmpeg binary', () => {
 
     const output = path.join(dir, 'out.mp4');
     const result = await concatClips({ clips: [{ file: first, seconds: 2 }, { file: second, seconds: 2 }], output, format: 'vertical', runner: realRunner });
-    expect(result.durationSeconds).toBeGreaterThan(3.8);
-    expect(result.durationSeconds).toBeLessThan(4.3);
+    expect(result.durationSeconds).toBeGreaterThan(3.55);
+    expect(result.durationSeconds).toBeLessThan(4.05);
     expect((await stat(output)).size).toBeGreaterThan(1000);
     const probe = await probeMedia(output, realRunner);
     expect(probe).toMatchObject({ hasVideo: true, hasAudio: true });
-    expect(probe.durationSeconds).toBeGreaterThan(3.8);
+    expect(probe.durationSeconds).toBeGreaterThan(3.55);
+  }, 60_000);
+
+  it('smoothly crossfades frames across the cut without fading in from black at t=0', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-ffmpeg-'));
+    workDirs.push(dir);
+    const bright = path.join(dir, 'bright.mp4');
+    const dark = path.join(dir, 'dark.mp4');
+    const make = (args: string[]) => expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', ...args], { windowsHide: true }).status).toBe(0);
+    make(['-f', 'lavfi', '-i', 'color=c=white:size=360x640:rate=24:duration=2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', bright]);
+    make(['-f', 'lavfi', '-i', 'color=c=black:size=640x360:rate=30:duration=2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', dark]);
+
+    const output = path.join(dir, 'fade.mp4');
+    const result = await concatClips({ clips: [{ file: bright, seconds: 2 }, { file: dark, seconds: 2 }], output, format: 'vertical', runner: realRunner });
+    expect(result.durationSeconds).toBeGreaterThan(3.55);
+    expect(result.durationSeconds).toBeLessThan(4.05);
+
+    const { default: sharp } = await import('sharp');
+    const centerLum = async (atSeconds: number): Promise<number> => {
+      const framePath = path.join(dir, `frame-${atSeconds}.png`);
+      expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(atSeconds), '-i', output, '-frames:v', '1', framePath], { windowsHide: true }).status).toBe(0);
+      const { data, info } = await sharp(framePath).raw().toBuffer({ resolveWithObject: true });
+      const idx = (Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)) * info.channels;
+      return data[idx];
+    };
+
+    // Start frame stays bright (#t=0.001/#t=0.1 thumbnails), midpoint of the 1.75s..2.00s transition is grey, and second clip is dark.
+    expect(await centerLum(0.05)).toBeGreaterThan(225);
+    expect(await centerLum(1.0)).toBeGreaterThan(225);
+    const mid = await centerLum(1.875);
+    expect(mid).toBeGreaterThan(60);
+    expect(mid).toBeLessThan(195);
+    expect(await centerLum(2.5)).toBeLessThan(30);
   }, 60_000);
 
   it('joins clips under a brand strip overlay', async () => {
@@ -353,13 +438,14 @@ describe('screen recordings in an ad', () => {
     expect(graph).toContain('[1:v:0]trim=start=12.5:duration=5,setpts=PTS-STARTPTS,fps=30,split=2[bgsrc1][fgsrc1]');
     expect(graph).toContain('[bgsrc1]scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,boxblur=24:2,eq=brightness=-0.22[bg1]');
     expect(graph).toContain('[fgsrc1]scale=662:1178:force_original_aspect_ratio=decrease:force_divisible_by=2[fg1]');
-    expect(graph).toContain('[bg1][fg1]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v1]');
+    expect(graph).toContain('[bg1][fg1]overlay=(W-w)/2:(H-h)/2,setsar=1,tpad=stop_mode=clone:stop_duration=0.25,trim=duration=5,setpts=PTS-STARTPTS,format=yuv420p,settb=1/30[v1]');
     // The silent moment gets a silent track of its own length, from the start.
     expect(args.join(' ')).toContain('-f lavfi -t 5 -i anullsrc=channel_layout=stereo:sample_rate=48000');
     expect(graph).toContain('[2:a:0]atrim=duration=5,');
     // The scene clip keeps the plain, full-frame fit.
     expect(graph).toContain('[0:v:0]trim=duration=4,setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280');
-    expect(graph).toContain('[v0][a0][v1][a1]concat=n=2:v=1:a=1');
+    expect(graph).toContain('[v0][v1]xfade=transition=fade:duration=0.25:offset=3.75[vout]');
+    expect(graph).toContain('[a0][a1]acrossfade=d=0.25:c1=tri:c2=tri[aout]');
   });
 
   it('frames a moment in a horizontal ad too, and trims a clip with sound from the same start', () => {
@@ -382,8 +468,8 @@ describe.skipIf(!hasFfmpeg)('a screen recording with a real ffmpeg binary', () =
     make(['-f', 'lavfi', '-i', 'testsrc=size=1280x800:rate=30:duration=8', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', demo]);
     const output = path.join(dir, 'out.mp4');
     const result = await concatClips({ clips: [{ file: scene, seconds: 2 }, { file: demo, seconds: 3, startSeconds: 4, fit: 'screen' }], output, format: 'vertical', runner: realRunner });
-    expect(result.durationSeconds).toBeGreaterThan(4.7);
-    expect(result.durationSeconds).toBeLessThan(5.4);
+    expect(result.durationSeconds).toBeGreaterThan(4.55);
+    expect(result.durationSeconds).toBeLessThan(5.1);
     expect(await probeMedia(output, realRunner)).toMatchObject({ hasVideo: true, hasAudio: true });
   }, 60_000);
 });

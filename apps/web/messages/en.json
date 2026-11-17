@@ -4356,6 +4356,7 @@
       "assemble": "Assemble video",
       "assembling": "Assembling...",
       "assembleHint": "Every scene needs a ready, current clip before the video can be assembled.",
+      "assembleTransitionHint": "Scenes are joined with a quick, smooth fade between clips.",
       "finalTitle": "Finished video",
       "finalMeta": "{seconds}s · assembled {when}",
       "finalOutOfDate": "The clips changed after this video was assembled. Assemble again to include them.",

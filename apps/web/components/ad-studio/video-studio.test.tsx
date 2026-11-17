@@ -319,6 +319,7 @@ describe('VideoStudio', () => {
     const fetchMock = vi.fn(async () => json({ video, clips, videos: [video] }));
     vi.stubGlobal('fetch', fetchMock);
     renderStudio({ initialClips: clips });
+    expect(screen.getByTestId('ad-studio-final-transition-hint')).toHaveTextContent('Scenes are joined with a quick, smooth fade between clips.');
     expect(screen.getByText('No assembled video yet.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Assemble video' }));
     await waitFor(() => expect(screen.getByTestId('ad-studio-final-player')).toHaveAttribute('src', `${BASE}/videos/v1/media#t=0.1`));
