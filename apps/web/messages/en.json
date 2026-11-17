@@ -6659,6 +6659,11 @@
           "why": "The audience could not be chosen last time. The pilot can try again.",
           "request": "Choose the audience again."
         },
+        "audience_declined": {
+          "title": "Choose different people to show the ads to",
+          "why": "You said no to the last choice of who sees the ads. The pilot can pick other people.",
+          "request": "Choose a different audience."
+        },
         "raise_budget": {
           "title": "Raise the daily budget",
           "why": "People click and sign up or buy, and the ads spend nearly all of their budget every day. A bigger budget can reach more people like them.",

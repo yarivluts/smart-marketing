@@ -9,7 +9,7 @@ import type { GrowthProposalView, GrowthTargetView } from './view';
  * project's thresholds (an admin setting over platform defaults); given them, this is a pure function.
  */
 
-export const GROWTH_SUGGESTIONS = ['no_clicks', 'low_ctr', 'no_conversions', 'raise_budget', 'add_video', 'retry_video', 'ads_failed', 'ads_declined', 'landing_failed', 'landing_declined', 'audience_failed'] as const;
+export const GROWTH_SUGGESTIONS = ['no_clicks', 'low_ctr', 'no_conversions', 'raise_budget', 'add_video', 'retry_video', 'ads_failed', 'ads_declined', 'landing_failed', 'landing_declined', 'audience_failed', 'audience_declined'] as const;
 export type GrowthSuggestionId = (typeof GROWTH_SUGGESTIONS)[number];
 
 export type GrowthSuggestion = { id: GrowthSuggestionId; action: 'change'; area: GrowthChangeArea } | { id: GrowthSuggestionId; action: 'video' } | { id: GrowthSuggestionId; action: 'budget' };
@@ -89,5 +89,6 @@ export function growthSuggestions(input: GrowthSuggestionInput): GrowthSuggestio
   if (can('landing') && target.landingStatus === 'failed') out.push({ id: 'landing_failed', action: 'change', area: 'landing' });
   if (can('landing') && target.landingStatus === 'rejected') out.push({ id: 'landing_declined', action: 'change', area: 'landing' });
   if (can('audience') && target.audienceStatus === 'failed') out.push({ id: 'audience_failed', action: 'change', area: 'audience' });
+  if (can('audience') && target.audienceStatus === 'rejected') out.push({ id: 'audience_declined', action: 'change', area: 'audience' });
   return out;
 }
