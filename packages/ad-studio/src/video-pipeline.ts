@@ -4,10 +4,14 @@ import path from 'node:path';
 import {
   AD_STUDIO_ASPECT_RATIO,
   AD_STUDIO_CLIP_TIMEOUT_MS,
+  AD_STUDIO_MAX_SCENE_REFERENCES,
   AD_STUDIO_MAX_TOTAL_SECONDS,
+  AD_STUDIO_REFERENCE_DESCRIPTION_MAX,
+  AD_STUDIO_REFERENCE_LABEL_MAX,
   AD_STUDIO_VIDEO_BRAND_BANNER,
   AD_STUDIO_VIDEO_BRAND_BANNER_OPACITY,
   assemblyPlan,
+  galleryLabelFromFileName,
   planDemoInserts,
   buildSceneEditInstruction,
   buildScenePrompt,
@@ -24,6 +28,8 @@ import {
   ttsNarrationStyle,
   ttsVoiceName,
   AD_STUDIO_DEFAULT_TTS_VOICE,
+  type AdStudioGallerySourceRef,
+  type AdStudioReferenceUse,
   type AdStudioScene,
   type AdStudioClipSummary,
   type AdStudioVideoContext,
@@ -47,6 +53,7 @@ import {
   recordAdStudioClipProgress,
   recordAdStudioUsage,
   releaseAdStudioClipLease,
+  saveAdStudioScript,
   type AdStudioBriefModel,
   type AdStudioClipModel,
   type AdStudioDemoRecordingModel,
@@ -57,11 +64,18 @@ import { adStudioRuntime, ensureOrm } from './runtime';
 import { AdStudioProviderError, resolveAdStudioLlm, resolveAdStudioReviewer, type AdStudioLlm, type AdStudioProviderErrorCode, type AdStudioReviewer } from './llm';
 import { saveAdStudioScriptWithPronunciation } from './vocalize';
 import { checkAdStudioClip } from './qa';
-import { loadSceneReferences } from './references';
+import { addUploadedReference, loadSceneReferences, toAdStudioReferenceView } from './references';
 import { englishForModel } from './translate';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
-import type { AdStudioClipView, AdStudioVideoView } from './view';
+import type { AdStudioClipView, AdStudioReferenceView, AdStudioVideoView } from './view';
+import {
+  AdStudioGalleryRequestError,
+  addUploadedGalleryAsset,
+  normalizeUploadedImage,
+  normalizeVideoClipForScene,
+  resolveGallerySource,
+} from './gallery';
 import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, mixNarration, type FfmpegRunner } from './ffmpeg';
 import { resolveAdStudioTts, type AdStudioTts } from './tts';
 import { brandStripLayer } from './ad-typography';
@@ -835,4 +849,194 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
   } finally {
     await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+/**
+ * Replaces or sets a scene's active video clip from a user upload, a project gallery video, an
+ * existing clip, or a scanned walkthrough moment (zero AI credits charged).
+ */
+export async function useCustomClipForScene(
+  ctx: BriefContext & {
+    sceneId: string;
+    upload?: { bytes: Buffer; fileName?: string | null; label?: string | null };
+    source?: AdStudioGallerySourceRef;
+    alsoSaveToGallery?: boolean;
+    durationSeconds?: number;
+  },
+  deps: { storage?: AdStudioMediaStorage; runner?: FfmpegRunner; now?: Date } = {},
+): Promise<AdStudioClipModel> {
+  await ensureOrm();
+  const storage = deps.storage ?? resolveAdStudioMediaStorage();
+  const now = deps.now ?? new Date();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const scene = brief.scenes.find((candidate) => candidate.id === ctx.sceneId);
+  if (!scene) throw new AdStudioVideoRequestError('scene_not_found');
+  const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
+  if (generatingFor(clips, ctx.sceneId)) throw new AdStudioVideoRequestError('already_generating');
+
+  let rawBytes: Buffer;
+  let label: string;
+  let startSeconds: number | undefined;
+  let endSeconds: number | undefined;
+  if (ctx.upload) {
+    rawBytes = ctx.upload.bytes;
+    label = (ctx.upload.label ?? '').trim() || galleryLabelFromFileName(ctx.upload.fileName ?? '') || 'Uploaded clip';
+  } else if (ctx.source) {
+    const resolved = await resolveGallerySource(
+      { organizationId: ctx.organizationId, projectId: ctx.projectId },
+      ctx.source,
+      'video',
+      { storage, runner: deps.runner },
+    );
+    rawBytes = resolved.bytes;
+    label = resolved.label || 'Gallery clip';
+    startSeconds = resolved.startSeconds;
+    endSeconds = resolved.endSeconds;
+  } else {
+    throw new AdStudioGalleryRequestError('invalid_input');
+  }
+
+  const aspectRatio = AD_STUDIO_ASPECT_RATIO[brief.video_format];
+  const rawResolution = normalizeVideoSettings(brief.video_settings).resolution;
+  const resolution = rawResolution === '1080p' ? '1080p' : '720p';
+  const normalized = await normalizeVideoClipForScene({
+    bytes: rawBytes,
+    aspectRatio,
+    resolution,
+    durationSeconds: ctx.durationSeconds ?? scene.durationSeconds,
+    startSeconds,
+    endSeconds,
+    runner: deps.runner,
+  });
+
+  if (ctx.upload && ctx.alsoSaveToGallery) {
+    await addUploadedGalleryAsset(
+      { organizationId: ctx.organizationId, projectId: ctx.projectId, actorId: ctx.actorId },
+      { bytes: ctx.upload.bytes, fileName: ctx.upload.fileName, label },
+      { storage, runner: deps.runner, now },
+    ).catch(() => null);
+  }
+
+  const clip = await createAdStudioClip({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    briefId: ctx.briefId,
+    sceneId: scene.id,
+    sceneFingerprint: sceneFingerprint(scene, videoContext(brief)),
+    kind: 'upload',
+    parentClipId: null,
+    prompt: label,
+    model: 'upload',
+    aspectRatio,
+    resolution,
+    durationSeconds: normalized.durationSeconds,
+    requestedBy: ctx.actorId,
+    narration: null,
+    now,
+  });
+
+  const objectPath = adStudioClipObjectPath({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    briefId: ctx.briefId,
+    clipId: clip.id,
+  });
+  try {
+    await storage.upload(objectPath, normalized.bytes, normalized.mimeType);
+  } catch (error) {
+    await markAdStudioClipFailed(clip, 'storage_error', now);
+    throw error;
+  }
+  await markAdStudioClipReady(clip, { gcsPath: objectPath, now });
+  return await chooseAdStudioClip(ctx.organizationId, ctx.projectId, ctx.briefId, clip.id);
+}
+
+/**
+ * Attaches a computer upload, project gallery photo, or scanned product screen as a scene
+ * reference image on the brief's script so rendering respects it.
+ */
+export async function attachImageToBriefScene(
+  ctx: BriefContext & {
+    sceneId: string;
+    upload?: { bytes: Buffer; fileName?: string | null; label?: string | null; description?: string | null };
+    source?: AdStudioGallerySourceRef;
+    use?: AdStudioReferenceUse;
+    alsoSaveToGallery?: boolean;
+  },
+  deps: { storage?: AdStudioMediaStorage; runner?: FfmpegRunner; now?: Date } = {},
+): Promise<{ reference: AdStudioReferenceView; scenes: AdStudioScene[] }> {
+  await ensureOrm();
+  const storage = deps.storage ?? resolveAdStudioMediaStorage();
+  const now = deps.now ?? new Date();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  if (!brief.scenes.some((candidate) => candidate.id === ctx.sceneId)) {
+    throw new AdStudioVideoRequestError('scene_not_found');
+  }
+
+  let rawBytes: Buffer;
+  let label: string;
+  let description: string;
+  if (ctx.upload) {
+    rawBytes = ctx.upload.bytes;
+    label = (ctx.upload.label ?? '').trim() || galleryLabelFromFileName(ctx.upload.fileName ?? '') || 'Scene image';
+    description = (ctx.upload.description ?? '').trim();
+  } else if (ctx.source) {
+    const resolved = await resolveGallerySource(
+      { organizationId: ctx.organizationId, projectId: ctx.projectId },
+      ctx.source,
+      'image',
+      { storage, runner: deps.runner },
+    );
+    rawBytes = resolved.bytes;
+    label = resolved.label || 'Scene image';
+    description = resolved.description;
+  } else {
+    throw new AdStudioGalleryRequestError('invalid_input');
+  }
+
+  const normalized = await normalizeUploadedImage(rawBytes);
+  if (ctx.upload && ctx.alsoSaveToGallery) {
+    await addUploadedGalleryAsset(
+      { organizationId: ctx.organizationId, projectId: ctx.projectId, actorId: ctx.actorId },
+      { bytes: ctx.upload.bytes, fileName: ctx.upload.fileName, label, description },
+      { storage, runner: deps.runner, now },
+    ).catch(() => null);
+  }
+
+  const referenceModel = await addUploadedReference(
+    {
+      organizationId: ctx.organizationId,
+      projectId: ctx.projectId,
+      briefId: ctx.briefId,
+      label: label.slice(0, AD_STUDIO_REFERENCE_LABEL_MAX) || 'Scene image',
+      description: description.slice(0, AD_STUDIO_REFERENCE_DESCRIPTION_MAX),
+      bytes: normalized.bytes,
+      actorId: ctx.actorId,
+      now,
+    },
+    storage,
+  );
+
+  const use: AdStudioReferenceUse = ctx.use ?? 'screen';
+  const nextScenes = brief.scenes.map((scene) => {
+    if (scene.id !== ctx.sceneId) return scene;
+    const filtered = (scene.references ?? []).filter((entry) => {
+      if (entry.imageId === referenceModel.id) return false;
+      if (use === 'first_frame' && entry.use === 'first_frame') return false;
+      return true;
+    });
+    const attached = [...filtered, { imageId: referenceModel.id, use }].slice(-AD_STUDIO_MAX_SCENE_REFERENCES);
+    return { ...scene, references: attached };
+  });
+
+  const savedBrief = await saveAdStudioScript({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    briefId: ctx.briefId,
+    scenes: nextScenes,
+    generatedBy: brief.script_generated_by ?? null,
+    now,
+  });
+
+  return { reference: toAdStudioReferenceView(referenceModel), scenes: savedBrief.scenes };
 }

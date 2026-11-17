@@ -58,7 +58,7 @@ export interface AdStudioClipView {
   id: string;
   sceneId: string;
   version: number;
-  kind: 'render' | 'edit';
+  kind: 'render' | 'edit' | 'upload';
   status: 'generating' | 'ready' | 'failed';
   failureReason: string | null;
   sceneFingerprint: string;
@@ -102,7 +102,7 @@ export interface AdStudioImageView {
   id: string;
   conceptId: string;
   format: AdStudioImageFormat;
-  kind: 'render' | 'edit';
+  kind: 'render' | 'edit' | 'upload';
   version: number;
   status: 'generating' | 'ready' | 'failed';
   selected: boolean;

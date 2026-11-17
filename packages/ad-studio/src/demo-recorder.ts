@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -14,6 +15,7 @@ import {
   assertAdStudioQuota,
   assertPublicHttpsUrl,
   createAdStudioDemoRecording,
+  createAdStudioGalleryAsset,
   getAdStudioDemoAccess,
   listAdStudioBriefs,
   listAdStudioDemoRecordings,
@@ -27,7 +29,13 @@ import {
 import { adStudioRuntime, ensureOrm } from './runtime';
 import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './llm';
 import { meteredCall } from './metering';
-import { adStudioDemoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
+import {
+  adStudioDemoObjectPath,
+  adStudioDemoSegmentFrameObjectPath,
+  adStudioGalleryObjectPath,
+  resolveAdStudioMediaStorage,
+  type AdStudioMediaStorage,
+} from './media-storage';
 import { defaultFfmpegRunner, FfmpegFailedError, FfmpegUnavailableError, runFfmpeg, type FfmpegRunner } from './ffmpeg';
 import { serverKms } from './planning-sources';
 import { createPlaywrightDemoLauncher } from './demo-browser';
@@ -262,7 +270,7 @@ export interface DemoTourResult {
  */
 export async function runDemoTour(params: {
   launchBrowser: DemoBrowserLauncher;
-  credentials: { loginUrl: string; username: string; password: string };
+  credentials: { loginUrl: string; username: string; password: string; publicSite?: boolean };
   context: DemoTourContext;
   /** One guide decision; the caller meters it. */
   decideStep: (system: string, user: string) => Promise<TourStep>;
@@ -304,17 +312,20 @@ export async function runDemoTour(params: {
   const elapsed = () => params.now() - startedAt - pausedMs;
   try {
     if (!(await driver.open(params.credentials.loginUrl))) throw new DemoRecorderError('site_unreachable');
-    let outcome: 'submitted' | 'no_form';
-    try {
-      outcome = await driver.login({ username: params.credentials.username, password: params.credentials.password });
-    } catch {
-      // Whatever went wrong while typing, the error is never passed on: it could quote the form.
-      throw new DemoRecorderError('login_form_not_found');
+    const skipLogin = Boolean(params.credentials.publicSite) || (!params.credentials.username.trim() && !params.credentials.password);
+    if (!skipLogin) {
+      let outcome: 'submitted' | 'no_form';
+      try {
+        outcome = await driver.login({ username: params.credentials.username, password: params.credentials.password });
+      } catch {
+        // Whatever went wrong while typing, the error is never passed on: it could quote the form.
+        throw new DemoRecorderError('login_form_not_found');
+      }
+      if (outcome === 'no_form') throw new DemoRecorderError('login_form_not_found');
+      if (await driver.passwordFieldVisible()) throw new DemoRecorderError('login_failed');
     }
-    if (outcome === 'no_form') throw new DemoRecorderError('login_form_not_found');
-    if (await driver.passwordFieldVisible()) throw new DemoRecorderError('login_failed');
 
-    // Signed in: from here no form is submitted, and navigation stays on the app's sites.
+    // Signed in (or scanning a public site without login): from here no form is submitted, and navigation stays on the app's sites.
     const landed = siteOf(driver.url());
     if (landed) sites.add(landed);
     state.loggedIn = true;
@@ -537,7 +548,33 @@ export async function recordProductWalkthrough(
     } catch {
       throw new DemoRecorderError('storage_error');
     }
-    return await markAdStudioDemoRecordingReady(recording, { gcsPath: objectPath, durationSeconds: Math.round(tour.durationMs / 10) / 100, segments, now: nowDate() });
+    const segmentsWithFrames = await Promise.all(
+      segments.map(async (seg) => {
+        const keyframe = pickSegmentKeyframe(tour.frames, seg.startSeconds, seg.endSeconds);
+        if (!keyframe) return seg;
+        const frameGcsPath = adStudioDemoSegmentFrameObjectPath({
+          organizationId: ctx.organizationId,
+          projectId: ctx.projectId,
+          recordingId: recording.id,
+          segmentId: seg.id,
+        });
+        try {
+          await deps.storage.upload(frameGcsPath, keyframe.data, 'image/jpeg');
+        } catch {
+          return seg;
+        }
+        if (seg.selected) {
+          await saveWalkthroughFrameToGallery(ctx, seg, keyframe.data, deps.storage, nowDate());
+        }
+        return { ...seg, frameGcsPath };
+      }),
+    );
+    return await markAdStudioDemoRecordingReady(recording, {
+      gcsPath: objectPath,
+      durationSeconds: Math.round(tour.durationMs / 10) / 100,
+      segments: segmentsWithFrames,
+      now: nowDate(),
+    });
   } catch (error) {
     const code = failureCode(error);
     const message = redactSecrets(error instanceof Error ? error.message : String(error), [access.password, access.username]);
@@ -551,5 +588,64 @@ function siteHost(loginUrl: string): string | null {
     return new URL(loginUrl).host;
   } catch {
     return null;
+  }
+}
+
+/** Picks the captured screenshot frame closest to the midpoint of `[startSeconds, endSeconds]`. */
+export function pickSegmentKeyframe<T extends { atMs: number }>(
+  frames: readonly T[],
+  startSeconds: number,
+  endSeconds: number,
+): T | null {
+  if (frames.length === 0) return null;
+  const startMs = Math.max(0, startSeconds * 1000);
+  const endMs = Math.max(startMs, endSeconds * 1000);
+  const targetMs = (startMs + endMs) / 2;
+  const inWindow = frames.filter((f) => f.atMs >= startMs && f.atMs <= endMs);
+  const pool = inWindow.length > 0 ? inWindow : frames;
+  let best = pool[0];
+  let bestDist = Math.abs(best.atMs - targetMs);
+  for (let i = 1; i < pool.length; i++) {
+    const dist = Math.abs(pool[i].atMs - targetMs);
+    if (dist < bestDist) {
+      best = pool[i];
+      bestDist = dist;
+    }
+  }
+  return best;
+}
+
+async function saveWalkthroughFrameToGallery(
+  ctx: { organizationId: string; projectId: string; actorId: string },
+  segment: { title: string; description: string },
+  jpegBytes: Buffer,
+  storage: AdStudioMediaStorage,
+  now: Date,
+): Promise<void> {
+  const assetId = randomUUID();
+  const gcsPath = adStudioGalleryObjectPath({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    assetId,
+    mimeType: 'image/jpeg',
+  });
+  try {
+    await storage.upload(gcsPath, jpegBytes, 'image/jpeg');
+    await createAdStudioGalleryAsset({
+      organizationId: ctx.organizationId,
+      projectId: ctx.projectId,
+      id: assetId,
+      kind: 'image',
+      source: 'walkthrough',
+      label: segment.title.trim().slice(0, 80) || 'Product screen',
+      description: segment.description.trim().slice(0, 300),
+      gcsPath,
+      mimeType: 'image/jpeg',
+      byteSize: jpegBytes.length,
+      actorId: ctx.actorId,
+      now,
+    });
+  } catch {
+    await storage.deletePrefix(gcsPath).catch(() => {});
   }
 }

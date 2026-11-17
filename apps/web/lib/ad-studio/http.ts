@@ -23,9 +23,18 @@ import {
   AdStudioDemoAccessInvalidError,
   AdStudioDemoRecordingNotFoundError,
   AdStudioDemoSegmentsInvalidError,
+  AdStudioGalleryAssetNotFoundError,
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
-import { AdStudioAssemblyError, AdStudioDemoRequestError, AdStudioImageRequestError, AdStudioProviderError, AdStudioReferenceRequestError, AdStudioVideoRequestError } from './engine';
+import {
+  AdStudioAssemblyError,
+  AdStudioDemoRequestError,
+  AdStudioGalleryRequestError,
+  AdStudioImageRequestError,
+  AdStudioProviderError,
+  AdStudioReferenceRequestError,
+  AdStudioVideoRequestError,
+} from './engine';
 
 const IMAGE_REQUEST_STATUS: Record<AdStudioImageRequestError['code'], number> = {
   concept_not_found: 404,
@@ -59,6 +68,16 @@ const REFERENCE_REQUEST_STATUS: Record<AdStudioReferenceRequestError['code'], nu
   reference_not_ready: 409,
 };
 
+const GALLERY_REQUEST_STATUS: Record<AdStudioGalleryRequestError['code'], number> = {
+  unsupported_media: 400,
+  invalid_input: 400,
+  ffmpeg_failed: 400,
+  asset_not_found: 404,
+  source_not_ready: 409,
+  media_too_large: 413,
+  ffmpeg_unavailable: 503,
+};
+
 /**
  * Maps every Ad Studio failure to a stable JSON code the UI translates. Unknown errors are
  * rethrown so the framework's normal 500 handling (and logging) applies.
@@ -78,7 +97,8 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
     error instanceof AdStudioImageNotFoundError ||
     error instanceof AdStudioRunNotFoundError ||
     error instanceof AdStudioReferenceNotFoundError ||
-    error instanceof AdStudioDemoRecordingNotFoundError
+    error instanceof AdStudioDemoRecordingNotFoundError ||
+    error instanceof AdStudioGalleryAssetNotFoundError
   ) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
@@ -121,6 +141,9 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof AdStudioReferenceInvalidError) {
     return NextResponse.json({ error: 'reference_request', code: error.code }, { status: error.code === 'library_full' ? 409 : 400 });
+  }
+  if (error instanceof AdStudioGalleryRequestError) {
+    return NextResponse.json({ error: 'gallery_request', code: error.code }, { status: GALLERY_REQUEST_STATUS[error.code] });
   }
   if (error instanceof AdStudioRunAlreadyActiveError) {
     return NextResponse.json({ error: 'run_active', runId: error.runId }, { status: 409 });

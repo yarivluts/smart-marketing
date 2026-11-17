@@ -17,3 +17,4 @@ export * from './length-repair';
 export * from './brand-kit';
 export * from './claims';
 export * from './demo';
+export * from './gallery';

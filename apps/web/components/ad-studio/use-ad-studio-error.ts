@@ -60,6 +60,16 @@ const REFERENCE_REQUEST_CODES = new Set([
   'library_full',
 ]);
 
+const GALLERY_REQUEST_CODES = new Set([
+  'unsupported_media',
+  'media_too_large',
+  'asset_not_found',
+  'source_not_ready',
+  'invalid_input',
+  'ffmpeg_unavailable',
+  'ffmpeg_failed',
+]);
+
 /** Turns a route's error body into one translated sentence. */
 export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
   const t = useTranslations('AdStudio');
@@ -82,6 +92,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     }
     if (body.error === 'invalid_video_settings' && body.code && VIDEO_SETTINGS_CODES.has(body.code)) return t(`advanced.errors.${body.code}`);
     if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
+    if (body.error === 'gallery_request' && body.code && GALLERY_REQUEST_CODES.has(body.code)) return t(`mediaGallery.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');
     if (body.error === 'unauthenticated') return t('errorSignedOut');
     if (body.error === 'forbidden') return t('errorForbidden');

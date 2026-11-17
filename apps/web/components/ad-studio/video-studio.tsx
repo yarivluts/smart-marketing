@@ -8,12 +8,14 @@ import {
   ChevronDown,
   Clapperboard,
   Film,
+  Image as ImageIcon,
   Info,
   Loader2,
   Mic,
   Play,
   RefreshCw,
   Save,
+  Upload,
   Wand2,
 } from 'lucide-react';
 import {
@@ -32,6 +34,10 @@ import {
   videoSettingsIssue,
   voiceDescription,
   type AdStudioAdCopy,
+  type AdStudioDemoAccessView,
+  type AdStudioDemoRecordingView,
+  type AdStudioGalleryItemView,
+  type AdStudioGallerySourceRef,
   type AdStudioNarrationMode,
   type AdStudioVoice,
   type AdStudioVideoSettings,
@@ -39,6 +45,8 @@ import {
   type AdStudioScene,
   type AdStudioSceneVideoState,
 } from '@growthos/shared';
+import { MediaGalleryPanel } from './media-gallery-panel';
+import { DemoAccessPanel } from './demo-access-panel';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -97,6 +105,13 @@ export interface VideoStudioProps {
   videoAvailable: boolean;
   /** Seconds of video the project may still generate today. */
   videoSecondsLeft: number;
+  /** Optional trial-site scanner config so scanned pages can be added directly here. */
+  demoConfig?: {
+    access: AdStudioDemoAccessView | null;
+    canEdit: boolean;
+    recordings: AdStudioDemoRecordingView[];
+    recordingAvailable: boolean;
+  };
 }
 
 const POLL_MS = 4000;
@@ -146,6 +161,7 @@ export function VideoStudio({
   videoSettings = null,
   narrationMode = null,
   effectiveNarrationMode = 'voiceover',
+  demoConfig,
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -162,6 +178,10 @@ export function VideoStudio({
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [instructions, setInstructions] = React.useState<Record<string, string>>({});
   const [shown, setShown] = React.useState<Record<string, string>>({});
+  const [galleryPicker, setGalleryPicker] = React.useState<{ sceneId: string; kind: 'video' | 'image' } | null>(null);
+  const [mediaSourcesOpen, setMediaSourcesOpen] = React.useState(false);
+  const [galleryRefresh, setGalleryRefresh] = React.useState(0);
+  const sceneFileInputs = React.useRef<Record<string, HTMLInputElement | null>>({});
   // The clock starts in the browser: an elapsed time rendered on the server never matches the one the
   // browser renders a second later, and React rejects the page (hydration error #418).
   const [now, setNow] = React.useState<Date | null>(null);
@@ -291,6 +311,55 @@ export function VideoStudio({
     } catch {
       setMessage({ tone: 'error', text: t('errorGeneric') });
       return false;
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function submitSceneCustomMedia(
+    sceneId: string,
+    kind: 'video' | 'image',
+    payload: { file?: File; source?: AdStudioGallerySourceRef; alsoSaveToGallery?: boolean },
+  ): Promise<void> {
+    const key = `custom-${kind}:${sceneId}`;
+    setPending(key);
+    setMessage(null);
+    try {
+      const endpoint = kind === 'video' ? `/scenes/${sceneId}/upload-clip` : `/scenes/${sceneId}/attach-image`;
+      let init: RequestInit;
+      if (payload.file) {
+        const form = new FormData();
+        form.set('file', payload.file);
+        if (payload.alsoSaveToGallery !== false) form.set('alsoSaveToGallery', 'true');
+        if (kind === 'image') form.set('use', 'screen');
+        init = { method: 'POST', body: form };
+      } else {
+        init = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: payload.source,
+            ...(kind === 'image' ? { use: 'screen' } : {}),
+          }),
+        };
+      }
+      const response = await fetch(`${base}${endpoint}`, init);
+      const result = (await response.json().catch(() => ({}))) as AdStudioApiError & Listing & { scenes?: AdStudioScene[] };
+      apply(result);
+      if (result.scenes) setScenes(result.scenes);
+      if (!response.ok) {
+        setMessage({ tone: 'error', text: errorMessage(result) });
+        return;
+      }
+      setGalleryPicker(null);
+      setGalleryRefresh((n) => n + 1);
+      setMessage({
+        tone: 'ok',
+        text: kind === 'video' ? t('video.customClipReady') : t('video.imageAttached'),
+      });
+      router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
     } finally {
       setPending(null);
     }
@@ -704,6 +773,66 @@ export function VideoStudio({
             </p>
           </form>
 
+      <details
+        open={mediaSourcesOpen}
+        onToggle={(event) => setMediaSourcesOpen(event.currentTarget.open)}
+        className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy"
+        data-testid="ad-studio-video-media-sources"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3 text-sm font-semibold hover:bg-pp-surface-container-low/60 [&::-webkit-details-marker]:hidden">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <ImageIcon className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div className="min-w-0 text-start">
+              <p className="font-pp-display text-sm font-semibold">{t('video.mediaSourcesTitle')}</p>
+              <p className="line-clamp-1 text-xs font-normal text-muted-foreground">{t('video.mediaSourcesHint')}</p>
+            </div>
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+        </summary>
+        {mediaSourcesOpen ? (
+          <div className="flex flex-col gap-4 border-t border-border/50 p-4">
+            <MediaGalleryPanel
+              orgId={orgId}
+              projectId={projectId}
+              briefId={briefId}
+              refreshKey={galleryRefresh}
+              busy={pending !== null}
+              onSelect={(item: AdStudioGalleryItemView) => {
+                const targetScene = galleryPicker?.sceneId ?? scenes[0]?.id;
+                if (!targetScene) return;
+                void submitSceneCustomMedia(targetScene, item.kind, { source: item.sourceRef });
+              }}
+            />
+            {demoConfig ? (
+              <DemoAccessPanel
+                orgId={orgId}
+                projectId={projectId}
+                access={demoConfig.access}
+                canEdit={demoConfig.canEdit}
+                recordings={demoConfig.recordings}
+                recordingAvailable={demoConfig.recordingAvailable}
+                onUseSegmentVideo={(recordingId, segmentId) => {
+                  const targetScene = galleryPicker?.sceneId ?? scenes[0]?.id;
+                  if (!targetScene) return;
+                  return submitSceneCustomMedia(targetScene, 'video', {
+                    source: { type: 'demo_segment', recordingId, segmentId },
+                  });
+                }}
+                onUseSegmentImage={(recordingId, segmentId) => {
+                  const targetScene = galleryPicker?.sceneId ?? scenes[0]?.id;
+                  if (!targetScene) return;
+                  return submitSceneCustomMedia(targetScene, 'image', {
+                    source: { type: 'demo_segment', recordingId, segmentId },
+                  });
+                }}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </details>
+
       <ol className="flex flex-col gap-3">
         {scenes.map((scene, index) => {
           const state = states[index];
@@ -863,10 +992,84 @@ export function VideoStudio({
                       ? t('video.rerender', { seconds: scene.durationSeconds })
                       : t('video.render', { seconds: scene.durationSeconds })}
                   </button>
+                  <input
+                    ref={(el) => {
+                      sceneFileInputs.current[scene.id] = el;
+                    }}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (file) void submitSceneCustomMedia(scene.id, 'video', { file, alsoSaveToGallery: true });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => sceneFileInputs.current[scene.id]?.click()}
+                    disabled={pending !== null || inFlight !== null}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    data-testid={`ad-studio-scene-upload-clip-${index + 1}`}
+                  >
+                    {pending === `custom-video:${scene.id}` ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {t('video.uploadClip')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGalleryPicker((cur) =>
+                        cur?.sceneId === scene.id && cur.kind === 'video' ? null : { sceneId: scene.id, kind: 'video' },
+                      )
+                    }
+                    disabled={pending !== null || inFlight !== null}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    data-testid={`ad-studio-scene-pick-clip-${index + 1}`}
+                  >
+                    <Film className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('video.chooseFromGallery')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGalleryPicker((cur) =>
+                        cur?.sceneId === scene.id && cur.kind === 'image' ? null : { sceneId: scene.id, kind: 'image' },
+                      )
+                    }
+                    disabled={pending !== null}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    data-testid={`ad-studio-scene-attach-image-${index + 1}`}
+                  >
+                    {pending === `custom-image:${scene.id}` ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {t('video.attachImage')}
+                  </button>
                   {videoAvailable && !inFlight && scene.durationSeconds > videoSecondsLeft ? (
                     <span className="text-xs text-destructive">{t('video.overLimitScene')}</span>
                   ) : null}
                 </div>
+
+                {galleryPicker?.sceneId === scene.id ? (
+                  <MediaGalleryPanel
+                    orgId={orgId}
+                    projectId={projectId}
+                    briefId={briefId}
+                    acceptKind={galleryPicker.kind}
+                    title={galleryPicker.kind === 'video' ? t('mediaGallery.pickerTitleVideo') : t('mediaGallery.pickerTitleImage')}
+                    refreshKey={galleryRefresh}
+                    busy={pending !== null}
+                    onSelect={(item) => void submitSceneCustomMedia(scene.id, galleryPicker.kind, { source: item.sourceRef })}
+                    onUploadFile={(file, save) => submitSceneCustomMedia(scene.id, galleryPicker.kind, { file, alsoSaveToGallery: save })}
+                    onClose={() => setGalleryPicker(null)}
+                  />
+                ) : null}
 
                 {readyClips.length > 0 ? (
                   <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
@@ -935,7 +1138,9 @@ export function VideoStudio({
                             <span className="text-muted-foreground" dir="auto">
                               {clip.kind === 'edit'
                                 ? t('video.versionEdit', { instruction: clip.instruction ?? '' })
-                                : t('video.versionRender')}
+                                : clip.kind === 'upload'
+                                  ? t('video.versionUpload')
+                                  : t('video.versionRender')}
                             </span>
                           </span>
                           <span className="flex items-center gap-2">

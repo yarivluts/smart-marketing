@@ -79,6 +79,7 @@ import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { BrandKitPanel } from '@/components/ad-studio/brand-kit-panel';
 import { DemoAccessPanel } from '@/components/ad-studio/demo-access-panel';
+import { MediaGalleryPanel } from '@/components/ad-studio/media-gallery-panel';
 import { BrandLogoProvider } from '@/components/ad-studio/brand-logo';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { KeywordResearch } from '@/components/ad-studio/keyword-research';
@@ -702,6 +703,12 @@ export default async function AdStudioPage({
                 }}
                 exports={imageExports}
                 linkUrl={selected.landingPageUrl}
+                demoConfig={{
+                  access: demoAccessLoaded,
+                  canEdit: canEditBrand,
+                  recordings: demoRecordings.slice(0, 5).map(toAdStudioDemoRecordingView),
+                  recordingAvailable: providers.text !== null && vault !== null,
+                }}
               />
               ) : null}
               {reviewItem.kind === 'video' ? (
@@ -727,6 +734,12 @@ export default async function AdStudioPage({
                   advertiser={brandKit.brandName || selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}
+                  demoConfig={{
+                    access: demoAccessLoaded,
+                    canEdit: canEditBrand,
+                    recordings: demoRecordings.slice(0, 5).map(toAdStudioDemoRecordingView),
+                    recordingAvailable: providers.text !== null && vault !== null,
+                  }}
                 />
               ) : null}
               {reviewItem.kind === 'search' ? (
@@ -939,6 +952,7 @@ export default async function AdStudioPage({
         </summary>
         <div className="mt-4 flex flex-col gap-4">
           <BrandKitPanel orgId={orgId} projectId={projectId} initial={brandKit} canEdit={canEditBrand} logoUrl={logoUrl} />
+        <MediaGalleryPanel orgId={orgId} projectId={projectId} briefId={selected?.id} />
         <DemoAccessPanel
           orgId={orgId}
           projectId={projectId}

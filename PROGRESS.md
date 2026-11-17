@@ -17,6 +17,34 @@ Template for each entry:
 
 ---
 
+## 2026-11-17 — Ad Studio: project media gallery, computer video/image uploads, and automatic URL page scanner
+
+### Shipped
+- **Project media gallery & computer uploads (`@growthos/shared`, `@growthos/firebase-orm-models`, `@growthos/ad-studio`, `apps/web`)**:
+  - Added project-scoped `AdStudioGalleryAsset` storage (`ad_studio_gallery_assets`) supporting uploaded PNG/JPEG/WebP images and MP4/WebM/MOV video clips (plus auto-saved walkthrough captures) with magic-byte validation, image normalization via `sharp`, video normalization via `ffmpeg`, title rename, streaming endpoint, and deletion.
+  - Added `upload-clip` (custom MP4/WebM/MOV clip or gallery clip into a video scene with `kind: 'upload'` and zero AI quota), `attach-image` (custom/gallery/scanned image onto a video scene), and `images/upload` (custom/gallery/scanned image into a new or existing image ad placement) routes and UI controls in `MediaGalleryPanel`, `VideoStudio`, and `ImageStudio`.
+- **Automatic URL scanner & walkthrough keyframes (`demo-recorder.ts`, `DemoAccessPanel`, `ad-studio/page.tsx`)**:
+  - Added `publicSite` mode for scanning public URLs without credentials alongside vault-encrypted (`GROWTHOS_VAULT_KEYS`) trial access credentials, plus a one-click **Save & automatically scan** (`saveAndScan`) trigger in `DemoAccessPanel`.
+  - Upgraded `demo-recorder` to extract per-segment JPEG keyframes (`frame_gcs_path` / `hasFrame`), serve them securely through `/demo-recordings/[recordingId]/segments/[segmentId]/frame`, save AI-chosen walkthrough captures into the project gallery (`source: 'walkthrough'`), and let users insert any scanned clip or page capture straight into Video & Image ads.
+
+### Verified
+- `@growthos/shared`: `build` + `vitest` (91 files, 1,029 tests passed).
+- `@growthos/firebase-orm-models`: `build` + Firestore emulator tests (2 files, 8 tests passed).
+- `@growthos/ad-studio`: `build` + `vitest --pool=forks` (23 files passed / 1 skipped, 245 tests passed / 2 skipped).
+- `@growthos/api`: `mcp-ad-studio-tools.spec.ts` under Firestore emulator (12 tests passed).
+- `@growthos/web`: Firestore emulator route suites (`ad-studio-gallery-routes.test.ts`, `ad-studio-demo-routes.test.ts`, `ad-studio-video-routes.test.ts`: 3 files, 34 tests passed); UI + copy suites (`components/ad-studio/` + `messages/`: 292 files, 1,071 tests passed).
+- Monorepo CI parity: `pnpm lint` (9/9), `pnpm typecheck` (16/16), and `turbo run build --env-mode=loose` (10/10) exited 0.
+
+### Key files
+- `packages/shared/src/ad-studio/{gallery,demo,index}.ts`
+- `packages/firebase-orm-models/src/{models/ad-studio-gallery.model.ts,services/ad-studio-gallery.service.ts,models/ad-studio-demo.model.ts,services/ad-studio-demo.service.ts}`
+- `packages/ad-studio/src/{gallery,demo-recorder,video-pipeline,image-pipeline,media-storage,view,runtime,index}.ts`
+- `apps/web/lib/ad-studio/{upload-request,http}.ts`, `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/**`
+- `apps/web/components/ad-studio/{media-gallery-panel,demo-access-panel,video-studio,image-studio,use-ad-studio-error}.tsx`
+- `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx`, `apps/web/messages/{en,he}.json`
+
+---
+
 ## 2026-11-16 — Ad Studio video: persistent, re-editable general instructions + Israeli casting
 
 - **Last completed:** Persisted general video instructions per brief under `video_settings.instructions` across [`video-settings.ts`](packages/shared/src/ad-studio/video-settings.ts), [`video-settings/route.ts`](apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/briefs/[briefId]/video-settings/route.ts), and [`mcp-ad-studio-tools.ts`](apps/api/src/mcp/mcp-ad-studio-tools.ts). Replaced the ephemeral one-shot edit box in [`video-studio.tsx`](apps/web/components/ad-studio/video-studio.tsx) with an always-visible General Video Instructions card featuring Save and Confirm & run buttons, unsaved-changes guard, and daily quota guard, and exposed the field in [`advanced-video-settings.tsx`](apps/web/components/ad-studio/advanced-video-settings.tsx). Updated [`writing-rules.ts`](packages/shared/src/ad-studio/writing-rules.ts), [`prompts.ts`](packages/shared/src/ad-studio/prompts.ts), [`video.ts`](packages/shared/src/ad-studio/video.ts), [`brand.ts`](packages/ad-studio/src/brand.ts), [`translate.ts`](packages/ad-studio/src/translate.ts), and [`video-pipeline.ts`](packages/ad-studio/src/video-pipeline.ts) so Hebrew ads default to Israeli people/settings, script generation/rewrites and scene renders/edits enforce general video instructions, Hebrew settings are translated once per batch to English for Gemini Omni, and changing instructions marks older clips out of date. Verified `@growthos/shared` (90 files, 1025 tests), `@growthos/ad-studio` (22 passed, 231 tests), `@growthos/web` UI + copy suites (242 files, 840 tests), Firestore-emulated route (`25/25`) and MCP (`12/12`) tests, `pnpm lint`, `pnpm typecheck`, and full `turbo build`.
