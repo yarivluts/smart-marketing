@@ -297,7 +297,7 @@ export function EmailPasswordForm({
             className="flex items-center gap-2 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium"
           >
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{t(errorKey)}</span>
+            <span>{t(errorKey === 'genericError' && mode === 'signup' ? 'signUpGenericError' : errorKey)}</span>
           </div>
         ) : null}
 

@@ -207,6 +207,25 @@ describe('EmailPasswordForm Component', () => {
     expect(screen.getByRole('heading', { name: enMessages.Auth.signUpTitle })).toBeInTheDocument();
   });
 
+  it('says the account could not be created (not "sign you in") when sign-up fails for an unknown reason', async () => {
+    mockSignUpWithEmail.mockRejectedValueOnce({ code: 'auth/internal-error' });
+    renderWithIntl(<EmailPasswordForm mode="signup" />, { locale: 'en' });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.emailLabel), { target: { value: 'a@b.co' } });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.passwordLabel), { target: { value: 'secret1' } });
+    fireEvent.submit(screen.getByLabelText(enMessages.Auth.emailLabel).closest('form') as HTMLFormElement);
+    expect(await screen.findByRole('alert')).toHaveTextContent(enMessages.Auth.signUpGenericError);
+    expect(screen.getByRole('alert')).not.toHaveTextContent('sign you in');
+  });
+
+  it('keeps the sign-in wording when sign-in fails for an unknown reason', async () => {
+    mockSignInWithEmail.mockRejectedValueOnce({ code: 'auth/internal-error' });
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.emailLabel), { target: { value: 'a@b.co' } });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.passwordLabel), { target: { value: 'secret1' } });
+    fireEvent.submit(screen.getByLabelText(enMessages.Auth.emailLabel).closest('form') as HTMLFormElement);
+    expect(await screen.findByRole('alert')).toHaveTextContent(enMessages.Auth.genericError);
+  });
+
   it('shows no error when the person closes the Google window', async () => {
     mockSignInWithGoogle.mockRejectedValueOnce({ code: 'auth/popup-closed-by-user' });
     renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
