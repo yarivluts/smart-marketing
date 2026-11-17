@@ -45,6 +45,12 @@ describe('growthSuggestions', () => {
     expect(ids({ target, changeAreas: [] })).toEqual([]);
   });
 
+  it('offers a different audience after the audience was declined', () => {
+    const target = targetView({ audienceStatus: 'rejected' });
+    expect(ids({ target, changeAreas: ['audience'] })).toEqual(['audience_declined']);
+    expect(ids({ target, changeAreas: ['ads'] })).toEqual([]);
+  });
+
   it('suggests nothing for a target that is not being promoted, or ads that cannot be redone', () => {
     expect(ids({ target: liveTarget({ status: 'proposed' }), results: totals({ impressions: 800 }) })).toEqual([]);
     expect(ids({ changeAreas: [], results: totals({ impressions: 800 }) })).toEqual([]);
