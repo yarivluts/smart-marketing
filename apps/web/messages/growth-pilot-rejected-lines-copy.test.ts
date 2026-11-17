@@ -22,4 +22,11 @@ describe('Growth Pilot rejected lines on a target card', () => {
     expect(en.GrowthPilot.audience.status.rejected).toContain('no money was spent');
     expect(en.GrowthPilot.landing.status.rejected).not.toContain('money');
   });
+
+  it('the publish card also says nothing was sent and no money was spent', () => {
+    expect(en.GrowthPilot.publish.status.rejected).toMatch(/nothing was sent .+ no money was spent/);
+    const line = he.GrowthPilot.publish.status.rejected;
+    expect(line).toContain(' - ');
+    expect(line).not.toMatch(/[A-Za-z]/);
+  });
 });
