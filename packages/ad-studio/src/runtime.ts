@@ -27,6 +27,13 @@ export interface AdStudioRuntime {
   demoBrowser?: DemoBrowserLauncher;
   /** The address guard the recorder applies to every request (tests serving a local app relax it). */
   demoAddressCheck?: (url: string) => Promise<void>;
+  normalizeVideo?: (params: {
+    bytes: Buffer;
+    mimeType: string;
+    aspectRatio: string;
+    resolution: string;
+    durationSeconds?: number;
+  }) => Promise<Buffer>;
 }
 
 let runtime: AdStudioRuntime = { ensureOrm: async () => undefined };

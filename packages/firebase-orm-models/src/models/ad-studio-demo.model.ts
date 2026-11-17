@@ -30,6 +30,10 @@ export class AdStudioDemoAccessModel extends BaseModel {
   @Field({ is_required: true })
   public encrypted_password!: SecretEnvelope;
 
+  /** True when scanning a public site without credentials. */
+  @Field({ is_required: false })
+  public public_site?: boolean | null;
+
   /** What to show and what to avoid, in the customer's words. */
   @Field({ is_required: false })
   public notes?: string | null;
@@ -49,6 +53,8 @@ export interface AdStudioDemoSegmentRecord {
   title: string;
   description: string;
   selected: boolean;
+  /** Stored JPEG keyframe captured at the start of this moment; absent on older recordings. */
+  frame_gcs_path?: string | null;
 }
 
 /**

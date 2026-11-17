@@ -22,6 +22,12 @@ describe('demo access input', () => {
     expect(demoAccessFieldIssues(input, true)).toEqual([]);
     expect(demoAccessFieldIssues({ ...input, loginUrl: '', username: '', notes: 'x'.repeat(1001) }, true)).toEqual(['login_url', 'username', 'notes']);
   });
+
+  it('allows public-site scans without username or password', () => {
+    const parsed = parseAdStudioDemoAccessInput({ loginUrl: ' https://example.com/product ', publicSite: true, notes: 'Show pricing' });
+    expect(parsed).toEqual({ loginUrl: 'https://example.com/product', username: '', password: '', notes: 'Show pricing', publicSite: true });
+    expect(demoAccessFieldIssues(parsed!, false)).toEqual([]);
+  });
 });
 
 describe('planDemoInserts', () => {

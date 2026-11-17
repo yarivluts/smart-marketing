@@ -9,6 +9,7 @@ const orm = vi.hoisted(() => ({
   listAdStudioDemoRecordings: vi.fn(),
   listAdStudioBriefs: vi.fn(),
   createAdStudioDemoRecording: vi.fn(),
+  createAdStudioGalleryAsset: vi.fn(),
   markAdStudioDemoRecordingReady: vi.fn(),
   markAdStudioDemoRecordingFailed: vi.fn(),
 }));
@@ -25,6 +26,7 @@ import {
   chooseDemoSegments,
   clickableForTour,
   DemoRecorderError,
+  pickSegmentKeyframe,
   recordProductWalkthrough,
   redactSecrets,
   runDemoTour,
@@ -355,5 +357,32 @@ describe('recordProductWalkthrough', () => {
     orm.listAdStudioDemoRecordings.mockResolvedValueOnce([{ status: 'recording', requested_on: new Date(setup.browser.now()).toISOString() }]);
     await expect(recordProductWalkthrough(ctx, setup.value)).rejects.toBeInstanceOf(AdStudioDemoRequestError);
     expect(orm.createAdStudioDemoRecording).not.toHaveBeenCalled();
+  });
+
+  it('picks segment keyframes and allows scanning public sites without login credentials', async () => {
+    const picked = pickSegmentKeyframe(
+      [
+        { data: Buffer.from('a'), atMs: 500 },
+        { data: Buffer.from('b'), atMs: 3200 },
+        { data: Buffer.from('c'), atMs: 7000 },
+      ],
+      2,
+      4,
+    );
+    expect(picked?.data.toString()).toBe('b');
+
+    const setup = deps(fakeBrowser({ loginWorks: false }));
+    orm.revealAdStudioDemoAccess.mockResolvedValueOnce({
+      loginUrl: 'https://app.example.com/home',
+      username: '',
+      password: '',
+      notes: '',
+      publicSite: true,
+    });
+    const result = await recordProductWalkthrough(ctx, setup.value);
+    expect(result.status).toBe('ready');
+    const [, readyParams] = orm.markAdStudioDemoRecordingReady.mock.calls.at(-1) as [unknown, { segments: { frameGcsPath?: string }[] }];
+    expect(readyParams.segments.every((seg) => Boolean(seg.frameGcsPath))).toBe(true);
+    expect(orm.createAdStudioGalleryAsset).toHaveBeenCalled();
   });
 });

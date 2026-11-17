@@ -23,6 +23,8 @@ export interface AdStudioDemoAccessView {
   /** The trial account's username or email; null when it cannot be shown (no rights, or unreadable). */
   username: string | null;
   hasPassword: boolean;
+  /** True when scanning a public page without signing in (username and password omitted). */
+  publicSite?: boolean;
   /** What to show and what to avoid, in the customer's words. */
   notes: string;
   lastChangedOn: string | null;
@@ -33,6 +35,7 @@ export interface AdStudioDemoAccessInput {
   loginUrl: string;
   username: string;
   password: string;
+  publicSite?: boolean;
   notes: string;
 }
 
@@ -74,6 +77,8 @@ export interface AdStudioDemoSegment {
   description: string;
   /** Used in video ads. */
   selected: boolean;
+  /** True when a keyframe screenshot was stored for this scanned page/moment. */
+  hasFrame?: boolean;
 }
 
 export interface AdStudioDemoRecordingView {
@@ -93,21 +98,23 @@ export function parseAdStudioDemoAccessInput(raw: unknown): AdStudioDemoAccessIn
   if (!raw || typeof raw !== 'object') return null;
   const value = raw as Record<string, unknown>;
   const text = (field: unknown) => (typeof field === 'string' ? field.trim() : null);
+  const publicSite = value.publicSite === true;
   const loginUrl = text(value.loginUrl);
-  const username = text(value.username);
+  const username =
+    publicSite && (value.username === undefined || value.username === null) ? '' : text(value.username);
   // A password is kept exactly as typed - spaces can be part of it.
   const password = typeof value.password === 'string' ? value.password : value.password === undefined || value.password === null ? '' : null;
   const notes = value.notes === undefined || value.notes === null ? '' : text(value.notes);
   if (loginUrl === null || username === null || password === null || notes === null) return null;
-  return { loginUrl, username, password, notes };
+  return { loginUrl, username, password, notes, ...(publicSite ? { publicSite: true } : {}) };
 }
 
 /** The fields that break the limits (not the address check, which needs the network). */
 export function demoAccessFieldIssues(input: AdStudioDemoAccessInput, hasStoredPassword: boolean): string[] {
   const issues: string[] = [];
   if (!input.loginUrl || input.loginUrl.length > AD_STUDIO_DEMO_LIMITS.loginUrl) issues.push('login_url');
-  if (!input.username || input.username.length > AD_STUDIO_DEMO_LIMITS.username) issues.push('username');
-  if ((!input.password && !hasStoredPassword) || input.password.length > AD_STUDIO_DEMO_LIMITS.password) issues.push('password');
+  if ((!input.publicSite && !input.username) || input.username.length > AD_STUDIO_DEMO_LIMITS.username) issues.push('username');
+  if ((!input.publicSite && !input.password && !hasStoredPassword) || input.password.length > AD_STUDIO_DEMO_LIMITS.password) issues.push('password');
   if (input.notes.length > AD_STUDIO_DEMO_LIMITS.notes) issues.push('notes');
   return issues;
 }

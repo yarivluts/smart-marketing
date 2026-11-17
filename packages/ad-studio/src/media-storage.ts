@@ -199,3 +199,33 @@ export function resolveAdStudioMediaStorage(env: NodeJS.ProcessEnv = process.env
   if (cached?.key !== key) cached = { key, storage: localDir ? createLocalMediaStorage(localDir) : createGcsMediaStorage(bucket) };
   return cached.storage;
 }
+
+const GALLERY_EXT_BY_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+  'video/quicktime': 'mov',
+};
+
+/** Private bucket path for a project-level gallery media asset (uploaded clip, photo, or saved screen). */
+export function adStudioGalleryObjectPath(ref: {
+  organizationId: string;
+  projectId: string;
+  assetId: string;
+  mimeType: string;
+}): string {
+  const ext = GALLERY_EXT_BY_MIME[ref.mimeType] ?? 'bin';
+  return `orgs/${ref.organizationId}/projects/${ref.projectId}/gallery/${ref.assetId}.${ext}`;
+}
+
+/** Private bucket path for a JPEG keyframe extracted for an automatic product-tour segment. */
+export function adStudioDemoSegmentFrameObjectPath(ref: {
+  organizationId: string;
+  projectId: string;
+  recordingId: string;
+  segmentId: string;
+}): string {
+  return `orgs/${ref.organizationId}/projects/${ref.projectId}/demo-recordings/${ref.recordingId}/segment-${ref.segmentId}.jpg`;
+}

@@ -104,6 +104,26 @@ describe('Ad Studio demo access', () => {
     expect(await getAdStudioDemoAccess(orgId, projectId, kms)).toBeNull();
     expect((await listAuditLogEntriesForOrg(orgId)).some((entry) => entry.action === 'ad_studio.demo_access_cleared')).toBe(true);
   });
+
+  it('supports public-site scans without username or password while keeping URL and notes', async () => {
+    const { owner, orgId, projectId } = await setup();
+    const view = await setAdStudioDemoAccess({
+      organizationId: orgId,
+      projectId,
+      input: { loginUrl: 'https://public.example.com/features', username: '', password: '', notes: 'Show charts', publicSite: true },
+      actorId: owner.id,
+      kms,
+      resolver: publicResolver,
+    });
+    expect(view).toMatchObject({ loginUrl: 'https://public.example.com/features', username: null, hasPassword: false, publicSite: true, notes: 'Show charts' });
+    expect(await revealAdStudioDemoAccess(orgId, projectId, kms)).toEqual({
+      loginUrl: 'https://public.example.com/features',
+      username: '',
+      password: '',
+      notes: 'Show charts',
+      publicSite: true,
+    });
+  });
 });
 
 describe('Ad Studio demo recordings', () => {
@@ -115,13 +135,21 @@ describe('Ad Studio demo recordings', () => {
 
     const second = await createAdStudioDemoRecording({ organizationId: orgId, projectId, site: 'app.example.com', requestedBy: owner.id, now: new Date('2026-11-01T11:00:00.000Z') });
     const segments = [
-      { id: 's1', startSeconds: 0, endSeconds: 4, title: 'Dashboard', description: 'The overview', selected: true },
+      { id: 's1', startSeconds: 0, endSeconds: 4, title: 'Dashboard', description: 'The overview', selected: true, frameGcsPath: 'orgs/o/projects/p/demo/s1.jpg' },
       { id: 's2', startSeconds: 4, endSeconds: 9, title: 'Reports', description: 'A report', selected: false },
     ];
     await markAdStudioDemoRecordingReady(second, { gcsPath: 'orgs/o/projects/p/demo/x.mp4', durationSeconds: 9, segments });
     const latest = await getLatestReadyAdStudioDemoRecording(orgId, projectId);
     expect(latest?.id).toBe(second.id);
-    expect(toAdStudioDemoRecordingView(latest!)).toMatchObject({ status: 'ready', durationSeconds: 9, segments, site: 'app.example.com' });
+    expect(toAdStudioDemoRecordingView(latest!)).toMatchObject({
+      status: 'ready',
+      durationSeconds: 9,
+      site: 'app.example.com',
+      segments: [
+        { id: 's1', startSeconds: 0, endSeconds: 4, title: 'Dashboard', description: 'The overview', selected: true, hasFrame: true },
+        { id: 's2', startSeconds: 4, endSeconds: 9, title: 'Reports', description: 'A report', selected: false },
+      ],
+    });
 
     const selected = await selectAdStudioDemoSegments({ organizationId: orgId, projectId, recordingId: second.id, segmentIds: ['s2'] });
     expect(selected.segments.map((segment) => segment.selected)).toEqual([false, true]);

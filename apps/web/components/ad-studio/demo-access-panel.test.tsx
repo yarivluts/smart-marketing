@@ -100,4 +100,37 @@ describe('DemoAccessPanel', () => {
     );
     expect(screen.getByTestId('ad-studio-demo-failed')).toHaveTextContent('The last recording failed: signing in did not work - check the username and password.');
   });
+
+  it('allows public-site scan without credentials and offers one-click save & scan', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/demo-access')) {
+        return new Response(
+          JSON.stringify({ demoAccess: { loginUrl: 'https://example.com', username: null, hasPassword: false, notes: '', lastChangedOn: null, publicSite: true } }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ recording: READY }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderWithIntl(
+      <DemoAccessPanel orgId="o" projectId="p" access={null} canEdit recordings={[]} recordingAvailable />,
+      { locale: 'en' },
+    );
+
+    fireEvent.click(screen.getByTestId('ad-studio-demo-public-site'));
+    expect(screen.queryByLabelText('Username or email')).toBeNull();
+    expect(screen.queryByLabelText('Password')).toBeNull();
+
+    fireEvent.change(screen.getByPlaceholderText('https://app.example.com/login'), {
+      target: { value: 'https://example.com' },
+    });
+    fireEvent.click(screen.getByTestId('ad-studio-demo-save-and-scan'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const [, firstCallInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(firstCallInit.body))).toMatchObject({
+      demoAccess: { loginUrl: 'https://example.com', publicSite: true, username: '', password: '' },
+    });
+  });
 });

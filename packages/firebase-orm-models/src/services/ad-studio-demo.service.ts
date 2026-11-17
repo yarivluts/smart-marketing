@@ -80,6 +80,16 @@ async function loadAccess(organizationId: string, projectId: string): Promise<Ad
 export async function getAdStudioDemoAccess(organizationId: string, projectId: string, kms: KmsProvider | null): Promise<AdStudioDemoAccessView | null> {
   const access = await loadAccess(organizationId, projectId);
   if (!access) return null;
+  if (access.public_site === true) {
+    return {
+      loginUrl: access.login_url,
+      username: null,
+      hasPassword: false,
+      publicSite: true,
+      notes: access.notes ?? '',
+      lastChangedOn: access.last_changed_on ?? null,
+    };
+  }
   let username: string | null = null;
   if (kms) {
     try {
@@ -102,9 +112,12 @@ export async function revealAdStudioDemoAccess(
   organizationId: string,
   projectId: string,
   kms: KmsProvider,
-): Promise<{ loginUrl: string; username: string; password: string; notes: string } | null> {
+): Promise<{ loginUrl: string; username: string; password: string; notes: string; publicSite?: boolean } | null> {
   const access = await loadAccess(organizationId, projectId);
   if (!access) return null;
+  if (access.public_site === true) {
+    return { loginUrl: access.login_url, username: '', password: '', notes: access.notes ?? '', publicSite: true };
+  }
   const tenantId = demoAccessTenantId(organizationId, projectId);
   const [username, password] = await Promise.all([decryptSecret(access.encrypted_username, tenantId, kms), decryptSecret(access.encrypted_password, tenantId, kms)]);
   return { loginUrl: access.login_url, username, password, notes: access.notes ?? '' };
@@ -125,8 +138,10 @@ export async function setAdStudioDemoAccess(params: {
 }): Promise<AdStudioDemoAccessView> {
   const project = await ProjectModel.init(params.projectId, { organization_id: params.organizationId });
   if (!project || project.organization_id !== params.organizationId) throw new ProjectNotFoundError();
+  const publicSite = params.input.publicSite === true;
   const existing = await loadAccess(params.organizationId, params.projectId);
-  const issues = demoAccessFieldIssues(params.input, Boolean(existing?.encrypted_password?.ciphertext));
+  const hasStoredPassword = Boolean(!publicSite && existing?.public_site !== true && existing?.encrypted_password?.ciphertext);
+  const issues = demoAccessFieldIssues(params.input, hasStoredPassword);
   let loginUrl = params.input.loginUrl;
   if (!issues.includes('login_url')) {
     try {
@@ -143,8 +158,14 @@ export async function setAdStudioDemoAccess(params: {
   access.organization_id = params.organizationId;
   access.project_id = params.projectId;
   access.login_url = loginUrl;
-  access.encrypted_username = await encryptSecret(params.input.username, tenantId, params.kms);
-  if (params.input.password) access.encrypted_password = await encryptSecret(params.input.password, tenantId, params.kms);
+  access.public_site = publicSite;
+  if (publicSite) {
+    access.encrypted_username = await encryptSecret('', tenantId, params.kms);
+    access.encrypted_password = await encryptSecret('', tenantId, params.kms);
+  } else {
+    access.encrypted_username = await encryptSecret(params.input.username, tenantId, params.kms);
+    if (params.input.password) access.encrypted_password = await encryptSecret(params.input.password, tenantId, params.kms);
+  }
   access.notes = params.input.notes;
   access.changed_by = params.actorId;
   access.last_changed_on = nowIso(params.now);
@@ -156,7 +177,7 @@ export async function setAdStudioDemoAccess(params: {
     actorId: params.actorId,
     action: 'ad_studio.demo_access_set',
     summary: `Set the trial access for product walkthroughs (${new URL(loginUrl).host})`,
-    after: { login_host: new URL(loginUrl).host, password_changed: Boolean(params.input.password), has_notes: Boolean(params.input.notes) },
+    after: { login_host: new URL(loginUrl).host, public_site: publicSite, password_changed: Boolean(!publicSite && params.input.password), has_notes: Boolean(params.input.notes) },
   });
   return (await getAdStudioDemoAccess(params.organizationId, params.projectId, params.kms)) as AdStudioDemoAccessView;
 }
@@ -170,7 +191,15 @@ export async function clearAdStudioDemoAccess(params: { organizationId: string; 
 }
 
 export function toAdStudioDemoSegment(segment: AdStudioDemoSegmentRecord): AdStudioDemoSegment {
-  return { id: segment.id, startSeconds: segment.start_seconds, endSeconds: segment.end_seconds, title: segment.title, description: segment.description, selected: segment.selected === true };
+  return {
+    id: segment.id,
+    startSeconds: segment.start_seconds,
+    endSeconds: segment.end_seconds,
+    title: segment.title,
+    description: segment.description,
+    selected: segment.selected === true,
+    ...(segment.frame_gcs_path ? { hasFrame: true } : {}),
+  };
 }
 
 export function toAdStudioDemoRecordingView(recording: AdStudioDemoRecordingModel): AdStudioDemoRecordingView {
@@ -223,7 +252,7 @@ export async function createAdStudioDemoRecording(params: { organizationId: stri
 
 export async function markAdStudioDemoRecordingReady(
   recording: Pick<AdStudioDemoRecordingModel, 'id' | 'organization_id' | 'project_id'>,
-  params: { gcsPath: string; durationSeconds: number; segments: AdStudioDemoSegment[]; now?: Date },
+  params: { gcsPath: string; durationSeconds: number; segments: (AdStudioDemoSegment & { frameGcsPath?: string | null })[]; now?: Date },
 ): Promise<AdStudioDemoRecordingModel> {
   const fresh = await getAdStudioDemoRecording(recording.organization_id, recording.project_id, recording.id);
   if (fresh.status !== 'recording') return fresh;
@@ -237,6 +266,7 @@ export async function markAdStudioDemoRecordingReady(
     title: segment.title,
     description: segment.description,
     selected: segment.selected,
+    ...(segment.frameGcsPath ? { frame_gcs_path: segment.frameGcsPath } : {}),
   }));
   fresh.completed_on = nowIso(params.now);
   await fresh.save();

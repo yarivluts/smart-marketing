@@ -4,7 +4,7 @@ import type { AdStudioImageFormat } from '@growthos/shared';
 export const AD_STUDIO_IMAGE_STATUSES = ['generating', 'ready', 'failed'] as const;
 export type AdStudioImageStatus = (typeof AD_STUDIO_IMAGE_STATUSES)[number];
 
-export const AD_STUDIO_IMAGE_KINDS = ['render', 'edit'] as const;
+export const AD_STUDIO_IMAGE_KINDS = ['render', 'edit', 'upload'] as const;
 export type AdStudioImageKind = (typeof AD_STUDIO_IMAGE_KINDS)[number];
 
 /** The AI check of a rendered image: `issues` when it found a major problem (a misspelled headline, gibberish letters, a deformed hand). */

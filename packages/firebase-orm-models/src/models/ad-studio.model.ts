@@ -236,7 +236,7 @@ export class AdStudioUsageModel extends BaseModel {
   public day!: string;
 }
 
-export const AD_STUDIO_CLIP_KINDS = ['render', 'edit'] as const;
+export const AD_STUDIO_CLIP_KINDS = ['render', 'edit', 'upload'] as const;
 export type AdStudioClipKind = (typeof AD_STUDIO_CLIP_KINDS)[number];
 
 /**

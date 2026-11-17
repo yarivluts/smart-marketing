@@ -39,3 +39,4 @@ export * from './brand';
 export * from './demo-policy';
 export * from './demo-recorder';
 export * from './demo-browser';
+export * from './gallery';

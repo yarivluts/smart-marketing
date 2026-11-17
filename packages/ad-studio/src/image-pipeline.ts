@@ -6,14 +6,19 @@ import {
   AD_STUDIO_IMAGE_HEADLINE_MAX,
   AD_STUDIO_IMAGE_ASPECT_RATIO,
   AD_STUDIO_IMAGE_INSTRUCTION_MAX,
+  AD_STUDIO_IMAGE_VISUAL_MAX,
+  AD_STUDIO_MAX_IMAGE_CONCEPTS,
   buildImageConceptRewritePrompt,
   buildImageConceptsPrompt,
   buildImagePrompt,
   fitAdStudioImageConcepts,
+  galleryLabelFromFileName,
   imageConceptFingerprint,
   isAdStudioImageFormat,
   planToScriptContext,
   sniffReferenceMimeType,
+  type AdStudioGallerySourceRef,
+  type AdStudioImageConcept,
   type AdStudioImageFormat,
 } from '@growthos/shared';
 import {
@@ -48,6 +53,13 @@ import { AdCopySchema } from './copy-writing';
 import { resolveAdStudioImageGenerator, type AdStudioGeneratedImage, type AdStudioImageGenerator } from './gemini-image';
 import { adStudioImageObjectPath, readAdStudioObject, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 import type { AdStudioImageView } from './view';
+import {
+  AdStudioGalleryRequestError,
+  addUploadedGalleryAsset,
+  normalizeUploadedImage,
+  resolveGallerySource,
+} from './gallery';
+import type { FfmpegRunner } from './ffmpeg';
 
 /** A stored ad image is a few MB at most; reading one for an edit or export is capped well above that. */
 const MAX_STORED_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -524,4 +536,162 @@ export async function exportBriefImage(params: {
     actorId: params.actorId,
     actorType: params.actorType,
   });
+}
+
+const IMAGE_PLACEMENT_DIMENSIONS: Record<AdStudioImageFormat, { width: number; height: number }> = {
+  square: { width: 1080, height: 1080 },
+  portrait: { width: 1080, height: 1350 },
+  story: { width: 1080, height: 1920 },
+  landscape: { width: 1920, height: 1080 },
+};
+
+/**
+ * Fills an existing image ad placement or creates a new image concept using an uploaded file,
+ * a project gallery photo, or a scanned product screen (0 AI quota charged). Applies the concept's
+ * headline overlay and the project brand strip when present.
+ */
+export async function useCustomImageForBrief(
+  ctx: BriefContext & {
+    conceptId?: string;
+    format?: AdStudioImageFormat;
+    upload?: { bytes: Buffer; fileName?: string | null; label?: string | null };
+    source?: AdStudioGallerySourceRef;
+    headline?: string;
+    alsoSaveToGallery?: boolean;
+  },
+  deps: { storage?: AdStudioMediaStorage; runner?: FfmpegRunner; now?: Date } = {},
+): Promise<{ brief: AdStudioBriefModel; image: AdStudioImageView }> {
+  await ensureOrm();
+  const storage = deps.storage ?? resolveAdStudioMediaStorage();
+  const now = deps.now ?? new Date();
+  let brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+
+  const format: AdStudioImageFormat = ctx.format ?? 'square';
+  if (!isAdStudioImageFormat(format)) throw new AdStudioGalleryRequestError('invalid_input');
+
+  let rawBytes: Buffer;
+  let label: string;
+  if (ctx.upload) {
+    rawBytes = ctx.upload.bytes;
+    label = (ctx.upload.label ?? '').trim() || galleryLabelFromFileName(ctx.upload.fileName ?? '') || 'Uploaded image';
+  } else if (ctx.source) {
+    const resolved = await resolveGallerySource(
+      { organizationId: ctx.organizationId, projectId: ctx.projectId },
+      ctx.source,
+      'image',
+      { storage, runner: deps.runner },
+    );
+    rawBytes = resolved.bytes;
+    label = resolved.label || 'Gallery image';
+  } else {
+    throw new AdStudioGalleryRequestError('invalid_input');
+  }
+
+  const targetDims = IMAGE_PLACEMENT_DIMENSIONS[format];
+  const prepared = await normalizeUploadedImage(rawBytes, targetDims);
+
+  const currentConcepts = brief.image_concepts ?? [];
+  let concept: AdStudioImageConcept | undefined;
+  if (ctx.conceptId) {
+    concept = currentConcepts.find((entry) => entry.id === ctx.conceptId);
+    if (!concept) throw new AdStudioImageRequestError('concept_not_found');
+    if (!concept.formats.includes(format)) throw new AdStudioImageRequestError('format_not_in_concept');
+  } else {
+    if (currentConcepts.length >= AD_STUDIO_MAX_IMAGE_CONCEPTS) {
+      throw new AdStudioGalleryRequestError('invalid_input', 'Maximum image concepts reached for this brief.');
+    }
+    const createdConcept: AdStudioImageConcept = {
+      id: newAdStudioSceneId(),
+      visualPrompt: `Uploaded creative: ${label}`.slice(0, AD_STUDIO_IMAGE_VISUAL_MAX),
+      headline: (ctx.headline ?? '').trim().slice(0, AD_STUDIO_IMAGE_HEADLINE_MAX),
+      formats: [format],
+    };
+    brief = await saveAdStudioImageConcepts({
+      organizationId: ctx.organizationId,
+      projectId: ctx.projectId,
+      briefId: ctx.briefId,
+      concepts: [...currentConcepts, createdConcept],
+      generatedBy: brief.image_concepts_generated_by ?? null,
+      now,
+    });
+    concept = (brief.image_concepts ?? []).find((entry) => entry.id === createdConcept.id) ?? createdConcept;
+  }
+
+  if (ctx.upload && ctx.alsoSaveToGallery) {
+    await addUploadedGalleryAsset(
+      { organizationId: ctx.organizationId, projectId: ctx.projectId, actorId: ctx.actorId },
+      { bytes: ctx.upload.bytes, fileName: ctx.upload.fileName, label },
+      { storage, runner: deps.runner, now },
+    ).catch(() => null);
+  }
+
+  const brand = await resolveAdBrandMark(brief, storage);
+  let composed: AdStudioGeneratedImage = { bytes: prepared.bytes, mimeType: prepared.mimeType };
+  const headline = (ctx.headline !== undefined ? ctx.headline : concept.headline).trim();
+  if (headline && canTypesetLanguage(brief.language)) {
+    try {
+      composed = await setHeadline({
+        image: composed,
+        headline,
+        format,
+        language: brief.language,
+        emphasis: concept.emphasis,
+        layout: concept.layout ?? 'centered',
+        accent: headlineAccent(brand.colors),
+      });
+    } catch (error) {
+      console.error('[ad-studio] headline overlay on uploaded image failed', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  const record = await createAdStudioImage({
+    organizationId: ctx.organizationId,
+    projectId: ctx.projectId,
+    briefId: ctx.briefId,
+    conceptId: concept.id,
+    format,
+    kind: 'upload',
+    parentImageId: null,
+    instruction: null,
+    conceptFingerprint: imageConceptFingerprint(concept, format, brief.language),
+    prompt: concept.visualPrompt,
+    provider: 'upload',
+    model: 'upload',
+    imageSize: null,
+    actorId: ctx.actorId,
+    now,
+  });
+
+  const ref = { organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: ctx.briefId };
+  let basePath: string | null = null;
+  let finished = composed;
+  if (brand.name || brand.logo) {
+    try {
+      finished = await applyBrandStrip({ image: composed, format, brand });
+      basePath = adStudioImageObjectPath({ ...ref, imageId: `${record.id}-base`, mimeType: composed.mimeType });
+      await storage.upload(basePath, composed.bytes, composed.mimeType);
+    } catch (error) {
+      console.error('[ad-studio] brand strip on uploaded image failed', { imageId: record.id, error: error instanceof Error ? error.message : String(error) });
+      finished = composed;
+      basePath = null;
+    }
+  }
+
+  const objectPath = adStudioImageObjectPath({ ...ref, imageId: record.id, mimeType: finished.mimeType });
+  try {
+    await storage.upload(objectPath, finished.bytes, finished.mimeType);
+    const ready = await markAdStudioImageReady(record, {
+      gcsPath: objectPath,
+      mimeType: finished.mimeType,
+      byteSize: finished.bytes.length,
+      qa: null,
+      basePath,
+      now,
+    });
+    return { brief, image: toAdStudioImageView(ready) };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await markAdStudioImageFailed(record, { code: 'storage_error', message, now });
+    throw error;
+  }
 }

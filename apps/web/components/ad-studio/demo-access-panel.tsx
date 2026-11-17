@@ -36,6 +36,8 @@ export function DemoAccessPanel({
   canEdit,
   recordings,
   recordingAvailable,
+  onUseSegmentVideo,
+  onUseSegmentImage,
 }: {
   orgId: string;
   projectId: string;
@@ -46,12 +48,20 @@ export function DemoAccessPanel({
   recordings: AdStudioDemoRecordingView[];
   /** A text model and the vault are configured. */
   recordingAvailable: boolean;
+  onUseSegmentVideo?: (recordingId: string, segmentId: string, title: string) => unknown;
+  onUseSegmentImage?: (recordingId: string, segmentId: string, title: string) => unknown;
 }): React.ReactElement {
   const t = useTranslations('AdStudio.demo');
   const locale = useLocale();
   const router = useRouter();
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio`;
-  const [form, setForm] = React.useState({ loginUrl: access?.loginUrl ?? '', username: access?.username ?? '', password: '', notes: access?.notes ?? '' });
+  const [form, setForm] = React.useState({
+    loginUrl: access?.loginUrl ?? '',
+    username: access?.username ?? '',
+    password: '',
+    notes: access?.notes ?? '',
+    publicSite: Boolean(access?.publicSite),
+  });
   const [saving, setSaving] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [recording, setRecording] = React.useState(false);
@@ -63,26 +73,43 @@ export function DemoAccessPanel({
   const replace = (next: AdStudioDemoRecordingView) => setRows((current) => [next, ...current.filter((row) => row.id !== next.id)].sort((a, b) => b.requestedOn.localeCompare(a.requestedOn)));
   const [selectionNote, setSelectionNote] = React.useState<string | null>(null);
 
-  async function save(event: React.FormEvent): Promise<void> {
-    event.preventDefault();
+  async function persistAccess(): Promise<boolean> {
     setSaving(true);
     setMessage(null);
     try {
-      const response = await fetch(`${base}/demo-access`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ demoAccess: form }) });
+      const payload = form.publicSite
+        ? { loginUrl: form.loginUrl, username: '', password: '', notes: form.notes, publicSite: true }
+        : { loginUrl: form.loginUrl, username: form.username, password: form.password, notes: form.notes };
+      const response = await fetch(`${base}/demo-access`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ demoAccess: payload }) });
       const body = (await response.json().catch(() => ({}))) as { fields?: string[]; code?: string };
       if (!response.ok) {
         const fields = (body.fields ?? []).filter((field): field is (typeof FIELD_CODES)[number] => (FIELD_CODES as readonly string[]).includes(field));
         setMessage({ tone: 'error', text: fields.length ? fields.map((field) => t(`field.${field}`)).join(' ') : body.code === 'vault_not_configured' ? t('vaultMissing') : t('saveFailed') });
-        return;
+        return false;
       }
       // The password is never kept in the page once saved.
       setForm((current) => ({ ...current, password: '' }));
       setMessage({ tone: 'ok', text: t('saved') });
       router.refresh();
+      return true;
     } catch {
       setMessage({ tone: 'error', text: t('saveFailed') });
+      return false;
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function save(event: React.FormEvent): Promise<void> {
+    event.preventDefault();
+    await persistAccess();
+  }
+
+  async function saveAndScan(): Promise<void> {
+    if (saving || recording) return;
+    const saved = await persistAccess();
+    if (saved && recordingAvailable) {
+      await record();
     }
   }
 
@@ -95,7 +122,7 @@ export function DemoAccessPanel({
         setMessage({ tone: 'error', text: t('saveFailed') });
         return;
       }
-      setForm({ loginUrl: '', username: '', password: '', notes: '' });
+      setForm({ loginUrl: '', username: '', password: '', notes: '', publicSite: false });
       setMessage({ tone: 'ok', text: t('removed') });
       router.refresh();
     } catch {
@@ -172,37 +199,65 @@ export function DemoAccessPanel({
 
         {canEdit ? (
           <form onSubmit={save} className="mt-2 grid gap-3 md:grid-cols-2" autoComplete="off" data-testid="ad-studio-demo-form">
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground md:col-span-2">
               {t('loginUrl')}
               <input type="url" required value={form.loginUrl} onChange={(event) => setForm({ ...form, loginUrl: event.target.value })} maxLength={AD_STUDIO_DEMO_LIMITS.loginUrl} placeholder={t('loginUrlPlaceholder')} dir="ltr" autoComplete="off" className={inputClass} />
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-              {t('username')}
-              <input value={form.username} required onChange={(event) => setForm({ ...form, username: event.target.value })} maxLength={AD_STUDIO_DEMO_LIMITS.username} dir="ltr" autoComplete="off" className={inputClass} />
+            <label className="flex flex-col gap-0.5 text-xs md:col-span-2">
+              <span className="inline-flex items-center gap-2 font-medium">
+                <input
+                  type="checkbox"
+                  checked={form.publicSite}
+                  onChange={(event) => setForm({ ...form, publicSite: event.target.checked })}
+                  data-testid="ad-studio-demo-public-site"
+                />
+                {t('publicSiteLabel')}
+              </span>
+              <span className="text-[11px] text-muted-foreground ps-5">{t('publicSiteHint')}</span>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-              {t('password')}
-              <input
-                type="password"
-                value={form.password}
-                required={!access?.hasPassword}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                maxLength={AD_STUDIO_DEMO_LIMITS.password}
-                placeholder={access?.hasPassword ? t('passwordKeep') : ''}
-                dir="ltr"
-                autoComplete="new-password"
-                className={inputClass}
-              />
-            </label>
+            {!form.publicSite ? (
+              <>
+                <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                  {t('username')}
+                  <input value={form.username} required onChange={(event) => setForm({ ...form, username: event.target.value })} maxLength={AD_STUDIO_DEMO_LIMITS.username} dir="ltr" autoComplete="off" className={inputClass} />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                  {t('password')}
+                  <input
+                    type="password"
+                    value={form.password}
+                    required={!access?.hasPassword}
+                    onChange={(event) => setForm({ ...form, password: event.target.value })}
+                    maxLength={AD_STUDIO_DEMO_LIMITS.password}
+                    placeholder={access?.hasPassword ? t('passwordKeep') : ''}
+                    dir="ltr"
+                    autoComplete="new-password"
+                    className={inputClass}
+                  />
+                </label>
+              </>
+            ) : null}
             <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground md:col-span-2">
               {t('notes')}
               <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} maxLength={AD_STUDIO_DEMO_LIMITS.notes} rows={2} dir="auto" placeholder={t('notesPlaceholder')} className={inputClass} />
             </label>
             <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-              <button type="submit" disabled={saving} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+              <button type="submit" disabled={saving || recording} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                 {t('save')}
               </button>
+              {recordingAvailable ? (
+                <button
+                  type="button"
+                  onClick={() => void saveAndScan()}
+                  disabled={saving || recording || !form.loginUrl.trim()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 text-sm font-semibold text-primary hover:bg-primary/15 disabled:opacity-50"
+                  data-testid="ad-studio-demo-save-and-scan"
+                >
+                  {saving || recording ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                  {t('saveAndScan')}
+                </button>
+              ) : null}
               {access ? (
                 <button type="button" onClick={() => void remove()} disabled={saving} className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50">
                   {t('remove')}
@@ -255,19 +310,50 @@ export function DemoAccessPanel({
               <span className="text-xs text-muted-foreground">{t('momentsHint')}</span>
               <ul className="flex flex-col gap-2" aria-label={t('moments')}>
                 {latest.segments.map((segment) => (
-                  <li key={segment.id} className="rounded-lg border border-border p-2">
-                    <label className="flex items-start gap-2 text-sm">
-                      <input type="checkbox" checked={segment.selected} onChange={(event) => void toggle(segment.id, event.target.checked)} className="mt-1" aria-label={`${t('useInAds')}: ${segment.title}`} />
-                      <span className="flex flex-col">
-                        <span className="font-medium" dir="auto">
-                          {segment.title}
+                  <li key={segment.id} className="flex flex-col gap-2 rounded-lg border border-border p-2">
+                    <div className="flex items-start gap-2.5">
+                      {segment.hasFrame ? (
+                        <img
+                          src={`${base}/demo-recordings/${latest.id}/segments/${segment.id}/frame`}
+                          alt={segment.title}
+                          className="h-14 w-24 shrink-0 rounded-md border border-border object-cover bg-muted"
+                        />
+                      ) : null}
+                      <label className="flex flex-1 items-start gap-2 text-sm">
+                        <input type="checkbox" checked={segment.selected} onChange={(event) => void toggle(segment.id, event.target.checked)} className="mt-1" aria-label={`${t('useInAds')}: ${segment.title}`} />
+                        <span className="flex flex-col">
+                          <span className="font-medium" dir="auto">
+                            {segment.title}
+                          </span>
+                          <span className="text-xs text-muted-foreground" dir="auto">
+                            {segment.description}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{t('momentRange', { start: Math.round(segment.startSeconds), end: Math.round(segment.endSeconds) })}</span>
                         </span>
-                        <span className="text-xs text-muted-foreground" dir="auto">
-                          {segment.description}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{t('momentRange', { start: Math.round(segment.startSeconds), end: Math.round(segment.endSeconds) })}</span>
-                      </span>
-                    </label>
+                      </label>
+                    </div>
+                    {onUseSegmentVideo || onUseSegmentImage ? (
+                      <div className="flex flex-wrap items-center gap-2 ps-6">
+                        {onUseSegmentVideo ? (
+                          <button
+                            type="button"
+                            onClick={() => void onUseSegmentVideo(latest.id, segment.id, segment.title)}
+                            className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary hover:bg-primary/20"
+                          >
+                            {t('useClipInScene')}
+                          </button>
+                        ) : null}
+                        {onUseSegmentImage ? (
+                          <button
+                            type="button"
+                            onClick={() => void onUseSegmentImage(latest.id, segment.id, segment.title)}
+                            className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium hover:bg-muted/80"
+                          >
+                            {t('useScreenInAd')}
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

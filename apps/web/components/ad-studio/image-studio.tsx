@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import {
   AlertTriangle,
+  ChevronDown,
   Download,
   ImageIcon,
   Images,
@@ -16,6 +17,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Trash2,
+  Upload,
   Wand2,
   Zap,
 } from 'lucide-react';
@@ -29,9 +31,14 @@ import {
   AD_STUDIO_MAX_EMPHASIS,
   AD_STUDIO_MAX_IMAGE_CONCEPTS,
   validateAdStudioImageConcepts,
+  type AdStudioDemoAccessView,
+  type AdStudioDemoRecordingView,
+  type AdStudioGallerySourceRef,
   type AdStudioImageConcept,
   type AdStudioImageFormat,
 } from '@growthos/shared';
+import { MediaGalleryPanel } from './media-gallery-panel';
+import { DemoAccessPanel } from './demo-access-panel';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import { AdCopyCard } from './ad-copy-card';
@@ -83,6 +90,12 @@ export interface ImageStudioProps {
   focusConceptId?: string;
   /** The landing page, shown as its domain in the ad previews. */
   linkUrl?: string | null;
+  demoConfig?: {
+    access: AdStudioDemoAccessView | null;
+    canEdit: boolean;
+    recordings: AdStudioDemoRecordingView[];
+    recordingAvailable: boolean;
+  };
 }
 
 /** Thumbnail beside each placement's details: the placement's own shape, a fixed width so the cards line up. */
@@ -149,6 +162,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
     ideasOnly = false,
     focusConceptId,
     linkUrl = null,
+    demoConfig,
   } = props;
   const t = useTranslations('AdStudio');
   const router = useRouter();
@@ -162,6 +176,11 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [instructions, setInstructions] = React.useState<Record<string, string>>({});
   const [editing, setEditing] = React.useState<string | null>(null);
+  const [slotPicker, setSlotPicker] = React.useState<{ conceptId: string; format: AdStudioImageFormat } | null>(null);
+  const [mediaSourcesOpen, setMediaSourcesOpen] = React.useState(false);
+  const [newAdFormat, setNewAdFormat] = React.useState<AdStudioImageFormat>('square');
+  const [newAdHeadline, setNewAdHeadline] = React.useState('');
+  const [galleryRefresh, setGalleryRefresh] = React.useState(0);
   // The one idea being rewritten by an instruction, and that instruction.
   const [ideaRewrite, setIdeaRewrite] = React.useState<{ id: string; instruction: string } | null>(null);
   // Review: show one idea or all of them.
@@ -223,6 +242,43 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+  async function submitCustomImage(params: {
+    conceptId?: string;
+    format: AdStudioImageFormat;
+    headline?: string;
+    file?: File;
+    source?: AdStudioGallerySourceRef;
+    alsoSaveToGallery?: boolean;
+  }): Promise<boolean> {
+    const key = params.conceptId ? `upload-${params.conceptId}-${params.format}` : 'upload-new';
+    let init: RequestInit;
+    if (params.file) {
+      const form = new FormData();
+      form.set('file', params.file);
+      form.set('format', params.format);
+      if (params.conceptId) form.set('conceptId', params.conceptId);
+      if (params.headline !== undefined) form.set('headline', params.headline);
+      if (params.alsoSaveToGallery !== false) form.set('alsoSaveToGallery', 'true');
+      init = { method: 'POST', body: form };
+    } else {
+      init = json('POST', {
+        source: params.source,
+        format: params.format,
+        ...(params.conceptId ? { conceptId: params.conceptId } : {}),
+        ...(params.headline !== undefined ? { headline: params.headline } : {}),
+      });
+    }
+    const ok = await call(key, '/images/upload', init, () => {
+      setMessage({ tone: 'ok', text: t('images.customImageReady') });
+    });
+    if (ok) {
+      setSlotPicker(null);
+      setNewAdHeadline('');
+      setGalleryRefresh((n) => n + 1);
+    }
+    return ok;
+  }
 
   function update(index: number, patch: Partial<AdStudioImageConcept>): void {
     setDraft((current) =>
@@ -387,6 +443,53 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
             </button>
           ) : null}
         </div>
+        <button
+          type="button"
+          disabled={pending !== null}
+          onClick={() =>
+            setSlotPicker((cur) =>
+              cur?.conceptId === slot.conceptId && cur.format === slot.format
+                ? null
+                : { conceptId: slot.conceptId, format: slot.format },
+            )
+          }
+          className="inline-flex h-8 items-center justify-center gap-1 rounded-full border border-border bg-card px-3 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          data-testid={`ad-studio-image-replace-${slot.format}`}
+        >
+          {pending === `upload-${slot.conceptId}-${slot.format}` ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+          )}
+          {t('images.replaceWithPhoto')}
+        </button>
+        {slotPicker?.conceptId === slot.conceptId && slotPicker.format === slot.format ? (
+          <MediaGalleryPanel
+            orgId={orgId}
+            projectId={projectId}
+            briefId={briefId}
+            acceptKind="image"
+            title={t('mediaGallery.pickerTitleImage')}
+            refreshKey={galleryRefresh}
+            busy={pending !== null}
+            onSelect={(item) =>
+              void submitCustomImage({
+                conceptId: slot.conceptId,
+                format: slot.format,
+                source: item.sourceRef,
+              })
+            }
+            onUploadFile={(file, save) =>
+              void submitCustomImage({
+                conceptId: slot.conceptId,
+                format: slot.format,
+                file,
+                alsoSaveToGallery: save,
+              })
+            }
+            onClose={() => setSlotPicker(null)}
+          />
+        ) : null}
         {shown && editing === shown.id ? (
           <form
             className="flex flex-col gap-1.5 rounded-xl border border-primary/30 bg-primary/5 p-2"
@@ -428,7 +531,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
               <button
                 key={image.id}
                 type="button"
-                title={image.instruction ?? t('images.versionRender')}
+                title={image.kind === 'upload' ? t('images.versionUpload') : (image.instruction ?? t('images.versionRender'))}
                 aria-pressed={image.selected}
                 onClick={() => void call(`select-${image.id}`, `/images/${image.id}/select`, { method: 'POST' })}
                 disabled={pending !== null || image.selected}
@@ -567,6 +670,101 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
             </div>
           ))}
         </dl>
+      ) : null}
+
+      {!ideasOnly ? (
+        <details
+          open={mediaSourcesOpen}
+          onToggle={(event) => setMediaSourcesOpen(event.currentTarget.open)}
+          className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy"
+          data-testid="ad-studio-image-media-sources"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3 text-sm font-semibold hover:bg-pp-surface-container-low/60 [&::-webkit-details-marker]:hidden">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Upload className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 text-start">
+                <p className="font-pp-display text-sm font-semibold">{t('images.mediaSourcesTitle')}</p>
+                <p className="line-clamp-1 text-xs font-normal text-muted-foreground">{t('images.uploadNewAd')}</p>
+              </div>
+            </div>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          {mediaSourcesOpen ? (
+            <div className="flex flex-col gap-4 border-t border-border/50 p-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-medium text-muted-foreground">
+                  {t('images.optionalHeadline')}
+                  <input
+                    value={newAdHeadline}
+                    onChange={(event) => setNewAdHeadline(event.target.value)}
+                    maxLength={AD_STUDIO_IMAGE_HEADLINE_MAX}
+                    placeholder={t('images.headlinePlaceholder')}
+                    dir="auto"
+                    className="h-9 rounded-xl border border-input bg-background px-3 text-xs text-foreground"
+                  />
+                </label>
+                <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t('images.placements')}>
+                  {AD_STUDIO_IMAGE_FORMATS.map((fmt) => (
+                    <button
+                      key={fmt}
+                      type="button"
+                      aria-pressed={newAdFormat === fmt}
+                      onClick={() => setNewAdFormat(fmt)}
+                      className={cn(
+                        'rounded-full border px-3 py-1 text-xs font-medium',
+                        newAdFormat === fmt ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted',
+                      )}
+                    >
+                      {t(`images.format.${fmt}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <MediaGalleryPanel
+                orgId={orgId}
+                projectId={projectId}
+                briefId={briefId}
+                acceptKind="image"
+                refreshKey={galleryRefresh}
+                busy={pending !== null}
+                onSelect={(item) =>
+                  void submitCustomImage({
+                    format: newAdFormat,
+                    headline: newAdHeadline,
+                    source: item.sourceRef,
+                  })
+                }
+                onUploadFile={(file, save) =>
+                  void submitCustomImage({
+                    format: newAdFormat,
+                    headline: newAdHeadline,
+                    file,
+                    alsoSaveToGallery: save,
+                  })
+                }
+              />
+              {demoConfig ? (
+                <DemoAccessPanel
+                  orgId={orgId}
+                  projectId={projectId}
+                  access={demoConfig.access}
+                  canEdit={demoConfig.canEdit}
+                  recordings={demoConfig.recordings}
+                  recordingAvailable={demoConfig.recordingAvailable}
+                  onUseSegmentImage={(recordingId, segmentId) =>
+                    submitCustomImage({
+                      format: newAdFormat,
+                      headline: newAdHeadline,
+                      source: { type: 'demo_segment', recordingId, segmentId },
+                    })
+                  }
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </details>
       ) : null}
 
       {draft.length === 0 ? <p className="text-sm text-muted-foreground">{t('images.noIdeas')}</p> : null}
