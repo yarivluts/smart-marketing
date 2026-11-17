@@ -3741,7 +3741,7 @@
     "payingRate": "Became customers %",
     "avg40dRevenue": "Average money in 40 days",
     "kpiTimeToSign": "Time to sign",
-    "kpiChurnRate": "{rate}% churn",
+    "kpiChurnRate": "{rate}% of customers canceled",
     "paybackDayWindow": "Collected by day {days}",
     "funnelEmptyTitle": "Your customer path is not set up yet",
     "funnelUnavailableTitle": "The customer path cannot be shown right now",
