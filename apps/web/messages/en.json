@@ -1434,7 +1434,7 @@
       },
       "customer_profiles": {
         "title": "Customer records",
-        "impact": "Without customer records the full customer view is empty and segments cannot filter on customer attributes."
+        "impact": "Without customer records the full customer view is empty and customer groups cannot filter on customer details."
       },
       "billing": {
         "title": "Billing and subscriptions",

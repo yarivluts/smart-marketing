@@ -551,6 +551,7 @@ Template for each entry:
 
 ## UX hourly
 
+- 2026-11-18 - (a/f) Setup health re-read. The customer-records line said "segments cannot filter" (he: פלחים) though the menu says Customer groups; now "customer groups" / קבוצות לקוחות (en + he) with a test. PR #TBD. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) MCP guide still says "segments".
 - 2026-11-18 - (a/f) Growth Pilot first visit, failure reasons and Hebrew copy re-read (clean). The demo work-list link said "Segments page" (he: דף הסגמנטים) though the page and menu are "Customer groups"; now matches (en + he) with a test. PR #1350. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) SetupHealth impact line still says "segments".
 
 - 2026-11-18 - (d) Ad Studio script problems re-read. A scene with an unrecognized narration choice only said "unknown narration type"; now says to choose again between "Voice-over in the background" and "A person in the shot speaks" (en + he) with a test. PR #1346. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) Hebrew pass over Onboarding journey* keys.
