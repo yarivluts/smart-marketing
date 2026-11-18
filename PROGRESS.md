@@ -17,6 +17,36 @@ Template for each entry:
 
 ---
 
+## 2026-11-18 — Ad Studio & Campaigns: third-party client sharing, feedback reports & AI request proposals
+
+### Shipped
+- **Client-share return reports & fix-agent prompt synthesis (`@growthos/shared`)**:
+  - Added [`client-share.ts`](packages/shared/src/ad-studio/client-share.ts) (exported from [`index.ts`](packages/shared/src/ad-studio/index.ts)) defining `AdShareFeedbackItem`, `AdShareProposalView`, input validation (`validateClientFeedbackInput`), Markdown return-report generation (`buildClientFeedbackReport`), and actionable fix-agent prompt generation (`buildClientFeedbackFixPrompt`).
+- **Feedback, AI proposal, and revision persistence (`@growthos/firebase-orm-models`)**:
+  - Extended [`AdShareLinkModel`](packages/firebase-orm-models/src/models/ad-share-link.model.ts) and [`ad-share-link.service.ts`](packages/firebase-orm-models/src/services/ad-share-link.service.ts) with `includeResults`, `allowFeedback`, `revisionNumber`, `revisionNote`, and `supersedesLinkId`.
+  - Added [`AdShareFeedbackModel`](packages/firebase-orm-models/src/models/ad-share-feedback.model.ts), `AdShareProposalModel`, and [`ad-share-feedback.service.ts`](packages/firebase-orm-models/src/services/ad-share-feedback.service.ts) for project-scoped client notes, approvals, lifecycle updates (`open` -> `proposed` -> `applied`/`declined` -> `sent_to_client`), and AI proposals without composite-index drift.
+- **AI proposal synthesis & approval execution (`@growthos/ad-studio`)**:
+  - Added [`client-requests.ts`](packages/ad-studio/src/client-requests.ts) (`proposeChangesFromClientFeedback` and `decideClientProposal`, exported from [`index.ts`](packages/ad-studio/src/index.ts)) to translate client requests into structured changes (`update_brief_settings`, `update_video_script`, `update_image_concepts`, `update_search_ad`, `create_new_brief`) and trigger `startAdStudioAutopilot` regeneration upon manager approval.
+- **Public client portal, agency request queue & campaign share entrypoints (`apps/web`)**:
+  - Extended [`share-view.ts`](apps/web/lib/ad-studio/share-view.ts) & [`share.ts`](apps/web/lib/ad-studio/share.ts) to include Google Search ad previews, campaign performance results via `buildUnifiedAdsCockpitData`, revision metadata, and client feedback loading.
+  - Added `/api/share/ads/[token]/feedback` (`GET`/`POST`), `/api/orgs/[orgId]/projects/[projectId]/ad-studio/client-requests` (`GET`/`POST` manual requests & AI proposals), `/api/.../client-requests/proposals/[proposalId]` (`POST` approve/decline), and revision/toggle fields + `markFeedbackSentIds` on `/api/.../share-links`.
+  - Updated [`SharedAdsView`](apps/web/components/ad-studio/shared-ads-view.tsx) & [`shared-ads-feedback.tsx`](apps/web/components/ad-studio/shared-ads-feedback.tsx) (campaign results summary + per-campaign feedback, Search ad preview, revision badge, one-click approval, toggle-gated note/new-ad forms), [`ShareLinksPanel`](apps/web/components/ad-studio/share-links-panel.tsx) (include-results / allow-feedback options), and created [`ClientRequestsPanel`](apps/web/components/ad-studio/client-requests-panel.tsx) (feedback queue, return-report copy/download, fix-agent instructions copy, AI proposal review, and **"Send updated version to client?"** revision-link flow), wired into [`ad-studio/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), [`campaigns/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/campaigns/page.tsx), and [`ads-performance-dashboard.tsx`](apps/web/components/campaigns/ads-performance-dashboard.tsx) with EN/HE copy in [`en.json`](apps/web/messages/en.json) and [`he.json`](apps/web/messages/he.json).
+
+### Verified
+- `@growthos/shared`: `build` + `vitest run --pool=forks` (93 files, 1,036 tests passed).
+- `@growthos/firebase-orm-models`: `build` + Firestore emulator `vitest` (`ad-share-link.emulator.test.ts` + `ad-share-feedback.emulator.test.ts`: 2 files, 7 tests passed).
+- `@growthos/ad-studio`: `build` + `src/client-requests.test.ts` (2 tests passed).
+- `@growthos/web`: Firestore + Auth emulator `app/api/share/ads/share-routes.test.ts` (5 tests passed); message/copy/ratchet & component suites (`messages.test.ts`, `hebrew-plural-copy.test.ts`, `share-preview-intro-plain-copy.test.ts`, `ad-studio-plain-video-copy.test.ts`, `hardcoded-strings.test.ts`, `shared-ads-view.test.tsx`, `share-links-panel.test.tsx`, `client-requests-panel.test.tsx`: all passed); zero Hebrew in changed `.ts`/`.tsx` files; `check-index-drift.mjs` (16/16, 0 drift); monorepo `pnpm lint` (9/9) and `pnpm typecheck` (16/16) passed.
+
+### Key files
+- `packages/shared/src/ad-studio/{client-share,client-share.test,index}.ts`
+- `packages/firebase-orm-models/src/{models/ad-share-link.model.ts,models/ad-share-feedback.model.ts,services/ad-share-link.service.ts,services/ad-share-feedback.service.ts,services/ad-share-link.emulator.test.ts,services/ad-share-feedback.emulator.test.ts,index.ts}`
+- `packages/ad-studio/src/{client-requests,client-requests.test,index}.ts`
+- `apps/web/app/api/share/ads/[token]/feedback/route.ts`, `apps/web/app/api/share/ads/share-routes.test.ts`, & `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/{share-links,client-requests/**}`
+- `apps/web/lib/ad-studio/{share-view,share}.ts`, `apps/web/components/ad-studio/{shared-ads-view,shared-ads-feedback,share-links-panel,client-requests-panel,client-requests-panel.test,shared-ads-view.test}.tsx`, `apps/web/components/campaigns/ads-performance-dashboard.tsx`, `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/{ad-studio,campaigns}/page.tsx`, & `apps/web/messages/{en,he}.json`
+
+---
+
 ## 2026-11-18 — Ad Studio: automatic full-page website scan & smooth scrolling video clips
 
 ### Shipped

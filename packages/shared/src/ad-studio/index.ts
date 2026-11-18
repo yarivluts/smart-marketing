@@ -19,3 +19,4 @@ export * from './claims';
 export * from './demo';
 export * from './gallery';
 export * from './site-scroll';
+export * from './client-share';

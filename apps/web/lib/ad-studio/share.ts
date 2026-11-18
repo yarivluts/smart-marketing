@@ -13,9 +13,30 @@ import {
   type ResolvedAdShareLink,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import {
+  listAdShareFeedbackForLink,
+  listAdShareFeedbackForProject,
+  listAdShareProposals,
+} from '@growthos/firebase-orm-models';
+import type { AdShareFeedbackItem, AdShareProposalView } from '@growthos/shared';
+import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
+import { toAutomationTargetView } from '@/lib/orgs/automation-view';
+import {
+  getCampaignSpendBreakdownForProject,
+  listAutomationActionsForProject,
+  listAutomationTargetStatesForProject,
+  type CampaignSpendBreakdownOutcome,
+} from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { listAdStudioBriefs, listAdStudioClips, listAdStudioVideos, toAdStudioBriefView } from './store';
 import { toAdStudioClipView, toAdStudioImageView, toAdStudioVideoView } from './engine';
-import { sharedBriefAds, sharedMediaBase, type SharedAdsPage, type SharedBriefAds } from './share-view';
+import {
+  sharedBriefAds,
+  sharedMediaBase,
+  type SharedAdsPage,
+  type SharedBriefAds,
+  type SharedCampaignResultsSummary,
+} from './share-view';
 
 /**
  * Server side of the client share links: resolving a token and gathering what it shows. A token
@@ -63,7 +84,11 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
   const link = await resolveShareLink(token);
   if (!link) return null;
   const { organizationId, projectId } = link;
-  const [briefModels, brandKit] = await Promise.all([listAdStudioBriefs(organizationId, projectId), getAdStudioBrandKit(organizationId, projectId)]);
+  const [briefModels, brandKit, feedback] = await Promise.all([
+    listAdStudioBriefs(organizationId, projectId),
+    getAdStudioBrandKit(organizationId, projectId),
+    link.allowFeedback ? listAdShareFeedbackForLink(organizationId, projectId, link.id) : Promise.resolve([]),
+  ]);
   const briefs = briefModels.map(toAdStudioBriefView).filter((brief) => shareLinkCoversBrief(link, brief.id));
   const shown = await Promise.all(
     briefs.map(async (brief): Promise<SharedBriefAds | null> => {
@@ -81,10 +106,82 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
       });
     }),
   );
+
+  let results: SharedCampaignResultsSummary | null = null;
+  if (link.includeResults) {
+    try {
+      const { selected: selectedEnvironment } = await resolveSelectedEnvironment(organizationId, projectId);
+      let spendOutcome: CampaignSpendBreakdownOutcome | null = null;
+      try {
+        spendOutcome = await getCampaignSpendBreakdownForProject(organizationId, projectId, {
+          environmentId: selectedEnvironment?.id,
+        });
+      } catch {
+        spendOutcome = null;
+      }
+      const [targets, actions] = await Promise.all([
+        listAutomationTargetStatesForProject(organizationId, projectId),
+        listAutomationActionsForProject(organizationId, projectId),
+      ]);
+      const targetViews = targets.map(toAutomationTargetView);
+      const lastActionAtByTarget = new Map<string, string>();
+      for (const action of actions) {
+        if (!lastActionAtByTarget.has(action.target_id)) {
+          lastActionAtByTarget.set(action.target_id, action.proposed_at);
+        }
+      }
+      const { items, summary } = buildUnifiedAdsCockpitData(targetViews, spendOutcome, new Map(), lastActionAtByTarget);
+      if (items.length > 0 || summary.campaignsWithSpendCount > 0) {
+        results = {
+          totalSpendUsd: summary.totalSpendUsd,
+          metaSpendUsd: summary.metaSpendUsd,
+          googleSpendUsd: summary.googleSpendUsd,
+          activeCampaignsCount: summary.activeCampaignsCount,
+          totalCampaignsCount: summary.totalCampaignsCount,
+          campaignsWithSpendCount: summary.campaignsWithSpendCount,
+          items: items.map((item) => ({
+            id: item.targetId,
+            label: item.label,
+            platform: item.platform,
+            status: item.status,
+            dailyBudgetUsd: item.dailyBudgetUsd,
+            totalSpendUsd: item.spend30dUsd,
+            roas: item.roas,
+            ctrPct: item.ctrPct,
+            conversions: item.conversions,
+          })),
+        };
+      }
+    } catch {
+      results = null;
+    }
+  }
+
   return {
     brandName: brandKit.brandName,
     logoSrc: brandKit.logo ? `${sharedMediaBase(token)}/logo${brandKit.lastChangedOn ? `?v=${encodeURIComponent(brandKit.lastChangedOn)}` : ''}` : null,
     expiresOn: link.expiresOn,
     briefs: shown.filter((entry): entry is SharedBriefAds => entry !== null),
+    token,
+    label: link.label,
+    includeResults: link.includeResults,
+    allowFeedback: link.allowFeedback,
+    revisionNumber: link.revisionNumber,
+    revisionNote: link.revisionNote,
+    results,
+    feedback,
   };
 });
+
+/** Loads project-level client feedback notes & AI proposals for the manager workspace. */
+export async function loadClientRequestsState(
+  organizationId: string,
+  projectId: string,
+): Promise<{ feedback: AdShareFeedbackItem[]; proposals: AdShareProposalView[] }> {
+  await ensureFirestoreOrm();
+  const [feedback, proposals] = await Promise.all([
+    listAdShareFeedbackForProject(organizationId, projectId),
+    listAdShareProposals(organizationId, projectId),
+  ]);
+  return { feedback, proposals };
+}
