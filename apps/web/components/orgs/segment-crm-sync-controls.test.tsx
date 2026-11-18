@@ -72,7 +72,7 @@ describe('SegmentCrmSyncControls', () => {
 
   it('shows a fallback message and no button when the project has no action-type plugin installs', () => {
     renderControls({ actionInstalls: [] });
-    expect(screen.getByText("Install a CRM-sync plugin (Plugins page) to export this list.")).toBeInTheDocument();
+    expect(screen.getByText("To send this list to your customer-management tool (CRM), first add a plugin for it on the Plugins page.")).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sync to CRM' })).not.toBeInTheDocument();
   });
 

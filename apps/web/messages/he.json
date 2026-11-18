@@ -2844,7 +2844,7 @@
     "noSegmentSuggestions": "אין הצעות מהימנות לסוג רשומה זה כרגע.",
     "segmentSuggestionSummary": "{name} (התאמה של {confidence}%)",
     "useSuggestionButton": "השתמש בזה",
-    "crmSyncNoInstalls": "התקינו תוסף סנכרון CRM (בעמוד התוספים) כדי לייצא רשימה זו.",
+    "crmSyncNoInstalls": "התקינו בעמוד התוספים תוסף שמעביר את הרשימה הזו לכלי ניהול הלקוחות שלכם (CRM).",
     "crmSyncInstallLabel": "יעד סנכרון CRM",
     "crmSyncButton": "סנכרן ל-CRM",
     "crmSyncError": "לא ניתן היה לסנכרן את הקבוצה. נסו שוב.",
