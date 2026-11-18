@@ -42,7 +42,7 @@ test.describe('Experiments (KAN-89)', () => {
     await page.getByRole('link', { name: 'Compare versions' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/experiments$`));
     await expect(page.getByRole('heading', { name: `Compare versions for Client Delta` })).toBeVisible();
-    await expect(page.getByText('Turn on A/B tracking to see which version of a page or ad works better.')).toBeVisible();
+    await expect(page.getByText('Turn on version comparison to see which version of a page or ad works better.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Install' }).click();
     // No BigQuery warehouse is wired up in this test env, so the results section degrades to its own
