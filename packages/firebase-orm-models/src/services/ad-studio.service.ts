@@ -41,6 +41,7 @@ import {
   type AdStudioPlanSources,
   type AdStudioScene,
   type AdStudioSceneIssue,
+  type AdStudioSiteScrollPage,
 } from '@growthos/shared';
 import {
   AdStudioBriefModel,
@@ -502,6 +503,41 @@ export async function saveAdStudioPlan(params: {
   brief.plan_sources = JSON.parse(JSON.stringify(params.sources)) as AdStudioPlanSources;
   brief.plan_generated_by = { ...params.generatedBy };
   if (brief.status !== 'scripted') brief.status = 'planned';
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/** Stores scanned website screenshots and their smooth scrolling clip paths on a brief. */
+export async function saveAdStudioBriefSitePages(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  sitePages: AdStudioSiteScrollPage[];
+  landingPageUrl?: string | null;
+  now?: Date;
+}): Promise<AdStudioBriefModel> {
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  brief.site_pages = JSON.parse(JSON.stringify(params.sitePages)) as AdStudioSiteScrollPage[];
+  if (params.landingPageUrl && !brief.landing_page_url) {
+    brief.landing_page_url = params.landingPageUrl;
+  }
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/** Updates which scanned scrolling website pages are included automatically in the assembled ad. */
+export async function updateAdStudioBriefSitePageSelection(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  selectedPageIds: readonly string[];
+  now?: Date;
+}): Promise<AdStudioBriefModel> {
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  const selected = new Set(params.selectedPageIds);
+  brief.site_pages = (brief.site_pages ?? []).map((page) => ({ ...page, selected: selected.has(page.id) }));
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;

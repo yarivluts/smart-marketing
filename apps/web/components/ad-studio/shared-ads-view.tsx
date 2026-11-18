@@ -1,11 +1,19 @@
 'use client';
 
 import * as React from 'react';
+import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import type { AdShareFeedbackItem } from '@growthos/shared';
 import { Eye, LinkIcon } from 'lucide-react';
 import { formatShareDate, type SharedAdsPage, type SharedImageAd } from '@/lib/ad-studio/share-view';
 import { AdPlacementPreview, IMAGE_PLACEMENTS, imageForPlacement, type AdPlacement } from './ad-placement-preview';
 import { BrandLogoProvider } from './brand-logo';
+import { SearchResultPreview } from './search-result-preview';
+import {
+  SharedBriefFeedbackBar,
+  SharedGeneralRequestSection,
+  SharedResultsSection,
+} from './shared-ads-feedback';
 
 /** The placements an idea has its own image for; every image placement when it has none exactly. */
 export function sharedImagePlacements(byFormat: SharedImageAd['byFormat']): readonly AdPlacement[] {
@@ -20,6 +28,11 @@ export function sharedImagePlacements(byFormat: SharedImageAd['byFormat']): read
 export function SharedAdsView({ page }: { page: SharedAdsPage }): React.ReactElement {
   const t = useTranslations('AdShare.public');
   const locale = useLocale();
+  const [feedback, setFeedback] = useState<AdShareFeedbackItem[]>(() => page.feedback ?? []);
+  const allowFeedback = Boolean(page.allowFeedback && page.token);
+  function appendFeedback(item: AdShareFeedbackItem): void {
+    setFeedback((prev) => (prev.some((existing) => existing.id === item.id) ? prev : [...prev, item]));
+  }
   const brand = page.brandName.trim();
 
   return (
@@ -35,9 +48,28 @@ export function SharedAdsView({ page }: { page: SharedAdsPage }): React.ReactEle
             <Eye className="h-3.5 w-3.5" aria-hidden="true" />
             {t('viewOnly', { date: formatShareDate(locale, page.expiresOn) })}
           </p>
+          {(page.revisionNumber ?? 1) > 1 || page.revisionNote ? (
+            <p
+              className="inline-flex flex-wrap items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+              data-testid="shared-ads-revision"
+            >
+              <span>{t('revisionBadge', { revision: page.revisionNumber ?? 1 })}</span>
+              {page.revisionNote ? <span className="text-foreground/80">· {page.revisionNote}</span> : null}
+            </p>
+          ) : null}
         </header>
 
-        {page.briefs.length === 0 ? (
+        {page.includeResults && page.results ? (
+          <SharedResultsSection
+            results={page.results}
+            allowFeedback={allowFeedback}
+            token={page.token}
+            feedback={feedback}
+            onSubmitted={appendFeedback}
+          />
+        ) : null}
+
+        {page.briefs.length === 0 && !(page.includeResults && page.results) ? (
           <p className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground" data-testid="shared-ads-empty">
             {t('empty')}
           </p>
@@ -72,9 +104,38 @@ export function SharedAdsView({ page }: { page: SharedAdsPage }): React.ReactEle
                   </article>
                 ))}
               </div>
+              {brief.searchAd ? (
+                <article
+                  className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4 shadow-sm"
+                  data-testid="shared-search-ad"
+                >
+                  <h3 className="text-sm font-semibold">{t('searchAdHeading')}</h3>
+                  <SearchResultPreview
+                    headlines={brief.searchAd.headlines}
+                    descriptions={brief.searchAd.descriptions}
+                    path1={brief.searchAd.path1}
+                    path2={brief.searchAd.path2}
+                    linkUrl={brief.landingPageUrl}
+                    advertiser={brand || brief.name}
+                  />
+                </article>
+              ) : null}
+              <SharedBriefFeedbackBar
+                briefId={brief.id}
+                allowFeedback={allowFeedback}
+                token={page.token}
+                feedback={feedback}
+                onSubmitted={appendFeedback}
+              />
             </section>
           ))
         )}
+        <SharedGeneralRequestSection
+          allowFeedback={allowFeedback}
+          token={page.token}
+          feedback={feedback}
+          onSubmitted={appendFeedback}
+        />
       </main>
     </BrandLogoProvider>
   );

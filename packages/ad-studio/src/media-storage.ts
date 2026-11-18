@@ -61,6 +61,14 @@ export function adStudioImageObjectPath(ref: BriefRef & { imageId: string; mimeT
   return `${adStudioBriefMediaPrefix(ref)}images/${ref.imageId}.${IMAGE_EXTENSIONS[ref.mimeType] ?? 'png'}`;
 }
 
+export function adStudioSitePageScreenshotObjectPath(ref: BriefRef & { pageId: string }): string {
+  return `${adStudioBriefMediaPrefix(ref)}site-pages/${ref.pageId}.png`;
+}
+
+export function adStudioSitePageVideoObjectPath(ref: BriefRef & { pageId: string }): string {
+  return `${adStudioBriefMediaPrefix(ref)}site-pages/${ref.pageId}.mp4`;
+}
+
 /** Reads a whole stored object into memory, refusing anything past `maxBytes`. */
 export async function readAdStudioObject(storage: AdStudioMediaStorage, objectPath: string, maxBytes: number): Promise<Buffer> {
   const chunks: Buffer[] = [];

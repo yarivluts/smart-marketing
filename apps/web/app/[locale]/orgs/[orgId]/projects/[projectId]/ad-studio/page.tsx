@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Clapperboard,
   FileText,
+  MessageSquareText,
   Share2,
   SlidersHorizontal,
   Workflow,
@@ -101,8 +102,9 @@ import { PlanSection } from '@/components/ad-studio/plan-section';
 import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
-import { listShareLinks } from '@/lib/ad-studio/share';
+import { listShareLinks, loadClientRequestsState } from '@/lib/ad-studio/share';
 import { ShareLinksPanel } from '@/components/ad-studio/share-links-panel';
+import { ClientRequestsPanel } from '@/components/ad-studio/client-requests-panel';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -161,7 +163,7 @@ export default async function AdStudioPage({
 
   const canEditBrand = can(bindings, principal, 'project.configure', { orgId, projectId });
   const vault = serverKms();
-  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot, shareLinks, demoAccessLoaded, demoRecordings] =
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable, brandLoaded, growthPilot, shareLinks, demoAccessLoaded, demoRecordings, clientRequests] =
     await Promise.all([
       listOrgProjects(orgId),
       listAdStudioBriefs(orgId, projectId),
@@ -177,6 +179,7 @@ export default async function AdStudioPage({
       // The trial account's username is shown only to those who may change it; the password never.
       getAdStudioDemoAccess(orgId, projectId, canEditBrand ? vault : null),
       listAdStudioDemoRecordings(orgId, projectId),
+      loadClientRequestsState(orgId, projectId),
     ]);
   const brandKit = brandLoaded.kit;
   const logoUrl = brandLoaded.logoVersion ? `/api/orgs/${orgId}/projects/${projectId}/ad-studio/brand-kit/logo?v=${encodeURIComponent(brandLoaded.logoVersion)}` : null;
@@ -185,6 +188,7 @@ export default async function AdStudioPage({
 
   const t = await getTranslations('AdStudio');
   const tShare = await getTranslations('AdShare.manage');
+  const tRequests = await getTranslations('AdShare.requests');
   const briefs = briefModels.map(toAdStudioBriefView);
   // The site this project already advertises - from an earlier ad or Growth Pilot - so a new ad needs no typing at all.
   const knownSite = briefs.find((brief) => brief.landingPageUrl)?.landingPageUrl ?? growthPilot?.site_url ?? null;
@@ -734,6 +738,7 @@ export default async function AdStudioPage({
                   advertiser={brandKit.brandName || selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}
+                  initialSitePages={selected.sitePages}
                   demoConfig={{
                     access: demoAccessLoaded,
                     canEdit: canEditBrand,
@@ -826,7 +831,7 @@ export default async function AdStudioPage({
                   </div>
                 </details>
               ) : null}
-              {canEditBrand && publishCreatives.some((creative) => creative.kind !== 'search') ? (
+              {canEditBrand && publishCreatives.length > 0 ? (
                 <details className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy" data-testid="ad-studio-share-shortcut">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-pp-surface-container-low/60 sm:px-5 [&::-webkit-details-marker]:hidden">
                     <span>{tShare('shortcut')}</span>
@@ -839,6 +844,30 @@ export default async function AdStudioPage({
                       briefs={[{ id: selected.id, name: selected.name }]}
                       initialLinks={shareLinks}
                       defaultBriefId={selected.id}
+                    />
+                  </div>
+                </details>
+              ) : null}
+              {clientRequests.feedback.length > 0 || clientRequests.proposals.length > 0 ? (
+                <details
+                  className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy"
+                  data-testid="ad-studio-publish-client-requests"
+                >
+                  <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-pp-surface-container-low/60 sm:px-5 [&::-webkit-details-marker]:hidden">
+                    <span>{tRequests('title')}</span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden="true" />
+                  </summary>
+                  <div className="border-t border-border/50 p-4 sm:p-5">
+                    <ClientRequestsPanel
+                      orgId={orgId}
+                      projectId={projectId}
+                      projectName={project.name}
+                      briefs={briefs.map((brief) => ({ id: brief.id, name: brief.name }))}
+                      initialFeedback={clientRequests.feedback}
+                      initialProposals={clientRequests.proposals}
+                      shareLinks={shareLinks}
+                      canCreateShareLink={canEditBrand}
+                      aiAvailable={providers.text !== null}
                     />
                   </div>
                 </details>
@@ -930,6 +959,49 @@ export default async function AdStudioPage({
               </div>
             </details>
           ) : null}
+          <details
+            className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy"
+            data-testid="ad-studio-client-requests-drawer"
+            open={
+              requestedSection === 'requests' ||
+              clientRequests.feedback.some((item) => item.status === 'open' || item.status === 'proposed' || item.status === 'applied') ||
+              clientRequests.proposals.some((proposal) => proposal.status === 'pending' || proposal.status === 'applied')
+            }
+          >
+            <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 transition-colors hover:bg-pp-surface-container-low/60 [&::-webkit-details-marker]:hidden">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
+                  <MessageSquareText className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0 text-start">
+                  <p className="font-pp-display text-sm font-bold text-foreground">{tRequests('title')}</p>
+                  <p className="line-clamp-1 text-xs text-muted-foreground">
+                    {tRequests('summaryToggle', {
+                      openCount: clientRequests.feedback.filter((item) => item.status === 'open' || item.status === 'proposed').length,
+                      pendingCount: clientRequests.proposals.filter((proposal) => proposal.status === 'pending').length,
+                    })}
+                  </p>
+                </div>
+              </div>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+                aria-hidden="true"
+              />
+            </summary>
+            <div className="border-t border-border/50 p-4">
+              <ClientRequestsPanel
+                orgId={orgId}
+                projectId={projectId}
+                projectName={project.name}
+                briefs={briefs.map((brief) => ({ id: brief.id, name: brief.name }))}
+                initialFeedback={clientRequests.feedback}
+                initialProposals={clientRequests.proposals}
+                shareLinks={shareLinks}
+                canCreateShareLink={canEditBrand}
+                aiAvailable={providers.text !== null}
+              />
+            </div>
+          </details>
         </div>
       )}
 

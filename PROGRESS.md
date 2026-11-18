@@ -17,6 +17,65 @@ Template for each entry:
 
 ---
 
+## 2026-11-18 — Ad Studio & Campaigns: third-party client sharing, feedback reports & AI request proposals
+
+### Shipped
+- **Client-share return reports & fix-agent prompt synthesis (`@growthos/shared`)**:
+  - Added [`client-share.ts`](packages/shared/src/ad-studio/client-share.ts) (exported from [`index.ts`](packages/shared/src/ad-studio/index.ts)) defining `AdShareFeedbackItem`, `AdShareProposalView`, input validation (`validateClientFeedbackInput`), Markdown return-report generation (`buildClientFeedbackReport`), and actionable fix-agent prompt generation (`buildClientFeedbackFixPrompt`).
+- **Feedback, AI proposal, and revision persistence (`@growthos/firebase-orm-models`)**:
+  - Extended [`AdShareLinkModel`](packages/firebase-orm-models/src/models/ad-share-link.model.ts) and [`ad-share-link.service.ts`](packages/firebase-orm-models/src/services/ad-share-link.service.ts) with `includeResults`, `allowFeedback`, `revisionNumber`, `revisionNote`, and `supersedesLinkId`.
+  - Added [`AdShareFeedbackModel`](packages/firebase-orm-models/src/models/ad-share-feedback.model.ts), `AdShareProposalModel`, and [`ad-share-feedback.service.ts`](packages/firebase-orm-models/src/services/ad-share-feedback.service.ts) for project-scoped client notes, approvals, lifecycle updates (`open` -> `proposed` -> `applied`/`declined` -> `sent_to_client`), and AI proposals without composite-index drift.
+- **AI proposal synthesis & approval execution (`@growthos/ad-studio`)**:
+  - Added [`client-requests.ts`](packages/ad-studio/src/client-requests.ts) (`proposeChangesFromClientFeedback` and `decideClientProposal`, exported from [`index.ts`](packages/ad-studio/src/index.ts)) to translate client requests into structured changes (`update_brief_settings`, `update_video_script`, `update_image_concepts`, `update_search_ad`, `create_new_brief`) and trigger `startAdStudioAutopilot` regeneration upon manager approval.
+- **Public client portal, agency request queue & campaign share entrypoints (`apps/web`)**:
+  - Extended [`share-view.ts`](apps/web/lib/ad-studio/share-view.ts) & [`share.ts`](apps/web/lib/ad-studio/share.ts) to include Google Search ad previews, campaign performance results via `buildUnifiedAdsCockpitData`, revision metadata, and client feedback loading.
+  - Added `/api/share/ads/[token]/feedback` (`GET`/`POST`), `/api/orgs/[orgId]/projects/[projectId]/ad-studio/client-requests` (`GET`/`POST` manual requests & AI proposals), `/api/.../client-requests/proposals/[proposalId]` (`POST` approve/decline), and revision/toggle fields + `markFeedbackSentIds` on `/api/.../share-links`.
+  - Updated [`SharedAdsView`](apps/web/components/ad-studio/shared-ads-view.tsx) & [`shared-ads-feedback.tsx`](apps/web/components/ad-studio/shared-ads-feedback.tsx) (campaign results summary + per-campaign feedback, Search ad preview, revision badge, one-click approval, toggle-gated note/new-ad forms), [`ShareLinksPanel`](apps/web/components/ad-studio/share-links-panel.tsx) (include-results / allow-feedback options), and created [`ClientRequestsPanel`](apps/web/components/ad-studio/client-requests-panel.tsx) (feedback queue, return-report copy/download, fix-agent instructions copy, AI proposal review, and **"Send updated version to client?"** revision-link flow), wired into [`ad-studio/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), [`campaigns/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/campaigns/page.tsx), and [`ads-performance-dashboard.tsx`](apps/web/components/campaigns/ads-performance-dashboard.tsx) with EN/HE copy in [`en.json`](apps/web/messages/en.json) and [`he.json`](apps/web/messages/he.json).
+
+### Verified
+- `@growthos/shared`: `build` + `vitest run --pool=forks` (93 files, 1,036 tests passed).
+- `@growthos/firebase-orm-models`: `build` + Firestore emulator `vitest` (`ad-share-link.emulator.test.ts` + `ad-share-feedback.emulator.test.ts`: 2 files, 7 tests passed).
+- `@growthos/ad-studio`: `build` + `src/client-requests.test.ts` (2 tests passed).
+- `@growthos/web`: Firestore + Auth emulator `app/api/share/ads/share-routes.test.ts` (5 tests passed); message/copy/ratchet & component suites (`messages.test.ts`, `hebrew-plural-copy.test.ts`, `share-preview-intro-plain-copy.test.ts`, `ad-studio-plain-video-copy.test.ts`, `hardcoded-strings.test.ts`, `shared-ads-view.test.tsx`, `share-links-panel.test.tsx`, `client-requests-panel.test.tsx`: all passed); zero Hebrew in changed `.ts`/`.tsx` files; `check-index-drift.mjs` (16/16, 0 drift); monorepo `pnpm lint` (9/9) and `pnpm typecheck` (16/16) passed.
+
+### Key files
+- `packages/shared/src/ad-studio/{client-share,client-share.test,index}.ts`
+- `packages/firebase-orm-models/src/{models/ad-share-link.model.ts,models/ad-share-feedback.model.ts,services/ad-share-link.service.ts,services/ad-share-feedback.service.ts,services/ad-share-link.emulator.test.ts,services/ad-share-feedback.emulator.test.ts,index.ts}`
+- `packages/ad-studio/src/{client-requests,client-requests.test,index}.ts`
+- `apps/web/app/api/share/ads/[token]/feedback/route.ts`, `apps/web/app/api/share/ads/share-routes.test.ts`, & `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/{share-links,client-requests/**}`
+- `apps/web/lib/ad-studio/{share-view,share}.ts`, `apps/web/components/ad-studio/{shared-ads-view,shared-ads-feedback,share-links-panel,client-requests-panel,client-requests-panel.test,shared-ads-view.test}.tsx`, `apps/web/components/campaigns/ads-performance-dashboard.tsx`, `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/{ad-studio,campaigns}/page.tsx`, & `apps/web/messages/{en,he}.json`
+
+---
+
+## 2026-11-18 — Ad Studio: automatic full-page website scan & smooth scrolling video clips
+
+### Shipped
+- **URL ranking & scroll-insert planner (`@growthos/shared`)**:
+  - Added [`site-scroll.ts`](packages/shared/src/ad-studio/site-scroll.ts) with `normalizeSitePageUrl`, `formatHostAndPath`, `rankCandidateSitePages` (homepage + Hebrew/English ad-relevant product/pricing page scoring without credentials), and `planSiteScrollInserts` (up to 2 selected scrolling clips within the 60s ad cap).
+- **Brief persistence (`@growthos/firebase-orm-models`)**:
+  - Added `site_pages?: AdStudioSiteScrollPage[] | null` on [`AdStudioBriefModel`](packages/firebase-orm-models/src/models/ad-studio.model.ts) along with `saveAdStudioBriefSitePages` and `updateAdStudioBriefSitePageSelection` in [`ad-studio.service.ts`](packages/firebase-orm-models/src/services/ad-studio.service.ts).
+- **FFmpeg scrolling renderer & public Playwright capturer (`packages/ad-studio`)**:
+  - Added `buildScrollVideoArgs` and `renderScrollingPageVideo` in [`ffmpeg.ts`](packages/ad-studio/src/ffmpeg.ts) to render oversampled full-page PNGs into smooth cosine-eased top-to-bottom scrolling MP4s at the brief's target aspect ratio and resolution.
+  - Added [`site-scroll.ts`](packages/ad-studio/src/site-scroll.ts) (`createPlaywrightSitePageCapturer`, `scanBriefSitePages`, `setBriefSitePageSelection`, `useScrollClipForScene`), saving full-page screenshots into the project gallery (`source: 'walkthrough'`), supporting scene-level scrolling clip creation with 0 AI quota (plus optional narration mix), and wiring automatic scan + `planSiteScrollInserts` splicing into [`video-pipeline.ts`](packages/ad-studio/src/video-pipeline.ts) `assembleBriefVideo`.
+- **Web API routes & Video Studio UI (`apps/web`)**:
+  - Added `/api/.../briefs/[briefId]/site-pages` (`POST` scan, `PATCH` selection), `/site-pages/[pageId]/media` (`GET` PNG/MP4 streaming), and `/scenes/[sceneId]/scroll-clip` (`POST` scene scrolling clip from scanned page, gallery item, or uploaded tall image).
+  - Created [`SiteScrollPanel`](apps/web/components/ad-studio/site-scroll-panel.tsx) (auto-scans when a website link exists on the brief and no pages are scanned yet, previews scrolling clips, toggles auto-weave selection, and applies to scenes), integrated it with per-scene **Scroll clip from page image** upload in [`VideoStudio`](apps/web/components/ad-studio/video-studio.tsx) and [`ad-studio/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), plus plain English & Hebrew copy in [`en.json`](apps/web/messages/en.json) and [`he.json`](apps/web/messages/he.json).
+
+### Verified
+- `@growthos/shared`: `build` + `vitest` (92 files, 1,033 tests passed).
+- `@growthos/firebase-orm-models`: `build` + Firestore emulator tests (2 files, 9 tests passed).
+- `@growthos/ad-studio`: `build`, `lint`, `typecheck`, `src/site-scroll.test.ts` (4 tests passed), and `src/ffmpeg.test.ts` (25 tests passed, including real `ffmpeg` top-to-bottom vertical scroll verification).
+- `@growthos/web`: Firestore emulator route suites (`ad-studio-site-scroll-routes.test.ts` + `ad-studio-video-routes.test.ts`: 2 files, 26 tests passed) and UI + copy/i18n/hardcoded-strings suites (6 files, 43 tests passed); monorepo `pnpm lint` and `pnpm typecheck` passed cleanly.
+
+### Key files
+- `packages/shared/src/ad-studio/{site-scroll,site-scroll.test,index}.ts`
+- `packages/firebase-orm-models/src/{models/ad-studio.model.ts,services/ad-studio.service.ts,services/ad-studio-gallery.emulator.test.ts}`
+- `packages/ad-studio/src/{ffmpeg,ffmpeg.test,site-scroll,site-scroll.test,media-storage,runtime,video-pipeline,index}.ts`
+- `apps/web/lib/ad-studio/{store,http}.ts` & `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/**`
+- `apps/web/components/ad-studio/{site-scroll-panel,site-scroll-panel.test,video-studio,use-ad-studio-error}.tsx` & `apps/web/messages/{en,he}.json`
+
+---
+
 ## 2026-11-17 — Ad Studio video assembly: smooth fast crossfade transitions between clips
 
 ### Shipped
@@ -523,6 +582,10 @@ Template for each entry:
 ## UX hourly
 
 - 2026-11-18 - (c) Project menu and home re-read (home redirects; menu labels clean). The "Connect an MCP client" consent text listed "metrics, cohorts"; now says an AI app such as Claude can read your numbers, customers and insights and cannot change anything (en + he) with a test. PR #1353. Next candidates: (1) rest of the MCP consent screen title/heading still says "MCP client"; (2) a proper "propose turning on again" action after rejecting the turn-on card; (3) project settings Business type is free text.
+- 2026-11-18 - (a/f) Setup health re-read. The customer-records line said "segments cannot filter" (he: פלחים) though the menu says Customer groups; now "customer groups" / קבוצות לקוחות (en + he) with a test. PR #1351. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) MCP guide still says "segments".
+- 2026-11-18 - (a/f) Growth Pilot first visit, failure reasons and Hebrew copy re-read (clean). The demo work-list link said "Segments page" (he: דף הסגמנטים) though the page and menu are "Customer groups"; now matches (en + he) with a test. PR #1350. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) SetupHealth impact line still says "segments".
+
+- 2026-11-18 - (d) Ad Studio script problems re-read. A scene with an unrecognized narration choice only said "unknown narration type"; now says to choose again between "Voice-over in the background" and "A person in the shot speaks" (en + he) with a test. PR #1346. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) Hebrew pass over Onboarding journey* keys.
 - 2026-11-18 - (f/d) Failure reasons across Ad Studio, Growth Pilot and Ads pages re-read (all mapped to plain words, no raw codes found). The empty spend line on an ad said "the platform has not reported any delivery"; now "has not reported it being shown to anyone yet" (en; he already plain) with a test. PR #1345. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) Ad Studio issue "unknown narration type" (invalid_delivery) wording.
 - 2026-11-17 - (c) Project menu follow-up re-read. After the menu became "Compare versions", the page's setup line and install button still said "A/B tracking" (he: מעקב A/B); now "version comparison" / השוואת גרסאות (en + he) with a test. PR #1344. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) other "A/B" mentions in the Hebrew install pack text.
 - 2026-11-17 - (b) Approval cards re-read after a "no". Saying no to the who-sees-the-ads choice left a dead end (ads and web page offered a "get different ones" suggestion, audience did not); added "Choose different people to show the ads to" (en + he) with tests. PR #1341. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) project settings Business type is free text, a pick-list would help; (3) unused BillingOpsFeed `mrrLine` key can be removed.

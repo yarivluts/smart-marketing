@@ -23,6 +23,13 @@ import { DELETE as revokeLink } from '../../orgs/[orgId]/projects/[projectId]/ad
 import { GET as sharedImage } from './[token]/briefs/[briefId]/images/[imageId]/route';
 import { GET as sharedVideo } from './[token]/briefs/[briefId]/videos/[videoId]/route';
 import { GET as sharedLogo } from './[token]/logo/route';
+import { GET as getPublicFeedback, POST as postPublicFeedback } from './[token]/feedback/route';
+import {
+  GET as getClientRequests,
+  POST as postClientRequests,
+} from '../../orgs/[orgId]/projects/[projectId]/ad-studio/client-requests/route';
+import { POST as decideProposalRoute } from '../../orgs/[orgId]/projects/[projectId]/ad-studio/client-requests/proposals/[proposalId]/route';
+import { saveAdShareProposals } from '@growthos/firebase-orm-models';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -194,5 +201,157 @@ describe('ad share links (routes)', () => {
     expect(Buffer.from(await logo.arrayBuffer())).toEqual(PNG);
     expect((await sharedLogo(request('GET'), { params: Promise.resolve({ token: 'nope' }) })).status).toBe(404);
     expect(await loadSharedAds('not-a-token')).toBeNull();
+  });
+
+  it('collects client feedback, serves manager return reports & manual requests, declines proposals, and mints updated revisions', async () => {
+    const ctx = await setup();
+    const { token, link } = await makeLink(ctx, { briefIds: null, includeResults: true, allowFeedback: true });
+
+    // Anonymous client approves & leaves an improvement request.
+    getServerSessionMock.mockResolvedValue(null);
+    const addFeedbackRes = await postPublicFeedback(
+      request('POST', {
+        authorName: 'Client Dana',
+        targetKind: 'brief',
+        briefId: ctx.briefId,
+        verdict: 'changes_requested',
+        comment: 'Use warmer lighting and emphasize 25-year guarantee.',
+      }),
+      { params: Promise.resolve({ token }) },
+    );
+    expect(addFeedbackRes.status).toBe(201);
+    const { item: fb } = (await addFeedbackRes.json()) as { item: { id: string } };
+
+    // Unknown brief returns 404, scoped share link out-of-scope brief returns 400, disabled feedback returns 403.
+    expect(
+      (
+        await postPublicFeedback(
+          request('POST', {
+            targetKind: 'brief',
+            briefId: 'other-brief',
+            verdict: 'comment',
+            comment: 'Unknown brief',
+          }),
+          { params: Promise.resolve({ token }) },
+        )
+      ).status,
+    ).toBe(404);
+
+    getServerSessionMock.mockResolvedValue(ctx.ownerSession);
+    const { token: scopedToken } = await makeLink(ctx, { briefIds: [ctx.briefId], allowFeedback: true });
+    getServerSessionMock.mockResolvedValue(null);
+    expect(
+      (
+        await postPublicFeedback(
+          request('POST', {
+            targetKind: 'brief',
+            briefId: 'another-brief-outside-scope',
+            verdict: 'comment',
+            comment: 'Out of scope brief',
+          }),
+          { params: Promise.resolve({ token: scopedToken }) },
+        )
+      ).status,
+    ).toBe(400);
+
+    const listPubRes = await getPublicFeedback(request('GET'), { params: Promise.resolve({ token }) });
+    expect(listPubRes.status).toBe(200);
+    const listPubBody = (await listPubRes.json()) as { feedback: { id: string }[] };
+    expect(listPubBody.feedback.map((entry) => entry.id)).toContain(fb.id);
+
+    getServerSessionMock.mockResolvedValue(ctx.ownerSession);
+    const { token: lockedToken } = await makeLink(ctx, { briefIds: null, allowFeedback: false });
+    getServerSessionMock.mockResolvedValue(null);
+    expect(
+      (
+        await postPublicFeedback(
+          request('POST', { targetKind: 'general', verdict: 'request', comment: 'Should be blocked' }),
+          { params: Promise.resolve({ token: lockedToken }) },
+        )
+      ).status,
+    ).toBe(403);
+
+    // Unauthenticated gets 401; invited viewer cannot read manager client-requests queue (403).
+    getServerSessionMock.mockResolvedValue(null);
+    expect((await getClientRequests(request('GET'), projectParams(ctx))).status).toBe(401);
+
+    const viewerEmail = `${unique('viewer')}@example.com`;
+    const viewerInvite = await inviteMemberToOrganization({ organizationId: ctx.orgId, email: viewerEmail, role: 'viewer', invitedByUserId: ctx.owner.id });
+    const viewerSession = await sessionFor(viewerEmail);
+    const viewerUser = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email: viewerEmail });
+    await acceptInvite({ organizationId: ctx.orgId, membershipId: viewerInvite.id, userId: viewerUser.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    expect((await getClientRequests(request('GET'), projectParams(ctx))).status).toBe(403);
+
+    // Owner reads return report + fix-agent prompt and records a manual client request.
+    getServerSessionMock.mockResolvedValue(ctx.ownerSession);
+    const managerGet = await getClientRequests(request('GET'), projectParams(ctx));
+    expect(managerGet.status).toBe(200);
+    const managerBody = (await managerGet.json()) as {
+      feedback: { id: string }[];
+      reportMarkdown: string;
+      fixAgentPrompt: string;
+    };
+    expect(managerBody.feedback.some((entry) => entry.id === fb.id)).toBe(true);
+    expect(managerBody.reportMarkdown).toContain('Use warmer lighting and emphasize 25-year guarantee.');
+    expect(managerBody.fixAgentPrompt).toContain('Use warmer lighting and emphasize 25-year guarantee.');
+    expect(managerBody.fixAgentPrompt).toContain(ctx.briefId);
+
+    const manualRes = await postClientRequests(
+      request('POST', {
+        action: 'add_request',
+        clientLabel: 'VIP',
+        targetKind: 'general',
+        verdict: 'request',
+        comment: 'Build an additional video ad for business customers.',
+      }),
+      projectParams(ctx),
+    );
+    expect(manualRes.status).toBe(201);
+
+    // Seed a proposal and verify manager decline route updates Firestore cleanly without needing LLM creds.
+    const [proposal] = await saveAdShareProposals({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      actorId: ctx.owner.id,
+      proposals: [
+        {
+          feedbackIds: [fb.id],
+          clientQuote: 'Use warmer lighting',
+          kind: 'update_brief_settings',
+          briefId: ctx.briefId,
+          briefName: 'Spring sale',
+          title: 'Warm daylight adjustment',
+          summary: 'Adjust video direction',
+          rationale: 'Direct client ask',
+          changes: { videoInstructions: 'Warm golden-hour lighting' },
+        },
+      ],
+    });
+    const declineRes = await decideProposalRoute(
+      request('POST', { decision: 'decline' }),
+      { params: Promise.resolve({ orgId: ctx.orgId, projectId: ctx.projectId, proposalId: proposal.id }) },
+    );
+    expect(declineRes.status).toBe(200);
+    expect(((await declineRes.json()) as { proposal: { status: string } }).proposal.status).toBe('declined');
+
+    // Create Revision #2 link marking feedback sent to client.
+    const revRes = await createLink(
+      request('POST', {
+        briefIds: null,
+        label: 'Spring v2',
+        expiresInDays: 30,
+        revisionNumber: 2,
+        revisionNote: 'Applied client feedback',
+        supersedesLinkId: link.id,
+        markFeedbackSentIds: [fb.id],
+      }),
+      projectParams(ctx),
+    );
+    expect(revRes.status).toBe(201);
+    const { token: rev2Token } = (await revRes.json()) as { token: string };
+    const rev2Page = await loadSharedAds(rev2Token);
+    expect(rev2Page?.revisionNumber).toBe(2);
+    expect(rev2Page?.revisionNote).toBe('Applied client feedback');
   });
 });

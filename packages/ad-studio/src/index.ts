@@ -38,5 +38,7 @@ export * from './translate';
 export * from './brand';
 export * from './demo-policy';
 export * from './demo-recorder';
+export * from './site-scroll';
 export * from './demo-browser';
 export * from './gallery';
+export * from './client-requests';

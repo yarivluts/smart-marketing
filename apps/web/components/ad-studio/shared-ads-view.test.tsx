@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import heMessages from '@/messages/he.json';
@@ -76,5 +76,119 @@ describe('SharedAdsInactive', () => {
     expect(screen.getByRole('heading', { name: 'This link is no longer active' })).toBeInTheDocument();
     renderWithIntl(<SharedAdsInactive />, { locale: 'he' });
     expect(screen.getByRole('heading', { name: heMessages.AdShare.public.inactiveTitle })).toBeInTheDocument();
+  });
+});
+
+describe('SharedAdsView — campaign results, Search ad, revision & interactive feedback', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders campaign results, Search ad preview, revision badge, and lets client approve & leave a note only after clicking toggle', async () => {
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body ?? '{}'));
+      return new Response(
+        JSON.stringify({
+          item: {
+            id: payload.verdict === 'approved' ? 'fb-approved' : 'fb-note',
+            shareLinkId: 'lnk-1',
+            clientLabel: 'Acme',
+            authorName: payload.authorName ?? '',
+            targetKind: payload.targetKind,
+            briefId: payload.briefId ?? null,
+            briefName: 'Spring launch',
+            creativeRef: null,
+            campaignId: payload.campaignId ?? null,
+            campaignLabel: payload.campaignLabel ?? null,
+            verdict: payload.verdict,
+            comment: payload.comment ?? '',
+            status: 'open',
+            createdOn: '2026-11-18T10:00:00.000Z',
+            resolvedOn: null,
+          },
+        }),
+        { status: 201, headers: { 'content-type': 'application/json' } },
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const richPage: SharedAdsPage = {
+      brandName: 'Acme Clinic',
+      logoSrc: null,
+      expiresOn: '2026-12-06T00:00:00.000Z',
+      token: 'T-LIVE',
+      includeResults: true,
+      allowFeedback: true,
+      revisionNumber: 2,
+      revisionNote: 'Stronger opening hook',
+      results: {
+        totalSpendUsd: 4200,
+        metaSpendUsd: 2600,
+        googleSpendUsd: 1600,
+        activeCampaignsCount: 2,
+        totalCampaignsCount: 2,
+        campaignsWithSpendCount: 2,
+        items: [
+          {
+            id: 'cmp-1',
+            label: 'Search — Dental Implants',
+            platform: 'google_ads',
+            status: 'enabled',
+            dailyBudgetUsd: 120,
+            totalSpendUsd: 1600,
+            roas: 4.2,
+            ctrPct: 5.1,
+            conversions: 32,
+          },
+        ],
+      },
+      briefs: [
+        {
+          id: 'b1',
+          name: 'Spring launch',
+          language: 'en',
+          landingPageUrl: 'https://acme.example',
+          images: [],
+          video: null,
+          searchAd: {
+            headlines: ['Book Smile Consult', 'Trusted Dental Care', 'Free 3D Scan'],
+            descriptions: ['Transparent pricing and experienced specialists.', 'Same-week appointments available.'],
+            path1: 'implants',
+            path2: 'book',
+            displayUrl: 'acme.example/implants/book',
+          },
+        },
+      ],
+    };
+
+    renderWithIntl(<SharedAdsView page={richPage} />);
+
+    // Security & UX invariant: zero textboxes before explicit toggle click, and zero publish/delete/edit buttons.
+    expect(screen.queryByRole('textbox')).toBeNull();
+    for (const btn of screen.getAllByRole('button')) {
+      expect(btn.textContent ?? '').not.toMatch(/publish|delete|edit/i);
+    }
+
+    expect(screen.getByTestId('shared-ads-revision')).toHaveTextContent('Updated version #2');
+    expect(screen.getByTestId('shared-ads-revision')).toHaveTextContent('Stronger opening hook');
+    expect(screen.getByTestId('shared-campaign-results')).toHaveTextContent('Search — Dental Implants');
+    expect(screen.getByTestId('shared-search-ad')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('shared-brief-approve-b1'));
+    const notesBox = await screen.findByTestId('shared-submitted-feedback-list');
+    expect(within(notesBox).getByText('Approved')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('shared-brief-note-toggle-b1'));
+    expect(screen.getAllByRole('textbox').length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. Dana Cohen'), { target: { value: 'Dana' } });
+    fireEvent.change(screen.getByPlaceholderText(/Tell the agency what works well/), {
+      target: { value: 'Emphasize 24h response time in headline 1' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to agency' }));
+
+    await waitFor(() => expect(screen.queryByTestId('shared-feedback-form')).toBeNull());
+    expect(screen.getByText('Emphasize 24h response time in headline 1')).toBeInTheDocument();
   });
 });

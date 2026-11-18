@@ -47,3 +47,14 @@ describe('Customer groups page uses the same name as the menu', () => {
     expect(m.segmentsHeading).toBe('קבוצות לקוחות');
   });
 });
+
+describe('Demo work-list link uses the menu name', () => {
+  it('says Customer groups (he: קבוצות לקוחות), not Segments', () => {
+    const en1 = (en as unknown as Copy).Demos.workListLinkLabel;
+    const he1 = (he as unknown as Copy).Demos.workListLinkLabel;
+    expect(en1).toMatch(/Customer groups/);
+    expect(en1).not.toMatch(/Segment/i);
+    expect(he1).toMatch(/קבוצות הלקוחות/);
+    expect(he1).not.toMatch(/סגמנט|פלח/);
+  });
+});

@@ -9,9 +9,12 @@ import {
   BarChart3,
   Image as ImageIcon,
   CheckCircle2,
+  ChevronDown,
   Search,
+  Share2,
   Megaphone,
 } from 'lucide-react';
+import { ShareLinksPanel, type ShareLinkRow } from '@/components/ad-studio/share-links-panel';
 import { AdsKpiScorecards } from './ads-kpi-scorecards';
 import { AdsPerformanceCharts } from './ads-performance-charts';
 import { EmptyState, PageHero } from '@/components/viz';
@@ -40,6 +43,7 @@ export interface AdsPerformanceDashboardProps {
   spendOutcome?: CampaignSpendBreakdownOutcome | null;
   /** The trailing window the per-campaign spend figures cover, in days. */
   spendWindowDays?: number;
+  shareConfig?: { briefs: { id: string; name: string }[]; initialLinks: ShareLinkRow[] } | null;
   className?: string;
 }
 
@@ -55,6 +59,7 @@ export function AdsPerformanceDashboard({
   canManagePlugins = true,
   spendOutcome = null,
   spendWindowDays = 30,
+  shareConfig = null,
   className = '',
 }: AdsPerformanceDashboardProps): React.ReactElement {
   const t = useTranslations('Campaigns');
@@ -212,6 +217,37 @@ export function AdsPerformanceDashboard({
         spendWindowDays={spendWindowDays}
         canManagePlugins={canManagePlugins}
       />
+
+      {shareConfig ? (
+        <details
+          className="group rounded-2xl border border-border bg-card shadow-xs"
+          data-testid="campaigns-client-share-drawer"
+        >
+          <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-2xl px-4 py-3.5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 text-start">
+                <p className="text-sm font-bold text-foreground">{t('shareWithClientTitle')}</p>
+                <p className="line-clamp-1 text-xs text-muted-foreground">{t('shareWithClientHint')}</p>
+              </div>
+            </div>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="border-t border-border/50 p-4">
+            <ShareLinksPanel
+              orgId={orgId}
+              projectId={projectId}
+              briefs={shareConfig.briefs}
+              initialLinks={shareConfig.initialLinks}
+            />
+          </div>
+        </details>
+      ) : null}
 
       {/* 4. Sub-Navigation Tabs */}
       <div className="border-b border-border">

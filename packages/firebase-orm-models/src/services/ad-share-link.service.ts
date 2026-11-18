@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { AD_SHARE_REVISION_NOTE_MAX } from '@growthos/shared';
 import { AdShareLinkModel } from '../models/ad-share-link.model';
 import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -43,6 +44,10 @@ export interface AdShareLinkView {
   expiresOn: string;
   revokedOn: string | null;
   status: AdShareLinkStatus;
+  includeResults: boolean;
+  allowFeedback: boolean;
+  revisionNumber: number;
+  revisionNote: string | null;
 }
 
 /** What a valid token opens: one project, and either all its ads or the listed ones. */
@@ -51,7 +56,12 @@ export interface ResolvedAdShareLink {
   organizationId: string;
   projectId: string;
   briefIds: string[] | null;
+  label: string;
   expiresOn: string;
+  includeResults: boolean;
+  allowFeedback: boolean;
+  revisionNumber: number;
+  revisionNote: string | null;
 }
 
 /** The stored id of a token: its SHA-256 hex digest. */
@@ -77,10 +87,16 @@ export function adShareLinkExpiry(days: number, now: Date = new Date()): string 
   return new Date(now.getTime() + days * DAY_MS).toISOString();
 }
 
-export function validateAdShareLinkInput(input: { briefIds: readonly string[] | null; label: string; expiresInDays: number }): string[] {
+export function validateAdShareLinkInput(input: {
+  briefIds: readonly string[] | null;
+  label: string;
+  expiresInDays: number;
+  revisionNote?: string | null;
+}): string[] {
   const reasons: string[] = [];
   if (!(AD_SHARE_LINK_EXPIRY_DAYS as readonly number[]).includes(input.expiresInDays)) reasons.push('invalid_expiry');
   if (input.label.length > AD_SHARE_LINK_LABEL_MAX) reasons.push('label_too_long');
+  if (input.revisionNote && input.revisionNote.length > AD_SHARE_REVISION_NOTE_MAX) reasons.push('revision_note_too_long');
   if (input.briefIds !== null) {
     if (input.briefIds.length === 0) reasons.push('no_briefs');
     if (input.briefIds.length > AD_SHARE_LINK_MAX_BRIEFS) reasons.push('too_many_briefs');
@@ -99,6 +115,10 @@ export function toAdShareLinkView(link: AdShareLinkModel, now: Date = new Date()
     expiresOn: link.expires_on,
     revokedOn: link.revoked_on ?? null,
     status: adShareLinkStatus(link, now),
+    includeResults: link.include_results !== false,
+    allowFeedback: link.allow_feedback !== false,
+    revisionNumber: link.revision_number ?? 1,
+    revisionNote: link.revision_note ?? null,
   };
 }
 
@@ -134,13 +154,23 @@ export async function createAdShareLink(params: {
   briefIds: string[] | null;
   label?: string;
   expiresInDays?: number;
+  includeResults?: boolean;
+  allowFeedback?: boolean;
+  revisionNumber?: number;
+  revisionNote?: string | null;
+  supersedesLinkId?: string | null;
   actorId: string;
   now?: Date;
 }): Promise<{ token: string; link: AdShareLinkView }> {
   const label = (params.label ?? '').trim();
   const expiresInDays = params.expiresInDays ?? AD_SHARE_LINK_DEFAULT_EXPIRY_DAYS;
   const briefIds = params.briefIds === null ? null : [...new Set(params.briefIds)];
-  const reasons = validateAdShareLinkInput({ briefIds, label, expiresInDays });
+  const revisionNote = params.revisionNote ? params.revisionNote.trim() : null;
+  const revisionNumber =
+    typeof params.revisionNumber === 'number' && Number.isInteger(params.revisionNumber) && params.revisionNumber >= 1
+      ? params.revisionNumber
+      : 1;
+  const reasons = validateAdShareLinkInput({ briefIds, label, expiresInDays, revisionNote });
   if (reasons.length) throw new AdShareLinkInvalidError(reasons);
   await requireProject(params.organizationId, params.projectId);
   if (briefIds) await Promise.all(briefIds.map((briefId) => getAdStudioBrief(params.organizationId, params.projectId, briefId)));
@@ -158,6 +188,11 @@ export async function createAdShareLink(params: {
   link.expires_on = adShareLinkExpiry(expiresInDays, now);
   link.revoked_on = null;
   link.revoked_by = null;
+  link.include_results = params.includeResults !== false;
+  link.allow_feedback = params.allowFeedback !== false;
+  link.revision_number = revisionNumber;
+  link.revision_note = revisionNote || null;
+  link.supersedes_link_id = params.supersedesLinkId ?? null;
   await link.save(id);
   await audit({
     organizationId: params.organizationId,
@@ -211,6 +246,11 @@ export async function resolveAdShareToken(token: string, now: Date = new Date())
     organizationId: link.organization_id,
     projectId: link.project_id,
     briefIds: link.brief_ids ?? null,
+    label: link.label ?? '',
     expiresOn: link.expires_on,
+    includeResults: link.include_results !== false,
+    allowFeedback: link.allow_feedback !== false,
+    revisionNumber: link.revision_number ?? 1,
+    revisionNote: link.revision_note ?? null,
   };
 }
