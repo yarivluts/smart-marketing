@@ -5,14 +5,18 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import { imageConceptFingerprint, type AdStudioImageConcept } from '@growthos/shared';
 import {
   acceptInvite,
+  chooseAdStudioClip,
   createAdStudioBrief,
+  createAdStudioClip,
   createAdStudioImage,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
+  markAdStudioClipReady,
   markAdStudioImageReady,
   saveAdStudioImageConcepts,
+  saveAdStudioScript,
   setAdStudioBrandLogo,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -22,6 +26,7 @@ import { GET as listLinks, POST as createLink } from '../../orgs/[orgId]/project
 import { DELETE as revokeLink } from '../../orgs/[orgId]/projects/[projectId]/ad-studio/share-links/[linkId]/route';
 import { GET as sharedImage } from './[token]/briefs/[briefId]/images/[imageId]/route';
 import { GET as sharedVideo } from './[token]/briefs/[briefId]/videos/[videoId]/route';
+import { GET as sharedClip } from './[token]/briefs/[briefId]/clips/[clipId]/route';
 import { GET as sharedLogo } from './[token]/logo/route';
 import { GET as getPublicFeedback, POST as postPublicFeedback } from './[token]/feedback/route';
 import {
@@ -353,5 +358,78 @@ describe('ad share links (routes)', () => {
     const rev2Page = await loadSharedAds(rev2Token);
     expect(rev2Page?.revisionNumber).toBe(2);
     expect(rev2Page?.revisionNote).toBe('Applied client feedback');
+  });
+
+  it('streams preferred pre-publication scene clips and loads unrendered drafts only when includeDrafts is true', async () => {
+    const ctx = await setup();
+    await saveAdStudioScript({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: ctx.otherBriefId,
+      scenes: [{ id: 's1', durationSeconds: 5, visualPrompt: 'Office desk', voiceover: 'Sign on mobile', onScreenText: 'Fast sign' }],
+    });
+    const oldTake = await createAdStudioClip({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: ctx.otherBriefId,
+      sceneId: 's1',
+      sceneFingerprint: 'fp-1',
+      kind: 'render',
+      prompt: 'Office desk v1',
+      model: 'veo',
+      aspectRatio: '9:16',
+      durationSeconds: 5,
+      requestedBy: ctx.owner.id,
+    });
+    const v1Bytes = Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 1]);
+    await storage.upload(`test/${ctx.orgId}/${ctx.otherBriefId}/k1.mp4`, v1Bytes, 'video/mp4');
+    await markAdStudioClipReady(oldTake, { gcsPath: `test/${ctx.orgId}/${ctx.otherBriefId}/k1.mp4` });
+
+    const bestTake = await createAdStudioClip({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: ctx.otherBriefId,
+      sceneId: 's1',
+      sceneFingerprint: 'fp-1',
+      kind: 'render',
+      prompt: 'Office desk v2',
+      model: 'veo',
+      aspectRatio: '9:16',
+      durationSeconds: 5,
+      requestedBy: ctx.owner.id,
+    });
+    const v2Bytes = Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 2]);
+    await storage.upload(`test/${ctx.orgId}/${ctx.otherBriefId}/k2.mp4`, v2Bytes, 'video/mp4');
+    await markAdStudioClipReady(bestTake, { gcsPath: `test/${ctx.orgId}/${ctx.otherBriefId}/k2.mp4` });
+    await chooseAdStudioClip(ctx.orgId, ctx.projectId, ctx.otherBriefId, oldTake.id);
+
+    getServerSessionMock.mockResolvedValue(ctx.ownerSession);
+    const { token: standardToken } = await makeLink(ctx, { briefIds: [ctx.otherBriefId] });
+    const { token: preToken } = await makeLink(ctx, { briefIds: [ctx.otherBriefId], includeDrafts: true, includeResults: false });
+
+    // Standard link hides unfinished briefs and refuses pre-publication clip streaming.
+    expect((await loadSharedAds(standardToken))?.briefs).toEqual([]);
+    getServerSessionMock.mockResolvedValue(null);
+    expect(
+      (await sharedClip(request('GET'), { params: Promise.resolve({ token: standardToken, briefId: ctx.otherBriefId, clipId: oldTake.id }) })).status,
+    ).toBe(404);
+
+    // Pre-publication link returns the drafted brief with scenes and streams only the chosen ready clip.
+    const prePage = await loadSharedAds(preToken);
+    expect(prePage?.includeDrafts).toBe(true);
+    expect(prePage?.briefs).toHaveLength(1);
+    expect(prePage?.briefs[0]?.scenes?.[0]?.clipSrc).toBe(`/api/share/ads/${preToken}/briefs/${ctx.otherBriefId}/clips/${oldTake.id}`);
+
+    const clipOk = await sharedClip(request('GET'), { params: Promise.resolve({ token: preToken, briefId: ctx.otherBriefId, clipId: oldTake.id }) });
+    expect(clipOk.status).toBe(200);
+    expect(Buffer.from(await clipOk.arrayBuffer())).toEqual(v1Bytes);
+
+    // Unselected alternate clip & wrong brief stay 404 even on includeDrafts links.
+    expect(
+      (await sharedClip(request('GET'), { params: Promise.resolve({ token: preToken, briefId: ctx.otherBriefId, clipId: bestTake.id }) })).status,
+    ).toBe(404);
+    expect(
+      (await sharedClip(request('GET'), { params: Promise.resolve({ token: preToken, briefId: ctx.briefId, clipId: oldTake.id }) })).status,
+    ).toBe(404);
   });
 });

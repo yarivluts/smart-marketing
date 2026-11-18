@@ -17,6 +17,33 @@ Template for each entry:
 
 ---
 
+## 2026-11-18 — Ad Studio & Campaigns: pre-publication ad sharing (drafts, storyboards, scene clips & pre-launch review)
+
+### Shipped
+- **Pre-publication share link flag (`@growthos/firebase-orm-models`)**:
+  - Added `include_drafts` on [`AdShareLinkModel`](packages/firebase-orm-models/src/models/ad-share-link.model.ts) and `includeDrafts` on `AdShareLinkView`, `ResolvedAdShareLink`, `toAdShareLinkView`, `resolveAdShareToken`, and `createAdShareLink` in [`ad-share-link.service.ts`](packages/firebase-orm-models/src/services/ad-share-link.service.ts).
+- **Pre-launch scene clip streaming & share view shaping (`apps/web`)**:
+  - Updated [`/api/orgs/[orgId]/projects/[projectId]/ad-studio/share-links/route.ts`](apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/share-links/route.ts) to persist `includeDrafts`.
+  - Added [`/api/share/ads/[token]/briefs/[briefId]/clips/[clipId]/route.ts`](apps/web/app/api/share/ads/[token]/briefs/[briefId]/clips/[clipId]/route.ts) to range-stream the chosen/newest ready scene clip strictly when `link.includeDrafts` is true and the brief is in scope (returning 404 otherwise), plus `AdStudioClipNotFoundError` handling in [`share.ts`](apps/web/lib/ad-studio/share.ts).
+  - Extended [`share-view.ts`](apps/web/lib/ad-studio/share-view.ts) & [`share.ts`](apps/web/lib/ad-studio/share.ts) (`sharedClipSrc`, draft image concepts & stale-selected mockups, `scenes` storyboard + clip URLs, `draftMeta`, and unpublished `campaignDrafts`) while preserving exact output when `includeDrafts` is false.
+- **Public pre-launch client preview & studio/campaign entrypoints (`apps/web`)**:
+  - Extended [`SharedAdsView`](apps/web/components/ad-studio/shared-ads-view.tsx) with a pre-publication review banner, per-ad "Before launch" badges, brief goal/audience/keywords summary, draft image concept cards, playable storyboard scene cards, and unpublished campaign drafts.
+  - Updated [`ShareLinksPanel`](apps/web/components/ad-studio/share-links-panel.tsx) (preset pills for "Ads before launch" vs. "Ads & live results", `includeDrafts` toggle, defaults), created [`AdPrepublishShareBar`](apps/web/components/ad-studio/ad-prepublish-share-bar.tsx) across all open-ad steps in [`ad-studio/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), added pre-publish share links on [`AdStudioAdsHub`](apps/web/components/ad-studio/ad-studio-ads-hub.tsx), [`ReviewOverview`](apps/web/components/ad-studio/review-overview.tsx), and [`AdsPerformanceDashboard`](apps/web/components/campaigns/ads-performance-dashboard.tsx), and preserved `includeDrafts`/`briefIds`/`includeResults` across [`ClientRequestsPanel`](apps/web/components/ad-studio/client-requests-panel.tsx) revision links with EN/HE copy in [`en.json`](apps/web/messages/en.json) and [`he.json`](apps/web/messages/he.json).
+
+### Verified
+- `@growthos/firebase-orm-models`: `build` + Firestore emulator `vitest` (`ad-share-link.emulator.test.ts` + `ad-share-feedback.emulator.test.ts`: 2 files, 8 tests passed); `check-index-drift.mjs` (16/16, 0 drift).
+- `@growthos/web`: Firestore + Auth emulator `app/api/share/ads/share-routes.test.ts` (6 tests passed); 12 unit/component/copy/ratchet files (`67 tests` passed including `share-view.test.ts`, `shared-ads-view.test.tsx`, `share-links-panel.test.tsx`, `client-requests-panel.test.tsx`, `ad-studio-ads-hub.test.tsx`, `review-overview.test.tsx`, `messages.test.ts`, `hardcoded-strings.test.ts`, `hebrew-your-plural-copy.test.ts`, `plain-ad-words.test.ts`); `pnpm --filter @growthos/web build` passed.
+- Monorepo: `pnpm lint` (9/9) and `pnpm typecheck` (16/16) passed; zero Hebrew in new `.ts`/`.tsx` diff lines.
+
+### Key files
+- `packages/firebase-orm-models/src/{models/ad-share-link.model.ts,services/ad-share-link.service.ts,services/ad-share-link.emulator.test.ts}`
+- `apps/web/app/api/share/ads/[token]/briefs/[briefId]/clips/[clipId]/route.ts`, `apps/web/app/api/share/ads/share-routes.test.ts`, & `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/share-links/route.ts`
+- `apps/web/lib/ad-studio/{share-view,share-view.test,share}.ts`
+- `apps/web/components/ad-studio/{ad-prepublish-share-bar,share-links-panel,share-links-panel.test,shared-ads-view,shared-ads-view.test,ad-studio-ads-hub,ad-studio-ads-hub.test,review-overview,review-overview.test,client-requests-panel}.tsx`
+- `apps/web/components/campaigns/ads-performance-dashboard.tsx`, `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx`, & `apps/web/messages/{en,he}.json`
+
+---
+
 ## 2026-11-18 — Ad Studio & Campaigns: third-party client sharing, feedback reports & AI request proposals
 
 ### Shipped

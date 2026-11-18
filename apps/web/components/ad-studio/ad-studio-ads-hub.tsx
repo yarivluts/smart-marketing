@@ -14,6 +14,7 @@ import {
   Monitor,
   Plus,
   Search,
+  Share2,
   Smartphone,
   Sparkles,
   X,
@@ -49,6 +50,7 @@ export interface AdStudioAdsHubProps {
   studioHref: string;
   knownSite: string | null;
   briefs: AdStudioListBrief[];
+  canShare?: boolean;
 }
 
 type StatusFilter = 'all' | AdStudioBriefStageStatus;
@@ -204,6 +206,7 @@ export function AdStudioAdsHub({
   studioHref,
   knownSite,
   briefs,
+  canShare = false,
 }: AdStudioAdsHubProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const locale = useLocale();
@@ -411,8 +414,20 @@ export function AdStudioAdsHub({
             ) : (
               <ul className="flex min-w-0 flex-col gap-3">
                 {filteredBriefs.map((brief) => (
-                  <li key={brief.id} className="min-w-0">
+                  <li key={brief.id} className="flex min-w-0 flex-col gap-1.5">
                     <AdStudioBriefCard brief={brief} studioHref={studioHref} locale={locale} />
+                    {canShare ? (
+                      <div className="flex justify-end px-2">
+                        <Link
+                          href={`${studioHref}?brief=${brief.id}&open=share`}
+                          data-testid={`ad-studio-brief-share-${brief.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-pp-outline-variant/45 bg-card px-3 py-1 text-[11px] font-semibold text-pp-primary shadow-2xs transition-colors hover:bg-pp-primary-fixed"
+                        >
+                          <Share2 className="h-3 w-3 shrink-0" aria-hidden="true" />
+                          <span>{t('list.shareBeforePublish')}</span>
+                        </Link>
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

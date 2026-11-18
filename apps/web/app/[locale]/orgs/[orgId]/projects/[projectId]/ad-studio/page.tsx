@@ -103,6 +103,7 @@ import { ClaimSourcesProvider } from '@/components/ad-studio/claim-sources';
 import { planAdStudioSteps, resolveAdStudioStep } from '@/lib/ad-studio/steps';
 import { isPlatformOperator } from '@/lib/auth/platform-operator';
 import { listShareLinks, loadClientRequestsState } from '@/lib/ad-studio/share';
+import { AdPrepublishShareBar } from '@/components/ad-studio/ad-prepublish-share-bar';
 import { ShareLinksPanel } from '@/components/ad-studio/share-links-panel';
 import { ClientRequestsPanel } from '@/components/ad-studio/client-requests-panel';
 
@@ -456,6 +457,16 @@ export default async function AdStudioPage({
         <BrandLogoProvider url={logoUrl}>
         <ClaimSourcesProvider sources={[selected.name, selected.objective, selected.productDescription, selected.plan?.landingPageSummary ?? '']}>
           <AdStudioStepper steps={stepNav} active={activeStep} label={t('stepper.label')} />
+          {canEditBrand ? (
+            <AdPrepublishShareBar
+              orgId={orgId}
+              projectId={projectId}
+              briefId={selected.id}
+              briefName={selected.name}
+              initialLinks={shareLinks}
+              defaultOpen={requestedSection === 'share'}
+            />
+          ) : null}
 
           {activeStep === 'brief' ? (
             <section
@@ -670,6 +681,7 @@ export default async function AdStudioPage({
                 })}
                 search={summarizeSearchCreative(selected.searchAd, selected.searchKeywords?.keywords.length ?? 0)}
                 publishHref={steps.states.publish !== 'locked' ? stepHref('publish') : null}
+                shareHref={canEditBrand ? `${stepHref('review')}&open=share` : null}
                 searchHost={displayHost(selected.landingPageUrl)}
               />
             </div>
@@ -831,7 +843,7 @@ export default async function AdStudioPage({
                   </div>
                 </details>
               ) : null}
-              {canEditBrand && publishCreatives.length > 0 ? (
+              {canEditBrand ? (
                 <details className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy" data-testid="ad-studio-share-shortcut">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 text-sm font-semibold transition-colors hover:bg-pp-surface-container-low/60 sm:px-5 [&::-webkit-details-marker]:hidden">
                     <span>{tShare('shortcut')}</span>
@@ -844,6 +856,8 @@ export default async function AdStudioPage({
                       briefs={[{ id: selected.id, name: selected.name }]}
                       initialLinks={shareLinks}
                       defaultBriefId={selected.id}
+                      defaultIncludeDrafts
+                      defaultIncludeResults={false}
                     />
                   </div>
                 </details>
@@ -912,6 +926,7 @@ export default async function AdStudioPage({
             projectId={projectId}
             studioHref={base}
             knownSite={knownSite}
+            canShare={canEditBrand}
             briefs={briefs.map((brief): AdStudioListBrief => ({
               id: brief.id,
               name: brief.name,
@@ -933,7 +948,11 @@ export default async function AdStudioPage({
             }))}
           />
           {canEditBrand && briefs.length > 0 ? (
-            <details className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy">
+            <details
+              className="group rounded-3xl border border-pp-outline-variant/40 bg-card shadow-pp-candy"
+              data-testid="ad-studio-hub-share-drawer"
+              open={requestedSection === 'share' || undefined}
+            >
               <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-3xl px-4 py-3.5 transition-colors hover:bg-pp-surface-container-low/60 [&::-webkit-details-marker]:hidden">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pp-primary-fixed text-pp-primary">
@@ -955,6 +974,8 @@ export default async function AdStudioPage({
                   projectId={projectId}
                   briefs={briefs.map((brief) => ({ id: brief.id, name: brief.name }))}
                   initialLinks={shareLinks}
+                  defaultIncludeDrafts
+                  defaultIncludeResults={false}
                 />
               </div>
             </details>

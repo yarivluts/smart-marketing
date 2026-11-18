@@ -279,9 +279,11 @@ export function ClientRequestsPanel({
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          briefIds: null,
+          briefIds: latestLink?.briefIds ?? null,
           label: latestLink?.label || projectName,
           expiresInDays: 30,
+          ...(latestLink?.includeDrafts ? { includeDrafts: true } : {}),
+          ...(latestLink?.includeResults === false ? { includeResults: false } : {}),
           revisionNumber: nextRevision,
           revisionNote: revisionNote.trim() || null,
           supersedesLinkId: latestLink?.id ?? null,

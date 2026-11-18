@@ -110,4 +110,38 @@ describe('ShareLinksPanel', () => {
     expect(address.value).toContain(`/he/share/ads/${TOKEN}`);
     expect(address).toHaveAttribute('dir', 'ltr');
   });
+
+  it('supports pre-publication share mode preset and defaultIncludeDrafts/defaultIncludeResults props', async () => {
+    const fetchMock = vi.fn(async () =>
+      json({ token: TOKEN, link: row({ id: 'h-pre', includeDrafts: true, includeResults: false }) }, 201),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = renderWithIntl(<ShareLinksPanel orgId="o" projectId="p" briefs={BRIEFS} initialLinks={[]} />);
+    fireEvent.click(screen.getByTestId('share-mode-prepublish'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create link' }));
+    await screen.findByTestId('ad-share-created');
+    expect(JSON.parse(String(((fetchMock.mock.calls[0] as unknown[])[1] as RequestInit).body))).toEqual({
+      briefIds: null,
+      label: '',
+      expiresInDays: 30,
+      includeResults: false,
+      includeDrafts: true,
+    });
+    expect(screen.getByTestId('ad-share-link-row')).toHaveTextContent('Before launch');
+    unmount();
+
+    renderWithIntl(
+      <ShareLinksPanel orgId="o" projectId="p" briefs={[BRIEFS[0]]} initialLinks={[]} defaultBriefId="b1" defaultIncludeDrafts defaultIncludeResults={false} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Create link' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(String(((fetchMock.mock.calls[1] as unknown[])[1] as RequestInit).body))).toEqual({
+      briefIds: ['b1'],
+      label: '',
+      expiresInDays: 30,
+      includeResults: false,
+      includeDrafts: true,
+    });
+  });
 });

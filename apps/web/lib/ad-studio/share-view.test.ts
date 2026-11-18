@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { imageConceptFingerprint, sceneFingerprint, type AdStudioImageConcept, type AdStudioScene } from '@growthos/shared';
 import type { AdStudioClipView, AdStudioImageView, AdStudioVideoView } from './view';
-import { sharedBriefAds, sharedImageSrc, sharedVideoSrc } from './share-view';
+import { sharedBriefAds, sharedClipSrc, sharedImageSrc, sharedVideoSrc } from './share-view';
 
 const TOKEN = 'T'.repeat(43);
 const concept = (id: string, extra: Partial<AdStudioImageConcept> = {}): AdStudioImageConcept => ({ id, visualPrompt: `Picture ${id}`, headline: 'Sign fast', formats: ['square', 'story'], ...extra });
@@ -72,5 +72,86 @@ describe('sharedBriefAds', () => {
   it('puts only the token in media addresses', () => {
     expect(sharedImageSrc(TOKEN, 'b1', 'i1')).toBe(`/api/share/ads/${TOKEN}/briefs/b1/images/i1`);
     expect(sharedVideoSrc(TOKEN, 'b1', 'v1')).toBe(`/api/share/ads/${TOKEN}/briefs/b1/videos/v1`);
+    expect(sharedClipSrc(TOKEN, 'b1', 'k1')).toBe(`/api/share/ads/${TOKEN}/briefs/b1/clips/k1`);
+  });
+
+  it('includes draft concepts, storyboard scenes with ready clips, and brief meta when includeDrafts is true', () => {
+    const cDraft = concept('c-draft', { formats: ['square', 'landscape'], headline: 'Sign faster today', copy: { headline: 'Sign faster', primaryText: 'Zero paperwork.', description: '' } });
+    const cStale = concept('c-stale', { formats: ['square'], headline: 'Edited copy' });
+    const staleImage = image({ id: 'i-stale', conceptId: 'c-stale', format: 'square', conceptFingerprint: 'old-fp' });
+    const scenes: AdStudioScene[] = [
+      { id: 's1', durationSeconds: 5, visualPrompt: 'Office desk', voiceover: 'Sign anywhere', onScreenText: '30 sec sign' },
+      { id: 's2', durationSeconds: 5, visualPrompt: 'Mobile screen', voiceover: 'Send via WhatsApp', onScreenText: 'Instant send' },
+    ];
+    const clipOld = { id: 'k1-old', sceneId: 's1', version: 1, status: 'ready', sceneFingerprint: 'fp1', durationSeconds: 5, chosen: false } as AdStudioClipView;
+    const clipChosen = { id: 'k1-chosen', sceneId: 's1', version: 2, status: 'ready', sceneFingerprint: 'fp1', durationSeconds: 5, chosen: true } as AdStudioClipView;
+
+    const shared = sharedBriefAds({
+      token: TOKEN,
+      includeDrafts: true,
+      brief: brief({
+        objective: 'Trial signups',
+        productDescription: 'Fast mobile contract signing',
+        targetSeconds: 10,
+        searchKeywords: { keywords: ['digital signature', 'esign'] },
+        metaTargeting: { countries: ['IL'], ageMin: 25, ageMax: 55 },
+        imageConcepts: [cDraft, cStale],
+        scenes,
+        videoCopy: { headline: 'Sign on mobile', primaryText: 'Try free', description: '' },
+      }),
+      images: [staleImage],
+      clips: [clipOld, clipChosen],
+      videos: [],
+    });
+
+    expect(shared?.isPrePublishDraft).toBe(true);
+    expect(shared?.draftMeta).toEqual({
+      objective: 'Trial signups',
+      productDescription: 'Fast mobile contract signing',
+      format: 'vertical',
+      targetSeconds: 10,
+      keywords: ['digital signature', 'esign'],
+      audienceSummary: 'IL · 25-55',
+    });
+    expect(shared?.images).toEqual([
+      {
+        conceptId: 'c-draft',
+        index: 1,
+        copy: { headline: 'Sign faster', primaryText: 'Zero paperwork.', description: '' },
+        byFormat: {},
+        isDraft: true,
+        headline: 'Sign faster today',
+        visualPrompt: 'Picture c-draft',
+        plannedFormats: ['square', 'landscape'],
+      },
+      {
+        conceptId: 'c-stale',
+        index: 2,
+        copy: null,
+        byFormat: { square: sharedImageSrc(TOKEN, 'b1', 'i-stale') },
+        isDraft: true,
+      },
+    ]);
+    expect(shared?.scenes).toEqual([
+      {
+        id: 's1',
+        index: 1,
+        durationSeconds: 5,
+        narration: 'Sign anywhere',
+        onScreenText: '30 sec sign',
+        visualPrompt: 'Office desk',
+        clipSrc: sharedClipSrc(TOKEN, 'b1', 'k1-chosen'),
+      },
+      {
+        id: 's2',
+        index: 2,
+        durationSeconds: 5,
+        narration: 'Send via WhatsApp',
+        onScreenText: 'Instant send',
+        visualPrompt: 'Mobile screen',
+        clipSrc: null,
+      },
+    ]);
+    expect(shared?.videoCopyDraft).toEqual({ headline: 'Sign on mobile', primaryText: 'Try free', description: '' });
   });
 });

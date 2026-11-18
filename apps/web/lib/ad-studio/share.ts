@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { NextResponse } from 'next/server';
 import {
   AdStudioBriefNotFoundError,
+  AdStudioClipNotFoundError,
   AdStudioImageNotFoundError,
   AdStudioVideoNotFoundError,
   getAdStudioBrandKit,
@@ -20,7 +21,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import type { AdShareFeedbackItem, AdShareProposalView } from '@growthos/shared';
 import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
-import { toAutomationTargetView } from '@/lib/orgs/automation-view';
+import { findCampaignDraftForTarget, toAutomationTargetView } from '@/lib/orgs/automation-view';
 import {
   getCampaignSpendBreakdownForProject,
   listAutomationActionsForProject,
@@ -35,6 +36,7 @@ import {
   sharedMediaBase,
   type SharedAdsPage,
   type SharedBriefAds,
+  type SharedCampaignDraftItem,
   type SharedCampaignResultsSummary,
 } from './share-view';
 
@@ -65,7 +67,14 @@ export function sharedNotFound(): NextResponse {
 
 /** Missing records read as not found; anything else is a real failure and is rethrown. */
 export function sharedMediaError(error: unknown): NextResponse {
-  if (error instanceof AdStudioImageNotFoundError || error instanceof AdStudioVideoNotFoundError || error instanceof AdStudioBriefNotFoundError) return sharedNotFound();
+  if (
+    error instanceof AdStudioImageNotFoundError ||
+    error instanceof AdStudioVideoNotFoundError ||
+    error instanceof AdStudioClipNotFoundError ||
+    error instanceof AdStudioBriefNotFoundError
+  ) {
+    return sharedNotFound();
+  }
   throw error;
 }
 
@@ -94,11 +103,16 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
     briefs.map(async (brief): Promise<SharedBriefAds | null> => {
       const [images, clips, videos] = await Promise.all([
         listAdStudioImages(organizationId, projectId, brief.id),
-        brief.scenes.length ? listAdStudioClips(organizationId, projectId, brief.id) : Promise.resolve([]),
-        brief.scenes.length ? listAdStudioVideos(organizationId, projectId, brief.id) : Promise.resolve([]),
+        brief.scenes.length > 0 || link.includeDrafts
+          ? listAdStudioClips(organizationId, projectId, brief.id)
+          : Promise.resolve([]),
+        brief.scenes.length > 0 || link.includeDrafts
+          ? listAdStudioVideos(organizationId, projectId, brief.id)
+          : Promise.resolve([]),
       ]);
       return sharedBriefAds({
         token,
+        ...(link.includeDrafts ? { includeDrafts: true } : {}),
         brief,
         images: images.map(toAdStudioImageView),
         clips: clips.map(toAdStudioClipView),
@@ -108,6 +122,22 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
   );
 
   let results: SharedCampaignResultsSummary | null = null;
+  const campaignDrafts: SharedCampaignDraftItem[] = [];
+  const needTargetsAndActions = link.includeResults || (link.includeDrafts && link.briefIds === null);
+  let targetViews: ReturnType<typeof toAutomationTargetView>[] = [];
+  let actions: Awaited<ReturnType<typeof listAutomationActionsForProject>> = [];
+  if (needTargetsAndActions) {
+    try {
+      [targetViews, actions] = await Promise.all([
+        listAutomationTargetStatesForProject(organizationId, projectId).then((rows) => rows.map(toAutomationTargetView)),
+        listAutomationActionsForProject(organizationId, projectId),
+      ]);
+    } catch {
+      targetViews = [];
+      actions = [];
+    }
+  }
+
   if (link.includeResults) {
     try {
       const { selected: selectedEnvironment } = await resolveSelectedEnvironment(organizationId, projectId);
@@ -119,11 +149,6 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
       } catch {
         spendOutcome = null;
       }
-      const [targets, actions] = await Promise.all([
-        listAutomationTargetStatesForProject(organizationId, projectId),
-        listAutomationActionsForProject(organizationId, projectId),
-      ]);
-      const targetViews = targets.map(toAutomationTargetView);
       const lastActionAtByTarget = new Map<string, string>();
       for (const action of actions) {
         if (!lastActionAtByTarget.has(action.target_id)) {
@@ -157,6 +182,52 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
     }
   }
 
+  if (link.includeDrafts && link.briefIds === null && targetViews.length > 0 && actions.length > 0) {
+    for (const target of targetViews) {
+      const hasLiveActivation = actions.some(
+        (action) =>
+          action.target_id === target.id &&
+          action.action_type === 'campaign_activation' &&
+          (action.status === 'executed' || action.status === 'verified'),
+      );
+      if (hasLiveActivation) continue;
+      const draft = findCampaignDraftForTarget(actions, target.id);
+      if (!draft) continue;
+      if (draft.platform === 'meta') {
+        campaignDrafts.push({
+          targetId: target.id,
+          campaignName: draft.campaignName,
+          platform: 'meta',
+          dailyBudgetUsd: draft.dailyBudgetUsd,
+          ads: draft.adSets.map((adSet) => ({
+            groupName: adSet.name,
+            headline: adSet.ad.creative.headline,
+            primaryText: adSet.ad.creative.primaryText,
+            description: adSet.ad.creative.description ?? '',
+            linkUrl: adSet.ad.creative.linkUrl,
+            audience: `${adSet.targeting.countries.join(', ')} (${adSet.targeting.ageMin}-${adSet.targeting.ageMax})`,
+          })),
+        });
+      } else if (draft.platform === 'google_ads') {
+        campaignDrafts.push({
+          targetId: target.id,
+          campaignName: draft.campaignName,
+          platform: 'google_ads',
+          dailyBudgetUsd: draft.dailyBudgetUsd,
+          ads: draft.adGroups.map((group) => ({
+            groupName: group.name,
+            headline: group.responsiveSearchAd.headlines[0] ?? draft.campaignName,
+            headlines: [...group.responsiveSearchAd.headlines],
+            primaryText: group.responsiveSearchAd.descriptions[0] ?? '',
+            descriptions: [...group.responsiveSearchAd.descriptions],
+            linkUrl: group.responsiveSearchAd.finalUrl,
+            keywords: group.keywords.map((kw) => kw.text),
+          })),
+        });
+      }
+    }
+  }
+
   return {
     brandName: brandKit.brandName,
     logoSrc: brandKit.logo ? `${sharedMediaBase(token)}/logo${brandKit.lastChangedOn ? `?v=${encodeURIComponent(brandKit.lastChangedOn)}` : ''}` : null,
@@ -166,10 +237,12 @@ export const loadSharedAds = cache(async (token: string): Promise<SharedAdsPage 
     label: link.label,
     includeResults: link.includeResults,
     allowFeedback: link.allowFeedback,
+    ...(link.includeDrafts ? { includeDrafts: true } : {}),
     revisionNumber: link.revisionNumber,
     revisionNote: link.revisionNote,
     results,
     feedback,
+    ...(campaignDrafts.length > 0 ? { campaignDrafts } : {}),
   };
 });
 

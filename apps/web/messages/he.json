@@ -3521,6 +3521,7 @@
     "tabAnalytics": "הוצאה ותוצאות",
     "shareWithClientTitle": "שיתוף תוצאות ומודעות עם לקוח",
     "shareWithClientHint": "שלחו קישור צפייה חיצוני הכולל את ביצועי הקמפיינים והמודעות, וקבלו הערות ובקשות ישירות מהלקוח.",
+    "shareAdsBeforePublishCta": "שתפו מודעות לאישור לפני פרסום",
     "noData": "אין נתונים",
     "noDataReason": "יופיע כאן אחרי שהמודעות שלכם יוצגו לאנשים.",
     "metricTotalSpend": "סך ההוצאה",
@@ -4123,6 +4124,7 @@
       "timelineLabel": "ציר זמן סרטון",
       "updatedOn": "עודכן {date}",
       "openAd": "לפתיחת המודעה",
+      "shareBeforePublish": "שיתוף לפני פרסום",
       "manualWriteExpand": "או כתבו את המודעה בעצמכם",
       "manualWriteHide": "הסתרת הטופס הידני",
       "adminHint": "ערכת מותג, הדגמת מוצר ומכסת ה-AI היומית"
@@ -5482,6 +5484,7 @@
         "working": "{count} בתהליך"
       },
       "manageIdeas": "כל רעיונות התמונה: כתיבה עם AI, הוספת רעיון",
+      "shareBeforePublish": "שיתוף לפני פרסום",
       "open": "פתיחה ועריכה",
       "state": {
         "ready": "מוכן",
@@ -6947,7 +6950,16 @@
       "allowFeedbackOption": "אפשרו ללקוח לאשר מודעות ולהשאיר הערות",
       "revisionBadge": "גרסה #{revision}",
       "includesResultsBadge": "כולל תוצאות",
-      "feedbackEnabledBadge": "משוב פתוח"
+      "feedbackEnabledBadge": "משוב פתוח",
+      "modeLabel": "סוג השיתוף",
+      "modePrePublish": "מודעות לפני פרסום",
+      "modeLiveResults": "מודעות ותוצאות קמפיינים",
+      "includeDraftsOption": "שתפו את המודעות עצמן גם לפני פרסום (טיוטות, רעיונות, תסריט וקטעי וידאו)",
+      "includesDraftsBadge": "לפני פרסום",
+      "prePublishBarTitle": "שיתוף המודעה לאישור לפני פרסום",
+      "prePublishBarHint": "שלחו ללקוח קישור לצפייה ואישור של המודעה, הרעיונות והסרטון עוד לפני העלייה לאוויר.",
+      "prePublishBarOpen": "שיתוף מודעה",
+      "prePublishBarClose": "סגירה"
     },
     "public": {
       "title": "המודעות שלכם",
@@ -7003,7 +7015,27 @@
       "feedbackSendError": "לא הצלחנו לשמור את הפנייה. בדקו את השדות ונסו שוב.",
       "commentRequiredError": "כתבו הערה או בקשה לפני השליחה.",
       "clientNotesHeading": "הערות שכבר נשלחו",
-      "defaultClientAuthor": "לקוח"
+      "defaultClientAuthor": "לקוח",
+      "prePublishBannerTitle": "תצוגה מוקדמת לאישור לפני פרסום",
+      "prePublishBannerBody": "מודעות אלו משותפות אתכם לפני העלייה לאוויר כדי שתוכלו לעבור על הניסוחים, התמונות והסרטונים, לאשר או לבקש התאמות עוד לפני הפרסום.",
+      "prePublishBadge": "לפני פרסום",
+      "draftVersionBadge": "טיוטה",
+      "conceptPreviewBadge": "רעיון לפני הפקה",
+      "plannedVisualLabel": "תיאור הוויזואל:",
+      "plannedFormatsLabel": "מיקומים:",
+      "storyboardHeading": "תסריט וידאו וקטעי סצנות ({count})",
+      "sceneHeading": "סצנה {index} ({seconds} שנ׳)",
+      "sceneVideoLabel": "קטע וידאו לסצנה {index}",
+      "sceneNarrationLabel": "קריינות:",
+      "sceneOverlayLabel": "טקסט על המסך:",
+      "sceneVisualLabel": "תיאור הסצנה:",
+      "metaObjectiveLabel": "מטרה:",
+      "metaAudienceLabel": "קהל יעד:",
+      "metaKeywordsLabel": "מילות מפתח:",
+      "campaignDraftsHeading": "טיוטות קמפיינים לאישור לפני עלייה לאוויר",
+      "campaignDraftDailyBudget": "${budget} ליום",
+      "campaignDraftPlatformMeta": "טיוטת קמפיין Meta",
+      "campaignDraftPlatformGoogle": "טיוטת קמפיין חיפוש בגוגל"
     },
     "requests": {
       "title": "בקשות לקוח והצעות לביצוע",
