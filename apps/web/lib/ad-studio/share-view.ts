@@ -1,4 +1,12 @@
-import { assemblyPlan, voiceDescription, type AdStudioAdCopy, type AdStudioImageFormat } from '@growthos/shared';
+import {
+  assemblyPlan,
+  searchAdDisplayUrl,
+  voiceDescription,
+  type AdShareFeedbackItem,
+  type AdStudioAdCopy,
+  type AdStudioImageFormat,
+  type AdStudioSearchAd,
+} from '@growthos/shared';
 import { adStudioImageSlots, currentAssembledVideo, type AdStudioClipView, type AdStudioImageView, type AdStudioVideoView } from './view';
 import type { AdStudioBriefView } from './store';
 
@@ -23,6 +31,14 @@ export interface SharedVideoAd {
   durationSeconds: number;
 }
 
+export interface SharedSearchAd {
+  headlines: string[];
+  descriptions: string[];
+  path1: string;
+  path2: string;
+  displayUrl: string;
+}
+
 export interface SharedBriefAds {
   id: string;
   name: string;
@@ -30,6 +46,29 @@ export interface SharedBriefAds {
   landingPageUrl: string | null;
   images: SharedImageAd[];
   video: SharedVideoAd | null;
+  searchAd?: SharedSearchAd | null;
+}
+
+export interface SharedCampaignResultItem {
+  id: string;
+  label: string;
+  platform: 'meta_ads' | 'google_ads' | 'simulated';
+  status: 'enabled' | 'paused' | 'removed' | 'none';
+  dailyBudgetUsd: number;
+  totalSpendUsd: number | null;
+  roas: number | null;
+  ctrPct: number | null;
+  conversions: number | null;
+}
+
+export interface SharedCampaignResultsSummary {
+  totalSpendUsd: number | null;
+  metaSpendUsd: number | null;
+  googleSpendUsd: number | null;
+  activeCampaignsCount: number;
+  totalCampaignsCount: number;
+  campaignsWithSpendCount: number;
+  items: SharedCampaignResultItem[];
 }
 
 export interface SharedAdsPage {
@@ -37,6 +76,14 @@ export interface SharedAdsPage {
   logoSrc: string | null;
   expiresOn: string;
   briefs: SharedBriefAds[];
+  token?: string;
+  label?: string;
+  includeResults?: boolean;
+  allowFeedback?: boolean;
+  revisionNumber?: number;
+  revisionNote?: string | null;
+  results?: SharedCampaignResultsSummary | null;
+  feedback?: AdShareFeedbackItem[];
 }
 
 /**
@@ -64,7 +111,10 @@ export function sharedVideoSrc(token: string, briefId: string, videoId: string):
 /** One ad's finished creatives, or null when it has none yet (nothing to show the client). */
 export function sharedBriefAds(params: {
   token: string;
-  brief: Pick<AdStudioBriefView, 'id' | 'name' | 'language' | 'landingPageUrl' | 'imageConcepts' | 'scenes' | 'format' | 'voice' | 'videoSettings' | 'videoCopy'>;
+  brief: Pick<
+    AdStudioBriefView,
+    'id' | 'name' | 'language' | 'landingPageUrl' | 'imageConcepts' | 'scenes' | 'format' | 'voice' | 'videoSettings' | 'videoCopy'
+  > & { searchAd?: AdStudioSearchAd | null };
   images: readonly AdStudioImageView[];
   clips: readonly AdStudioClipView[];
   videos: readonly AdStudioVideoView[];
@@ -93,6 +143,25 @@ export function sharedBriefAds(params: {
     };
   }
 
-  if (!images.length && !video) return null;
-  return { id: brief.id, name: brief.name, language: brief.language, landingPageUrl: brief.landingPageUrl, images, video };
+  const searchAd: SharedSearchAd | null =
+    brief.searchAd && (brief.searchAd.headlines.length > 0 || brief.searchAd.descriptions.length > 0)
+      ? {
+          headlines: [...brief.searchAd.headlines],
+          descriptions: [...brief.searchAd.descriptions],
+          path1: brief.searchAd.path1,
+          path2: brief.searchAd.path2,
+          displayUrl: searchAdDisplayUrl(brief.landingPageUrl, brief.searchAd),
+        }
+      : null;
+
+  if (!images.length && !video && !searchAd) return null;
+  return {
+    id: brief.id,
+    name: brief.name,
+    language: brief.language,
+    landingPageUrl: brief.landingPageUrl,
+    images,
+    video,
+    ...(searchAd ? { searchAd } : {}),
+  };
 }

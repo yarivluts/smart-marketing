@@ -15,6 +15,10 @@ export interface ShareLinkRow {
   expiresOn: string;
   revokedOn: string | null;
   status: 'active' | 'expired' | 'revoked';
+  includeResults?: boolean;
+  allowFeedback?: boolean;
+  revisionNumber?: number;
+  revisionNote?: string | null;
 }
 
 const EXPIRY_DAYS = [7, 30, 90] as const;
@@ -48,13 +52,17 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
   const [scope, setScope] = React.useState(defaultBriefId ?? ALL);
   const [label, setLabel] = React.useState('');
   const [days, setDays] = React.useState<(typeof EXPIRY_DAYS)[number]>(30);
+  const [includeResults, setIncludeResults] = React.useState(true);
+  const [allowFeedback, setAllowFeedback] = React.useState(true);
   const [pending, setPending] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   const [created, setCreated] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [confirming, setConfirming] = React.useState<string | null>(null);
   const briefName = new Map(briefs.map((brief) => [brief.id, brief.name]));
-  const date = (iso: string) => formatShareDate(locale, iso);
+  function date(iso: string): string {
+    return formatShareDate(locale, iso);
+  }
 
   async function create(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -65,7 +73,13 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
       const response = await fetch(api, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ briefIds: scope === ALL ? null : [scope], label, expiresInDays: days }),
+        body: JSON.stringify({
+          briefIds: scope === ALL ? null : [scope],
+          label,
+          expiresInDays: days,
+          ...(!includeResults ? { includeResults: false } : {}),
+          ...(!allowFeedback ? { allowFeedback: false } : {}),
+        }),
       });
       if (!response.ok) throw new Error(String(response.status));
       const body = (await response.json()) as { token: string; link: ShareLinkRow };
@@ -147,6 +161,26 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
             ))}
           </select>
         </label>
+        <div className="flex flex-wrap gap-4 sm:col-span-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+            <input
+              type="checkbox"
+              checked={includeResults}
+              onChange={(event) => setIncludeResults(event.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            <span>{t('includeResultsOption')}</span>
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+            <input
+              type="checkbox"
+              checked={allowFeedback}
+              onChange={(event) => setAllowFeedback(event.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            <span>{t('allowFeedbackOption')}</span>
+          </label>
+        </div>
         <div className="sm:col-span-3">
           <button type="submit" disabled={pending} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
             {pending ? t('creating') : t('create')}
@@ -194,6 +228,23 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
                     {' · '}
                     {link.status === 'revoked' && link.revokedOn ? t('revokedOn', { date: date(link.revokedOn) }) : t('expiresOn', { date: date(link.expiresOn) })}
                   </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    {(link.revisionNumber ?? 1) > 1 ? (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        {t('revisionBadge', { revision: link.revisionNumber ?? 1 })}
+                      </span>
+                    ) : null}
+                    {link.includeResults !== false ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {t('includesResultsBadge')}
+                      </span>
+                    ) : null}
+                    {link.allowFeedback !== false ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {t('feedbackEnabledBadge')}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span

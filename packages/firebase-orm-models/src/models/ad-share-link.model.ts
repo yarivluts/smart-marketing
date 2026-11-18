@@ -42,4 +42,24 @@ export class AdShareLinkModel extends BaseModel {
 
   @Field({ is_required: false })
   public revoked_by?: string | null;
+
+  /** Whether campaign performance results are included on this shared link (default true). */
+  @Field({ is_required: false })
+  public include_results?: boolean | null;
+
+  /** Whether the external client may submit per-ad comments and change requests (default true). */
+  @Field({ is_required: false })
+  public allow_feedback?: boolean | null;
+
+  /** Revision iteration number when sharing updated versions back to the client (default 1). */
+  @Field({ is_required: false })
+  public revision_number?: number | null;
+
+  /** Optional manager note summarizing what changed in this updated version. */
+  @Field({ is_required: false })
+  public revision_note?: string | null;
+
+  /** Optional hash id of an earlier share link this revision follows up on. */
+  @Field({ is_required: false })
+  public supersedes_link_id?: string | null;
 }

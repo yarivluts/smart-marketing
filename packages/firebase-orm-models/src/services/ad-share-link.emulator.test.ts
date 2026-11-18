@@ -56,7 +56,18 @@ describe('ad share links', () => {
     expect(stored?.organization_id).toBe(ctx.orgId);
     expect(Object.values(stored ?? {}).some((value) => value === token)).toBe(false);
 
-    expect(await resolveAdShareToken(token)).toEqual({ id: link.id, organizationId: ctx.orgId, projectId: ctx.projectId, briefIds: [ctx.briefId], expiresOn: link.expiresOn });
+    expect(await resolveAdShareToken(token)).toMatchObject({
+      id: link.id,
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefIds: [ctx.briefId],
+      label: 'Dana',
+      expiresOn: link.expiresOn,
+      includeResults: true,
+      allowFeedback: true,
+      revisionNumber: 1,
+      revisionNote: null,
+    });
     expect(await resolveAdShareToken(`${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`)).toBeNull();
     expect(await resolveAdShareToken('not-a-token')).toBeNull();
 

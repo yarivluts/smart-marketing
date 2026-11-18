@@ -23,6 +23,8 @@ import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesiz
 import { AdsPerformanceDashboard } from '@/components/campaigns/ads-performance-dashboard';
 import type { CampaignDraftView } from '@/components/campaigns/campaign-creatives-panel';
 import type { CampaignSpendBreakdownOutcome } from '@/lib/orgs/queries';
+import { listShareLinks } from '@/lib/ad-studio/share';
+import { listAdStudioBriefs } from '@/lib/ad-studio/store';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -57,6 +59,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
   const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId, projectId });
+  const canShareWithClient = can(bindings, principal, 'project.configure', { orgId, projectId });
 
   if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
@@ -72,12 +75,14 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
     spendOutcome = null;
   }
 
-  const [projects, targets, actions, attachments, credentials] = await Promise.all([
+  const [projects, targets, actions, attachments, credentials, shareLinks, adBriefs] = await Promise.all([
     listOrgProjects(orgId),
     listAutomationTargetStatesForProject(orgId, projectId),
     listAutomationActionsForProject(orgId, projectId),
     listActiveAttachmentsForProject(orgId, projectId),
     listSharedCredentials(orgId),
+    canShareWithClient ? listShareLinks(orgId, projectId) : Promise.resolve([]),
+    canShareWithClient ? listAdStudioBriefs(orgId, projectId) : Promise.resolve([]),
   ]);
 
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -134,6 +139,11 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
         canManagePlugins={canManagePlugins}
         spendOutcome={spendOutcome}
         spendWindowDays={CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS}
+        shareConfig={
+          canShareWithClient
+            ? { briefs: adBriefs.map((b) => ({ id: b.id, name: b.name })), initialLinks: shareLinks }
+            : null
+        }
       />
     </div>
   );
