@@ -191,4 +191,91 @@ describe('SharedAdsView — campaign results, Search ad, revision & interactive 
     await waitFor(() => expect(screen.queryByTestId('shared-feedback-form')).toBeNull());
     expect(screen.getByText('Emphasize 24h response time in headline 1')).toBeInTheDocument();
   });
+
+  it('renders pre-publication preview (draft banner, storyboard with scene clip, draft concepts, meta & campaign drafts) without edit controls', () => {
+    const prePublishPage: SharedAdsPage = {
+      brandName: 'Acme Clinic',
+      logoSrc: null,
+      expiresOn: '2026-12-06T00:00:00.000Z',
+      token: 'T-PRE',
+      includeResults: false,
+      allowFeedback: true,
+      includeDrafts: true,
+      briefs: [
+        {
+          id: 'b-draft',
+          name: 'Unpublished Dental Promo',
+          language: 'en',
+          landingPageUrl: 'https://acme.example/promo',
+          isPrePublishDraft: true,
+          draftMeta: {
+            objective: 'Book free 3D dental scans',
+            productDescription: 'Same-week consultation',
+            format: 'vertical',
+            targetSeconds: 15,
+            keywords: ['dental scan', 'implants'],
+            audienceSummary: 'IL · 25-55',
+          },
+          images: [
+            {
+              conceptId: 'c-unrendered',
+              index: 1,
+              copy: { headline: 'Smile with confidence', primaryText: 'Book your scan today.', description: '' },
+              byFormat: {},
+              isDraft: true,
+              headline: 'Smile with confidence',
+              visualPrompt: 'Bright clinic reception in sunlight',
+              plannedFormats: ['square', 'story'],
+            },
+          ],
+          video: null,
+          videoCopyDraft: { headline: 'See the clinic', primaryText: 'Modern dental care', description: '' },
+          scenes: [
+            {
+              id: 's1',
+              index: 1,
+              durationSeconds: 5,
+              narration: 'Welcome to Acme Clinic',
+              onScreenText: 'Free 3D scan',
+              visualPrompt: 'Doctor greeting patient',
+              clipSrc: '/api/share/ads/T-PRE/briefs/b-draft/clips/k1',
+            },
+          ],
+        },
+      ],
+      campaignDrafts: [
+        {
+          targetId: 't-draft-1',
+          campaignName: 'Pre-launch Meta Lead Campaign',
+          platform: 'meta',
+          dailyBudgetUsd: 50,
+          ads: [
+            {
+              groupName: 'Local Adults',
+              headline: 'Free Dental Consult',
+              primaryText: 'Reserve your slot before launch.',
+              description: 'Limited spots',
+              linkUrl: 'https://acme.example/promo',
+              audience: 'IL (25-55)',
+            },
+          ],
+        },
+      ],
+    };
+
+    renderWithIntl(<SharedAdsView page={prePublishPage} />);
+
+    expect(screen.getByTestId('shared-ads-prepublish-banner')).toBeInTheDocument();
+    expect(screen.getByTestId('shared-brief-prepublish-badge')).toHaveTextContent('Before launch');
+    expect(screen.getByTestId('shared-brief-meta')).toHaveTextContent('Book free 3D dental scans');
+    expect(screen.getByTestId('shared-image-draft')).toHaveTextContent('Bright clinic reception in sunlight');
+    const storyboard = screen.getByTestId('shared-video-storyboard');
+    expect(within(storyboard).getByLabelText('Scene 1 video')).toHaveAttribute('src', '/api/share/ads/T-PRE/briefs/b-draft/clips/k1');
+    expect(screen.getByTestId('shared-campaign-drafts')).toHaveTextContent('Pre-launch Meta Lead Campaign');
+    expect(screen.queryByTestId('shared-ads-empty')).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+    for (const btn of screen.getAllByRole('button')) {
+      expect(btn.textContent ?? '').not.toMatch(/publish|delete|edit/i);
+    }
+  });
 });

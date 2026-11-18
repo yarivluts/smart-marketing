@@ -65,6 +65,7 @@ export function AdsPerformanceDashboard({
   const t = useTranslations('Campaigns');
 
   const [activeTab, setActiveTab] = useState<'overview' | 'creatives' | 'analytics'>('overview');
+  const [shareOpenPrePublish, setShareOpenPrePublish] = useState(false);
   const [platformFilter, setPlatformFilter] = useState<'all' | 'meta_ads' | 'google_ads' | 'simulated'>('all');
   // Only offer "Sample data" when simulated campaigns exist; a newcomer has no use for a filter with nothing behind it.
   const showSimulated = platformFilter === 'simulated' || initialItems.some((item) => item.platform === 'simulated');
@@ -222,6 +223,7 @@ export function AdsPerformanceDashboard({
         <details
           className="group rounded-2xl border border-border bg-card shadow-xs"
           data-testid="campaigns-client-share-drawer"
+          open={shareOpenPrePublish || undefined}
         >
           <summary className="flex cursor-pointer list-none select-none items-center justify-between gap-3 rounded-2xl px-4 py-3.5 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
             <div className="flex min-w-0 items-center gap-3">
@@ -244,6 +246,8 @@ export function AdsPerformanceDashboard({
               projectId={projectId}
               briefs={shareConfig.briefs}
               initialLinks={shareConfig.initialLinks}
+              defaultIncludeDrafts={shareOpenPrePublish}
+              defaultIncludeResults={!shareOpenPrePublish}
             />
           </div>
         </details>
@@ -442,7 +446,23 @@ export function AdsPerformanceDashboard({
       )}
 
       {activeTab === 'creatives' && (
-        <CreativePreviewGallery items={initialItems} />
+        <div className="flex flex-col gap-4">
+          {shareConfig ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
+              <p className="text-xs font-medium text-foreground">{t('shareWithClientHint')}</p>
+              <button
+                type="button"
+                data-testid="campaigns-share-prepublish-btn"
+                onClick={() => setShareOpenPrePublish(true)}
+                className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90"
+              >
+                <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{t('shareAdsBeforePublishCta')}</span>
+              </button>
+            </div>
+          ) : null}
+          <CreativePreviewGallery items={initialItems} />
+        </div>
       )}
 
       {activeTab === 'analytics' && (

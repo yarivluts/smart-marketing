@@ -42,6 +42,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     expiresInDays?: unknown;
     includeResults?: unknown;
     allowFeedback?: unknown;
+    includeDrafts?: unknown;
     revisionNumber?: unknown;
     revisionNote?: unknown;
     supersedesLinkId?: unknown;
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       expiresInDays: body.expiresInDays as number | undefined,
       ...(typeof body.includeResults === 'boolean' ? { includeResults: body.includeResults } : {}),
       ...(typeof body.allowFeedback === 'boolean' ? { allowFeedback: body.allowFeedback } : {}),
+      ...(typeof body.includeDrafts === 'boolean' ? { includeDrafts: body.includeDrafts } : {}),
       ...(typeof body.revisionNumber === 'number' ? { revisionNumber: body.revisionNumber } : {}),
       ...(body.revisionNote !== undefined ? { revisionNote: body.revisionNote as string | null } : {}),
       ...(body.supersedesLinkId !== undefined ? { supersedesLinkId: body.supersedesLinkId as string | null } : {}),

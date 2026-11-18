@@ -17,6 +17,7 @@ export interface ShareLinkRow {
   status: 'active' | 'expired' | 'revoked';
   includeResults?: boolean;
   allowFeedback?: boolean;
+  includeDrafts?: boolean;
   revisionNumber?: number;
   revisionNote?: string | null;
 }
@@ -32,6 +33,10 @@ export interface ShareLinksPanelProps {
   initialLinks: ShareLinkRow[];
   /** Preselects one ad (the per-ad shortcut); otherwise "all ads". */
   defaultBriefId?: string;
+  /** Preselects pre-publication mode (drafts + creatives before live launch). */
+  defaultIncludeDrafts?: boolean;
+  /** Initial value for including campaign results (defaults to true to keep live cockpit behavior). */
+  defaultIncludeResults?: boolean;
 }
 
 /** The address a client opens; built in the browser so it follows whatever host the person is on. */
@@ -44,7 +49,15 @@ export function shareUrl(origin: string, locale: string, token: string): string 
  * ads - all of them or one - for 7, 30 or 90 days, shows it once to copy, and lists every link
  * made so far with a way to turn it off.
  */
-export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaultBriefId }: ShareLinksPanelProps): React.ReactElement {
+export function ShareLinksPanel({
+  orgId,
+  projectId,
+  briefs,
+  initialLinks,
+  defaultBriefId,
+  defaultIncludeDrafts = false,
+  defaultIncludeResults = true,
+}: ShareLinksPanelProps): React.ReactElement {
   const t = useTranslations('AdShare.manage');
   const locale = useLocale();
   const api = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/share-links`;
@@ -52,14 +65,24 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
   const [scope, setScope] = React.useState(defaultBriefId ?? ALL);
   const [label, setLabel] = React.useState('');
   const [days, setDays] = React.useState<(typeof EXPIRY_DAYS)[number]>(30);
-  const [includeResults, setIncludeResults] = React.useState(true);
+  const [includeResults, setIncludeResults] = React.useState(defaultIncludeResults);
   const [allowFeedback, setAllowFeedback] = React.useState(true);
+  const [includeDrafts, setIncludeDrafts] = React.useState(defaultIncludeDrafts);
   const [pending, setPending] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   const [created, setCreated] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [confirming, setConfirming] = React.useState<string | null>(null);
   const briefName = new Map(briefs.map((brief) => [brief.id, brief.name]));
+  React.useEffect(() => {
+    if (defaultBriefId !== undefined) setScope(defaultBriefId);
+  }, [defaultBriefId]);
+  React.useEffect(() => {
+    setIncludeDrafts(defaultIncludeDrafts);
+  }, [defaultIncludeDrafts]);
+  React.useEffect(() => {
+    setIncludeResults(defaultIncludeResults);
+  }, [defaultIncludeResults]);
   function date(iso: string): string {
     return formatShareDate(locale, iso);
   }
@@ -79,6 +102,7 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
           expiresInDays: days,
           ...(!includeResults ? { includeResults: false } : {}),
           ...(!allowFeedback ? { allowFeedback: false } : {}),
+          ...(includeDrafts ? { includeDrafts: true } : {}),
         }),
       });
       if (!response.ok) throw new Error(String(response.status));
@@ -161,7 +185,56 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
             ))}
           </select>
         </label>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+          <span className="text-xs font-medium text-muted-foreground">{t('modeLabel')}</span>
+          <button
+            type="button"
+            data-testid="share-mode-prepublish"
+            aria-pressed={includeDrafts && !includeResults}
+            onClick={() => {
+              setIncludeDrafts(true);
+              setIncludeResults(false);
+              setAllowFeedback(true);
+            }}
+            className={cn(
+              'inline-flex h-8 items-center rounded-full border px-3 text-xs font-semibold transition-colors',
+              includeDrafts && !includeResults
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-background text-muted-foreground hover:bg-muted',
+            )}
+          >
+            {t('modePrePublish')}
+          </button>
+          <button
+            type="button"
+            data-testid="share-mode-live"
+            aria-pressed={!includeDrafts && includeResults}
+            onClick={() => {
+              setIncludeDrafts(false);
+              setIncludeResults(true);
+              setAllowFeedback(true);
+            }}
+            className={cn(
+              'inline-flex h-8 items-center rounded-full border px-3 text-xs font-semibold transition-colors',
+              !includeDrafts && includeResults
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border bg-background text-muted-foreground hover:bg-muted',
+            )}
+          >
+            {t('modeLiveResults')}
+          </button>
+        </div>
         <div className="flex flex-wrap gap-4 sm:col-span-3">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+            <input
+              type="checkbox"
+              data-testid="share-include-drafts-checkbox"
+              checked={includeDrafts}
+              onChange={(event) => setIncludeDrafts(event.target.checked)}
+              className="h-4 w-4 rounded border-border accent-primary"
+            />
+            <span>{t('includeDraftsOption')}</span>
+          </label>
           <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
             <input
               type="checkbox"
@@ -232,6 +305,11 @@ export function ShareLinksPanel({ orgId, projectId, briefs, initialLinks, defaul
                     {(link.revisionNumber ?? 1) > 1 ? (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                         {t('revisionBadge', { revision: link.revisionNumber ?? 1 })}
+                      </span>
+                    ) : null}
+                    {link.includeDrafts ? (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        {t('includesDraftsBadge')}
                       </span>
                     ) : null}
                     {link.includeResults !== false ? (

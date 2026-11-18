@@ -22,6 +22,50 @@ export interface SharedImageAd {
   index: number;
   copy: AdStudioAdCopy | null;
   byFormat: Partial<Record<AdStudioImageFormat, string>>;
+  /** Present only when pre-publication drafts are included. */
+  isDraft?: boolean;
+  headline?: string;
+  visualPrompt?: string;
+  plannedFormats?: AdStudioImageFormat[];
+}
+
+export interface SharedScenePreview {
+  id: string;
+  index: number;
+  durationSeconds: number;
+  narration: string;
+  onScreenText: string;
+  visualPrompt: string;
+  clipSrc: string | null;
+}
+
+export interface SharedBriefDraftMeta {
+  objective: string;
+  productDescription: string;
+  format: 'vertical' | 'horizontal';
+  targetSeconds: number;
+  keywords: string[];
+  audienceSummary: string | null;
+}
+
+export interface SharedCampaignDraftAdItem {
+  groupName: string;
+  headline: string;
+  headlines?: string[];
+  primaryText: string;
+  descriptions?: string[];
+  description?: string;
+  linkUrl: string;
+  keywords?: string[];
+  audience?: string;
+}
+
+export interface SharedCampaignDraftItem {
+  targetId: string;
+  campaignName: string;
+  platform: 'meta' | 'google_ads';
+  dailyBudgetUsd: number;
+  ads: SharedCampaignDraftAdItem[];
 }
 
 export interface SharedVideoAd {
@@ -47,6 +91,10 @@ export interface SharedBriefAds {
   images: SharedImageAd[];
   video: SharedVideoAd | null;
   searchAd?: SharedSearchAd | null;
+  isPrePublishDraft?: boolean;
+  scenes?: SharedScenePreview[];
+  videoCopyDraft?: AdStudioAdCopy | null;
+  draftMeta?: SharedBriefDraftMeta | null;
 }
 
 export interface SharedCampaignResultItem {
@@ -80,10 +128,12 @@ export interface SharedAdsPage {
   label?: string;
   includeResults?: boolean;
   allowFeedback?: boolean;
+  includeDrafts?: boolean;
   revisionNumber?: number;
   revisionNote?: string | null;
   results?: SharedCampaignResultsSummary | null;
   feedback?: AdShareFeedbackItem[];
+  campaignDrafts?: SharedCampaignDraftItem[];
 }
 
 /**
@@ -108,33 +158,87 @@ export function sharedVideoSrc(token: string, briefId: string, videoId: string):
   return `${sharedMediaBase(token)}/briefs/${encodeURIComponent(briefId)}/videos/${encodeURIComponent(videoId)}`;
 }
 
-/** One ad's finished creatives, or null when it has none yet (nothing to show the client). */
+export function sharedClipSrc(token: string, briefId: string, clipId: string): string {
+  return `${sharedMediaBase(token)}/briefs/${encodeURIComponent(briefId)}/clips/${encodeURIComponent(clipId)}`;
+}
+
+/** Picks the best ready clip for a pre-publication scene preview (chosen first, else newest ready version). */
+function pickReadySceneClip(clips: readonly AdStudioClipView[], sceneId: string): AdStudioClipView | null {
+  const ready = clips.filter((clip) => clip.sceneId === sceneId && clip.status === 'ready');
+  if (!ready.length) return null;
+  return ready.find((clip) => clip.chosen) ?? [...ready].sort((a, b) => b.version - a.version)[0];
+}
+
+/**
+ * One ad's creatives for external review.
+ * - Standard links (`includeDrafts` false/omitted): only chosen, up-to-date creatives and current
+ *   assembled videos, returning null when nothing is finished yet.
+ * - Pre-publication links (`includeDrafts` true): also exposes brief goals/keywords/targeting,
+ *   draft image concepts (even before renders exist or after copy edits), storyboard scenes with
+ *   playable scene clips, and proposed Search ads before campaign launch.
+ */
 export function sharedBriefAds(params: {
   token: string;
+  includeDrafts?: boolean;
   brief: Pick<
     AdStudioBriefView,
     'id' | 'name' | 'language' | 'landingPageUrl' | 'imageConcepts' | 'scenes' | 'format' | 'voice' | 'videoSettings' | 'videoCopy'
-  > & { searchAd?: AdStudioSearchAd | null };
+  > & {
+    searchAd?: AdStudioSearchAd | null;
+    objective?: string;
+    productDescription?: string;
+    targetSeconds?: number;
+    searchKeywords?: { keywords: readonly (string | { text: string })[] } | null;
+    metaTargeting?: { countries: readonly string[]; ageMin: number; ageMax: number } | null;
+  };
   images: readonly AdStudioImageView[];
   clips: readonly AdStudioClipView[];
   videos: readonly AdStudioVideoView[];
 }): SharedBriefAds | null {
-  const { token, brief } = params;
+  const { token, brief, includeDrafts = false } = params;
   const slots = adStudioImageSlots(brief.imageConcepts, params.images, brief.language);
   const images: SharedImageAd[] = [];
   brief.imageConcepts.forEach((concept, position) => {
     const byFormat: Partial<Record<AdStudioImageFormat, string>> = {};
+    let hasStaleSelected = false;
     for (const slot of slots) {
-      if (slot.conceptId === concept.id && slot.current && slot.selected) byFormat[slot.format] = sharedImageSrc(token, brief.id, slot.selected.id);
+      if (slot.conceptId !== concept.id) continue;
+      if (includeDrafts) {
+        if (slot.selected && slot.selected.status === 'ready') {
+          byFormat[slot.format] = sharedImageSrc(token, brief.id, slot.selected.id);
+          if (!slot.current) hasStaleSelected = true;
+        }
+      } else if (slot.current && slot.selected) {
+        byFormat[slot.format] = sharedImageSrc(token, brief.id, slot.selected.id);
+      }
     }
-    if (Object.keys(byFormat).length) images.push({ conceptId: concept.id, index: position + 1, copy: concept.copy ?? null, byFormat });
+    if (Object.keys(byFormat).length) {
+      images.push({
+        conceptId: concept.id,
+        index: position + 1,
+        copy: concept.copy ?? null,
+        byFormat,
+        ...(includeDrafts && hasStaleSelected ? { isDraft: true } : {}),
+      });
+    } else if (includeDrafts) {
+      images.push({
+        conceptId: concept.id,
+        index: position + 1,
+        copy: concept.copy ?? (concept.headline ? { headline: concept.headline, primaryText: '', description: '' } : null),
+        byFormat: {},
+        isDraft: true,
+        headline: concept.headline,
+        visualPrompt: concept.visualPrompt,
+        plannedFormats: [...concept.formats],
+      });
+    }
   });
 
   let video: SharedVideoAd | null = null;
   const context = { format: brief.format, language: brief.language, voice: voiceDescription(brief.voice), settings: brief.videoSettings };
   const plan = assemblyPlan(brief.scenes, params.clips, context);
   const assembled = currentAssembledVideo(params.videos, plan?.map((entry) => entry.clip.id) ?? null);
-  if (assembled.current && assembled.latest) {
+  if ((assembled.current || includeDrafts) && assembled.latest && assembled.latest.status === 'ready') {
     video = {
       src: sharedVideoSrc(token, brief.id, assembled.latest.id),
       vertical: brief.format === 'vertical',
@@ -154,7 +258,58 @@ export function sharedBriefAds(params: {
         }
       : null;
 
-  if (!images.length && !video && !searchAd) return null;
+  if (!includeDrafts) {
+    if (!images.length && !video && !searchAd) return null;
+    return {
+      id: brief.id,
+      name: brief.name,
+      language: brief.language,
+      landingPageUrl: brief.landingPageUrl,
+      images,
+      video,
+      ...(searchAd ? { searchAd } : {}),
+    };
+  }
+
+  const scenes: SharedScenePreview[] =
+    brief.scenes.length > 0 && !assembled.current
+      ? brief.scenes.map((scene, index) => {
+          const clip = pickReadySceneClip(params.clips, scene.id);
+          return {
+            id: scene.id,
+            index: index + 1,
+            durationSeconds: clip?.durationSeconds ?? scene.durationSeconds,
+            narration: scene.voiceover,
+            onScreenText: scene.onScreenText,
+            visualPrompt: scene.visualPrompt,
+            clipSrc: clip ? sharedClipSrc(token, brief.id, clip.id) : null,
+          };
+        })
+      : [];
+
+  const targetingCountries = brief.metaTargeting?.countries ?? [];
+  const audienceSummary = brief.metaTargeting
+    ? [targetingCountries.join(', '), `${brief.metaTargeting.ageMin}-${brief.metaTargeting.ageMax}`].filter(Boolean).join(' · ')
+    : null;
+  const keywords = brief.searchKeywords?.keywords
+    ? brief.searchKeywords.keywords
+        .map((entry) => (typeof entry === 'string' ? entry : entry.text))
+        .filter((text) => Boolean(text && text.trim()))
+    : [];
+  const objective = brief.objective ?? '';
+  const productDescription = brief.productDescription ?? '';
+  const draftMeta: SharedBriefDraftMeta | null =
+    objective || productDescription || keywords.length > 0 || audienceSummary
+      ? {
+          objective,
+          productDescription,
+          format: brief.format,
+          targetSeconds: brief.targetSeconds ?? 15,
+          keywords,
+          audienceSummary,
+        }
+      : null;
+
   return {
     id: brief.id,
     name: brief.name,
@@ -163,5 +318,9 @@ export function sharedBriefAds(params: {
     images,
     video,
     ...(searchAd ? { searchAd } : {}),
+    isPrePublishDraft: true,
+    ...(scenes.length ? { scenes } : {}),
+    ...(scenes.length && brief.videoCopy ? { videoCopyDraft: brief.videoCopy } : {}),
+    ...(draftMeta ? { draftMeta } : {}),
   };
 }

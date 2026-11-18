@@ -121,6 +121,11 @@ describe('ReviewOverview', () => {
     expect(empty).toHaveTextContent(heMessages.AdStudio.review.imagesEmpty);
   });
 
+  it('shows a pre-publication share shortcut button when shareHref is provided', () => {
+    renderWithIntl(<ReviewOverview {...PROPS} shareHref="/r?open=share" />, { locale: 'en' });
+    expect(screen.getByTestId('ad-studio-review-share')).toHaveAttribute('href', '/r?open=share');
+  });
+
   describe('while something is still being made', () => {
     afterEach(() => {
       vi.useRealTimers();

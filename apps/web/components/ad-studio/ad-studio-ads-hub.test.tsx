@@ -128,7 +128,7 @@ describe('AdStudioAdsHub', () => {
 
   it('renders localized Hebrew copy cleanly when locale is he', () => {
     renderWithIntl(
-      <AdStudioAdsHub orgId="org-1" projectId="proj-1" studioHref="/orgs/org-1/projects/proj-1/ad-studio" knownSite={null} briefs={SAMPLE_BRIEFS} />,
+      <AdStudioAdsHub orgId="org-1" projectId="proj-1" studioHref="/orgs/org-1/projects/proj-1/ad-studio" knownSite={null} briefs={SAMPLE_BRIEFS} canShare />,
       { locale: 'he' },
     );
 
@@ -136,5 +136,9 @@ describe('AdStudioAdsHub', () => {
     expect(screen.getByTestId('ad-studio-mobile-new-cta')).toHaveTextContent(heMessages.AdStudio.list.newAdShortcut);
     expect(screen.getByPlaceholderText(heMessages.AdStudio.list.searchPlaceholder)).toBeInTheDocument();
     expect(screen.getByTestId('ad-studio-filter-scripted')).toHaveTextContent(heMessages.AdStudio.status.scripted);
+    expect(screen.getByTestId('ad-studio-brief-share-b-draft')).toHaveAttribute(
+      'href',
+      '/orgs/org-1/projects/proj-1/ad-studio?brief=b-draft&open=share',
+    );
   });
 });

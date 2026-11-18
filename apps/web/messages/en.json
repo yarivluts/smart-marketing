@@ -3521,6 +3521,7 @@
     "tabAnalytics": "Spend and results",
     "shareWithClientTitle": "Share results & ads with client",
     "shareWithClientHint": "Send a link where someone outside your team can see your ads and how they are doing, and write back with comments.",
+    "shareAdsBeforePublishCta": "Share ads before launch",
     "noData": "No data",
     "noDataReason": "Shows up here once your ads have been shown to people.",
     "metricTotalSpend": "Total Spend",
@@ -4123,6 +4124,7 @@
       "timelineLabel": "Video timeline",
       "updatedOn": "Updated {date}",
       "openAd": "Open ad",
+      "shareBeforePublish": "Share before launch",
       "manualWriteExpand": "Or write the ad yourself",
       "manualWriteHide": "Hide manual form",
       "adminHint": "Brand kit, product demo and daily AI allowance"
@@ -5482,6 +5484,7 @@
         "working": "{count} in progress"
       },
       "manageIdeas": "All image ideas: write with AI, add an idea",
+      "shareBeforePublish": "Share ad before launch",
       "open": "Open and edit",
       "state": {
         "ready": "Ready",
@@ -6947,7 +6950,16 @@
       "allowFeedbackOption": "Let client approve ads and leave notes",
       "revisionBadge": "Revision #{revision}",
       "includesResultsBadge": "Includes results",
-      "feedbackEnabledBadge": "Feedback enabled"
+      "feedbackEnabledBadge": "Feedback enabled",
+      "modeLabel": "Quick preset",
+      "modePrePublish": "Ads before launch",
+      "modeLiveResults": "Ads & live results",
+      "includeDraftsOption": "Share draft ads before publication (scripts, concepts, clips & unlaunched drafts)",
+      "includesDraftsBadge": "Before launch",
+      "prePublishBarTitle": "Share this ad before launch",
+      "prePublishBarHint": "Send the client a preview of the copy, images, and scenes before publishing.",
+      "prePublishBarOpen": "Share ad",
+      "prePublishBarClose": "Hide sharing"
     },
     "public": {
       "title": "Your ads",
@@ -7003,7 +7015,27 @@
       "feedbackSendError": "We could not save your feedback. Check the fields and try again.",
       "commentRequiredError": "Write a short note or request before sending.",
       "clientNotesHeading": "Submitted feedback",
-      "defaultClientAuthor": "Client"
+      "defaultClientAuthor": "Client",
+      "prePublishBannerTitle": "Pre-launch preview for your review",
+      "prePublishBannerBody": "These ads are shared ahead of launch so you can review the copy, visuals, and videos, approve them, or ask for adjustments before anything goes live.",
+      "prePublishBadge": "Before launch",
+      "draftVersionBadge": "Draft",
+      "conceptPreviewBadge": "Concept before render",
+      "plannedVisualLabel": "Planned visual:",
+      "plannedFormatsLabel": "Formats:",
+      "storyboardHeading": "Video script & scene clips ({count})",
+      "sceneHeading": "Scene {index} ({seconds}s)",
+      "sceneVideoLabel": "Scene {index} video",
+      "sceneNarrationLabel": "Voiceover:",
+      "sceneOverlayLabel": "On-screen text:",
+      "sceneVisualLabel": "Scene plan:",
+      "metaObjectiveLabel": "Goal:",
+      "metaAudienceLabel": "Audience:",
+      "metaKeywordsLabel": "Search keywords:",
+      "campaignDraftsHeading": "Campaign drafts ready to review before launch",
+      "campaignDraftDailyBudget": "${budget}/day",
+      "campaignDraftPlatformMeta": "Meta campaign draft",
+      "campaignDraftPlatformGoogle": "Google Search campaign draft"
     },
     "requests": {
       "title": "Client comments and suggested changes",

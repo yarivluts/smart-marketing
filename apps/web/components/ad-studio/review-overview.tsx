@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, CheckCircle2, ChevronLeft, CircleDashed, Clapperboard, ImageIcon, Images, Loader2, Play, Search, Sparkles, Wand2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, CircleDashed, Clapperboard, ImageIcon, Images, Loader2, Play, Search, Share2, Sparkles, Wand2 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -220,6 +220,8 @@ export interface ReviewOverviewProps {
   adDirection?: 'rtl' | 'ltr';
   /** The Publish step, once something can be published; null while it is locked. */
   publishHref?: string | null;
+  /** Opens pre-publication client sharing for this ad before publish. */
+  shareHref?: string | null;
   /** The landing page's host, shown in the search ad preview the way Google shows it. */
   searchHost?: string | null;
 }
@@ -230,7 +232,7 @@ export interface ReviewOverviewProps {
  * opens the creative's own page, where all of it is shown and edited. Work on all ideas at once (new
  * ideas with AI, add an idea) lives on the image ideas page.
  */
-export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoFormat, adDirection = 'ltr', publishHref = null, searchHost = null }: ReviewOverviewProps): React.ReactElement {
+export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoFormat, adDirection = 'ltr', publishHref = null, shareHref = null, searchHost = null }: ReviewOverviewProps): React.ReactElement {
   const t = useTranslations('AdStudio.review');
   const tf = useTranslations('AdStudio.images.format');
   const counts = [...images.map((image) => image.state), video.state, search.state];
@@ -288,14 +290,26 @@ export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoF
             </div>
             <p className="text-sm text-muted-foreground">{t('description')}</p>
           </div>
-          <Link
-            href={hrefs.images}
-            className="inline-flex h-10 shrink-0 items-center gap-2 self-start rounded-full border border-primary/20 bg-primary/5 px-4 text-sm font-semibold text-primary hover:bg-primary/10 sm:self-auto"
-            data-testid="ad-studio-review-manage-ideas"
-          >
-            <Wand2 className="h-4 w-4" aria-hidden="true" />
-            {t('manageIdeas')}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {shareHref ? (
+              <Link
+                href={shareHref}
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-pp-outline-variant/50 bg-card px-4 text-sm font-semibold text-pp-primary hover:bg-pp-primary-fixed"
+                data-testid="ad-studio-review-share"
+              >
+                <Share2 className="h-4 w-4" aria-hidden="true" />
+                {t('shareBeforePublish')}
+              </Link>
+            ) : null}
+            <Link
+              href={hrefs.images}
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 text-sm font-semibold text-primary hover:bg-primary/10"
+              data-testid="ad-studio-review-manage-ideas"
+            >
+              <Wand2 className="h-4 w-4" aria-hidden="true" />
+              {t('manageIdeas')}
+            </Link>
+          </div>
         </header>
 
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

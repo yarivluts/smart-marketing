@@ -62,4 +62,8 @@ export class AdShareLinkModel extends BaseModel {
   /** Optional hash id of an earlier share link this revision follows up on. */
   @Field({ is_required: false })
   public supersedes_link_id?: string | null;
+
+  /** Whether pre-publication / draft ads (scripts, concepts, scene clips, unpublished drafts) are included (default false on legacy links). */
+  @Field({ is_required: false })
+  public include_drafts?: boolean | null;
 }

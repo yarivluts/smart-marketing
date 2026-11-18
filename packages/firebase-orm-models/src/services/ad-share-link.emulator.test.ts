@@ -65,6 +65,7 @@ describe('ad share links', () => {
       expiresOn: link.expiresOn,
       includeResults: true,
       allowFeedback: true,
+      includeDrafts: false,
       revisionNumber: 1,
       revisionNote: null,
     });
@@ -117,5 +118,22 @@ describe('ad share links', () => {
     const { link } = await createAdShareLink({ organizationId: other.orgId, projectId: other.projectId, briefIds: null, actorId: other.owner.id });
     await expect(revokeAdShareLink({ organizationId: ctx.orgId, projectId: ctx.projectId, linkId: link.id, actorId: ctx.owner.id })).rejects.toBeInstanceOf(AdShareLinkNotFoundError);
     await expect(revokeAdShareLink({ organizationId: ctx.orgId, projectId: ctx.projectId, linkId: 'nope', actorId: ctx.owner.id })).rejects.toBeInstanceOf(AdShareLinkNotFoundError);
+  });
+
+  it('persists includeDrafts for pre-publication links and defaults omitted links to false', async () => {
+    const ctx = await setup();
+    const { token: preToken, link: preLink } = await createAdShareLink({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefIds: [ctx.briefId],
+      includeDrafts: true,
+      includeResults: false,
+      actorId: ctx.owner.id,
+    });
+    expect(preLink.includeDrafts).toBe(true);
+    expect(preLink.includeResults).toBe(false);
+    expect(await resolveAdShareToken(preToken)).toMatchObject({ includeDrafts: true, includeResults: false });
+    const [listed] = await listAdShareLinks(ctx.orgId, ctx.projectId);
+    expect(listed.includeDrafts).toBe(true);
   });
 });

@@ -46,6 +46,7 @@ export interface AdShareLinkView {
   status: AdShareLinkStatus;
   includeResults: boolean;
   allowFeedback: boolean;
+  includeDrafts: boolean;
   revisionNumber: number;
   revisionNote: string | null;
 }
@@ -60,6 +61,7 @@ export interface ResolvedAdShareLink {
   expiresOn: string;
   includeResults: boolean;
   allowFeedback: boolean;
+  includeDrafts: boolean;
   revisionNumber: number;
   revisionNote: string | null;
 }
@@ -117,6 +119,7 @@ export function toAdShareLinkView(link: AdShareLinkModel, now: Date = new Date()
     status: adShareLinkStatus(link, now),
     includeResults: link.include_results !== false,
     allowFeedback: link.allow_feedback !== false,
+    includeDrafts: Boolean(link.include_drafts),
     revisionNumber: link.revision_number ?? 1,
     revisionNote: link.revision_note ?? null,
   };
@@ -156,6 +159,7 @@ export async function createAdShareLink(params: {
   expiresInDays?: number;
   includeResults?: boolean;
   allowFeedback?: boolean;
+  includeDrafts?: boolean;
   revisionNumber?: number;
   revisionNote?: string | null;
   supersedesLinkId?: string | null;
@@ -190,6 +194,7 @@ export async function createAdShareLink(params: {
   link.revoked_by = null;
   link.include_results = params.includeResults !== false;
   link.allow_feedback = params.allowFeedback !== false;
+  link.include_drafts = Boolean(params.includeDrafts);
   link.revision_number = revisionNumber;
   link.revision_note = revisionNote || null;
   link.supersedes_link_id = params.supersedesLinkId ?? null;
@@ -250,6 +255,7 @@ export async function resolveAdShareToken(token: string, now: Date = new Date())
     expiresOn: link.expires_on,
     includeResults: link.include_results !== false,
     allowFeedback: link.allow_feedback !== false,
+    includeDrafts: Boolean(link.include_drafts),
     revisionNumber: link.revision_number ?? 1,
     revisionNote: link.revision_note ?? null,
   };
