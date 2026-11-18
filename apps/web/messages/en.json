@@ -2844,7 +2844,7 @@
     "noSegmentSuggestions": "No confident suggestions for this type of record yet.",
     "segmentSuggestionSummary": "{name} ({confidence}% match)",
     "useSuggestionButton": "Use this",
-    "crmSyncNoInstalls": "Install a CRM-sync plugin (Plugins page) to export this list.",
+    "crmSyncNoInstalls": "To send this list to your customer-management tool (CRM), first add a plugin for it on the Plugins page.",
     "crmSyncInstallLabel": "CRM sync destination",
     "crmSyncButton": "Sync to CRM",
     "crmSyncError": "Could not sync this group. Please try again.",
