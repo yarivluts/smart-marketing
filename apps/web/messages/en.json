@@ -4176,7 +4176,7 @@
       "invalid_reference_use": "Scene {scene} has an image without a valid use.",
       "two_first_frames": "Scene {scene} can start on only one image.",
       "unknown_reference": "Scene {scene} uses an image that is not ready or no longer exists.",
-      "invalid_delivery": "Scene {scene} has an unknown narration type.",
+      "invalid_delivery": "Scene {scene} has a narration choice we do not recognize. Choose again between \"Voice-over in the background\" and \"A person in the shot speaks\".",
       "speaker_too_long": "In scene {scene}, the description of who speaks is too long."
     },
     "addScene": "Add scene",
