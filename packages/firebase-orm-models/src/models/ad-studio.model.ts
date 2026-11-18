@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioAdCopy, AdStudioNarrationMode, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioAdCopy, AdStudioNarrationMode, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene, AdStudioSiteScrollPage } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -115,6 +115,10 @@ export class AdStudioBriefModel extends BaseModel {
   /** The ad copy that runs next to the assembled video in the feed (KAN-278); absent until written. */
   @Field({ is_required: false })
   public video_copy?: AdStudioAdCopy | null;
+
+  /** Automatically scanned homepage + product pages and their smooth scrolling videos. */
+  @Field({ is_required: false })
+  public site_pages?: AdStudioSiteScrollPage[] | null;
 
   @Field({ is_required: true })
   public created_by!: string;

@@ -9,11 +9,13 @@ import {
   AD_STUDIO_TRANSITION_SECONDS,
   buildConcatArgs,
   buildNarrationMixArgs,
+  buildScrollVideoArgs,
   concatClips,
   fitNarration,
   mixNarration,
   NARRATION_MAX_TEMPO,
   plannedConcatSeconds,
+  renderScrollingPageVideo,
   transitionSecondsBetween,
   defaultFfmpegRunner,
   FfmpegFailedError,
@@ -471,5 +473,68 @@ describe.skipIf(!hasFfmpeg)('a screen recording with a real ffmpeg binary', () =
     expect(result.durationSeconds).toBeGreaterThan(4.55);
     expect(result.durationSeconds).toBeLessThan(5.1);
     expect(await probeMedia(output, realRunner)).toMatchObject({ hasVideo: true, hasAudio: true });
+  }, 60_000);
+});
+
+describe('scrolling website capture video', () => {
+  it('builds smooth eased vertical crop args without shell quotes', () => {
+    const args = buildScrollVideoArgs({
+      image: 'sheet.png',
+      output: 'scroll.mp4',
+      sheetWidth: 1440,
+      sheetHeight: 4800,
+      frameWidth: 720,
+      frameHeight: 1280,
+      durationSeconds: 4,
+    });
+    expect(args).toContain('-loop');
+    const filter = args[args.indexOf('-filter_complex') + 1];
+    expect(filter).not.toContain("'");
+    expect(filter).toContain('crop=1440:2560:0:if(lt(t\\,0.45)\\,0\\,if(gt(t\\,3.6)\\,2240\\,2240*(0.5-0.5*cos(PI*(t-0.45)/3.15))))');
+    expect(filter).toContain('scale=720:1280:flags=bilinear,setsar=1,fps=30,format=yuv420p[vout]');
+    expect(filter).toContain('[1:a:0]atrim=duration=4,asetpts=PTS-STARTPTS[aout]');
+  });
+
+  it.skipIf(!hasFfmpeg)('renders a tall PNG into a smooth scrolling MP4 moving from top to bottom', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-scroll-test-'));
+    workDirs.push(dir);
+    const { default: sharp } = await import('sharp');
+    // Top half bright white, bottom half near black.
+    const tallPng = await sharp({
+      create: { width: 720, height: 3600, channels: 3, background: { r: 10, g: 10, b: 10 } },
+    })
+      .composite([
+        {
+          input: { create: { width: 720, height: 1800, channels: 3, background: { r: 245, g: 245, b: 245 } } },
+          top: 0,
+          left: 0,
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    const output = path.join(dir, 'page-scroll.mp4');
+    const rendered = await renderScrollingPageVideo({
+      imageBytes: tallPng,
+      output,
+      format: 'vertical',
+      durationSeconds: 3,
+      runner: realRunner,
+    });
+    expect(rendered.durationSeconds).toBe(3);
+    const probe = await probeMedia(output, realRunner);
+    expect(probe).toMatchObject({ hasVideo: true, hasAudio: true });
+    expect(probe.durationSeconds).toBeGreaterThan(2.8);
+
+    const lumAt = async (atSeconds: number): Promise<number> => {
+      const frameFile = path.join(dir, `scroll-frame-${atSeconds}.png`);
+      expect(spawnSync(realRunner.ffmpegPath, ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(atSeconds), '-i', output, '-frames:v', '1', frameFile], { windowsHide: true }).status).toBe(0);
+      const { data, info } = await sharp(frameFile).raw().toBuffer({ resolveWithObject: true });
+      const idx = (Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)) * info.channels;
+      return data[idx];
+    };
+
+    expect(await lumAt(0.1)).toBeGreaterThan(220);
+    expect(await lumAt(2.8)).toBeLessThan(35);
   }, 60_000);
 });

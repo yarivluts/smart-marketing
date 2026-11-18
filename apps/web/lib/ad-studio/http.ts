@@ -33,6 +33,7 @@ import {
   AdStudioImageRequestError,
   AdStudioProviderError,
   AdStudioReferenceRequestError,
+  AdStudioSiteScrollError,
   AdStudioVideoRequestError,
 } from './engine';
 
@@ -75,6 +76,16 @@ const GALLERY_REQUEST_STATUS: Record<AdStudioGalleryRequestError['code'], number
   asset_not_found: 404,
   source_not_ready: 409,
   media_too_large: 413,
+  ffmpeg_unavailable: 503,
+};
+
+const SITE_SCROLL_STATUS: Record<AdStudioSiteScrollError['code'], number> = {
+  invalid_url: 400,
+  address_blocked: 400,
+  page_not_found: 404,
+  site_unreachable: 502,
+  ffmpeg_failed: 500,
+  browser_unavailable: 503,
   ffmpeg_unavailable: 503,
 };
 
@@ -144,6 +155,9 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof AdStudioGalleryRequestError) {
     return NextResponse.json({ error: 'gallery_request', code: error.code }, { status: GALLERY_REQUEST_STATUS[error.code] });
+  }
+  if (error instanceof AdStudioSiteScrollError) {
+    return NextResponse.json({ error: 'site_scroll', code: error.code }, { status: SITE_SCROLL_STATUS[error.code] });
   }
   if (error instanceof AdStudioRunAlreadyActiveError) {
     return NextResponse.json({ error: 'run_active', runId: error.runId }, { status: 409 });

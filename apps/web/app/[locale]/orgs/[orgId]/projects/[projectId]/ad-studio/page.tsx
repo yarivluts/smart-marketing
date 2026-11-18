@@ -734,6 +734,7 @@ export default async function AdStudioPage({
                   advertiser={brandKit.brandName || selected.name}
                   textAvailable={providers.text !== null}
                   linkUrl={selected.landingPageUrl}
+                  initialSitePages={selected.sitePages}
                   demoConfig={{
                     access: demoAccessLoaded,
                     canEdit: canEditBrand,

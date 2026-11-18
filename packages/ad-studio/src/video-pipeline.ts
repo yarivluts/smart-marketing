@@ -13,6 +13,7 @@ import {
   assemblyPlan,
   galleryLabelFromFileName,
   planDemoInserts,
+  planSiteScrollInserts,
   buildSceneEditInstruction,
   buildScenePrompt,
   isDefaultVideoSettings,
@@ -77,6 +78,7 @@ import {
   resolveGallerySource,
 } from './gallery';
 import { assemblyFrame, concatClips, defaultFfmpegRunner, FfmpegUnavailableError, mixNarration, plannedConcatSeconds, type FfmpegRunner } from './ffmpeg';
+import { scanBriefSitePages } from './site-scroll';
 import { resolveAdStudioTts, type AdStudioTts } from './tts';
 import { brandStripLayer } from './ad-typography';
 import { resolveAdBrandMark } from './brand';
@@ -797,11 +799,36 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
     throw new AdStudioVideoRequestError('already_assembling');
   }
   const sceneSeconds = plan.reduce((sum, entry) => sum + entry.seconds, 0);
-  // The product in action: selected moments of the newest walkthrough go in after the hook.
+  // The product in action: selected moments of the newest walkthrough go in after the hook;
+  // when there is no walkthrough recording, weave smooth scrolling clips of scanned site pages.
   const demo = await demoInsertsFor(ctx, sceneSeconds);
+  let sitePages = brief.site_pages ?? [];
+  if (
+    !(demo.recording && demo.inserts.length) &&
+    sitePages.length === 0 &&
+    brief.landing_page_url &&
+    (adStudioRuntime().sitePageCapturer || process.env.CHROMIUM_PATH?.trim())
+  ) {
+    const scanned = await scanBriefSitePages(
+      {
+        organizationId: ctx.organizationId,
+        projectId: ctx.projectId,
+        briefId: ctx.briefId,
+        actorId: ctx.actorId,
+      },
+      { storage: deps.storage, runner: deps.runner, now },
+    ).catch(() => null);
+    if (scanned && scanned.length > 0) {
+      sitePages = (await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId)).site_pages ?? [];
+    }
+  }
+  const siteInserts =
+    demo.recording && demo.inserts.length ? [] : planSiteScrollInserts({ pages: sitePages, sceneSeconds });
   const orderedSegments: { seconds: number }[] = [...plan];
   if (demo.recording && demo.inserts.length) {
     orderedSegments.splice(1, 0, ...demo.inserts.map((insert) => ({ seconds: insert.seconds })));
+  } else if (siteInserts.length) {
+    orderedSegments.splice(1, 0, ...siteInserts.map((insert) => ({ seconds: insert.seconds })));
   }
   const plannedDurationSeconds = Math.min(AD_STUDIO_MAX_TOTAL_SECONDS, plannedConcatSeconds(orderedSegments));
   const video = await createAdStudioVideo({
@@ -829,6 +856,18 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
       const file = path.join(workDir, 'walkthrough.mp4');
       await deps.storage.downloadToFile(demo.recording.gcs_path as string, file);
       local.splice(1, 0, ...demo.inserts.map((insert) => ({ file, seconds: insert.seconds, startSeconds: insert.startSeconds, fit: 'screen' as const })));
+    } else if (siteInserts.length) {
+      const pageSegments: { file: string; seconds: number }[] = [];
+      for (const insert of siteInserts) {
+        const page = sitePages.find((entry) => entry.id === insert.pageId);
+        if (!page?.scrollVideoGcsPath) continue;
+        const file = path.join(workDir, `site-scroll-${insert.pageId}.mp4`);
+        await deps.storage.downloadToFile(page.scrollVideoGcsPath, file);
+        pageSegments.push({ file, seconds: insert.seconds });
+      }
+      if (pageSegments.length > 0) {
+        local.splice(1, 0, ...pageSegments);
+      }
     }
     // The brand banner (logo, name, slogan) along the bottom edge, over full-frame footage: drawn once
     // as a PNG the size of the frame and laid over every frame. The project can switch it off.

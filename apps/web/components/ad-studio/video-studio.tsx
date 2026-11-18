@@ -44,9 +44,11 @@ import {
   type AdStudioFormat,
   type AdStudioScene,
   type AdStudioSceneVideoState,
+  type AdStudioSiteScrollPageView,
 } from '@growthos/shared';
 import { MediaGalleryPanel } from './media-gallery-panel';
 import { DemoAccessPanel } from './demo-access-panel';
+import { SiteScrollPanel } from './site-scroll-panel';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 import {
@@ -105,6 +107,8 @@ export interface VideoStudioProps {
   videoAvailable: boolean;
   /** Seconds of video the project may still generate today. */
   videoSecondsLeft: number;
+  /** Scanned website pages ready to render or weave into scrolling clips. */
+  initialSitePages?: AdStudioSiteScrollPageView[];
   /** Optional trial-site scanner config so scanned pages can be added directly here. */
   demoConfig?: {
     access: AdStudioDemoAccessView | null;
@@ -161,6 +165,7 @@ export function VideoStudio({
   videoSettings = null,
   narrationMode = null,
   effectiveNarrationMode = 'voiceover',
+  initialSitePages = [],
   demoConfig,
 }: VideoStudioProps): React.ReactElement {
   const t = useTranslations('AdStudio');
@@ -182,6 +187,7 @@ export function VideoStudio({
   const [mediaSourcesOpen, setMediaSourcesOpen] = React.useState(false);
   const [galleryRefresh, setGalleryRefresh] = React.useState(0);
   const sceneFileInputs = React.useRef<Record<string, HTMLInputElement | null>>({});
+  const sceneScrollInputs = React.useRef<Record<string, HTMLInputElement | null>>({});
   // The clock starts in the browser: an elapsed time rendered on the server never matches the one the
   // browser renders a second later, and React rejects the page (hydration error #418).
   const [now, setNow] = React.useState<Date | null>(null);
@@ -357,6 +363,44 @@ export function VideoStudio({
         tone: 'ok',
         text: kind === 'video' ? t('video.customClipReady') : t('video.imageAttached'),
       });
+      router.refresh();
+    } catch {
+      setMessage({ tone: 'error', text: t('errorGeneric') });
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function submitSceneScrollClip(
+    sceneId: string,
+    payload: { sitePageId?: string; file?: File; alsoSaveToGallery?: boolean },
+  ): Promise<void> {
+    const key = `scroll-clip:${sceneId}`;
+    setPending(key);
+    setMessage(null);
+    try {
+      let init: RequestInit;
+      if (payload.file) {
+        const form = new FormData();
+        form.set('file', payload.file);
+        if (payload.alsoSaveToGallery !== false) form.set('alsoSaveToGallery', 'true');
+        init = { method: 'POST', body: form };
+      } else {
+        init = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sitePageId: payload.sitePageId }),
+        };
+      }
+      const response = await fetch(`${base}/scenes/${sceneId}/scroll-clip`, init);
+      const result = (await response.json().catch(() => ({}))) as AdStudioApiError & Listing;
+      apply(result);
+      if (!response.ok) {
+        setMessage({ tone: 'error', text: errorMessage(result) });
+        return;
+      }
+      setGalleryRefresh((n) => n + 1);
+      setMessage({ tone: 'ok', text: t('video.scrollClipReady') });
       router.refresh();
     } catch {
       setMessage({ tone: 'error', text: t('errorGeneric') });
@@ -773,6 +817,21 @@ export function VideoStudio({
             </p>
           </form>
 
+      <SiteScrollPanel
+        orgId={orgId}
+        projectId={projectId}
+        briefId={briefId}
+        linkUrl={linkUrl}
+        initialPages={initialSitePages}
+        scenes={scenes.map((scene) => ({ id: scene.id }))}
+        busy={pending !== null}
+        onScanned={() => {
+          setGalleryRefresh((n) => n + 1);
+          router.refresh();
+        }}
+        onUseInScene={(sitePageId, sceneId) => submitSceneScrollClip(sceneId, { sitePageId })}
+      />
+
       <details
         open={mediaSourcesOpen}
         onToggle={(event) => setMediaSourcesOpen(event.currentTarget.open)}
@@ -1050,6 +1109,33 @@ export function VideoStudio({
                       <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
                     )}
                     {t('video.attachImage')}
+                  </button>
+                  <input
+                    ref={(el) => {
+                      sceneScrollInputs.current[scene.id] = el;
+                    }}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (file) void submitSceneScrollClip(scene.id, { file, alsoSaveToGallery: true });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => sceneScrollInputs.current[scene.id]?.click()}
+                    disabled={pending !== null || inFlight !== null}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+                    data-testid={`ad-studio-scene-scroll-upload-${index + 1}`}
+                  >
+                    {pending === `scroll-clip:${scene.id}` ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Film className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {t('video.scrollFromImage')}
                   </button>
                   {videoAvailable && !inFlight && scene.durationSeconds > videoSecondsLeft ? (
                     <span className="text-xs text-destructive">{t('video.overLimitScene')}</span>

@@ -4,13 +4,17 @@ import { AD_STUDIO_MAX_GALLERY_ASSETS } from '@growthos/shared';
 import {
   AdStudioGalleryAssetNotFoundError,
   AdStudioGalleryInvalidError,
+  createAdStudioBrief,
   createAdStudioGalleryAsset,
   createOrganizationWithOwner,
   createProject,
   deleteAdStudioGalleryAsset,
   ensureUserForFirebaseSession,
+  getAdStudioBrief,
   getAdStudioGalleryAsset,
   listAdStudioGalleryAssets,
+  saveAdStudioBriefSitePages,
+  updateAdStudioBriefSitePageSelection,
   updateAdStudioGalleryAsset,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -129,5 +133,71 @@ describe('Ad Studio project gallery', () => {
         actorId: owner.id,
       }),
     ).rejects.toBeInstanceOf(AdStudioGalleryInvalidError);
+  });
+
+  it('saves and updates scanned site scroll pages on a brief', async () => {
+    const { owner, orgId, projectId } = await setup();
+    const brief = await createAdStudioBrief({
+      organizationId: orgId,
+      projectId,
+      createdByUserId: owner.id,
+      input: {
+        name: 'Site Scroll Brief',
+        objective: 'signups',
+        productDescription: 'SaaS workflow automation',
+        format: 'vertical',
+        language: 'en',
+        targetSeconds: 15,
+      },
+    });
+
+    await saveAdStudioBriefSitePages({
+      organizationId: orgId,
+      projectId,
+      briefId: brief.id,
+      landingPageUrl: 'https://example.com',
+      sitePages: [
+        {
+          id: 'p1',
+          url: 'https://example.com/',
+          title: 'Home',
+          kind: 'home',
+          relevanceReason: 'Homepage overview',
+          screenshotGcsPath: 'orgs/o/p/briefs/b/site-pages/p1.png',
+          scrollVideoGcsPath: 'orgs/o/p/briefs/b/site-pages/p1.mp4',
+          durationSeconds: 4,
+          selected: true,
+          capturedOn: '2026-11-18T00:00:00.000Z',
+        },
+        {
+          id: 'p2',
+          url: 'https://example.com/product',
+          title: 'Product',
+          kind: 'product',
+          relevanceReason: 'Matches ad focus',
+          screenshotGcsPath: 'orgs/o/p/briefs/b/site-pages/p2.png',
+          scrollVideoGcsPath: 'orgs/o/p/briefs/b/site-pages/p2.mp4',
+          durationSeconds: 4,
+          selected: true,
+          capturedOn: '2026-11-18T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const updated = await updateAdStudioBriefSitePageSelection({
+      organizationId: orgId,
+      projectId,
+      briefId: brief.id,
+      selectedPageIds: ['p2'],
+    });
+    expect(updated.landing_page_url).toBe('https://example.com');
+    expect(updated.site_pages?.map((p) => [p.id, p.selected])).toEqual([
+      ['p1', false],
+      ['p2', true],
+    ]);
+
+    const reloaded = await getAdStudioBrief(orgId, projectId, brief.id);
+    expect(reloaded.site_pages).toHaveLength(2);
+    expect(reloaded.site_pages?.[1].selected).toBe(true);
   });
 });
