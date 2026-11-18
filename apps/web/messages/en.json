@@ -911,10 +911,10 @@
   "McpConsent": {
     "metaTitle": "Connect an MCP client",
     "heading": "Connect an MCP client to GrowthOS",
-    "description": "An MCP client is requesting read access to one of your projects — it will be able to query metrics, cohorts, customer records, and insights on your behalf.",
+    "description": "An AI app, such as Claude, is asking to look at one of your projects. It will be able to read your numbers, customers and insights, and answer questions about them for you. It cannot change anything.",
     "projectLabel": "Project",
     "noEligibleProjects": "You don't have MCP read access to any project yet. Ask a project admin to grant you a role with mcp.read.",
-    "scopeReadDescription": "Read metrics, cohorts, customers, and insights",
+    "scopeReadDescription": "Read your numbers, customers and insights",
     "approve": "Approve",
     "deny": "Cancel",
     "invalidRequest": "This authorization request is invalid, expired, or was already used.",
