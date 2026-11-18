@@ -107,3 +107,11 @@ describe('Campaign page spend card with nothing to show', () => {
     expect(he.Campaigns.spendCardNoDataHint).not.toMatch(/[A-Za-z]/);
   });
 });
+
+describe('Ad page empty spend line', () => {
+  it('says the ad has not been shown yet instead of using the word delivery', () => {
+    expect(en.Campaigns.spendNoData).not.toMatch(/deliver/i);
+    expect(en.Campaigns.spendNoData).toMatch(/shown/);
+    expect(he.Campaigns.spendNoData).not.toMatch(/[A-Za-z]/);
+  });
+});
