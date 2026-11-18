@@ -4346,6 +4346,8 @@
       "attachImage": "Add photo / screen",
       "customClipReady": "Custom video clip added to this scene.",
       "imageAttached": "Image attached to this scene.",
+      "scrollFromImage": "Scroll clip from page image",
+      "scrollClipReady": "Scrolling page clip added to this scene.",
       "versionStatus": {
         "generating": "Generating",
         "ready": "Ready",
@@ -5702,6 +5704,38 @@
         "invalid_input": "Check the item title or clear space in your project gallery (up to 60 items).",
         "ffmpeg_unavailable": "Video conversion is unavailable right now.",
         "ffmpeg_failed": "Could not prepare this video file. Try a standard MP4 or shorter clip."
+      }
+    },
+    "siteScroll": {
+      "title": "Website page scroll clips",
+      "description": "Scans your public website without login details, captures full-page screenshots of the homepage and relevant product pages, and weaves smooth scrolling clips into your video ad.",
+      "urlLabel": "Website link",
+      "urlPlaceholder": "https://example.com",
+      "scanNow": "Scan site pages",
+      "rescan": "Scan again",
+      "scanning": "Scanning main pages and preparing scrolling clips...",
+      "emptyHint": "Enter your website link above to capture full-page screenshots and turn them into scrolling video clips.",
+      "autoWeaveHint": "Checked pages (up to 2) are automatically woven into the assembled video right after the opening scene.",
+      "includeInVideo": "Weave into video",
+      "useInScene": "Use as scene clip",
+      "sceneSelectLabel": "Target scene",
+      "kind": {
+        "home": "Homepage",
+        "product": "Product page",
+        "page": "Site page"
+      },
+      "durationBadge": "{seconds}s scroll",
+      "scannedCount": "{count, plural, one {# page ready} other {# pages ready}}",
+      "scanSuccess": "Website pages captured and scrolling clips are ready.",
+      "selectionSaved": "Video page selection saved.",
+      "errors": {
+        "invalid_url": "Enter a valid public website link starting with https://.",
+        "address_blocked": "This address cannot be scanned because it points to a private or local host.",
+        "site_unreachable": "The website did not respond when scanning pages. Check the link and try again.",
+        "browser_unavailable": "Website capture is unavailable on our side right now. Please try again shortly.",
+        "ffmpeg_unavailable": "Video processing is unavailable on our side right now.",
+        "ffmpeg_failed": "Could not create the scrolling clip from this page. Try another page or image.",
+        "page_not_found": "That page or scene is no longer available."
       }
     }
   },

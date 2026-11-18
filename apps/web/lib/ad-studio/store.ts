@@ -1,5 +1,19 @@
 import 'server-only';
-import type { AdStudioAdCopy, AdStudioNarrationMode, AdStudioVoice, AdStudioVideoSettings, AdStudioSearchAd, AdStudioSearchKeywords, AdStudioMetaTargeting, AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type {
+  AdStudioAdCopy,
+  AdStudioNarrationMode,
+  AdStudioVoice,
+  AdStudioVideoSettings,
+  AdStudioSearchAd,
+  AdStudioSearchKeywords,
+  AdStudioMetaTargeting,
+  AdStudioBriefInput,
+  AdStudioImageConcept,
+  AdStudioPlan,
+  AdStudioPlanSources,
+  AdStudioScene,
+  AdStudioSiteScrollPageView,
+} from '@growthos/shared';
 import {
   adStudioNarrationMode,
   createAdStudioBrief as createAdStudioBriefInOrganization,
@@ -32,7 +46,13 @@ import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { getAdStudioBrandKit } from '@growthos/firebase-orm-models';
 import type { AdStudioBrandKit } from '@growthos/shared';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
-import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage, toAdStudioRunView, type AdStudioRunView } from './engine';
+import {
+  adStudioBriefMediaPrefix,
+  resolveAdStudioMediaStorage,
+  toAdStudioRunView,
+  toAdStudioSiteScrollPageView,
+  type AdStudioRunView,
+} from './engine';
 
 /** The web app's Ad Studio reads and writes: the package services, with the ORM connected first. */
 
@@ -173,6 +193,8 @@ export interface AdStudioBriefView {
   searchAd: AdStudioSearchAd | null;
   /** The Meta audience the ad is planned for; null until chosen. */
   metaTargeting: AdStudioMetaTargeting | null;
+  /** Scanned website pages rendered into smooth scrolling video clips for this brief. */
+  sitePages: AdStudioSiteScrollPageView[];
   createdOn: string;
   lastChangedOn: string;
 }
@@ -211,6 +233,9 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
     metaTargeting: brief.meta_targeting
       ? { ...brief.meta_targeting, countries: [...brief.meta_targeting.countries], genders: [...brief.meta_targeting.genders], customAudiences: brief.meta_targeting.customAudiences.map((audience) => ({ ...audience })), interests: brief.meta_targeting.interests.map((interest) => ({ ...interest })) }
       : null,
+    sitePages: (brief.site_pages ?? []).map((page) =>
+      toAdStudioSiteScrollPageView(brief.organization_id, brief.project_id, brief.id, page),
+    ),
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
   };

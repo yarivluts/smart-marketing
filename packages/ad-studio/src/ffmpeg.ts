@@ -1,4 +1,8 @@
 import { spawn } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
 import { AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat } from '@growthos/shared';
 
 /**
@@ -490,4 +494,162 @@ export function cropToAspectArgs(input: string, output: string, width: number, h
 /** One frame of a video (at `atSeconds`) as a JPEG - a video ad's thumbnail. */
 export function videoFrameArgs(input: string, output: string, atSeconds: number): string[] {
   return ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(atSeconds), '-i', input, '-frames:v', '1', '-q:v', '3', output];
+}
+
+const MAX_SCROLL_SHEET_HEIGHT = 10_000;
+const MIN_SCROLL_HEIGHT_MULTIPLIER = 1.18;
+const MAX_SCROLL_SCREENS = 2.4;
+
+/**
+ * FFmpeg arguments that animate a tall full-page PNG into a smooth vertical scroll video with
+ * cosine ease-in-out motion, brief top/bottom holds, and stereo 48 kHz silent audio.
+ */
+export function buildScrollVideoArgs(params: {
+  image: string;
+  output: string;
+  sheetWidth: number;
+  sheetHeight: number;
+  frameWidth: number;
+  frameHeight: number;
+  durationSeconds: number;
+  fps?: number;
+}): string[] {
+  const fps = params.fps ?? AD_STUDIO_FPS;
+  const durNum = Math.max(1, params.durationSeconds);
+  const dur = seconds(durNum);
+  const cropW = even(params.sheetWidth);
+  const cropH = even(Math.min(params.sheetHeight, Math.round((cropW * params.frameHeight) / params.frameWidth)));
+  const maxTravel = Math.max(0, Math.min(params.sheetHeight - cropH, Math.round(cropH * MAX_SCROLL_SCREENS)));
+
+  const holdStart = Math.round(Math.min(0.45, durNum * 0.12) * 1000) / 1000;
+  const holdEnd = Math.round(Math.min(0.4, durNum * 0.12) * 1000) / 1000;
+  const moveDur = Math.round(Math.max(0.4, durNum - holdStart - holdEnd) * 1000) / 1000;
+  const endMove = Math.round((holdStart + moveDur) * 1000) / 1000;
+
+  // Escaped commas keep the expression inside the filter graph option without shell quoting.
+  const yExpr =
+    maxTravel > 0
+      ? `if(lt(t\\,${seconds(holdStart)})\\,0\\,if(gt(t\\,${seconds(endMove)})\\,${maxTravel}\\,${maxTravel}*(0.5-0.5*cos(PI*(t-${seconds(holdStart)})/${seconds(moveDur)}))))`
+      : '0';
+
+  const filter = `[0:v:0]crop=${cropW}:${cropH}:0:${yExpr},scale=${params.frameWidth}:${params.frameHeight}:flags=bilinear,setsar=1,fps=${fps},format=yuv420p[vout];[1:a:0]atrim=duration=${dur},asetpts=PTS-STARTPTS[aout]`;
+
+  return [
+    '-hide_banner',
+    '-nostdin',
+    '-y',
+    '-loop',
+    '1',
+    '-framerate',
+    String(fps),
+    '-t',
+    dur,
+    '-i',
+    params.image,
+    '-f',
+    'lavfi',
+    '-t',
+    dur,
+    '-i',
+    'anullsrc=channel_layout=stereo:sample_rate=48000',
+    '-filter_complex',
+    filter,
+    '-map',
+    '[vout]',
+    '-map',
+    '[aout]',
+    '-c:v',
+    'libx264',
+    '-profile:v',
+    'high',
+    '-level:v',
+    '4.0',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '20',
+    '-pix_fmt',
+    'yuv420p',
+    '-r',
+    String(fps),
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-ar',
+    '48000',
+    '-movflags',
+    '+faststart',
+    '-t',
+    dur,
+    params.output,
+  ];
+}
+
+/**
+ * Turns a full-page screenshot or uploaded page image into an MP4 showing a smooth vertical scroll,
+ * ready to plug straight into `concatClips` with no AI video quota.
+ */
+export async function renderScrollingPageVideo(params: {
+  imageBytes: Buffer;
+  output: string;
+  format: AdStudioFormat;
+  resolution?: string | null;
+  durationSeconds: number;
+  runner?: FfmpegRunner;
+}): Promise<{ durationSeconds: number }> {
+  const runner = params.runner ?? defaultFfmpegRunner();
+  const frame = assemblyFrame(params.format, params.resolution);
+  const sheetWidth = even(frame.width * 2);
+  const minHeight = even(Math.round(frame.height * 2 * MIN_SCROLL_HEIGHT_MULTIPLIER));
+
+  const workDir = await mkdtemp(path.join(tmpdir(), 'ad-studio-scroll-'));
+  try {
+    const initial = sharp(params.imageBytes, { failOn: 'error' }).rotate();
+    const scaledBuffer = await initial.resize({ width: sheetWidth }).png().toBuffer();
+    const scaledMeta = await sharp(scaledBuffer).metadata();
+    const scaledHeight = scaledMeta.height ?? minHeight;
+
+    let finalSheetBuffer: Buffer;
+    let finalHeight: number;
+    if (scaledHeight < minHeight) {
+      finalHeight = minHeight;
+      finalSheetBuffer = await sharp(scaledBuffer)
+        .resize({ width: sheetWidth, height: minHeight, fit: 'cover', position: 'top' })
+        .png()
+        .toBuffer();
+    } else if (scaledHeight > MAX_SCROLL_SHEET_HEIGHT) {
+      finalHeight = MAX_SCROLL_SHEET_HEIGHT;
+      finalSheetBuffer = await sharp(scaledBuffer)
+        .extract({ left: 0, top: 0, width: sheetWidth, height: MAX_SCROLL_SHEET_HEIGHT })
+        .png()
+        .toBuffer();
+    } else {
+      finalHeight = even(scaledHeight);
+      finalSheetBuffer =
+        finalHeight === scaledHeight
+          ? scaledBuffer
+          : await sharp(scaledBuffer).extract({ left: 0, top: 0, width: sheetWidth, height: finalHeight }).png().toBuffer();
+    }
+
+    const sheetPath = path.join(workDir, 'sheet.png');
+    await writeFile(sheetPath, finalSheetBuffer);
+
+    const args = buildScrollVideoArgs({
+      image: sheetPath,
+      output: params.output,
+      sheetWidth,
+      sheetHeight: finalHeight,
+      frameWidth: frame.width,
+      frameHeight: frame.height,
+      durationSeconds: params.durationSeconds,
+    });
+    const { code, stderr } = await runFfmpeg(args, runner);
+    if (code !== 0) {
+      throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
+    }
+    return { durationSeconds: params.durationSeconds };
+  } finally {
+    await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+  }
 }

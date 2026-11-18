@@ -70,6 +70,16 @@ const GALLERY_REQUEST_CODES = new Set([
   'ffmpeg_failed',
 ]);
 
+const SITE_SCROLL_CODES = new Set([
+  'invalid_url',
+  'address_blocked',
+  'site_unreachable',
+  'browser_unavailable',
+  'ffmpeg_unavailable',
+  'ffmpeg_failed',
+  'page_not_found',
+]);
+
 /** Turns a route's error body into one translated sentence. */
 export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
   const t = useTranslations('AdStudio');
@@ -93,6 +103,7 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'invalid_video_settings' && body.code && VIDEO_SETTINGS_CODES.has(body.code)) return t(`advanced.errors.${body.code}`);
     if (body.error === 'reference_request' && body.code && REFERENCE_REQUEST_CODES.has(body.code)) return t(`references.errors.${body.code}`);
     if (body.error === 'gallery_request' && body.code && GALLERY_REQUEST_CODES.has(body.code)) return t(`mediaGallery.errors.${body.code}`);
+    if (body.error === 'site_scroll' && body.code && SITE_SCROLL_CODES.has(body.code)) return t(`siteScroll.errors.${body.code}`);
     if (body.error === 'run_active') return t('autopilot.errorRunActive');
     if (body.error === 'unauthenticated') return t('errorSignedOut');
     if (body.error === 'forbidden') return t('errorForbidden');

@@ -18,3 +18,4 @@ export * from './brand-kit';
 export * from './claims';
 export * from './demo';
 export * from './gallery';
+export * from './site-scroll';

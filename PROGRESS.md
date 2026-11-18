@@ -17,6 +17,35 @@ Template for each entry:
 
 ---
 
+## 2026-11-18 — Ad Studio: automatic full-page website scan & smooth scrolling video clips
+
+### Shipped
+- **URL ranking & scroll-insert planner (`@growthos/shared`)**:
+  - Added [`site-scroll.ts`](packages/shared/src/ad-studio/site-scroll.ts) with `normalizeSitePageUrl`, `formatHostAndPath`, `rankCandidateSitePages` (homepage + Hebrew/English ad-relevant product/pricing page scoring without credentials), and `planSiteScrollInserts` (up to 2 selected scrolling clips within the 60s ad cap).
+- **Brief persistence (`@growthos/firebase-orm-models`)**:
+  - Added `site_pages?: AdStudioSiteScrollPage[] | null` on [`AdStudioBriefModel`](packages/firebase-orm-models/src/models/ad-studio.model.ts) along with `saveAdStudioBriefSitePages` and `updateAdStudioBriefSitePageSelection` in [`ad-studio.service.ts`](packages/firebase-orm-models/src/services/ad-studio.service.ts).
+- **FFmpeg scrolling renderer & public Playwright capturer (`packages/ad-studio`)**:
+  - Added `buildScrollVideoArgs` and `renderScrollingPageVideo` in [`ffmpeg.ts`](packages/ad-studio/src/ffmpeg.ts) to render oversampled full-page PNGs into smooth cosine-eased top-to-bottom scrolling MP4s at the brief's target aspect ratio and resolution.
+  - Added [`site-scroll.ts`](packages/ad-studio/src/site-scroll.ts) (`createPlaywrightSitePageCapturer`, `scanBriefSitePages`, `setBriefSitePageSelection`, `useScrollClipForScene`), saving full-page screenshots into the project gallery (`source: 'walkthrough'`), supporting scene-level scrolling clip creation with 0 AI quota (plus optional narration mix), and wiring automatic scan + `planSiteScrollInserts` splicing into [`video-pipeline.ts`](packages/ad-studio/src/video-pipeline.ts) `assembleBriefVideo`.
+- **Web API routes & Video Studio UI (`apps/web`)**:
+  - Added `/api/.../briefs/[briefId]/site-pages` (`POST` scan, `PATCH` selection), `/site-pages/[pageId]/media` (`GET` PNG/MP4 streaming), and `/scenes/[sceneId]/scroll-clip` (`POST` scene scrolling clip from scanned page, gallery item, or uploaded tall image).
+  - Created [`SiteScrollPanel`](apps/web/components/ad-studio/site-scroll-panel.tsx) (auto-scans when a website link exists on the brief and no pages are scanned yet, previews scrolling clips, toggles auto-weave selection, and applies to scenes), integrated it with per-scene **Scroll clip from page image** upload in [`VideoStudio`](apps/web/components/ad-studio/video-studio.tsx) and [`ad-studio/page.tsx`](apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx), plus plain English & Hebrew copy in [`en.json`](apps/web/messages/en.json) and [`he.json`](apps/web/messages/he.json).
+
+### Verified
+- `@growthos/shared`: `build` + `vitest` (92 files, 1,033 tests passed).
+- `@growthos/firebase-orm-models`: `build` + Firestore emulator tests (2 files, 9 tests passed).
+- `@growthos/ad-studio`: `build`, `lint`, `typecheck`, `src/site-scroll.test.ts` (4 tests passed), and `src/ffmpeg.test.ts` (25 tests passed, including real `ffmpeg` top-to-bottom vertical scroll verification).
+- `@growthos/web`: Firestore emulator route suites (`ad-studio-site-scroll-routes.test.ts` + `ad-studio-video-routes.test.ts`: 2 files, 26 tests passed) and UI + copy/i18n/hardcoded-strings suites (6 files, 43 tests passed); monorepo `pnpm lint` and `pnpm typecheck` passed cleanly.
+
+### Key files
+- `packages/shared/src/ad-studio/{site-scroll,site-scroll.test,index}.ts`
+- `packages/firebase-orm-models/src/{models/ad-studio.model.ts,services/ad-studio.service.ts,services/ad-studio-gallery.emulator.test.ts}`
+- `packages/ad-studio/src/{ffmpeg,ffmpeg.test,site-scroll,site-scroll.test,media-storage,runtime,video-pipeline,index}.ts`
+- `apps/web/lib/ad-studio/{store,http}.ts` & `apps/web/app/api/orgs/[orgId]/projects/[projectId]/ad-studio/**`
+- `apps/web/components/ad-studio/{site-scroll-panel,site-scroll-panel.test,video-studio,use-ad-studio-error}.tsx` & `apps/web/messages/{en,he}.json`
+
+---
+
 ## 2026-11-17 — Ad Studio video assembly: smooth fast crossfade transitions between clips
 
 ### Shipped

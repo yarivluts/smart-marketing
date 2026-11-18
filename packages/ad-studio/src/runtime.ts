@@ -1,8 +1,9 @@
 import { LocalKmsProvider, loadLocalKmsKeyRingFromEnv, type KmsProvider } from '@growthos/firebase-orm-models';
 import type { AdStudioMediaStorage } from './media-storage';
-import type { concatClips, mixNarration } from './ffmpeg';
+import type { concatClips, mixNarration, renderScrollingPageVideo } from './ffmpeg';
 import type { PlanningSourceDeps } from './planning-sources';
 import type { DemoBrowserLauncher } from './demo-recorder';
+import type { SitePageCapturer } from './site-scroll';
 
 /**
  * How the host app plugs into the Ad Studio engine. The engine is shared by the web app (routes and
@@ -27,6 +28,10 @@ export interface AdStudioRuntime {
   demoBrowser?: DemoBrowserLauncher;
   /** The address guard the recorder applies to every request (tests serving a local app relax it). */
   demoAddressCheck?: (url: string) => Promise<void>;
+  /** Captures full-page screenshots and links of public website pages for scrolling clips. */
+  sitePageCapturer?: SitePageCapturer;
+  /** Renders a smooth vertical scrolling video over a tall full-page screenshot. */
+  renderScrollingVideo?: typeof renderScrollingPageVideo;
   normalizeVideo?: (params: {
     bytes: Buffer;
     mimeType: string;
