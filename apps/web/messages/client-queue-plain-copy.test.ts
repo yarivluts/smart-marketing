@@ -24,3 +24,17 @@ describe('agency client comments queue: plain words', () => {
     expect(req(he).appliedTag).not.toBe(req(en).appliedTag);
   });
 });
+
+describe('agency client comments queue: Hebrew matches the plain English', () => {
+  it('he: no report/agent jargon in the queue labels', () => {
+    const c = req(he);
+    for (const k of ['intro', 'generateProposals', 'copyReport', 'downloadReport', 'copyFixAgent', 'rationaleLabel']) {
+      expect(c[k], k).toBeTruthy();
+      expect(c[k], k).not.toMatch(/דוח חוזר|משימת תיקון|לסוכן|חכמות|היגיון|\.md/);
+    }
+  });
+
+  it('he: says nothing changes until you approve', () => {
+    expect(req(he).intro).toContain('שום דבר לא משתנה עד שתאשרו');
+  });
+});
