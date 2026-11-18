@@ -3520,7 +3520,7 @@
     "tabCreatives": "Ad gallery",
     "tabAnalytics": "Spend and results",
     "shareWithClientTitle": "Share results & ads with client",
-    "shareWithClientHint": "Send an external view link containing campaign performance and ad creatives, and collect client feedback.",
+    "shareWithClientHint": "Send a link where someone outside your team can see your ads and how they are doing, and write back with comments.",
     "noData": "No data",
     "noDataReason": "Shows up here once your ads have been shown to people.",
     "metricTotalSpend": "Total Spend",
