@@ -4176,7 +4176,7 @@
       "invalid_reference_use": "בסצנה {scene} יש תמונה בלי שימוש תקין.",
       "two_first_frames": "סצנה {scene} יכולה להתחיל רק מתמונה אחת.",
       "unknown_reference": "סצנה {scene} משתמשת בתמונה שלא מוכנה או שכבר לא קיימת.",
-      "invalid_delivery": "בסצנה {scene} סוג הקריינות לא מוכר.",
+      "invalid_delivery": "בסצנה {scene} בחירת הקריינות לא מזוהה. בחרו שוב בין \"קריין ברקע\" ל\"דמות בסרטון מדברת\".",
       "speaker_too_long": "בסצנה {scene} התיאור של מי שמדבר ארוך מדי."
     },
     "addScene": "הוספת סצנה",
