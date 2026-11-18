@@ -909,11 +909,11 @@
     "touchpointSnippetVerify": "To check the install, open the browser console on your site and run GrowthOS.verify() - or see the Installation check in Data health."
   },
   "McpConsent": {
-    "metaTitle": "Connect an MCP client",
-    "heading": "Connect an MCP client to GrowthOS",
+    "metaTitle": "Connect an AI app",
+    "heading": "Let an AI app look at your project",
     "description": "An AI app, such as Claude, is asking to look at one of your projects. It will be able to read your numbers, customers and insights, and answer questions about them for you. It cannot change anything.",
     "projectLabel": "Project",
-    "noEligibleProjects": "You don't have MCP read access to any project yet. Ask a project admin to grant you a role with mcp.read.",
+    "noEligibleProjects": "You don't have permission to connect an AI app to any project yet. Ask a project admin to give you access, then try again.",
     "scopeReadDescription": "Read your numbers, customers and insights",
     "approve": "Approve",
     "deny": "Cancel",
