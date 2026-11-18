@@ -6311,7 +6311,7 @@
       "reject": "Reject",
       "rejectHint": "Not for you? Reject it - nothing is published and no money is spent.",
       "rejectHintPublish": "Not now? Reject it - the ads are not sent to Facebook and Instagram and no money is spent.",
-      "rejectHintActivate": "Not now? Reject it - the ads stay switched off and no money is spent.",
+      "rejectHintActivate": "Not now? Reject it - the ads stay switched off and no money is spent. They stay saved in your Facebook ad account, so you can switch them on there whenever you are ready.",
       "needsOwner": "Only an owner or admin can publish or turn on ads. Ask them to approve this - or reject it if you do not want it.",
       "approveHint": {
         "target": "Approve and the AI starts making ads, a web page for the people who click them and a list of who to reach. Nothing goes live yet.",
