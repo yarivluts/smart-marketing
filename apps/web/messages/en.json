@@ -6310,7 +6310,7 @@
       "emptyPaused": "The pilot is paused, so nothing new will show up here. Press Resume at the top to continue.",
       "approve": "Approve",
       "reject": "Reject",
-      "rejectHint": "Not for you? Reject it - nothing is published and no money is spent.",
+      "rejectHint": "Not for you? Reject it - nothing is published and no money is spent. Then press \"Something else to grow\" at the top to suggest a different idea.",
       "rejectHintPublish": "Not now? Reject it - the ads are not sent to Facebook and Instagram and no money is spent.",
       "rejectHintActivate": "Not now? Reject it - the ads stay switched off and no money is spent. They stay saved in your Facebook ad account, so you can switch them on there whenever you are ready.",
       "needsOwner": "Only an owner or admin can publish or turn on ads. Ask them to approve this - or reject it if you do not want it.",
