@@ -1732,9 +1732,9 @@
     "byTypeDescription": "What the listed insights are about.",
     "byTypeCenter": "insights",
     "kindLabel": {
-      "tracking_alert": "Tracking alert",
+      "tracking_alert": "Data problem",
       "win_event": "Win",
-      "metric_health": "Metric health"
+      "metric_health": "Number looks off"
     },
     "perDayTitle": "Insights by day",
     "perDayDescription": "When the listed insights happened, by severity.",
@@ -1743,7 +1743,7 @@
     "kindAction": {
       "tracking_alert": "Check Data health",
       "win_event": "View win rules",
-      "metric_health": "Fix the metric"
+      "metric_health": "Fix this number"
     }
   },
   "Feedback": {
