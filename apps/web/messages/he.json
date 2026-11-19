@@ -1732,18 +1732,18 @@
     "byTypeDescription": "במה עוסקות התובנות שברשימה.",
     "byTypeCenter": "תובנות",
     "kindLabel": {
-      "tracking_alert": "התראת מעקב",
+      "tracking_alert": "בעיה בנתונים",
       "win_event": "הצלחה",
-      "metric_health": "תקינות מדד"
+      "metric_health": "מספר שנראה חריג"
     },
     "perDayTitle": "תובנות לפי יום",
     "perDayDescription": "מתי קרו התובנות שברשימה, לפי חומרה.",
     "feedTitle": "ציר זמן",
     "feedDescription": "מהחדשה לישנה. אזהרות מודגשות.",
     "kindAction": {
-      "tracking_alert": "לבדיקת תקינות הנתונים",
+      "tracking_alert": "לראות מה לא תקין בנתונים",
       "win_event": "לכללי ההצלחה",
-      "metric_health": "לתיקון המדד"
+      "metric_health": "לתקן את המספר"
     }
   },
   "Feedback": {
