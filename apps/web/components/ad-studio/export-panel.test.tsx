@@ -53,6 +53,7 @@ describe('ExportPanel', () => {
     renderPanel();
 
     expect(screen.getByText('Send the finished 30-second video to your Facebook and Instagram ad account or your YouTube channel.')).toBeInTheDocument();
+    expect(screen.getByText(/No ad is created, nothing goes live and no money is spent/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Video title'), { target: { value: 'Signed before lunch' } });
     fireEvent.click(within(screen.getByTestId('ad-studio-export-meta')).getByRole('button'));
 

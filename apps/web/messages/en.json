@@ -4559,6 +4559,7 @@
     "planningAdminHint": "Deep analysis also reads the web page (public https pages only) and the last 90 days of web page results from your connected data. A missing source is shown as missing, never estimated.",
     "exportTitle": "Export",
     "exportDescription": "Send the finished {seconds}-second video to your Facebook and Instagram ad account or your YouTube channel.",
+    "exportNoAdNote": "This only uploads the video. No ad is created, nothing goes live and no money is spent until you set up an ad yourself.",
     "exportNeedsVideo": "Assemble the video first. Only the current finished video can be exported.",
     "exportDestination": {
       "meta": "Facebook and Instagram",
