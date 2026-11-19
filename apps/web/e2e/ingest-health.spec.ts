@@ -88,7 +88,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     // DuckDB stand-in — normally a few seconds, but a generous 60s timeout here absorbs real subprocess
     // slowness under a loaded CI/sandbox runner (confirmed by hand: this genuinely completes, just not
     // always inside 30s under contention) rather than treating that as a UI-timing flake.
-    await page.getByRole('button', { name: 'Run now' }).click();
+    await page.getByRole('button', { name: 'Refresh now' }).click();
     await expect(page.getByText(/Succeeded · started/)).toBeVisible({ timeout: 60_000 });
     // This project was created through the product, not the dbt fixture's own hardcoded project ids, so
     // its freshness snapshot legitimately comes back with zero rows in every table — a real, honest
@@ -118,7 +118,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('0 of 6 setup requirements connected in the Prod (real data) environment.')).toBeVisible();
     await expect(page.getByText('No rejected records for this project. Everything that arrived was usable.')).toBeVisible();
     await expect(page.getByText('Nothing is stuck. All data was passed on.')).toBeVisible();
-    await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();
+    await expect(page.getByText('Nothing is waiting in line.')).toBeVisible();
     await expect(page.getByText('No runs started from this page yet. The automatic hourly refresh runs by itself and is not listed here.')).toBeVisible();
     // KAN-201: with no runs, one message rather than two near-identical ones.
     await expect(page.getByText('No run has been started from this page yet. The automatic hourly refresh is not listed here - "How up to date your reports are" above reflects it.')).toHaveCount(0);
