@@ -26,11 +26,11 @@ describe('CreateWinRuleForm', () => {
 
   it('disables submit until a name is entered', () => {
     renderForm();
-    expect(screen.getByRole('button', { name: 'Create win rule' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create win' })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Big order' } });
 
-    expect(screen.getByRole('button', { name: 'Create win rule' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create win' })).toBeEnabled();
   });
 
   it('creates a filterless win rule and refreshes', async () => {
@@ -38,7 +38,7 @@ describe('CreateWinRuleForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New signup' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create win' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -58,7 +58,7 @@ describe('CreateWinRuleForm', () => {
     fireEvent.change(screen.getByLabelText('Win type'), { target: { value: 'reactivation' } });
     expect(screen.getByText('Usually celebrates a customer who had left and is active again.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create win' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -80,7 +80,7 @@ describe('CreateWinRuleForm', () => {
     fireEvent.change(screen.getByLabelText('Condition'), { target: { value: '>' } });
     expect(screen.getByRole('option', { name: 'is at least' })).toHaveValue('>=');
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: '100' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create win' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -101,9 +101,9 @@ describe('CreateWinRuleForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Big order' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create win' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the win rule. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the win. Nothing was saved, please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });

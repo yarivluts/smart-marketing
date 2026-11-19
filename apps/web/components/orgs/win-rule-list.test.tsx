@@ -37,7 +37,7 @@ describe('WinRuleList', () => {
 
   it('shows an empty state when there are no rules', () => {
     renderList([]);
-    expect(screen.getByText('This project has no win rules yet.')).toBeInTheDocument();
+    expect(screen.getByText('You have not set up any wins yet. Create one below.')).toBeInTheDocument();
   });
 
   it('renders a rule with its schema and filter summary', () => {
@@ -105,7 +105,7 @@ describe('WinRuleList', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update this win rule. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update this win. Nothing was changed, please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 
