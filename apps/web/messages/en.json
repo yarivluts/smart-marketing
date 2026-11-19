@@ -1727,7 +1727,7 @@
     "kpiLatest": "Latest",
     "kpiNoValue": "None yet",
     "timeUtc": "{time} UTC",
-    "emptyNextStep": "Set up a win rule or register metrics and schemas, and findings will appear here as they happen.",
+    "emptyNextStep": "Connect your website or another data source, then set up what counts as a win. Alerts and wins will appear here as they happen.",
     "byTypeTitle": "By type",
     "byTypeDescription": "What the listed insights are about.",
     "byTypeCenter": "insights",
