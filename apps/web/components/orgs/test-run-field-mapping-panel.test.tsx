@@ -65,7 +65,7 @@ describe('TestRunFieldMappingPanel', () => {
     fireEvent.change(screen.getByLabelText('Sample data (JSON)'), { target: { value: '{}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    expect(await screen.findByText('Mapping errors: event_id:not_found:id')).toBeInTheDocument();
+    expect(await screen.findByText('Problems with the matching rules: event_id:not_found:id')).toBeInTheDocument();
     expect(screen.queryByText('The mapped record looks good.')).not.toBeInTheDocument();
   });
 
