@@ -28,7 +28,7 @@ describe('SweepQueuedPipelineMessagesButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ delivered: 2, failed: 1 }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sweep stuck queued messages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pass waiting data on now' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/ingest-health/sweep-queued-pipeline-messages', {
@@ -41,7 +41,7 @@ describe('SweepQueuedPipelineMessagesButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ delivered: 0, failed: 0 }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sweep stuck queued messages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pass waiting data on now' }));
 
     expect(await screen.findByText('0 delivered, 0 still failing')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
@@ -51,9 +51,9 @@ describe('SweepQueuedPipelineMessagesButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sweep stuck queued messages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pass waiting data on now' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't sweep queued messages. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't pass the waiting data on. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

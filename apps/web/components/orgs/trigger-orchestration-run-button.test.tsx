@@ -28,7 +28,7 @@ describe('TriggerOrchestrationRunButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ id: 'run-1', status: 'succeeded', errorMessage: null }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh now' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/ingest-health/trigger-orchestration-run', {
@@ -40,9 +40,9 @@ describe('TriggerOrchestrationRunButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run now' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh now' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't trigger an orchestration run. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't refresh your reports. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

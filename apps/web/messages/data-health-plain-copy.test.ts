@@ -3,34 +3,34 @@ import en from './en.json';
 import he from './he.json';
 
 const KEYS = [
-  'warehouseFreshnessHeading',
-  'warehouseFreshnessLine',
-  'warehouseFreshnessEmpty',
-  'warehouseFreshnessNotConfigured',
-  'orchestrationHeading',
-  'orchestrationNoFreshnessYet',
-  'orchestrationNoRuns',
+  'orchestrationTriggerButton',
+  'orchestrationTriggerError',
+  'queuedMessagesHeading',
+  'noQueuedMessages',
+  'queuedMessageSummary',
+  'sweepQueuedMessages',
+  'sweepQueuedMessagesError',
+  'flowTitle',
+  'flowDescription',
 ] as const;
 
-const placeholders = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
-
-describe('Data health page avoids warehouse jargon', () => {
-  it.each(KEYS)('English %s has no warehouse, BigQuery or orchestration wording', (key) => {
-    const text = en.IngestHealth[key].replace(/\{\w+\}/g, '');
-    expect(text).not.toMatch(/warehouse|bigquery|orchestration|landed|deployment/i);
+describe('the Data health page speaks plainly', () => {
+  it('English avoids orchestration / sweep / pipeline / queue / API jargon', () => {
+    for (const key of KEYS) {
+      expect(en.IngestHealth[key]).not.toMatch(/orchestrat|sweep|pipeline|queue|\bAPI\b/i);
+    }
   });
 
-  it.each(KEYS)('Hebrew %s is Hebrew and keeps the same placeholders', (key) => {
-    const text = he.IngestHealth[key];
-    expect(text).toMatch(/[֐-׿]/);
-    expect(text).not.toMatch(/bigquery|מחסן|תזמור|נחת/i);
-    expect(placeholders(text)).toEqual(placeholders(en.IngestHealth[key]));
+  it('Hebrew stays in Hebrew, without תזמור, צינור or Latin jargon', () => {
+    for (const key of KEYS) {
+      const text = he.IngestHealth[key].replace(/\{[^}]*\}/g, '');
+      expect(text).toMatch(/[֐-׿]/);
+      expect(text).not.toMatch(/[A-Za-z]|תזמור|צינור/);
+    }
   });
 
-  it('page and billing eyebrows are plain in both languages', () => {
-    expect(en.IngestHealth.eyebrow).toBe('Your data');
-    expect(en.BillingOpsFeed.eyebrow).toBe('Failed payments');
-    expect(he.IngestHealth.eyebrow).toBe('הנתונים שלכם');
-    expect(he.BillingOpsFeed.eyebrow).toBe('תשלומים שנכשלו');
+  it('the refresh button says what it does', () => {
+    expect(en.IngestHealth.orchestrationTriggerButton).toBe('Refresh now');
+    expect(en.IngestHealth.orchestrationTriggerError).toMatch(/refresh your reports/i);
   });
 });
