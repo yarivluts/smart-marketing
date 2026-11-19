@@ -56,7 +56,7 @@ describe('EditWinRuleForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Enterprise order' } });
     fireEvent.change(screen.getByLabelText('Win type'), { target: { value: 'reactivation' } });
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: '500' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save win rule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save win' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -89,7 +89,7 @@ describe('EditWinRuleForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: '  ' } });
 
-    expect(screen.getByRole('button', { name: 'Save win rule' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save win' })).toBeDisabled();
   });
 
   it('disables saving once a filter field is emptied', () => {
@@ -97,7 +97,7 @@ describe('EditWinRuleForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Field'), { target: { value: '' } });
 
-    expect(screen.getByRole('button', { name: 'Save win rule' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save win' })).toBeDisabled();
   });
 
   it('shows an inline error and stays open when saving fails', async () => {
@@ -105,9 +105,9 @@ describe('EditWinRuleForm', () => {
     renderForm();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save win rule' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save win' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save this win rule. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save this win. Nothing was changed, please try again.");
     expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
