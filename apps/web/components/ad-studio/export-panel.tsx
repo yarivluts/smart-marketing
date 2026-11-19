@@ -101,6 +101,7 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
             {t('exportTitle')}
           </h2>
           <p className="text-sm text-muted-foreground">{video ? t('exportDescription', { seconds: Math.round(video.durationSeconds) }) : t('exportNeedsVideo')}</p>
+          {video ? <p className="mt-1 text-xs text-muted-foreground">{t('exportNoAdNote')}</p> : null}
         </div>
       </header>
 
