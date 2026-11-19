@@ -2285,7 +2285,7 @@
     "listCapNote": "Showing the {count} most recent entries.",
     "listCapNoteTruncated": "Showing the {count} most recent entries — more exist than are shown, so this is a window onto the log, not the whole of it.",
     "eyebrow": "Organization",
-    "heroDescription": "Every configuration, key, role and schema change in this organization, who made it and when. Entries are hash-chained, so tampering is detectable.",
+    "heroDescription": "Every change to settings, access keys, people's roles and data fields in this organization, who made it and when. Entries are locked together, so any later edit to the history would be noticed.",
     "kpiIntegrity": "Log integrity",
     "kpiIntegrityOk": "Intact",
     "kpiIntegrityBroken": "Broken",
