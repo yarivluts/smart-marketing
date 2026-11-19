@@ -2101,7 +2101,7 @@
     "kpiSignificantLossesSub": "{count, plural, one {# version clearly worse} other {# versions clearly worse}}",
     "kpiNoDataSub": "Results could not be loaded just now. They show here once your data is connected.",
     "resultsEmptyHint": "Results appear here once your site reports who saw each version and who signed up or bought. Ask the AI helper to set it up.",
-    "experimentSummary": "Original: {control} · {variants} versions · {exposures} people saw it",
+    "experimentSummary": "Original: {control} · {variants, plural, one {# version} other {# versions}} · {exposures, plural, one {# person saw it} other {# people saw it}}",
     "rateChartLabel": "Share who signed up or bought, by version, for {experimentKey}",
     "upliftShort": "{uplift}% vs. the original",
     "pipelineExposuresSub": "people who saw a version",

@@ -2101,7 +2101,7 @@
     "kpiSignificantLossesSub": "{count, plural, one {גרסה אחת גרועה בבירור} other {# גרסאות גרועות בבירור}}",
     "kpiNoDataSub": "לא הצלחנו לטעון תוצאות עכשיו. הן יופיעו כאן ברגע שהנתונים שלכם יחוברו.",
     "resultsEmptyHint": "התוצאות יופיעו כאן כשהאתר שלכם ידווח מי ראה כל גרסה ומי נרשם או קנה. בקשו מעוזר ה-AI להגדיר את זה.",
-    "experimentSummary": "המקור: {control} · {variants} גרסאות · {exposures} אנשים ראו",
+    "experimentSummary": "המקור: {control} · {variants, plural, one {גרסה אחת} other {# גרסאות}} · {exposures, plural, one {אדם אחד ראה} other {# אנשים ראו}}",
     "rateChartLabel": "שיעור מי שנרשמו או קנו, לפי גרסה, עבור {experimentKey}",
     "upliftShort": "{uplift}% לעומת המקור",
     "pipelineExposuresSub": "אנשים שראו גרסה",
