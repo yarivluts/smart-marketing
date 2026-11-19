@@ -41,7 +41,7 @@ test.describe('Audit log (KAN-44): entries render, chain verifies, quoted summar
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards/[^/]+$`), { timeout: 20_000 });
 
     await page.goto(`/en/orgs/${orgId}/audit-log`);
-    await expect(page.getByText('Chain verified')).toBeVisible();
+    await expect(page.getByText('History checked')).toBeVisible();
     const enSummary = page.getByTestId('audit-entry-summary').first();
     await expect(enSummary).toHaveText('Created board "Quote Test Board"');
     await expect(enSummary).toHaveAttribute('dir', 'ltr');
