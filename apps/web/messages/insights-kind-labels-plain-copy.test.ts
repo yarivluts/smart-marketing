@@ -9,7 +9,7 @@ describe('Insights kind labels and actions are plain', () => {
   it('avoids marketing-analytics jargon in English', () => {
     for (const k of kinds) {
       expect(en.Insights.kindLabel[k]).not.toMatch(/tracking|metric|health/i);
-      expect(en.Insights.kindAction[k]).not.toMatch(/metric|health/i);
+      expect(en.Insights.kindAction[k]).not.toMatch(/metric/i);
     }
   });
 

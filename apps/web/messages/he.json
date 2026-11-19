@@ -1741,7 +1741,7 @@
     "feedTitle": "ציר זמן",
     "feedDescription": "מהחדשה לישנה. אזהרות מודגשות.",
     "kindAction": {
-      "tracking_alert": "לראות מה לא תקין בנתונים",
+      "tracking_alert": "לבדיקת תקינות הנתונים",
       "win_event": "לכללי ההצלחה",
       "metric_health": "לתקן את המספר"
     }

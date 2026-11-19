@@ -1741,7 +1741,7 @@
     "feedTitle": "Timeline",
     "feedDescription": "Newest first. Warnings are highlighted.",
     "kindAction": {
-      "tracking_alert": "See what is wrong with your data",
+      "tracking_alert": "Check Data health",
       "win_event": "View win rules",
       "metric_health": "Fix this number"
     }
