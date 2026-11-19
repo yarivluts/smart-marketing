@@ -28,7 +28,7 @@ describe('AuditChainStatus', () => {
     renderWithIntl(<AuditChainStatus chain={{ valid: true, entryCount: 3, forks: [] }} visibleEntryIds={new Set()} actorName={actorName} />);
     const status = screen.getByTestId('audit-chain-status');
     expect(status).toHaveAttribute('data-state', 'intact');
-    expect(status).toHaveTextContent('Chain verified — 3 entries, no tampering detected.');
+    expect(status).toHaveTextContent('History checked — 3 entries, none were changed or removed.');
   });
 
   it('presents concurrent-append forks as verified, explains them, and never claims tampering', () => {
@@ -36,7 +36,7 @@ describe('AuditChainStatus', () => {
     const status = screen.getByTestId('audit-chain-status');
     expect(status).toHaveAttribute('data-state', 'branched');
     expect(status).not.toHaveAttribute('role', 'alert');
-    expect(status).toHaveTextContent('Chain verified - 717 entries, none changed or removed from the middle of the log.');
+    expect(status).toHaveTextContent('History checked - 717 entries, none were changed or removed from the middle.');
     expect(status).toHaveTextContent('At 12 points, several changes were saved at the same moment');
     expect(status).toHaveTextContent('(12 entries sit on a side branch)');
     expect(status).toHaveTextContent('is not a sign of tampering');
