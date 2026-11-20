@@ -928,7 +928,7 @@ export function GrowthPilotApp({ orgId, projectId, initial, metaConnectHref, can
               {t('targets.title')}
             </h2>
             {targets.length === 0 ? (
-              <p className="rounded-3xl border border-dashed border-border p-5 text-sm text-muted-foreground">{t('targets.empty')}</p>
+              <p className="rounded-3xl border border-dashed border-border p-5 text-sm text-muted-foreground">{t(waiting.length === 0 ? 'targets.emptyNoIdea' : 'targets.empty')}</p>
             ) : (
               <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {targets.map((target) => (
