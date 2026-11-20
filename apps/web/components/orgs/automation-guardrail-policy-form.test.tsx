@@ -40,4 +40,13 @@ describe('AutomationGuardrailPolicyForm', () => {
       expect(heMessages.Automation[key]).toBeTruthy();
     }
   });
+
+  it('calls the limits "safety limits" everywhere, not policy or guardrail', () => {
+    for (const m of [enMessages.Automation, heMessages.Automation]) {
+      expect(m.policySaveButton).toBe(m.policySaveButton.trim());
+    }
+    expect(enMessages.Automation.policySaveButton).toMatch(/safety limits/i);
+    expect(enMessages.Automation.policyInvalidNumberError).not.toMatch(/guardrail|policy/i);
+    expect(enMessages.Automation.policySaveButton).not.toMatch(/policy/i);
+  });
 });
