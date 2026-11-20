@@ -4093,7 +4093,7 @@
       "plan": "Plan",
       "script": "Script",
       "video": "Video",
-      "export": "Export",
+      "export": "Upload",
       "images": "Images"
     },
     "stageStatus": {
@@ -4107,7 +4107,7 @@
     "formatHorizontalShort": "Horizontal 16:9",
     "backToAds": "All ads",
     "pipelineTitle": "Where this ad stands",
-    "pipelineDescription": "From what the ad is about, to a plan and a script of scenes, then the video and its export.",
+    "pipelineDescription": "From what the ad is about, to a plan and a script of scenes, then the video and its upload.",
     "editDetails": "Edit what the ad is about",
     "newAdTitle": "New ad",
     "newAdDescription": "Describe the ad. The AI writes a script from it, and you can edit every scene.",
@@ -4566,10 +4566,10 @@
       "vault_not_configured": "We could not open the saved Google Ads login right now, so there are no real search numbers. Your ad is not affected."
     },
     "planningAdminHint": "Deep analysis also reads the web page (public https pages only) and the last 90 days of web page results from your connected data. A missing source is shown as missing, never estimated.",
-    "exportTitle": "Export",
+    "exportTitle": "Upload the video",
     "exportDescription": "Send the finished {seconds}-second video to your Facebook and Instagram ad account or your YouTube channel.",
     "exportNoAdNote": "This only uploads the video. No ad is created, nothing goes live and no money is spent until you set up an ad yourself.",
-    "exportNeedsVideo": "Assemble the video first. Only the current finished video can be exported.",
+    "exportNeedsVideo": "Assemble the video first. Only the current finished video can be uploaded.",
     "exportDestination": {
       "meta": "Facebook and Instagram",
       "youtube": "YouTube"
@@ -4598,10 +4598,10 @@
       "public": "Public"
     },
     "exporting": "Uploading...",
-    "exportButton": "Export to {destination}",
+    "exportButton": "Upload to {destination}",
     "exportVideoTitle": "Video title",
     "exportVideoDescription": "Video description",
-    "exportNeedsPermission": "Exporting needs permission to make changes on the ad platforms. Ask a project admin.",
+    "exportNeedsPermission": "Uploading needs permission to make changes on the ad platforms. Ask a project admin.",
     "exportDone": "Uploaded to {destination}.",
     "exportFailure": {
       "auth_failed": "The ad platform no longer accepts the saved login. Reconnect the account in Ad platform connections.",
@@ -4613,8 +4613,8 @@
       "account_action_required": "Facebook and Instagram need you to verify the account in Facebook's ad tool (Ads Manager, at adsmanager.facebook.com) before ads can be created or changed."
     },
     "exportVideoNotReady": "That video is not assembled yet.",
-    "exportHistory": "Exports",
-    "exportHistoryEmpty": "Nothing exported yet.",
+    "exportHistory": "Uploads so far",
+    "exportHistoryEmpty": "Nothing uploaded yet.",
     "exportStatus": {
       "uploading": "Uploading",
       "done": "Uploaded",
