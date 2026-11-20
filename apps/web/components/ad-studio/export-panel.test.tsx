@@ -88,13 +88,13 @@ describe('ExportPanel', () => {
 
   it('blocks exporting without a video or without permission', () => {
     const { unmount } = renderPanel({ video: null });
-    expect(screen.getByText('Assemble the video first. Only the current finished video can be exported.')).toBeInTheDocument();
+    expect(screen.getByText('Assemble the video first. Only the current finished video can be uploaded.')).toBeInTheDocument();
     expect(within(screen.getByTestId('ad-studio-export-meta')).getByRole('button')).toBeDisabled();
     unmount();
 
     renderPanel({ canExport: false });
     expect(within(screen.getByTestId('ad-studio-export-meta')).getByRole('button')).toBeDisabled();
-    expect(screen.getByText('Exporting needs permission to make changes on the ad platforms. Ask a project admin.')).toBeInTheDocument();
+    expect(screen.getByText('Uploading needs permission to make changes on the ad platforms. Ask a project admin.')).toBeInTheDocument();
   });
 
   it('lists past exports with status, visibility and a link to the uploaded video, in Hebrew', () => {
@@ -128,5 +128,21 @@ describe('ExportPanel YouTube visibility hint', () => {
     renderPanel({ destinations: youtubeConnected }, 'he');
     expect(screen.getByText(heMessages.AdStudio.exportPrivacyHint)).toBeInTheDocument();
     expect(heMessages.AdStudio.exportPrivacyHint).toContain(heMessages.AdStudio.exportPrivacyShort.unlisted);
+  });
+});
+
+describe('ExportPanel plain words', () => {
+  it('says "upload" for what the step does, in English and Hebrew', () => {
+    const { unmount } = renderPanel();
+    expect(screen.getByRole('heading', { name: 'Upload the video' })).toBeInTheDocument();
+    expect(screen.getByText('Nothing uploaded yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload to YouTube' })).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toMatch(/export/i);
+    unmount();
+
+    renderPanel({}, 'he');
+    expect(screen.getByRole('heading', { name: heMessages.AdStudio.exportTitle })).toBeInTheDocument();
+    expect(document.body.textContent ?? '').not.toContain('ייצוא');
+    expect(document.body.textContent ?? '').not.toContain('ייצואים');
   });
 });
