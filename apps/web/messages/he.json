@@ -4579,6 +4579,7 @@
     },
     "exportOpenResources": "פתיחת משאבי הפרויקט",
     "exportPrivacy": "נראות ביוטיוב",
+    "exportPrivacyHint": "לא בטוחים? השאירו על \"לא רשום\": רק מי ששלחתם לו את הקישור יוכל לצפות, ואפשר להפוך אותו לציבורי אחר כך ביוטיוב.",
     "exportPrivacyUnlisted": "לא רשום - רק למי שיש קישור",
     "exportPrivacyPrivate": "פרטי",
     "exportPrivacyPublic": "ציבורי",

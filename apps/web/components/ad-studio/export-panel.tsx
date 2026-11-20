@@ -55,6 +55,7 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
   const [title, setTitle] = React.useState(defaultTitle.slice(0, 100));
   const [description, setDescription] = React.useState(defaultDescription.slice(0, 5000));
   const [privacy, setPrivacy] = React.useState<'private' | 'unlisted' | 'public'>('unlisted');
+  const privacyHintId = React.useId();
   const [pending, setPending] = React.useState<ExportDestinationId | null>(null);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const localTime = useLocalDateTime(MEDIUM);
@@ -142,14 +143,24 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
                 </p>
               )}
               {destination === 'youtube' && state.available ? (
-                <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
-                  {t('exportPrivacy')}
-                  <select value={privacy} onChange={(event) => setPrivacy(event.target.value as typeof privacy)} className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground">
-                    <option value="unlisted">{t('exportPrivacyUnlisted')}</option>
-                    <option value="private">{t('exportPrivacyPrivate')}</option>
-                    <option value="public">{t('exportPrivacyPublic')}</option>
-                  </select>
-                </label>
+                <div className="flex flex-col gap-1">
+                  <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                    {t('exportPrivacy')}
+                    <select
+                      value={privacy}
+                      onChange={(event) => setPrivacy(event.target.value as typeof privacy)}
+                      aria-describedby={privacyHintId}
+                      className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground"
+                    >
+                      <option value="unlisted">{t('exportPrivacyUnlisted')}</option>
+                      <option value="private">{t('exportPrivacyPrivate')}</option>
+                      <option value="public">{t('exportPrivacyPublic')}</option>
+                    </select>
+                  </label>
+                  <p id={privacyHintId} className="text-xs text-muted-foreground">
+                    {t('exportPrivacyHint')}
+                  </p>
+                </div>
               ) : null}
               <button
                 type="button"
