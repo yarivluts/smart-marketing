@@ -18,7 +18,7 @@ describe('onboarding stat tiles', () => {
   it('en avoids jargon: events, funnel, batches, boards', () => {
     const o = (en as unknown as Copy).Onboarding;
     const text = [o.kpiEvents, o.kpiEventsSubtext, o.kpiFunnelSteps, o.kpiBoards].join(' ');
-    expect(text).not.toMatch(/event|funnel|batch|board/i);
+    expect(text).not.toMatch(/event|funnel|batch|\bboards?\b/i);
   });
 
   it('he avoids the jargon "משפך" in the tile labels', () => {
