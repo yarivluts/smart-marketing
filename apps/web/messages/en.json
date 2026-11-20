@@ -2296,7 +2296,7 @@
     "kpiBusiestDay": "Busiest day",
     "kpiBusiestDaySubtext": "changes on {day}",
     "kpiBusiestDayNone": "No changes in the last {days} days",
-    "noEntriesHint": "Entries appear here as soon as someone changes a board, key, role, schema or setting.",
+    "noEntriesHint": "Nothing has been changed yet. A line appears here as soon as someone changes a setting, an access key, a person's role or a data field.",
     "perDayTitle": "Activity per day",
     "perDayDescription": "Audited changes per day over the last {days} days.",
     "perDaySeries": "Changes",
