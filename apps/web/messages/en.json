@@ -5875,7 +5875,7 @@
     "description": "Log in with Facebook once and pick the ad account and Page. GrowthOS keeps the access safely locked away and publishes your Facebook and Instagram ads through it.",
     "connect": "Connect with Facebook",
     "reconnect": "Connect or renew with Facebook",
-    "needsPermission": "Connecting an ad account needs the \"manage resources\" permission in this organization.",
+    "needsPermission": "Only an organization admin can connect an ad account. Ask an admin to do this step, or to give you admin access.",
     "tryAgain": "Try again",
     "chooseTitle": "Choose what to connect",
     "chooseDescription": "Facebook gave access to these ad accounts and Pages. Pick the account ads are billed to and the Page they run as.",
@@ -5908,7 +5908,7 @@
       "not_authorized": "Facebook has not returned yet for this attempt. Start again.",
       "exchange_failed": "Facebook did not accept the login. Start again; if it keeps happening, contact GrowthOS support.",
       "invalid_choice": "Pick an ad account and a Page from the list.",
-      "no_ad_accounts": "This Facebook login has no ad accounts. Log in with the account that manages your ads.",
+      "no_ad_accounts": "This Facebook login has no ad account to connect. Log in with the Facebook profile that manages your ads, or create an ad account in Facebook first, then try again.",
       "project_not_found": "That project was not found in this organization.",
       "meta_error": "Facebook refused the connection and said:"
     }
