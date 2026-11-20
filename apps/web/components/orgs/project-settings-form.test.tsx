@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { ProjectSettingsForm } from './project-settings-form';
 import messages from '../../messages/en.json';
+import heMessages from '../../messages/he.json';
 
 const refresh = vi.fn();
 
@@ -28,6 +29,21 @@ describe('ProjectSettingsForm', () => {
     renderForm();
     expect(screen.getByLabelText('Project name')).toHaveValue('Website');
     expect(screen.getByLabelText('Business type')).toHaveValue('ecommerce');
+  });
+
+  it('suggests plain business types in both languages', () => {
+    renderForm();
+    const input = screen.getByLabelText('Business type');
+    const list = document.getElementById(input.getAttribute('list') ?? '');
+    const values = Array.from(list?.querySelectorAll('option') ?? []).map((o) => o.getAttribute('value'));
+    expect(values).toContain('Online shop');
+    expect(values).toContain('Law firm');
+    const he = JSON.parse(JSON.stringify(heMessages.ProjectSettings)) as Record<string, string>;
+    const en = messages.ProjectSettings as Record<string, string>;
+    for (const key of Object.keys(en).filter((k) => k.startsWith('verticalOption_'))) {
+      expect(he[key]).toBeTruthy();
+      expect(he[key]).not.toBe(en[key]);
+    }
   });
 
   it('offers one click to use the device time zone instead of typing it', async () => {

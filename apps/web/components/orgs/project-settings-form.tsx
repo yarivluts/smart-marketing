@@ -6,6 +6,9 @@ import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
+/** Suggested business types: a beginner picks one instead of guessing what to type. */
+const VERTICAL_OPTIONS = ['shop', 'restaurant', 'lawFirm', 'clinic', 'beauty', 'realEstate', 'courses', 'software', 'services'] as const;
+
 export interface ProjectSettingsFormProps {
   orgId: string;
   projectId: string;
@@ -129,7 +132,12 @@ export function ProjectSettingsForm({
         <label className="text-sm font-medium" htmlFor="project-settings-vertical">
           {t('verticalLabel')}
         </label>
-        <Input id="project-settings-vertical" value={vertical} onChange={(event) => setVertical(event.target.value)} />
+        <Input id="project-settings-vertical" value={vertical} onChange={(event) => setVertical(event.target.value)} list="project-settings-vertical-options" autoComplete="off" />
+        <datalist id="project-settings-vertical-options">
+          {VERTICAL_OPTIONS.map((key) => (
+            <option key={key} value={t(`verticalOption_${key}`)} />
+          ))}
+        </datalist>
         <p className="text-xs text-muted-foreground">{t('verticalHelp')}</p>
       </div>
 
