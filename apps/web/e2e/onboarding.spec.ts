@@ -72,7 +72,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.getByRole('button', { name: 'Confirm customer path' }).click();
 
     // Step 4: the pack's three starter boards + the invite/goal/war-room CTAs + finish.
-    await expect(page.getByRole('heading', { name: 'Your starter board' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your starter dashboard' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Marketing' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Revenue / MRR' })).toBeVisible();
     // exact: true - the persistent sidebar's own "Funnel & Goals" primary-module link also
