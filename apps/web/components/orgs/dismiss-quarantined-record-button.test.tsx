@@ -29,7 +29,7 @@ describe('DismissQuarantinedRecordButton', () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
 
     expect(fetch).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
@@ -40,7 +40,7 @@ describe('DismissQuarantinedRecordButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ outcome: 'dismissed' }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/quarantined-records/qr-1/dismiss', {
@@ -53,9 +53,9 @@ describe('DismissQuarantinedRecordButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't dismiss this record. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't discard this record. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });
