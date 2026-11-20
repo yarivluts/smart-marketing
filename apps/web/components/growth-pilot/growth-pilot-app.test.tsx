@@ -375,6 +375,12 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByText(/The AI is working on the next step/)).toBeInTheDocument();
   });
 
+  it('does not ask for an approval that is not there when nothing is waiting and nothing is being grown', () => {
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [{ ...page().targets[0], status: 'rejected' }] })} />, { locale: 'en' });
+    expect(screen.getByText('Nothing is being grown yet. An idea you say yes to appears here.')).toBeInTheDocument();
+    expect(screen.queryByText('Approve a proposal and it becomes something the pilot works on.')).not.toBeInTheDocument();
+  });
+
   it('says what happens next when nothing waits: working, paused or all caught up, in both languages', () => {
     const quiet = page({ proposals: [], targets: [] });
     const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={quiet} />, { locale: 'en' });
