@@ -113,3 +113,20 @@ describe('ExportPanel', () => {
     expect(within(second).queryByRole('link')).toBeNull();
   });
 });
+
+describe('ExportPanel YouTube visibility hint', () => {
+  const youtubeConnected = { meta: CONNECTED, youtube: { available: true as const, credentialName: 'Channel' } };
+
+  it('explains what to pick and ties it to the choice', () => {
+    renderPanel({ destinations: youtubeConnected });
+    const select = screen.getByLabelText("Visibility on YouTube");
+    const hint = screen.getByText(/Not sure\? Leave it on "Unlisted"/);
+    expect(select).toHaveAccessibleDescription(hint.textContent ?? '');
+  });
+
+  it('says the same in Hebrew', () => {
+    renderPanel({ destinations: youtubeConnected }, 'he');
+    expect(screen.getByText(heMessages.AdStudio.exportPrivacyHint)).toBeInTheDocument();
+    expect(heMessages.AdStudio.exportPrivacyHint).toContain(heMessages.AdStudio.exportPrivacyShort.unlisted);
+  });
+});

@@ -608,6 +608,7 @@ Template for each entry:
 
 ## UX hourly
 
+- 2026-11-20 - (d) Ad Studio Export step re-read. The "Visibility on YouTube" choice (Unlisted / Private / Public) had no advice; now a line under it says to leave it on Unlisted if unsure, only people with the link can watch, and it can be made public later (en + he) with tests. PR #1379. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) project settings Business type is free text, a pick-list would help.
 - 2026-11-19 - (f/g) Data health rejected-record buttons and delivery step re-read. They said "Replay", "Dismiss" and "Pipeline delivery" (he: שידור חוזר, בטל לצמיתות, משלוח בצינור); now "Try again", "Discard" and "Passed on to your reports" (en + he) with a test. PR #1378. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) Data health still says "Entities" and "Measures".
 
 - 2026-11-19 - (f) Incoming data links and Match your fields pages re-read. They said "ingested", "Envelope errors" and "Mapping errors" (he: מעטפה, נקלט); now "turned into records" and "Problems with the delivery itself / matching rules" (en + he) with a test. PR #1377. Next candidates: (1) a proper "propose turning on again" action after rejecting the turn-on card; (2) rejected target has no way back; (3) "Rule transforms" on the field-matching chart.

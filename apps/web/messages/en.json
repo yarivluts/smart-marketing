@@ -4579,6 +4579,7 @@
     },
     "exportOpenResources": "Open project resources",
     "exportPrivacy": "Visibility on YouTube",
+    "exportPrivacyHint": "Not sure? Leave it on \"Unlisted\": only people you send the link to can watch it, and you can make it public later on YouTube.",
     "exportPrivacyUnlisted": "Unlisted - only people with the link",
     "exportPrivacyPrivate": "Private",
     "exportPrivacyPublic": "Public",
