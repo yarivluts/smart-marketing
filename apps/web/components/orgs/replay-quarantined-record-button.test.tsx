@@ -28,7 +28,7 @@ describe('ReplayQuarantinedRecordButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ outcome: 'accepted' }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/quarantined-records/qr-1/replay', {
@@ -44,7 +44,7 @@ describe('ReplayQuarantinedRecordButton', () => {
     } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
     expect(await screen.findByText('Still rejected: missing_required_field:plan')).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
@@ -54,9 +54,9 @@ describe('ReplayQuarantinedRecordButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Replay' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't replay this record. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't try this record again. Please try again in a moment.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

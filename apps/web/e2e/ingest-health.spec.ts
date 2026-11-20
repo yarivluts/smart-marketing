@@ -76,7 +76,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     // Replaying without first fixing the schema (KAN-34) leaves the record quarantined, with its
     // reasons re-surfaced inline rather than silently no-op'ing.
-    await page.getByRole('button', { name: 'Replay' }).click();
+    await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.getByText('Still rejected: missing_required_field:amount')).toBeVisible();
 
     // Orchestration (KAN-38): before triggering a run, there's no history and no freshness snapshot yet.
