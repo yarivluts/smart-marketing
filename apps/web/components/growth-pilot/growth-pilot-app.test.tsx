@@ -341,9 +341,10 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByRole('button', { name: 'Use another address' })).toBeInTheDocument();
     nothing.unmount();
     const quota = view('quota_exceeded');
-    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    // The limit resets tomorrow: without a Try again button the card could never be left, but another address would not help.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Use another address' })).toBeNull();
-    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('resets tomorrow');
+    expect(screen.getByTestId('growth-pilot-failed')).toHaveTextContent('resets tomorrow - come back then and press Try again.');
     quota.unmount();
     // Fixed on our side (e.g. AI credit topped up): the card must never be a dead end.
     const unavailable = view('provider_billing');
