@@ -235,6 +235,8 @@ describe('AutomationHubDashboard Component', () => {
     expect(items[0]).toHaveTextContent('Spring sale — $20 ליום');
     expect(items[0]).toHaveTextContent('מושהה');
     expect(items[1]).toHaveTextContent('Brand ad — $5 ליום');
+    expect(items[0]).toHaveTextContent('קוד: t1');
+    expect(items[1]).toHaveTextContent('קוד: t2');
     expect(items[1]).not.toHaveTextContent('—  ');
   });
 

@@ -497,6 +497,7 @@ export function AutomationHubDashboard({
                   return (
                     <li key={target.id}>
                       {t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}
+                      {` ${t('targetCodeLine', { code: target.id })}`}
                       {statusKey ? ` ${t('targetCampaignStatusLine', { status: t(statusKey) })}` : ''}
                     </li>
                   );
