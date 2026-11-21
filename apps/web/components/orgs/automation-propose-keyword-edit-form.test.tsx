@@ -48,7 +48,7 @@ describe('AutomationProposeKeywordEditForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/create and execute an ad draft/)).toBeInTheDocument();
+    expect(screen.getByText(/propose a new ad draft above and approve it first/)).toBeInTheDocument();
   });
 
   it('names the groups of ads by number, never by their raw resource names', () => {

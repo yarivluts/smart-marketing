@@ -3159,7 +3159,7 @@
     "proposeKeywordEditEmptyError": "Enter at least one keyword or word to avoid.",
     "proposeKeywordEditError": "Couldn't propose the keyword edit. Please try again.",
     "proposeAdEditHeading": "Propose an ad edit",
-    "proposeAdEditNoTargetsNote": "No target has an ad yet — create and execute an ad draft above first.",
+    "proposeAdEditNoTargetsNote": "No target has an ad yet — propose a new ad draft above and approve it first.",
     "proposeAdEditTargetLabel": "Which ad",
     "proposeAdEditAdLabel": "Ad",
     "proposeAdEditHeadlinesLabel": "New headlines (one per line, 3-15)",

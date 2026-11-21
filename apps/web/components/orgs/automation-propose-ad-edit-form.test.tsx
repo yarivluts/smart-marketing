@@ -48,7 +48,7 @@ describe('AutomationProposeAdEditForm', () => {
       </NextIntlClientProvider>,
     );
 
-    expect(screen.getByText(/create and execute an ad draft/)).toBeInTheDocument();
+    expect(screen.getByText(/propose a new ad draft above and approve it first/)).toBeInTheDocument();
   });
 
   it('submits an ad edit for the selected target and ad', async () => {

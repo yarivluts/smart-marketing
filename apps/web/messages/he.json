@@ -3159,7 +3159,7 @@
     "proposeKeywordEditEmptyError": "הזינו לפחות מילת מפתח אחת או מילה אחת להימנע ממנה.",
     "proposeKeywordEditError": "לא ניתן היה להציע את עריכת מילות המפתח. נסו שוב.",
     "proposeAdEditHeading": "הצע עריכת מודעה",
-    "proposeAdEditNoTargetsNote": "לאף יעד אין עדיין מודעה - צרו והפעילו טיוטת מודעה למעלה תחילה.",
+    "proposeAdEditNoTargetsNote": "לאף יעד אין עדיין מודעה - הציעו טיוטת מודעה חדשה למעלה ואשרו אותה תחילה.",
     "proposeAdEditTargetLabel": "איזו מודעה",
     "proposeAdEditAdLabel": "מודעה",
     "proposeAdEditHeadlinesLabel": "כותרות חדשות (אחת בכל שורה, 3-15)",

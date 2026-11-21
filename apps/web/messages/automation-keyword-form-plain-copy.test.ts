@@ -34,6 +34,8 @@ describe('keyword form "no ads yet" note', () => {
     const autoHe = he.Automation as Record<string, string>;
     expect(auto.proposeKeywordEditNoTargetsNote).toMatch(/propose .*approve/);
     expect(auto.proposeKeywordEditNoTargetsNote).not.toMatch(/execute/i);
+    expect(auto.proposeAdEditNoTargetsNote).toMatch(/propose .*approve/);
+    expect(autoHe.proposeAdEditNoTargetsNote).not.toMatch(/הפעיל/);
     expect(autoHe.proposeKeywordEditNoTargetsNote).not.toMatch(/הפעיל/);
   });
 });
