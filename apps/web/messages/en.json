@@ -5721,7 +5721,7 @@
         "asset_not_found": "That media item is no longer available.",
         "source_not_ready": "That media item is still being prepared. Try again in a moment.",
         "invalid_input": "Check the item title or clear space in your project gallery (up to 60 items).",
-        "ffmpeg_unavailable": "Video conversion is unavailable right now.",
+        "ffmpeg_unavailable": "The video could not be prepared because of a problem on our side, not yours. Trying again will not help - please contact GrowthOS support.",
         "ffmpeg_failed": "Could not prepare this video file. Try a standard MP4 or shorter clip."
       }
     },
@@ -5752,7 +5752,7 @@
         "address_blocked": "This address cannot be scanned because it points to a private or local host.",
         "site_unreachable": "The website did not respond when scanning pages. Check the link and try again.",
         "browser_unavailable": "Website capture is unavailable on our side right now. Please try again shortly.",
-        "ffmpeg_unavailable": "Video processing is unavailable on our side right now.",
+        "ffmpeg_unavailable": "The scrolling clip could not be made because of a problem on our side, not yours. Trying again will not help - please contact GrowthOS support.",
         "ffmpeg_failed": "Could not create the scrolling clip from this page. Try another page or image.",
         "page_not_found": "That page or scene is no longer available."
       }
