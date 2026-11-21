@@ -26,8 +26,8 @@ describe('AdsKpiScorecards', () => {
 
     expect(screen.getByTestId('kpi-metric-cards')).toBeInTheDocument();
 
-    // 1. Total Spend
-    expect(screen.getByText('Total Spend')).toBeInTheDocument();
+    // 1. Money spent
+    expect(screen.getByText('Money spent')).toBeInTheDocument();
     expect(screen.getByText('$18,500')).toBeInTheDocument();
     expect(screen.getByText('Facebook & Instagram: $11,000 · Google: $7,500')).toBeInTheDocument();
 

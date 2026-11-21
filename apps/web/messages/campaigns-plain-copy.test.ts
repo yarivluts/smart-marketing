@@ -115,3 +115,13 @@ describe('Ad page empty spend line', () => {
     expect(he.Campaigns.spendNoData).not.toMatch(/[A-Za-z]/);
   });
 });
+
+describe('Ads page money labels', () => {
+  const KEYS = ['metricTotalSpend', 'columnSpend', 'analyticsSpendByChannel'] as const;
+  it.each(KEYS)('en: %s says "money spent", not "spend"', (key) => {
+    expect(en.Campaigns[key]).toMatch(/^Money spent/);
+  });
+  it.each(KEYS)('he: %s uses the same plain words as the Growth Pilot results tile', (key) => {
+    expect(he.Campaigns[key]).toMatch(/^כסף שהוצא/);
+  });
+});
