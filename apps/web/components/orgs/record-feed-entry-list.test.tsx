@@ -40,8 +40,8 @@ describe('RecordFeedEntryList (KAN-210 identity line)', () => {
     ]);
 
     const identity = screen.getByRole('group', { name: 'Identity' });
-    expect(within(identity).getByText('anon_id: anon-3')).toBeInTheDocument();
-    expect(within(identity).getByText('customer_id: cust-9')).toBeInTheDocument();
+    expect(within(identity).getByText('Visitor: anon-3')).toBeInTheDocument();
+    expect(within(identity).getByText('Customer: cust-9')).toBeInTheDocument();
     expect(screen.getByText('plan: pro')).toBeInTheDocument();
     expect(screen.getByText('id evt-1')).toBeInTheDocument();
     expect(screen.getByText('Production')).toBeInTheDocument();
@@ -50,19 +50,19 @@ describe('RecordFeedEntryList (KAN-210 identity line)', () => {
   it('says so explicitly when a record carries no identity keys, since that is itself the stitching answer', () => {
     renderList([entry({ id: 'r1' })]);
     const identity = screen.getByRole('group', { name: 'Identity' });
-    expect(within(identity).getByText('no anon_id or customer_id on this record')).toBeInTheDocument();
+    expect(within(identity).getByText('no visitor or customer on this record')).toBeInTheDocument();
   });
 
   it('renders only the redaction placeholder for an identity key flagged PII', () => {
     renderList([entry({ id: 'r1', identity: [{ name: 'customer_id', value: '••••••', isPii: true }] })]);
     const identity = screen.getByRole('group', { name: 'Identity' });
-    expect(within(identity).getByText('customer_id: ••••••')).toHaveClass('text-muted-foreground');
+    expect(within(identity).getByText('Customer: ••••••')).toHaveClass('text-muted-foreground');
   });
 
   it('keeps identity values left-to-right inside the Hebrew layout', () => {
     renderList([entry({ id: 'r1', identity: [{ name: 'anon_id', value: 'anon-3', isPii: false }] })], 'he');
     const identity = screen.getByRole('group', { name: heMessages.RecordFeed.identityLabel });
-    expect(within(identity).getByText('anon_id: anon-3')).toHaveAttribute('dir', 'ltr');
+    expect(within(identity).getByText(`${heMessages.RecordFeed.identityVisitor}: anon-3`)).toHaveAttribute('dir', 'ltr');
   });
 });
 
@@ -115,8 +115,9 @@ describe('RecordFeedFieldSelect', () => {
 
     const select = screen.getByLabelText('field') as HTMLSelectElement;
     expect(select.value).toBe('anon_id');
+    expect(within(screen.getByRole('group', { name: 'Identity' })).getAllByRole('option').map((o) => (o as HTMLOptionElement).value)).toEqual(['anon_id', 'customer_id']);
     const identityGroup = screen.getByRole('group', { name: 'Identity' });
-    expect(within(identityGroup).getAllByRole('option').map((option) => option.textContent)).toEqual(['anon_id', 'customer_id']);
+    expect(within(identityGroup).getAllByRole('option').map((option) => option.textContent)).toEqual(['Visitor', 'Customer']);
     const declaredGroup = screen.getByRole('group', { name: 'Record fields' });
     expect(within(declaredGroup).getAllByRole('option').map((option) => option.textContent)).toEqual(['plan']);
   });
@@ -128,5 +129,15 @@ describe('RecordFeedFieldSelect', () => {
       </NextIntlClientProvider>,
     );
     expect(screen.queryByRole('group', { name: 'Identity' })).not.toBeInTheDocument();
+  });
+});
+
+describe('RecordFeed identity copy', () => {
+  it('uses plain words, not raw field names, in both languages', () => {
+    for (const m of [enMessages.RecordFeed, heMessages.RecordFeed]) {
+      expect(m.identityNone).not.toMatch(/anon_id|customer_id/);
+      expect(m.identityVisitor).toBeTruthy();
+      expect(m.identityCustomer).toBeTruthy();
+    }
   });
 });
