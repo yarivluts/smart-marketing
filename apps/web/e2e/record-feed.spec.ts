@@ -97,8 +97,8 @@ test.describe('Record feed (KAN-81)', () => {
 
     // KAN-210: the undeclared identity keys stitching joins on are shown on each record's
     // Identity line, and are filterable even though the schema never declared them.
-    await expect(page.getByText('anon_id: anon-e2e-1')).toBeVisible();
-    await expect(page.getByText('customer_id: cust-e2e-2')).toBeVisible();
+    await expect(page.getByText('Visitor: anon-e2e-1')).toBeVisible();
+    await expect(page.getByText('Customer: cust-e2e-2')).toBeVisible();
 
     await page.getByLabel('Filter by field').selectOption('anon_id');
     await page.getByLabel('Value').fill('anon-e2e-1');
