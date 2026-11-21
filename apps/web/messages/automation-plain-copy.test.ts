@@ -35,3 +35,13 @@ describe('the automation page speaks plain words', () => {
     }
   });
 });
+
+describe('the protected-ads box says where to find an ad code', () => {
+  it('speaks of an ad code, shown in the list, in both languages', () => {
+    expect(en.Automation.policyProtectedTargetIdsHint).toMatch(/ad code/);
+    expect(en.Automation.policyProtectedTargetIdsHint).not.toMatch(/\bID\b/);
+    expect(en.Automation.targetCodeLine).toContain('{code}');
+    expect(he.Automation.policyProtectedTargetIdsHint).toContain('קוד');
+    expect(he.Automation.targetCodeLine).toContain('{code}');
+  });
+});
