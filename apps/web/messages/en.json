@@ -4448,9 +4448,9 @@
     "storageGcs": "Private bucket {location}",
     "storageLocal": "Local test folder",
     "storageMemory": "In memory (tests)",
-    "ffmpeg": "Video assembly (ffmpeg)",
+    "ffmpeg": "Tool that joins the video clips",
     "ffmpegReady": "Installed",
-    "ffmpegMissing": "Not installed - assembly will fail",
+    "ffmpegMissing": "Not installed - videos cannot be put together",
     "stagePlanValue": "{count, plural, one {# recommendation} other {# recommendations}}",
     "plan": {
       "title": "Deep analysis",
@@ -4568,7 +4568,7 @@
       "credential_not_configured": "Google Ads is connected but the setup is not finished. Finish it under ad platform connections to get real search numbers.",
       "vault_not_configured": "We could not open the saved Google Ads login right now, so there are no real search numbers. Your ad is not affected."
     },
-    "planningAdminHint": "Deep analysis also reads the web page (public https pages only) and the last 90 days of web page results from your connected data. A missing source is shown as missing, never estimated.",
+    "planningAdminHint": "The plan also reads the web page (public https pages only) and the last 90 days of web page results from your connected data. A missing source is shown as missing, never estimated.",
     "exportTitle": "Upload the video",
     "exportDescription": "Send the finished {seconds}-second video to your Facebook and Instagram ad account or your YouTube channel.",
     "exportNoAdNote": "This only uploads the video. No ad is created, nothing goes live and no money is spent until you set up an ad yourself.",
