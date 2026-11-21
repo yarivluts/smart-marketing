@@ -12,6 +12,13 @@ export interface RecordFeedEntryListProps {
   nowMs?: number;
 }
 
+/** The plain word for an identity key (a visitor or a customer); any other key is shown as it is. */
+function identityLabel(t: ReturnType<typeof useTranslations>, name: string): string {
+  if (name === 'anon_id') return t('identityVisitor');
+  if (name === 'customer_id') return t('identityCustomer');
+  return name;
+}
+
 function dayKey(iso: string): string {
   return iso.slice(0, 10);
 }
@@ -91,7 +98,7 @@ export function RecordFeedEntryList({ entries, environmentDisplayNameById, nowMs
                         <span key={key.name} className="inline-flex max-w-full items-center gap-1 rounded-full border border-info/30 bg-info/10 px-2 py-0.5">
                           <Icon className="h-3 w-3 shrink-0 text-info" aria-hidden="true" />
                           <span dir="ltr" className={`truncate font-mono ${key.isPii ? 'text-muted-foreground' : ''}`}>
-                            {t('fieldLine', { name: key.name, value: key.value })}
+                            {t('fieldLine', { name: identityLabel(t, key.name), value: key.value })}
                           </span>
                         </span>
                       );
@@ -136,7 +143,7 @@ export function RecordFeedFieldSelect({ id, declaredFieldNames, identityFieldNam
         <optgroup label={t('identityLabel')}>
           {identityFieldNames.map((name) => (
             <option key={name} value={name}>
-              {name}
+              {identityLabel(t, name)}
             </option>
           ))}
         </optgroup>
