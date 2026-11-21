@@ -65,7 +65,7 @@ describe('AutomationSeedTargetForm short code', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add ad' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('Ad name and environment are required.');
+    expect((await screen.findByRole('alert')).textContent).toBe('Fill in the ad name and "Where it runs" to add the ad.');
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.change(screen.getByLabelText(/Short code/), { target: { value: 'mine' } });
     fireEvent.change(screen.getByLabelText('Ad name'), { target: { value: 'Ad' } });
