@@ -1472,7 +1472,7 @@
     "amountUnitNote": "Amounts are shown in the currency each customer paid in. They are not converted between currencies.",
     "customerLine": "customer {customerId}",
     "failureLine": "Failure: {message}",
-    "refundReasonLine": "Reason: {reason}",
+    "refundReasonLine": "Reason: {reason, select, requested_by_customer {the customer asked for the money back} duplicate {the customer was charged twice} fraudulent {the payment looked like fraud} other {{reason}}}",
     "landedAtLine": "Received {landedAt}",
     "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent billing events.",
