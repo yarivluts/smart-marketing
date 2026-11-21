@@ -71,7 +71,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.getByTestId('ads-performance-dashboard')).toBeInTheDocument();
     const kpiCards = screen.getByTestId('kpi-metric-cards');
     expect(kpiCards).toBeInTheDocument();
-    expect(screen.getByText('Total Spend')).toBeInTheDocument();
+    expect(screen.getByText('Money spent')).toBeInTheDocument();
     expect(screen.getAllByText('$2,600').length).toBeGreaterThan(0);
     expect(screen.getAllByText('3.8x').length).toBeGreaterThan(0);
     expect(screen.getByTestId('proactive-recommendation-banner')).toBeInTheDocument();
