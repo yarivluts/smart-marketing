@@ -1472,7 +1472,7 @@
     "amountUnitNote": "הסכומים מוצגים במטבע שבו כל לקוח שילם. הם לא מומרים בין מטבעות.",
     "customerLine": "לקוח {customerId}",
     "failureLine": "כשל: {message}",
-    "refundReasonLine": "סיבה: {reason}",
+    "refundReasonLine": "סיבה: {reason, select, requested_by_customer {הלקוח ביקש את הכסף בחזרה} duplicate {הלקוח חויב פעמיים} fraudulent {התשלום נראה כהונאה} other {{reason}}}",
     "landedAtLine": "נקלט ב-{landedAt}",
     "clientIdLine": "מזהה {clientId}",
     "capNote": "מוצגים {count} אירועי החיוב האחרונים.",
