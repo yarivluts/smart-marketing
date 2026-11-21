@@ -6498,7 +6498,7 @@
         "ready": "Publishing waits for your approval",
         "published": "On Facebook and Instagram, switched off - not showing to anyone",
         "running": "Ads are running",
-        "rejected": "You chose not to publish - nothing was sent to Facebook and Instagram and no money was spent",
+        "rejected": "You chose not to publish - nothing was sent to Facebook and Instagram and no money was spent. Changed your mind? Open the ads in the Ad Studio and publish them from there.",
         "failed": "Publishing failed ({reason}). No ad was switched on, so nothing was spent.",
         "connect": "Connect Facebook and Instagram",
         "turnOnWaiting": "When you are ready, turn them on in the \"Turn on the ads\" card waiting for your approval.",

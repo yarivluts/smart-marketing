@@ -902,6 +902,11 @@ describe('GrowthPilotApp', () => {
       expect(within(line).getByTestId('growth-pilot-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
     });
 
+    it('tells the person how to publish later after they chose not to publish', () => {
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [{ ...TARGET, publishStatus: 'rejected' }] })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-target-publish')).toHaveTextContent(/no money was spent\. Changed your mind\? Open the ads in the Ad Studio and publish them from there\./);
+    });
+
     it('hides publish and activate approval controls when canExecute is false while keeping reject and non-platform approvals available (KAN-152)', () => {
       const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
       const publishView = renderWithIntl(
