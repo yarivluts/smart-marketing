@@ -3147,7 +3147,7 @@
     "proposeActivateButton": "Propose activation",
     "proposeActivateError": "Couldn't propose the activation. Please try again.",
     "proposeKeywordEditHeading": "Propose a keyword edit",
-    "proposeKeywordEditNoTargetsNote": "No ad has a group of ads yet — create and execute an ad draft above first.",
+    "proposeKeywordEditNoTargetsNote": "No ad has a group of ads yet — propose a new ad draft above and approve it first.",
     "proposeKeywordEditTargetLabel": "Which ad",
     "proposeKeywordEditAdGroupLabel": "Group of ads",
     "proposeKeywordEditAdGroupOption": "Group of ads {number}",

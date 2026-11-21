@@ -3147,7 +3147,7 @@
     "proposeActivateButton": "הצע הפעלה",
     "proposeActivateError": "לא ניתן היה להציע את ההפעלה. נסו שוב.",
     "proposeKeywordEditHeading": "הצע עריכת מילות מפתח",
-    "proposeKeywordEditNoTargetsNote": "לאף יעד אין עדיין קבוצת מודעות - צרו והפעילו טיוטת מודעה למעלה תחילה.",
+    "proposeKeywordEditNoTargetsNote": "לאף יעד אין עדיין קבוצת מודעות - הציעו טיוטת מודעה חדשה למעלה ואשרו אותה תחילה.",
     "proposeKeywordEditTargetLabel": "איזו מודעה",
     "proposeKeywordEditAdGroupLabel": "קבוצת מודעות",
     "proposeKeywordEditAdGroupOption": "קבוצת מודעות {number}",

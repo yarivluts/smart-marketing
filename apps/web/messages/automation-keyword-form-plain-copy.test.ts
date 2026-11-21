@@ -27,3 +27,13 @@ describe('automation keyword form copy', () => {
     expect(autoHe.proposeKeywordEditEmptyError).not.toMatch(/שליל/);
   });
 });
+
+describe('keyword form "no ads yet" note', () => {
+  it('says to propose and approve a draft, not to "execute" or turn one on', () => {
+    const auto = en.Automation as Record<string, string>;
+    const autoHe = he.Automation as Record<string, string>;
+    expect(auto.proposeKeywordEditNoTargetsNote).toMatch(/propose .*approve/);
+    expect(auto.proposeKeywordEditNoTargetsNote).not.toMatch(/execute/i);
+    expect(autoHe.proposeKeywordEditNoTargetsNote).not.toMatch(/הפעיל/);
+  });
+});
