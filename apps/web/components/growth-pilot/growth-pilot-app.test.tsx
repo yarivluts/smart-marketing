@@ -801,7 +801,7 @@ describe('GrowthPilotApp', () => {
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The 2 approved images go to Facebook and Instagram as ready-but-switched-off ads');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('https://app.growthos.io/lp/abc');
       expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('The page people open after clicking: https://app.growthos.io/lp/abc');
-      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Countries: Israel');
+      expect(screen.getByTestId('growth-pilot-publish')).toHaveTextContent('Shown in: Israel');
       expect(within(screen.getByTestId('growth-pilot-ads-preview')).getAllByRole('img')).toHaveLength(2);
       expect(within(card).queryByTestId('growth-pilot-change')).toBeNull();
       expect(screen.getByTestId('growth-pilot-budget')).toHaveAccessibleDescription('The most you will spend per day, in your ad account currency, once you turn the ads on. Nothing is spent before that.');

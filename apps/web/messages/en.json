@@ -6485,7 +6485,7 @@
       "description": "{count, plural, one {The approved image goes to Facebook and Instagram as a ready-but-switched-off ad} other {The # approved images go to Facebook and Instagram as ready-but-switched-off ads}}. Nobody sees them and nothing is spent until you turn them on.",
       "activateDescription": "The ads are on Facebook and Instagram, switched off. Turning them on makes them visible and starts spending - up to {budget} a day in your ad account currency.",
       "link": "The page people open after clicking",
-      "countries": "Countries",
+      "countries": "Shown in",
       "budget": "Daily budget",
       "budgetHint": "The most you will spend per day, in your ad account currency, once you turn the ads on. Nothing is spent before that.",
       "budgetStart": "Not sure what to enter? A small amount is fine to start. This is only the most you will spend per day, in your ad account currency, and nothing is spent until you turn the ads on.",
