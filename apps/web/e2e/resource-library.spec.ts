@@ -66,7 +66,8 @@ test.describe('Org Resource Library: create, request, approve, detach (KAN-27)',
     // detaching frees the resource back up for a fresh request.
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/resources`);
     await expect(page.getByText('Status: Approved (act_111)')).toBeVisible();
-    await page.getByRole('button', { name: 'Detach' }).click();
+    await page.getByRole('button', { name: 'Remove from this project' }).click();
+    await page.getByRole('button', { name: 'Yes, remove' }).click();
     await expect(page.getByRole('button', { name: 'Request' })).toBeVisible();
   });
 });

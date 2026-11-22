@@ -28,7 +28,8 @@ describe('DetachAttachmentButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ status: 'detached' }) } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Detach' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from this project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/resource-attachments/attach-1', { method: 'DELETE' });
@@ -38,9 +39,22 @@ describe('DetachAttachmentButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Detach' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from this project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't detach this resource. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't remove this from the project. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('asks first, sends nothing until confirmed, and Keep it backs out', () => {
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from this project' }));
+    expect(screen.getByText(/GrowthOS stops using it here/)).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(screen.getByRole('button', { name: 'Remove from this project' })).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });
