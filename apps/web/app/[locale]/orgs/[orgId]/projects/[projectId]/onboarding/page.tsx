@@ -362,6 +362,14 @@ async function SourcesStep({
         ) : (
           <p className="text-sm text-muted-foreground">{t('sourceStepNoEventsYet')}</p>
         )}
+        {!hasReceivedData && (connectedSourceInstall || hasIngestKey) ? (
+          <p className="text-sm text-muted-foreground" data-testid="onboarding-no-data-pilot">
+            {t('sourceStepNoDataYetHint')}{' '}
+            <Link className="font-medium underline" href={`/orgs/${orgId}/projects/${projectId}/growth-pilot`}>
+              {t('sourceStepNoDataLink')}
+            </Link>
+          </p>
+        ) : null}
         {quarantinedCount > 0 ? (
           <p className="text-sm text-muted-foreground">
             {t('sourceStepQuarantined', { count: quarantinedCount })}{' '}

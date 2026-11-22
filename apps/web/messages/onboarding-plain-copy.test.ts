@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import en from './en.json';
 import he from './he.json';
@@ -67,5 +69,24 @@ describe('source step never dead-ends a newcomer with nothing to connect', () =>
     }
     expect(en.Onboarding.sourceStepNoDataLink).toMatch(/Growth Pilot/);
     expect(he.Onboarding.sourceStepNoDataLink).not.toMatch(/[A-Za-z]/);
+  });
+});
+
+describe('source step shows the Growth Pilot way out while no data has arrived', () => {
+  it('has the hint in both languages, in plain words', () => {
+    for (const lang of [en, he]) {
+      expect(lang.Onboarding.sourceStepNoDataYetHint).toBeTruthy();
+    }
+    expect(en.Onboarding.sourceStepNoDataYetHint).toMatch(/do not need any data/);
+    expect(he.Onboarding.sourceStepNoDataYetHint).not.toMatch(/[A-Za-z]/);
+  });
+
+  it('is rendered in the waiting-for-data box, only before data arrives', () => {
+    const page = readFileSync(
+      join(__dirname, '..', 'app', '[locale]', 'orgs', '[orgId]', 'projects', '[projectId]', 'onboarding', 'page.tsx'),
+      'utf8',
+    );
+    expect(page).toMatch(/!hasReceivedData && \(connectedSourceInstall \|\| hasIngestKey\)/);
+    expect(page).toContain("t('sourceStepNoDataYetHint')");
   });
 });
