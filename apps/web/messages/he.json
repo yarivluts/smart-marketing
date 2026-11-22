@@ -563,6 +563,7 @@
     "sourceStepNoEnvironmentsLink": "פתחו את הגדרות הפרויקט",
     "sourceStepContinueHint": "חברו מקור נתונים למעלה כדי להמשיך.",
     "sourceStepNoDataHint": "אין עדיין מה לחבר? אפשר להתחיל בלי שום נתונים.",
+    "sourceStepNoDataYetHint": "לא בטוחים איך שולחים נתונים? אפשר לדלג - לא צריך שום נתונים כדי להתחיל.",
     "sourceStepNoDataLink": "תנו לטייס צמיחה לקרוא את האתר שלכם במקום",
     "sourceContinueButton": "המשך",
     "funnelStepHeading": "אישור מסלול הלקוחות שלכם",

@@ -563,6 +563,7 @@
     "sourceStepNoEnvironmentsLink": "Open project settings",
     "sourceStepContinueHint": "Connect a source above to continue.",
     "sourceStepNoDataHint": "Nothing to connect yet? You do not need any data to start.",
+    "sourceStepNoDataYetHint": "Not sure how to send data? You can skip this - you do not need any data to start.",
     "sourceStepNoDataLink": "Let Growth Pilot read your website instead",
     "sourceContinueButton": "Continue",
     "funnelStepHeading": "Confirm your customer path",
