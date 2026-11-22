@@ -30,4 +30,11 @@ describe('Onboarding plain copy', () => {
     expect(he.Onboarding.sourceStepNoEnvironmentsLink).toMatch(/[\u0590-\u05ff]/);
     expect(en.Onboarding.sourceStepNoEnvironmentsLink).not.toMatch(/environment/i);
   });
+
+  it('explains the "no data space" note in plain words and says the step can be skipped', () => {
+    expect(en.Onboarding.sourceStepNoEnvironments).toMatch(/a place that keeps your data/i);
+    expect(en.Onboarding.sourceStepNoEnvironments).toMatch(/skip/i);
+    expect(he.Onboarding.sourceStepNoEnvironments).toContain('לדלג');
+    expect(he.Onboarding.sourceStepNoEnvironments).toContain('מקום ששומר');
+  });
 });

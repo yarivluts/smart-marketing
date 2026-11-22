@@ -559,7 +559,7 @@
     "sourceStepNoManifests": "עדיין לא נוספו לארגון הזה חיבורים מוכנים.",
     "sourceStepNoManifestsLink": "עיינו בחיבורים המוכנים",
     "sourceStepPushYourOwnHeading": "או שלחו נתונים משלכם",
-    "sourceStepNoEnvironments": "לפרויקט הזה אין עדיין מרחב נתונים, ולכן אי אפשר ליצור מפתח. פתחו את הגדרות הפרויקט כדי להוסיף אחד.",
+    "sourceStepNoEnvironments": "מפתח צריך מרחב נתונים (מקום ששומר את הנתונים שלכם), ולפרויקט הזה אין עדיין. אפשר להוסיף אחד בהגדרות הפרויקט, או לדלג - לא צריך שום נתונים כדי להתחיל.",
     "sourceStepNoEnvironmentsLink": "פתחו את הגדרות הפרויקט",
     "sourceStepContinueHint": "חברו מקור נתונים למעלה כדי להמשיך.",
     "sourceStepNoDataHint": "אין עדיין מה לחבר? אפשר להתחיל בלי שום נתונים.",
