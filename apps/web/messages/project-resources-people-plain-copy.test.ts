@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import en from './en.json';
 import he from './he.json';
 
-const t = (locale: 'en' | 'he', namespace: string) =>
+const t = (locale: 'en' | 'he', namespace: 'ProjectResources' | 'ResourceLibrary') =>
   createTranslator({ locale, messages: locale === 'en' ? en : he, namespace });
 
 describe('Resources pages say "team members", not "People registry"', () => {
-  for (const ns of ['ProjectResources', 'ResourceLibrary']) {
+  for (const ns of ['ProjectResources', 'ResourceLibrary'] as const) {
     it(`${ns} uses plain headings in en and he`, () => {
       expect(t('en', ns)('peopleHeading')).toBe('Team members');
       expect(t('he', ns)('peopleHeading')).not.toMatch(/\u05de\u05e8\u05e9\u05dd/);
