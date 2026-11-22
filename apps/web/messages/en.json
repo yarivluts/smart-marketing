@@ -6504,6 +6504,7 @@
         "connect": "Connect Facebook and Instagram",
         "turnOnWaiting": "When you are ready, turn them on in the \"Turn on the ads\" card waiting for your approval.",
         "turnOnDeclined": "The ads stay switched off and nothing is spent. When you want them on, turn them on in your Facebook and Instagram ad account.",
+        "turnOnDeclinedLink": "The ads stay switched off and nothing is spent. When you want them on, use the \"Open in Facebook Ads Manager\" link here and switch them on there.",
         "adsManager": "Open in Facebook Ads Manager"
       },
       "confirmActivate": "Yes, turn on - spend up to {budget} a day",

@@ -857,6 +857,16 @@ describe('GrowthPilotApp', () => {
       expect(screen.queryByTestId('growth-pilot-turn-on-declined')).toBeNull();
     });
 
+    it('when the ads link exists, the declined turn-on line points to it, in English and Hebrew', () => {
+      const published = [{ ...TARGET, publishStatus: 'published' as const, adsManagerUrl: 'https://business.facebook.com/x' }];
+      const he = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'he' });
+      expect(screen.getByTestId('growth-pilot-turn-on-declined')).toHaveTextContent('היכנסו דרך הקישור');
+      he.unmount();
+      renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: published })} />, { locale: 'en' });
+      expect(screen.getByTestId('growth-pilot-turn-on-declined')).toHaveTextContent('use the "Open in Facebook Ads Manager" link here');
+      expect(screen.getByTestId('growth-pilot-ads-manager')).toBeTruthy();
+    });
+
     it('Reject on the publish and turn-on cards says what it really does, in English and Hebrew', () => {
       const ACTIVATE = { ...PUBLISH, id: 'act1', kind: 'activate' as const };
       const published = [{ ...TARGET, publishStatus: 'published' as const }];
