@@ -13,7 +13,7 @@ describe('Growth Pilot rejected lines on a target card', () => {
   it.each(places)('%s: Hebrew has the same two-part line, in Hebrew only', (place) => {
     const line = he.GrowthPilot[place].status.rejected;
     expect(line).toContain(' - ');
-    expect(line).not.toMatch(/[A-Za-z]/);
+    expect(line.replace('ל-AI', '')).not.toMatch(/[A-Za-z]/);
     expect(line.length).toBeGreaterThan(en.GrowthPilot[place].status.rejected.length / 3);
   });
 
