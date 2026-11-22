@@ -4433,11 +4433,11 @@
     },
     "videoRequestErrors": {
       "scene_not_found": "הסצנה הזו כבר לא בתסריט השמור. שמרו את התסריט ונסו שוב.",
-      "already_generating": "כבר נוצר קליפ לסצנה הזו.",
+      "already_generating": "קליפ לסצנה הזו עדיין נוצר. המתינו שיסתיים ונסו שוב.",
       "clip_not_editable": "אפשר לערוך רק קליפ שהסתיים.",
       "invalid_instruction": "כתבו איך הקליפ צריך להשתנות.",
       "not_ready": "לכל סצנה צריך קודם קליפ מוכן ועדכני.",
-      "already_assembling": "הסרטון כבר בהרכבה."
+      "already_assembling": "הסרטון עדיין מורכב. המתינו שיסתיים ונסו שוב."
     },
     "assemblyErrors": {
       "ffmpeg_unavailable": "אי אפשר היה להרכיב את הסרטון בגלל תקלה אצלנו, לא אצלכם. ניסיון נוסף לא יעזור - פנו לתמיכה של GrowthOS.",

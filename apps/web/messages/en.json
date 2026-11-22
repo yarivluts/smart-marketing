@@ -4433,11 +4433,11 @@
     },
     "videoRequestErrors": {
       "scene_not_found": "That scene is no longer in the saved script. Save the script and try again.",
-      "already_generating": "This scene already has a clip being generated.",
+      "already_generating": "A clip for this scene is still being made. Wait for it to finish, then try again.",
       "clip_not_editable": "Only a finished clip can be edited.",
       "invalid_instruction": "Say how the clip should change.",
       "not_ready": "Every scene needs a ready, current clip first.",
-      "already_assembling": "The video is already being assembled."
+      "already_assembling": "The video is still being put together. Wait for it to finish, then try again."
     },
     "assemblyErrors": {
       "ffmpeg_unavailable": "The video could not be put together because of a problem on our side, not yours. Trying again will not help - please contact GrowthOS support.",
