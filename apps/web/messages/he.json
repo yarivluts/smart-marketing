@@ -2529,8 +2529,8 @@
       "previous_period": "תקופה קודמת",
       "previous_year": "שנה קודמת"
     },
-    "globalFiltersLabel": "מסננים גלובליים",
-    "noGlobalFilters": "לא הוגדרו מסננים גלובליים — כל אריח שואל את המדד שלו ללא סינון.",
+    "globalFiltersLabel": "מסננים לכל לוח המחוונים",
+    "noGlobalFilters": "עדיין אין מסננים — כל אריח מציג את כל הנתונים שלו. הוסיפו מסנן כדי לצמצם את כל האריחים בבת אחת.",
     "filterFieldLabel": "שדה סינון",
     "filterFieldPlaceholder": "שדה",
     "filterOperatorLabel": "השוואה",

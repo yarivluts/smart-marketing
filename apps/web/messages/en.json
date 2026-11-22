@@ -2529,8 +2529,8 @@
       "previous_period": "Previous period",
       "previous_year": "Previous year"
     },
-    "globalFiltersLabel": "Global filters",
-    "noGlobalFilters": "No global filters set — every tile queries its own metric unfiltered.",
+    "globalFiltersLabel": "Filters for the whole dashboard",
+    "noGlobalFilters": "No filters yet — every tile shows all of its data. Add one to narrow every tile at once.",
     "filterFieldLabel": "Filter field",
     "filterFieldPlaceholder": "field",
     "filterOperatorLabel": "Comparison",
