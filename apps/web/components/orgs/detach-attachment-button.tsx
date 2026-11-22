@@ -15,6 +15,7 @@ export function DetachAttachmentButton({ orgId, attachmentId }: DetachAttachment
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   async function handleClick(): Promise<void> {
     setError(false);
@@ -25,6 +26,7 @@ export function DetachAttachmentButton({ orgId, attachmentId }: DetachAttachment
         setError(true);
         return;
       }
+      setConfirming(false);
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -33,9 +35,23 @@ export function DetachAttachmentButton({ orgId, attachmentId }: DetachAttachment
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={submitting}>
-        {t('detach')}
-      </Button>
+      {confirming ? (
+        <div className="flex flex-col items-end gap-2">
+          <p className="text-xs text-muted-foreground">{t('detachConfirm')}</p>
+          <div className="flex gap-2">
+            <Button type="button" variant="destructive" size="sm" onClick={handleClick} disabled={submitting}>
+              {t('detachConfirmYes')}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(false)} disabled={submitting}>
+              {t('detachKeep')}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(true)}>
+          {t('detach')}
+        </Button>
+      )}
       {error ? (
         <p role="alert" className="text-xs text-destructive">
           {t('detachError')}
