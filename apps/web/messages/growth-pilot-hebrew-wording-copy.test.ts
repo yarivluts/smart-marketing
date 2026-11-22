@@ -13,4 +13,11 @@ describe('Growth Pilot Hebrew uses the same plain words everywhere', () => {
     expect(he.GrowthPilot.performance.targetResults).not.toContain('קליקים');
     expect(he.GrowthPilot.performance.kpi.clicks).toContain('לחיצות');
   });
+
+  it('per-target results say the money was spent, as a sentence, not "50 הוצאה"', () => {
+    const text = he.GrowthPilot.performance.targetResults;
+    expect(text).toContain('{spend}');
+    expect(text).toMatch(/הוצאו \{spend\}/);
+    expect(text).not.toMatch(/\{spend\} הוצאה/);
+  });
 });
