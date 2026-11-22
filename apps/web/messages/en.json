@@ -559,7 +559,7 @@
     "sourceStepNoManifests": "No ready-made connections have been added to this organization yet.",
     "sourceStepNoManifestsLink": "Browse ready-made connections",
     "sourceStepPushYourOwnHeading": "Or send your own data",
-    "sourceStepNoEnvironments": "This project has no data space yet, so a key cannot be created. Open the project settings to add one.",
+    "sourceStepNoEnvironments": "A key needs a data space (a place that keeps your data), and this project has none yet. Add one in the project settings, or skip this - you do not need any data to start.",
     "sourceStepNoEnvironmentsLink": "Open project settings",
     "sourceStepContinueHint": "Connect a source above to continue.",
     "sourceStepNoDataHint": "Nothing to connect yet? You do not need any data to start.",
