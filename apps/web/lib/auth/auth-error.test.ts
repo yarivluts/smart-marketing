@@ -52,4 +52,10 @@ describe('auth error copy', () => {
       expect(heMessages.Auth[key]).toBeTruthy();
     }
   });
+
+  it('tells a person who signed up another way what to do if they forgot the password', () => {
+    expect(enMessages.Auth.accountExistsOtherMethodError).toContain('Forgot password?');
+    expect(enMessages.Auth.accountExistsOtherMethodError).toContain(enMessages.Auth.tooManyAttemptsError.match(/"([^"]+)"/)?.[1] ?? '');
+    expect(heMessages.Auth.accountExistsOtherMethodError).toContain(heMessages.Auth.tooManyAttemptsError.match(/"([^"]+)"/)?.[1] ?? 'x');
+  });
 });
