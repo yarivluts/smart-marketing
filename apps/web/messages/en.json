@@ -7099,7 +7099,7 @@
       "sendingUpdated": "Creating updated link...",
       "updatedLinkReady": "Updated client review link ready:",
       "copyUpdatedLink": "Copy client link",
-      "actionError": "Something went wrong. Review open items and try again.",
+      "actionError": "That did not go through, so nothing was changed. Check your internet connection and try again in a moment.",
       "statusOpen": "Open",
       "statusProposed": "Proposal ready",
       "statusApplied": "Applied",
