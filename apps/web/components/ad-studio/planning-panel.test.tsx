@@ -136,9 +136,9 @@ describe('PlanningPanel', () => {
 
   it('before any analysis it explains the step; with no provider the button is disabled', () => {
     renderPanel({ plan: null, sources: null, generatedBy: null, aiAvailable: false });
-    expect(screen.getByText('No analysis yet')).toBeInTheDocument();
+    expect(screen.getByText('No plan yet')).toBeInTheDocument();
     expect(screen.getByText('The AI helper is not switched on yet, so it cannot analyze your ads. Contact GrowthOS support to switch it on.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run deep analysis' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Write the plan' })).toBeDisabled();
   });
 
   it('runs the analysis and refreshes, or shows the translated error', async () => {
@@ -148,13 +148,13 @@ describe('PlanningPanel', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ brief: {} }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     renderPanel({ plan: null, sources: null, generatedBy: null });
-    fireEvent.click(screen.getByRole('button', { name: 'Run deep analysis' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Write the plan' }));
     expect(await screen.findByText("You have used today's AI allowance (50 of 50). It starts again tomorrow. Daily limits come from your GrowthOS plan - contact us if you need more.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/orgs/o/projects/p/ad-studio/briefs/b1/plan', { method: 'POST' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run deep analysis' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Write the plan' }));
     await waitFor(() => expect(refresh).toHaveBeenCalled());
-    expect(screen.getByText('Analysis ready.')).toBeInTheDocument();
+    expect(screen.getByText('Plan ready.')).toBeInTheDocument();
   });
 });
 
