@@ -316,7 +316,7 @@
     "cardAccepted": "Received (last 14 days)",
     "cardRejected": "Set aside (last 14 days)",
     "cardTrendLabel": "Data received per day, last 14 days",
-    "cardNoRecentData": "No data received in the last 14 days.",
+    "cardNoRecentData": "No data received in the last 14 days. That is fine - you do not need any to start. Open Growth Pilot and it works from your website.",
     "cardHealthUnavailable": "This project's health could not be read right now.",
     "cardHealthRestricted": "Only project admins can see whether data is arriving.",
     "cardOnboarding": "Setup {completed} of {total} steps done",

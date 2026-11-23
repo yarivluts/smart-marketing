@@ -27,3 +27,14 @@ describe('dashboard project card wording', () => {
     }
   });
 });
+
+describe('dashboard project card with no data yet', () => {
+  it.each([
+    ['en', en, /you do not need any/, /Growth Pilot/],
+    ['he', he, /אין צורך בנתונים/, /\u05d8\u05d9\u05d9\u05e1 \u05e6\u05de\u05d9\u05d7\u05d4/],
+  ] as const)('%s: reassures a newcomer and points to Growth Pilot', (_l, messages, need, pilot) => {
+    const text = (messages as unknown as Copy).DashboardPage.cardNoRecentData;
+    expect(text).toMatch(need);
+    expect(text).toMatch(pilot);
+  });
+});
