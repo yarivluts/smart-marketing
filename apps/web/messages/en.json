@@ -4457,17 +4457,17 @@
     "ffmpegMissing": "Not installed - videos cannot be put together",
     "stagePlanValue": "{count, plural, one {# recommendation} other {# recommendations}}",
     "plan": {
-      "title": "Deep analysis",
+      "title": "The plan",
       "description": "Reads your web page, measured results, existing ads and Google keyword volumes, then plans the ad from that evidence.",
-      "run": "Run deep analysis",
+      "run": "Write the plan",
       "rerun": "Run again",
-      "running": "Analyzing...",
+      "running": "Writing the plan...",
       "runningHint": "Reading your web page, results, existing ads and keyword volumes. This can take up to a minute.",
       "noProvider": "The AI helper is not switched on yet, so it cannot analyze your ads. Contact GrowthOS support to switch it on.",
-      "emptyTitle": "No analysis yet",
-      "emptyDescription": "Run a deep analysis to see what the evidence says before writing the script. The script writer then builds on it.",
+      "emptyTitle": "No plan yet",
+      "emptyDescription": "Press Write the plan to see what your page and results say before the script is written. The script then builds on it.",
       "generatedBy": "Worked out by the AI helper on {date}",
-      "done": "Analysis ready.",
+      "done": "Plan ready.",
       "sourcesTitle": "Data sources",
       "sourcesDescription": "What the analysis could read. Anything missing is left out, never estimated.",
       "source": {
@@ -4632,8 +4632,8 @@
     "stageImagesValue": "{current} of {total} images",
     "autopilot": {
       "title": "Create everything automatically",
-      "description": "One click takes this ad from your idea to finished ads: a deep plan, the script, image ad ideas and images in every size, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
-      "optionPlan": "Deep plan first",
+      "description": "One click takes this ad from your idea to finished ads: a plan, the script, image ad ideas and images in every size, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
+      "optionPlan": "Write the plan first",
       "optionImages": "Image ads",
       "optionVideo": "Video ad",
       "formatsLegend": "Where the images will show",
@@ -4658,7 +4658,7 @@
         "awaiting_approval": "Waiting for you to confirm the plan"
       },
       "step": {
-        "plan": "Deep plan",
+        "plan": "Plan",
         "script": "Script",
         "image_concepts": "Image ideas",
         "images": "Images",
@@ -4693,7 +4693,7 @@
         "qa_issues": "the AI check still found problems - see the scenes"
       },
       "prepareTitle": "Prepare the plan",
-      "prepareDescription": "The AI writes the deep plan, the video script and the image ideas. Nothing is made yet: you review and change them below, then confirm.",
+      "prepareDescription": "The AI writes the plan, the video script and the image ideas. Nothing is made yet: you review and change them below, then confirm.",
       "prepare": "Prepare the plan",
       "createTitle": "Creating your ads",
       "createDescription": "The confirmed plan is being turned into images and video. You can leave this page; it continues when you come back.",

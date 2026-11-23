@@ -44,9 +44,9 @@ test.describe('AI Ad Studio deep analysis (KAN-230)', () => {
     const { orgId, projectId, briefId } = await createBrief(page);
 
     const panel = page.getByTestId('ad-studio-planning');
-    await expect(panel.getByRole('heading', { name: 'Deep analysis' })).toBeVisible();
-    await expect(panel.getByText('No analysis yet')).toBeVisible();
-    await expect(panel.getByRole('button', { name: 'Run deep analysis' })).toBeVisible();
+    await expect(panel.getByRole('heading', { name: 'The plan' })).toBeVisible();
+    await expect(panel.getByText('No plan yet')).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Write the plan' })).toBeVisible();
     await expect(page.getByTestId('ad-studio-keyword-data')).toContainText('Google Ads is not connected to this project');
 
     // Stand in for a model call: store a plan through the same service the plan route writes with.
