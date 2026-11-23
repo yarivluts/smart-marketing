@@ -20,6 +20,14 @@ describe('Campaigns beginner copy', () => {
   });
 });
 
+describe('Campaigns empty ad preview', () => {
+  it('names Growth Pilot and says nothing goes live without approval, in both languages', () => {
+    expect(en.Campaigns.noCreativesYet).toContain('Growth Pilot');
+    expect(en.Campaigns.noCreativesYet).not.toMatch(/draft|ads page/i);
+    expect(he.Campaigns.noCreativesYet).toContain(he.AppShell.growthPilot);
+  });
+});
+
 describe('Campaigns spend, tab and recommendation copy', () => {
   for (const [name, bundle] of [['en', en], ['he', he]] as const) {
     it(`${name}: spend messages have no data-plumbing jargon`, () => {

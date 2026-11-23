@@ -3505,7 +3505,7 @@
     "creativesHeading": "Your ads",
     "historyHeading": "Action history",
     "noHistory": "No actions have touched this ad yet.",
-    "noCreativesYet": "No ad draft exists for this ad yet - create one from the ads page.",
+    "noCreativesYet": "There is no ad preview for this ad yet. Growth Pilot can write one for you, and you approve it before anything goes live.",
     "platformLabel": "Platform",
     "statusLabel": "Status",
     "budgetLabel": "Daily budget",
