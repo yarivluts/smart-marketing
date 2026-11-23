@@ -125,3 +125,11 @@ describe('Ads page money labels', () => {
     expect(he.Campaigns[key]).toMatch(/^כסף שהוצא/);
   });
 });
+
+describe('Ad with no draft yet', () => {
+  it('points to Growth Pilot, not to the page the person is already on', () => {
+    expect(en.Campaigns.noCreativesYet).toContain('Growth Pilot');
+    expect(en.Campaigns.noCreativesYet).not.toMatch(/ads page/i);
+    expect(he.Campaigns.noCreativesYet).toContain(he.AppShell.growthPilot);
+  });
+});
