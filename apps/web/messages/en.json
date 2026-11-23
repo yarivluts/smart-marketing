@@ -3659,7 +3659,7 @@
       "warehouse_not_configured": "Your ad numbers are not connected yet, so ad spend cannot be shown. Connect your ad account to see spend by channel and ad.",
       "quota_exceeded": "GrowthOS has reached today's limit for loading your numbers. The spend charts come back tomorrow.",
       "not_yet_backed": "Your ad spend has not arrived yet. Connect your Facebook, Instagram or Google ad account and wait for the first update.",
-      "query_error": "We could not load your ad spend - no spend has been collected for this project yet. Connect your Facebook, Instagram or Google ad account to start measuring spend."
+      "query_error": "We could not load your ad spend just now. Your ads are not affected. Refresh the page in a minute; if it keeps happening, check that your ad account is still connected."
     },
     "connectAdSourceCta": "Connect an ad source",
     "chartsSpendByChannel": "Spend by platform",

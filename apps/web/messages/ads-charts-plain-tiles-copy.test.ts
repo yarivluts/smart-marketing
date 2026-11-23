@@ -17,7 +17,14 @@ describe('Ads & results spend tiles and empty states use plain words', () => {
 
   it('tells a newcomer which ad account to connect, in both languages', () => {
     expect(c.en.spendCockpitDegraded.not_yet_backed).toMatch(/Facebook, Instagram or Google ad account/);
-    expect(c.he.spendCockpitDegraded.query_error).toMatch(/פייסבוק, באינסטגרם או בגוגל/);
+    expect(c.he.spendCockpitDegraded.not_yet_backed).toMatch(/פייסבוק, באינסטגרם או בגוגל/);
+  });
+
+  it('a failed spend load says to retry, not that no spend was collected or to connect an account', () => {
+    expect(c.en.spendCockpitDegraded.query_error).toMatch(/Refresh the page/);
+    expect(c.en.spendCockpitDegraded.query_error).not.toMatch(/no spend has been collected/);
+    expect(c.he.spendCockpitDegraded.query_error).toMatch(/רעננו/);
+    expect(c.he.spendCockpitDegraded.query_error).not.toMatch(/לא נאספה/);
   });
 });
 
