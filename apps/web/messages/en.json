@@ -659,8 +659,8 @@
     "globalJourneyAllDone": "Every project you administer is set up. Showing {project} in {org}."
   },
   "Invite": {
-    "title": "Organization invite",
-    "alreadyResolved": "This invite has already been used. If it was you, your team is waiting - just open GrowthOS and sign in.",
+    "title": "You are invited to join a team",
+    "alreadyResolved": "This invite has already been used, so there is nothing more to accept. If you accepted it, open GrowthOS and sign in - the team is in your list.",
     "openGrowthOs": "Open GrowthOS",
     "description": "You've been invited to join {organizationName}. This invite was sent to {email}.",
     "signInToAccept": "Sign in to accept",

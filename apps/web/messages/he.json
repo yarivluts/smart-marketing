@@ -659,8 +659,8 @@
     "globalJourneyAllDone": "כל הפרויקטים שאתם מנהלים מוגדרים. מוצג {project} בארגון {org}."
   },
   "Invite": {
-    "title": "הזמנה לארגון",
-    "alreadyResolved": "ההזמנה הזו כבר נוצלה. אם זה היה אתם, הצוות מחכה לכם - פשוט פתחו את GrowthOS והתחברו.",
+    "title": "הוזמנתם להצטרף לצוות",
+    "alreadyResolved": "ההזמנה הזו כבר נוצלה, ולכן אין מה לאשר. אם אישרתם אותה, פתחו את GrowthOS והתחברו - הצוות מופיע ברשימה שלכם.",
     "openGrowthOs": "פתיחת GrowthOS",
     "description": "הוזמנתם להצטרף אל {organizationName}. ההזמנה נשלחה אל {email}.",
     "signInToAccept": "התחברו כדי לאשר",
