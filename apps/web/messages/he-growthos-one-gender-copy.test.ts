@@ -15,4 +15,9 @@ describe('Hebrew copy speaks of GrowthOS in one gender on the first screens', ()
     for (const t of [...texts, ...auto]) expect(t).not.toMatch(FEMININE_VERB);
     expect(he.Auth.brandDescription).toMatch(/GrowthOS \u05e7\u05d5\u05e8\u05d0 /);
   });
+
+  it('the churn-themes note says GrowthOS sorts in the masculine', () => {
+    expect(he.ChurnReasons.themeDigestNoneMatched).toContain('GrowthOS \u05de\u05de\u05d9\u05d9\u05df ');
+    expect(he.ChurnReasons.themeDigestNoneMatched).not.toContain('\u05de\u05de\u05d9\u05d9\u05e0\u05ea');
+  });
 });

@@ -1899,7 +1899,7 @@
     "reasonCodeCount": "{count, plural, one {ביטול #} other {# ביטולים}}",
     "themeDigestHeading": "מה הלקוחות אומרים",
     "themeDigestEmpty": "טרם נקלטו הערות ביטול.",
-    "themeDigestNoneMatched": "{count, plural, one {התקבלה תגובה #} other {התקבלו # תגובות}}, אך אף אחת לא תאמה נושא מוכר. GrowthOS ממיינת תגובות לפי מילים נפוצות באנגלית, ולכן תגובות בשפה אחרת או בניסוח שונה אינן ממוינות.",
+    "themeDigestNoneMatched": "{count, plural, one {התקבלה תגובה #} other {התקבלו # תגובות}}, אך אף אחת לא תאמה נושא מוכר. GrowthOS ממיין תגובות לפי מילים נפוצות באנגלית, ולכן תגובות בשפה אחרת או בניסוח שונה אינן ממוינות.",
     "themeDigestCoverage": "הנושאים מכסים {matched} מתוך {total} תגובות. השאר לא תאמו אף נושא מוכר, ולכן אינם נכללים למעלה.",
     "themeCommentCount": "{count, plural, one {תגובה #} other {# תגובות}}",
     "themeExampleComment": "“{comment}”",
