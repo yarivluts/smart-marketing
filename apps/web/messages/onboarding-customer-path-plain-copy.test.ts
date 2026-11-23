@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import en from './en.json';
 import he from './he.json';
 
-const KEYS = ['funnelStepHeading', 'funnelStepIntro', 'funnelStepEmpty', 'funnelStepConfirm', 'confirmedFunnelHeading', 'confirmedFunnelIntro', 'confirmedFunnelEdit', 'confirmedFunnelViewConversion'] as const;
+const KEYS = ['funnelStepHeading', 'funnelStepIntro', 'funnelStepEmpty', 'funnelStepSkip', 'funnelStepConfirm', 'confirmedFunnelHeading', 'confirmedFunnelIntro', 'confirmedFunnelEdit', 'confirmedFunnelViewConversion'] as const;
 
 describe('the onboarding customer-path step speaks plain words', () => {
   it('English avoids funnel, events, conversion and marketing stage names', () => {

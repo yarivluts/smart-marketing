@@ -67,9 +67,9 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.getByRole('button', { name: 'Done' }).click();
     await page.getByRole('button', { name: 'Continue' }).click();
 
-    // Step 3: no events ingested yet, so the AI-proposed funnel is empty — confirm anyway.
+    // Step 3: no events ingested yet, so the AI-proposed funnel is empty — skip it.
     await expect(page.getByText("Nothing has happened on this project yet")).toBeVisible();
-    await page.getByRole('button', { name: 'Confirm customer path' }).click();
+    await page.getByRole('button', { name: 'Skip this step' }).click();
 
     // Step 4: the pack's three starter boards + the invite/goal/war-room CTAs + finish.
     await expect(page.getByRole('heading', { name: 'Your starter dashboard' })).toBeVisible();
