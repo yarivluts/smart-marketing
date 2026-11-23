@@ -5590,7 +5590,7 @@
       "reasons": {
         "invalid_url": "Enter your website address, for example easysign.co.il.",
         "nothing_found": "The site was read, but the AI could not tell what it sells. Try the page that describes your product, or write the ad yourself.",
-        "blocked": "This address cannot be read from here (a private or local address).",
+        "blocked": "That address is not a public website page, so we could not read it. Enter your website address, for example easysign.co.il.",
         "unreachable": "The site did not answer. Check the address and try again.",
         "unreadable": "The page has no readable text (it may be built only with images or scripts). Try another page of the site."
       }
