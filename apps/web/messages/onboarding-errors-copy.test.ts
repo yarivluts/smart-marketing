@@ -38,3 +38,12 @@ describe('Onboarding plain copy', () => {
     expect(he.Onboarding.sourceStepNoEnvironments).toContain('מקום ששומר');
   });
 });
+
+describe('Onboarding data-step intro', () => {
+  it('explains what an access key is and that the step can be skipped', () => {
+    expect(en.Onboarding.sourceStepIntro).toMatch(/access key \(a secret code/i);
+    expect(en.Onboarding.sourceStepIntro).toMatch(/skip this step/i);
+    expect(he.Onboarding.sourceStepIntro).toContain('קוד סודי');
+    expect(he.Onboarding.sourceStepIntro).toContain('לדלג');
+  });
+});

@@ -553,7 +553,7 @@
     "packCustomDescription": "Skip this for now and pick the numbers you care about later.",
     "packInstalling": "Setting up your starter set and your first dashboards…",
     "sourceStepHeading": "Connect a data source",
-    "sourceStepIntro": "Connect a tool that already holds your data, or send your own data from your website or app using an access key — either way works.",
+    "sourceStepIntro": "Connect a tool that already holds your data, or send your own data from your website or app using an access key (a secret code that lets your site prove the data is yours) — either way works, and you can skip this step.",
     "sourceStepPluginHeading": "Use a ready-made connection",
     "sourceStepPluginConnected": "Connected: {name}",
     "sourceStepNoManifests": "No ready-made connections have been added to this organization yet.",
