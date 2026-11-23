@@ -4647,7 +4647,7 @@
       "runAgainHint": "After an edit, a new run redoes only what changed.",
       "cancel": "Stop",
       "progress": "{done} of {total}",
-      "doneHint": "Everything is ready. Review and edit each part below, then export when you are happy with it.",
+      "doneHint": "Everything is ready. Review and edit each part below, then go to Publish when you are happy with it. Ads are created paused, so nothing spends until you turn them on.",
       "errorRunActive": "The autopilot is already running for this ad.",
       "errorInvalidOptions": "Choose images, video or both, and at least one place for the images to show.",
       "runStatus": {
