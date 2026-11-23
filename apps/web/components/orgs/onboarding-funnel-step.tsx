@@ -84,8 +84,13 @@ export function OnboardingFunnelStep({ orgId, projectId, proposal, confirmedHref
     return (
       <div className="flex flex-col gap-3">
         <p className="text-muted-foreground">{t('funnelStepEmpty')}</p>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {t('genericError')}
+          </p>
+        ) : null}
         <Button type="button" onClick={handleConfirm} disabled={submitting}>
-          {t('funnelStepConfirm')}
+          {t(confirmedHref ? 'funnelStepConfirm' : 'funnelStepSkip')}
         </Button>
       </div>
     );

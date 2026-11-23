@@ -125,7 +125,8 @@ describe('OnboardingFunnelStep', () => {
     );
 
     expect(screen.getByText(/Nothing has happened on this project yet/)).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm customer path' }));
+    expect(screen.queryByRole('button', { name: 'Confirm customer path' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Skip this step' }));
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
@@ -133,6 +134,20 @@ describe('OnboardingFunnelStep', () => {
         expect.objectContaining({ body: JSON.stringify({ steps: [] }) }),
       ),
     );
+  });
+
+  it('an empty proposal shows the failure instead of failing silently', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({}) } as Response);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <OnboardingFunnelStep orgId="org-1" projectId="project-1" proposal={[]} />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip this step' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not save this step/i);
+    expect(refresh).not.toHaveBeenCalled();
   });
   /*
     KAN-199: a funnel can now be confirmed outside the wizard (MCP set_funnel). The editor then
