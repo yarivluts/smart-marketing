@@ -85,7 +85,14 @@ export function EmailPasswordForm({
       setResetNotice({ tone: 'ok', text: t('resetSent', { email: trimmed }) });
     } catch (error) {
       const code = (error as { code?: string } | null)?.code;
-      setResetNotice(code === 'auth/user-not-found' ? { tone: 'ok', text: t('resetSent', { email: trimmed }) } : { tone: 'error', text: t('resetError') });
+      if (code === 'auth/user-not-found') {
+        setResetNotice({ tone: 'ok', text: t('resetSent', { email: trimmed }) });
+        return;
+      }
+      // Say what actually went wrong when we know it (typo, no internet, too many tries).
+      const key = authErrorMessageKey(error);
+      const specific = key === 'invalidEmailError' || key === 'networkError' || key === 'tooManyAttemptsError';
+      setResetNotice({ tone: 'error', text: specific ? t(key) : t('resetError') });
     }
   }
 

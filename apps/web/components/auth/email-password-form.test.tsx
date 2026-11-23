@@ -196,6 +196,20 @@ describe('EmailPasswordForm Component', () => {
     expect(await screen.findByText('If an account exists for nobody@b.co, a password reset link is on its way.')).toBeInTheDocument();
   });
 
+  it('says what went wrong when a reset link cannot be sent, not one vague line', async () => {
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.emailLabel), { target: { value: 'a@b' } });
+    mockSendPasswordResetEmail.mockRejectedValueOnce({ code: 'auth/invalid-email' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    expect(await screen.findByText(enMessages.Auth.invalidEmailError)).toBeInTheDocument();
+    mockSendPasswordResetEmail.mockRejectedValueOnce({ code: 'auth/network-request-failed' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    expect(await screen.findByText(enMessages.Auth.networkError)).toBeInTheDocument();
+    mockSendPasswordResetEmail.mockRejectedValueOnce({ code: 'auth/internal-error' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    expect(await screen.findByText(enMessages.Auth.resetError)).toBeInTheDocument();
+  });
+
   it('switches between Sign In and Sign Up tabs in-place', () => {
     renderWithIntl(<EmailPasswordForm mode="signin" />);
 
