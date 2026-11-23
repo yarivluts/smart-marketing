@@ -12,7 +12,7 @@ describe('Growth Pilot publish card: the countries line says what it is for', ()
   });
   it('he: says where the ads are shown, not just "מדינות"', () => {
     const label = (he as unknown as Pilot).GrowthPilot.publish.countries;
-    expect(label).toBe('מוצגות ב');
+    expect(label).toBe('המודעות יוצגו במדינות');
     expect(label).not.toBe('מדינות');
   });
 });
