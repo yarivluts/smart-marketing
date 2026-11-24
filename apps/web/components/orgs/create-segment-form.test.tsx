@@ -83,7 +83,7 @@ describe('CreateSegmentForm', () => {
     fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the group. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the group. Nothing was created. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 

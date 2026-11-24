@@ -102,7 +102,7 @@ describe('CreateGoalForm', () => {
     fireEvent.change(screen.getByLabelText('Deadline'), { target: { value: '2026-09-30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create goal' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the goal. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the goal. Nothing was created. Check your internet connection and try again.');
     expect(push).not.toHaveBeenCalled();
   });
 });

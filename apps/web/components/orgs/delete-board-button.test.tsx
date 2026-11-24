@@ -53,7 +53,7 @@ describe('DeleteBoardButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete dashboard' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the dashboard. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the dashboard. Nothing was deleted. Check your internet connection and try again.');
     expect(push).not.toHaveBeenCalled();
   });
 });

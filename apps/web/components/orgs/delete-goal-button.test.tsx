@@ -53,7 +53,7 @@ describe('DeleteGoalButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete goal' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the goal. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the goal. Nothing was deleted. Check your internet connection and try again.');
     expect(push).not.toHaveBeenCalled();
   });
 });

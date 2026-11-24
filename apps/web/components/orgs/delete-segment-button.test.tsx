@@ -53,7 +53,7 @@ describe('DeleteSegmentButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the group. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the group. Nothing was deleted. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });
