@@ -58,17 +58,17 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await openMoreTools(page);
     await page.getByRole('link', { name: 'Boards' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
-    await expect(page.getByText('This project has no boards yet.')).toBeVisible();
+    await expect(page.getByText('This project has no dashboards yet.')).toBeVisible();
 
     await page.getByLabel('Name').fill('Marketing');
-    await page.getByRole('button', { name: 'Create board' }).click();
+    await page.getByRole('button', { name: 'Create dashboard' }).click();
     // A generous timeout: this is the very first visit to the dynamic
     // `boards/[boardId]` route in this dev-server process, so the
     // client-side navigation waits on an on-demand compile, not just a
     // network round trip.
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards/[^/]+$`), { timeout: 20_000 });
     await expect(page.getByRole('heading', { name: 'Marketing' })).toBeVisible();
-    await expect(page.getByText('This board has no tiles yet. Click "Edit layout" to add one.')).toBeVisible();
+    await expect(page.getByText('This dashboard has no tiles yet. Click "Edit layout" to add one.')).toBeVisible();
 
     // Build a tile: enter edit mode, add one, give it a title, save.
     await page.getByRole('button', { name: 'Edit layout' }).click();
@@ -113,8 +113,8 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
 
     // Delete the board — back on the (now empty again) boards list.
     page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Delete board' }).click();
+    await page.getByRole('button', { name: 'Delete dashboard' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
-    await expect(page.getByText('This project has no boards yet.')).toBeVisible();
+    await expect(page.getByText('This project has no dashboards yet.')).toBeVisible();
   });
 });

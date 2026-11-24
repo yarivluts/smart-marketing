@@ -57,7 +57,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
     await page.getByRole('link', { name: 'Boards' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
     await page.getByLabel('Name').fill('Marketing Overview');
-    await page.getByRole('button', { name: 'Create board' }).click();
+    await page.getByRole('button', { name: 'Create dashboard' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards/[^/]+$`), { timeout: 20_000 });
     const boardId = page.url().split('/').pop()!;
 

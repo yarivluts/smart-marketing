@@ -37,7 +37,7 @@ test.describe('Audit log (KAN-44): entries render, chain verifies, quoted summar
 
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/boards`);
     await page.getByLabel('Name').fill('Quote Test Board');
-    await page.getByRole('button', { name: 'Create board' }).click();
+    await page.getByRole('button', { name: 'Create dashboard' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards/[^/]+$`), { timeout: 20_000 });
 
     await page.goto(`/en/orgs/${orgId}/audit-log`);
