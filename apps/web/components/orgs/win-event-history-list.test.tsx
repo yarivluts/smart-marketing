@@ -45,7 +45,7 @@ describe('WinEventHistoryList', () => {
 
   it('shows a cap note with the count once there is at least one event', () => {
     renderList([event, { ...event, id: 'win-2' }]);
-    expect(screen.getByText('Showing the most recent 2 win(s).')).toBeInTheDocument();
+    expect(screen.getByText('Showing the most recent 2 wins.')).toBeInTheDocument();
   });
 
   it('says more wins exist when the page measured truncation', () => {
