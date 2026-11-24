@@ -139,25 +139,25 @@ describe('SetCredentialSecretForm', () => {
   it('warns that a secret sealed under a retired key cannot be decrypted', () => {
     renderForm(true, 'unreadable');
     expect(screen.getByText(/Secret set/)).toBeInTheDocument();
-    expect(screen.getByText(/Cannot be decrypted/)).toBeInTheDocument();
+    expect(screen.getByText(/can no longer be opened/)).toBeInTheDocument();
   });
 
   it('warns, more gently, about a secret still readable under an older key', () => {
     renderForm(true, 'rotatable');
-    expect(screen.getByText(/older key/)).toBeInTheDocument();
-    expect(screen.queryByText(/Cannot be decrypted/)).toBeNull();
+    expect(screen.getByText(/old lock/)).toBeInTheDocument();
+    expect(screen.queryByText(/can no longer be opened/)).toBeNull();
   });
 
   /** A deployment with no vault keys can read no secret at all, which "Secret set" hid just as effectively. */
   it('warns when the deployment has no vault keys configured', () => {
     renderForm(true, 'vault_not_configured');
-    expect(screen.getByText(/no vault keys are configured/i)).toBeInTheDocument();
+    expect(screen.getByText(/secure storage is not set up/i)).toBeInTheDocument();
   });
 
   it('stays quiet for a healthy secret, so the warning means something when it appears', () => {
     renderForm(true, 'current');
     expect(screen.getByText(/Secret set/)).toBeInTheDocument();
-    expect(screen.queryByText(/Cannot be decrypted/)).toBeNull();
-    expect(screen.queryByText(/older key/)).toBeNull();
+    expect(screen.queryByText(/can no longer be opened/)).toBeNull();
+    expect(screen.queryByText(/old lock/)).toBeNull();
   });
 });
