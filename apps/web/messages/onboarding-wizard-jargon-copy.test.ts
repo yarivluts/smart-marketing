@@ -12,7 +12,7 @@ describe('onboarding wizard avoids developer words', () => {
   });
 
   it('says in plain words that data is arriving and what happened to unusable records', () => {
-    expect(en.Onboarding.sourceStepEventsReceived).toContain('{count}');
+    expect(en.Onboarding.sourceStepEventsReceived).toContain('{count');
     expect(en.Onboarding.sourceStepEventsReceived).toMatch(/arriving/);
     expect(en.Onboarding.sourceStepQuarantined).toMatch(/set aside/);
   });
@@ -22,7 +22,7 @@ describe('onboarding wizard avoids developer words', () => {
       expect(he.Onboarding[key]).toMatch(/[֐-׿]/);
       expect(he.Onboarding[key]).not.toMatch(/חבילת|בידוד|הקליטה/);
     }
-    expect(he.Onboarding.sourceStepEventsReceived).toContain('{count}');
-    expect(he.Onboarding.sourceStepQuarantined).toContain('{count}');
+    expect(he.Onboarding.sourceStepEventsReceived).toContain('{count');
+    expect(he.Onboarding.sourceStepQuarantined).toContain('{count');
   });
 });

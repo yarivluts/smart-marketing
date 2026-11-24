@@ -531,8 +531,8 @@
   "Onboarding": {
     "sourceStepDataStatusHeading": "Data received",
     "sourceStepNoEventsYet": "No data has reached this project yet. A key on its own does not move data - your website or app still has to send its data (what people do, like signing up or buying) to the address above.",
-    "sourceStepEventsReceived": "{count} activity records received so far. Your data is arriving.",
-    "sourceStepQuarantined": "{count} records could not be used and were set aside.",
+    "sourceStepEventsReceived": "{count, plural, one {# activity record} other {# activity records}} received so far. Your data is arriving.",
+    "sourceStepQuarantined": "{count, plural, one {# record} other {# records}} could not be used and {count, plural, one {was} other {were}} set aside.",
     "sourceStepIngestHealthLink": "See why in Data health",
     "sourceContinueWithoutDataButton": "Continue without data",
     "metaTitle": "Get started",
