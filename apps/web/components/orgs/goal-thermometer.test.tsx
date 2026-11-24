@@ -62,14 +62,16 @@ describe('GoalThermometer', () => {
     expect(screen.getByText("Your data isn't connected yet")).toBeInTheDocument();
   });
 
-  it('renders a quota_exceeded degraded outcome with its message', () => {
+  it('says what to do for a quota_exceeded outcome, without the raw engine message', () => {
     renderThermometer({ kind: 'quota_exceeded', message: 'Daily query quota exceeded' });
-    expect(screen.getByText('Daily query quota exceeded')).toBeInTheDocument();
+    expect(screen.getByText(/Try again tomorrow/)).toBeInTheDocument();
+    expect(screen.queryByText('Daily query quota exceeded')).not.toBeInTheDocument();
   });
 
-  it('renders a query_error degraded outcome with its message', () => {
+  it('explains a query_error outcome in plain words, not the raw error', () => {
     renderThermometer({ kind: 'query_error', message: 'boom' });
-    expect(screen.getByText('boom')).toBeInTheDocument();
+    expect(screen.getByText(/Refresh in a minute/)).toBeInTheDocument();
+    expect(screen.queryByText('boom')).not.toBeInTheDocument();
   });
 });
 

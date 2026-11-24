@@ -42,7 +42,6 @@ export function GoalThermometer({ view }: GoalThermometerProps): React.ReactElem
     return (
       <div className="flex flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input p-4 text-center">
         <span className="text-xs font-medium text-muted-foreground">{t(`thermometerUnavailableReason.${view.kind}`)}</span>
-        {'message' in view ? <span className="text-xs text-muted-foreground">{view.message}</span> : null}
       </div>
     );
   }
