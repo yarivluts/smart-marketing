@@ -29,7 +29,7 @@ describe('CreateBoardForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Marketing' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create dashboard' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/project-1/boards/board-1'));
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/boards', {
@@ -41,7 +41,7 @@ describe('CreateBoardForm', () => {
 
   it('disables the submit button while the name is empty', () => {
     renderForm();
-    expect(screen.getByRole('button', { name: 'Create board' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create dashboard' })).toBeDisabled();
   });
 
   it('shows an inline error and does not navigate when the request fails', async () => {
@@ -49,9 +49,9 @@ describe('CreateBoardForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Marketing' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create dashboard' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the board. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the dashboard. Please try again.');
     expect(push).not.toHaveBeenCalled();
   });
 });

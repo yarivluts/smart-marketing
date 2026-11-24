@@ -104,7 +104,7 @@ describe('EditTvPairingSettingsForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('One of the selected boards no longer exists in this project. Refresh the page and try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('One of the selected dashboards no longer exists in this project. Refresh the page and try again.');
   });
 
   it('shows a specific error when the pairing has been revoked', async () => {
