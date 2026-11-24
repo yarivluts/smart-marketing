@@ -1093,7 +1093,7 @@
     "flowAnySourceSub": "For mappings not tied to one link"
   },
   "SchemaRegistry": {
-    "eventRejectedCount": "{count} records were rejected and set aside - they never landed, so this still reads as never received.",
+    "eventRejectedCount": "{count, plural, one {# record was rejected and set aside - it never landed, so this still reads as never received.} other {# records were rejected and set aside - they never landed, so this still reads as never received.}}",
     "eventRejectedLink": "See why in Data health",
     "eventRejectedSampleNote": "Counted from the {sampled} most recent set-aside records, so the real number may be higher.",
     "metaTitle": "Data fields",
