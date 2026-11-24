@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import en from './en.json';
 import he from './he.json';
+import { createTranslator } from 'next-intl';
 
 const c = { en: en.Campaigns, he: he.Campaigns } as unknown as Record<'en' | 'he', Record<string, any>>;
 
@@ -35,9 +36,23 @@ describe('Ads & results coverage tile and zero-spend message use plain words', (
         expect(String(c[l][k]).replace(/\{\w+\}/g, '')).not.toMatch(/measured|window|נמדד/i);
       }
       expect(c[l].effMeasuredCoverageSub).toContain('{measured}');
-      expect(c[l].effMeasuredCoverageSub).toContain('{total}');
+      expect(c[l].effMeasuredCoverageSub).toContain('{total,');
     }
     expect(c.en.effMeasuredCoverage).toBe('Ads with spend figures');
     expect(c.he.chartsNoPositiveSpend).toMatch(/מודעות/);
+  });
+});
+
+describe('Ads charts say "ad" for a single ad, not "1 ads"', () => {
+  it('uses plural forms for the coverage subtext and the platform split description', () => {
+    const fmt = (l: 'en' | 'he', k: string, v: Record<string, number>) =>
+      createTranslator({ locale: l, messages: l === 'en' ? en : he, namespace: 'Campaigns' } as never)(k as never, v as never) as string;
+    expect(fmt('en', 'effMeasuredCoverageSub', { measured: 1, total: 1 })).toBe('We know what 1 of your 1 ad spent');
+    expect(fmt('en', 'effMeasuredCoverageSub', { measured: 2, total: 3 })).toBe('We know what 2 of your 3 ads spent');
+    expect(fmt('en', 'chartsCampaignsByChannelDescription', { count: 1 })).toBe('How your 1 ad is split across ad platforms.');
+    expect(fmt('en', 'chartsCampaignsByChannelDescription', { count: 4 })).toBe('How your 4 ads are split across ad platforms.');
+    expect(fmt('he', 'effMeasuredCoverageSub', { measured: 1, total: 1 })).toContain('מודעה אחת');
+    expect(fmt('he', 'chartsCampaignsByChannelDescription', { count: 1 })).toContain('המודעה שלכם');
+    expect(fmt('he', 'chartsCampaignsByChannelDescription', { count: 4 })).toContain('4 המודעות');
   });
 });
