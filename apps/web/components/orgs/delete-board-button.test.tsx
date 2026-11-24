@@ -29,7 +29,7 @@ describe('DeleteBoardButton', () => {
     vi.mocked(window.confirm).mockReturnValue(false);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete dashboard' }));
 
     expect(fetch).not.toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
@@ -40,7 +40,7 @@ describe('DeleteBoardButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete dashboard' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/orgs/org-1/projects/project-1/boards'));
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/boards/board-1', { method: 'DELETE' });
@@ -51,9 +51,9 @@ describe('DeleteBoardButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderButton();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete board' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete dashboard' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the board. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the dashboard. Please try again.');
     expect(push).not.toHaveBeenCalled();
   });
 });

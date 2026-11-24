@@ -90,7 +90,7 @@ describe('BoardGridEditor', () => {
 
   it('shows the empty state when there are no tiles', () => {
     renderEditor([]);
-    expect(screen.getByText('This board has no tiles yet. Click "Edit layout" to add one.')).toBeInTheDocument();
+    expect(screen.getByText('This dashboard has no tiles yet. Click "Edit layout" to add one.')).toBeInTheDocument();
   });
 
   it('a dashboards.read-only viewer still sees every tile\'s data, but gets no "Edit layout" button (and so no way into edit mode at all)', () => {

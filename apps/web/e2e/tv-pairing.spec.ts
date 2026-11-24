@@ -43,7 +43,7 @@ test.describe('War-room TV mode: pair a TV with a real code, manage it from the 
     await page.getByRole('link', { name: 'Boards' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
     await page.getByLabel('Name').fill('Marketing');
-    await page.getByRole('button', { name: 'Create board' }).click();
+    await page.getByRole('button', { name: 'Create dashboard' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards/[^/]+$`), { timeout: 20_000 });
 
     // The TV kiosk page requires no login of its own — visiting it mints a
