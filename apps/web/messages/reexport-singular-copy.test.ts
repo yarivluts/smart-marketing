@@ -3,7 +3,8 @@ import { createTranslator } from 'next-intl';
 import en from './en.json';
 import he from './he.json';
 
-const tr = (l: 'en' | 'he') => createTranslator({ locale: l, messages: (l === 'en' ? en : he) as never, namespace: 'IngestHealth' });
+const tr = (l: 'en' | 'he'): ((key: string, values: Record<string, number>) => string) =>
+  createTranslator({ locale: l, messages: (l === 'en' ? en : he) as never, namespace: 'IngestHealth' } as never) as never;
 
 describe('re-export result line', () => {
   it('says "1 record", not "record(s)"', () => {
