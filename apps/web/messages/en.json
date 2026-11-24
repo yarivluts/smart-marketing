@@ -6527,7 +6527,7 @@
       "ctr": "{value} of the people who saw an ad clicked it",
       "costPerConversion": "{value} for each sign-up or sale",
       "source": "Numbers come from Facebook and Instagram for the ads the pilot made, in your ad account currency.",
-      "targetResults": "{clicks} clicks, {spend} spent",
+      "targetResults": "{clicks, plural, one {# click} other {# clicks}}, {spend} spent",
       "kpi": {
         "spend": "Money spent",
         "impressions": "Times shown",

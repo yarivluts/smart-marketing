@@ -6527,7 +6527,7 @@
       "ctr": "{value} מהאנשים שראו מודעה לחצו עליה",
       "costPerConversion": "{value} לכל הרשמה או מכירה",
       "source": "הנתונים מגיעים מפייסבוק ואינסטגרם עבור המודעות שהטייס יצר, במטבע של חשבון המודעות.",
-      "targetResults": "{clicks} לחיצות, הוצאו {spend}",
+      "targetResults": "{clicks, plural, one {לחיצה אחת} other {# לחיצות}}, הוצאו {spend}",
       "kpi": {
         "spend": "כסף שהוצא",
         "impressions": "כמה פעמים הוצגו",

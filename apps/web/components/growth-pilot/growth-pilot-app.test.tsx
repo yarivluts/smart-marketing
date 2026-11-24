@@ -952,6 +952,14 @@ describe('GrowthPilotApp', () => {
     expect(screen.getByTestId('growth-pilot-target-publish')).toHaveTextContent('Ads are running');
   });
 
+  it('says "1 click", not "1 clicks", when a target has a single click', async () => {
+    const TARGET = { id: 't1', kind: 'service' as const, name: 'Free plan', description: '', audience: '', status: 'active' as const, origin: 'site' as const, briefId: 'b1', adsStatus: 'approved' as const, adsFailure: null, landingPageId: null, landingStatus: 'published' as const, landingFailure: null, audienceStatus: 'approved' as const, audienceFailure: null, publishStatus: 'running' as const, publishFailure: null, videoStatus: 'none' as const, videoFailure: null, liveAds: 0, changeRequests: [], dailyBudget: null, budgetCurrency: null, adsManagerUrl: null, createdOn: '', updatedOn: '' };
+    const totals = { spend: 2, impressions: 50, clicks: 1, linkClicks: 1, conversions: 0, ctr: 0.02, cpc: 2, costPerConversion: null };
+    stubFetch({ body: { status: 'ok', since: 'a', until: 'b', summary: { totals, daily: [], byTarget: { t1: totals } } } });
+    renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page({ proposals: [], targets: [TARGET] })} />, { locale: 'en' });
+    expect(await screen.findByTestId('growth-pilot-target-results')).toHaveTextContent('1 click, 2 spent');
+  });
+
   describe('overview and details', () => {
     const LIVE = liveTarget({ id: 't1', name: 'Free plan' });
     const READY = targetView({ id: 't2', name: 'Law firms', adsStatus: 'ready', landingStatus: 'ready', audienceStatus: 'ready' });

@@ -615,7 +615,7 @@ function TargetPublishLine({ target, metaConnectHref, results, turnOnWaiting = f
       {status === 'published' && !turnOnWaiting ? <span data-testid="growth-pilot-turn-on-declined">{t(target.adsManagerUrl ? 'turnOnDeclinedLink' : 'turnOnDeclined')}</span> : null}
       {results && (status === 'published' || status === 'running') ? (
         <span className="font-semibold text-foreground" data-testid="growth-pilot-target-results">
-          {tr('targetResults', { clicks: new Intl.NumberFormat(locale).format(results.clicks), spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}
+          {tr('targetResults', { clicks: results.clicks, spend: new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(results.spend) })}
         </span>
       ) : null}
       {status === 'needs_meta' && metaConnectHref ? (
