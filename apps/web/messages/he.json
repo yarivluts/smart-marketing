@@ -1345,7 +1345,7 @@
     "reexportRawRecords": "שליחה חוזרת של רשומות קודמות לדוחות",
     "reexportError": "לא ניתן היה לשלוח את הרשומות הקודמות לדוחות. נסו שוב.",
     "reexportNotConfigured": "אחסון הדוחות עדיין לא הוגדר אצלנו, ולכן אין לאן לשלוח. אפשר לפנות לתמיכה של GrowthOS.",
-    "reexportResult": "{exported} מתוך {attempted} רשומות יוצאו, {failed} נכשלו",
+    "reexportResult": "{exported} מתוך {attempted, plural, one {רשומה אחת} other {# רשומות}} יוצאו, {failed} נכשלו",
     "queuedMessagesHeading": "נתונים שממתינים להמשך",
     "noQueuedMessages": "שום דבר לא ממתין בתור.",
     "queuedMessageSummary": "{clientId} ({kind}, {environment}): ממתין כבר {minutes} דקות",

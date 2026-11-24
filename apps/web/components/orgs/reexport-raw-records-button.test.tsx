@@ -23,7 +23,7 @@ describe('ReexportRawRecordsButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Send past records to your reports again' }));
 
-    expect(await screen.findByText('5 of 5 record(s) exported, 0 failed')).toBeInTheDocument();
+    expect(await screen.findByText('5 of 5 records exported, 0 failed')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/ingest-health/reexport-raw-records', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
