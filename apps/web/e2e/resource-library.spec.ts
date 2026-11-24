@@ -48,7 +48,7 @@ test.describe('Org Resource Library: create, request, approve, detach (KAN-27)',
     await page.getByLabel('Provider').selectOption('meta_ads');
     await page.getByLabel('Available scopes').fill('act_111, act_222');
     await page.getByRole('button', { name: 'Add credential' }).click();
-    await expect(page.getByText('Shared Meta MCC (meta_ads, 2 available scopes)')).toBeVisible();
+    await expect(page.getByText('Shared Meta MCC (meta_ads, 2 permissions)')).toBeVisible();
 
     // Request attaching it to the project, selecting only one of the two available scopes.
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/resources`);
