@@ -1345,7 +1345,7 @@
     "reexportRawRecords": "Send past records to your reports again",
     "reexportError": "Could not send the past records to your reports. Please try again.",
     "reexportNotConfigured": "Report storage is not set up on our side yet, so there is nowhere to send them. Please contact GrowthOS support.",
-    "reexportResult": "{exported} of {attempted} record(s) exported, {failed} failed",
+    "reexportResult": "{exported} of {attempted, plural, one {# record} other {# records}} exported, {failed} failed",
     "queuedMessagesHeading": "Data waiting to be passed on",
     "noQueuedMessages": "Nothing is waiting in line.",
     "queuedMessageSummary": "{clientId} ({kind}, {environment}): waiting for {minutes} min",
