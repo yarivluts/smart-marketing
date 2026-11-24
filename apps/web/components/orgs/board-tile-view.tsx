@@ -85,11 +85,10 @@ function buildColorIndexByLabel(currentSeries: readonly TimeSeries[], previousSe
   return index;
 }
 
-function UnavailableView({ message, reasonLabel }: { message: string; reasonLabel: string }): React.ReactElement {
+function UnavailableView({ reasonLabel }: { reasonLabel: string }): React.ReactElement {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-1 rounded-md border border-dashed border-input p-4 text-center">
       <span className="text-xs font-medium text-muted-foreground">{reasonLabel}</span>
-      <span className="text-xs text-muted-foreground">{message}</span>
     </div>
   );
 }
@@ -948,7 +947,7 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
   const content = (() => {
     switch (view.kind) {
       case 'unavailable':
-        return <UnavailableView message={view.message} reasonLabel={t(`tileUnavailableReason.${view.reason}`)} />;
+        return <UnavailableView reasonLabel={t(`tileUnavailableReason.${view.reason}`)} />;
       case 'big_number':
         return <BigNumberView view={view} />;
       case 'time_series':
@@ -966,7 +965,7 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
       case 'histogram':
         return <HistogramView view={view} />;
       default:
-        return <UnavailableView message={tile.title} reasonLabel={t('tileUnavailableReason.query_error')} />;
+        return <UnavailableView reasonLabel={t('tileUnavailableReason.query_error')} />;
     }
   })();
 

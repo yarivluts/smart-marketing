@@ -2606,7 +2606,7 @@
       "warehouse_not_configured": "Your data isn't connected yet",
       "quota_exceeded": "Too many data requests today. Try again tomorrow",
       "not_yet_backed": "There's no real data for this yet",
-      "query_error": "Couldn't load this tile"
+      "query_error": "Couldn't load this tile just now. Refresh in a minute - nothing was lost"
     },
     "sessionReplayLinkTitle": "Open the session recordings for this web page",
     "sessionReplayLinkTitleUnfiltered": "Open your session-replay tool. This project template does not filter to a single page, so this opens the same view for every row.",
@@ -2707,7 +2707,7 @@
       "warehouse_not_configured": "Your data isn't connected yet",
       "quota_exceeded": "Too many data requests today. Try again tomorrow",
       "not_yet_backed": "There's no real data for this yet",
-      "query_error": "Couldn't load this goal's progress",
+      "query_error": "Couldn't load this goal's progress just now. Refresh in a minute - nothing was lost",
       "pending": "Just created - progress appears once the page is refreshed"
     },
     "cockpitTitle": "Your goals",

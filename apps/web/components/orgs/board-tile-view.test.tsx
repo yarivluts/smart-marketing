@@ -38,7 +38,13 @@ describe('BoardTileView', () => {
   it('renders an unavailable tile with a translated reason', () => {
     renderTile({ kind: 'unavailable', reason: 'warehouse_not_configured', message: 'not configured yet' });
     expect(screen.getByText("Your data isn't connected yet")).toBeInTheDocument();
-    expect(screen.getByText('not configured yet')).toBeInTheDocument();
+    expect(screen.queryByText('not configured yet')).not.toBeInTheDocument();
+  });
+
+  it('never prints a raw engine error under a failed tile', () => {
+    renderTile({ kind: 'unavailable', reason: 'query_error', message: 'boom: SQL syntax error' });
+    expect(screen.getByText(/Refresh in a minute/)).toBeInTheDocument();
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument();
   });
 
   it('renders a big_number tile with a delta', () => {
