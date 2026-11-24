@@ -6587,7 +6587,7 @@
       "title": "Where things stand",
       "percent": "{percent}%",
       "progressLabel": "Overall progress",
-      "explain": "Across {count, plural, one {the # item} other {the # items}} the pilot is promoting for you.",
+      "explain": "Across {count, plural, one {the one item} other {the # items}} the pilot is promoting for you.",
       "counts": {
         "done": "{count, plural, one {step done} other {steps done}}",
         "inProgress": "in progress",
