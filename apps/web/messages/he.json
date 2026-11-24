@@ -531,8 +531,8 @@
   "Onboarding": {
     "sourceStepDataStatusHeading": "נתונים שהתקבלו",
     "sourceStepNoEventsYet": "עדיין לא הגיעו נתונים לפרויקט הזה. מפתח לבדו אינו מעביר נתונים — האתר או האפליקציה שלכם עדיין צריכים לשלוח את הנתונים שלהם (מה שאנשים עושים, כמו הרשמה או קנייה) לכתובת שלמעלה.",
-    "sourceStepEventsReceived": "התקבלו {count} רשומות פעילות. הנתונים שלכם מגיעים.",
-    "sourceStepQuarantined": "{count} רשומות לא היו שמישות ונשמרו בצד.",
+    "sourceStepEventsReceived": "{count, plural, one {התקבלה רשומת פעילות אחת} other {התקבלו # רשומות פעילות}}. הנתונים שלכם מגיעים.",
+    "sourceStepQuarantined": "{count, plural, one {רשומה אחת לא הייתה שמישה ונשמרה בצד} other {# רשומות לא היו שמישות ונשמרו בצד}}.",
     "sourceStepIngestHealthLink": "בדקו מדוע ב״תקינות הנתונים״",
     "sourceContinueWithoutDataButton": "המשך ללא נתונים",
     "metaTitle": "צעדים ראשונים",
