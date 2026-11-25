@@ -7033,7 +7033,7 @@
       "sendingFeedback": "Sending...",
       "cancelFeedbackButton": "Close",
       "feedbackSentSuccess": "Your feedback was sent to the team.",
-      "feedbackSendError": "We could not save your feedback. Check the fields and try again.",
+      "feedbackSendError": "Your feedback was not sent, nothing was saved. Check your internet connection and try again.",
       "commentRequiredError": "Write a short note or request before sending.",
       "clientNotesHeading": "Submitted feedback",
       "defaultClientAuthor": "Client",
