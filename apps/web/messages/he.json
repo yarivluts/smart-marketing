@@ -7033,7 +7033,7 @@
       "sendingFeedback": "שולחים...",
       "cancelFeedbackButton": "סגרו",
       "feedbackSentSuccess": "המשוב נשלח לצוות השיווק.",
-      "feedbackSendError": "לא הצלחנו לשמור את הפנייה. בדקו את השדות ונסו שוב.",
+      "feedbackSendError": "הפנייה לא נשלחה ושום דבר לא נשמר. בדקו את החיבור לאינטרנט ונסו שוב.",
       "commentRequiredError": "כתבו הערה או בקשה לפני השליחה.",
       "clientNotesHeading": "הערות שכבר נשלחו",
       "defaultClientAuthor": "לקוח",

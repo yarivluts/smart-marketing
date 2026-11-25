@@ -279,3 +279,40 @@ describe('SharedAdsView — campaign results, Search ad, revision & interactive 
     }
   });
 });
+
+describe('SharedAdsView — failed feedback send', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('tells the client nothing was sent and to check the connection, then keeps their note', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));
+    const page: SharedAdsPage = {
+      brandName: 'Acme Clinic',
+      logoSrc: null,
+      expiresOn: '2026-12-06T00:00:00.000Z',
+      token: 'T-FAIL',
+      allowFeedback: true,
+      briefs: [
+        {
+          id: 'b1',
+          name: 'Spring launch',
+          language: 'en',
+          landingPageUrl: 'https://acme.example',
+          images: [],
+          video: null,
+        },
+      ],
+    } as SharedAdsPage;
+    renderWithIntl(<SharedAdsView page={page} />);
+    fireEvent.click(screen.getByTestId('shared-brief-note-toggle-b1'));
+    fireEvent.change(screen.getByPlaceholderText(/Tell the agency what works well/), {
+      target: { value: 'Make it shorter' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send to agency' }));
+    const alert = await screen.findByText(/was not sent, nothing was saved/);
+    expect(alert).toHaveTextContent(/internet connection/);
+    expect(alert.textContent).not.toMatch(/fields/);
+    expect(screen.getByDisplayValue('Make it shorter')).toBeInTheDocument();
+  });
+});
