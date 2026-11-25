@@ -54,7 +54,18 @@ describe('GoalStatusButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Pause goal' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Could not update the goal's status. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("The goal was not changed. Check your internet connection and try again.");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the connection drops and re-enables the button', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton('active');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pause goal' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The goal was not changed. Check your internet connection');
+    expect(screen.getByRole('button', { name: 'Pause goal' })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 });

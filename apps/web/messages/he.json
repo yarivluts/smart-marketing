@@ -2679,7 +2679,7 @@
     "pauseButton": "השהיית יעד",
     "resumeButton": "חידוש יעד",
     "pausedBadge": "מושהה",
-    "statusUpdateError": "לא ניתן היה לעדכן את מצב היעד. נסו שוב.",
+    "statusUpdateError": "היעד לא השתנה. בדקו את חיבור האינטרנט ונסו שוב.",
     "targetUpdateError": "עדכון היעד נכשל. נסו שוב.",
     "editGoal": "ערוך יעד",
     "saveGoal": "שמור יעד",

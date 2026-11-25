@@ -2679,7 +2679,7 @@
     "pauseButton": "Pause goal",
     "resumeButton": "Resume goal",
     "pausedBadge": "Paused",
-    "statusUpdateError": "Could not update the goal's status. Please try again.",
+    "statusUpdateError": "The goal was not changed. Check your internet connection and try again.",
     "targetUpdateError": "Couldn't update the target. Please try again.",
     "editGoal": "Edit goal",
     "saveGoal": "Save goal",
