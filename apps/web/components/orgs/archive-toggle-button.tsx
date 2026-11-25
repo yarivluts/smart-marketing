@@ -46,6 +46,9 @@ export function ArchiveToggleButton({
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection throws before any response; show the same message.
+      setError(true);
     } finally {
       setSubmitting(false);
     }

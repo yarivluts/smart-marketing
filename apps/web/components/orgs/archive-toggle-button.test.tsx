@@ -42,6 +42,17 @@ describe('ArchiveToggleButton', () => {
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/resources/people/person-1/unarchive', { method: 'POST' });
   });
 
+  it('shows the inline error when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    render(<ArchiveToggleButton {...baseProps} archived={false} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't do that. Please try again.");
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Archive' })).not.toBeDisabled();
+  });
+
   it('shows an inline error and does not refresh when the request fails', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     render(<ArchiveToggleButton {...baseProps} archived={false} />);
