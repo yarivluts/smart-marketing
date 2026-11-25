@@ -5472,7 +5472,7 @@
       "addColor": "Add a colour",
       "save": "Save brand kit",
       "saved": "Brand kit saved. New AI writing follows it.",
-      "saveFailed": "The brand kit could not be saved. Please try again.",
+      "saveFailed": "The brand kit was not saved, and nothing was changed. Check your internet connection and try again.",
       "readOnly": "Only project admins can change the brand kit.",
       "leaveUnsaved": "You have unsaved changes to the brand kit. Leave without saving?",
       "issue": {
@@ -5640,7 +5640,7 @@
       "saved": "Trial access saved.",
       "remove": "Remove trial access",
       "removed": "Trial access removed.",
-      "saveFailed": "Could not save. Try again.",
+      "saveFailed": "Could not save, and nothing was changed. Check your internet connection and try again.",
       "field": {
         "login_url": "Enter the public https address of your app's login page.",
         "username": "Enter the trial account's username or email.",

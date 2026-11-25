@@ -134,3 +134,15 @@ describe('DemoAccessPanel', () => {
     });
   });
 });
+
+describe('DemoAccessPanel save failure', () => {
+  it('says nothing was changed and to check the connection when the save fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    renderWithIntl(<DemoAccessPanel orgId="o" projectId="p" access={null} canEdit recordings={[]} recordingAvailable />, { locale: 'en' });
+    fireEvent.change(screen.getByLabelText('App login address'), { target: { value: 'https://app.example.com/login' } });
+    fireEvent.change(screen.getByLabelText('Username or email'), { target: { value: 'trial@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-pass' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save trial access' }));
+    await waitFor(() => expect(screen.getByText(/nothing was changed\. Check your internet connection/)).toBeInTheDocument());
+  });
+});
