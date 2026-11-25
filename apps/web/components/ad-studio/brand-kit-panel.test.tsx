@@ -36,3 +36,13 @@ describe('BrandKitPanel', () => {
     expect(screen.getByText('Only project admins can change the brand kit.')).toBeInTheDocument();
   });
 });
+
+describe('BrandKitPanel save failure', () => {
+  it('says nothing was changed and to check the connection when the save fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    renderWithIntl(<BrandKitPanel orgId="o" projectId="p" initial={EMPTY} canEdit />, { locale: 'en' });
+    fireEvent.change(screen.getByLabelText(/^Brand name/), { target: { value: 'EasySign' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save brand kit' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('nothing was changed. Check your internet connection'));
+  });
+});
