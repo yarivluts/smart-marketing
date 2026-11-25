@@ -54,6 +54,9 @@ export function AddNikudButton({
         return;
       }
       onVocalized(body.pronunciation);
+    } catch {
+      // A dropped connection rejects the fetch: say so instead of failing silently.
+      setError(errorMessage({}));
     } finally {
       setPending(false);
     }
