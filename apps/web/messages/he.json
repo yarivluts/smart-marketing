@@ -2428,7 +2428,7 @@
     "builtinPacksIntro": "התקנה בלחיצה אחת לערכות תוצאות מוכנות שבפלטפורמה — בלי להדביק דבר ובלי למלא טופס.",
     "builtinPackInstallButton": "התקנה",
     "builtinPackInstalling": "מתקין…",
-    "builtinPackInstallError": "התקנת החבילה נכשלה. נסו שוב.",
+    "builtinPackInstallError": "לא הצלחנו להוסיף את הסט הזה. שום דבר לא השתנה. בדקו את חיבור האינטרנט ונסו שוב.",
     "allBuiltinPacksInstalled": "כל החבילות המובנות כבר מותקנות בפרויקט הזה.",
     "builtinPackSaasTitle": "מדדי SaaS ושיווק",
     "builtinPackSaasDescription": "הוצאות פרסום, הרשמות, כמה עולה כל לקוח חדש, הכנסה חודשית, וכמה מההרשמות הופכות ללקוחות משלמים.",

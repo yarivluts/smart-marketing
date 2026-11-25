@@ -60,7 +60,17 @@ describe('InstallBuiltinPackSection', () => {
 
     fireEvent.click(screen.getByText('Engagement Pack'));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not install this pack. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not add this set. Nothing was changed. Check your internet connection and try again.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same plain error when the connection drops before any answer', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderSection();
+
+    fireEvent.click(screen.getByText('Engagement Pack'));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was changed');
     expect(refresh).not.toHaveBeenCalled();
   });
 

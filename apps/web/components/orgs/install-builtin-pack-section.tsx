@@ -61,6 +61,8 @@ export function InstallBuiltinPackSection({ orgId, projectId, packs, canInstall 
         return;
       }
       router.refresh();
+    } catch {
+      setError(t('builtinPackInstallError'));
     } finally {
       setInstallingPluginId(null);
     }

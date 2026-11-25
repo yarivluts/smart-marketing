@@ -2428,7 +2428,7 @@
     "builtinPacksIntro": "One-click install for the ready-made sets of results this platform includes - nothing to paste and nothing to fill in.",
     "builtinPackInstallButton": "Install",
     "builtinPackInstalling": "Installing…",
-    "builtinPackInstallError": "Could not install this pack. Please try again.",
+    "builtinPackInstallError": "Could not add this set. Nothing was changed. Check your internet connection and try again.",
     "allBuiltinPacksInstalled": "Every built-in pack is already installed in this project.",
     "builtinPackSaasTitle": "SaaS & Marketing Metrics",
     "builtinPackSaasDescription": "Ad spend, signups, what each new customer costs you, monthly income, and how many signups become paying customers.",
