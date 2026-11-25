@@ -26,18 +26,18 @@ describe('CampaignTargetInput', () => {
 
   it('renders the current target, empty when none is set', () => {
     renderInput();
-    expect(screen.getByLabelText('Spend target for summer_search')).toHaveValue(null);
+    expect(screen.getByLabelText('Budget for summer_search')).toHaveValue(null);
 
     renderInput(500);
-    expect(screen.getAllByLabelText('Spend target for summer_search')[1]).toHaveValue(500);
+    expect(screen.getAllByLabelText('Budget for summer_search')[1]).toHaveValue(500);
   });
 
   it('PATCHes the new budget on blur, then refreshes', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderInput();
 
-    fireEvent.change(screen.getByLabelText('Spend target for summer_search'), { target: { value: '750' } });
-    fireEvent.blur(screen.getByLabelText('Spend target for summer_search'));
+    fireEvent.change(screen.getByLabelText('Budget for summer_search'), { target: { value: '750' } });
+    fireEvent.blur(screen.getByLabelText('Budget for summer_search'));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith(
@@ -50,8 +50,8 @@ describe('CampaignTargetInput', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderInput(500);
 
-    fireEvent.change(screen.getByLabelText('Spend target for summer_search'), { target: { value: '' } });
-    fireEvent.blur(screen.getByLabelText('Spend target for summer_search'));
+    fireEvent.change(screen.getByLabelText('Budget for summer_search'), { target: { value: '' } });
+    fireEvent.blur(screen.getByLabelText('Budget for summer_search'));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/campaign-ops/targets/summer_search', expect.objectContaining({ method: 'DELETE' }));
@@ -60,10 +60,10 @@ describe('CampaignTargetInput', () => {
   it('shows an inline error and never calls fetch for a negative value', async () => {
     renderInput();
 
-    fireEvent.change(screen.getByLabelText('Spend target for summer_search'), { target: { value: '-5' } });
-    fireEvent.blur(screen.getByLabelText('Spend target for summer_search'));
+    fireEvent.change(screen.getByLabelText('Budget for summer_search'), { target: { value: '-5' } });
+    fireEvent.blur(screen.getByLabelText('Budget for summer_search'));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't update the target. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save your budget. Nothing was changed - please try again.");
     expect(fetch).not.toHaveBeenCalled();
     expect(refresh).not.toHaveBeenCalled();
   });
@@ -72,10 +72,10 @@ describe('CampaignTargetInput', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderInput();
 
-    fireEvent.change(screen.getByLabelText('Spend target for summer_search'), { target: { value: '100' } });
-    fireEvent.blur(screen.getByLabelText('Spend target for summer_search'));
+    fireEvent.change(screen.getByLabelText('Budget for summer_search'), { target: { value: '100' } });
+    fireEvent.blur(screen.getByLabelText('Budget for summer_search'));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't update the target. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save your budget. Nothing was changed - please try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });
