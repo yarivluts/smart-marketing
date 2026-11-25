@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
+import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
 import type { GrowthActivityView, GrowthPilotPageData, GrowthProposalView } from '@/lib/growth-pilot/view';
 import { isolate } from '@/lib/bidi';
@@ -401,9 +402,11 @@ describe('GrowthPilotApp', () => {
   it('tells the person what Reject does, in English and Hebrew', () => {
     const { unmount } = renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'en' });
     expect(within(screen.getByTestId('growth-pilot-proposal')).getByTestId('growth-pilot-reject-hint')).toHaveTextContent('nothing is published and no money is spent');
+    expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent(`"${enMessages.GrowthPilot.waiting.change}"`);
     unmount();
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={page()} />, { locale: 'he' });
     expect(screen.getByTestId('growth-pilot-reject-hint')).toHaveTextContent(heMessages.GrowthPilot.waiting.rejectHint);
+    expect(heMessages.GrowthPilot.waiting.rejectHint).toContain(heMessages.GrowthPilot.waiting.change);
   });
 
   it('says what approving a proposed thing to grow does, in English and Hebrew', () => {
