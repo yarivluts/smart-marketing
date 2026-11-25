@@ -3379,7 +3379,7 @@
     "nameRequiredError": "Project name is required.",
     "save": "Save",
     "saved": "Saved.",
-    "saveError": "Could not save these settings. Please try again.",
+    "saveError": "We could not save these settings, and nothing was changed. Check your internet connection and try again.",
     "currencyLabel": "Currency",
     "currencyHelp": "The currency your ad spend and sales are shown in, as a three-letter code such as ILS or USD. Leave empty if you are not sure.",
     "timezoneLabel": "Time zone",
