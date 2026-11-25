@@ -126,18 +126,20 @@ export function CampaignStatusToggle({
 
     const targetStatusToRestore = toast.previousStatus;
     const actionId = toast.actionId;
+    const statusBeforeUndo = currentStatus;
     setToast(null);
     setIsSyncing(true);
     setCurrentStatus(targetStatusToRestore);
 
     try {
+      let undoResponse: Response;
       if (actionId) {
-        await fetch(
+        undoResponse = await fetch(
           `/api/orgs/${orgId}/projects/${projectId}/automation/actions/${actionId}/rollback`,
           { method: 'POST' },
         );
       } else {
-        await fetch(
+        undoResponse = await fetch(
           `/api/orgs/${orgId}/projects/${projectId}/automation/actions/quick-execute`,
           {
             method: 'POST',
@@ -153,6 +155,13 @@ export function CampaignStatusToggle({
         );
       }
 
+      if (!undoResponse.ok) {
+        // The undo did not happen: show the state the campaign is really in.
+        setCurrentStatus(statusBeforeUndo);
+        setErrorMessage(t('undoError'));
+        return;
+      }
+
       if (onStatusChange) {
         onStatusChange(targetStatusToRestore);
       }
@@ -161,6 +170,7 @@ export function CampaignStatusToggle({
         router.refresh();
       });
     } catch {
+      setCurrentStatus(statusBeforeUndo);
       setErrorMessage(t('undoError'));
     } finally {
       setIsSyncing(false);

@@ -3587,7 +3587,7 @@
     "budgetSuccessToast": "Daily budget for \"{name}\" updated to ${amount}/day.",
     "undoButton": "Undo",
     "undoSuccessToast": "Action undone successfully.",
-    "undoError": "Could not undo action. Please try again.",
+    "undoError": "Could not undo that. The campaign stays as it was after your change - check your internet connection and try again.",
     "guardrailMaxChange": "That is a bigger change than your safety limit allows in one day. Try a smaller step.",
     "guardrailSpendCeiling": "That budget is above the spending limit set for this project. Try a lower amount.",
     "guardrailProtected": "This ad is protected, so quick changes are switched off for it.",

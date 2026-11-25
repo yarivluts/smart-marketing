@@ -113,4 +113,36 @@ describe('CampaignStatusToggle', () => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
   });
+
+  it('undo that fails keeps the real state and says the campaign stays as it was', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'action-1', status: 'executed' }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) });
+    global.fetch = fetchMock;
+
+    renderWithIntl(
+      <CampaignStatusToggle
+        orgId="org-1"
+        projectId="proj-1"
+        targetId="target-1"
+        campaignLabel="Summer Sale"
+        initialStatus="enabled"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('switch'));
+    const undo = await screen.findByRole('button', { name: /undo/i });
+    fireEvent.click(undo);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/stays as it was/i);
+    });
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
+  });
 });
