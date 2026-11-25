@@ -40,7 +40,7 @@ describe('SuspendMemberButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Suspend' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't suspend this member. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't suspend this member. Nothing was changed - check your internet connection and try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 

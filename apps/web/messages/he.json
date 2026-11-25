@@ -477,7 +477,7 @@
     "status_active": "פעיל",
     "status_suspended": "מושעה",
     "changeRoleLabel": "תפקיד",
-    "changeRoleError": "לא ניתן היה לשנות את תפקיד החבר. נסו שוב.",
+    "changeRoleError": "לא ניתן היה לשנות את תפקיד החבר. דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב.",
     "inviteEmailLabel": "אימייל",
     "inviteRoleLabel": "תפקיד",
     "inviteRoleHint": {
@@ -495,13 +495,13 @@
     "inviteErrorAlreadyMember": "האדם הזה כבר חבר, או שכבר מחכה לו הזמנה. אין מה לעשות.",
     "projectRoleAndStatus": "{role} · {project} – סטטוס: {status}",
     "remove": "הסרה",
-    "removeError": "לא ניתן היה להסיר את החבר. נסו שוב.",
+    "removeError": "לא ניתן היה להסיר את החבר. דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב.",
     "removeLastOwnerError": "לארגון חייב להיות תמיד לפחות בעלים אחד.",
     "suspend": "השעיה",
-    "suspendError": "לא ניתן היה להשעות את החבר. נסו שוב.",
+    "suspendError": "לא ניתן היה להשעות את החבר. דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב.",
     "suspendLastOwnerError": "לארגון חייב להיות תמיד לפחות בעלים אחד.",
     "reactivate": "הפעלה מחדש",
-    "reactivateError": "לא ניתן היה להפעיל מחדש את החבר. נסו שוב."
+    "reactivateError": "לא ניתן היה להפעיל מחדש את החבר. דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב."
   },
   "NewProjectPage": {
     "title": "יצירת פרויקט",

@@ -40,7 +40,7 @@ describe('ReactivateMemberButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reactivate this member. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reactivate this member. Nothing was changed - check your internet connection and try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 });

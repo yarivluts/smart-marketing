@@ -477,7 +477,7 @@
     "status_active": "Active",
     "status_suspended": "Suspended",
     "changeRoleLabel": "Role",
-    "changeRoleError": "Couldn't change this member's role. Please try again.",
+    "changeRoleError": "Couldn't change this member's role. Nothing was changed - check your internet connection and try again.",
     "inviteEmailLabel": "Email",
     "inviteRoleLabel": "Role",
     "inviteRoleHint": {
@@ -495,13 +495,13 @@
     "inviteErrorAlreadyMember": "This person is already a member, or already has an invite waiting. Nothing more to do.",
     "projectRoleAndStatus": "{role} · {project} – status: {status}",
     "remove": "Remove",
-    "removeError": "Couldn't remove this member. Please try again.",
+    "removeError": "Couldn't remove this member. Nothing was changed - check your internet connection and try again.",
     "removeLastOwnerError": "An organization must always have at least one owner.",
     "suspend": "Suspend",
-    "suspendError": "Couldn't suspend this member. Please try again.",
+    "suspendError": "Couldn't suspend this member. Nothing was changed - check your internet connection and try again.",
     "suspendLastOwnerError": "An organization must always have at least one owner.",
     "reactivate": "Reactivate",
-    "reactivateError": "Couldn't reactivate this member. Please try again."
+    "reactivateError": "Couldn't reactivate this member. Nothing was changed - check your internet connection and try again."
   },
   "NewProjectPage": {
     "title": "Create a project",

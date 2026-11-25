@@ -49,7 +49,7 @@ describe('ChangeRoleControl', () => {
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Role' }), { target: { value: 'viewer' } });
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't change this member's role. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't change this member's role. Nothing was changed - check your internet connection and try again.");
     await waitFor(() => expect(screen.getByRole('combobox', { name: 'Role' })).toHaveValue('org_admin'));
     expect(refresh).not.toHaveBeenCalled();
   });
