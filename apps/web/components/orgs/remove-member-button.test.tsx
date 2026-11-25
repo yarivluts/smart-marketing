@@ -40,7 +40,7 @@ describe('RemoveMemberButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't remove this member. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't remove this member. Nothing was changed - check your internet connection and try again.");
     expect(refresh).not.toHaveBeenCalled();
   });
 
