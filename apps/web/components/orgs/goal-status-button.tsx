@@ -35,6 +35,8 @@ export function GoalStatusButton({ orgId, projectId, goalId, status }: GoalStatu
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }
