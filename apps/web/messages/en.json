@@ -4305,6 +4305,7 @@
     },
     "deleteConfirm": "Delete this ad and its script?",
     "deleteAd": "Delete ad",
+    "deleteFailed": "The ad was not deleted. Check your internet connection and try again.",
     "stageVideoValue": "{rendered} of {total} scenes made",
     "stageVideoAssembled": "Assembled · {seconds}s",
     "video": {

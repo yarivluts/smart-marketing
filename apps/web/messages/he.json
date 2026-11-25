@@ -4305,6 +4305,7 @@
     },
     "deleteConfirm": "למחוק את המודעה ואת התסריט שלה?",
     "deleteAd": "מחיקת המודעה",
+    "deleteFailed": "המודעה לא נמחקה. בדקו את חיבור האינטרנט ונסו שוב.",
     "stageVideoValue": "{rendered} מתוך {total} סצנות נוצרו",
     "stageVideoAssembled": "הורכב · {seconds} שנ׳",
     "video": {

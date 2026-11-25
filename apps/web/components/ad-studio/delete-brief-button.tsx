@@ -43,7 +43,7 @@ export function DeleteBriefButton({ orgId, projectId, briefId, afterDeleteHref }
         </button>
         {failed ? (
           <span role="alert" className="text-xs text-destructive">
-            {t('errorGeneric')}
+            {t('deleteFailed')}
           </span>
         ) : null}
       </span>
