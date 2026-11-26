@@ -841,7 +841,7 @@
     "copied": "Copied",
     "done": "Done",
     "revoke": "Revoke",
-    "revokeError": "Couldn't revoke this key. Please try again.",
+    "revokeError": "The key was not revoked and still works. Check your internet connection and try again.",
     "rename": "Rename",
     "saveRename": "Save name",
     "cancelRename": "Cancel",
