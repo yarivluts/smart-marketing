@@ -43,4 +43,15 @@ describe('CompleteOnboardingButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not save this step. Check your internet connection and try again - your earlier steps are kept.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('shows the same message and re-enables the button when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(screen.getByRole('button', { name: 'Finish' })).toBeEnabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });
