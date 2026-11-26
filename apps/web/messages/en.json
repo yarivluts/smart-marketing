@@ -689,7 +689,7 @@
     "editPerson": "Edit",
     "savePerson": "Save",
     "cancelEditPerson": "Cancel",
-    "editPersonError": "Couldn't save these changes. Please try again.",
+    "editPersonError": "Nothing was changed; the person still has their old details. Check your internet connection and try again.",
     "createError": "We could not add it. Nothing was saved, so please try again in a moment.",
     "createNetworkError": "We cannot reach GrowthOS. Check your internet connection and try again - nothing was saved.",
     "credentialsHeading": "Account connections",
