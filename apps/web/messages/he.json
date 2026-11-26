@@ -3516,7 +3516,7 @@
     "lastKnownStateAt": "מצב ידוע אחרון נכון ל-{at}",
     "stateSourceNote": "כאן מוצג מה ש־GrowthOS עשה עד כה. מספרים חיים מפלטפורמת הפרסום עדיין לא מחוברים.",
     "pauseButton": "השהה מודעה",
-    "pauseError": "לא ניתן היה להשהות את המודעה. נסו שוב.",
+    "pauseError": "המודעה לא הושהתה והיא עדיין פעילה. בדקו את חיבור האינטרנט ונסו שוב.",
     "keywordsLine": "מילות מפתח: {keywords}",
     "metaTargetingSummary": "{countries}, גילאים {ageMin}-{ageMax}",
     "lastPlatformReadAt": "סונכרן מפלטפורמת הפרסום נכון ל-{at}",
