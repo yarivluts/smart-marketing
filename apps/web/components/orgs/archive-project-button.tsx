@@ -35,6 +35,8 @@ export function ArchiveProjectButton({ orgId, projectId, archived }: ArchiveProj
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

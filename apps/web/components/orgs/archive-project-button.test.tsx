@@ -57,7 +57,18 @@ describe('ArchiveProjectButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Archive project' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Could not change the project's archive state. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was changed - the project is still as it was. Check your internet connection and try again.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message and re-enables the button when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archive project' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(screen.getByRole('button', { name: 'Archive project' })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 });

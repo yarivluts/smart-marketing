@@ -3394,7 +3394,7 @@
     "archiveButton": "Archive project",
     "unarchiveButton": "Unarchive project",
     "archiveConfirm": "Archive this project? It will disappear from the project switcher and every listing. Nothing is deleted.",
-    "archiveError": "Could not change the project's archive state. Please try again.",
+    "archiveError": "Nothing was changed - the project is still as it was. Check your internet connection and try again.",
     "eyebrow": "Project",
     "kpiProfile": "Details filled in",
     "kpiProfileSubtext": "{filled} of {total} details filled in",
