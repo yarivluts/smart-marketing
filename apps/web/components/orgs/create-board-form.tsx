@@ -36,6 +36,9 @@ export function CreateBoardForm({ orgId, projectId }: CreateBoardFormProps): Rea
       const body = (await response.json()) as { board: { id: string } };
       setName('');
       router.push(`/orgs/${orgId}/projects/${projectId}/boards/${body.board.id}`);
+    } catch {
+      // A dropped connection throws before any response; show the same message.
+      setError(t('createError'));
     } finally {
       setSubmitting(false);
     }

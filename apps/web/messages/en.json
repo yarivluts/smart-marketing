@@ -2684,7 +2684,7 @@
     "editGoal": "Edit goal",
     "saveGoal": "Save goal",
     "cancelEditGoal": "Cancel",
-    "editGoalError": "Could not update the goal. Please try again.",
+    "editGoalError": "The goal was not changed. Check your internet connection and try again.",
     "targetValueInputLabel": "Target value for {goalName}",
     "rangeMinInputLabel": "Range minimum for {goalName}",
     "rangeMaxInputLabel": "Range maximum for {goalName}",

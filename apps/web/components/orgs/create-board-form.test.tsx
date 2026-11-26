@@ -54,4 +54,16 @@ describe('CreateBoardForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the dashboard. Nothing was created. Check your internet connection and try again.');
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('shows the same message and does not navigate when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Marketing' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create dashboard' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was created. Check your internet connection and try again.');
+    expect(push).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Create dashboard' })).toBeEnabled();
+  });
 });

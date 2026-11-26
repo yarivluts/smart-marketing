@@ -85,6 +85,9 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames, eventSc
       setFilters([emptyFilterRow()]);
       setEventConditions([]);
       router.refresh();
+    } catch {
+      // A dropped connection throws before any response; show the same message.
+      setError(t('createError'));
     } finally {
       setSubmitting(false);
     }

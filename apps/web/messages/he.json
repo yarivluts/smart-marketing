@@ -2684,7 +2684,7 @@
     "editGoal": "ערוך יעד",
     "saveGoal": "שמור יעד",
     "cancelEditGoal": "ביטול",
-    "editGoalError": "לא ניתן היה לעדכן את היעד. נסו שוב.",
+    "editGoalError": "היעד לא השתנה. בדקו את חיבור האינטרנט ונסו שוב.",
     "targetValueInputLabel": "ערך יעד עבור {goalName}",
     "rangeMinInputLabel": "מינימום הטווח עבור {goalName}",
     "rangeMaxInputLabel": "מקסימום הטווח עבור {goalName}",

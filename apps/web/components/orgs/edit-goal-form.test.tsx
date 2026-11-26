@@ -140,7 +140,19 @@ describe('EditGoalForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit goal' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save goal' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not update the goal. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The goal was not changed. Check your internet connection and try again.');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+  });
+
+  it('says the goal was not changed when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit goal' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save goal' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The goal was not changed. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
