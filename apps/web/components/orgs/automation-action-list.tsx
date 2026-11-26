@@ -76,12 +76,21 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove, ca
   const t = useTranslations('Automation');
   const router = useRouter();
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const [failedActionId, setFailedActionId] = useState<string | null>(null);
 
   async function runTransition(actionId: string, transition: 'approve' | 'reject' | 'execute' | 'rollback'): Promise<void> {
     setPendingActionId(actionId);
+    setFailedActionId(null);
     try {
-      await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/${actionId}/${transition}`, { method: 'POST' });
+      const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/${actionId}/${transition}`, { method: 'POST' });
+      if (!response.ok) {
+        setFailedActionId(actionId);
+        return;
+      }
       router.refresh();
+    } catch {
+      // Dropped connection: say so instead of leaving the button looking dead.
+      setFailedActionId(actionId);
     } finally {
       setPendingActionId(null);
     }
@@ -188,6 +197,11 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove, ca
               </Button>
             ) : null}
           </div>
+          {failedActionId === action.id ? (
+            <p role="alert" className="text-destructive">
+              {t('actionTransitionError')}
+            </p>
+          ) : null}
         </li>
       ))}
     </ul>

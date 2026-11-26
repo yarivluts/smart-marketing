@@ -3053,6 +3053,7 @@
     "killSwitchReasonRequiredError": "כתבו סיבה קצרה כדי שהצוות יֵדע למה האוטומציה הושהתה.",
     "killSwitchEngageButton": "השהה את כל האוטומציה",
     "killSwitchDisengageButton": "המשך את האוטומציה",
+    "actionTransitionError": "הפעולה לא עברה, והשינוי נשאר כפי שהיה. בדקו את חיבור האינטרנט ונסו שוב.",
     "killSwitchError": "האוטומציה עדיין מושהית, שום דבר לא השתנה. בדקו את חיבור האינטרנט ונסו שוב.",
     "killSwitchEngageError": "האוטומציה לא הושהתה והיא עדיין פועלת. בדקו את חיבור האינטרנט ונסו שוב.",
     "policyHeading": "מגבלות בטיחות",

@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
@@ -68,5 +69,26 @@ describe('AutomationActionList rollback reason', () => {
   it('is translated in Hebrew and falls back to a plain line for unknown reasons', () => {
     renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={[undone('something_new')]} canApprove />, { locale: 'he' });
     expect(screen.getByTestId('automation-rollback-a1')).toHaveTextContent(heMessages.Automation.rollbackOther);
+  });
+});
+
+describe('AutomationActionList failed button press', () => {
+  const awaiting: AutomationActionView = { ...failed, status: 'awaiting_approval', failureReason: undefined };
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('says the change is still as it was when the request is refused', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={[awaiting]} canApprove />);
+    await userEvent.click(screen.getByRole('button', { name: enMessages.Automation.approveButton }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('still as it was');
+    expect(screen.getByRole('button', { name: enMessages.Automation.approveButton })).toBeEnabled();
+  });
+
+  it('says it too when the connection drops, in Hebrew', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+    renderWithIntl(<AutomationActionList orgId="o" projectId="p" actions={[awaiting]} canApprove />, { locale: 'he' });
+    await userEvent.click(screen.getByRole('button', { name: heMessages.Automation.approveButton }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(heMessages.Automation.actionTransitionError);
   });
 });
