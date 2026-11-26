@@ -42,11 +42,14 @@ export function AutomationKillSwitchPanel({
         body: JSON.stringify({ engaged, reason: engaged ? reason.trim() : undefined }),
       });
       if (!response.ok) {
-        setError(t('killSwitchError'));
+        setError(t(engaged ? 'killSwitchEngageError' : 'killSwitchError'));
         return;
       }
       setReason('');
       router.refresh();
+    } catch {
+      // Dropped connection: say plainly what state automation is still in.
+      setError(t(engaged ? 'killSwitchEngageError' : 'killSwitchError'));
     } finally {
       setSubmitting(false);
     }
