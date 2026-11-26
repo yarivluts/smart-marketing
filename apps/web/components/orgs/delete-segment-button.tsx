@@ -31,6 +31,8 @@ export function DeleteSegmentButton({ orgId, projectId, segmentId }: DeleteSegme
         return;
       }
       router.refresh();
+    } catch {
+      setError(t('deleteError'));
     } finally {
       setSubmitting(false);
     }

@@ -56,4 +56,15 @@ describe('DeleteGoalButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the goal. Nothing was deleted. Check your internet connection and try again.');
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('shows the same inline error when the connection drops', async () => {
+    vi.mocked(window.confirm).mockReturnValue(true);
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete goal' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the goal. Nothing was deleted. Check your internet connection and try again.');
+    expect(screen.getByRole('button', { name: 'Delete goal' })).toBeEnabled();
+  });
 });

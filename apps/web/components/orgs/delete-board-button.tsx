@@ -30,6 +30,8 @@ export function DeleteBoardButton({ orgId, projectId, boardId }: DeleteBoardButt
         return;
       }
       router.push(`/orgs/${orgId}/projects/${projectId}/boards`);
+    } catch {
+      setError(t('deleteError'));
     } finally {
       setSubmitting(false);
     }

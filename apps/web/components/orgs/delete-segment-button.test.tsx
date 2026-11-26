@@ -56,4 +56,15 @@ describe('DeleteSegmentButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the group. Nothing was deleted. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('shows the same inline error when the connection drops', async () => {
+    vi.mocked(window.confirm).mockReturnValue(true);
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete the group. Nothing was deleted. Check your internet connection and try again.');
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeEnabled();
+  });
 });

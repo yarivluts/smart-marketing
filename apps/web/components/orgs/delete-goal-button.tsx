@@ -30,6 +30,8 @@ export function DeleteGoalButton({ orgId, projectId, goalId }: DeleteGoalButtonP
         return;
       }
       router.push(`/orgs/${orgId}/projects/${projectId}/goals`);
+    } catch {
+      setError(t('deleteError'));
     } finally {
       setSubmitting(false);
     }
