@@ -95,4 +95,19 @@ describe('OnboardingSourceContinueButton', () => {
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
+
+  it('shows the failure message when the connection drops, and can be pressed again', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" hasReceivedData />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/check your internet connection/i);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
 });

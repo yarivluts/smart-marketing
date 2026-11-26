@@ -214,4 +214,18 @@ describe('OnboardingFunnelStep', () => {
       }),
     );
   });
+
+  it('shows the failure message when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <OnboardingFunnelStep orgId="org-1" projectId="project-1" proposal={[]} />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip this step' }));
+
+    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent(/check your internet connection/i);
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

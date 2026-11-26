@@ -81,4 +81,15 @@ describe('OnboardingPackStep', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('We could not save this step. Check your internet connection and try again - your earlier steps are kept.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('shows the failure message when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderStep();
+
+    fireEvent.click(screen.getByRole('button', { name: /Ads, sign-ups and sales/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/check your internet connection/i);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Ads, sign-ups and sales/ })).toBeEnabled();
+  });
 });

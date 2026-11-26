@@ -43,6 +43,8 @@ export function OnboardingPackStep({ orgId, projectId, packs }: OnboardingPackSt
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmittingKey(null);
     }
