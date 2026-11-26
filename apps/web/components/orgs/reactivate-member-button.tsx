@@ -27,6 +27,9 @@ export function ReactivateMemberButton({ orgId, membershipId }: ReactivateMember
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the button did nothing and said nothing.
+      setError(t('reactivateError'));
     } finally {
       setSubmitting(false);
     }

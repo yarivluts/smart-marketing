@@ -498,10 +498,10 @@
     "removeError": "Couldn't remove this member. Please try again.",
     "removeLastOwnerError": "An organization must always have at least one owner.",
     "suspend": "Suspend",
-    "suspendError": "Couldn't suspend this member. Please try again.",
+    "suspendError": "Nothing was changed; the member can still use GrowthOS. Check your internet connection and try again.",
     "suspendLastOwnerError": "An organization must always have at least one owner.",
     "reactivate": "Reactivate",
-    "reactivateError": "Couldn't reactivate this member. Please try again."
+    "reactivateError": "Nothing was changed; the member is still suspended. Check your internet connection and try again."
   },
   "NewProjectPage": {
     "title": "Create a project",
