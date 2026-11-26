@@ -845,7 +845,7 @@
     "rename": "Rename",
     "saveRename": "Save name",
     "cancelRename": "Cancel",
-    "renameError": "Couldn't rename this key. Please try again.",
+    "renameError": "The key keeps its old name; nothing was changed. Check your internet connection and try again.",
     "touchpointSnippetHeading": "Website tracking snippet",
     "touchpointSnippetIntro": "Paste this once in the head section of every page. It loads without slowing the page, notes where each visitor came from (which ad or link, and which page they landed on) at the start of each visit, and gives you GrowthOS.track(name, properties) and GrowthOS.identify(userId) after login.",
     "copySnippet": "Copy snippet",
