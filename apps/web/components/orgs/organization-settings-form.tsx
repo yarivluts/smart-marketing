@@ -57,6 +57,9 @@ export function OrganizationSettingsForm({
       }
       setSaved(true);
       router.refresh();
+    } catch {
+      // The request never reached us (offline, dropped connection): say so instead of failing silently.
+      setError(t('saveError'));
     } finally {
       setSubmitting(false);
     }

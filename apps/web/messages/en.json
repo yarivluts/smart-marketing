@@ -3346,7 +3346,7 @@
     "nameRequiredError": "Organization name is required.",
     "save": "Save",
     "saved": "Saved.",
-    "saveError": "Could not save these settings. Please try again.",
+    "saveError": "We could not save these settings, and nothing was changed. Check your internet connection and try again.",
     "eyebrow": "Organization",
     "kpiProjects": "Projects",
     "kpiMembers": "Active members",
