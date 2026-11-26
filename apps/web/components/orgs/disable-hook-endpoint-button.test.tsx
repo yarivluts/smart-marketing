@@ -40,7 +40,17 @@ describe('DisableHookEndpointButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't disable this endpoint. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("The data link was not turned off and still receives data. Check your internet connection and try again.");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('explains nothing changed when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The data link was not turned off and still receives data. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });

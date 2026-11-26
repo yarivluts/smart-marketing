@@ -29,6 +29,9 @@ export function EnableHookEndpointButton({ orgId, projectId, hookEndpointId }: E
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the button did nothing and said nothing.
+      setError(true);
     } finally {
       setSubmitting(false);
     }
