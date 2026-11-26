@@ -75,6 +75,8 @@ export function OnboardingFunnelStep({ orgId, projectId, proposal, confirmedHref
       } else {
         router.refresh();
       }
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

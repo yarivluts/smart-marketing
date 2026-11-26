@@ -50,6 +50,8 @@ export function OnboardingSourceContinueButton({
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }
