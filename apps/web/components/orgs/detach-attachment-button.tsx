@@ -28,6 +28,8 @@ export function DetachAttachmentButton({ orgId, attachmentId }: DetachAttachment
       }
       setConfirming(false);
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

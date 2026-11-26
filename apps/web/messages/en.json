@@ -772,7 +772,7 @@
     "detachConfirm": "Remove this from the project? GrowthOS stops using it here. You can ask for it again later.",
     "detachConfirmYes": "Yes, remove",
     "detachKeep": "Keep it",
-    "detachError": "Couldn't remove this from the project. Please try again.",
+    "detachError": "Nothing was changed - this is still part of the project. Check your internet connection and try again.",
     "writeTierLabel": "What GrowthOS may do with this account",
     "writeTierRead": "Look only - changes nothing",
     "writeTierOptimize": "Adjust budgets, pause or turn on ads",
