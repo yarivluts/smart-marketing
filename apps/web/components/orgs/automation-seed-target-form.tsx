@@ -81,6 +81,9 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
       setTargetId('');
       setLabel('');
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the button did nothing and said nothing.
+      setError(t('seedTargetOfflineError'));
     } finally {
       setSubmitting(false);
     }
