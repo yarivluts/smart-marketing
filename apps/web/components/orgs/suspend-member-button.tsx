@@ -35,6 +35,9 @@ export function SuspendMemberButton({ orgId, membershipId }: SuspendMemberButton
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the button did nothing and said nothing.
+      setError(t('suspendError'));
     } finally {
       setSubmitting(false);
     }

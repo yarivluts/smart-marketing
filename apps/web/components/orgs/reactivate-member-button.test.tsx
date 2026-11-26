@@ -40,7 +40,18 @@ describe('ReactivateMemberButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't reactivate this member. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Nothing was changed; the member is still suspended. Check your internet connection and try again.");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says nothing was changed when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reactivate' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(screen.getByRole('button', { name: 'Reactivate' })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 });
