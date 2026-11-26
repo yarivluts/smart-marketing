@@ -40,7 +40,18 @@ describe('RevokeApiKeyButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't revoke this key. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("The key was not revoked and still works. Check your internet connection and try again.");
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('still works');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Revoke' })).toBeEnabled();
   });
 });
