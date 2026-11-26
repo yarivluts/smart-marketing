@@ -6414,7 +6414,7 @@
       "invalid_site": "Enter a website address, like example.com.",
       "invalid_site_email": "That looks like an email address. Enter your website instead, like example.com.",
       "empty_request": "Write what you want first.",
-      "quota_exceeded": "Today's AI limit is used up. It resets tomorrow.",
+      "quota_exceeded": "Today's AI limit is used up, so nothing was changed. It resets tomorrow - come back then and try again.",
       "provider_failed": "The AI service did not answer. Try again in a minute.",
       "ai_unavailable": "The AI service is not available on our side right now, so trying again will not help. Please contact GrowthOS support.",
       "not_pending": "You already decided on this one. Reload the page to see what is next.",

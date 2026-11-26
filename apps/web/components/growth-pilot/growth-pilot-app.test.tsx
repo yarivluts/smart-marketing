@@ -160,7 +160,7 @@ describe('GrowthPilotApp', () => {
   it.each([
     ['not_configured', 'will not help. Please contact GrowthOS support.'],
     ['provider_billing', 'will not help. Please contact GrowthOS support.'],
-    ['quota_exceeded', "Today's AI limit is used up. It resets tomorrow."],
+    ['quota_exceeded', "Today's AI limit is used up, so nothing was changed. It resets tomorrow - come back then and try again."],
   ])('does not say "try again in a minute" when the AI refusal is %s', async (code, text) => {
     stubFetch({ status: 503, body: { error: 'provider_failed', code } });
     renderWithIntl(<GrowthPilotApp orgId="o" projectId="p" initial={null} />, { locale: 'en' });
