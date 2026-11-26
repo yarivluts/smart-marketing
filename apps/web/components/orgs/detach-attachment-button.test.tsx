@@ -42,7 +42,21 @@ describe('DetachAttachmentButton', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove from this project' }));
     fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't remove this from the project. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nothing was changed - this is still part of the project. Check your internet connection and try again.',
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the connection drops, and can be pressed again', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from this project' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, remove' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(screen.getByRole('button', { name: 'Yes, remove' })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 
