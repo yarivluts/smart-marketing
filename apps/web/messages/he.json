@@ -845,7 +845,7 @@
     "rename": "שינוי שם",
     "saveRename": "שמירת שם",
     "cancelRename": "ביטול",
-    "renameError": "לא ניתן היה לשנות את שם המפתח. נסו שוב.",
+    "renameError": "שם המפתח נשאר כמו שהיה ושום דבר לא השתנה. בדקו את חיבור האינטרנט ונסו שוב.",
     "touchpointSnippetHeading": "קטע מעקב לאתר",
     "touchpointSnippetIntro": "הדביקו את זה פעם אחת באזור ה-head של כל עמוד. הוא נטען בלי להאט את העמוד, רושם מאיפה כל מבקר הגיע (מאיזו מודעה או קישור, ולאיזה עמוד נחת) בתחילת כל ביקור, ומאפשר GrowthOS.track(name, properties) ו-GrowthOS.identify(userId) אחרי התחברות.",
     "copySnippet": "העתקת הקטע",

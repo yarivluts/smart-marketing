@@ -51,6 +51,9 @@ export function EditApiKeyNameForm({ orgId, projectId, apiKeyId, initialName }: 
       }
       setEditing(false);
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the button did nothing and said nothing.
+      setError(true);
     } finally {
       setSubmitting(false);
     }

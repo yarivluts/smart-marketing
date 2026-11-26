@@ -59,9 +59,21 @@ describe('EditApiKeyNameForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save name' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't rename this key. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed. Check your internet connection');
     expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByDisplayValue('Original name')).toBeInTheDocument();
+  });
+
+  it('shows the same message when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save name' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('keeps its old name');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Save name' })).toBeEnabled();
   });
 
   it('discards edits on cancel', () => {
