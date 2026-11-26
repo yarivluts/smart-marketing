@@ -89,8 +89,20 @@ describe('EditPersonForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't save these changes. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was changed');
     expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
+  });
+
+  it('shows the same message when the connection drops, and can be retried', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 });
