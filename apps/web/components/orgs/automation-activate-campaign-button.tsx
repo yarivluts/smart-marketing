@@ -32,6 +32,8 @@ export function AutomationActivateCampaignButton({ orgId, projectId, targetId }:
         return;
       }
       router.refresh();
+    } catch {
+      setError(t('proposeActivateNetworkError'));
     } finally {
       setSubmitting(false);
     }
