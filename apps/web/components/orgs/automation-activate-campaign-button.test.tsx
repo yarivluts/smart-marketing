@@ -46,7 +46,18 @@ describe('AutomationActivateCampaignButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Propose activation' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't propose the activation. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't send the activation proposal, so nothing was proposed. Please try again.");
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says nothing was proposed and to check the connection when the request cannot be sent', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Propose activation' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was proposed. Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Propose activation' })).toBeEnabled();
   });
 });
