@@ -30,6 +30,8 @@ export function PauseCampaignButton({ orgId, projectId, activationActionId }: Pa
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

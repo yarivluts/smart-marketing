@@ -3516,7 +3516,7 @@
     "lastKnownStateAt": "Last known state as of {at}",
     "stateSourceNote": "This shows what GrowthOS has done so far. Live numbers from the ad platform are not connected yet.",
     "pauseButton": "Pause ad",
-    "pauseError": "Could not pause the ad. Please try again.",
+    "pauseError": "The ad was not paused and is still running. Check your internet connection and try again.",
     "keywordsLine": "Keywords: {keywords}",
     "metaTargetingSummary": "{countries}, ages {ageMin}-{ageMax}",
     "lastPlatformReadAt": "Synced from the ad platform as of {at}",
