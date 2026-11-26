@@ -31,6 +31,8 @@ export function RefreshCampaignStateButton({ orgId, projectId, targetId }: Refre
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }

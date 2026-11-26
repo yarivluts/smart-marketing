@@ -3523,7 +3523,7 @@
     "lastPlatformReadAt": "Synced from the ad platform as of {at}",
     "refreshStateButton": "Refresh from platform",
     "refreshStateInProgress": "Refreshing...",
-    "refreshStateError": "Could not refresh from the ad platform. The last recorded state is still shown.",
+    "refreshStateError": "Could not refresh from the ad platform. Nothing was changed - the last recorded state is still shown. Check your internet connection and try again.",
     "objectiveLabel": "Objective",
     "importedAdCta": "Button text: {cta, select, LEARN_MORE {Learn more} SHOP_NOW {Shop now} SIGN_UP {Sign up} CONTACT_US {Contact us} GET_QUOTE {Get quote} BOOK_TRAVEL {Book now} DOWNLOAD {Download} SUBSCRIBE {Subscribe} APPLY_NOW {Apply now} ORDER_NOW {Order now} GET_OFFER {Get offer} CALL_NOW {Call now} SEND_MESSAGE {Send message} WHATSAPP_MESSAGE {WhatsApp message} WATCH_MORE {Watch more} other {{ctaFallback}}}",
     "spendHeading": "Ad spend (last 28 days)",
