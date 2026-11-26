@@ -83,6 +83,9 @@ export function CreateGoalForm({ orgId, projectId, metricCatalog, people }: Crea
       }
       const body = (await response.json()) as { goal: { id: string } };
       router.push(`/orgs/${orgId}/projects/${projectId}/goals/${body.goal.id}`);
+    } catch {
+      // A dropped connection throws before any response; show the same message.
+      setError(t('createError'));
     } finally {
       setSubmitting(false);
     }

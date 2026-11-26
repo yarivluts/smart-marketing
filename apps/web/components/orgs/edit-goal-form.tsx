@@ -119,6 +119,9 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
       }
       setEditing(false);
       router.refresh();
+    } catch {
+      // A dropped connection throws before any response; show the same message.
+      setError(true);
     } finally {
       setSubmitting(false);
     }

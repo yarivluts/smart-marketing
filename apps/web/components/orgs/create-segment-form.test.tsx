@@ -87,6 +87,19 @@ describe('CreateSegmentForm', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it('shows the same message and does not refresh when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pro customers' } });
+    fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was created. Check your internet connection and try again.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it('fills the name from an applied suggestion when the name field is still blank, and replaces the filter rows', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,

@@ -105,6 +105,20 @@ describe('CreateGoalForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the goal. Nothing was created. Check your internet connection and try again.');
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('shows the same message and does not navigate when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Q3 signups' } });
+    fireEvent.change(screen.getByLabelText('Target value'), { target: { value: '1000' } });
+    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-07-01' } });
+    fireEvent.change(screen.getByLabelText('Deadline'), { target: { value: '2026-09-30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create goal' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was created. Check your internet connection and try again.');
+    expect(push).not.toHaveBeenCalled();
+  });
 });
 
 describe('CreateGoalForm on a ratio metric (KAN-213)', () => {
