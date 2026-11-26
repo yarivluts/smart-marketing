@@ -27,6 +27,8 @@ export function CompleteOnboardingButton({ orgId, projectId }: CompleteOnboardin
         return;
       }
       router.refresh();
+    } catch {
+      setError(true);
     } finally {
       setSubmitting(false);
     }
