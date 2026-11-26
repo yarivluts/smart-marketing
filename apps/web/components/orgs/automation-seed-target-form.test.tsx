@@ -84,3 +84,25 @@ describe('AutomationSeedTargetForm environment box', () => {
     expect(box).toHaveAccessibleDescription(/real ads/);
   });
 });
+
+describe('AutomationSeedTargetForm failures', () => {
+  it('says the ad was not added when the connection drops, and can be pressed again', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
+    fireEvent.change(screen.getByLabelText('Ad name'), { target: { value: 'Spring' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add ad' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/ad was not added.*internet connection/);
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Add ad' }) as HTMLButtonElement).disabled).toBe(false));
+    vi.unstubAllGlobals();
+  });
+
+  it('says nothing was added when the server refuses', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
+    fireEvent.change(screen.getByLabelText('Ad name'), { target: { value: 'Spring' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add ad' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('nothing was added');
+    vi.unstubAllGlobals();
+  });
+});
