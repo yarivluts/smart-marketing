@@ -69,7 +69,18 @@ describe('OrganizationSettingsForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save these settings. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not save these settings, and nothing was changed. Check your internet connection and try again.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the request never reaches the server (offline)', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed');
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     expect(refresh).not.toHaveBeenCalled();
   });
 });
