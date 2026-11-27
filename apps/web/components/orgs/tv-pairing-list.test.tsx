@@ -60,7 +60,18 @@ describe('TvPairingList', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Unpair' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not unpair this TV. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The TV was not unpaired');
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderList();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unpair' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Unpair' })).toBeEnabled();
   });
 });
