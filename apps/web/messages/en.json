@@ -777,7 +777,7 @@
     "writeTierRead": "Look only - changes nothing",
     "writeTierOptimize": "Adjust budgets, pause or turn on ads",
     "writeTierManage": "Full control - also create and edit ads",
-    "writeTierError": "Couldn't change what GrowthOS may do with this account. Please try again.",
+    "writeTierError": "Nothing was changed - what GrowthOS may do with this account is as it was. Check your internet connection and try again.",
     "eyebrow": "Project",
     "heroDescription": "Account connections, templates and team members from your organization's shared library that this project uses, is waiting on, or can still ask for.",
     "kpiAttached": "Attached",
