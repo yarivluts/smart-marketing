@@ -106,8 +106,12 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
           type="number"
           min={0}
           value={initialDailyBudgetUsd}
+          aria-describedby="seed-target-budget-hint"
           onChange={(event) => setInitialDailyBudgetUsd(event.target.value)}
         />
+        <p id="seed-target-budget-hint" className="text-xs text-muted-foreground">
+          {t('seedTargetBudgetHint')}
+        </p>
       </div>
       <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[180px] sm:flex-1">
         <label className="text-sm font-medium" htmlFor="seed-target-connection">

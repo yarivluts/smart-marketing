@@ -117,6 +117,15 @@ describe('AutomationSeedTargetForm more options', () => {
     expect(details?.contains(screen.getByLabelText('Where it runs'))).toBe(true);
     // The two things a newcomer must give stay outside it.
     expect(details?.contains(screen.getByLabelText('Ad name'))).toBe(false);
-    expect(details?.contains(screen.getByLabelText('Initial daily budget (USD)'))).toBe(false);
+    expect(details?.contains(screen.getByLabelText('Daily budget (USD)'))).toBe(false);
+  });
+});
+
+describe('AutomationSeedTargetForm budget', () => {
+  it('explains in one line what the daily budget does, tied to the box', () => {
+    renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
+    const input = screen.getByLabelText('Daily budget (USD)');
+    const hint = document.getElementById(input.getAttribute('aria-describedby') ?? '');
+    expect(hint?.textContent).toBe('About how much this ad may spend each day. You can change it later.');
   });
 });
