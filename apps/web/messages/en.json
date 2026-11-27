@@ -1217,7 +1217,7 @@
     "archivedLabel": "Archived",
     "archive": "Archive",
     "archiveConfirm": "Archive metric \"{name}\"? It disappears from the catalog and stops resolving for queries, goals, and formulas. Nothing is deleted.",
-    "archiveError": "Could not archive this metric. Please try again.",
+    "archiveError": "Nothing was changed - the metric was not archived. Check your internet connection and try again.",
     "archiveStillReferencedError": "Other metrics still use this one: {referencedBy}. Edit or archive those first.",
     "formulaSummary": "= {formula}",
     "dimensionsSummary": "Dimensions: {dimensions}",

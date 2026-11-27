@@ -40,6 +40,9 @@ export function ArchiveMetricDefButton({ orgId, projectId, name }: ArchiveMetric
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the button did nothing and said nothing.
+      setError(t('archiveError'));
     } finally {
       setSubmitting(false);
     }
