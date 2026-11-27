@@ -862,7 +862,7 @@
     "mcpConnectionNeverUsedLabel": "Never used",
     "mcpConnectionGrantedLabel": "Granted {createdAt}",
     "revokeMcpConnection": "Revoke",
-    "revokeMcpConnectionError": "Couldn't revoke this connection. Please try again.",
+    "revokeMcpConnectionError": "The connection was not revoked and still works. Check your internet connection and try again.",
     "eyebrow": "Access",
     "heroDescription": "Every credential that can send data to or read from this project, where it works, what it may do, and when it was last used.",
     "kpiActive": "Active keys",
