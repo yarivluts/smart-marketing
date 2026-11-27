@@ -41,6 +41,9 @@ export function WriteTierSelector({ orgId, attachmentId, tier, disabled }: Write
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this the menu snapped back and said nothing.
+      setError(true);
     } finally {
       setSubmitting(false);
     }
