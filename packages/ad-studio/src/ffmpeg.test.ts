@@ -537,4 +537,19 @@ describe('scrolling website capture video', () => {
     expect(await lumAt(0.1)).toBeGreaterThan(220);
     expect(await lumAt(2.8)).toBeLessThan(35);
   }, 60_000);
+
+  it('renders a page whose scaled height comes out odd (no "bad extract area")', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-scroll-odd-'));
+    workDirs.push(dir);
+    const { default: sharp } = await import('sharp');
+    // Vertical sheets are 2160 wide; a 2160 x 5001 page keeps width and lands on an odd height
+    // between the minimum and the cap - the branch that used to round up past the bottom edge.
+    const oddPng = await sharp({ create: { width: 2160, height: 5001, channels: 3, background: { r: 200, g: 200, b: 200 } } })
+      .png()
+      .toBuffer();
+    const output = path.join(dir, 'odd-scroll.mp4');
+    const rendered = await renderScrollingPageVideo({ imageBytes: oddPng, output, format: 'vertical', durationSeconds: 1, runner: realRunner });
+    expect(rendered.durationSeconds).toBe(1);
+    expect((await probeMedia(output, realRunner)).hasVideo).toBe(true);
+  }, 60_000);
 });
