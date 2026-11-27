@@ -2992,7 +2992,7 @@
     "lastSeenLabel": "Last seen {lastSeenAt}",
     "neverSeenLabel": "Never seen",
     "revoke": "Unpair",
-    "revokeError": "Could not unpair this TV. Please try again.",
+    "revokeError": "The TV was not unpaired and still shows your dashboards. Check your internet connection and try again.",
     "editSettings": "Edit",
     "saveSettings": "Save settings",
     "cancelEditSettings": "Cancel",

@@ -2992,7 +2992,7 @@
     "lastSeenLabel": "נראתה לאחרונה {lastSeenAt}",
     "neverSeenLabel": "לא נראתה מעולם",
     "revoke": "בטל צימוד",
-    "revokeError": "לא ניתן היה לבטל את צימוד הטלוויזיה. נסו שוב.",
+    "revokeError": "הצימוד לטלוויזיה לא בוטל והיא עדיין מציגה את לוחות המחוונים שלכם. בדקו את חיבור האינטרנט ונסו שוב.",
     "editSettings": "ערוך",
     "saveSettings": "שמור הגדרות",
     "cancelEditSettings": "בטל",

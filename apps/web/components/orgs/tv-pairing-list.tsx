@@ -33,6 +33,8 @@ export function TvPairingList({ orgId, projectId, pairings, boards }: TvPairingL
         return;
       }
       router.refresh();
+    } catch {
+      setError(pairingId);
     } finally {
       setRevokingId(null);
     }
