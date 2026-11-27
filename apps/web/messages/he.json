@@ -4757,6 +4757,8 @@
       "editInstruction": "מה לשנות?",
       "editInstructionPlaceholder": "למשל: תאורה חמה יותר, הכותרת למעלה",
       "applyEdit": "החלה",
+      "makingNewVersion": "יוצרים את הגרסה החדשה - בערך דקה",
+      "changedBy": "השינוי שביקשתם: {instruction}",
       "versions": "גרסאות",
       "versionRender": "נוצר מהרעיון",
       "versionUpload": "מהמדיה שלכם",

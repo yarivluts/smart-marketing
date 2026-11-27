@@ -197,18 +197,26 @@ describe('ImageStudio', () => {
 
   it('changes an image by an instruction and lets the person pick between versions', async () => {
     const v2 = image({ id: 'i2', version: 2, kind: 'edit', parentImageId: 'i1', instruction: 'Warmer light' });
+    let finishEdit: (response: Response) => void = () => undefined;
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(json({ concepts: [CONCEPT], images: [v2, image({ selected: false })] }))
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { finishEdit = resolve; }))
       .mockResolvedValueOnce(json({ concepts: [CONCEPT], images: [{ ...v2, selected: false }, image()] }));
     vi.stubGlobal('fetch', fetchMock);
     renderStudio();
 
     const square = screen.getByTestId('ad-studio-image-slot-square');
+    expect(within(square).queryByTestId('ad-studio-image-working-square')).toBeNull();
     fireEvent.click(within(square).getByRole('button', { name: 'Change with AI' }));
     fireEvent.change(within(square).getByLabelText('What should change?'), { target: { value: 'Warmer light' } });
     fireEvent.click(within(square).getByRole('button', { name: 'Apply' }));
+    // While the edit runs (tens of seconds in production) the picture itself says so.
+    expect(await within(square).findByTestId('ad-studio-image-working-square')).toHaveTextContent('Making the new version');
+    finishEdit(json({ concepts: [CONCEPT], images: [v2, image({ selected: false })] }));
     await waitFor(() => expect(within(screen.getByTestId('ad-studio-image-slot-square')).getByRole('button', { name: 'v2' })).toHaveAttribute('aria-pressed', 'true'));
+    expect(within(screen.getByTestId('ad-studio-image-slot-square')).queryByTestId('ad-studio-image-working-square')).toBeNull();
+    // The chosen version says what was asked for, without hovering a version chip.
+    expect(screen.getByTestId('ad-studio-image-change-square')).toHaveTextContent('Change asked for: Warmer light');
     expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ instruction: 'Warmer light' });
     expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe(`${BASE}/images/i1/edit`);
 

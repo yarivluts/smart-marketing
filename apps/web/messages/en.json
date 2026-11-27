@@ -4757,6 +4757,8 @@
       "editInstruction": "What should change?",
       "editInstructionPlaceholder": "e.g. warmer light, put the headline at the top",
       "applyEdit": "Apply",
+      "makingNewVersion": "Making the new version - about a minute",
+      "changedBy": "Change asked for: {instruction}",
       "versions": "Versions",
       "versionRender": "Made from the idea",
       "versionUpload": "From your media",
