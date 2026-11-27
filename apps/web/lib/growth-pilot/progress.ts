@@ -122,7 +122,8 @@ export function growthTargetProgress(input: GrowthProgressInput): GrowthTargetPr
   else if (publish === 'ready') stages.push(decision('published', open(publishes)));
   else if (publish === 'needs_meta') stages.push(stage('published', 'waiting'));
   else if (publish === 'rejected') stages.push(stage('published', 'declined'));
-  else if (publish === 'failed') stages.push(stage('published', 'failed', { failure: target.publishFailure, proposalId: open(publishes)?.id ?? null }));
+  // The ad platform asking us to slow down is stored as quota_exceeded; shown as it is, it would blame the person's AI limit.
+  else if (publish === 'failed') stages.push(stage('published', 'failed', { failure: target.publishFailure === 'quota_exceeded' ? 'platform_busy' : target.publishFailure, proposalId: open(publishes)?.id ?? null }));
   else stages.push(stage('published', 'not_started'));
 
   const turnOn = open(activations);
