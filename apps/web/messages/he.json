@@ -3080,6 +3080,7 @@
     "campaignStatusPaused": "מושהה",
     "campaignStatusEnabled": "פעיל",
     "campaignStatusRemoved": "הוסר",
+    "seedTargetMoreOptions": "אפשרויות נוספות (לא חובה - ברירות המחדל מתאימות)",
     "seedTargetIdLabel": "קוד קצר (לא חובה - אם משאירים ריק, נבחר אחד בשבילכם)",
     "seedTargetLabelLabel": "שם המודעה",
     "seedTargetEnvironmentLabel": "איפה זה רץ",

@@ -92,30 +92,10 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
   return (
     <form className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap" onSubmit={handleSubmit} noValidate>
       <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[140px] sm:flex-1">
-        <label className="text-sm font-medium" htmlFor="seed-target-id">
-          {t('seedTargetIdLabel')}
-        </label>
-        <Input id="seed-target-id" value={targetId} onChange={(event) => setTargetId(event.target.value)} />
-      </div>
-      <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[140px] sm:flex-1">
         <label className="text-sm font-medium" htmlFor="seed-target-label">
           {t('seedTargetLabelLabel')}
         </label>
         <Input id="seed-target-label" value={label} onChange={(event) => setLabel(event.target.value)} />
-      </div>
-      <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[120px] sm:flex-1">
-        <label className="text-sm font-medium" htmlFor="seed-target-environment">
-          {t('seedTargetEnvironmentLabel')}
-        </label>
-        <Input
-          id="seed-target-environment"
-          aria-describedby="seed-target-environment-hint"
-          value={environmentId}
-          onChange={(event) => setEnvironmentId(event.target.value)}
-        />
-        <p id="seed-target-environment-hint" className="text-xs text-muted-foreground">
-          {t('seedTargetEnvironmentHint')}
-        </p>
       </div>
       <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[120px] sm:flex-1">
         <label className="text-sm font-medium" htmlFor="seed-target-budget">
@@ -148,6 +128,31 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
           ))}
         </select>
       </div>
+      <details className="flex w-full flex-col gap-3 text-sm">
+        <summary className="cursor-pointer text-muted-foreground">{t('seedTargetMoreOptions')}</summary>
+        <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+      <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[140px] sm:flex-1">
+        <label className="text-sm font-medium" htmlFor="seed-target-id">
+          {t('seedTargetIdLabel')}
+        </label>
+        <Input id="seed-target-id" value={targetId} onChange={(event) => setTargetId(event.target.value)} />
+      </div>
+      <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[120px] sm:flex-1">
+        <label className="text-sm font-medium" htmlFor="seed-target-environment">
+          {t('seedTargetEnvironmentLabel')}
+        </label>
+        <Input
+          id="seed-target-environment"
+          aria-describedby="seed-target-environment-hint"
+          value={environmentId}
+          onChange={(event) => setEnvironmentId(event.target.value)}
+        />
+        <p id="seed-target-environment-hint" className="text-xs text-muted-foreground">
+          {t('seedTargetEnvironmentHint')}
+        </p>
+      </div>
+        </div>
+      </details>
       <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
         {t('seedTargetButton')}
       </Button>

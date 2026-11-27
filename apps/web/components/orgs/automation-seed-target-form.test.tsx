@@ -106,3 +106,17 @@ describe('AutomationSeedTargetForm failures', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('AutomationSeedTargetForm more options', () => {
+  it('keeps the short code and "Where it runs" tucked under a "More options" disclosure', () => {
+    const { container } = renderWithIntl(<AutomationSeedTargetForm orgId="o" projectId="p" connections={[]} />);
+    const details = container.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details?.querySelector('summary')?.textContent).toBe('More options (optional - the defaults are fine)');
+    expect(details?.contains(screen.getByLabelText(/Short code \(optional/))).toBe(true);
+    expect(details?.contains(screen.getByLabelText('Where it runs'))).toBe(true);
+    // The two things a newcomer must give stay outside it.
+    expect(details?.contains(screen.getByLabelText('Ad name'))).toBe(false);
+    expect(details?.contains(screen.getByLabelText('Initial daily budget (USD)'))).toBe(false);
+  });
+});
