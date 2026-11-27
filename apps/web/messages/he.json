@@ -2398,7 +2398,7 @@
     "disableButton": "השבת",
     "enableButton": "הפעל",
     "uninstallButton": "הסר",
-    "actionError": "לא ניתן היה להשלים את הפעולה. נסו שוב.",
+    "actionError": "הפעולה לא הושלמה, ולכן שום דבר לא השתנה. בדקו את החיבור לאינטרנט ונסו שוב בעוד רגע.",
     "editConfigButton": "ערוך הגדרות",
     "saveConfigButton": "שמור הגדרות",
     "cancelEditConfigButton": "ביטול",
