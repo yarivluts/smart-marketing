@@ -30,9 +30,11 @@ function WinRuleRow({ orgId, projectId, rule, winCount }: { orgId: string; proje
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   async function toggleActive(): Promise<void> {
     setError(false);
+    setOffline(false);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/win-rules/${rule.id}`, {
@@ -45,6 +47,8 @@ function WinRuleRow({ orgId, projectId, rule, winCount }: { orgId: string; proje
         return;
       }
       router.refresh();
+    } catch {
+      setOffline(true);
     } finally {
       setSubmitting(false);
     }
@@ -52,6 +56,7 @@ function WinRuleRow({ orgId, projectId, rule, winCount }: { orgId: string; proje
 
   async function handleDelete(): Promise<void> {
     setError(false);
+    setOffline(false);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/win-rules/${rule.id}`, { method: 'DELETE' });
@@ -60,6 +65,8 @@ function WinRuleRow({ orgId, projectId, rule, winCount }: { orgId: string; proje
         return;
       }
       router.refresh();
+    } catch {
+      setOffline(true);
     } finally {
       setSubmitting(false);
     }
@@ -125,9 +132,9 @@ function WinRuleRow({ orgId, projectId, rule, winCount }: { orgId: string; proje
           initialWinType={rule.winType}
         />
       </div>
-      {error ? (
+      {error || offline ? (
         <p role="alert" className="text-xs text-destructive">
-          {t('actionError')}
+          {offline ? t('actionOffline') : t('actionError')}
         </p>
       ) : null}
     </li>

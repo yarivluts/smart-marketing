@@ -2906,6 +2906,7 @@
     "cancelEditRule": "Cancel",
     "editRuleError": "Couldn't save this win. Nothing was changed, please try again.",
     "actionError": "Could not update this win. Nothing was changed, please try again.",
+    "actionOffline": "That did not go through, so nothing was changed. Check your internet connection and try again in a moment.",
     "createHeading": "New win",
     "noEventSchemas": "Nothing to celebrate yet - no events are coming in. Connect your website or another data source first, then come back to set up a win.",
     "nameLabel": "Name",

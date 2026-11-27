@@ -133,4 +133,13 @@ describe('WinRuleList', () => {
     renderList([activeRule]);
     expect(screen.queryByRole('group', { name: 'Trigger to win' })).not.toBeInTheDocument();
   });
+
+  it.each(['Disable', 'Delete'])('says nothing changed and to check the connection when %s cannot reach the server', async (name) => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    renderList([activeRule]);
+    fireEvent.click(screen.getByRole('button', { name }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed. Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('button', { name })).toBeEnabled());
+  });
 });
