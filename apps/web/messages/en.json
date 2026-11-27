@@ -4370,6 +4370,7 @@
       "versionUpload": "Uploaded or from gallery",
       "mediaSourcesTitle": "Project media gallery & automatic site scan",
       "mediaSourcesHint": "Upload videos or photos from your computer, reuse your project gallery, or scan your website automatically",
+      "ownMedia": "Use your own clip or image instead",
       "uploadClip": "Clip from computer",
       "chooseFromGallery": "Pick clip from gallery",
       "attachImage": "Add photo / screen",
