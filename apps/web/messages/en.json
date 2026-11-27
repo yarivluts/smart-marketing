@@ -2545,7 +2545,7 @@
     "removeFilterButton": "Remove",
     "addFilterButton": "Add filter",
     "invalidDateRangeError": "The start date must not be after the end date.",
-    "settingsError": "Could not save settings. Please try again.",
+    "settingsError": "Nothing was changed; the dashboard keeps its old settings. Check your internet connection and try again.",
     "saveSettingsButton": "Save settings",
     "tilesHeading": "Tiles",
     "editLayoutButton": "Edit layout",

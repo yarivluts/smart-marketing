@@ -2545,7 +2545,7 @@
     "removeFilterButton": "הסר",
     "addFilterButton": "הוסף מסנן",
     "invalidDateRangeError": "תאריך ההתחלה לא יכול להיות מאוחר מתאריך הסיום.",
-    "settingsError": "לא ניתן היה לשמור את ההגדרות. נסו שוב.",
+    "settingsError": "שום דבר לא השתנה, ללוח המחוונים נשארו ההגדרות הקודמות. בדקו את חיבור האינטרנט ונסו שוב.",
     "saveSettingsButton": "שמור הגדרות",
     "tilesHeading": "אריחים",
     "editLayoutButton": "ערוך פריסה",

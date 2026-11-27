@@ -108,6 +108,9 @@ export function BoardSettingsForm({
         return;
       }
       router.refresh();
+    } catch {
+      // A dropped connection rejects fetch; without this Save did nothing and said nothing.
+      setError(t('settingsError'));
     } finally {
       setSubmitting(false);
     }

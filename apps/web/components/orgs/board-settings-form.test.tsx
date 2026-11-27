@@ -121,8 +121,19 @@ describe('BoardSettingsForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not save settings. Please try again.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was changed; the dashboard keeps its old settings. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the connection drops (fetch rejects)', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Save settings' })).toBeEnabled();
   });
 
   it('renders every preset label in Hebrew too', () => {
