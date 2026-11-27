@@ -2861,7 +2861,7 @@
     "editSegment": "Edit",
     "saveSegment": "Save",
     "cancelEditSegment": "Cancel",
-    "editSegmentError": "Could not update the group. Please try again.",
+    "editSegmentError": "Nothing was changed; the group still has its old details. Check your internet connection and try again.",
     "crmSyncLastRunSucceededUnknownCount": "Last sync succeeded. The destination did not report how many records it accepted.",
     "eyebrow": "Growth",
     "description": "Saved groups of customers, built from your types of record, each with its live member count, its filters, and who owns the follow-up.",
