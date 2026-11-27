@@ -1651,7 +1651,7 @@
     "title": "מי חוזר אלינו עבור {projectName}",
     "description": "אנשים מקובצים לפי חודש ההרשמה, וכמה מכל קבוצה עדיין פעילים חודש אחרי חודש.",
     "conversionEventLabel": "פעולה שנחשבת חזרה",
-    "conversionEventPlaceholder": "השאר ריק לכל פעילות, או ציין שם אירוע (למשל purchase)",
+    "conversionEventPlaceholder": "השאירו ריק לכל פעילות, או ציינו שם אירוע (למשל purchase)",
     "conversionEventApplyButton": "החל",
     "conversionEventClear": "נקה",
     "notConfigured": "תצוגת הלקוחות החוזרים עוד לא מוכנה: הנתונים שלכם עדיין לא מחוברים",
