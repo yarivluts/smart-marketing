@@ -18,6 +18,14 @@ describe('the copilot quick-prompt chips speak plain words', () => {
   });
 });
 
+describe('the English chip labels are all short sentence-case phrases', () => {
+  it('no chip label is Title Case', () => {
+    for (const key of ['chipTopAdsLabel', 'chipScaleBudgetLabel', 'chipNewCampaignLabel', 'chipRebalanceLabel'] as const) {
+      expect(en.CopilotChatPanel[key], key).not.toMatch(/\s[A-Z]/);
+    }
+  });
+});
+
 describe('the AI helper chips and tabs speak to everyone in plain words', () => {
   it('Hebrew chip prompts use the plural imperative, not the masculine singular', () => {
     expect(he.CopilotChatPanel.chipScaleBudgetQuery).toMatch(/^הגדילו /);
