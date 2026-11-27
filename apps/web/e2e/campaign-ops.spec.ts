@@ -72,6 +72,8 @@ test.describe('Campaign ops (KAN-86)', () => {
     await expect(page.getByTestId('ads-performance-dashboard')).toBeVisible();
 
     // Seed a campaign using the mobile AutomationSeedTargetForm right on the page.
+    // The short code sits under the "More options" disclosure.
+    await page.locator('form:has(#seed-target-id) details > summary').click();
     await page.locator('#seed-target-id').fill('camp-meta-1');
     await page.locator('#seed-target-label').fill('Meta Mobile Launch');
     await page.locator('#seed-target-budget').fill('120');

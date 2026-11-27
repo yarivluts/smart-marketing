@@ -3080,6 +3080,7 @@
     "campaignStatusPaused": "paused",
     "campaignStatusEnabled": "enabled",
     "campaignStatusRemoved": "removed",
+    "seedTargetMoreOptions": "More options (optional - the defaults are fine)",
     "seedTargetIdLabel": "Short code (optional - leave empty and we pick one)",
     "seedTargetLabelLabel": "Ad name",
     "seedTargetEnvironmentLabel": "Where it runs",
