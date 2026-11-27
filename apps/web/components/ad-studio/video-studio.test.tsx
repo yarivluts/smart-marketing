@@ -104,6 +104,17 @@ describe('VideoStudio', () => {
     expect(within(ownMedia).getByTestId('ad-studio-scene-upload-clip-1')).toBeInTheDocument();
   });
 
+  it('badges a clip the AI check flagged as needing a look, not as ready (en + he)', () => {
+    const flagged = { status: 'issues' as const, issues: [{ kind: 'visual' as const, severity: 'major' as const, detail: 'The watch changes', atSeconds: 0.6 }], transcript: null, checkedOn: '2026-11-27T22:52:21.000Z' };
+    const clips = [clip('c1', 'a', 1, 'ready', fp(0), { qa: flagged }), clip('c2', 'b', 1, 'ready', fp(1))];
+    const { unmount } = renderStudio({ initialClips: clips });
+    expect(within(screen.getByTestId('ad-studio-video-scene-1')).getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Needs a look');
+    expect(within(screen.getByTestId('ad-studio-video-scene-2')).getByTestId('ad-studio-scene-video-state')).toHaveTextContent('Ready');
+    unmount();
+    renderStudio({ initialClips: clips }, 'he');
+    expect(within(screen.getByTestId('ad-studio-video-scene-1')).getAllByText(heMessages.AdStudio.video.legend.needsLook).length).toBeGreaterThan(0);
+  });
+
   it('keeps a scene with a current clip on a quiet re-make button', () => {
     renderStudio({ initialClips: [clip('c1', 'a', 1, 'ready', fp(0))] });
     expect(within(screen.getByTestId('ad-studio-video-scene-1')).getByTestId('ad-studio-scene-render-1')).not.toHaveClass('bg-primary');

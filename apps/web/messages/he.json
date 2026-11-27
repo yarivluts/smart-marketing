@@ -4324,6 +4324,7 @@
       "progress": "{rendered} מתוך {total} סצנות נוצרו",
       "rulerLabel": "מצב הווידאו של כל סצנה על סרגל הדקה",
       "legend": {
+        "needsLook": "דורש בדיקה",
         "none": "עדיין לא נוצר",
         "generating": "ביצירה",
         "ready": "מוכן",

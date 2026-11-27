@@ -915,6 +915,10 @@ export function VideoStudio({
             !instructionsTooLong &&
             scene.durationSeconds <= videoSecondsLeft;
           const lastFailed = history[0]?.status === 'failed' ? history[0] : null;
+          // A clip the AI check flagged is usable but not "Ready" - the badge must not say green next to a red finding.
+          const checkFlagged = state.state === 'ready' && state.usable?.qa?.status === 'issues';
+          const badgeClass = checkFlagged ? 'bg-warning/15 text-warning' : STATE_BADGE[state.state];
+          const badgeText = checkFlagged ? t('video.legend.needsLook') : t(`video.legend.${state.state}`);
           return (
             <MobileAccordionItem
               key={scene.id}
@@ -937,10 +941,10 @@ export function VideoStudio({
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      STATE_BADGE[state.state],
+                      badgeClass,
                     )}
                   >
-                    {t(`video.legend.${state.state}`)}
+                    {badgeText}
                   </span>
                   {shownClip?.qa ? (
                     <span className="text-[11px] text-muted-foreground">
@@ -964,11 +968,11 @@ export function VideoStudio({
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      STATE_BADGE[state.state],
+                      badgeClass,
                     )}
                     data-testid="ad-studio-scene-video-state"
                   >
-                    {t(`video.legend.${state.state}`)}
+                    {badgeText}
                   </span>
                 </div>
                 <NarrationEditor

@@ -4324,6 +4324,7 @@
       "progress": "{rendered} of {total} scenes made",
       "rulerLabel": "Video status of each scene on the one-minute ruler",
       "legend": {
+        "needsLook": "Needs a look",
         "none": "Not made yet",
         "generating": "Generating",
         "ready": "Ready",
