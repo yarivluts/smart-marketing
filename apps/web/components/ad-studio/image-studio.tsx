@@ -98,9 +98,11 @@ export interface ImageStudioProps {
   };
 }
 
-/** Thumbnail beside each placement's details: the placement's own shape, a fixed width so the cards line up. */
-// Big enough to judge a change ("brighter background") without opening the file: the card's width,
-// with tall placements capped so a story image does not push the buttons off screen.
+/**
+ * Each placement's picture, in its own shape, above its details. Big enough to judge a change
+ * ("brighter background") without opening the file: the card's width, with tall placements capped so
+ * a story image does not push the buttons off screen.
+ */
 const THUMB_CLASS: Record<AdStudioImageFormat, string> = {
   square: 'aspect-square w-full max-w-64',
   portrait: 'aspect-[4/5] w-full max-w-56',
