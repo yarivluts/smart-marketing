@@ -106,4 +106,16 @@ describe('CreateWinRuleForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the win. Nothing was saved, please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('says nothing was saved and to check the connection when the request throws', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Big order' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create win' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed. Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Create win' })).toBeEnabled();
+  });
 });

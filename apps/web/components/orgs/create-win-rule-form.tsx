@@ -63,6 +63,8 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
       setFilters([]);
       setWinType('generic');
       router.refresh();
+    } catch {
+      setError(t('actionOffline'));
     } finally {
       setSubmitting(false);
     }
