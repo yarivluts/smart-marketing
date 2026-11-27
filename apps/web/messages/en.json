@@ -4705,6 +4705,8 @@
       "prepareDescription": "The AI writes the plan, the video script and the image ideas. Nothing is made yet: you review and change them below, then confirm.",
       "prepare": "Prepare the plan",
       "createTitle": "Creating your ads",
+      "createdTitle": "Your ads were created",
+      "showSteps": "Show the steps of this run ({done} of {total})",
       "createDescription": "The confirmed plan is being turned into images and video. You can leave this page; it continues when you come back.",
       "awaitingTitle": "The plan is ready for your review",
       "awaitingDescription": "Read the plan, the scenes and the image ideas below and change anything you want. When it looks right, confirm to create the images and the video.",

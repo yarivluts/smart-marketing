@@ -251,6 +251,37 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
       )
     : 0;
 
+  // A finished run is a record, not the ad's live state (a clip can go out of date after it): fold
+  // its steps away so "final video - done" is not read as the current status, and the ads come first.
+  const runFinished = run?.status === 'done' && !running;
+  const stepList = run ? (
+    <ol className={cn('grid gap-2', mode === 'progress' ? 'grid-cols-2 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3')}>
+      {run.steps.map((step) => {
+        const Icon = STEP_ICON[step.status];
+        return (
+          <li
+            key={step.id}
+            className={cn(
+              'flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5',
+              step.status === 'running' ? 'border-pp-primary/40 bg-pp-primary-fixed/40' : 'border-pp-outline-variant/35 bg-card',
+            )}
+            data-testid={`ad-studio-autopilot-step-${step.id}`}
+          >
+            <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', STEP_TONE[step.status], step.status === 'running' && 'animate-spin')} aria-hidden="true" />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate text-xs font-semibold sm:text-sm">{t(`autopilot.step.${step.id}`)}</span>
+              <span className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                {t(`autopilot.stepStatus.${step.status}`)}
+                {step.progress && step.progress.total > 0 ? ` · ${t('autopilot.progress', { done: step.progress.done, total: step.progress.total })}` : ''}
+                {step.reason && KNOWN_REASONS.has(step.reason) ? ` · ${t(`autopilot.reason.${step.reason}`)}` : ''}
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  ) : null;
+
   return (
     <section
       className="relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-3xl border border-pp-outline-variant/45 bg-card p-4 shadow-pp-candy sm:p-5"
@@ -268,7 +299,7 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
           </span>
           <div className="min-w-0 flex-1">
             <h2 id="ad-studio-autopilot-heading" className="font-pp-display text-base font-bold tracking-tight sm:text-lg">
-              {mode === 'prepare' ? t('autopilot.prepareTitle') : t('autopilot.createTitle')}
+              {mode === 'prepare' ? t('autopilot.prepareTitle') : runFinished ? t('autopilot.createdTitle') : t('autopilot.createTitle')}
             </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground sm:text-sm">
               {mode === 'prepare' ? t('autopilot.prepareDescription') : t('autopilot.createDescription')}
@@ -415,33 +446,16 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
             </div>
           </div>
 
-          <ol className={cn('grid gap-2', mode === 'progress' ? 'grid-cols-2 lg:grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3')}>
-            {run.steps.map((step) => {
-              const Icon = STEP_ICON[step.status];
-              return (
-                <li
-                  key={step.id}
-                  className={cn(
-                    'flex min-w-0 items-start gap-2 rounded-2xl border px-3 py-2.5',
-                    step.status === 'running'
-                      ? 'border-pp-primary/40 bg-pp-primary-fixed/40'
-                      : 'border-pp-outline-variant/35 bg-card',
-                  )}
-                  data-testid={`ad-studio-autopilot-step-${step.id}`}
-                >
-                  <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', STEP_TONE[step.status], step.status === 'running' && 'animate-spin')} aria-hidden="true" />
-                  <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-xs font-semibold sm:text-sm">{t(`autopilot.step.${step.id}`)}</span>
-                    <span className="text-[11px] leading-snug text-muted-foreground sm:text-xs">
-                      {t(`autopilot.stepStatus.${step.status}`)}
-                      {step.progress && step.progress.total > 0 ? ` · ${t('autopilot.progress', { done: step.progress.done, total: step.progress.total })}` : ''}
-                      {step.reason && KNOWN_REASONS.has(step.reason) ? ` · ${t(`autopilot.reason.${step.reason}`)}` : ''}
-                    </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+          {runFinished ? (
+            <details className="group" data-testid="ad-studio-autopilot-steps">
+              <summary className="cursor-pointer text-xs font-semibold text-pp-primary hover:underline">
+                {t('autopilot.showSteps', { done: runDoneSteps, total: runTotalSteps })}
+              </summary>
+              <div className="pt-2">{stepList}</div>
+            </details>
+          ) : (
+            stepList
+          )}
           {running ? <p className="text-xs text-muted-foreground">{paused ? t('autopilot.pausedHint') : t('autopilot.keepOpen')}</p> : null}
           {run.status === 'done' ? <p className="text-xs text-muted-foreground">{t('autopilot.doneHint')}</p> : null}
         </div>
