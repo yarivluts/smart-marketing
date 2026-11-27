@@ -4026,7 +4026,7 @@
   },
   "CopilotChatPanel": {
     "welcomeMessage": "Hello! I'm your AI helper. Ask me how your ads are doing, or ask me to prepare a change - nothing happens until you approve it.",
-    "chipTopAdsLabel": "Top Ads",
+    "chipTopAdsLabel": "Best ads",
     "chipTopAdsQuery": "What are top ads this week?",
     "chipScaleBudgetLabel": "Spend more",
     "chipScaleBudgetQuery": "Increase budget to $250 for my ad",

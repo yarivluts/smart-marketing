@@ -61,7 +61,7 @@ describe('CopilotChatPanel Component', () => {
     renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} />, { locale: 'en' });
 
     const chips = screen.getAllByRole('button');
-    const topAdsChip = chips.find((c) => c.textContent?.includes('Top Ads'));
+    const topAdsChip = chips.find((c) => c.textContent?.includes('Best ads'));
     expect(topAdsChip).toBeDefined();
 
     if (topAdsChip) {
