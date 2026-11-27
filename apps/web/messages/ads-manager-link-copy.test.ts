@@ -26,8 +26,8 @@ describe('Ads Manager links say Facebook, not Meta', () => {
 describe('failure reasons introduce Ads Manager as Facebook\'s ad tool', () => {
   it('english', () => {
     const all = JSON.stringify(en.GrowthPilot);
-    expect(all).toContain("verify your ad account in Facebook's ad tool (Ads Manager");
-    expect(all).toContain("Open Facebook's ad tool (Ads Manager");
+    expect(all).toContain("verify your ad account in Facebook's ad tool, Ads Manager, at");
+    expect(all).toContain("Open Facebook's ad tool, Ads Manager, at");
   });
 });
 
