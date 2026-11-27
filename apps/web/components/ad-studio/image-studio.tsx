@@ -98,12 +98,16 @@ export interface ImageStudioProps {
   };
 }
 
-/** Thumbnail beside each placement's details: the placement's own shape, a fixed width so the cards line up. */
+/**
+ * Each placement's picture, in its own shape, above its details. Big enough to judge a change
+ * ("brighter background") without opening the file: the card's width, with tall placements capped so
+ * a story image does not push the buttons off screen.
+ */
 const THUMB_CLASS: Record<AdStudioImageFormat, string> = {
-  square: 'aspect-square w-24',
-  portrait: 'aspect-[4/5] w-24',
-  story: 'aspect-[9/16] w-20',
-  landscape: 'aspect-video w-32',
+  square: 'aspect-square w-full max-w-64',
+  portrait: 'aspect-[4/5] w-full max-w-56',
+  story: 'aspect-[9/16] w-full max-w-40',
+  landscape: 'aspect-video w-full max-w-80',
 };
 
 type Payload = {
@@ -387,8 +391,19 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           </span>
           <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', badge.tone)}>{badge.text}</span>
         </div>
-        <div className="flex items-start gap-3">
-          <div className={cn('relative shrink-0 overflow-hidden rounded-xl border border-border bg-muted', THUMB_CLASS[slot.format])}>
+        <div className="flex flex-col items-center gap-2">
+          <div className={cn('relative mx-auto shrink-0 overflow-hidden rounded-xl border border-border bg-muted', THUMB_CLASS[slot.format])}>
+            {shown && (slot.generating || pending === `render-${key}` || pending === `edit-${shown.id}`) ? (
+              // An edit or a new render takes tens of seconds: say so on the picture itself.
+              <div
+                className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 bg-black/55 p-2 text-center text-[11px] font-semibold text-white"
+                role="status"
+                data-testid={`ad-studio-image-working-${slot.format}`}
+              >
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                {t('images.makingNewVersion')}
+              </div>
+            ) : null}
             {shown ? (
               // A plain img: private media served by our own authenticated route, not the Next image optimizer.
               <a href={`${base}/images/${shown.id}/media`} target="_blank" rel="noreferrer" title={t('images.openFull')}>
@@ -404,8 +419,13 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
               </div>
             )}
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex w-full min-w-0 flex-col gap-1.5">
             {shown ? <ImageQaNote qa={shown.qa} /> : null}
+            {shown?.instruction ? (
+              <p className="text-[11px] text-muted-foreground" data-testid={`ad-studio-image-change-${slot.format}`}>
+                {t('images.changedBy', { instruction: shown.instruction })}
+              </p>
+            ) : null}
             {latestFailed && !slot.generating ? <p className="text-[11px] text-destructive">{failure.image(latestFailed.failureCode)}</p> : null}
             {shown ? (
               <span className="text-[11px] text-muted-foreground tabular-nums" dir="ltr">

@@ -68,6 +68,17 @@ describe('summarizeVideoCreative', () => {
     expect(summarizeVideoCreative({ scenes, clips: [clip({}), clip({ id: 'k9', version: 2, status: 'generating' })], assembled: false, assembledSeconds: 0, hasCopy: false })).toMatchObject({ state: 'working', generating: true });
     expect(summarizeVideoCreative({ scenes, clips: [clip({})], assembled: false, assembledSeconds: 0, hasCopy: false }).generating).toBe(false);
   });
+
+  it('counts only clips that still match their scene, and flags out-of-date ones instead of "only assembly left"', () => {
+    const scenes = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
+    const clips = [clip({}), clip({ id: 'k2', sceneId: 's2' }), clip({ id: 'k3', sceneId: 's3' })];
+    const summary = summarizeVideoCreative({ scenes, clips, assembled: false, assembledSeconds: 0, hasCopy: true, progress: { rendered: 0, outOfDate: 3 } });
+    expect(summary).toMatchObject({ state: 'attention', rendered: 0, outOfDate: 3, previewClipId: 'k1' });
+    expect(videoNeedsAssembly(summary)).toBe(false);
+    expect(reviewNextStep([], summary, { kind: 'search', state: 'ready', headlines: 3, descriptions: 2, keywords: 1, sample: null, sampleSecond: null, sampleDescription: null })).toEqual({ kind: 'attention', count: 1, item: { kind: 'video' } });
+    // While the re-made clips render it is work in progress, not a problem.
+    expect(summarizeVideoCreative({ scenes, clips: [...clips, clip({ id: 'k4', version: 2, status: 'generating' })], assembled: false, assembledSeconds: 0, hasCopy: true, progress: { rendered: 0, outOfDate: 2 } }).state).toBe('working');
+  });
 });
 
 describe('summarizeSearchCreative', () => {
@@ -84,7 +95,7 @@ describe('summarizeSearchCreative', () => {
 
 describe('reviewNextStep', () => {
   const img = (conceptId: string, state: CreativeState): ImageCreativeSummary => ({ kind: 'image', conceptId, index: 1, headline: '', state, preview: null, placements: [], hasCopy: true });
-  const video = (extra: Partial<VideoCreativeSummary> = {}): VideoCreativeSummary => ({ kind: 'video', state: 'ready', scenes: 3, rendered: 3, previewClipId: null, assembled: true, assembledSeconds: 15, hasCopy: true, generating: false, ...extra });
+  const video = (extra: Partial<VideoCreativeSummary> = {}): VideoCreativeSummary => ({ kind: 'video', state: 'ready', scenes: 3, rendered: 3, previewClipId: null, assembled: true, assembledSeconds: 15, hasCopy: true, generating: false, outOfDate: 0, ...extra });
   const search = (state: CreativeState): SearchCreativeSummary => ({ kind: 'search', state, headlines: 0, descriptions: 0, keywords: 0, sample: null, sampleSecond: null, sampleDescription: null });
   const unassembled = video({ state: 'working', assembled: false, assembledSeconds: 0 });
 

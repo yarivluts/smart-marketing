@@ -98,6 +98,16 @@ export function SiteScrollPanel({
     const key = `${briefId}:${trimmed}`;
     if (autoScannedKey.current === key) return;
     autoScannedKey.current = key;
+    // Once per ad and address per browser: a site that cannot be scanned would otherwise be
+    // re-scanned (tens of seconds of server work, ending in the same error) on every visit.
+    // The button still scans again whenever the person asks.
+    const storageKey = `adStudio.siteAutoScan.${key}`;
+    try {
+      if (window.localStorage.getItem(storageKey)) return;
+      window.localStorage.setItem(storageKey, '1');
+    } catch {
+      // Storage blocked: fall back to once per page load.
+    }
     void runScan(trimmed, true);
   }, [autoScan, briefId, initialPages.length, linkUrl, runScan]);
 

@@ -24,7 +24,7 @@ const PROPS: ReviewOverviewProps = {
     { kind: 'image', conceptId: 'c1', index: 1, headline: 'Sign in 30 seconds', state: 'ready', preview: { imageId: 'i1', format: 'square' }, placements: [{ format: 'square', state: 'ready' }], hasCopy: true },
     { kind: 'image', conceptId: 'c2', index: 2, headline: '', state: 'attention', preview: null, placements: [{ format: 'story', state: 'attention' }], hasCopy: false },
   ],
-  video: { kind: 'video', state: 'working', scenes: 3, rendered: 2, previewClipId: 'k1', assembled: false, assembledSeconds: 0, hasCopy: false, generating: false },
+  video: { kind: 'video', state: 'working', scenes: 3, rendered: 2, previewClipId: 'k1', assembled: false, assembledSeconds: 0, hasCopy: false, generating: false, outOfDate: 0 },
   search: { kind: 'search', state: 'empty', headlines: 0, descriptions: 0, keywords: 0, sample: null, sampleSecond: null, sampleDescription: null },
 };
 
@@ -75,6 +75,13 @@ describe('ReviewOverview', () => {
     expect(preview).toHaveTextContent('Sign fast | Free trial');
     expect(preview).toHaveTextContent('Contracts signed on WhatsApp.');
     expect(preview).toHaveTextContent('easysign.co.il');
+  });
+
+  it('says how many scenes need re-making instead of "assemble" when their clips are out of date (he)', () => {
+    renderWithIntl(<ReviewOverview {...PROPS} video={{ ...PROPS.video, state: 'attention', rendered: 0, outOfDate: 3 }} />, { locale: 'he' });
+    const card = screen.getByTestId('ad-studio-creative-video');
+    expect(card).toHaveTextContent('3 סצנות צריכות יצירה מחדש');
+    expect(card).not.toHaveTextContent('נשאר להרכיב');
   });
 
   it('leads with the next step: the first creative that needs a look, highlighted, with the way to publish', () => {

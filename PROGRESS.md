@@ -17,6 +17,23 @@ Template for each entry:
 
 ---
 
+## 2026-11-28 — Ad Studio: PM/QA pass on making and editing image + video ads (PR #1494)
+- **Last completed:** walked the EasySign ad in prod as the QA org admin. Fixed:
+  - The site scan 500ed on every open of the video page: `extract_area: bad extract area`, because an odd scaled height was rounded up.
+  - The automatic scan repeated on every visit and pushed web-prod past its 1 GiB memory. It now runs once per ad per browser.
+  - The review card said "3 of 3 scenes, only assembly left" while the editor said "0 of 3". It now uses the editor's count and flags out-of-date scenes.
+  - A clip the AI check flagged was badged "Ready". It now says "Needs a look".
+  - A finished autopilot run is folded into one line.
+  - Image cards are larger, show a "making the new version" overlay, and show the change that was asked for.
+  - Each scene leads with one re-make button, and the own-media options are folded away.
+- **Verified in prod:** an AI image change made v2, which passed its check. A scene re-make took 74s and gave a silent clip whose narration transcript matches the script. The check flagged a changing wristwatch, correctly.
+- **In progress:** none.
+- **Blocked + why:** none.
+- **Next step:**
+  - The scene's "what the camera shows" is English model text. It needs a Hebrew view for non-experts.
+  - The legacy auto-made briefs on EasySign carry an English "Bring … to try …" objective, which is data from October and not current code.
+- **Waiting on human:** none. web-prod now runs with 2 GiB, because a site scan, which runs Chromium plus sharp, OOMed at 1 GiB.
+
 ## 2026-11-18 — Ad Studio & Campaigns: pre-publication ad sharing (drafts, storyboards, scene clips & pre-launch review)
 
 ### Shipped

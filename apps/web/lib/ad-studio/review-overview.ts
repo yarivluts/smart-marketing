@@ -35,6 +35,8 @@ export interface VideoCreativeSummary {
   hasCopy: boolean;
   /** A scene's newest clip is still rendering. */
   generating: boolean;
+  /** Scenes whose clip no longer matches the scene (script or video method changed) and need re-making. */
+  outOfDate: number;
 }
 
 export interface SearchCreativeSummary {
@@ -94,13 +96,22 @@ export function summarizeVideoCreative(params: {
   assembled: boolean;
   assembledSeconds: number;
   hasCopy: boolean;
+  /**
+   * The video editor's own count (`summarizeVideoProgress`): only clips that still match their scene
+   * are "rendered". Without it a scene whose clip went out of date read "3 of 3 scenes made - only
+   * assembly left" here while the editor said "0 of 3" and blocked assembly.
+   */
+  progress?: { rendered: number; outOfDate: number };
 }): VideoCreativeSummary {
   const newest = params.scenes.map((scene) =>
     params.clips.filter((clip) => clip.sceneId === scene.id).sort((a, b) => b.version - a.version)[0] ?? null,
   );
-  const rendered = newest.filter((clip) => clip?.status === 'ready').length;
+  const rendered = params.progress?.rendered ?? newest.filter((clip) => clip?.status === 'ready').length;
+  const outOfDate = params.progress?.outOfDate ?? 0;
   const generating = newest.some((clip) => clip?.status === 'generating');
-  const flagged = newest.some((clip) => clip?.status === 'failed' || (clip?.status === 'ready' && clip.qa?.status === 'issues'));
+  const flagged =
+    (outOfDate > 0 && !generating) ||
+    newest.some((clip) => clip?.status === 'failed' || (clip?.status === 'ready' && clip.qa?.status === 'issues'));
   const previewClip = newest.find((clip) => clip?.status === 'ready') ?? null;
   let state: CreativeState;
   if (params.scenes.length === 0) state = 'empty';
@@ -118,6 +129,7 @@ export function summarizeVideoCreative(params: {
     assembledSeconds: params.assembledSeconds,
     hasCopy: params.hasCopy,
     generating,
+    outOfDate,
   };
 }
 

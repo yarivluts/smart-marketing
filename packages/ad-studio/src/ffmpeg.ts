@@ -625,7 +625,9 @@ export async function renderScrollingPageVideo(params: {
         .png()
         .toBuffer();
     } else {
-      finalHeight = even(scaledHeight);
+      // Round DOWN to an even height: `even()` rounds to nearest, and one pixel past the bottom of
+      // an odd-height sheet is "extract_area: bad extract area" - a 500 on every site scan of it.
+      finalHeight = Math.max(2, Math.floor(scaledHeight / 2) * 2);
       finalSheetBuffer =
         finalHeight === scaledHeight
           ? scaledBuffer

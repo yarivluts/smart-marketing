@@ -98,6 +98,16 @@ describe('AutopilotPanel', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/ad?step=review'));
   });
 
+  it('folds a finished run into one line, so its "final video - done" is not read as the live status (he)', () => {
+    const done = run({ status: 'done', planApprovedOn: 'x', finishedOn: 'y' }, ['done', 'done', 'done', 'done', 'done', 'done']);
+    renderPanel({ mode: 'progress', initialRun: done }, 'he');
+    expect(screen.getByText(heMessages.AdStudio.autopilot.createdTitle)).toBeInTheDocument();
+    const steps = screen.getByTestId('ad-studio-autopilot-steps');
+    expect(steps.tagName).toBe('DETAILS');
+    expect(steps).not.toHaveAttribute('open');
+    expect(steps).toHaveTextContent('הצגת השלבים של ההרצה (6 מתוך 6)');
+  });
+
   it('shows each step with its progress and reason, in Hebrew too', () => {
     const finished = run({ status: 'failed' }, ['skipped', 'done', 'done', 'done', 'failed', 'skipped']);
     finished.steps[0].reason = 'already_done';

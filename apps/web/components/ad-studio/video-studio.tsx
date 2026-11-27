@@ -915,6 +915,10 @@ export function VideoStudio({
             !instructionsTooLong &&
             scene.durationSeconds <= videoSecondsLeft;
           const lastFailed = history[0]?.status === 'failed' ? history[0] : null;
+          // A clip the AI check flagged is usable but not "Ready" - the badge must not say green next to a red finding.
+          const checkFlagged = state.state === 'ready' && state.usable?.qa?.status === 'issues';
+          const badgeClass = checkFlagged ? 'bg-warning/15 text-warning' : STATE_BADGE[state.state];
+          const badgeText = checkFlagged ? t('video.legend.needsLook') : t(`video.legend.${state.state}`);
           return (
             <MobileAccordionItem
               key={scene.id}
@@ -937,10 +941,10 @@ export function VideoStudio({
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      STATE_BADGE[state.state],
+                      badgeClass,
                     )}
                   >
-                    {t(`video.legend.${state.state}`)}
+                    {badgeText}
                   </span>
                   {shownClip?.qa ? (
                     <span className="text-[11px] text-muted-foreground">
@@ -964,11 +968,11 @@ export function VideoStudio({
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[11px] font-medium',
-                      STATE_BADGE[state.state],
+                      badgeClass,
                     )}
                     data-testid="ad-studio-scene-video-state"
                   >
-                    {t(`video.legend.${state.state}`)}
+                    {badgeText}
                   </span>
                 </div>
                 <NarrationEditor
@@ -1040,7 +1044,14 @@ export function VideoStudio({
                     type="button"
                     onClick={() => void handleSceneRender(scene.id)}
                     disabled={!canRender}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
+                    data-testid={`ad-studio-scene-render-${index + 1}`}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50',
+                      // The one thing to do next on an out-of-date or failed scene: make it stand out.
+                      state.state === 'out_of_date' || state.state === 'failed' || state.state === 'none'
+                        ? 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90'
+                        : 'border border-border hover:bg-muted',
+                    )}
                   >
                     {pending === `render:${scene.id}` ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -1051,6 +1062,14 @@ export function VideoStudio({
                       ? t('video.rerender', { seconds: scene.durationSeconds })
                       : t('video.render', { seconds: scene.durationSeconds })}
                   </button>
+                  {videoAvailable && !inFlight && scene.durationSeconds > videoSecondsLeft ? (
+                    <span className="text-xs text-destructive">{t('video.overLimitScene')}</span>
+                  ) : null}
+                </div>
+                {/* Bringing your own footage is the less common path: one line that opens to four ways. */}
+                <details className="group text-xs" data-testid={`ad-studio-scene-own-media-${index + 1}`} open={galleryPicker?.sceneId === scene.id || undefined}>
+                  <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground">{t('video.ownMedia')}</summary>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                   <input
                     ref={(el) => {
                       sceneFileInputs.current[scene.id] = el;
@@ -1137,10 +1156,8 @@ export function VideoStudio({
                     )}
                     {t('video.scrollFromImage')}
                   </button>
-                  {videoAvailable && !inFlight && scene.durationSeconds > videoSecondsLeft ? (
-                    <span className="text-xs text-destructive">{t('video.overLimitScene')}</span>
-                  ) : null}
-                </div>
+                  </div>
+                </details>
 
                 {galleryPicker?.sceneId === scene.id ? (
                   <MediaGalleryPanel

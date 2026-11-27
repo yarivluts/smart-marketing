@@ -42,6 +42,7 @@ const PAGES: AdStudioSiteScrollPageView[] = [
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  window.localStorage.clear();
 });
 
 describe('SiteScrollPanel', () => {
@@ -71,6 +72,30 @@ describe('SiteScrollPanel', () => {
     );
     expect(onScanned).toHaveBeenCalledWith(PAGES);
     expect(screen.getByTestId('ad-studio-site-scroll-page-2')).toHaveTextContent('Pricing & Plans');
+  });
+
+  it('does not auto-scan the same ad again on a later visit after a failed scan, but the button still scans', async () => {
+    const fetchMock = vi.fn(async () => json({ error: 'internal' }, 500));
+    vi.stubGlobal('fetch', fetchMock);
+    const props = {
+      orgId: 'o',
+      projectId: 'p',
+      briefId: 'b1',
+      linkUrl: 'https://easysign.example.com',
+      initialPages: [] as AdStudioSiteScrollPageView[],
+      scenes: SCENES,
+    };
+    const first = renderWithIntl(<SiteScrollPanel {...props} />, { locale: 'en' });
+    await waitFor(() => expect(screen.getByTestId('ad-studio-site-scroll-feedback')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    renderWithIntl(<SiteScrollPanel {...props} />, { locale: 'en' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('ad-studio-site-scroll-scan'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
   it('updates auto-weave selection with PATCH and sends selected page to scene callback', async () => {

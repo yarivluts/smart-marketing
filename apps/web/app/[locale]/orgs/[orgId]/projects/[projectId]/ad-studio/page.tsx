@@ -234,12 +234,14 @@ export default async function AdStudioPage({
   const videos = videoModels.map(toAdStudioVideoView);
   let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
   let exportableVideo: { id: string; durationSeconds: number } | null = null;
+  let videoProgress: { rendered: number; outOfDate: number } | undefined;
   if (selected) {
     const context = { format: selected.format, language: selected.language, voice: voiceDescription(selected.voice), settings: selected.videoSettings };
     const progress = summarizeVideoProgress(
       sceneVideoStates(selected.scenes, clips, context),
       selected.scenes,
     );
+    videoProgress = { rendered: progress.rendered, outOfDate: progress.outOfDate };
     const assembly = assemblyPlan(selected.scenes, clips, context);
     const assembled = currentAssembledVideo(
       videos,
@@ -678,6 +680,7 @@ export default async function AdStudioPage({
                   assembled: Boolean(videoStage?.assembled),
                   assembledSeconds: videoStage?.assembledSeconds ?? 0,
                   hasCopy: Boolean(selected.videoCopy && (selected.videoCopy.headline.trim() || selected.videoCopy.primaryText.trim())),
+                  progress: videoProgress,
                 })}
                 search={summarizeSearchCreative(selected.searchAd, selected.searchKeywords?.keywords.length ?? 0)}
                 publishHref={steps.states.publish !== 'locked' ? stepHref('publish') : null}
