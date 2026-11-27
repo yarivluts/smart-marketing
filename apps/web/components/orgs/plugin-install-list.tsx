@@ -38,6 +38,9 @@ export function PluginInstallList({ orgId, projectId, installs, manifests }: Plu
         return;
       }
       router.refresh();
+    } catch {
+      // Offline or the request never reached the server: say so instead of failing silently.
+      setError(t('actionError'));
     } finally {
       setPendingId(null);
     }

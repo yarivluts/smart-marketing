@@ -2398,7 +2398,7 @@
     "disableButton": "Disable",
     "enableButton": "Enable",
     "uninstallButton": "Uninstall",
-    "actionError": "Couldn't complete that action. Please try again.",
+    "actionError": "That did not go through, so nothing was changed. Check your internet connection and try again in a moment.",
     "editConfigButton": "Edit config",
     "saveConfigButton": "Save config",
     "cancelEditConfigButton": "Cancel",

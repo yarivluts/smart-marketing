@@ -111,7 +111,18 @@ describe('PluginInstallList', () => {
     renderList([install({ status: 'installed' })]);
 
     fireEvent.click(screen.getByRole('button', { name: 'Uninstall' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't complete that action. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent(messages.ProjectPlugins.actionError);
+    expect(messages.ProjectPlugins.actionError).toMatch(/nothing was changed.*internet connection/);
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('shows the same message when the connection drops and re-enables the buttons', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderList([install({ status: 'installed' })]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(messages.ProjectPlugins.actionError);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Disable' })).toBeEnabled();
   });
 });
