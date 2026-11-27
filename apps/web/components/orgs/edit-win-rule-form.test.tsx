@@ -112,6 +112,18 @@ describe('EditWinRuleForm', () => {
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
 
+  it('says nothing was changed and to check the connection when the request throws', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save win' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('nothing was changed. Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+  });
+
   it('cancels back to the Edit button without submitting, discarding edits', () => {
     renderForm();
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));

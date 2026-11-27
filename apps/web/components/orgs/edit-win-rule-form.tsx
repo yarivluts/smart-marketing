@@ -86,6 +86,8 @@ export function EditWinRuleForm({
       }
       setEditing(false);
       router.refresh();
+    } catch {
+      setError(t('actionOffline'));
     } finally {
       setSubmitting(false);
     }
