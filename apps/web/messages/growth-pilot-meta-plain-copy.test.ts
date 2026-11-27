@@ -52,3 +52,13 @@ describe('the published page link reads in plain words', () => {
     expect(p.en.publish.link).toBe('The page people open after clicking');
   });
 });
+
+describe('Growth Pilot failure reasons sit inside brackets, so they hold none of their own', () => {
+  it('has no brackets in any reason, in English or Hebrew', () => {
+    for (const locale of ['en', 'he'] as const) {
+      for (const [code, text] of Object.entries(p[locale].reasons)) {
+        expect(text, `${locale} reason ${code}`).not.toMatch(/[()]/);
+      }
+    }
+  });
+});
