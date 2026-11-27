@@ -538,7 +538,7 @@ describe('scrolling website capture video', () => {
     expect(await lumAt(2.8)).toBeLessThan(35);
   }, 60_000);
 
-  it('renders a page whose scaled height comes out odd (no "bad extract area")', async () => {
+  it.skipIf(!hasFfmpeg)('renders a page whose scaled height comes out odd (no "bad extract area")', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'ad-studio-scroll-odd-'));
     workDirs.push(dir);
     const { default: sharp } = await import('sharp');
