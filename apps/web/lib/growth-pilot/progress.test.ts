@@ -59,6 +59,11 @@ describe('growthTargetProgress', () => {
     expect(turnOn.stages.find((stage) => stage.id === 'live')).toMatchObject({ state: 'waiting', proposalId: 'act' });
   });
 
+  it('does not blame the AI limit when the ad platform asked us to slow down', () => {
+    const busy = growthTargetProgress({ target: liveTarget({ publishStatus: 'failed', publishFailure: 'quota_exceeded' }), proposals: [], landingPages: [], pilotActive: true });
+    expect(busy.stages.find((stage) => stage.id === 'published')).toMatchObject({ state: 'failed', failure: 'platform_busy' });
+  });
+
   it('waits for a Meta ad account, and keeps a failed publish open for another try', () => {
     expect(states(growthTargetProgress({ target: liveTarget({ publishStatus: 'needs_meta' }), proposals: [], landingPages: [], pilotActive: true })).published).toBe('waiting');
     const failed = growthTargetProgress({ target: liveTarget({ publishStatus: 'failed', publishFailure: 'auth_failed' }), proposals: [proposalView({ id: 'pub', kind: 'publish' })], landingPages: [], pilotActive: true });
