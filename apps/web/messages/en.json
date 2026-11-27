@@ -4339,7 +4339,7 @@
       "generating": "Generating {elapsed}",
       "generatingHint": "Usually one to three minutes. You can leave this page and come back.",
       "outOfDate": "Out of date",
-      "outOfDateHint": "The scene changed after this clip was made. Make it again to match the script.",
+      "outOfDateHint": "This clip was made before the scene or the way videos are made changed. Make it again so it matches.",
       "failed": "Failed: {reason}",
       "noClip": "Not made yet.",
       "overLimitScene": "Not enough video seconds left today.",
@@ -5534,6 +5534,7 @@
       "searchKeywords": "{count, plural, =0 {No keywords chosen} one {# keyword} other {# keywords}}",
       "back": "All your ads",
       "videoNotAssembled": "Every scene is ready - assemble the video",
+      "videoOutOfDate": "{count, plural, one {# scene needs re-creating} other {# scenes need re-creating}} - its clip no longer matches the scene",
       "videoVertical": "Vertical 9:16",
       "videoHorizontal": "Horizontal 16:9",
       "next": {

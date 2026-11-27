@@ -382,7 +382,9 @@ export function ReviewOverview({ mediaBase, hrefs, images, video, search, videoF
             facts={
               <>
                 <Fact done={video.scenes > 0 && video.rendered === video.scenes}>{video.scenes ? t('videoScenes', { rendered: video.rendered, scenes: video.scenes }) : t('videoNoScript')}</Fact>
-                {video.assembled ? (
+                {video.outOfDate > 0 && !video.generating ? (
+                  <Fact strong>{t('videoOutOfDate', { count: video.outOfDate })}</Fact>
+                ) : video.assembled ? (
                   <Fact done>{t('videoAssembled', { seconds: video.assembledSeconds })}</Fact>
                 ) : videoNeedsAssembly(video) ? (
                   <Fact strong>{t('videoNotAssembled')}</Fact>
