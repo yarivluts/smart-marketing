@@ -58,4 +58,15 @@ describe('ArchiveMetricDefButton', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Other metrics still use this one: cost_per_signup. Edit or archive those first.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('says nothing was changed when the connection drops, and can be retried', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was changed - the metric was not archived. Check your internet connection');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeEnabled();
+  });
 });
