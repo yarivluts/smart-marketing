@@ -862,7 +862,7 @@
     "mcpConnectionNeverUsedLabel": "מעולם לא נעשה בו שימוש",
     "mcpConnectionGrantedLabel": "אושר בתאריך {createdAt}",
     "revokeMcpConnection": "ביטול",
-    "revokeMcpConnectionError": "לא ניתן היה לבטל את החיבור. נסו שוב.",
+    "revokeMcpConnectionError": "החיבור לא בוטל והוא עדיין פעיל. בדקו את חיבור האינטרנט ונסו שוב.",
     "eyebrow": "גישה",
     "heroDescription": "כל אישור גישה שיכול לשלוח נתונים לפרויקט הזה או לקרוא ממנו: איפה הוא פועל, מה מותר לו, ומתי השתמשו בו לאחרונה.",
     "kpiActive": "מפתחות פעילים",
