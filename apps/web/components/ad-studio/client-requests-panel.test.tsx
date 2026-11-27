@@ -236,7 +236,7 @@ describe('ShareLinksPanel — results & feedback toggles', () => {
 
     renderWithIntl(<ShareLinksPanel orgId="org-1" projectId="proj-1" briefs={BRIEFS} initialLinks={[]} />);
 
-    fireEvent.click(screen.getByLabelText('Include campaign performance results'));
+    fireEvent.click(screen.getByLabelText('Include how the ads are doing'));
     fireEvent.click(screen.getByLabelText('Let client approve ads and leave notes'));
     fireEvent.click(screen.getByRole('button', { name: 'Create link' }));
 
