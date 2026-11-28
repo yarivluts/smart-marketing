@@ -227,6 +227,47 @@ describe('autopilot runs', () => {
     expect(audit.find((entry) => entry.action === 'ad_studio.plan_approved')).toMatchObject({ actor_id: ctx.owner.id, target_id: ctx.briefId });
     await expect(approve()).rejects.toBeInstanceOf(AdStudioRunNotAwaitingApprovalError);
   });
+
+  it('allows distinct targeted runs (video + search) concurrently and conflicts only on the same target', async () => {
+    const ctx = await setup();
+    const videoRun = await startAdStudioRun({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: ctx.briefId,
+      options: { target: 'video', siteEnrich: true, plan: true, images: false, video: true, search: false, confirmPlan: false, notifyAlways: true },
+      actorId: ctx.owner.id,
+    });
+    expect(videoRun.steps.map((s) => s.id)).toEqual(['site_enrich', 'plan', 'script', 'clips', 'assemble']);
+
+    const searchRun = await startAdStudioRun({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: ctx.briefId,
+      options: { target: 'search', siteEnrich: true, plan: true, images: false, video: false, search: true, confirmPlan: false, notifyAlways: true },
+      actorId: ctx.owner.id,
+    });
+    expect(searchRun.steps.map((s) => s.id)).toEqual(['site_enrich', 'plan', 'search_keywords', 'search_ad']);
+
+    // A second video run conflicts with the active video run; an `all` run also conflicts.
+    await expect(
+      startAdStudioRun({
+        organizationId: ctx.orgId,
+        projectId: ctx.projectId,
+        briefId: ctx.briefId,
+        options: { target: 'video', plan: false, images: false, video: true },
+        actorId: ctx.owner.id,
+      }),
+    ).rejects.toBeInstanceOf(AdStudioRunAlreadyActiveError);
+    await expect(
+      startAdStudioRun({
+        organizationId: ctx.orgId,
+        projectId: ctx.projectId,
+        briefId: ctx.briefId,
+        options: {},
+        actorId: ctx.owner.id,
+      }),
+    ).rejects.toBeInstanceOf(AdStudioRunAlreadyActiveError);
+  });
 });
 
 describe('exportAdStudioImage', () => {

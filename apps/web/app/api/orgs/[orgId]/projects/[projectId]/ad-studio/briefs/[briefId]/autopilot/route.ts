@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { getLatestAdStudioRun } from '@growthos/firebase-orm-models';
+import { getLatestAdStudioRun, listAdStudioRuns } from '@growthos/firebase-orm-models';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -12,15 +12,21 @@ interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; briefId: string }>;
 }
 
-/** The brief's latest autopilot run, or null. Gated on `ai.use`. */
+/** The brief's latest autopilot run (and any active runs), or null. Gated on `ai.use`. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, briefId } = await params;
   const { error } = await requireProjectPermission(orgId, projectId, 'ai.use');
   if (error) return error;
   try {
     await ensureFirestoreOrm();
-    const run = await getLatestAdStudioRun(orgId, projectId, briefId);
-    return NextResponse.json({ run: run ? toAdStudioRunView(run) : null });
+    const [run, runs] = await Promise.all([
+      getLatestAdStudioRun(orgId, projectId, briefId),
+      listAdStudioRuns(orgId, projectId, briefId),
+    ]);
+    const activeRuns = runs
+      .filter((candidate) => candidate.status === 'running' || candidate.status === 'awaiting_approval')
+      .map(toAdStudioRunView);
+    return NextResponse.json({ run: run ? toAdStudioRunView(run) : null, activeRuns });
   } catch (err) {
     return adStudioErrorResponse(err);
   }

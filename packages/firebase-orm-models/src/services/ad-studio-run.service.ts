@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { isAdStudioImageFormat } from '@growthos/shared';
 import {
-  AD_STUDIO_RUN_STEPS,
+  AD_STUDIO_RUN_TARGETS,
   AdStudioRunModel,
   type AdStudioRunOptions,
   type AdStudioRunStep,
@@ -46,8 +46,40 @@ function pathParams(organizationId: string, projectId: string) {
   return { organization_id: organizationId, project_id: projectId };
 }
 
-function freshSteps(): AdStudioRunStep[] {
-  return AD_STUDIO_RUN_STEPS.map((id) => ({ id, status: 'pending', reason: null, progress: null, started_on: null, finished_on: null }));
+const CLASSIC_RUN_STEPS: readonly AdStudioRunStepId[] = ['plan', 'script', 'image_concepts', 'images', 'clips', 'assemble'];
+const MAX_RUN_INSTRUCTION_CHARS = 600;
+
+function makeStep(id: AdStudioRunStepId): AdStudioRunStep {
+  return { id, status: 'pending', reason: null, progress: null, started_on: null, finished_on: null };
+}
+
+function freshSteps(options: AdStudioRunOptions): AdStudioRunStep[] {
+  if ((!options.target || options.target === 'all') && !options.siteEnrich && !options.search && !options.instruction) {
+    return CLASSIC_RUN_STEPS.map(makeStep);
+  }
+  const ids: AdStudioRunStepId[] = [];
+  if (options.siteEnrich) ids.push('site_enrich');
+  if (options.instruction) {
+    ids.push('revise');
+    if (options.target === 'video' || (!options.target && options.video)) {
+      ids.push('clips', 'assemble');
+    }
+    if (options.target === 'images' || options.target === 'image' || (!options.target && options.images)) {
+      ids.push('images');
+    }
+  } else {
+    if (options.plan) ids.push('plan');
+    if (options.video) ids.push('script');
+    if (options.images) {
+      if (options.target !== 'image' || !options.targetConceptId) {
+        ids.push('image_concepts');
+      }
+      ids.push('images');
+    }
+    if (options.video) ids.push('clips', 'assemble');
+    if (options.search) ids.push('search_keywords', 'search_ad');
+  }
+  return ids.map(makeStep);
 }
 
 /** Checks and normalizes what the person asked the autopilot to do. */
@@ -57,10 +89,27 @@ export function normalizeAdStudioRunOptions(input: Partial<AdStudioRunOptions>):
   if (!Array.isArray(imageFormats) || imageFormats.some((format) => !isAdStudioImageFormat(format))) reasons.push('imageFormats must list known image formats');
   const images = input.images ?? true;
   const video = input.video ?? true;
+  const search = input.search;
+  const target = input.target;
+  if (target !== undefined && !(AD_STUDIO_RUN_TARGETS as readonly string[]).includes(target)) {
+    reasons.push('target must be a valid ad studio run target');
+  }
+  let instruction = '';
+  if (input.instruction !== undefined && input.instruction !== null) {
+    if (typeof input.instruction !== 'string') {
+      reasons.push('instruction must be a string');
+    } else {
+      instruction = input.instruction.trim();
+      if (instruction.length > MAX_RUN_INSTRUCTION_CHARS) {
+        reasons.push(`instruction must be at most ${MAX_RUN_INSTRUCTION_CHARS} characters`);
+      }
+    }
+  }
   if (images && Array.isArray(imageFormats) && imageFormats.length === 0) reasons.push('imageFormats must list at least one format when images are on');
-  if (!images && !video) reasons.push('turn on images, video or both');
+  if (!images && !video && !search && !instruction) reasons.push('turn on images, video, search or provide an instruction');
   if (reasons.length) throw new AdStudioRunOptionsInvalidError(reasons);
-  return {
+
+  const normalized: AdStudioRunOptions = {
     plan: input.plan ?? true,
     images,
     imageFormats: [...new Set(imageFormats)],
@@ -68,6 +117,32 @@ export function normalizeAdStudioRunOptions(input: Partial<AdStudioRunOptions>):
     environmentId: typeof input.environmentId === 'string' && input.environmentId.trim() ? input.environmentId.trim() : null,
     confirmPlan: input.confirmPlan ?? true,
   };
+  if (input.siteEnrich !== undefined) normalized.siteEnrich = Boolean(input.siteEnrich);
+  if (search !== undefined) normalized.search = Boolean(search);
+  if (target !== undefined) normalized.target = target;
+  const targetConceptId = typeof input.targetConceptId === 'string' && input.targetConceptId.trim() ? input.targetConceptId.trim() : null;
+  if (targetConceptId) normalized.targetConceptId = targetConceptId;
+  const siteUrl = typeof input.siteUrl === 'string' && input.siteUrl.trim() ? input.siteUrl.trim() : null;
+  if (siteUrl) normalized.siteUrl = siteUrl;
+  if (instruction) normalized.instruction = instruction;
+  if (input.notifyAlways !== undefined) normalized.notifyAlways = Boolean(input.notifyAlways);
+  return normalized;
+}
+
+function runsConflict(a: AdStudioRunOptions, b: AdStudioRunOptions): boolean {
+  const targetA = a.target ?? 'all';
+  const targetB = b.target ?? 'all';
+  if (targetA === 'all' || targetB === 'all') return true;
+  if (targetA === targetB) {
+    if (targetA === 'image') {
+      return !a.targetConceptId || !b.targetConceptId || a.targetConceptId === b.targetConceptId;
+    }
+    return true;
+  }
+  if ((targetA === 'images' && targetB === 'image') || (targetA === 'image' && targetB === 'images')) {
+    return true;
+  }
+  return false;
 }
 
 export async function listAdStudioRuns(organizationId: string, projectId: string, briefId: string): Promise<AdStudioRunModel[]> {
@@ -105,14 +180,17 @@ export async function startAdStudioRun(params: {
   const options = normalizeAdStudioRunOptions(params.options);
   const brief = await AdStudioBriefModel.init(params.briefId, pathParams(params.organizationId, params.projectId));
   if (!brief || brief.organization_id !== params.organizationId || brief.project_id !== params.projectId) throw new AdStudioRunNotFoundError();
-  const latest = await getLatestAdStudioRun(params.organizationId, params.projectId, params.briefId);
-  if (latest && isActive(latest, now)) throw new AdStudioRunAlreadyActiveError(latest.id);
-  if (latest && latest.status === 'running') {
-    // Abandoned mid-run (nobody polled it for a long time): close it so the history reads true.
-    latest.status = 'cancelled';
-    latest.failure_code = 'abandoned';
-    latest.finished_on = now.toISOString();
-    await latest.save();
+  const existingRuns = await listAdStudioRuns(params.organizationId, params.projectId, params.briefId);
+  const activeConflict = existingRuns.find((candidate) => isActive(candidate, now) && runsConflict(candidate.options, options));
+  if (activeConflict) throw new AdStudioRunAlreadyActiveError(activeConflict.id);
+  for (const stale of existingRuns) {
+    if (!isActive(stale, now) && stale.status === 'running') {
+      // Abandoned mid-run (nobody polled it for a long time): close it so the history reads true.
+      stale.status = 'cancelled';
+      stale.failure_code = 'abandoned';
+      stale.finished_on = now.toISOString();
+      await stale.save();
+    }
   }
 
   const run = new AdStudioRunModel();
@@ -121,7 +199,7 @@ export async function startAdStudioRun(params: {
   run.brief_id = params.briefId;
   run.status = 'running';
   run.options = options;
-  run.steps = freshSteps();
+  run.steps = freshSteps(options);
   run.lease_until = null;
   run.lease_token = null;
   run.started_by = params.actorId;
@@ -189,26 +267,39 @@ export async function saveAdStudioRunProgress(run: AdStudioRunModel, token: stri
   await run.save();
   // Only the lease holder gets here, so a run that just stopped to wait, finished or failed is
   // announced exactly once.
-  const kind = RUN_EVENT_BY_STATUS[run.status];
-  if (kind && fresh.status !== run.status) {
+  const ev = runEventFor(run);
+  if (ev && fresh.status !== run.status) {
     await emitActivityEvent({
       source: 'ad_studio',
-      kind,
+      kind: ev.kind,
       organizationId: run.organization_id,
       projectId: run.project_id,
       // The run got here by itself, not by anyone's click: the person who started it hears too.
       actor: 'autopilot',
       briefId: run.brief_id,
+      ...(ev.item ? { item: ev.item } : {}),
+      ...(run.options.notifyAlways ? { forceNotify: true } : {}),
     });
   }
   return run;
 }
 
-const RUN_EVENT_BY_STATUS: Partial<Record<AdStudioRunModel['status'], string>> = {
-  awaiting_approval: 'run_awaiting_approval',
-  done: 'run_done',
-  failed: 'run_failed',
-};
+function runEventFor(run: AdStudioRunModel): { kind: string; item?: string } | null {
+  if (run.status === 'awaiting_approval') return { kind: 'run_awaiting_approval' };
+  if (run.status !== 'done' && run.status !== 'failed') return null;
+  const suffix = run.status === 'done' ? 'done' : 'failed';
+  const target = run.options.target;
+  if (target === 'video') return { kind: `video_${suffix}`, item: 'video' };
+  if (target === 'search') return { kind: `search_${suffix}`, item: 'search' };
+  if (target === 'images') return { kind: `images_${suffix}`, item: 'images' };
+  if (target === 'image') {
+    return {
+      kind: `images_${suffix}`,
+      item: run.options.targetConceptId ? `image:${run.options.targetConceptId}` : 'images',
+    };
+  }
+  return { kind: `run_${suffix}` };
+}
 
 export function runStep(run: AdStudioRunModel, id: AdStudioRunStepId): AdStudioRunStep {
   const step = run.steps.find((candidate) => candidate.id === id);

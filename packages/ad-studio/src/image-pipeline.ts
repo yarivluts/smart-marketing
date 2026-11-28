@@ -157,11 +157,11 @@ async function repairConceptLengths(ctx: AdStudioCallContext, brief: AdStudioBri
  * present) and saves them, replacing the earlier list. When the person chose placements (`formats`),
  * every idea is rendered in all of them; otherwise each idea keeps the placements the model suggested.
  */
-export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & { briefId: string; formats?: readonly AdStudioImageFormat[] }): Promise<AdStudioBriefModel> {
+export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & { briefId: string; formats?: readonly AdStudioImageFormat[]; instruction?: string }): Promise<AdStudioBriefModel> {
   await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildImageConceptsPrompt(await briefPromptInput(brief), { ...context, scenes: brief.scenes });
+  const prompt = buildImageConceptsPrompt(await briefPromptInput(brief), { ...context, scenes: brief.scenes, ...(ctx.instruction ? { instruction: ctx.instruction } : {}) });
   const raw = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   const generated = { concepts: await repairConceptLengths(ctx, brief, raw.concepts) };
   const allowed = ctx.formats?.length ? ctx.formats.filter(isAdStudioImageFormat) : null;

@@ -24,7 +24,7 @@ export async function notifyActivityEvent(event: ActivityEvent, options: Deliver
   const config = options.config === undefined ? resolveWebPushConfig() : options.config;
   if (!config) return null;
 
-  if (event.source === 'ad_studio' && event.briefId && (await isGrowthPilotBrief(event.organizationId, event.projectId, event.briefId))) return null;
+  if (event.source === 'ad_studio' && !event.forceNotify && event.briefId && (await isGrowthPilotBrief(event.organizationId, event.projectId, event.briefId))) return null;
 
   const recipients = (await listProjectNotificationRecipients(event.organizationId, event.projectId)).filter((userId) => userId !== event.actor);
   if (recipients.length === 0) return null;
@@ -45,6 +45,7 @@ export async function notifyActivityEvent(event: ActivityEvent, options: Deliver
     subject: event.subject ?? briefName ?? null,
     count: event.count ?? null,
     briefId: event.briefId ?? null,
+    item: event.item ?? null,
     targetId: event.targetId ?? null,
   };
   return deliverToUsers({ userIds: recipients, category, payloadFor: (locale) => buildEventPayload(locale, wording) }, { ...options, config });

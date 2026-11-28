@@ -41,11 +41,11 @@ export type GeneratedScript = z.infer<typeof GeneratedScriptSchema>;
 type GeneratedScene = z.infer<typeof GeneratedSceneSchema>;
 
 /** A generated scene's delivery fields, when the model gave a valid one; the narration mode settles the rest. */
-function generatedDelivery(scene: GeneratedScene): Pick<AdStudioScene, 'delivery' | 'speaker'> {
+export function generatedDelivery(scene: GeneratedScene): Pick<AdStudioScene, 'delivery' | 'speaker'> {
   return isAdStudioDelivery(scene.delivery) ? { delivery: scene.delivery, ...(scene.speaker?.trim() ? { speaker: scene.speaker } : {}) } : {};
 }
 
-function toScenes(generated: GeneratedScript['scenes']): AdStudioScene[] {
+export function toGeneratedScenes(generated: GeneratedScript['scenes']): AdStudioScene[] {
   return generated.map((scene) => ({
     id: newAdStudioSceneId(),
     durationSeconds: scene.durationSeconds,
@@ -69,7 +69,7 @@ export async function generateAdStudioScript(
   const context = ctx.context ?? (brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : undefined);
   const prompt = buildScriptPrompt(await briefPromptInput(brief), context);
   const generated = await meteredCall(ctx, 'script', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedScriptSchema }));
-  const scenes = fitAdStudioScenes(toScenes(generated.scenes), newAdStudioSceneId);
+  const scenes = fitAdStudioScenes(toGeneratedScenes(generated.scenes), newAdStudioSceneId);
   if (scenes.length === 0 || scenes.some((scene) => scene.visualPrompt.length === 0)) {
     throw new AdStudioProviderError('invalid_output', 'The model returned a scene without a visual description.');
   }

@@ -4669,12 +4669,16 @@
         "awaiting_approval": "Waiting for you to confirm the plan"
       },
       "step": {
+        "site_enrich": "Reading target website",
         "plan": "Plan",
         "script": "Script",
         "image_concepts": "Image ideas",
         "images": "Images",
         "clips": "Video scenes",
-        "assemble": "Final video"
+        "assemble": "Final video",
+        "search_keywords": "Search keywords",
+        "search_ad": "Google search ad",
+        "revise": "Applying your AI note"
       },
       "stepStatus": {
         "pending": "Waiting",
@@ -4701,7 +4705,13 @@
         "blocked": "waiting on an earlier step",
         "cancelled": "cancelled",
         "error": "failed",
-        "qa_issues": "the AI check still found problems - see the scenes"
+        "qa_issues": "the AI check still found problems - see the scenes",
+        "no_site_url": "no website link set - used what you wrote",
+        "site_unreachable": "could not reach the website - used what we have",
+        "site_empty_page": "website page had little text - used what we have",
+        "site_blocked_url": "website address could not be opened - used what we have",
+        "site_timeout": "website took too long to answer - used what we have",
+        "site_too_large": "website page was too large - used what we have"
       },
       "prepareTitle": "Prepare the plan",
       "prepareDescription": "The AI writes the plan, the video script and the image ideas. Nothing is made yet: you review and change them below, then confirm.",
@@ -5570,6 +5580,33 @@
           "description": "Write image ideas with AI or add your own to get started.",
           "action": "Open image ideas"
         }
+      },
+      "quick": {
+        "startCreating": "Start creating",
+        "recreate": "Create missing parts",
+        "finishCreating": "Finish creating",
+        "aiChange": "Ask AI to change",
+        "aiCreateWithNote": "Create with AI note",
+        "aiPlaceholderVideo": "Tell AI what to change, e.g. focus on the free trial and make the opening faster",
+        "aiPlaceholderSearch": "Tell AI what to change, e.g. mention 24/7 support and add a price offer",
+        "aiPlaceholderImage": "Tell AI what to change, e.g. warmer colors, shorter headline, highlight mobile",
+        "aiSubmit": "Apply with AI",
+        "aiCancel": "Cancel",
+        "stop": "Stop",
+        "tryAgain": "Try again",
+        "siteUrlLabel": "Target website for AI (optional)",
+        "siteUrlPlaceholder": "https://your-website.com",
+        "siteUrlHint": "The AI will read this site and fill any missing brand and project settings automatically.",
+        "notifyWhenDone": "Notify me when done",
+        "notifyEnabled": "Notifications on - we will alert you when it is ready",
+        "notifyBlocked": "Browser notifications are blocked on this device.",
+        "notifyBackgroundHint": "Runs in the background - we will notify you when done",
+        "toastDoneVideo": "Video is ready",
+        "toastDoneSearch": "Google search ad is ready",
+        "toastDoneImages": "Images are ready",
+        "toastDoneBody": "Open it to review, tweak with AI, or publish.",
+        "toastFailedTitle": "Could not finish creating",
+        "aiUnavailable": "AI creation is not set up on this account yet."
       }
     },
     "adHeader": {
@@ -7332,6 +7369,30 @@
         "run_failed": {
           "title": "Ads were not finished",
           "body": "Making {subject} in {project} stopped. Open it to see why."
+        },
+        "video_done": {
+          "title": "Video is ready",
+          "body": "Your video for {subject} is ready in {project}."
+        },
+        "video_failed": {
+          "title": "Video was not finished",
+          "body": "Making the video for {subject} in {project} stopped. Open it to see why."
+        },
+        "search_done": {
+          "title": "Google search ad is ready",
+          "body": "Your Google search ad for {subject} is ready in {project}."
+        },
+        "search_failed": {
+          "title": "Google search ad was not finished",
+          "body": "Making the Google search ad for {subject} in {project} stopped. Open it to see why."
+        },
+        "images_done": {
+          "title": "Ad images are ready",
+          "body": "Your ad images for {subject} are ready in {project}."
+        },
+        "images_failed": {
+          "title": "Ad images were not finished",
+          "body": "Making images for {subject} in {project} stopped. Open it to see why."
         }
       }
     }

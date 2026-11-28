@@ -78,8 +78,28 @@ export function parseImageConcepts(value: unknown): AdStudioImageConcept[] | nul
 }
 
 /** What a person asked the autopilot to do; the run service checks and fills the rest. */
-export function parseAutopilotOptions(value: unknown): { plan?: boolean; images?: boolean; imageFormats?: AdStudioImageFormat[]; video?: boolean; environmentId?: string | null; confirmPlan?: boolean } {
+export function parseAutopilotOptions(value: unknown): {
+  plan?: boolean;
+  images?: boolean;
+  imageFormats?: AdStudioImageFormat[];
+  video?: boolean;
+  environmentId?: string | null;
+  confirmPlan?: boolean;
+  siteEnrich?: boolean;
+  search?: boolean;
+  target?: 'all' | 'images' | 'image' | 'video' | 'search';
+  targetConceptId?: string | null;
+  siteUrl?: string | null;
+  instruction?: string | null;
+  notifyAlways?: boolean;
+} {
   const options = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const target =
+    options.target === 'all' || options.target === 'images' || options.target === 'image' || options.target === 'video' || options.target === 'search'
+      ? options.target
+      : typeof options.target === 'string'
+        ? (options.target as 'all')
+        : undefined;
   return {
     ...(typeof options.plan === 'boolean' ? { plan: options.plan } : {}),
     ...(typeof options.images === 'boolean' ? { images: options.images } : {}),
@@ -87,5 +107,12 @@ export function parseAutopilotOptions(value: unknown): { plan?: boolean; images?
     ...(typeof options.confirmPlan === 'boolean' ? { confirmPlan: options.confirmPlan } : {}),
     ...(Array.isArray(options.imageFormats) ? { imageFormats: stringList(options.imageFormats) as AdStudioImageFormat[] } : {}),
     ...(typeof options.environmentId === 'string' ? { environmentId: options.environmentId } : {}),
+    ...(typeof options.siteEnrich === 'boolean' ? { siteEnrich: options.siteEnrich } : {}),
+    ...(typeof options.search === 'boolean' ? { search: options.search } : {}),
+    ...(target !== undefined ? { target } : {}),
+    ...(typeof options.targetConceptId === 'string' ? { targetConceptId: options.targetConceptId } : {}),
+    ...(typeof options.siteUrl === 'string' ? { siteUrl: options.siteUrl } : {}),
+    ...(typeof options.instruction === 'string' ? { instruction: options.instruction } : {}),
+    ...(typeof options.notifyAlways === 'boolean' ? { notifyAlways: options.notifyAlways } : {}),
   };
 }

@@ -166,3 +166,65 @@ export function buildSceneRewritePrompt(
     ].join('\n'),
   };
 }
+
+/**
+ * The instructions for revising an entire video script based on a user's high-level request,
+ * keeping unchanged scenes verbatim so rendered clips can be preserved when possible.
+ */
+export function buildScriptRevisePrompt(
+  brief: AdStudioBriefInput,
+  scenes: readonly AdStudioScene[],
+  instruction: string,
+  context: AdStudioScriptContext = {},
+): AdStudioPrompt {
+  const videoInstructions = brief.videoInstructions?.trim();
+  const contextLines = [
+    context.landingPageSummary ? `Landing page summary: ${context.landingPageSummary}` : null,
+    context.audience ? `Audience: ${context.audience}` : null,
+    context.messagingAngles?.length ? `Messaging angles to build on: ${context.messagingAngles.join('; ')}` : null,
+    context.keywordThemes?.length ? `What people search for: ${context.keywordThemes.join('; ')}` : null,
+  ].filter((line): line is string => line !== null);
+  const outline = scenes
+    .map(
+      (scene, index) =>
+        `${index + 1}. [${scene.durationSeconds}s] ${scene.visualPrompt}${scene.voiceover ? ` | VO: ${scene.voiceover}` : ''}${scene.voiceover && scene.delivery === 'on_screen' ? ` | Spoken on camera by: ${scene.speaker?.trim() || 'the person in the shot'}` : ''}${scene.onScreenText ? ` | Text: ${scene.onScreenText}` : ''}`,
+    )
+    .join('\n');
+  return {
+    system: [
+      'You revise an existing short video ad script according to the editor request in <editor_request>.',
+      'Rules:',
+      ...SCRIPT_RULES.map((rule) => `- ${rule}`),
+      `- ${voiceoverBudgetRule(brief.language)}`,
+      ...narrationModeRules(brief.narrationMode ?? null).map((rule) => `- ${rule}`),
+      ...[...adWritingRules(brief.language), ...brandKitRules(brief.brand)].map((rule) => `- ${rule}`),
+      '- Preserve any scene that does NOT need to change verbatim (exact same durationSeconds, visualPrompt, voiceover, onScreenText, delivery, speaker) so already-rendered video clips do not have to be re-made.',
+      '- Modify, reorder, add, or remove scenes only where needed to satisfy <editor_request>.',
+      ...(videoInstructions
+        ? ["- Follow the general video instructions in <editor_request> across every scene's visualPrompt, overriding any default appearance or setting."]
+        : []),
+      `- ${UNTRUSTED_INPUT_RULE}`,
+      '- copy is the ad text that runs next to the finished video in the feed.',
+      ...AD_COPY_RULES.map((rule) => `- ${rule}`),
+    ].join('\n'),
+    user: [
+      `Ad name: ${brief.name}`,
+      `Objective: ${brief.objective}`,
+      `Product: ${brief.productDescription}`,
+      brief.landingPageUrl ? `Landing page: ${brief.landingPageUrl}` : null,
+      `Frame: ${brief.format} (${AD_STUDIO_ASPECT_RATIO[brief.format]})`,
+      `Ad language: ${languageName(brief.language)}`,
+      `Requested length: ${Math.min(brief.targetSeconds, AD_STUDIO_MAX_TOTAL_SECONDS)} seconds`,
+      ...(contextLines.length ? ['', 'Context from the planning stage:', ...contextLines] : []),
+      ...(videoInstructions ? ['', 'General video instructions (apply to every scene):', wrapUntrusted('editor_request', videoInstructions)] : []),
+      '',
+      'Current script:',
+      outline,
+      '',
+      'Revise the script as the editor asks:',
+      wrapUntrusted('editor_request', instruction.trim() || 'Make it stronger.'),
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n'),
+  };
+}

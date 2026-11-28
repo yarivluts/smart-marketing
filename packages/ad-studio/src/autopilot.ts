@@ -1,4 +1,4 @@
-import { assemblyPlan, sceneVideoStates, summarizeVideoProgress, voiceDescription } from '@growthos/shared';
+import { assemblyPlan, cleanKeywordSeeds, defaultSearchTargeting, sceneVideoStates, summarizeVideoProgress, voiceDescription } from '@growthos/shared';
 import {
   acquireAdStudioRunLease,
   AdStudioQuotaExceededError,
@@ -11,6 +11,7 @@ import {
   listEnvironmentsForProject,
   runStep,
   saveAdStudioRunProgress,
+  saveAdStudioSearchKeywords,
   startAdStudioRun,
   type AdStudioBriefModel,
   type AdStudioRunModel,
@@ -21,7 +22,11 @@ import {
 import { ensureOrm } from './runtime';
 import { AdStudioProviderError, resolveAdStudioLlm, type AdStudioLlm } from './llm';
 import { planAdStudioBrief } from './planning';
+import type { PlanningSourceDeps } from './planning-sources';
+import { enrichProjectAndBriefFromSite } from './site-enrich';
 import { generateAdStudioScript } from './script-generation';
+import { suggestAdStudioKeywords, writeAdStudioSearchAd } from './search';
+import { reviseAdStudioImagesWithInstruction, reviseAdStudioScriptWithInstruction, reviseAdStudioSearchAdWithInstruction } from './quick-revise';
 import { generateAdStudioImageConcepts, renderAdStudioConceptImage, toAdStudioImageView, type AdStudioImageDeps } from './image-pipeline';
 import { advanceBriefVideo, assembleBriefVideo, startRenderAll, startSceneRender, toAdStudioClipView, toAdStudioVideoView, type AdStudioVideoDeps } from './video-pipeline';
 import { adStudioImageSlots, currentAssembledVideo, missingImageRenders, type AdStudioClipView, type AdStudioRunView } from './view';
@@ -46,6 +51,8 @@ export interface AdStudioAutopilotDeps {
   images: AdStudioImageDeps;
   /** The text model; null when none is configured. */
   llm: AdStudioLlm | null;
+  /** Optional site fetch/KMS dependencies (used in tests and site enrichment). */
+  site?: PlanningSourceDeps;
   now?: () => Date;
 }
 
@@ -108,6 +115,16 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
   const callCtx = (llm: AdStudioLlm) => ({ organizationId: ctx.organizationId, projectId: ctx.projectId, actorId: ctx.actorId, llm, briefId: brief.id, now: deps.now?.() });
 
   switch (id) {
+    case 'site_enrich': {
+      if (!options.siteEnrich) return { status: 'skipped', reason: 'off' };
+      if (!deps.llm) return { status: 'skipped', reason: 'not_configured' };
+      const res = await enrichProjectAndBriefFromSite({
+        ...callCtx(deps.llm),
+        siteUrl: options.siteUrl ?? null,
+        deps: deps.site,
+      });
+      return { status: res.status, reason: res.reason };
+    }
     case 'plan': {
       if (!options.plan) return { status: 'skipped', reason: 'off' };
       if (brief.plan) return { status: 'skipped', reason: 'already_done' };
@@ -131,7 +148,8 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
     }
     case 'images': {
       if (!options.images) return { status: 'skipped', reason: 'off' };
-      const concepts = brief.image_concepts ?? [];
+      const allConcepts = brief.image_concepts ?? [];
+      const concepts = options.targetConceptId ? allConcepts.filter((candidate) => candidate.id === options.targetConceptId) : allConcepts;
       if (concepts.length === 0) return { status: 'skipped', reason: 'no_concepts' };
       const images = (await listAdStudioImages(ctx.organizationId, ctx.projectId, brief.id)).map(toAdStudioImageView);
       const slots = adStudioImageSlots(concepts, images, brief.language);
@@ -188,6 +206,67 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
       await assembleBriefVideo({ ...ctx, briefId: brief.id }, deps.video);
       return { status: 'done', reason: null };
     }
+    case 'search_keywords': {
+      if (!options.search) return { status: 'skipped', reason: 'off' };
+      if ((brief.search_keywords?.keywords.length ?? 0) > 0) return { status: 'skipped', reason: 'already_done' };
+      if (!deps.llm) return { status: 'failed', reason: 'not_configured' };
+      const targeting = brief.search_keywords?.targeting ?? defaultSearchTargeting(brief.language);
+      const seeds = cleanKeywordSeeds([...(brief.plan?.keywordThemes.flatMap((theme) => theme.keywords) ?? []), brief.name]);
+      const suggestion = await suggestAdStudioKeywords({
+        ...callCtx(deps.llm),
+        targeting,
+        seeds,
+        url: brief.landing_page_url ?? options.siteUrl ?? null,
+        kms: deps.site?.kms,
+        fetchImpl: deps.site?.fetchImpl,
+      });
+      await saveAdStudioSearchKeywords({
+        organizationId: ctx.organizationId,
+        projectId: ctx.projectId,
+        briefId: brief.id,
+        keywords: suggestion.keywords,
+        now: deps.now?.(),
+      });
+      return { status: 'done', reason: null };
+    }
+    case 'search_ad': {
+      if (!options.search) return { status: 'skipped', reason: 'off' };
+      const existingAd = brief.search_ad;
+      const validExisting = Boolean(
+        existingAd &&
+          existingAd.headlines.filter((h) => h.trim()).length >= 3 &&
+          existingAd.descriptions.filter((d) => d.trim()).length >= 2,
+      );
+      if (validExisting) return { status: 'skipped', reason: 'already_done' };
+      if (!deps.llm) return { status: 'failed', reason: 'not_configured' };
+      await writeAdStudioSearchAd(callCtx(deps.llm));
+      return { status: 'done', reason: null };
+    }
+    case 'revise': {
+      const instruction = options.instruction?.trim() ?? '';
+      if (!instruction) return { status: 'skipped', reason: 'off' };
+      if (!deps.llm) return { status: 'failed', reason: 'not_configured' };
+      if (options.target === 'video') {
+        await reviseAdStudioScriptWithInstruction({ ...callCtx(deps.llm), instruction });
+      } else if (options.target === 'search') {
+        await reviseAdStudioSearchAdWithInstruction({
+          ...callCtx(deps.llm),
+          instruction,
+          kms: deps.site?.kms,
+          fetchImpl: deps.site?.fetchImpl,
+        });
+      } else if (options.target === 'image' || options.target === 'images') {
+        await reviseAdStudioImagesWithInstruction({
+          ...callCtx(deps.llm),
+          instruction,
+          conceptId: options.targetConceptId ?? null,
+          formats: options.imageFormats,
+        });
+      } else {
+        return { status: 'skipped', reason: 'off' };
+      }
+      return { status: 'done', reason: null };
+    }
     default:
       return { status: 'skipped', reason: 'unknown_step' };
   }
@@ -236,8 +315,8 @@ async function clipsQualityGate(
 /** Steps that render media - the costly part a confirmed plan unlocks. */
 const RENDER_STEPS: ReadonlySet<AdStudioRunStepId> = new Set(['images', 'clips', 'assemble']);
 
-/** Steps whose failure stops the run: without a script or its clips there is no video to finish. */
-const BLOCKING: ReadonlySet<AdStudioRunStepId> = new Set(['script', 'clips', 'assemble']);
+/** Steps whose failure stops the run: without a script, clips, search copy/keywords or revision there is nothing to finish. */
+const BLOCKING: ReadonlySet<AdStudioRunStepId> = new Set(['script', 'clips', 'assemble', 'search_keywords', 'search_ad', 'revise']);
 
 /**
  * Advances a run by one unit of work and returns it. A caller that finds the run leased (someone

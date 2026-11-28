@@ -246,6 +246,46 @@ describe('activity events', () => {
     expect(events).toEqual([{ source: 'ad_studio', kind: 'run_done', organizationId: scope.organizationId, projectId: scope.projectId, actor: 'autopilot', briefId: brief.id }]);
   });
 
+  it('announces creative-specific targeted runs with deep-link item and forceNotify when requested', async () => {
+    const scope = await setup();
+    const brief = await createAdStudioBrief({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+      input: { name: 'Sign', objective: 'Trials', productDescription: 'E-sign', landingPageUrl: null, format: 'vertical', language: 'en', targetSeconds: 15 },
+      createdByUserId: scope.ownerId,
+    });
+    const videoRun = await startAdStudioRun({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+      briefId: brief.id,
+      options: { target: 'video', images: false, video: true, confirmPlan: false, notifyAlways: true },
+      actorId: scope.ownerId,
+    });
+    const searchRun = await startAdStudioRun({
+      organizationId: scope.organizationId,
+      projectId: scope.projectId,
+      briefId: brief.id,
+      options: { target: 'search', images: false, video: false, search: true, confirmPlan: false, notifyAlways: true },
+      actorId: scope.ownerId,
+    });
+    const events = listen();
+
+    const vToken = await acquireAdStudioRunLease(videoRun, { ttlMs: 60_000 });
+    const vWorking = await getAdStudioRun(scope.organizationId, scope.projectId, brief.id, videoRun.id);
+    vWorking.status = 'done';
+    await saveAdStudioRunProgress(vWorking, vToken!);
+
+    const sToken = await acquireAdStudioRunLease(searchRun, { ttlMs: 60_000 });
+    const sWorking = await getAdStudioRun(scope.organizationId, scope.projectId, brief.id, searchRun.id);
+    sWorking.status = 'failed';
+    await saveAdStudioRunProgress(sWorking, sToken!);
+
+    expect(events).toEqual([
+      { source: 'ad_studio', kind: 'video_done', organizationId: scope.organizationId, projectId: scope.projectId, actor: 'autopilot', briefId: brief.id, item: 'video', forceNotify: true },
+      { source: 'ad_studio', kind: 'search_failed', organizationId: scope.organizationId, projectId: scope.projectId, actor: 'autopilot', briefId: brief.id, item: 'search', forceNotify: true },
+    ]);
+  });
+
   it('never fails or stalls the caller when a listener throws or hangs', async () => {
     stopListening = setActivityEventListener('test', () => {
       throw new Error('push service down');

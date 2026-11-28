@@ -90,6 +90,63 @@ export function extractSiteLogoUrl(html: string, pageUrl: string): string | null
   return null;
 }
 
+const BRAND_CSS_VAR = /--[a-z0-9-]*(?:primary|brand|accent|main|theme|secondary)[a-z0-9-]*\s*:\s*(#[0-9a-f]{3}(?:[0-9a-f]{3})?)(?![0-9a-f])/gi;
+
+function normalizeBrandHex(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(trimmed)) return trimmed;
+  if (/^#[0-9a-f]{3}$/.test(trimmed)) {
+    const [, r, g, b] = trimmed;
+    return `#${r}${r}${g}${g}${b}${b}`;
+  }
+  return null;
+}
+
+function isUsableBrandColor(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (min >= 235 || max <= 20) return false;
+  if (max - min <= 14) return false;
+  return true;
+}
+
+/**
+ * Brand colors detected from HTML meta tags (`theme-color`, `msapplication-TileColor`) and CSS
+ * custom properties (`--primary`, `--brand`, `--accent`, `--main-color`, etc.), normalized to
+ * lowercase `#rrggbb`, filtered against near-white/black/neutral grays, deduplicated, and capped at 5.
+ */
+export function extractSiteColors(html: string, limit = 5): string[] {
+  const found: string[] = [];
+  const push = (raw: string | undefined) => {
+    const hex = normalizeBrandHex(raw);
+    if (hex && isUsableBrandColor(hex) && !found.includes(hex)) {
+      found.push(hex);
+    }
+  };
+  const attr = (tag: string, name: string) =>
+    new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')
+      .exec(tag)
+      ?.slice(1)
+      .find((value) => value !== undefined);
+
+  for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+    const name = (attr(tag, 'name') ?? '').toLowerCase();
+    if (name === 'theme-color' || name === 'msapplication-tilecolor') {
+      push(attr(tag, 'content'));
+    }
+  }
+  for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+    for (const varMatch of match[1].matchAll(BRAND_CSS_VAR)) {
+      push(varMatch[1]);
+    }
+  }
+  return found.slice(0, Math.max(0, limit));
+}
+
 function clean(value: unknown, max: number): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
 }

@@ -90,7 +90,7 @@ export async function saveAdStudioBrandLogo(
  */
 export async function fillAdStudioBrandFromSite(
   ctx: { organizationId: string; projectId: string; actorId: string },
-  found: { businessName?: string | null; slogan?: string | null; logoUrl?: string | null },
+  found: { businessName?: string | null; slogan?: string | null; toneOfVoice?: string | null; colors?: readonly string[] | null; logoUrl?: string | null },
   deps: { storage?: AdStudioMediaStorage; site?: PlanningSourceDeps } = {},
 ): Promise<void> {
   try {
@@ -98,11 +98,18 @@ export async function fillAdStudioBrandFromSite(
     const kit = await getAdStudioBrandKit(ctx.organizationId, ctx.projectId);
     const brandName = kit.brandName || (found.businessName ?? '').trim().slice(0, AD_STUDIO_BRAND_LIMITS.brandName);
     const slogan = kit.slogan || (found.slogan ?? '').trim().slice(0, AD_STUDIO_BRAND_LIMITS.slogan);
-    if (brandName !== kit.brandName || slogan !== kit.slogan) {
+    const toneOfVoice = kit.toneOfVoice || (found.toneOfVoice ?? '').trim().slice(0, AD_STUDIO_BRAND_LIMITS.toneOfVoice);
+    const detectedColors = [...new Set((found.colors ?? []).map((c) => c.trim().toLowerCase()).filter((c) => /^#[0-9a-f]{6}$/.test(c)))].slice(
+      0,
+      AD_STUDIO_BRAND_LIMITS.colors,
+    );
+    const colors = kit.colors.length ? kit.colors : detectedColors;
+    const colorsChanged = kit.colors.length === 0 && colors.length > 0;
+    if (brandName !== kit.brandName || slogan !== kit.slogan || toneOfVoice !== kit.toneOfVoice || colorsChanged) {
       await setAdStudioBrandKit({
         organizationId: ctx.organizationId,
         projectId: ctx.projectId,
-        kit: { brandName, slogan, toneOfVoice: kit.toneOfVoice, avoidWords: kit.avoidWords, colors: kit.colors },
+        kit: { brandName, slogan, toneOfVoice, avoidWords: kit.avoidWords, colors },
         actorId: ctx.actorId,
       });
     }
