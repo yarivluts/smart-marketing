@@ -5100,7 +5100,7 @@
       "cancel": "Cancel",
       "saved": "Saved. Make the scene again to see and hear the change.",
       "sceneLabel": "What the camera shows",
-      "sceneHint": "In English, for the AI that makes the video: who, where, what happens, camera and light.",
+      "sceneHint": "Who, where, what happens, camera and light. Any language works; it is translated for the AI that makes the video.",
       "suggest": "AI suggestion",
       "suggestLabel": "What should change? (optional)",
       "suggestPlaceholder": "e.g. shorter, more energy, mention the free trial",
