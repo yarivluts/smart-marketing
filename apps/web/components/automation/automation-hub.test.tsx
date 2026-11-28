@@ -173,7 +173,7 @@ describe('Automation pause panel copy', () => {
   });
 
   it('uses the same Hebrew label for resuming in the button and in the Growth Pilot hint', () => {
-    expect(heMessages.Automation.killSwitchDisengageButton).toBe('המשך את האוטומציה');
+    expect(heMessages.Automation.killSwitchDisengageButton).toBe('המשיכו את האוטומציה');
     expect(heMessages.GrowthPilot.errors.automation_stopped).toContain(`'${heMessages.Automation.killSwitchDisengageButton}'`);
   });
 });
