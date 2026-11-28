@@ -150,7 +150,7 @@ describe('ScriptEditor pronunciation (nikud)', () => {
     fireEvent.change(within(screen.getByTestId('ad-studio-scene-1')).getByLabelText('Voiceover'), { target: { value: `${plain} ${plain}` } });
     fireEvent.click(screen.getByRole('button', { name: 'Save script' }));
     await waitFor(() => expect((field.getByLabelText(/Pronunciation/) as HTMLTextAreaElement).value).toBe(`${vocalized} ${vocalized}`));
-    expect(field.getByText(/This is what the narrator reads/)).toBeInTheDocument();
+    expect(field.getByText(/This is exactly what the narrator will read out loud/)).toBeInTheDocument();
     // What was saved is what is shown: nothing is left unsaved.
     expect(screen.queryByText('Unsaved changes')).toBeNull();
   });
