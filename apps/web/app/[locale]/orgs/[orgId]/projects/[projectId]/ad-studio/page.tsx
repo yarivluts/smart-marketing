@@ -642,43 +642,45 @@ export default async function AdStudioPage({
 
           {activeStep === 'review' && !reviewItem ? (
             <div className="flex min-w-0 flex-col gap-5">
-              <AutopilotPanel
-                mode="progress"
-                orgId={orgId}
-                projectId={projectId}
-                briefId={selected.id}
-                initialRun={fullAutopilotRun}
-                has={{
-                  plan: Boolean(selected.plan),
-                  script: selected.scenes.length > 0,
-                  concepts: selected.imageConcepts.length > 0,
-                }}
-                available={{
-                  text: providers.text !== null,
-                  images: imagesAvailable,
-                  video: videoAvailable,
-                }}
-                stepHrefs={{ create: stepHref('review'), review: stepHref('review') }}
-                pipelineDrawer={
-                  <details className="group rounded-2xl border border-pp-outline-variant/35 bg-pp-surface-container-low/60">
-                    <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-pp-primary [&::-webkit-details-marker]:hidden">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Workflow className="h-3.5 w-3.5" aria-hidden="true" />
-                        {t('stepWorkspace.pipelineToggle')}
-                      </span>
-                      <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
-                    </summary>
-                    <div className="border-t border-pp-outline-variant/30 p-3">
-                      <FlowDiagram
-                        label={t('pipelineTitle')}
-                        nodes={stageNodes}
-                        edges={stageEdges}
-                        height={190}
-                      />
-                    </div>
-                  </details>
-                }
-              />
+              {fullAutopilotRun ? (
+                <AutopilotPanel
+                  mode="progress"
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  initialRun={fullAutopilotRun}
+                  has={{
+                    plan: Boolean(selected.plan),
+                    script: selected.scenes.length > 0,
+                    concepts: selected.imageConcepts.length > 0,
+                  }}
+                  available={{
+                    text: providers.text !== null,
+                    images: imagesAvailable,
+                    video: videoAvailable,
+                  }}
+                  stepHrefs={{ create: stepHref('review'), review: stepHref('review') }}
+                  pipelineDrawer={
+                    <details className="group rounded-2xl border border-pp-outline-variant/35 bg-pp-surface-container-low/60">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2.5 text-xs font-semibold text-pp-primary [&::-webkit-details-marker]:hidden">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Workflow className="h-3.5 w-3.5" aria-hidden="true" />
+                          {t('stepWorkspace.pipelineToggle')}
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
+                      </summary>
+                      <div className="border-t border-pp-outline-variant/30 p-3">
+                        <FlowDiagram
+                          label={t('pipelineTitle')}
+                          nodes={stageNodes}
+                          edges={stageEdges}
+                          height={190}
+                        />
+                      </div>
+                    </details>
+                  }
+                />
+              ) : null}
               <ReviewOverview
                 mediaBase={mediaBase}
                 videoFormat={selected.format}

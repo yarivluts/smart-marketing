@@ -17,6 +17,17 @@ Template for each entry:
 
 ---
 
+## 2026-11-28 — Ad Studio: Fix Hebrew claim false positive, stray progress card on Review, and QA-only card buttons + prod deploy
+- **Last completed:**
+  - **Hebrew claim word-boundary fix (`packages/shared/src/ad-studio/claims.ts`, `claims.test.ts`):** Updated Hebrew matching in `containsWord` so `"הכי"` matches standalone/proclitic `"הכי"`/`"והכי"`/`"שהכי"` rather than matching inside unrelated verbs like `"הכינו"` (`prepare`), and matched other Hebrew claim words with proper `[\u0590-\u05ff]` word boundaries.
+  - **Review step polish (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx`):** Hide the standalone `AutopilotPanel` (`mode="progress"`) on `?step=review` when `fullAutopilotRun === null`, avoiding a permanent "Creating your ads" box above card-driven runs.
+  - **QA-only `attention` card controls (`apps/web/components/ad-studio/review-overview.tsx`, `review-overview.test.tsx`):** Hide no-op Start/Finish buttons when all placements exist or a video is already assembled with all scenes current and only QA needs a look (while preserving **"Ask AI to change"** and **"Open and edit"**).
+  - **Verified & deployed:** `@growthos/shared` build & test (94 files, 1,042 tests), `apps/web` (`review-overview.test.tsx` 16/16, `autopilot-panel.test.tsx` 9/9, `hardcoded-strings.test.ts` 2/2), zero Hebrew in `.ts`/`.tsx` diff, `pnpm lint` (9/9), `pnpm typecheck` (16/16), `pnpm exec turbo run build --env-mode=loose` (10/10).
+- **In progress (exact stopping point):** Opening PR, merging to `main`, deploying `web-prod`, and fixing the 2 QA-flagged items on the live Success Center / Galileo brief (`WfXOgyOOQvpvVUxawcvI`).
+- **Blocked + why:** none.
+- **Next step:** Verify 5/5 Ready ads on Success Center / Galileo in live UI and present final screenshots.
+- **Waiting on human:** none.
+
 ## 2026-11-28 — Ad Studio: One-click card creation, target-site enrichment, inline AI revision & completion notifications
 - **Last completed:**
   - **One-click creation & live card progress (`apps/web/components/ad-studio/review-overview.tsx`, `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/ad-studio/page.tsx`):** Added direct **Start creating** / **Finish creating** / **Assemble the video** / **Retry** controls on Video, Google Search Ad, Images empty card, and individual Image Idea cards, with live step label, sub-progress, weighted progress bar, Stop button, sequential round-robin `/advance` polling across concurrent runs, and **Open and edit >** footer link into each dedicated editor.

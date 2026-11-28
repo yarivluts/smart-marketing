@@ -952,12 +952,17 @@ export function ReviewOverview({
   const searchStartOptions = { plan: true, images: false, video: false, search: true, target: 'search' };
   const imagesStartOptions = { plan: true, images: true, imageFormats: ['square', 'portrait'], video: false, search: false, target: 'images' };
 
+  const videoNeedsWork =
+    effectiveVideo.state === 'empty' ||
+    effectiveVideo.rendered < effectiveVideo.scenes ||
+    effectiveVideo.outOfDate > 0 ||
+    videoNeedsAssembly(effectiveVideo);
   const videoStartLabel =
     effectiveVideo.state === 'empty'
       ? t('quick.startCreating')
       : videoNeedsAssembly(effectiveVideo)
         ? t('next.assemble.action')
-        : effectiveVideo.state !== 'ready'
+        : videoNeedsWork
           ? t('quick.recreate')
           : undefined;
   const searchStartLabel =
@@ -1042,6 +1047,8 @@ export function ReviewOverview({
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {effectiveImages.map((image) => {
             const cardKey = `image:${image.conceptId}`;
+            const hasUnrenderedPlacement = image.placements.some((p) => p.state === 'empty');
+            const imageNeedsCreation = image.state === 'empty' || hasUnrenderedPlacement;
             const imageStartOptions = {
               plan: false,
               images: true,
@@ -1086,9 +1093,9 @@ export function ReviewOverview({
                   target: 'image',
                   conceptId: image.conceptId,
                   state: image.state,
-                  startLabel: image.state === 'empty' ? t('quick.startCreating') : image.state !== 'ready' ? t('quick.finishCreating') : undefined,
+                  startLabel: image.state === 'empty' ? t('quick.startCreating') : imageNeedsCreation ? t('quick.finishCreating') : undefined,
                   startDisabled: !available.images,
-                  onStart: image.state !== 'ready' ? () => void startCardCreation(cardKey, imageStartOptions) : undefined,
+                  onStart: imageNeedsCreation ? () => void startCardCreation(cardKey, imageStartOptions) : undefined,
                   aiPlaceholder: t('quick.aiPlaceholderImage'),
                   testSuffix: `image-${image.index}`,
                 })}
@@ -1161,7 +1168,7 @@ export function ReviewOverview({
               state: effectiveVideo.state,
               startLabel: videoStartLabel,
               startDisabled: !available.text || !available.video,
-              onStart: effectiveVideo.state !== 'ready' ? () => void startCardCreation('video', videoStartOptions) : undefined,
+              onStart: videoNeedsWork ? () => void startCardCreation('video', videoStartOptions) : undefined,
               aiPlaceholder: t('quick.aiPlaceholderVideo'),
               testSuffix: 'video',
             })}

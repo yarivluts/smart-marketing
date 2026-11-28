@@ -20,8 +20,12 @@ describe('findUnverifiedClaims', () => {
     expect(findUnverifiedClaims('Freedom from paper', SOURCES)).toEqual([]);
   });
 
-  it('checks Hebrew promise words too', () => {
+  it('checks Hebrew promise words with word boundaries', () => {
     expect(findUnverifiedClaims('\u05d4\u05db\u05d9 \u05de\u05d4\u05d9\u05e8 \u05e9\u05d9\u05e9', ['Fast e-signatures'])).toEqual(['\u05d4\u05db\u05d9']);
+    expect(findUnverifiedClaims('\u05d5\u05d4\u05db\u05d9 \u05de\u05d4\u05d9\u05e8', ['Fast e-signatures'])).toEqual(['\u05d4\u05db\u05d9']);
+    expect(findUnverifiedClaims('\u05d1\u05d7\u05d9\u05e0\u05dd \u05dc\u05db\u05d5\u05dc\u05dd', ['Try online'])).toEqual(['\u05d7\u05d9\u05e0\u05dd']);
+    // Must not match inside unrelated conjugated verbs like "\u05d4\u05db\u05d9\u05e0\u05d5" ("prepare").
+    expect(findUnverifiedClaims('\u05d4\u05db\u05d9\u05e0\u05d5 \u05d0\u05ea \u05d4\u05d9\u05dc\u05d3\u05d9\u05dd \u05dc\u05de\u05d1\u05d7\u05df', ['Prepare children for tests'])).toEqual([]);
     expect(findUnverifiedClaims('\u05e0\u05e1\u05d5 \u05d7\u05d9\u05e0\u05dd', ['\u05e0\u05d9\u05e1\u05d9\u05d5\u05df \u05d7\u05d9\u05e0\u05dd \u05dc-14 \u05d9\u05de\u05d9\u05dd'])).toEqual([]);
   });
 });
