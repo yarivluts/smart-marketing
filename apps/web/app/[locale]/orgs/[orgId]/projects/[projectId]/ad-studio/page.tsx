@@ -37,7 +37,7 @@ import {
   resolveAdStudioExportDestinations,
   toAdStudioExportView,
   toAdStudioBriefView,
-  getLatestAdStudioRunView,
+  listAdStudioRunViews,
   loadAdStudioBrandKit,
 } from '@/lib/ad-studio/store';
 import {
@@ -57,6 +57,7 @@ import {
   adStudioStages,
   currentAssembledVideo,
   summarizeAdStudio,
+  type AdStudioRunView,
   type AdStudioStageStatus,
   type AdStudioVideoStageProgress,
 } from '@/lib/ad-studio/view';
@@ -205,7 +206,7 @@ export default async function AdStudioPage({
   const storage = resolveAdStudioMediaStorage().describe();
 
   // The selected ad's clips and assembled videos, and how far its video stage has come.
-  const [clipModels, videoModels, exportRows, exportDestinations, images, latestRun, references] =
+  const [clipModels, videoModels, exportRows, exportDestinations, images, runs, references] =
     selected
       ? await Promise.all([
           listAdStudioClips(orgId, projectId, selected.id),
@@ -213,10 +214,25 @@ export default async function AdStudioPage({
           listAdStudioExports(orgId, projectId, selected.id),
           resolveAdStudioExportDestinations(orgId, projectId),
           listBriefImages({ organizationId: orgId, projectId, briefId: selected.id }),
-          getLatestAdStudioRunView(orgId, projectId, selected.id),
+          listAdStudioRunViews(orgId, projectId, selected.id),
           listBriefReferences({ organizationId: orgId, projectId, briefId: selected.id }),
         ])
-      : [[], [], [], null, [], null, []];
+      : [[], [], [], null, [], [], []];
+  const latestRun = runs[0] ?? null;
+  const fullAutopilotRun = runs.find((run) => !run.options.target || run.options.target === 'all') ?? null;
+  const cardRuns: AdStudioRunView[] = [];
+  const seenCardKeys = new Set<string>();
+  for (const run of runs) {
+    const target = run.options.target;
+    if (!target || target === 'all') continue;
+    const key = target === 'image' && run.options.targetConceptId ? `image:${run.options.targetConceptId}` : target;
+    if (seenCardKeys.has(key)) continue;
+    seenCardKeys.add(key);
+    if (run.status === 'running' || run.status === 'failed') {
+      cardRuns.push(run);
+    }
+  }
+  const hasSiteUrl = Boolean(selected?.landingPageUrl || knownSite || demoAccessLoaded?.loginUrl);
   const exportsView = exportRows.map(toAdStudioExportView);
   const uploadedCount = exportsView.filter((row) => row.status === 'done').length;
   const videoExports = exportsView
@@ -516,7 +532,7 @@ export default async function AdStudioPage({
                     orgId={orgId}
                     projectId={projectId}
                     briefId={selected.id}
-                    initialRun={latestRun}
+                    initialRun={fullAutopilotRun}
                     has={{
                       plan: Boolean(selected.plan),
                       script: selected.scenes.length > 0,
@@ -631,7 +647,7 @@ export default async function AdStudioPage({
                 orgId={orgId}
                 projectId={projectId}
                 briefId={selected.id}
-                initialRun={latestRun}
+                initialRun={fullAutopilotRun}
                 has={{
                   plan: Boolean(selected.plan),
                   script: selected.scenes.length > 0,
@@ -686,6 +702,13 @@ export default async function AdStudioPage({
                 publishHref={steps.states.publish !== 'locked' ? stepHref('publish') : null}
                 shareHref={canEditBrand ? `${stepHref('review')}&open=share` : null}
                 searchHost={displayHost(selected.landingPageUrl)}
+                initialRuns={cardRuns}
+                hasSiteUrl={hasSiteUrl}
+                available={{
+                  text: providers.text !== null,
+                  images: imagesAvailable,
+                  video: videoAvailable,
+                }}
               />
             </div>
           ) : null}

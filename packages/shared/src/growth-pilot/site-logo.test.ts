@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractSiteLogoUrl, sanitizeSiteAnalysis } from './analysis';
+import { extractSiteColors, extractSiteLogoUrl, sanitizeSiteAnalysis } from './analysis';
 
 const PAGE = 'https://easysign.example/he/';
 
@@ -28,5 +28,30 @@ describe('site analysis slogan', () => {
     const analysis = sanitizeSiteAnalysis({ businessName: 'EasySign', slogan: `  ${'s'.repeat(90)} `, summary: 'x', language: 'he', offerings: [], audiences: [] });
     expect(analysis.slogan).toHaveLength(70);
     expect(sanitizeSiteAnalysis({ businessName: 'EasySign', summary: 'x', language: 'he', offerings: [], audiences: [] }).slogan).toBe('');
+  });
+});
+
+describe('extractSiteColors', () => {
+  it('extracts normalized brand colors from meta tags and CSS variables, skipping white/black/gray', () => {
+    const html = `
+      <meta name="theme-color" content="#3B82F6" />
+      <meta name="msapplication-TileColor" content="#fff" />
+      <style>
+        :root {
+          --primary-color: #1e40af;
+          --brand-accent: #F90;
+          --neutral-main: #e5e5e5;
+          --dark-theme: #111111;
+          --secondary: #10B981;
+          --extra-brand: #6366f1;
+          --another-accent: #ec4899;
+        }
+      </style>
+    `;
+    expect(extractSiteColors(html)).toEqual(['#3b82f6', '#1e40af', '#ff9900', '#10b981', '#6366f1']);
+  });
+
+  it('ignores non-hex values and handles empty HTML', () => {
+    expect(extractSiteColors('<meta name="theme-color" content="rgb(0,0,0)"><style>:root{--primary: blue;}</style>')).toEqual([]);
   });
 });

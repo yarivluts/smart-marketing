@@ -25,6 +25,12 @@ describe('push categories', () => {
     expect(pushCategoryForEvent('ad_studio', 'run_awaiting_approval')).toBe('approvals');
     expect(pushCategoryForEvent('ad_studio', 'run_done')).toBe('ready');
     expect(pushCategoryForEvent('ad_studio', 'run_failed')).toBe('failures');
+    expect(pushCategoryForEvent('ad_studio', 'video_done')).toBe('ready');
+    expect(pushCategoryForEvent('ad_studio', 'video_failed')).toBe('failures');
+    expect(pushCategoryForEvent('ad_studio', 'search_done')).toBe('ready');
+    expect(pushCategoryForEvent('ad_studio', 'search_failed')).toBe('failures');
+    expect(pushCategoryForEvent('ad_studio', 'images_done')).toBe('ready');
+    expect(pushCategoryForEvent('ad_studio', 'images_failed')).toBe('failures');
   });
 
   it('sends nothing for feed-only events', () => {

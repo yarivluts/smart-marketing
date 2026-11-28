@@ -4669,12 +4669,16 @@
         "awaiting_approval": "ממתין לאישור התכנון שלכם"
       },
       "step": {
+        "site_enrich": "קריאת אתר היעד",
         "plan": "תכנון",
         "script": "תסריט",
         "image_concepts": "רעיונות לתמונות",
         "images": "תמונות",
         "clips": "סצנות וידאו",
-        "assemble": "סרטון סופי"
+        "assemble": "סרטון סופי",
+        "search_keywords": "מילות מפתח לחיפוש",
+        "search_ad": "מודעת חיפוש בגוגל",
+        "revise": "עדכון התוכן עם AI"
       },
       "stepStatus": {
         "pending": "ממתין",
@@ -4701,7 +4705,13 @@
         "blocked": "ממתין לשלב קודם",
         "cancelled": "בוטל",
         "error": "נכשל",
-        "qa_issues": "בדיקת ה-AI עדיין מצאה בעיות - ראו בסצנות"
+        "qa_issues": "בדיקת ה-AI עדיין מצאה בעיות - ראו בסצנות",
+        "no_site_url": "לא הוגדר קישור לאתר - המשכנו לפי התקציר",
+        "site_unreachable": "לא הצלחנו לגשת לאתר - המשכנו עם מה שיש",
+        "site_empty_page": "בדף האתר היה מעט טקסט - המשכנו עם מה שיש",
+        "site_blocked_url": "אי אפשר היה לפתוח את כתובת האתר - המשכנו עם מה שיש",
+        "site_timeout": "האתר לא הגיב בזמן - המשכנו עם מה שיש",
+        "site_too_large": "דף האתר היה גדול מדי - המשכנו עם מה שיש"
       },
       "prepareTitle": "הכנת התכנון",
       "prepareDescription": "ה-AI כותב את התכנון, את תסריט הסרטון ואת רעיונות התמונות. עדיין לא נוצר דבר: עוברים עליהם למטה, משנים ומאשרים.",
@@ -5570,6 +5580,33 @@
           "description": "כתבו רעיונות לתמונות עם AI או הוסיפו רעיון משלכם כדי להתחיל.",
           "action": "לרעיונות התמונה"
         }
+      },
+      "quick": {
+        "startCreating": "התחלת יצירה",
+        "recreate": "השלמת היצירה",
+        "finishCreating": "סיום היצירה",
+        "aiChange": "שינוי עם AI",
+        "aiCreateWithNote": "יצירה עם בקשה ל-AI",
+        "aiPlaceholderVideo": "כתבו ל-AI מה לשנות, למשל להתמקד בתקופת הניסיון ולקצר את הפתיחה",
+        "aiPlaceholderSearch": "כתבו ל-AI מה לשנות, למשל להדגיש תמיכה 24/7 ולהוסיף הצעת מחיר",
+        "aiPlaceholderImage": "כתבו ל-AI מה לשנות, למשל צבעים חמים יותר, כותרת קצרה יותר ודגש על מובייל",
+        "aiSubmit": "עדכון עם AI",
+        "aiCancel": "ביטול",
+        "stop": "עצירה",
+        "tryAgain": "ניסיון נוסף",
+        "siteUrlLabel": "אתר היעד עבור ה-AI (לא חובה)",
+        "siteUrlPlaceholder": "https://your-website.com",
+        "siteUrlHint": "ה-AI ייגש לאתר הזה וישלים אוטומטית את כל פרטי המותג והגדרות הפרויקט שחסרים.",
+        "notifyWhenDone": "עדכנו אותי בסיום",
+        "notifyEnabled": "ההתראות פעילות - נעדכן אתכם כשהכל יהיה מוכן",
+        "notifyBlocked": "התראות הדפדפן חסומות במכשיר הזה.",
+        "notifyBackgroundHint": "רץ ברקע - נעדכן אתכם בסיום",
+        "toastDoneVideo": "הסרטון מוכן",
+        "toastDoneSearch": "מודעת החיפוש בגוגל מוכנה",
+        "toastDoneImages": "התמונות מוכנות",
+        "toastDoneBody": "פתחו כדי לבדוק, לשנות עם AI או לפרסם.",
+        "toastFailedTitle": "היצירה נעצרה",
+        "aiUnavailable": "יצירה עם AI עדיין לא מופעלת בחשבון הזה."
       }
     },
     "adHeader": {
@@ -7332,6 +7369,30 @@
         "run_failed": {
           "title": "המודעות לא הושלמו",
           "body": "היצירה של {subject} ב-{project} נעצרה. פתחו כדי לראות למה."
+        },
+        "video_done": {
+          "title": "הסרטון מוכן",
+          "body": "הסרטון עבור {subject} מוכן ב-{project}."
+        },
+        "video_failed": {
+          "title": "הסרטון לא הושלם",
+          "body": "יצירת הסרטון עבור {subject} ב-{project} נעצרה. פתחו כדי לראות למה."
+        },
+        "search_done": {
+          "title": "מודעת החיפוש מוכנה",
+          "body": "מודעת החיפוש בגוגל עבור {subject} מוכנה ב-{project}."
+        },
+        "search_failed": {
+          "title": "מודעת החיפוש לא הושלמה",
+          "body": "יצירת מודעת החיפוש עבור {subject} ב-{project} נעצרה. פתחו כדי לראות למה."
+        },
+        "images_done": {
+          "title": "תמונות המודעה מוכנות",
+          "body": "תמונות המודעה עבור {subject} מוכנות ב-{project}."
+        },
+        "images_failed": {
+          "title": "תמונות המודעה לא הושלמו",
+          "body": "יצירת התמונות עבור {subject} ב-{project} נעצרה. פתחו כדי לראות למה."
         }
       }
     }

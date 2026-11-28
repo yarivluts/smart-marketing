@@ -262,8 +262,9 @@ const CONCEPT_RULES = [
 /** The instructions for proposing image concepts from a brief (and, when present, its plan and video script). */
 export function buildImageConceptsPrompt(
   brief: AdStudioBriefInput,
-  context: AdStudioScriptContext & { scenes?: readonly Pick<AdStudioScene, 'visualPrompt' | 'onScreenText'>[] } = {},
+  context: AdStudioScriptContext & { scenes?: readonly Pick<AdStudioScene, 'visualPrompt' | 'onScreenText'>[]; instruction?: string } = {},
 ): AdStudioPrompt {
+  const instruction = context.instruction?.trim();
   const contextLines = [
     context.landingPageSummary ? `Landing page summary: ${context.landingPageSummary}` : null,
     context.audience ? `Audience: ${context.audience}` : null,
@@ -288,6 +289,7 @@ export function buildImageConceptsPrompt(
       brief.landingPageUrl ? `Landing page: ${brief.landingPageUrl}` : null,
       `Ad language: ${languageName(brief.language)}`,
       ...(contextLines.length ? ['', 'Context:', ...contextLines] : []),
+      ...(instruction ? ['', 'Follow this direction from the editor:', wrapUntrusted('editor_request', instruction)] : []),
       '',
       'Propose the image ideas.',
     ]

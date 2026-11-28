@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSceneRewritePrompt, buildScriptPrompt, type AdStudioBriefInput } from './prompts';
+import { buildSceneRewritePrompt, buildScriptPrompt, buildScriptRevisePrompt, type AdStudioBriefInput } from './prompts';
 
 const BRIEF: AdStudioBriefInput = {
   name: 'Sign in 30 seconds',
@@ -58,5 +58,19 @@ describe('buildSceneRewritePrompt', () => {
     expect(prompt.system).toContain("Follow the general video instructions in <editor_request> across every scene's visualPrompt");
     expect(prompt.system).toContain('<editor_request>');
     expect(prompt.system).toContain('Keep the scene at 6 seconds');
+  });
+});
+
+describe('buildScriptRevisePrompt', () => {
+  it('instructs preserving unchanged scenes verbatim and wraps the instruction', () => {
+    const scenes = [
+      { id: 'a', durationSeconds: 5, visualPrompt: 'Office scene', voiceover: 'Save time', onScreenText: '' },
+      { id: 'b', durationSeconds: 5, visualPrompt: 'Happy customer', voiceover: 'Try today', onScreenText: 'Start' },
+    ];
+    const prompt = buildScriptRevisePrompt(BRIEF, scenes, 'Make the opening faster and add a price mention', { audience: 'Lawyers' });
+    expect(prompt.system).toContain('Preserve any scene that does NOT need to change verbatim');
+    expect(prompt.user).toContain('1. [5s] Office scene | VO: Save time');
+    expect(prompt.user).toContain('<editor_request>\nMake the opening faster and add a price mention\n</editor_request>');
+    expect(prompt.user).toContain('Audience: Lawyers');
   });
 });

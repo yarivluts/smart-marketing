@@ -82,10 +82,18 @@ describe('notifyActivityEvent', () => {
     expect(payload.body).toContain('Spring sale');
   });
 
-  it('leaves a Growth Pilot run to the pilot’s own update, so one change is one notification', async () => {
+  it('leaves a Growth Pilot run to the pilot’s own update, unless forceNotify is set, and deep-links item', async () => {
     orm.growthBrief = true;
     expect(await notifyActivityEvent({ source: 'ad_studio', kind: 'run_done', organizationId: 'o1', projectId: 'p1', actor: 'u', briefId: 'b1' }, { config: CONFIG })).toBeNull();
     expect(deliver).not.toHaveBeenCalled();
+
+    await notifyActivityEvent(
+      { source: 'ad_studio', kind: 'video_done', organizationId: 'o1', projectId: 'p1', actor: 'autopilot', briefId: 'b1', item: 'video', forceNotify: true },
+      { config: CONFIG },
+    );
+    expect(deliver).toHaveBeenCalledTimes(1);
+    const payload = await deliver.mock.calls[0][0].payloadFor('en');
+    expect(payload.url).toBe('/en/orgs/o1/projects/p1/ad-studio?brief=b1&step=review&item=video');
   });
 
   it('registers once, by name, as an activity listener', () => {

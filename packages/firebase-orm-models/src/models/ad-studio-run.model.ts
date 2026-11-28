@@ -2,8 +2,23 @@ import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 import type { AdStudioImageFormat } from '@growthos/shared';
 
 /** The steps an autopilot run walks, in order. */
-export const AD_STUDIO_RUN_STEPS = ['plan', 'script', 'image_concepts', 'images', 'clips', 'assemble'] as const;
+export const AD_STUDIO_RUN_STEPS = [
+  'site_enrich',
+  'plan',
+  'script',
+  'image_concepts',
+  'images',
+  'clips',
+  'assemble',
+  'search_keywords',
+  'search_ad',
+  'revise',
+] as const;
 export type AdStudioRunStepId = (typeof AD_STUDIO_RUN_STEPS)[number];
+
+/** Which creative(s) a run is scoped to (`all` covers the whole brief). */
+export const AD_STUDIO_RUN_TARGETS = ['all', 'images', 'image', 'video', 'search'] as const;
+export type AdStudioRunTarget = (typeof AD_STUDIO_RUN_TARGETS)[number];
 
 export const AD_STUDIO_RUN_STEP_STATUSES = ['pending', 'running', 'done', 'skipped', 'failed'] as const;
 export type AdStudioRunStepStatus = (typeof AD_STUDIO_RUN_STEP_STATUSES)[number];
@@ -40,6 +55,20 @@ export interface AdStudioRunOptions {
    * image or video is rendered (the costly part). On by default; runs saved before it existed read false.
    */
   confirmPlan?: boolean;
+  /** Automatically read the target site and fill missing project/brand/brief fields first. */
+  siteEnrich?: boolean;
+  /** Research keywords and write a Google search ad. */
+  search?: boolean;
+  /** Scoped creative target (`all` by default). Distinct targets can run in parallel. */
+  target?: AdStudioRunTarget;
+  /** When `target === 'image'`, the concept ID being rendered or revised. */
+  targetConceptId?: string | null;
+  /** Explicit website URL fallback when the project/brief has none yet. */
+  siteUrl?: string | null;
+  /** Inline AI instruction for targeted revision runs (`revise` step). */
+  instruction?: string | null;
+  /** Send a browser push notification on completion even for Growth Pilot-linked briefs. */
+  notifyAlways?: boolean;
 }
 
 /**

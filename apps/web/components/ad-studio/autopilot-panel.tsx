@@ -39,6 +39,12 @@ export function autopilotRetryDelay(failures: number): number {
 
 const KNOWN_REASONS = new Set([
   'qa_issues',
+  'no_site_url',
+  'site_unreachable',
+  'site_empty_page',
+  'site_blocked_url',
+  'site_timeout',
+  'site_too_large',
   'off',
   'already_done',
   'no_concepts',

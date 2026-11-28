@@ -1,6 +1,6 @@
 import { languageName, type AdStudioBriefInput, type AdStudioPrompt, type AdStudioScriptContext } from './prompts';
 import type { AdStudioKeywordCompetition, AdStudioKeywordIdea, AdStudioKeywordTargeting } from './planning';
-import { UNTRUSTED_INPUT_RULE, adWritingRules } from './writing-rules';
+import { UNTRUSTED_INPUT_RULE, adWritingRules, wrapUntrusted } from './writing-rules';
 import { brandKitRules } from './brand-kit';
 
 /**
@@ -363,6 +363,47 @@ export function buildKeywordChoicePrompt(
     ]
       .filter((line): line is string => line !== null)
       .join('\n'),
+  };
+}
+
+/**
+ * The instructions for updating a responsive search ad (and optionally its keywords) in response
+ * to an inline AI instruction from the user.
+ */
+export function buildSearchAdRevisePrompt(
+  brief: AdStudioBriefInput,
+  currentAd: AdStudioSearchAd | null,
+  currentKeywords: readonly Pick<AdStudioSearchKeyword, 'text' | 'matchType' | 'avgMonthlySearches'>[],
+  instruction: string,
+  context: AdStudioScriptContext = {},
+): AdStudioPrompt {
+  const base = buildSearchAdPrompt(brief, currentKeywords, context);
+  const currentAdSummary = currentAd
+    ? JSON.stringify({
+        headlines: currentAd.headlines,
+        descriptions: currentAd.descriptions,
+        path1: currentAd.path1,
+        path2: currentAd.path2,
+      })
+    : 'None yet';
+  const currentKeywordList = currentKeywords.length
+    ? currentKeywords.map((kw) => `${kw.text} [${kw.matchType}]`).join(', ')
+    : 'None yet';
+  return {
+    system: [
+      base.system,
+      '- Revise the responsive search ad according to <editor_request>. Keep strong existing headlines/descriptions where they do not conflict with the request.',
+      `- Also return keywords (at most ${AD_STUDIO_AI_KEYWORDS_MAX} objects with text and matchType BROAD/PHRASE/EXACT) and negatives (at most ${AD_STUDIO_AI_NEGATIVES_MAX}) if the request asks to change targeting/keywords or if there are no keywords yet; otherwise omit them or return the existing list.`,
+    ].join('\n'),
+    user: [
+      base.user,
+      '',
+      `Current search ad: ${currentAdSummary}`,
+      `Current keywords: ${currentKeywordList}`,
+      '',
+      'Revise the search ad as asked:',
+      wrapUntrusted('editor_request', instruction.trim() || 'Make the search ad stronger.'),
+    ].join('\n'),
   };
 }
 

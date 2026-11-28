@@ -42,3 +42,5 @@ export * from './site-scroll';
 export * from './demo-browser';
 export * from './gallery';
 export * from './client-requests';
+export * from './site-enrich';
+export * from './quick-revise';

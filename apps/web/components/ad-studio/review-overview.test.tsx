@@ -1,14 +1,18 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import enMessages from '@/messages/en.json';
 import heMessages from '@/messages/he.json';
+import type { AdStudioRunView } from '@/lib/ad-studio/view';
 import { REVIEW_POLL_MS, ReviewOverview, type ReviewOverviewProps } from './review-overview';
 
 const refresh = vi.fn();
+const push = vi.fn();
+const toastMock = vi.hoisted(() => vi.fn());
+vi.mock('@/components/ui/use-toast', () => ({ toast: toastMock }));
 vi.mock('@/i18n/navigation', () => ({
-  useRouter: () => ({ refresh }),
+  useRouter: () => ({ refresh, push }),
   Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>
       {children}
@@ -32,7 +36,7 @@ describe('ReviewOverview', () => {
   it('shows each creative as a card that opens its own page, with a preview and where it stands', () => {
     renderWithIntl(<ReviewOverview {...PROPS} />, { locale: 'en' });
     const first = screen.getByTestId('ad-studio-creative-image-1');
-    expect(first).toHaveAttribute('href', '/r?item=image:c1');
+    expect(within(first).getByTestId('ad-studio-creative-image-1-open')).toHaveAttribute('href', '/r?item=image:c1');
     expect(within(first).getByRole('img')).toHaveAttribute('src', '/m/images/i1/media');
     expect(first).toHaveTextContent('Image idea 1');
     expect(first).toHaveTextContent('Sign in 30 seconds');
@@ -44,13 +48,13 @@ describe('ReviewOverview', () => {
     expect(second).toHaveTextContent('No ad text yet');
 
     const video = screen.getByTestId('ad-studio-creative-video');
-    expect(video).toHaveAttribute('href', '/r?item=video');
+    expect(within(video).getByTestId('ad-studio-creative-video-open')).toHaveAttribute('href', '/r?item=video');
     expect(video.querySelector('video')).toHaveAttribute('src', '/m/clips/k1/media#t=0.1');
     expect(video).toHaveTextContent('2 of 3 scenes made');
     expect(video).not.toHaveTextContent('assemble the video');
 
     const search = screen.getByTestId('ad-studio-creative-search');
-    expect(search).toHaveAttribute('href', '/r?item=search');
+    expect(within(search).getByTestId('ad-studio-creative-search-open')).toHaveAttribute('href', '/r?item=search');
     expect(search).toHaveTextContent('No keywords chosen');
     expect(within(search).getByTestId('ad-studio-creative-state')).toHaveTextContent('Not started');
   });
@@ -124,7 +128,7 @@ describe('ReviewOverview', () => {
   it('offers to start image ideas when there are none, in Hebrew', () => {
     renderWithIntl(<ReviewOverview {...PROPS} images={[]} />, { locale: 'he' });
     const empty = screen.getByTestId('ad-studio-creative-images-empty');
-    expect(empty).toHaveAttribute('href', '/r?item=images');
+    expect(within(empty).getByTestId('ad-studio-creative-images-empty-open')).toHaveAttribute('href', '/r?item=images');
     expect(empty).toHaveTextContent(heMessages.AdStudio.review.imagesEmpty);
   });
 
@@ -166,6 +170,233 @@ describe('ReviewOverview', () => {
       renderWithIntl(<ReviewOverview {...PROPS} images={[PROPS.images[0]]} />, { locale: 'en' });
       await vi.advanceTimersByTimeAsync(REVIEW_POLL_MS * 3);
       expect(refresh).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('quick creation, live progress, inline AI revisions and completion alerts', () => {
+    function jsonResponse(body: unknown, status = 200): Response {
+      return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    }
+
+    function makeRun(overrides: Partial<AdStudioRunView> = {}): AdStudioRunView {
+      return {
+        id: 'run-search-1',
+        status: 'running',
+        options: {
+          plan: true,
+          images: false,
+          imageFormats: ['square', 'portrait'],
+          video: false,
+          search: true,
+          siteEnrich: true,
+          target: 'search',
+          targetConceptId: null,
+          siteUrl: null,
+          instruction: null,
+          notifyAlways: true,
+          environmentId: null,
+          confirmPlan: false,
+        },
+        steps: [
+          { id: 'site_enrich', status: 'running', reason: null, progress: null },
+          { id: 'plan', status: 'pending', reason: null, progress: null },
+          { id: 'search_keywords', status: 'pending', reason: null, progress: null },
+          { id: 'search_ad', status: 'pending', reason: null, progress: null },
+        ],
+        failureCode: null,
+        failureMessage: null,
+        startedOn: '2026-11-28T08:00:00.000Z',
+        lastAdvancedOn: '2026-11-28T08:00:00.000Z',
+        finishedOn: null,
+        planApprovedOn: '2026-11-28T08:00:00.000Z',
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      toastMock.mockReset();
+      refresh.mockReset();
+      push.mockReset();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    });
+
+    it('starts search ad creation from the card, advances progress live, fires completion toast, and stops polling once done', async () => {
+      const started = makeRun();
+      const mid = makeRun({
+        steps: [
+          { id: 'site_enrich', status: 'done', reason: null, progress: null },
+          { id: 'plan', status: 'done', reason: null, progress: null },
+          { id: 'search_keywords', status: 'running', reason: null, progress: null },
+          { id: 'search_ad', status: 'pending', reason: null, progress: null },
+        ],
+      });
+      const done = makeRun({
+        status: 'done',
+        finishedOn: '2026-11-28T08:01:00.000Z',
+        steps: [
+          { id: 'site_enrich', status: 'done', reason: null, progress: null },
+          { id: 'plan', status: 'done', reason: null, progress: null },
+          { id: 'search_keywords', status: 'done', reason: null, progress: null },
+          { id: 'search_ad', status: 'done', reason: null, progress: null },
+        ],
+      });
+
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ run: started }, 201))
+        .mockResolvedValueOnce(jsonResponse({ run: mid }))
+        .mockResolvedValueOnce(jsonResponse({ run: done }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      renderWithIntl(<ReviewOverview {...PROPS} />, { locale: 'en' });
+      fireEvent.click(screen.getByTestId('ad-studio-card-start-search'));
+
+      await waitFor(() => {
+        const progress = screen.getByTestId('ad-studio-card-progress-search');
+        expect(progress).toHaveTextContent('Search keywords');
+        expect(within(progress).getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50');
+      });
+      expect(fetchMock.mock.calls[0]?.[0]).toBe('/m/autopilot');
+      expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+        options: {
+          plan: true,
+          images: false,
+          video: false,
+          search: true,
+          target: 'search',
+          siteEnrich: true,
+          confirmPlan: false,
+          notifyAlways: true,
+        },
+      });
+
+      await waitFor(
+        () =>
+          expect(toastMock).toHaveBeenCalledWith(
+            expect.objectContaining({
+              variant: 'success',
+              title: 'Google search ad is ready',
+            }),
+          ),
+        { timeout: 5000 },
+      );
+
+      // Should not keep calling /advance after status becomes done.
+      const totalCalls = fetchMock.mock.calls.length;
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      expect(fetchMock.mock.calls.length).toBe(totalCalls);
+      expect(screen.queryByTestId('ad-studio-card-progress-search')).toBeNull();
+    });
+
+    it('starts video creation from an empty card and cancels via Stop button', async () => {
+      const runningVideo = makeRun({
+        id: 'run-video-1',
+        options: {
+          plan: true,
+          images: false,
+          imageFormats: ['square', 'portrait'],
+          video: true,
+          search: false,
+          siteEnrich: true,
+          target: 'video',
+          targetConceptId: null,
+          siteUrl: null,
+          instruction: null,
+          notifyAlways: true,
+          environmentId: null,
+          confirmPlan: false,
+        },
+        steps: [
+          { id: 'site_enrich', status: 'done', reason: null, progress: null },
+          { id: 'clips', status: 'running', reason: null, progress: { done: 1, total: 3 } },
+          { id: 'assemble', status: 'pending', reason: null, progress: null },
+        ],
+      });
+      const cancelled = { ...runningVideo, status: 'cancelled' as const };
+      const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url === '/m/autopilot') return jsonResponse({ run: runningVideo }, 201);
+        if (url === '/m/autopilot/run-video-1/cancel') return jsonResponse({ run: cancelled });
+        return jsonResponse({ run: runningVideo });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const emptyVideo = { ...PROPS.video, state: 'empty' as const, scenes: 0, rendered: 0, previewClipId: null };
+      renderWithIntl(<ReviewOverview {...PROPS} video={emptyVideo} />, { locale: 'en' });
+
+      fireEvent.click(screen.getByTestId('ad-studio-card-start-video'));
+      await waitFor(() => expect(screen.getByTestId('ad-studio-card-progress-video')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByTestId('ad-studio-card-stop-video'));
+      await waitFor(() => expect(screen.queryByTestId('ad-studio-card-progress-video')).toBeNull());
+      expect(fetchMock.mock.calls.some(([url]) => url === '/m/autopilot/run-video-1/cancel')).toBe(true);
+    });
+
+    it('submits an inline AI instruction on a card and passes optional target website URL when missing', async () => {
+      const reviseRun = makeRun({
+        id: 'run-revise-img',
+        options: {
+          plan: false,
+          images: true,
+          imageFormats: ['square'],
+          video: false,
+          search: false,
+          siteEnrich: true,
+          target: 'image',
+          targetConceptId: 'c1',
+          siteUrl: 'https://acme.example',
+          instruction: 'Make it warmer',
+          notifyAlways: true,
+          environmentId: null,
+          confirmPlan: false,
+        },
+        steps: [{ id: 'revise', status: 'done', reason: null, progress: null }],
+        status: 'done',
+      });
+      const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ run: reviseRun }, 201));
+      vi.stubGlobal('fetch', fetchMock);
+
+      renderWithIntl(<ReviewOverview {...PROPS} hasSiteUrl={false} />, { locale: 'en' });
+      const siteContainer = screen.getByTestId('ad-studio-review-site-url');
+      fireEvent.change(within(siteContainer).getByRole('textbox'), { target: { value: 'https://acme.example' } });
+
+      fireEvent.click(screen.getByTestId('ad-studio-card-ai-toggle-image-1'));
+      const input = screen.getByTestId('ad-studio-card-ai-input-image-1');
+      fireEvent.change(input, { target: { value: 'Make it warmer' } });
+      fireEvent.submit(screen.getByTestId('ad-studio-card-ai-form-image-1'));
+
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      expect(fetchMock.mock.calls[0]?.[0]).toBe('/m/ai-revise');
+      expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+        target: 'image',
+        conceptId: 'c1',
+        instruction: 'Make it warmer',
+        siteUrl: 'https://acme.example',
+      });
+      expect(screen.queryByTestId('ad-studio-card-ai-form-image-1')).toBeNull();
+    });
+
+    it('displays failed run error with Try again button that restarts creation', async () => {
+      const failedSearch = makeRun({
+        id: 'run-failed-1',
+        status: 'failed',
+        failureCode: 'site_unreachable',
+        steps: [{ id: 'site_enrich', status: 'failed', reason: 'site_unreachable', progress: null }],
+      });
+      const restarted = makeRun({ id: 'run-restarted-1', status: 'done', steps: [{ id: 'search_ad', status: 'done', reason: null, progress: null }] });
+      const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ run: restarted }, 201));
+      vi.stubGlobal('fetch', fetchMock);
+
+      renderWithIntl(<ReviewOverview {...PROPS} initialRuns={[failedSearch]} />, { locale: 'en' });
+      const alert = screen.getByTestId('ad-studio-card-error-search');
+      expect(alert).toHaveTextContent('could not reach the website');
+
+      fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/m/autopilot', expect.anything()));
     });
   });
 });

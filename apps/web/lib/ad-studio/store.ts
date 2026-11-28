@@ -22,6 +22,7 @@ import {
   getAdStudioClip as getAdStudioClipInOrganization,
   getAdStudioVideo as getAdStudioVideoInOrganization,
   getLatestAdStudioRun as getLatestAdStudioRunInOrganization,
+  listAdStudioRuns as listAdStudioRunsInOrganization,
   listAdStudioClips as listAdStudioClipsInOrganization,
   listAdStudioExports as listAdStudioExportsInOrganization,
   resolveAdStudioExportDestinations as resolveAdStudioExportDestinationsInOrganization,
@@ -297,6 +298,13 @@ export async function getLatestAdStudioRunView(organizationId: string, projectId
   await ensureFirestoreOrm();
   const run = await getLatestAdStudioRunInOrganization(organizationId, projectId, briefId);
   return run ? toAdStudioRunView(run) : null;
+}
+
+/** All autopilot runs for a brief (newest first), as the page receives them. */
+export async function listAdStudioRunViews(organizationId: string, projectId: string, briefId: string): Promise<AdStudioRunView[]> {
+  await ensureFirestoreOrm();
+  const runs = await listAdStudioRunsInOrganization(organizationId, projectId, briefId);
+  return runs.map(toAdStudioRunView);
 }
 
 /**

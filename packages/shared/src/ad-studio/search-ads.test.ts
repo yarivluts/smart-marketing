@@ -3,6 +3,7 @@ import {
   AD_STUDIO_AI_KEYWORDS_MAX,
   buildKeywordChoicePrompt,
   buildSearchAdPrompt,
+  buildSearchAdRevisePrompt,
   sanitizeKeywordChoice,
   cleanKeyword,
   cleanKeywordSeeds,
@@ -169,5 +170,20 @@ describe('AI keyword choice', () => {
   it('survives a malformed answer', () => {
     expect(sanitizeKeywordChoice(null, IDEAS)).toEqual({ keywords: [], negatives: [] });
     expect(sanitizeKeywordChoice({ keywords: 'x', negatives: {} }, null)).toEqual({ keywords: [], negatives: [] });
+  });
+
+  it('builds a revision prompt with current ad, keywords, and wrapped editor instruction', () => {
+    const prompt = buildSearchAdRevisePrompt(
+      BRIEF,
+      { headlines: ['Sign fast', 'Lawyers e-sign', 'Send on WhatsApp'], descriptions: ['Fast signing.', 'Binding in Israel.'], path1: 'sign', path2: 'now' },
+      [keyword('sign pdf')],
+      'Emphasize instant WhatsApp delivery',
+      { audience: 'Lawyers' },
+    );
+    expect(prompt.system).toContain('Revise the responsive search ad according to <editor_request>');
+    expect(prompt.user).toContain('Current search ad:');
+    expect(prompt.user).toContain('Lawyers e-sign');
+    expect(prompt.user).toContain('Current keywords: sign pdf [PHRASE]');
+    expect(prompt.user).toContain('<editor_request>\nEmphasize instant WhatsApp delivery\n</editor_request>');
   });
 });

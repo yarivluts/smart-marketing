@@ -186,12 +186,40 @@ export function missingImageRenders(slots: readonly AdStudioImageSlot[], concept
     .map((slot) => ({ conceptId: slot.conceptId, format: slot.format }));
 }
 
+export type AdStudioRunViewStepId =
+  | 'site_enrich'
+  | 'plan'
+  | 'script'
+  | 'image_concepts'
+  | 'images'
+  | 'clips'
+  | 'assemble'
+  | 'search_keywords'
+  | 'search_ad'
+  | 'revise';
+
+export type AdStudioRunViewTarget = 'all' | 'images' | 'image' | 'video' | 'search';
+
 /** An autopilot run as the page and MCP receive it. */
 export interface AdStudioRunView {
   id: string;
   status: 'running' | 'awaiting_approval' | 'done' | 'failed' | 'cancelled';
-  options: { plan: boolean; images: boolean; imageFormats: AdStudioImageFormat[]; video: boolean; environmentId: string | null; confirmPlan: boolean };
-  steps: { id: 'plan' | 'script' | 'image_concepts' | 'images' | 'clips' | 'assemble'; status: 'pending' | 'running' | 'done' | 'skipped' | 'failed'; reason: string | null; progress: { done: number; total: number } | null }[];
+  options: {
+    plan: boolean;
+    images: boolean;
+    imageFormats: AdStudioImageFormat[];
+    video: boolean;
+    environmentId: string | null;
+    confirmPlan: boolean;
+    siteEnrich?: boolean;
+    search?: boolean;
+    target?: AdStudioRunViewTarget;
+    targetConceptId?: string | null;
+    siteUrl?: string | null;
+    instruction?: string | null;
+    notifyAlways?: boolean;
+  };
+  steps: { id: AdStudioRunViewStepId; status: 'pending' | 'running' | 'done' | 'skipped' | 'failed'; reason: string | null; progress: { done: number; total: number } | null }[];
   failureCode: string | null;
   failureMessage: string | null;
   startedOn: string;

@@ -39,8 +39,8 @@ describe('fillAdStudioBrandFromSite', () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="1200" height="600" fill="#5b4fe9"/></svg>');
     const fetchImpl = vi.fn(async () => new Response(svg, { status: 200, headers: { 'content-type': 'image/svg+xml' } }));
     const store = storage();
-    await fillAdStudioBrandFromSite(ctx, { businessName: 'EasySign', slogan: 'Sign anywhere', logoUrl: 'https://easysign.example/logo.svg' }, { storage: store, site: { fetchImpl: fetchImpl as never, resolver: publicResolver } });
-    expect(orm.setAdStudioBrandKit).toHaveBeenCalledWith(expect.objectContaining({ kit: expect.objectContaining({ brandName: 'EasySign', slogan: 'Sign anywhere' }), actorId: 'u' }));
+    await fillAdStudioBrandFromSite(ctx, { businessName: 'EasySign', slogan: 'Sign anywhere', toneOfVoice: 'Direct and clear', colors: ['#5B4FE9', 'bad', '#10b981'], logoUrl: 'https://easysign.example/logo.svg' }, { storage: store, site: { fetchImpl: fetchImpl as never, resolver: publicResolver } });
+    expect(orm.setAdStudioBrandKit).toHaveBeenCalledWith(expect.objectContaining({ kit: expect.objectContaining({ brandName: 'EasySign', slogan: 'Sign anywhere', toneOfVoice: 'Direct and clear', colors: ['#5b4fe9', '#10b981'] }), actorId: 'u' }));
     const [path, bytes, mime] = store.upload.mock.calls[0];
     expect(path).toMatch(/^orgs\/o\/projects\/p\/brand\/logo-\d+\.png$/);
     expect(mime).toBe('image/png');

@@ -47,6 +47,12 @@ const CATEGORY_BY_EVENT: Record<PushEventSource, Readonly<Record<string, PushCat
     run_awaiting_approval: 'approvals',
     run_done: 'ready',
     run_failed: 'failures',
+    video_done: 'ready',
+    video_failed: 'failures',
+    search_done: 'ready',
+    search_failed: 'failures',
+    images_done: 'ready',
+    images_failed: 'failures',
   },
 };
 

@@ -38,6 +38,7 @@ import { GET as latestRun, POST as startRun } from './briefs/[briefId]/autopilot
 import { POST as advanceRun } from './briefs/[briefId]/autopilot/[runId]/advance/route';
 import { POST as cancelRun } from './briefs/[briefId]/autopilot/[runId]/cancel/route';
 import { POST as approveRun } from './briefs/[briefId]/autopilot/[runId]/approve/route';
+import { POST as aiRevise } from './briefs/[briefId]/ai-revise/route';
 import { POST as publishAd } from './briefs/[briefId]/publish/route';
 
 const { getServerSessionMock, memoryStorage, concatClipsMock } = vi.hoisted(() => ({
@@ -72,7 +73,12 @@ beforeEach(() => {
     await copyFile(video, output);
     return { tempo: 1, seconds: 1, trimmed: false, clipSeconds: 5 };
   };
-  configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage, concatClips: concatClipsMock, mixNarration });
+  configureAdStudioRuntime({
+    mediaStorage: () => memoryStorage.current as MemoryStorage,
+    concatClips: concatClipsMock,
+    mixNarration,
+    siteReader: { resolver: async () => ['93.184.216.34'] },
+  });
   process.env.GEMINI_API_KEY = 'test-gemini-key';
   delete process.env.ANTHROPIC_API_KEY;
 });
@@ -110,10 +116,115 @@ function fakeGoogle(options: { imageStatus?: number; imageMessage?: string; qa?:
     calls.push({ url, body });
     if (url === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'ads-token', expires_in: 3600 });
     if (url === 'https://googleads.googleapis.com/v25/customers/1234567890/assets:mutate') return Response.json({ results: [{ resourceName: 'customers/1234567890/assets/77' }] });
+    if (url.startsWith('https://client-site.example')) {
+      return new Response(
+        '<!doctype html><html><head><title>Client Law</title><meta name="theme-color" content="#1e40af"><meta name="description" content="Online contract signing for law firms."></head><body><h1>Sign contracts fast</h1><p>Send contracts on WhatsApp and get legally binding signatures in seconds.</p></body></html>',
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      );
+    }
     expect(url.startsWith(BASE)).toBe(true);
     expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-gemini-key');
     if (url.endsWith(':generateContent')) {
       const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
+      if (schema.includes('"brandName"') && schema.includes('"currency"')) {
+        return Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      brandName: 'Client Law',
+                      slogan: 'Sign contracts fast',
+                      toneOfVoice: 'Direct and helpful',
+                      colors: ['#1e40af'],
+                      productDescription: 'Online contract signing platform for law firms via WhatsApp.',
+                      objective: 'Drive free trial signups from law firms',
+                      currency: 'ILS',
+                      timezone: 'Asia/Jerusalem',
+                      vertical: 'Legal Tech',
+                      voicePreset: 'woman_warm',
+                      language: 'en',
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      }
+      if (schema.includes('"messagingAngles"')) {
+        return Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      summary: 'Lead with instant WhatsApp contract signing.',
+                      audience: 'Small law firm partners',
+                      landingPageSummary: 'Online contract signing for law firms.',
+                      messagingAngles: ['No printing', 'Instant WhatsApp signing'],
+                      keywordThemes: [{ theme: 'esignature', keywords: ['online contract signing'], evidence: 'landing page' }],
+                      recommendations: [{ title: 'Highlight speed', rationale: 'Lawyers want fast signatures.', priority: 'high', evidence: [{ source: 'market', detail: 'High buyer urgency' }] }],
+                      marketNotes: ['Speed is a top buying factor'],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      }
+      if (schema.includes('"keywords"') && schema.includes('"negatives"') && !schema.includes('"headlines"')) {
+        return Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      keywords: [
+                        { text: 'online contract signing', matchType: 'PHRASE' },
+                        { text: 'digital signature software', matchType: 'EXACT' },
+                      ],
+                      negatives: ['free template'],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      }
+      if (schema.includes('"headlines"') && schema.includes('"descriptions"')) {
+        return Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      headlines: ['Online Contract Signing', 'Sign In 30 Seconds', 'Try Client Law Free', 'Built For Law Firms', 'No Printing Needed'],
+                      descriptions: [
+                        'Send contracts on WhatsApp and get legally binding signatures in seconds.',
+                        'Trusted by growing law firms. Start your free trial with zero setup today.',
+                      ],
+                      path1: 'sign',
+                      path2: 'trial',
+                      keywords: [
+                        { text: 'online contract signing', matchType: 'PHRASE' },
+                        { text: 'whatsapp contracts', matchType: 'PHRASE' },
+                      ],
+                      negatives: ['free pdf'],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        });
+      }
       if (schema.includes('"lines"')) {
         // The vocalizer: each line comes back with its nikud; the check then finds it right.
         const prompt = (body?.contents as { parts: { text: string }[] }[])[0].parts[0].text;
@@ -604,6 +715,78 @@ describe('autopilot routes', () => {
     expect(cancelled.status).toBe('cancelled');
     expect((await approveRun(request('POST'), ctx.p({ runId: run.id }))).status).toBe(409);
     expect(((await (await listImages(request('GET'), ctx.p())).json()) as ImagesPayload).images).toHaveLength(0);
+  });
+
+  it('enriches missing project/brief details from the target website, creates a targeted search ad, and supports ai-revise + activeRuns', async () => {
+    fakeGoogle();
+    const ctx = await setup();
+
+    const started = await startRun(
+      request('POST', {
+        options: {
+          target: 'search',
+          siteEnrich: true,
+          plan: true,
+          search: true,
+          images: false,
+          video: false,
+          confirmPlan: false,
+          notifyAlways: true,
+          siteUrl: 'https://client-site.example',
+        },
+      }),
+      ctx.p(),
+    );
+    expect(started.status).toBe(201);
+    const { run } = (await started.json()) as { run: AdStudioRunView };
+
+    // GET .../autopilot reports activeRuns while a card-targeted run is active.
+    const activeListing = (await (await latestRun(request('GET'), ctx.p())).json()) as { run: AdStudioRunView; activeRuns: AdStudioRunView[] };
+    expect(activeListing.activeRuns.some((r) => r.id === run.id)).toBe(true);
+
+    const finished = await drive(ctx, run.id);
+    expect(finished.status).toBe('done');
+    expect(finished.steps.map((s) => [s.id, s.status])).toEqual([
+      ['site_enrich', 'done'],
+      ['plan', 'done'],
+      ['search_keywords', 'done'],
+      ['search_ad', 'done'],
+    ]);
+
+    const enrichedBrief = await getAdStudioBrief(ctx.orgId, ctx.projectId, ctx.briefId);
+    expect(enrichedBrief.landing_page_url).toBe('https://client-site.example/');
+    expect(enrichedBrief.search_ad?.headlines).toContain('Online Contract Signing');
+    expect(enrichedBrief.search_keywords?.keywords.length).toBeGreaterThan(0);
+
+    // Inline AI revision validation + execution for search & video.
+    expect((await aiRevise(request('POST', { target: 'invalid', instruction: 'change it' }), ctx.p())).status).toBe(400);
+    expect((await aiRevise(request('POST', { target: 'search', instruction: '   ' }), ctx.p())).status).toBe(400);
+    expect((await aiRevise(request('POST', { target: 'image', instruction: 'warmer' }), ctx.p())).status).toBe(400);
+
+    const searchReviseRes = await aiRevise(
+      request('POST', { target: 'search', instruction: 'Highlight 24/7 support and free trial' }),
+      ctx.p(),
+    );
+    expect(searchReviseRes.status).toBe(201);
+    const searchReviseRun = ((await searchReviseRes.json()) as { run: AdStudioRunView }).run;
+    const searchReviseDone = await drive(ctx, searchReviseRun.id);
+    expect(searchReviseDone.status).toBe('done');
+    expect(searchReviseDone.steps.map((s) => s.id)).toContain('revise');
+
+    const videoReviseRes = await aiRevise(
+      request('POST', { target: 'video', instruction: 'Open with a busy law office scene' }),
+      ctx.p(),
+    );
+    expect(videoReviseRes.status).toBe(201);
+    const videoReviseRun = ((await videoReviseRes.json()) as { run: AdStudioRunView }).run;
+    const videoReviseDone = await drive(ctx, videoReviseRun.id);
+    expect(videoReviseDone.status).toBe('done');
+    expect(videoReviseDone.steps.map((s) => [s.id, s.status])).toEqual([
+      ['site_enrich', 'done'],
+      ['revise', 'done'],
+      ['clips', 'done'],
+      ['assemble', 'done'],
+    ]);
   });
 });
 

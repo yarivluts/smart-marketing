@@ -35,6 +35,7 @@ describe('push notification wording', () => {
     expect(pushLocale('fr')).toBe('en');
     expect(pushLocale(null)).toBe('en');
     expect(pushEventPath('he', { source: 'ad_studio', organizationId: 'o 1', projectId: 'p', briefId: null })).toBe('/he/orgs/o%201/projects/p/ad-studio');
+    expect(pushEventPath('en', { source: 'ad_studio', organizationId: 'o', projectId: 'p', briefId: 'b 1', item: 'image:c1' })).toBe('/en/orgs/o/projects/p/ad-studio?brief=b%201&step=review&item=image%3Ac1');
     expect(pushEventPath('en', { source: 'growth_pilot', organizationId: 'o', projectId: 'p', briefId: null })).toBe('/en/orgs/o/projects/p/growth-pilot');
     expect(pushEventPath('en', { source: 'growth_pilot', organizationId: 'o', projectId: 'p', briefId: null, targetId: 't 1' })).toBe('/en/orgs/o/projects/p/growth-pilot/targets/t%201');
     const test = await buildTestPayload('he');

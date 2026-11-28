@@ -80,6 +80,7 @@ import {
   buildTargetRevisionPrompt,
   DEFAULT_AD_STUDIO_NARRATION_MODE,
   extractLandingPageContent,
+  extractSiteColors,
   extractSiteLogoUrl,
   GROWTH_PILOT_MAX_PAGES,
   GROWTH_TARGET_KINDS,
@@ -175,8 +176,8 @@ export const GrowthAudienceDraftSchema = z.object({
 
 export const GrowthInterestChoiceSchema = z.object({ ids: z.array(z.string()).describe('The ids of the relevant interests, at most 8.') });
 
-/** The site as read: its pages, and where its logo most likely is (for the brand kit), or why it could not be read. */
-export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[]; logoUrl?: string | null } | { status: 'unavailable'; reason: string };
+/** The site as read: its pages, detected colors, and where its logo most likely is (for the brand kit), or why it could not be read. */
+export type GrowthSiteRead = { status: 'ok'; pages: GrowthSitePage[]; logoUrl?: string | null; colors?: string[] } | { status: 'unavailable'; reason: string };
 
 function toPage(url: string, html: string): GrowthSitePage | null {
   const page = extractLandingPageContent(html);
@@ -201,7 +202,7 @@ export async function readGrowthSite(siteUrl: string, deps: PlanningSourceDeps =
       return fetched.status === 'ok' ? toPage(fetched.url, fetched.html) : null;
     }),
   );
-  return { status: 'ok', pages: [first, ...more.filter((page): page is GrowthSitePage => page !== null)], logoUrl: extractSiteLogoUrl(home.html, home.url) };
+  return { status: 'ok', pages: [first, ...more.filter((page): page is GrowthSitePage => page !== null)], logoUrl: extractSiteLogoUrl(home.html, home.url), colors: extractSiteColors(home.html) };
 }
 
 /** A failure as a stable code the page words: the daily limit, a provider problem, or anything else. */

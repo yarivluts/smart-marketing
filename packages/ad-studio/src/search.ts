@@ -119,18 +119,12 @@ export const SearchAdSchema = z.object({
   path2: z.string().describe('At most 15 characters, no spaces.'),
 });
 
-/**
- * Writes the ad's responsive search ad in one metered text call (kind `search_ad`) from the brief,
- * the plan and the keywords it bids on, fits it to Google's limits and saves it - replacing the
- * saved one, so the page asks first when there is one.
- */
-export async function writeAdStudioSearchAd(ctx: AdStudioCallContext & { briefId: string }): Promise<AdStudioBriefModel> {
-  await ensureOrm();
-  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
-  const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
-  const prompt = buildSearchAdPrompt(await briefPromptInput(brief), brief.search_keywords?.keywords ?? [], context);
-  const written = await meteredCall(ctx, 'search_ad', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: SearchAdSchema }));
-  // Over-long headlines and descriptions are rewritten to fit rather than dropped or cut.
+/** Repairs over-length headlines and descriptions, fits Google RSA limits, and validates minimum counts. */
+export async function repairAndFitSearchAd(
+  ctx: AdStudioCallContext,
+  brief: Pick<AdStudioBriefModel, 'id' | 'language'>,
+  written: { headlines: readonly string[]; descriptions: readonly string[]; path1?: string; path2?: string },
+) {
   const repaired = await repairOverLength(ctx, 'search_ad', brief.id, brief.language, [
     ...written.headlines.map((text, index) => ({ id: `h${index}`, text, max: AD_STUDIO_RSA_HEADLINE_MAX })),
     ...written.descriptions.map((text, index) => ({ id: `d${index}`, text, max: AD_STUDIO_RSA_DESCRIPTION_MAX })),
@@ -144,6 +138,21 @@ export async function writeAdStudioSearchAd(ctx: AdStudioCallContext & { briefId
   if (ad.headlines.length < AD_STUDIO_RSA_HEADLINES.min || ad.descriptions.length < AD_STUDIO_RSA_DESCRIPTIONS.min) {
     throw new AdStudioProviderError('invalid_output', 'The model returned too few usable headlines or descriptions for a search ad.');
   }
+  return ad;
+}
+
+/**
+ * Writes the ad's responsive search ad in one metered text call (kind `search_ad`) from the brief,
+ * the plan and the keywords it bids on, fits it to Google's limits and saves it - replacing the
+ * saved one, so the page asks first when there is one.
+ */
+export async function writeAdStudioSearchAd(ctx: AdStudioCallContext & { briefId: string }): Promise<AdStudioBriefModel> {
+  await ensureOrm();
+  const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
+  const context = brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : {};
+  const prompt = buildSearchAdPrompt(await briefPromptInput(brief), brief.search_keywords?.keywords ?? [], context);
+  const written = await meteredCall(ctx, 'search_ad', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: SearchAdSchema }));
+  const ad = await repairAndFitSearchAd(ctx, brief, written);
   return saveAdStudioSearchAd({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id, ad, now: ctx.now });
 }
 

@@ -22,6 +22,10 @@ export interface ActivityEvent {
   count?: number | null;
   /** The Ad Studio brief the event is about, when it is about one. */
   briefId?: string | null;
+  /** Optional Review item deep-link (e.g. `video`, `search`, `images`, `image:<id>`). */
+  item?: string | null;
+  /** When true, browser push notifications are sent even for Growth Pilot briefs. */
+  forceNotify?: boolean;
   /** The Growth Pilot target the event is about, when it is about one (its notification opens the target's page). */
   targetId?: string | null;
 }
