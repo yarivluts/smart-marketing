@@ -56,7 +56,20 @@ describe('DecideAttachmentButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't record that decision. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Nothing was changed - your decision was not saved. Check your internet connection and try again.',
+    );
     expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says nothing was changed and re-enables the button when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Nothing was changed');
+    expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Reject' })).not.toBeDisabled();
   });
 });

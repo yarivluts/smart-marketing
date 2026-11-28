@@ -727,7 +727,7 @@
     "pendingRequestSummary": "{projectName} requests {resourceKind} \"{resourceName}\"",
     "approve": "Approve",
     "reject": "Reject",
-    "decideError": "Couldn't record that decision. Please try again.",
+    "decideError": "Nothing was changed - your decision was not saved. Check your internet connection and try again.",
     "pushToProject": "Push to project",
     "pushProjectLabel": "Project to push to",
     "pushScopeSelectionLabel": "Accounts to share (separate with commas)",
