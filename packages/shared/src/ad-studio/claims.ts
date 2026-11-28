@@ -30,14 +30,24 @@ const CLAIM_WORDS = [
 ];
 
 const NUMBER = /[$₪€£]?\d+(?:[.,]\d+)?\s?(?:%|₪|\$|€)?/gu;
+const HEBREW_HACHI = '\u05d4\u05db\u05d9';
 
 function digitsOf(token: string): string {
   return token.replace(/[^\d.,]/g, '').replace(/[.,]$/, '');
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function containsWord(haystack: string, word: string): boolean {
   if (/^[a-z# ]+$/i.test(word)) return new RegExp(`(^|[^a-z])${word.replace(/[#]/g, '\\#')}([^a-z]|$)`, 'i').test(haystack);
-  return haystack.includes(word);
+  if (word === HEBREW_HACHI) {
+    return new RegExp(`(?<![\\u0590-\\u05ff])[\\u05d5\\u05e9]?${escapeRegex(word)}(?![\\u0590-\\u05ff])`).test(haystack);
+  }
+  return new RegExp(
+    `(?<![\\u0590-\\u05ff])[\\u05d1\\u05d4\\u05d5\\u05db\\u05dc\\u05de\\u05e9]?${escapeRegex(word)}(?:\\u05ea|\\u05d9\\u05dd|\\u05d5\\u05ea)?(?![\\u0590-\\u05ff])`,
+  ).test(haystack);
 }
 
 /** The claims in `text` that none of `sources` contains, each once, in the order they appear. */

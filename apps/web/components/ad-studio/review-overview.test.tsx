@@ -398,5 +398,41 @@ describe('ReviewOverview', () => {
       fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
       await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/m/autopilot', expect.anything()));
     });
+
+    it('hides Start/Finish buttons on QA-only attention image and assembled video cards while keeping AI change and Open links', () => {
+      renderWithIntl(
+        <ReviewOverview
+          {...PROPS}
+          images={[
+            {
+              ...PROPS.images[0],
+              state: 'attention',
+              placements: [
+                { format: 'square', state: 'ready' },
+                { format: 'portrait', state: 'attention' },
+              ],
+            },
+          ]}
+          video={{
+            ...PROPS.video,
+            state: 'attention',
+            scenes: 5,
+            rendered: 5,
+            outOfDate: 0,
+            assembled: true,
+            assembledSeconds: 36.5,
+          }}
+        />,
+        { locale: 'en' },
+      );
+
+      expect(screen.queryByTestId('ad-studio-card-start-image-1')).toBeNull();
+      expect(screen.getByTestId('ad-studio-card-ai-toggle-image-1')).toBeEnabled();
+      expect(screen.getByTestId('ad-studio-creative-image-1-open')).toHaveAttribute('href', '/r?item=image:c1');
+
+      expect(screen.queryByTestId('ad-studio-card-start-video')).toBeNull();
+      expect(screen.getByTestId('ad-studio-card-ai-toggle-video')).toBeEnabled();
+      expect(screen.getByTestId('ad-studio-creative-video-open')).toHaveAttribute('href', '/r?item=video');
+    });
   });
 });
