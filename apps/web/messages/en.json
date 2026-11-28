@@ -429,6 +429,7 @@
     "kpiInvited": "Invitations out",
     "kpiAdmins": "Owners and admins",
     "noProjectsHint": "Create the first one, type your website, and GrowthOS proposes what to grow. You only approve.",
+    "noProjectsAskAdmin": "Ask an owner or admin of this organization to create the first project.",
     "groupData": "Your data",
     "groupCustomers": "Customers and signals",
     "groupAnalytics": "Analytics",

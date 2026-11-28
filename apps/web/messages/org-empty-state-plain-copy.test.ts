@@ -14,4 +14,9 @@ describe('organization page for a newcomer with no project yet', () => {
     expect(en.OrgDetailPage.groupData).not.toMatch(/pipeline/i);
     expect(he.OrgDetailPage.groupData).not.toContain('צנרת');
   });
+
+  it('tells someone who cannot create projects who to ask', () => {
+    expect(en.OrgDetailPage.noProjectsAskAdmin).toMatch(/ask an owner or admin/i);
+    expect(he.OrgDetailPage.noProjectsAskAdmin).toContain('בקשו');
+  });
 });
