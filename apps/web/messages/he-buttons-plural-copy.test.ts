@@ -14,7 +14,9 @@ describe('Hebrew buttons speak to everyone, like the rest of the app', () => {
 
   it('has no masculine-only singular save/create/add/delete/remove/edit buttons', () => {
     const bad = all.filter(
-      ([key, text]) => /(Button|Btn|Goal|Filter|Settings)$/.test(key) && /^(שמור|צור|הוסף|מחק|הסר|ערוך) /.test(text),
+      ([key, text]) =>
+        /(Button|Btn|Goal|Filter|Settings)$/.test(key) &&
+        /^(שמור|צור|הוסף|מחק|הסר|ערוך) /.test(text),
     );
     expect(bad).toEqual([]);
   });
@@ -34,5 +36,32 @@ describe('Hebrew bare Delete / Save buttons on customer groups and win rules', (
     expect(segments.deleteButton).toBe('מחקו');
     expect(segments.saveSegment).toBe('שמרו');
     expect(winRules.deleteRule).toBe('מחקו');
+  });
+});
+
+describe('Hebrew remove / cancel / edit / send / close buttons', () => {
+  const all: Array<[string, string]> = [];
+  collect(he, 'he', all);
+
+  it('are not bare masculine singular imperatives', () => {
+    const bad = all.filter(([, text]) =>
+      ['הסר', 'בטל', 'ערוך', 'שלח', 'סגור', 'בטל צימוד', 'המשך את האוטומציה'].includes(text),
+    );
+    expect(bad).toEqual([]);
+  });
+
+  it('use the plural forms', () => {
+    const texts = new Set(all.map(([, t]) => t));
+    for (const t of [
+      'הסירו',
+      'בטלו',
+      'ערכו',
+      'שלחו',
+      'סגרו',
+      'בטלו צימוד',
+      'המשיכו את האוטומציה',
+    ]) {
+      expect(texts.has(t)).toBe(true);
+    }
   });
 });
