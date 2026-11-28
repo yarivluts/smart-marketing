@@ -310,7 +310,7 @@ export default async function OrgDetailPage({
               compact
               icon={FolderKanban}
               title={t('noProjects')}
-              description={canManageProjects ? t('noProjectsHint') : undefined}
+              description={canManageProjects ? t('noProjectsHint') : t('noProjectsAskAdmin')}
             />
           ) : (
             <div className="flex flex-col gap-5">
