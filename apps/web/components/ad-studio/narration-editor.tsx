@@ -269,7 +269,7 @@ export function NarrationEditor({
               rows={3}
               value={draft.visualPrompt}
               onChange={(event) => setDraft({ ...draft, visualPrompt: event.target.value })}
-              dir="ltr"
+              dir="auto"
               className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
             />
             <span className="font-normal">{t('sceneHint')}</span>

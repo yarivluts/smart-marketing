@@ -28,6 +28,8 @@ describe('Ad Studio hints talk about "the AI", not "the video/image model"', () 
     it(`keeps the placeholders and the Hebrew-is-fine promise (${name})`, () => {
       expect(a.images.visualPromptHint).toMatch(name === 'en' ? /Any language works/ : /בעברית/);
       expect(a.visualPromptHint).toMatch(name === 'en' ? /Hebrew description/ : /בעברית/);
+      expect(a.narration.sceneHint).toMatch(name === 'en' ? /Any language works/ : /בעברית/);
+      expect(a.narration.sceneHint).not.toMatch(name === 'en' ? /^In English/i : /^באנגלית/);
     });
   }
 });
