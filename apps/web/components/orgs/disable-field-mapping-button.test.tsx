@@ -40,7 +40,17 @@ describe('DisableFieldMappingButton', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't disable this mapping. Please try again.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("The mapping was not turned off and is still in use. Check your internet connection and try again.");
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('says nothing changed when the connection drops', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('Failed to fetch'));
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disable' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The mapping was not turned off and is still in use. Check your internet connection and try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
 });
