@@ -727,7 +727,7 @@
     "pendingRequestSummary": "{projectName} מבקש/ת {resourceKind} \"{resourceName}\"",
     "approve": "אישור",
     "reject": "דחייה",
-    "decideError": "לא ניתן היה לשמור את ההחלטה. נסו שוב.",
+    "decideError": "דבר לא השתנה - ההחלטה שלכם לא נשמרה. בדקו את חיבור האינטרנט ונסו שוב.",
     "pushToProject": "צירוף לפרויקט",
     "pushProjectLabel": "פרויקט לצירוף",
     "pushScopeSelectionLabel": "חשבונות לשיתוף (מופרדים בפסיק)",
