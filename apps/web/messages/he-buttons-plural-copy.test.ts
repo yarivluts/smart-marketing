@@ -29,8 +29,8 @@ describe('Hebrew buttons speak to everyone, like the rest of the app', () => {
 
 describe('Hebrew bare Delete / Save buttons on customer groups and win rules', () => {
   it('speaks to everyone', () => {
-    const segments = he.Segments as Record<string, string>;
-    const winRules = he.WinRules as Record<string, string>;
+    const segments = he.Segments;
+    const winRules = he.WinRules;
     expect(segments.deleteButton).toBe('מחקו');
     expect(segments.saveSegment).toBe('שמרו');
     expect(winRules.deleteRule).toBe('מחקו');
